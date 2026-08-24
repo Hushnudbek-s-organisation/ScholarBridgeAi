@@ -7,6 +7,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "intl-messageformat": "11.2.13",
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3"

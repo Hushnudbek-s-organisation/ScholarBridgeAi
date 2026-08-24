@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { 
   GraduationCap, 
   Search, 
@@ -80,23 +81,26 @@ export function Navbar({
   onLogout,
   onLocaleChange,
 }: NavbarProps) {
+  const t = useTranslations("nav");
+  const tm = useTranslations("meta");
+
   const navItems = [
-    { id: "dashboard", label: "Dashboard & Audit", icon: LayoutDashboard },
-    { id: "universities", label: "University Explorer", icon: Search },
-    { id: "scholarships", label: "Scholarship Hub", icon: Award },
-    { id: "tracker", label: "My Applications", icon: GraduationCap },
+    { id: "dashboard", label: t("dashboard"), icon: LayoutDashboard },
+    { id: "universities", label: t("universities"), icon: Search },
+    { id: "scholarships", label: t("scholarships"), icon: Award },
+    { id: "tracker", label: t("tracker"), icon: GraduationCap },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
-    { id: "deadlines", label: "Deadlines", icon: CalendarClock, premium: true, hidden: true },
-    { id: "sop", label: "AI SOP & Essays", icon: FileText, premium: true },
-    { id: "tasks", label: "Tasks & Roadmap", icon: CheckSquare, premium: true },
-    { id: "chat", label: "AI Mentor", icon: Bot },
-    { id: "forum", label: "Community Forum", icon: MessagesSquare, premium: true },
+    { id: "deadlines", label: t("deadlines"), icon: CalendarClock, premium: true, hidden: true },
+    { id: "sop", label: t("sop"), icon: FileText, premium: true },
+    { id: "tasks", label: t("tasks"), icon: CheckSquare, premium: true },
+    { id: "chat", label: t("chat"), icon: Bot },
+    { id: "forum", label: t("forum"), icon: MessagesSquare, premium: true },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
-    { id: "courses", label: "Courses", icon: Video, premium: true, hidden: true },
-    { id: "payments", label: "Premium", icon: Crown },
-    { id: "rewards", label: "Rewards & Referrals", icon: Gift },
+    { id: "courses", label: t("courses"), icon: Video, premium: true, hidden: true },
+    { id: "payments", label: t("payments"), icon: Crown },
+    { id: "rewards", label: t("rewards"), icon: Gift },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
-    { id: "consulting", label: "Consulting", icon: Headset, hidden: true },
+    { id: "consulting", label: t("consulting"), icon: Headset, hidden: true },
   ];
 
   // Admin sees an extra management tab. Hidden items stay in the code but are
@@ -104,7 +108,7 @@ export function Navbar({
   const isAdmin = !!activeProfile?.isAdmin;
   const visibleItems = navItems.filter((item) => !item.hidden);
   const displayItems = isAdmin
-    ? [...visibleItems, { id: "admin", label: "Admin Panel", icon: Crown }]
+    ? [...visibleItems, { id: "admin", label: t("adminPanel"), icon: Crown, premium: false, hidden: false }]
     : visibleItems;
 
   const Logo = (
@@ -113,18 +117,18 @@ export function Navbar({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png"
-          alt="ScholarBridge Logo"
+          alt={t("logoAlt")}
           className="h-9 w-9 object-cover"
         />
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="font-bold text-lg tracking-tight text-slate-900 truncate">ScholarBridge</span>
+          <span className="font-bold text-lg tracking-tight text-slate-900 truncate">{tm("appName")}</span>
           <span className="hidden xl:inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
             <Sparkles className="h-2.5 w-2.5 text-indigo-600" /> AI
           </span>
         </div>
-        <p className="text-[10px] text-slate-500 truncate hidden sm:block">Global Admissions & Scholarship Discovery</p>
+        <p className="text-[10px] text-slate-500 truncate hidden sm:block">{tm("tagline")}</p>
       </div>
     </div>
   );
@@ -139,7 +143,7 @@ export function Navbar({
       >
         <User className="h-4 w-4 text-slate-500 shrink-0" />
         <span className="truncate text-xs font-semibold text-slate-800">
-          {activeProfile?.name || "No profile"}
+          {activeProfile?.name || t("noProfile")}
         </span>
         {isAdmin && (
           <ShieldCheck className="h-3.5 w-3.5 text-slate-700 shrink-0" />
@@ -149,9 +153,9 @@ export function Navbar({
         <button
           onClick={onSwitchProfile}
           className="shrink-0 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1.5 rounded-lg border border-indigo-200 transition-colors"
-          title="Sign in / switch account"
+          title={t("switchAccountTitle")}
         >
-          {activeProfile ? "Switch" : "Sign in"}
+          {activeProfile ? t("switch") : t("signIn")}
         </button>
       )}
     </div>
@@ -216,7 +220,7 @@ export function Navbar({
 
         {/* Bottom: profile switcher + actions */}
         <div className="px-4 py-4 border-t border-slate-100 space-y-2.5">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Student profile</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">{t("studentProfile")}</p>
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">{ProfileChip}</div>
             <NotificationBell profileId={activeProfileId ?? null} />
@@ -226,14 +230,14 @@ export function Navbar({
               onClick={() => onOpenProfileModal(false)}
               className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-2 rounded-lg border border-indigo-200 transition-colors"
             >
-              Edit Profile
+              {t("editProfile")}
             </button>
             <button
               onClick={onStartOnboarding ?? (() => onOpenProfileModal(true))}
               className="flex items-center justify-center gap-1 text-[11px] font-bold text-slate-600 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 px-2.5 py-2 rounded-lg border border-slate-200 transition-colors"
-              title="Add New Profile"
+              title={t("addNewTitle")}
             >
-              <Plus className="h-3 w-3" /> Add New
+              <Plus className="h-3 w-3" /> {t("addNew")}
             </button>
           </div>
           {onLogout && (
@@ -241,7 +245,7 @@ export function Navbar({
               onClick={onLogout}
               className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-2 rounded-lg border border-red-200 transition-colors"
             >
-              <LogOut className="h-3 w-3" /> Chiqish (Logout)
+              <LogOut className="h-3 w-3" /> {t("logout")}
             </button>
           )}
           <div className="pt-1">
@@ -260,12 +264,12 @@ export function Navbar({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png"
-                  alt="ScholarBridge Logo"
+                  alt={t("logoAlt")}
                   className="h-8 w-8 object-cover"
                 />
               </div>
               <span className="font-bold text-base tracking-tight text-slate-900 truncate">
-                ScholarBridge
+                {tm("appName")}
               </span>
             </button>
 
@@ -275,15 +279,15 @@ export function Navbar({
               <button
                 onClick={onSwitchProfile}
                 className="flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-2 rounded-lg border border-indigo-200"
-                title="Sign in / switch account"
+                title={t("switchAccountTitle")}
               >
                 <User className="h-3 w-3" />
-                {activeProfile ? "Switch" : "Sign in"}
+                {activeProfile ? t("switch") : t("signIn")}
               </button>
               <button
                 onClick={onStartOnboarding ?? (() => onOpenProfileModal(true))}
                 className="p-2 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 rounded-lg"
-                title="Add New Profile"
+                title={t("addNewTitle")}
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -304,7 +308,7 @@ export function Navbar({
                 onClick={() => onOpenProfileModal(false)}
                 className="text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1.5 rounded-lg border border-indigo-200 shrink-0"
               >
-                Edit
+                {t("edit")}
               </button>
             </div>
           )}
