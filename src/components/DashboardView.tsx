@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
   Sparkles, 
@@ -36,6 +37,7 @@ export function DashboardView({
   taskCount,
   onEditProfile,
 }: DashboardViewProps) {
+  const t = useTranslations("dashboard");
   const [aiEvaluation, setAiEvaluation] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   // Real scholarship match count (fetched, never a hardcoded claim).
@@ -67,7 +69,7 @@ export function DashboardView({
   if (!profile) {
     return (
       <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
-        <p className="text-slate-600 font-medium">No profile selected. Please select or create a profile above.</p>
+        <p className="text-slate-600 font-medium">{t("noProfileSelected")}</p>
       </div>
     );
   }
@@ -114,12 +116,12 @@ export function DashboardView({
   // Score-based tier label (deterministic, not AI).
   const admissionTier =
     compositeScore >= 85
-      ? "Top Tier Candidate"
+      ? t("tierTop")
       : compositeScore >= 70
-      ? "Competitive Global Tier"
+      ? t("tierCompetitive")
       : compositeScore >= 55
-      ? "Developing Profile"
-      : "Needs Strengthening";
+      ? t("tierDeveloping")
+      : t("tierNeeds");
 
   let preferredCountriesList: string[] = ["United States", "United Kingdom", "Canada"];
   try {
@@ -141,27 +143,34 @@ export function DashboardView({
           <div className="lg:col-span-2 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-indigo-200 border border-white/10 text-xs font-semibold backdrop-blur-md">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              Active Applicant: {profile.name}
+              {t("activeApplicant", { name: profile.name })}
             </div>
             
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Global Admissions & Scholarship Discovery Hub
+              {t("heroTitle")}
             </h1>
             
             <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
-              Matching your academic credentials (**GPA {profile.gpa}/{profile.gpaScale}**, {profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : "Test Prep Active"}) for **{profile.degreeLevel} in {profile.targetMajor}** across top universities in {preferredCountriesList.slice(0, 3).join(", ")}.
+              {t("heroBody", {
+                gpa: profile.gpa,
+                scale: profile.gpaScale,
+                test: profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : t("testPrepActive"),
+                degree: profile.degreeLevel,
+                major: profile.targetMajor,
+                countries: preferredCountriesList.slice(0, 3).join(", "),
+              })}
             </p>
 
             {/* Quick Metrics Badges */}
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium border border-white/10">
-                🎓 Level: <strong className="text-white">{profile.degreeLevel}</strong>
+                🎓 {t("levelBadge")}: <strong className="text-white">{profile.degreeLevel}</strong>
               </span>
               <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium border border-white/10">
-                💰 Budget Limit: <strong className="text-emerald-300">${profile.budgetAnnualUsd?.toLocaleString()}/yr</strong>
+                💰 {t("budgetBadge")}: <strong className="text-emerald-300">${profile.budgetAnnualUsd?.toLocaleString()}{t("perYear")}</strong>
               </span>
               <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium border border-white/10">
-                🏆 Pubs/Work: <strong className="text-amber-300">{profile.researchPublications || 0} Pubs • {profile.workExperienceYears || 0} yrs Exp</strong>
+                🏆 {t("pubsBadge")}: <strong className="text-amber-300">{profile.researchPublications || 0} {t("pubsUnit")} • {profile.workExperienceYears || 0} {t("yrsUnit")}</strong>
               </span>
             </div>
           </div>
@@ -169,7 +178,7 @@ export function DashboardView({
           {/* Readiness Score Card */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/15 text-center flex flex-col items-center justify-center space-y-3">
             <div className="text-xs font-semibold tracking-wider text-indigo-200 uppercase">
-              Admissions Index
+              {t("admissionsIndex")}
             </div>
 
             <div className="relative flex items-center justify-center">
@@ -189,7 +198,7 @@ export function DashboardView({
               className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-900 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
             >
               <Bot className="h-4 w-4" />
-              {isEvaluating ? "Analyzing Profile..." : "Run Gemini AI Audit"}
+              {isEvaluating ? t("analyzing") : t("runAudit")}
             </button>
           </div>
         </div>
@@ -202,13 +211,13 @@ export function DashboardView({
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Shortlisted Programs</span>
+            <span className="text-xs font-semibold">{t("statShortlisted")}</span>
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
               <GraduationCap className="h-4 w-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">{savedUniCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Universities in tracker</p>
+          <p className="text-[11px] text-slate-500 mt-1">{t("statShortlistedSub")}</p>
         </div>
 
         <div 
@@ -216,13 +225,13 @@ export function DashboardView({
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Scholarships Tracked</span>
+            <span className="text-xs font-semibold">{t("statScholarships")}</span>
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
               <Award className="h-4 w-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">{savedScholarshipCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Saved aid programs</p>
+          <p className="text-[11px] text-slate-500 mt-1">{t("statScholarshipsSub")}</p>
         </div>
 
         <div 
@@ -230,13 +239,13 @@ export function DashboardView({
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Pending Milestones</span>
+            <span className="text-xs font-semibold">{t("statMilestones")}</span>
             <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-colors">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">{taskCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Application tasks pending</p>
+          <p className="text-[11px] text-slate-500 mt-1">{t("statMilestonesSub")}</p>
         </div>
 
         <div 
@@ -244,13 +253,13 @@ export function DashboardView({
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">AI SOP & Review Studio</span>
+            <span className="text-xs font-semibold">{t("statSop")}</span>
             <div className="p-2 bg-purple-50 text-purple-600 rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
               <FileText className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">Ready</div>
-          <p className="text-[11px] text-slate-500 mt-1">Draft or evaluate essay</p>
+          <div className="text-2xl font-bold text-slate-900">{t("statSopReady")}</div>
+          <p className="text-[11px] text-slate-500 mt-1">{t("statSopSub")}</p>
         </div>
       </div>
 
@@ -260,13 +269,13 @@ export function DashboardView({
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg">
               <Bot className="h-5 w-5" />
-              ScholarBridge Gemini AI Strategic Evaluation
+              {t("aiReportTitle")}
             </div>
             <button
               onClick={() => setAiEvaluation(null)}
               className="text-xs text-slate-400 hover:text-slate-600 font-semibold"
             >
-              Close Report
+              {t("closeReport")}
             </button>
           </div>
 
@@ -284,37 +293,37 @@ export function DashboardView({
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <Compass className="h-5 w-5 text-indigo-600" />
-                University Portfolio Strategy (3-2-1 Rule)
+                {t("portfolioTitle")}
               </h2>
               <button
                 onClick={() => onNavigateTab("universities")}
                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
               >
-                Explore All <ArrowRight className="h-3.5 w-3.5" />
+                {t("exploreAll")} <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
 
             <p className="text-xs text-slate-600">
-              Admissions counselors recommend building a balanced portfolio across Reach, Match, and Safety tiers:
+              {t("portfolioIntro")}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-purple-700 uppercase">🚀 Reach (20-30%)</span>
-                <div className="text-sm font-bold text-purple-900">MIT, Oxford, ETH Zurich</div>
-                <p className="text-[11px] text-purple-700">Aspirational top-10 world institutions.</p>
+                <span className="text-[10px] font-bold tracking-wider text-purple-700 uppercase">{t("reachLabel")}</span>
+                <div className="text-sm font-bold text-purple-900">{t("reachExamples")}</div>
+                <p className="text-[11px] text-purple-700">{t("reachText")}</p>
               </div>
 
               <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-blue-700 uppercase">🎯 Match (50-60%)</span>
-                <div className="text-sm font-bold text-blue-900">TUM, U of Toronto, NUS</div>
-                <p className="text-[11px] text-blue-700">Highest statistical acceptance likelihood.</p>
+                <span className="text-[10px] font-bold tracking-wider text-blue-700 uppercase">{t("matchLabel")}</span>
+                <div className="text-sm font-bold text-blue-900">{t("matchExamples")}</div>
+                <p className="text-[11px] text-blue-700">{t("matchText")}</p>
               </div>
 
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-emerald-700 uppercase">🛡️ Safety (10-20%)</span>
-                <div className="text-sm font-bold text-emerald-900">U of Melbourne, UBC</div>
-                <p className="text-[11px] text-emerald-700">Guaranteed admission & funding backups.</p>
+                <span className="text-[10px] font-bold tracking-wider text-emerald-700 uppercase">{t("safetyLabel")}</span>
+                <div className="text-sm font-bold text-emerald-900">{t("safetyExamples")}</div>
+                <p className="text-[11px] text-emerald-700">{t("safetyText")}</p>
               </div>
             </div>
           </div>
@@ -329,11 +338,11 @@ export function DashboardView({
                 <FileText className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-base">Statement of Purpose Generator</h3>
-                <p className="text-xs text-indigo-100 mt-1">Draft a university-specific SOP tailored to your GPA, research, and career goals in seconds.</p>
+                <h3 className="font-bold text-base">{t("sopToolTitle")}</h3>
+                <p className="text-xs text-indigo-100 mt-1">{t("sopToolText")}</p>
               </div>
               <div className="text-xs font-bold inline-flex items-center gap-1 text-amber-300">
-                Launch SOP Studio <ArrowRight className="h-3.5 w-3.5" />
+                {t("sopToolCta")} <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </div>
 
@@ -345,11 +354,11 @@ export function DashboardView({
                 <Bot className="h-5 w-5 text-amber-300" />
               </div>
               <div>
-                <h3 className="font-bold text-base">ScholarBridge AI Chat Mentor</h3>
-                <p className="text-xs text-slate-300 mt-1">Ask any questions regarding visas (OPT, PGWP, Job Seeker), GRE waivers, or cost of living.</p>
+                <h3 className="font-bold text-base">{t("chatToolTitle")}</h3>
+                <p className="text-xs text-slate-300 mt-1">{t("chatToolText")}</p>
               </div>
               <div className="text-xs font-bold inline-flex items-center gap-1 text-amber-300">
-                Open AI Chat <ArrowRight className="h-3.5 w-3.5" />
+                {t("chatToolCta")} <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </div>
           </div>
@@ -360,35 +369,35 @@ export function DashboardView({
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
-              Profile Health Checklist
+              {t("checklistTitle")}
             </h3>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-medium text-slate-700">Academic Transcript GPA</span>
+                <span className="font-medium text-slate-700">{t("checkGpa")}</span>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
                   {profile.gpa} / {profile.gpaScale}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-medium text-slate-700">Language Proficiency</span>
+                <span className="font-medium text-slate-700">{t("checkLanguage")}</span>
                 <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
-                  {profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : profile.toeflScore ? `TOEFL ${profile.toeflScore}` : "Pending"}
+                  {profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : profile.toeflScore ? `TOEFL ${profile.toeflScore}` : t("pending")}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-medium text-slate-700">Annual Tuition Budget</span>
+                <span className="font-medium text-slate-700">{t("checkBudget")}</span>
                 <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
                   ${profile.budgetAnnualUsd?.toLocaleString()}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-medium text-slate-700">Publications & Experience</span>
+                <span className="font-medium text-slate-700">{t("checkPubs")}</span>
                 <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold">
-                  {profile.researchPublications || 0} Pubs • {profile.workExperienceYears || 0} yrs
+                  {profile.researchPublications || 0} {t("pubsUnit")} • {profile.workExperienceYears || 0} {t("yrsShort")}
                 </span>
               </div>
             </div>
@@ -397,25 +406,25 @@ export function DashboardView({
               onClick={onEditProfile}
               className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
             >
-              Update Credentials
+              {t("updateCredentials")}
             </button>
           </div>
 
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              Scholarship Match Guarantee
+              {t("guaranteeTitle")}
             </div>
             <p className="text-xs text-emerald-800 leading-relaxed">
               {scholarshipMatchCount != null
-                ? `Based on your profile, ${scholarshipMatchCount} scholarship${scholarshipMatchCount === 1 ? "" : "s"} currently match your credentials — open the Scholarship Hub to compare them.`
-                : "Scholarship matches are calculated from your profile — open the Scholarship Hub to see how many fit your credentials."}
+                ? t("guaranteeWithCount", { count: scholarshipMatchCount })
+                : t("guaranteeNoCount")}
             </p>
             <button
               onClick={() => onNavigateTab("scholarships")}
               className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors"
             >
-              View Eligible Scholarships
+              {t("viewEligible")}
             </button>
           </div>
         </div>
