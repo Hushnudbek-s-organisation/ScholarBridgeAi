@@ -38,6 +38,7 @@ import { logRunStart, logRunFinish, buildReport } from "./audit";
 import { normalizeNameKey, normalizeUrl, toNumber, normalizeCurrency, toIsoDate } from "./normalize";
 import { isResearchSourceUrl, rejectSourceReason } from "./urlFilter";
 import { createAIProvider } from "./ai/openrouter";
+import { resolveProviderCredential } from "@/lib/ai/credentials";
 import { validateAIEvidence, aiEvidenceToSourceEvidence } from "./ai/validate";
 import { decideFinalClassification } from "./ai/decide";
 import { hasContentEvidenceFor } from "./extract";
@@ -75,7 +76,12 @@ export async function runUniversity(
   const evidence: SourceEvidence[] = [];
   // AI provider (server-side only) — deterministic rules run first; AI is a
   // fallback/assist and NEVER auto-verifies anything (spec §2, §3, §14).
-  const aiProvider: AIProvider = createAIProvider();
+  // The OpenRouter key/model resolve from the admin panel (DB) with env fallback.
+  const aiCreds = await resolveProviderCredential("openrouter");
+  const aiProvider: AIProvider = createAIProvider({
+    apiKey: aiCreds.apiKey,
+    model: aiCreds.model,
+  });
   const aiSession = {
     status: (aiProvider.available ? "available" : "unavailable") as "available" | "unavailable",
     provider: aiProvider.name,

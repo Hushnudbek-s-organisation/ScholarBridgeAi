@@ -2,13 +2,27 @@
  * AI provider abstraction (spec §12, §13, §15).
  *
  * Each provider adapter implements the same interface. The router picks a
- * provider per TASK from environment configuration:
- *   AI_PROVIDER_ADMISSIONS | AI_PROVIDER_ESSAY | AI_PROVIDER_GENERAL |
- *   AI_PROVIDER_SEARCH | AI_PROVIDER_DOCUMENT_ANALYSIS
- * (fallback: AI_PROVIDER_DEFAULT, then "openrouter").
+ * provider per TASK with this priority:
+ *   1. admin panel (app_config: ai_provider_<task>, ai_default_provider)
+ *   2. environment: AI_PROVIDER_ADMISSIONS | AI_PROVIDER_ESSAY |
+ *      AI_PROVIDER_GENERAL | AI_PROVIDER_SEARCH | AI_PROVIDER_DOCUMENT_ANALYSIS
+ *   3. default "openrouter"
+ * API keys resolve the same way: admin panel credential (encrypted in DB) →
+ * env (OPENROUTER_API_KEY | OPENAI_API_KEY | ANTHROPIC_API_KEY | GEMINI_API_KEY).
  *
  * All API keys stay server-side. No provider-specific logic in the frontend.
  */
+import {
+  DEFAULT_PROVIDER_CONFIG_KEY,
+  resolveCredential,
+  resolveProviderForTask,
+  taskProviderConfigKey,
+} from "./settings";
+import { getConfig } from "@/lib/config";
+import { resolveProviderCredential } from "./credentials";
+
+export { TASK_PROVIDER_ENV } from "./settings";
+export type { AIProviderId, AITaskId, PublicCredential, ResolvedCredential } from "./settings";
 
 export interface AIProviderConfig {
   apiKey?: string;
@@ -198,37 +212,44 @@ export const PROVIDERS: Record<AIProviderName, AIProviderAdapter> = {
 // Task → provider mapping (spec §12)
 // ---------------------------------------------------------------------------
 
-export const TASK_PROVIDER_ENV: Record<string, string> = {
-  admissions: "AI_PROVIDER_ADMISSIONS",
-  essay: "AI_PROVIDER_ESSAY",
-  general: "AI_PROVIDER_GENERAL",
-  search: "AI_PROVIDER_SEARCH",
-  document: "AI_PROVIDER_DOCUMENT_ANALYSIS",
-};
-
 export function providerForTask(taskType: string): { name: AIProviderName; apiKey?: string; model?: string } {
-  const envKey = TASK_PROVIDER_ENV[taskType] || "AI_PROVIDER_GENERAL";
-  const name = (process.env[envKey] || process.env.AI_PROVIDER_DEFAULT || "openrouter").toLowerCase();
-  const providerName: AIProviderName = name in PROVIDERS ? (name as AIProviderName) : "openrouter";
+  const name = resolveProviderForTask(taskType, {}, process.env);
+  const cfg = resolveCredential(name, null, process.env);
+  return { name, apiKey: cfg.apiKey, model: cfg.model };
+}
 
-  const apiKeyEnv: Record<AIProviderName, string> = {
-    openrouter: "OPENROUTER_API_KEY",
-    openai: "OPENAI_API_KEY",
-    anthropic: "ANTHROPIC_API_KEY",
-    gemini: "GEMINI_API_KEY",
-  };
-  const modelEnv: Record<AIProviderName, string> = {
-    openrouter: "OPENROUTER_MODEL",
-    openai: "OPENAI_MODEL",
-    anthropic: "ANTHROPIC_MODEL",
-    gemini: "GEMINI_MODEL",
-  };
+/**
+ * Runtime provider resolution for one task — priority:
+ *   1. admin panel (app_config `ai_provider_<task>`, `ai_default_provider`)
+ *   2. env (AI_PROVIDER_<TASK>, AI_PROVIDER_DEFAULT)
+ *   3. default "openrouter"
+ * API key + model come from the provider's credential (DB → env).
+ */
+export async function resolveRuntimeProvider(
+  taskType: string
+): Promise<{ name: AIProviderName; apiKey?: string; apiKeySource: "db" | "env" | "none"; model?: string }> {
+  const dbProviders: Record<string, string> = {};
+  try {
+    const defaultProvider = await getConfig("ai_default_provider");
+    if (defaultProvider) dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] = defaultProvider;
+    const taskProvider = await getConfig(taskProviderConfigKey(taskType));
+    if (taskProvider) dbProviders[taskProviderConfigKey(taskType)] = taskProvider;
+  } catch {
+    // DB unavailable — env/default only, the app keeps working.
+  }
 
-  return {
-    name: providerName,
-    apiKey: process.env[apiKeyEnv[providerName]],
-    model: process.env[modelEnv[providerName]],
-  };
+  const name = resolveProviderForTask(taskType, dbProviders, process.env);
+  const cfg = await resolveProviderCredential(name);
+  return { name, apiKey: cfg.apiKey, apiKeySource: cfg.apiKeySource, model: cfg.model };
+}
+
+/**
+ * Whether the task's resolved provider has a usable API key (DB or env).
+ * Used by callers that want a cheap gate before invoking AI.
+ */
+export async function isAiConfigured(taskType: string): Promise<boolean> {
+  const runtime = await resolveRuntimeProvider(taskType);
+  return Boolean(runtime.apiKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +258,7 @@ export function providerForTask(taskType: string): { name: AIProviderName; apiKe
 
 export async function aiGenerate(req: AIRequest): Promise<AIResponse | null> {
   const taskType = req.taskType || "general";
-  const providerCfg = providerForTask(taskType);
+  const providerCfg = await resolveRuntimeProvider(taskType);
   const adapter = PROVIDERS[providerCfg.name];
 
   try {
@@ -248,12 +269,15 @@ export async function aiGenerate(req: AIRequest): Promise<AIResponse | null> {
     if (response) return response;
 
     // Provider fallback (spec §16): try openrouter if it isn't the primary.
-    if (providerCfg.name !== "openrouter" && process.env.OPENROUTER_API_KEY) {
-      const fb = await PROVIDERS.openrouter.call(req, {
-        apiKey: process.env.OPENROUTER_API_KEY,
-        model: process.env.OPENROUTER_MODEL,
-      });
-      if (fb) return { ...fb, provider: `${fb.provider}:fallback` };
+    if (providerCfg.name !== "openrouter") {
+      const fbCred = await resolveProviderCredential("openrouter");
+      if (fbCred.apiKey) {
+        const fb = await PROVIDERS.openrouter.call(req, {
+          apiKey: fbCred.apiKey,
+          model: fbCred.model,
+        });
+        if (fb) return { ...fb, provider: `${fb.provider}:fallback` };
+      }
     }
     return null;
   } catch (err) {
