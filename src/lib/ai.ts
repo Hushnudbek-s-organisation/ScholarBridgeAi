@@ -6,6 +6,8 @@
 import { aiGenerate } from "@/lib/ai/index";
 import { logAIUsage } from "@/lib/ai/usage";
 
+export { isAiConfigured } from "@/lib/ai/index";
+
 export async function callAI(
   prompt: string,
   systemInstruction?: string,

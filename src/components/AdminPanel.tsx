@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
@@ -10,6 +10,7 @@ import { ScholarshipsManager } from "./admin/ScholarshipsManager";
 import { PremiumManager } from "./admin/PremiumManager";
 import { AuditLogViewer } from "./admin/AuditLogViewer";
 import { ConfigManager } from "./admin/ConfigManager";
+import { AiSettingsManager } from "./admin/AiSettingsManager";
 import { RefreshCenter } from "./admin/RefreshCenter";
 import { VerificationManager } from "./admin/VerificationManager";
 import { ConsultingManager } from "./admin/ConsultingManager";
@@ -38,7 +39,7 @@ interface AdminPanelProps {
   activeProfile: StudentProfile | null;
 }
 
-type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "premium" | "audit" | "refresh" | "config" | "verify" | "consulting" | "reports" | "research";
+type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research";
 
 export function AdminPanel({ activeProfile }: AdminPanelProps) {
   const [tab, setTab] = useState<AdminTab>("universities");
@@ -58,6 +59,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
     { id: "reports", label: "Reports", icon: <Flag className="h-4 w-4" /> },
     { id: "consulting", label: "Consulting", icon: <Headset className="h-4 w-4" /> },
     { id: "research", label: "Research Agent", icon: <Bot className="h-4 w-4" /> },
+    { id: "ai", label: "AI Settings", icon: <KeyRound className="h-4 w-4" /> },
     { id: "refresh", label: "Data Refresh", icon: <RefreshCw className="h-4 w-4" /> },
     { id: "config", label: "Settings", icon: <Settings2 className="h-4 w-4" /> },
   ];
@@ -116,6 +118,9 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       )}
       {tab === "config" && (
         <ErrorBoundary><ConfigManager adminProfileId={activeProfile.id} /></ErrorBoundary>
+      )}
+      {tab === "ai" && (
+        <ErrorBoundary><AiSettingsManager adminProfileId={activeProfile.id} /></ErrorBoundary>
       )}
       {tab === "verify" && (
         <ErrorBoundary><VerificationManager adminProfileId={activeProfile.id} /></ErrorBoundary>

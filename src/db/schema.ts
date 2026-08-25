@@ -408,6 +408,20 @@ export const appConfig = pgTable("app_config", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+/**
+ * AI provider credentials managed from the admin panel (spec §12, §16).
+ * API keys are stored ENCRYPTED (AES-256-GCM, "enc:v1:" prefix) — the raw key
+ * is only ever decrypted server-side for the duration of a request and is
+ * never returned by any API. `model` overrides the provider's default model.
+ */
+export const aiProviderCredentials = pgTable("ai_provider_credentials", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().unique(), // openrouter | openai | anthropic | gemini
+  apiKeyEnc: text("api_key_enc"), // encrypted payload, never plaintext
+  model: text("model"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 /** Audit / change history for scholarships & universities (spec §11). */
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
