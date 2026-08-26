@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const systemInstruction = `${languageInstruction}You are ScholarBridge AI, an expert, encouraging, and knowledgeable study-abroad counselor.
+    const systemInstruction = `${languageInstruction}You are ScholarBridgeAI, an expert, encouraging, and knowledgeable study-abroad counselor.
 You guide students on international university selection, scholarships (Fulbright, Chevening, DAAD, Erasmus, etc.), SOP writing, LOR requests, IELTS/GRE strategy, post-study work visas (OPT, PGWP, UK Graduate Visa, Germany Job Seeker), and financial proof.
 Be concise, practical, well-formatted with markdown lists, bold text, and clear bullet points.
 ${profileContext}`;
@@ -40,7 +40,7 @@ ${profileContext}`;
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       historyText = chatHistory
         .slice(-6)
-        .map((h: { sender: string; text: string }) => `${h.sender === "user" ? "User" : "ScholarBridge AI"}: ${h.text}`)
+        .map((h: { sender: string; text: string }) => `${h.sender === "user" ? "User" : "ScholarBridgeAI"}: ${h.text}`)
         .join("\n");
     }
 
@@ -89,7 +89,7 @@ To write a compelling Statement of Purpose that stands out to committee members:
 
 Need help generating a draft? Use our **AI SOP Assistant** in the main menu!`;
       } else {
-        reply = `### 🎓 ScholarBridge AI Guidance
+        reply = `### 🎓 ScholarBridgeAI Guidance
 
 Thank you for your question regarding **"${message}"**!
 

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    const prompt = `You are ScholarBridge AI, an elite international admissions counselor and scholarship evaluator. Analyze the following student profile and produce a detailed, highly strategic evaluation.
+    const prompt = `You are ScholarBridgeAI, an elite international admissions counselor and scholarship evaluator. Analyze the following student profile and produce a detailed, highly strategic evaluation.
 IMPORTANT: Write the ENTIRE evaluation in ${localeToLanguageName(profile.preferredLocale || "en")}. Translate section headings, bullet points, and recommendations into this language.
 
 STUDENT PROFILE DATA:

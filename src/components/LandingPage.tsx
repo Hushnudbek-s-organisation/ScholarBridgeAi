@@ -117,10 +117,21 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               <CheckCircle2 className="h-4 w-4 text-emerald-300" /> {t("benefit3")}
             </span>
           </div>
+          <p className="mt-6 text-[11px] text-indigo-200">
+            By continuing, you agree to our{" "}
+            <a href="/terms" className="underline hover:text-white">
+              Terms
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="underline hover:text-white">
+              Privacy Policy
+            </a>
+            .
+          </p>
           {onEnterApp && (
             <button
               onClick={onEnterApp}
-              className="mt-6 text-xs font-semibold text-indigo-200 underline-offset-4 hover:text-white hover:underline transition-colors"
+              className="mt-4 text-xs font-semibold text-indigo-200 underline-offset-4 hover:text-white hover:underline transition-colors"
             >
               {t("enterApp")}
             </button>
@@ -213,7 +224,17 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
       {/* ===== Footer ===== */}
       <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} {t("footerLeft")}</p>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <p>© {new Date().getFullYear()} {t("footerLeft")}</p>
+            <div className="flex items-center gap-3">
+              <a href="/terms" className="hover:text-slate-700 underline underline-offset-4">
+                Terms
+              </a>
+              <a href="/privacy" className="hover:text-slate-700 underline underline-offset-4">
+                Privacy
+              </a>
+            </div>
+          </div>
           <p className="text-slate-400">{t("footerRight")}</p>
         </div>
       </footer>

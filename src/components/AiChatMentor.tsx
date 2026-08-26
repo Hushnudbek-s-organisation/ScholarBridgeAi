@@ -30,7 +30,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
     {
       id: "1",
       sender: "ai",
-      text: `Hello ${activeProfile?.name || "there"}! I'm **ScholarBridge AI**, your global study counselor. 
+      text: `Hello ${activeProfile?.name || "there"}! I'm **ScholarBridgeAI**, your global study counselor. 
 
 I'm aware of your profile (**${activeProfile?.degreeLevel} in ${activeProfile?.targetMajor}**, GPA ${activeProfile?.gpa}/${activeProfile?.gpaScale}, budget ${formatMoney(activeProfile?.budgetAnnualUsd, "USD", { suffix: "/yr", placeholder: "Not specified" })}).
 
@@ -109,7 +109,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
           </div>
           <div>
             <h1 className="font-bold text-base flex items-center gap-2">
-              ScholarBridge AI Counselor
+              ScholarBridgeAI Counselor
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold">
                 Online
               </span>
@@ -153,7 +153,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
         {loading && (
           <div className="flex gap-3 items-center text-xs text-slate-500 italic">
             <Bot className="h-5 w-5 text-indigo-600 animate-pulse" />
-            ScholarBridge AI is typing thoughtful advice...
+            ScholarBridgeAI is typing thoughtful advice...
           </div>
         )}
       </div>
