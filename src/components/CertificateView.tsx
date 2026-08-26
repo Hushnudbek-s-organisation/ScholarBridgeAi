@@ -43,7 +43,7 @@ export function CertificateView({ certificate, profileName }: CertificateViewPro
           </div>
 
           <div>
-            <p className="text-[10px] tracking-[0.35em] text-slate-400 font-bold uppercase">ScholarBridge AI</p>
+            <p className="text-[10px] tracking-[0.35em] text-slate-400 font-bold uppercase">ScholarBridgeAI</p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">{t("certificate")}</h2>
           </div>
 

@@ -190,7 +190,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             </div>
             <div>
               <h2 className="text-xl font-bold">{isNew ? "Create Student Profile" : "Edit Academic Profile"}</h2>
-              <p className="text-xs text-indigo-100">ScholarBridge AI matching engine calculates recommendations using these metrics.</p>
+              <p className="text-xs text-indigo-100">ScholarBridgeAI matching engine calculates recommendations using these metrics.</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg">

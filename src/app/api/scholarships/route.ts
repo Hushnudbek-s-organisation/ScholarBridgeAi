@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { scholarships, studentProfiles } from "@/db/schema";
+import {
+  scholarships,
+  studentProfiles,
+  scholarshipSources,
+  sources,
+} from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
 import { withStatus } from "@/lib/scholarshipStatus";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 
 export async function GET(req: Request) {
@@ -41,7 +46,80 @@ export async function GET(req: Request) {
       allScholarships = allScholarships.filter(s => s.coverageType.includes(coverageType));
     }
 
-    const results = allScholarships.map(s => {
+    // ---------- Fetch source signals (scholarship_sources -> sources) ----------
+    const sourceMap = new Map<number, { sourceUrl: string | null; lastVerifiedAt: string | null; sourceTitle: string | null }>();
+    try {
+      const schIds = allScholarships.map((s) => s.id);
+      if (schIds.length > 0) {
+        const links = await db
+          .select()
+          .from(scholarshipSources)
+          .where(inArray(scholarshipSources.scholarshipId, schIds));
+
+        const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
+        let srcById = new Map<number, { url: string; title: string; accessedAt: Date | null }>();
+        if (srcIds.length > 0) {
+          try {
+            const srcRows = await db
+              .select({ id: sources.id, url: sources.url, title: sources.title, accessedAt: sources.accessedAt })
+              .from(sources)
+              .where(inArray(sources.id, srcIds));
+            srcById = new Map(srcRows.map((r) => [r.id, r]));
+          } catch {
+            // sources shape differs
+          }
+        }
+
+        const grouped = new Map<number, typeof links>();
+        for (const link of links) {
+          const arr = grouped.get(link.scholarshipId) || [];
+          arr.push(link);
+          grouped.set(link.scholarshipId, arr);
+        }
+
+        for (const [schId, schLinks] of grouped) {
+          let bestUrl: string | null = null;
+          let bestVerified: Date | null = null;
+          let bestTitle: string | null = null;
+          for (const l of schLinks) {
+            if (l.sourceId == null) continue;
+            const src = srcById.get(l.sourceId);
+            if (!src) continue;
+            const accessed = src.accessedAt ? new Date(src.accessedAt) : null;
+            if (!bestUrl || (accessed && (!bestVerified || accessed > bestVerified))) {
+              bestUrl = src.url;
+              bestTitle = src.title;
+              bestVerified = accessed;
+            } else if (!bestUrl) {
+              bestUrl = src.url;
+              bestTitle = src.title;
+            }
+          }
+          if (bestUrl) {
+            sourceMap.set(schId, {
+              sourceUrl: bestUrl,
+              lastVerifiedAt: bestVerified ? bestVerified.toISOString() : null,
+              sourceTitle: bestTitle,
+            });
+          }
+        }
+
+        // If linked source exists but lacks accessedAt, fallback to scholarship's own lastVerifiedAt
+        for (const sch of allScholarships) {
+          const existing = sourceMap.get(sch.id);
+          if (existing && !existing.lastVerifiedAt) {
+            const fallback = (sch as any).lastVerifiedAt ? new Date((sch as any).lastVerifiedAt).toISOString() : null;
+            if (fallback) {
+              sourceMap.set(sch.id, { ...existing, lastVerifiedAt: fallback });
+            }
+          }
+        }
+      }
+    } catch {
+      // tables missing — UI will show pending verification
+    }
+
+    const results = allScholarships.map((s) => {
       let matchInfo: {
         matchScore: number | null;
         isEligible: boolean | null;
@@ -53,6 +131,7 @@ export async function GET(req: Request) {
       }
       // Computed application status from dates (spec §6) — never stale.
       const statusInfo = withStatus(s);
+      const src = sourceMap.get(s.id) || null;
       return {
         ...s,
         matchScore: matchInfo.matchScore,
@@ -62,6 +141,9 @@ export async function GET(req: Request) {
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,
+        sourceUrl: src?.sourceUrl ?? null,
+        sourceTitle: src?.sourceTitle ?? null,
+        sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,
       };
     });
 

@@ -260,7 +260,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900">Your profile is ready! 🎉</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            ScholarBridge can now match you with universities and grants that fit
+            ScholarBridgeAI can now match you with universities and grants that fit
             your GPA, test scores and budget. Let&apos;s go to your dashboard!
           </p>
           <button
@@ -574,8 +574,21 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
         )}
 
+        {/* Terms agreement */}
+        <p className="mt-5 text-[11px] text-slate-400 text-center leading-relaxed">
+          By continuing, you agree to our{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
+            Terms
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
+            Privacy Policy
+          </a>
+          .
+        </p>
+
         {/* Nav buttons */}
-        <div className="flex items-center gap-2 mt-7 pt-5 border-t border-slate-100">
+        <div className="flex items-center gap-2 mt-4 pt-5 border-t border-slate-100">
           <button
             type="button"
             onClick={handleBack}

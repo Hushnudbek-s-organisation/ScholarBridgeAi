@@ -49,6 +49,9 @@ export interface University {
   matchCategory?: "Reach" | "Match" | "Safety" | null;
   matchReasons?: string[];
   matchIssues?: string[];
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
+  sourceLastVerifiedAt?: string | null;
 }
 
 interface UniversityExplorerProps {
@@ -421,6 +424,29 @@ export function UniversityExplorer({
                       Post-Study Work Visa:
                     </span>
                     <strong className="text-slate-900 font-bold">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
+                  </div>
+
+                  {/* Source credibility footnote */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
+                    {uni.sourceUrl ? (
+                      <a
+                        href={uni.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Source
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">Source: pending verification</span>
+                    )}
+                    {uni.sourceLastVerifiedAt ? (
+                      <span className="text-slate-400">
+                        Last verified: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString()}
+                      </span>
+                    ) : uni.sourceUrl ? (
+                      <span className="text-slate-400">Last verified: —</span>
+                    ) : null}
                   </div>
 
                   {/* Action Buttons */}

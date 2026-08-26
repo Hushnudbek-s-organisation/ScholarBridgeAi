@@ -44,6 +44,9 @@ export interface Scholarship {
   computedStatus?: string;
   statusLabel?: string;
   expectedLabel?: string | null;
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
+  sourceLastVerifiedAt?: string | null;
 }
 
 interface ScholarshipHubProps {
@@ -279,6 +282,29 @@ export function ScholarshipHub({
                     Requirements & Eligibility:
                   </span>
                   <p className="text-[11px] leading-relaxed">{s.requirements}</p>
+                </div>
+
+                {/* Source credibility footnote */}
+                <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
+                  {s.sourceUrl ? (
+                    <a
+                      href={s.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-slate-500 hover:text-amber-600 transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Source
+                    </a>
+                  ) : (
+                    <span className="text-slate-400">Source: pending verification</span>
+                  )}
+                  {s.sourceLastVerifiedAt ? (
+                    <span className="text-slate-400">
+                      Last verified: {new Date(s.sourceLastVerifiedAt).toLocaleDateString()}
+                    </span>
+                  ) : s.sourceUrl ? (
+                    <span className="text-slate-400">Last verified: —</span>
+                  ) : null}
                 </div>
 
                 {/* Actions */}
