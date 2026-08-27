@@ -192,6 +192,10 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
   const [sources, setSources] = useState<SourceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Presentation-only UI state (no fetch/API changes)
+  const [reqsExpanded, setReqsExpanded] = useState(false);
+  const [showAllPrograms, setShowAllPrograms] = useState(false);
+  const [expandedProgramReqs, setExpandedProgramReqs] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -469,12 +473,14 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
         </p>
       </div>
 
-      {/* ===== ACADEMIC REQUIREMENTS (spec §5) ===== */}
+      {/* ===== ACADEMIC REQUIREMENTS (spec §5) — compact, collapsible ===== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <GraduationCap className="h-4 w-4 text-indigo-600" /> Academic Requirements
         </h2>
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+
+        {/* Score grid: 2-col mobile / 4-col desktop */}
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <Field label="IELTS" value={req(universityRequirements, "ielts", (v) => `${v}`)} />
           <Field label="TOEFL" value={req(universityRequirements, "toefl", (v) => `${v}`)} />
           <Field label="Duolingo" value={req(universityRequirements, "duolingo", (v) => `${v}`)} />
@@ -501,22 +507,71 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
           />
           <Field label="PTE Academic" value={req(universityRequirements, "pte", (v) => `${v}`)} />
           <Field label="Cambridge English" value={req(universityRequirements, "cambridgeEnglish", (v) => `${v}`)} />
-          {Array.isArray(universityRequirements?.other) && universityRequirements.other.length > 0 && (
-            <Field label="Other requirements" value={universityRequirements.other.join("; ")} />
-          )}
-          {Array.isArray(universityRequirements?.subject) && universityRequirements.subject.length > 0 && (
-            <Field label="Subject requirements" value={universityRequirements.subject.join("; ")} />
-          )}
         </div>
-        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
-          {universityRequirements?.portfolioRequired && <span>📁 Portfolio required</span>}
-          {universityRequirements?.interviewRequired && <span>🎤 Interview required</span>}
-          {universityRequirements?.recommendationRequired && <span>📩 Recommendation letters</span>}
-          {universityRequirements?.personalStatementRequired && <span>✍️ Personal statement</span>}
-        </div>
-        <p className="mt-3 text-[11px] text-slate-400 italic">
-          Values shown come from verified program requirements. If a value is not specified by the university, it is marked &quot;Not specified&quot;.
-        </p>
+
+        {/* Long text requirements: full-width, clamped by default */}
+        {(() => {
+          const subjectReqs: string[] = Array.isArray(universityRequirements?.subject) ? universityRequirements.subject : [];
+          const otherReqs: string[] = Array.isArray(universityRequirements?.other) ? universityRequirements.other : [];
+          const flags = [
+            universityRequirements?.portfolioRequired && "📁 Portfolio required",
+            universityRequirements?.interviewRequired && "🎤 Interview required",
+            universityRequirements?.recommendationRequired && "📩 Recommendation letters",
+            universityRequirements?.personalStatementRequired && "✍️ Personal statement",
+          ].filter(Boolean) as string[];
+          const hasLongContent = subjectReqs.length > 0 || otherReqs.length > 0;
+          if (!hasLongContent && flags.length === 0) {
+            return (
+              <p className="mt-3 text-[11px] text-slate-400 italic">
+                Values shown come from verified program requirements. If a value is not specified by the university, it is marked &quot;Not specified&quot;.
+              </p>
+            );
+          }
+          return (
+            <>
+              <div className="relative">
+                <div
+                  className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+                  style={{ maxHeight: reqsExpanded ? "2000px" : "5.5rem" }}
+                >
+                  {subjectReqs.length > 0 && (
+                    <div className="mt-3 w-full rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Subject Requirements</p>
+                      <p className="mt-1 text-xs text-slate-700 leading-relaxed">{subjectReqs.join("; ")}</p>
+                    </div>
+                  )}
+                  {otherReqs.length > 0 && (
+                    <div className="mt-3 w-full rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Other Requirements</p>
+                      <p className="mt-1 text-xs text-slate-700 leading-relaxed">{otherReqs.join("; ")}</p>
+                    </div>
+                  )}
+                  {flags.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                      {flags.map((f) => (
+                        <span key={f}>{f}</span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-3 text-[11px] text-slate-400 italic">
+                    Values shown come from verified program requirements. If a value is not specified by the university, it is marked &quot;Not specified&quot;.
+                  </p>
+                </div>
+                {!reqsExpanded && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setReqsExpanded((v) => !v)}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                aria-expanded={reqsExpanded}
+              >
+                {reqsExpanded ? "Show less ↑" : "Show more ↓"}
+              </button>
+            </>
+          );
+        })()}
       </div>
 
       {/* ===== TUITION & COSTS (spec §6) ===== */}
@@ -552,61 +607,93 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
         {programs.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">Program list not available yet — check the official website.</p>
         ) : (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {programs.map((p) => (
-              <div key={p.id} className="rounded-xl border border-slate-200 p-4 hover:border-violet-300 transition-colors">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-extrabold text-slate-800">{p.name}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {fmtValue(p.degree)} · {p.durationYears != null ? `${p.durationYears} years` : "Duration not specified"} · {fmtValue(p.language)}
-                    </p>
-                  </div>
-                  {p.programUrl && (
-                    <a href={p.programUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 shrink-0" title="View program">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                  <span><b>Tuition:</b> {fmtMoney(p.tuitionAmount, p.tuitionCurrency)}</span>
-                  <span><b>Duration:</b> {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || "years"}` : "Not specified"}</span>
-                  <span><b>Mode:</b> {fmtValue(p.studyMode)}</span>
-                  <span><b>IELTS:</b> {p.minIelts != null ? p.minIelts : "Not specified"}</span>
-                  {p.applicationDeadline && <span><b>Deadline:</b> {p.applicationDeadline}</span>}
-                </div>
-
-                {/* Program-specific requirements (verified values only) */}
-                {p.requirements.length > 0 && (
-                  <div className="mt-2.5 rounded-xl bg-slate-50 border border-slate-100 p-2.5 space-y-1">
-                    {p.requirements.map((r, i) => (
-                      <p key={i} className="text-[11px] text-slate-600">
-                        <b className="capitalize">{r.requirementType}:</b>{" "}
-                        {r.minimumValue != null ? r.minimumValue : r.valueText ? r.valueText : "required"}
-                      </p>
-                    ))}
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-1 border-t border-slate-100">
-                      {p.portfolioRequired && <span className="text-[10px] text-slate-500">📁 Portfolio required</span>}
-                      {p.interviewRequired && <span className="text-[10px] text-slate-500">🎤 Interview required</span>}
-                      {p.recommendationRequired && <span className="text-[10px] text-slate-500">📩 Recommendation letters</span>}
-                      {p.personalStatementRequired && <span className="text-[10px] text-slate-500">✍️ Personal statement</span>}
+          <>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(showAllPrograms ? programs : programs.slice(0, 4)).map((p) => {
+                const reqsOpen = !!expandedProgramReqs[p.id];
+                const hasLongReqs = p.requirements.length > 0;
+                return (
+                  <div key={p.id} className="rounded-xl border border-slate-200 p-4 hover:border-violet-300 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-extrabold text-slate-800">{p.name}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {fmtValue(p.degree)} · {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || "years"}` : "Duration not specified"} · {fmtValue(p.studyMode)}
+                        </p>
+                      </div>
+                      {p.programUrl && (
+                        <a href={p.programUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 shrink-0" title="View program">
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
                     </div>
-                  </div>
-                )}
+                    <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                      <span><b>Tuition:</b> {fmtMoney(p.tuitionAmount, p.tuitionCurrency)}</span>
+                      <span><b>IELTS:</b> {p.minIelts != null ? p.minIelts : "Not specified"}</span>
+                      {p.language && <span><b>Language:</b> {p.language}</span>}
+                      {p.applicationDeadline && <span><b>Deadline:</b> {p.applicationDeadline}</span>}
+                    </div>
 
-                {p.applicationUrl && (
-                  <a
-                    href={p.applicationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" /> Apply for this program
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
+                    {/* Program-specific requirements — clamped to 3 lines until expanded */}
+                    {hasLongReqs && (
+                      <div className="mt-2.5 rounded-xl bg-slate-50 border border-slate-100 p-2.5">
+                        <div
+                          className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+                          style={{ maxHeight: reqsOpen ? "2000px" : "3.9rem" }}
+                        >
+                          <div className="space-y-1">
+                            {p.requirements.map((r, i) => (
+                              <p key={i} className="text-[11px] text-slate-600">
+                                <b className="capitalize">{r.requirementType}:</b>{" "}
+                                {r.minimumValue != null ? r.minimumValue : r.valueText ? r.valueText : "required"}
+                              </p>
+                            ))}
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-1 border-t border-slate-100">
+                              {p.portfolioRequired && <span className="text-[10px] text-slate-500">📁 Portfolio required</span>}
+                              {p.interviewRequired && <span className="text-[10px] text-slate-500">🎤 Interview required</span>}
+                              {p.recommendationRequired && <span className="text-[10px] text-slate-500">📩 Recommendation letters</span>}
+                              {p.personalStatementRequired && <span className="text-[10px] text-slate-500">✍️ Personal statement</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedProgramReqs((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
+                          }
+                          className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-700"
+                          aria-expanded={reqsOpen}
+                        >
+                          {reqsOpen ? "Show less ↑" : "Show more ↓"}
+                        </button>
+                      </div>
+                    )}
+
+                    {p.applicationUrl && (
+                      <a
+                        href={p.applicationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Apply for this program
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {programs.length > 4 && (
+              <button
+                type="button"
+                onClick={() => setShowAllPrograms((v) => !v)}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                aria-expanded={showAllPrograms}
+              >
+                {showAllPrograms ? "Show fewer programs ↑" : `View all ${programs.length} programs →`}
+              </button>
+            )}
+          </>
         )}
       </div>
 
