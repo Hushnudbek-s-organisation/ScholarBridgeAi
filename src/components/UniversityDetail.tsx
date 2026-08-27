@@ -253,21 +253,35 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
 
       {/* ===== HERO (spec §2) ===== */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_80%_10%,white_1px,transparent_1px)] bg-[length:24px_24px]" />
+        {uni.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={uni.imageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_80%_10%,white_1px,transparent_1px)] bg-[length:24px_24px]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-indigo-950/75 to-slate-900/85 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-black/10" />
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row items-start gap-5">
-            {uni.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={uni.imageUrl}
-                alt={`${uni.name} logo`}
-                className="h-16 w-16 rounded-2xl bg-white object-contain p-1.5 shadow-lg"
-              />
-            ) : (
-              <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-                <Building2 className="h-8 w-8 text-amber-300" />
-              </div>
-            )}
+            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-white shadow-2xl border border-white/30 overflow-hidden flex items-center justify-center shrink-0">
+              {uni.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={uni.imageUrl}
+                  alt={`${uni.name} logo`}
+                  className="h-full w-full object-contain p-2"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-1 text-slate-700">
+                  <span className="text-2xl leading-none">{uni.flagEmoji}</span>
+                  <Building2 className="h-7 w-7 text-amber-500" />
+                </div>
+              )}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{uni.name}</h1>
@@ -276,7 +290,7 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
                 <MapPin className="h-3.5 w-3.5" />
                 {uni.city}, {uni.country} {uni.flagEmoji}
               </p>
-              <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/10 border border-white/15 px-3 py-1.5">
+              <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
                 <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
                 <span className="text-xs font-bold">QS World Ranking 2027</span>
                 <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
@@ -293,7 +307,7 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
                         href={site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-white text-slate-900 px-4 py-2 text-xs font-bold hover:bg-indigo-50"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50"
                       >
                         <Globe className="h-3.5 w-3.5" /> Official Website
                       </a>
@@ -303,7 +317,7 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
                         href={apply}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 px-4 py-2 text-xs font-bold hover:bg-amber-300"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:from-amber-300 hover:to-yellow-400"
                       >
                         <ExternalLink className="h-3.5 w-3.5" /> Apply Now
                       </a>

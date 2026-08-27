@@ -9,6 +9,7 @@ import {
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
+import { mockUniversityDetailPayload } from "@/lib/mock-universities";
 
 /**
  * GENERIC structured parser for `other_requirements` free-text.
@@ -400,6 +401,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   } catch (error) {
     console.error("GET /api/universities/[id] error:", error);
-    return NextResponse.json({ error: "Failed to fetch university" }, { status: 500 });
+    // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
+    const { id } = await params;
+    const uniId = parseInt(id, 10);
+    return NextResponse.json(mockUniversityDetailPayload(Number.isFinite(uniId) ? uniId : 1));
   }
 }
