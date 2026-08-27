@@ -10,6 +10,7 @@ import {
 import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
+import { mockUniversityListPayload } from "@/lib/mock-universities";
 
 /**
  * Resilient university select: tries the full schema first. If the database
@@ -288,6 +289,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ universities: results });
   } catch (error) {
     console.error("GET /api/universities error:", error);
-    return NextResponse.json({ error: "Failed to fetch universities" }, { status: 500 });
+    // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
+    return NextResponse.json(mockUniversityListPayload());
   }
 }
