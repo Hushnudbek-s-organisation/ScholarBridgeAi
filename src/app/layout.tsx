@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { SiteTracker } from "@/components/SiteTracker";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
@@ -87,7 +88,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="uz">
-      <body className="bg-slate-100 text-slate-900 antialiased">{children}</body>
+      <body className="bg-slate-100 text-slate-900 antialiased">
+        {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
+        <SiteTracker />
+        {children}
+      </body>
     </html>
   );
 }

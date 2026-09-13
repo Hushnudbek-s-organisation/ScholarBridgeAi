@@ -4,6 +4,7 @@ import { studentProfiles } from "@/db/schema";
 import { seedDatabase } from "@/db/seed";
 import { awardPoints } from "@/lib/gamification";
 import { ensureReferralCode, applyReferralCodeToProfile } from "@/lib/referrals";
+import { recordVisit } from "@/lib/visits";
 
 /** Detect a schema-mismatch error (new columns missing in the database). */
 function isMissingColumnsError(err: unknown): boolean {
@@ -81,6 +82,20 @@ export async function POST(req: Request) {
       researchPublications: numOrNull(body.researchPublications) ?? 0,
       preferredLocale: body.preferredLocale || "en",
     }).returning();
+
+    // Analytics: attribute the signup to the anonymous visitor cookie so the
+    // admin dashboard can show the visitor → signup funnel. Never throws.
+    try {
+      await recordVisit({
+        eventType: "signup",
+        path: "/",
+        profileId: newProfile.id,
+        locale: newProfile.preferredLocale,
+        headers: req.headers,
+      });
+    } catch (err) {
+      console.warn("Failed to record signup analytics:", err);
+    }
 
     // Welcome points for the new student (idempotent per profile).
     try {
