@@ -104,7 +104,7 @@ export default function PrivacyPage() {
               </p>
               <ul className="mt-2 list-disc pl-5 space-y-1">
                 <li><strong>Essential:</strong> scholarbridge_active_profile, scholarbridge_device_profiles, scholarbridge_ref (48h referral attribution), scholarbridge_locale.</li>
-                <li><strong>Analytics:</strong> If we enable analytics (e.g., for page views), it will be aggregated and anonymized, not linked to your GPA or budget. We do not currently use third-party advertising cookies.</li>
+                <li><strong>Analytics (first-party, anonymous):</strong> we count visits with our own <code>sb_vid</code> cookie (a random id, valid 1 year) so we can see how many people visited, which sections they opened and where they came from. We store the page/section name, a shortened referrer domain, the browser user-agent string (only to separate bots and mobile/desktop) and — if you are signed in — your profile id. <strong>We never store your IP address</strong>, we use no third-party advertising cookies, and the counters are only visible to site administrators in aggregated form. Blocking the <code>sb_vid</code> cookie simply opts you out of the visit counter; the app keeps working normally.</li>
               </ul>
               <p className="mt-2">
                 You can block cookies in your browser settings, but essential localStorage is needed to stay signed in and resume onboarding.

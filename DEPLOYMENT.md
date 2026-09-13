@@ -59,3 +59,23 @@ service.
 
 > **SSL note:** If the app can't connect to Postgres, append `?sslmode=require`
 > to the `DATABASE_URL` (or use the Internal URL Render provides).
+
+## Admin → Analytics (statistika)
+
+The admin panel opens on the **Analytics** tab: visitors, page/section views,
+signups, premium users, revenue, content inventory, engagement and the latest
+activity, for a 7 / 30 / 90 day window (CSV export included).
+
+Traffic is counted in one extra table, `site_visits` (anonymous `sb_vid`
+cookie — no IP address is stored):
+
+- The app creates it automatically on the first tracked visit
+  (`CREATE TABLE IF NOT EXISTS`, additive only — no existing table is ever
+  altered or dropped).
+- If your database user is not allowed to create tables, run
+  `supabase/add_analytics.sql` in the Supabase SQL Editor once. The dashboard
+  then shows an amber banner until the table exists; every other metric keeps
+  working.
+
+Endpoint: `GET /api/admin/analytics?adminProfileId=<id>&days=30&fresh=1`
+(admin-only, server-side, read-only, cached ~45s). Beacon: `POST /api/track`.

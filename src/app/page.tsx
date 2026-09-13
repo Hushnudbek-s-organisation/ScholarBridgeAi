@@ -24,6 +24,7 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { trackScreen } from "@/lib/tracker";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -91,6 +92,15 @@ export default function Home() {
       // localStorage unavailable — ignore
     }
   }, []);
+
+  // --- Anonymous usage tracking (Admin → Analytics) -------------------------
+  // This is a single-page app: switching sections does not change the URL, so
+  // every visible section is reported as its own "screen view". The call is
+  // fire-and-forget, de-duplicated in `@/lib/tracker` and never throws.
+  useEffect(() => {
+    const screen = view === "app" ? activeTab : view === "wizard" ? "onboarding" : "landing";
+    trackScreen(screen, activeProfile?.id ?? null);
+  }, [view, activeTab, activeProfile?.id]);
 
   const getStoredReferralCode = (): string | null => {
     try {

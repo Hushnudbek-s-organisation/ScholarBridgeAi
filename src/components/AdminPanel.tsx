@@ -42,7 +42,8 @@ interface AdminPanelProps {
 type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research";
 
 export function AdminPanel({ activeProfile }: AdminPanelProps) {
-  const [tab, setTab] = useState<AdminTab>("universities");
+  // Analytics first: the owner opens the panel to see how the platform is doing.
+  const [tab, setTab] = useState<AdminTab>("analytics");
 
   if (!activeProfile) {
     return <p className="text-sm text-slate-500 p-6">Select a profile to manage the site.</p>;

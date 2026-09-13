@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, index, AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
@@ -690,3 +690,43 @@ export const scholarshipSources = pgTable("scholarship_sources", {
   sourceType: text("source_type").notNull().default("official_scholarship"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ---------------------------------------------------------------------------
+// 13. SITE ANALYTICS — anonymous traffic tracking (Admin → Analytics)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per tracked event: a page view, an in-app screen (tab) view or a
+ * signup. Visitors are identified by an anonymous first-party cookie
+ * (`sb_vid`) — no personal data is collected for guests, and `profile_id`
+ * is only filled when the visitor is signed in.
+ *
+ * ADDITIVE TABLE: it is created with `CREATE TABLE IF NOT EXISTS` by
+ * `src/lib/visits.ts` (and can also be created manually with
+ * `supabase/add_analytics.sql`). No existing table is ever altered or
+ * dropped — if the table cannot be created, tracking silently disables
+ * itself and the rest of the app keeps working.
+ */
+export const siteVisits = pgTable(
+  "site_visits",
+  {
+    id: serial("id").primaryKey(),
+    visitorId: text("visitor_id").notNull().default(""),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    eventType: text("event_type").notNull().default("page_view"), // page_view | screen_view | signup
+    path: text("path").notNull().default("/"),
+    screen: text("screen"), // in-app section: dashboard | universities | admin | ...
+    referrer: text("referrer"), // normalized source domain ("direct", "google.com", ...)
+    userAgent: text("user_agent"),
+    device: text("device").notNull().default("desktop"), // desktop | mobile | tablet | bot
+    locale: text("locale"),
+    country: text("country"), // only when the host provides a geo header
+    isFirstVisit: boolean("is_first_visit").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("site_visits_created_at_idx").on(table.createdAt),
+    index("site_visits_visitor_id_idx").on(table.visitorId),
+    index("site_visits_event_type_created_at_idx").on(table.eventType, table.createdAt),
+  ]
+);
