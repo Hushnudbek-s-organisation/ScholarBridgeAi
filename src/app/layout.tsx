@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
+import { getBranding } from "@/lib/branding";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
 
-const LOGO_URL =
-  "https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png";
-
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const { logo, favicon } = await getBranding();
+  return {
   metadataBase: new URL(SITE_URL),
   manifest: "/manifest.json",
   // Google Search Console ownership verification (renders the
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
       "ScholarBridgeAI — GPA, IELTS va byudjetga mos xorijiy universitetlar va grantlarni toping. Universitet tanlash, SOP yozish va ariza topshirishda AI yordami.",
     images: [
       {
-        url: LOGO_URL,
+        url: logo,
         width: 1200,
         height: 630,
         alt: "ScholarBridgeAI logotipi",
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     title: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
     description:
       "ScholarBridgeAI — GPA, IELTS va byudjetga mos xorijiy universitetlar va grantlarni toping. Universitet tanlash, SOP yozish va ariza topshirishda AI yordami.",
-    images: [LOGO_URL],
+    images: [logo],
   },
   robots: {
     index: true,
@@ -75,15 +75,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: LOGO_URL, sizes: "any" },
-      { url: LOGO_URL, type: "image/png", sizes: "512x512" },
+      { url: favicon, sizes: "any" },
+      { url: favicon, type: "image/png", sizes: "512x512" },
     ],
     apple: [
-      { url: LOGO_URL, sizes: "180x180", type: "image/png" },
+      { url: favicon, sizes: "180x180", type: "image/png" },
     ],
-    shortcut: LOGO_URL,
+    shortcut: favicon,
   },
-};
+  };
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

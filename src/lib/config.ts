@@ -34,6 +34,9 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   // Referral (spec — existing)
   referral_premium_multiple: "5",
   referral_premium_days: "30",
+  // Branding (editable from Admin → Settings)
+  branding_logo_url: "",
+  branding_favicon_url: "",
 };
 
 const cache = new Map<string, string | null>();

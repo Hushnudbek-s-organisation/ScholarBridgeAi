@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandingImage } from "./BrandingImage";
 import React from "react";
 import { useTranslations } from "next-intl";
 import { 
@@ -114,12 +115,7 @@ export function Navbar({
   const Logo = (
     <div className="flex items-center gap-2.5">
       <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-md shadow-indigo-200 border border-slate-200 shrink-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png"
-          alt={t("logoAlt")}
-          className="h-9 w-9 object-cover"
-        />
+        <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
@@ -262,11 +258,7 @@ export function Navbar({
             <button className="flex items-center gap-2 min-w-0" onClick={() => setActiveTab("dashboard")}>
               <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200 shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png"
-                  alt={t("logoAlt")}
-                  className="h-8 w-8 object-cover"
-                />
+                <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
               </div>
               <span className="font-bold text-base tracking-tight text-slate-900 truncate">
                 {tm("appName")}
