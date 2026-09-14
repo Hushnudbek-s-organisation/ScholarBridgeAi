@@ -43,7 +43,9 @@ export const universities = pgTable("universities", {
   flagEmoji: text("flag_emoji").notNull().default("🌐"),
   worldRanking: integer("world_ranking").notNull(),
   degreeLevel: text("degree_level").notNull().default("All"),
-  programMajor: text("program_major").notNull(),
+  // Default 'All' matches the DB default (supabase/fix_top51_80_seed.sql):
+  // raw SQL seeds that omit this column must not fail on NOT NULL.
+  programMajor: text("program_major").notNull().default("All"),
   // --- Financial (NULL = not verified, spec §14) ---
   // Legacy USD columns (kept — DO NOT drop)
   annualTuitionUsd: integer("annual_tuition_usd"),
