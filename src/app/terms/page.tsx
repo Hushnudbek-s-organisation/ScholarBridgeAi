@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BrandingImage } from "@/components/BrandingImage";
 
 export const metadata: Metadata = {
   title: "Terms of Service | ScholarBridgeAI",
@@ -14,12 +15,7 @@ export default function TermsPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png"
-                alt="ScholarBridgeAI Logo"
-                className="h-8 w-8 object-cover"
-              />
+              <BrandingImage alt="ScholarBridgeAI Logo" className="h-8 w-8 object-cover" />
             </div>
             <span className="font-extrabold text-slate-900 tracking-tight">ScholarBridgeAI</span>
           </Link>

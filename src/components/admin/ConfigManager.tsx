@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Settings2, Loader2, RefreshCw, Save } from "lucide-react";
+import { Settings2, Loader2, RefreshCw, Save, Upload, Image as ImageIcon } from "lucide-react";
 
 interface ConfigManagerProps {
   adminProfileId: number;
@@ -18,13 +18,21 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [uploading, setUploading] = useState<"logo" | "favicon" | "">("");
+  const [branding, setBranding] = useState({ logo: "", favicon: "" });
 
   const load = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/config?adminProfileId=${adminProfileId}`);
       const data = await res.json();
-      if (res.ok && data.config) setRows(data.config);
+      if (res.ok && data.config) {
+        setRows(data.config);
+        setBranding({
+          logo: data.config.find((r: ConfigRow) => r.key === "branding_logo_url")?.value || "",
+          favicon: data.config.find((r: ConfigRow) => r.key === "branding_favicon_url")?.value || "",
+        });
+      }
     } catch (err) {
       console.error("Failed to load config:", err);
     } finally {
@@ -57,6 +65,27 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
     }
   };
 
+  const uploadBranding = async (kind: "logo" | "favicon", file: File) => {
+    setUploading(kind);
+    setMessage(null);
+    try {
+      const form = new FormData();
+      form.append("adminProfileId", String(adminProfileId));
+      form.append("kind", kind);
+      form.append("file", file);
+      const res = await fetch("/api/admin/branding/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setBranding((prev) => ({ ...prev, [kind]: data.url }));
+      setRows((prev) => prev.map((r) => r.key === `branding_${kind}_url` ? { ...r, value: data.url } : r));
+      setMessage({ ok: true, text: `${kind === "logo" ? "Logo" : "Favicon"} successfully replaced` });
+    } catch (err: any) {
+      setMessage({ ok: false, text: err.message || "Upload failed" });
+    } finally {
+      setUploading("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
@@ -75,6 +104,34 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+        <div className="flex items-start gap-3 mb-4">
+          <ImageIcon className="h-5 w-5 text-indigo-600 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-800">Site images</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Replace the logo and browser tab favicon across the platform. PNG, JPG, WEBP or ICO, up to 5 MB.</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["logo", "favicon"] as const).map((kind) => (
+            <div key={kind} className="flex items-center gap-3 rounded-xl border border-white bg-white p-3 shadow-xs">
+              <div className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                {branding[kind] ? <img src={branding[kind]} alt={`${kind} preview`} className="h-full w-full object-contain" /> : <ImageIcon className="h-5 w-5 text-slate-300" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-extrabold text-slate-700">{kind === "logo" ? "Site logo" : "Favicon"}</p>
+                <p className="truncate text-[10px] text-slate-400">{branding[kind] ? "Custom image active" : "Default image active"}</p>
+                <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 has-[:disabled]:opacity-60">
+                  {uploading === kind ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                  Upload and replace
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" className="sr-only" disabled={uploading !== ""} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadBranding(kind, file); e.currentTarget.value = ""; }} />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {message && (
