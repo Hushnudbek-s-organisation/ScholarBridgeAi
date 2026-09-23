@@ -21,7 +21,10 @@ service.
      and only after reviewing what it will change.
 5. After the first deploy, set the **secret** env vars in the web service's
    **Environment** tab:
-   - `GROQ_API_KEY` — required for AI features (Groq, default model `llama-3.3-70b-versatile`)
+   - `GROQ_API_KEY` — required for AI features (Groq, default model `openai/gpt-oss-120b`)
+   - `GROQ_MODEL` — optional. Set to `openai/gpt-oss-120b` or delete it so the
+     code default applies. Do **not** leave `llama-3.3-70b-versatile`: Groq
+     removed that model on 2026-08-16 and requests 404.
    - `NEXT_PUBLIC_APP_URL` — your public app URL (e.g.
      `https://scholarbridge-ai.onrender.com`)
    - Optional payment keys if you configure real Payme/Click:
@@ -47,7 +50,8 @@ service.
 | Variable                     | Required | Purpose                                   |
 | ---------------------------- | :------: | ----------------------------------------- |
 | `DATABASE_URL`               |   Yes    | Postgres connection (auto-set by blueprint) |
-| `GROQ_API_KEY`               |   Yes    | Groq (llama-3.3-70b-versatile) for all AI features |
+| `GROQ_API_KEY`               |   Yes    | Groq (`openai/gpt-oss-120b`) for all AI features |
+| `GROQ_MODEL`                 |    No    | Model override; default `openai/gpt-oss-120b` |
 | `NEXT_PUBLIC_APP_URL`        |   No     | Public URL used for referral links        |
 | `PAYME_MERCHANT_ID`/`KEY`/`PASSWORD` | No | Real Payme merchant creds         |
 | `CLICK_SERVICE_ID`/`MERCHANT_ID`/`MERCHANT_USER_ID`/`SECRET_KEY` | No | Real Click creds |

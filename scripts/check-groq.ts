@@ -78,7 +78,7 @@ async function withStubbedFetch(
 }
 
 async function main() {
-  const MODEL = "llama-3.3-70b-versatile";
+  const MODEL = "openai/gpt-oss-120b";
 
   // ---------------------------------------------------------------------------
   // Configuration helpers
@@ -153,6 +153,61 @@ async function main() {
     assert.equal(body.max_tokens, 300);
     assert.equal(body.response_format, undefined, "plain mode must not set response_format");
     delete process.env.GROQ_API_KEY;
+  });
+
+  await check("reasoningEffort low is sent as reasoning_effort, and omitted otherwise", async () => {
+    process.env.GROQ_API_KEY = "gsk_test_key_1234567890";
+    const prevModel = process.env.GROQ_MODEL;
+    delete process.env.GROQ_MODEL;
+    try {
+      const { init } = await withStubbedFetch(
+        () => ({
+          ok: true,
+          status: 200,
+          body: { choices: [{ message: { content: "Good morning." } }] },
+        }),
+        async () => {
+          await groqChatComplete({
+            messages: [{ role: "user", content: "Begin." }],
+            maxTokens: 2048,
+            reasoningEffort: "low",
+          });
+        },
+      );
+      const body = JSON.parse(String(init.body)) as {
+        model?: string;
+        max_tokens?: number;
+        reasoning_effort?: string;
+      };
+      assert.equal(body.reasoning_effort, "low");
+      assert.equal(body.max_tokens, 2048);
+      assert.equal(body.model, MODEL);
+
+      const { init: plain } = await withStubbedFetch(
+        () => ({
+          ok: true,
+          status: 200,
+          body: { choices: [{ message: { content: "Good morning." } }] },
+        }),
+        async () => {
+          await groqChatComplete({
+            messages: [{ role: "user", content: "Begin." }],
+          });
+        },
+      );
+      const plainBody = JSON.parse(String(plain.body)) as {
+        reasoning_effort?: string;
+      };
+      assert.equal(
+        plainBody.reasoning_effort,
+        undefined,
+        "reasoning_effort must be omitted when reasoningEffort is not set",
+      );
+    } finally {
+      delete process.env.GROQ_API_KEY;
+      if (prevModel) process.env.GROQ_MODEL = prevModel;
+      else delete process.env.GROQ_MODEL;
+    }
   });
 
   await check("jsonMode sets response_format json_object", async () => {
@@ -429,6 +484,12 @@ async function main() {
   };
   if (!chat.includes("withGroqRetry") || !analyze.includes("withGroqRetry")) {
     throw new Error("visa routes must wrap groqChatComplete in withGroqRetry");
+  }
+  if (!chat.includes('reasoningEffort: "low"') || !analyze.includes('reasoningEffort: "low"')) {
+    throw new Error('visa routes must pass reasoningEffort: "low"');
+  }
+  if (!chat.includes("maxTokens: 2048") || !analyze.includes("maxTokens: 2048")) {
+    throw new Error("visa routes must raise maxTokens to 2048 for reasoning models");
   }
   if (!pkg.scripts?.["test:groq"]?.includes("check-groq.ts")) {
     throw new Error("package.json missing test:groq script");

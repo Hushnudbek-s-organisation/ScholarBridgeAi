@@ -181,7 +181,7 @@ const groq: AIProviderAdapter = {
         Authorization: `Bearer ${cfg.apiKey}`,
       },
       body: JSON.stringify({
-        model: cfg.model || "llama-3.3-70b-versatile",
+        model: cfg.model || "openai/gpt-oss-120b",
         messages: [
           ...(req.systemInstruction ? [{ role: "system", content: req.systemInstruction }] : []),
           { role: "user", content: req.prompt },

@@ -44,6 +44,9 @@ export async function POST(req: Request) {
     const history = sanitizeHistory(body?.messages);
     const profile = (body?.profile || null) as VisaApplicantProfile | null;
 
+    // gpt-oss is a reasoning model: reasoning tokens share max_tokens, so a
+    // 300-token cap returns an empty spoken line. 2048 + low effort keeps
+    // the officer reply short without starving the visible answer.
     const result = await withGroqRetry(() =>
       groqChatComplete({
         model: getGroqModelName(),
@@ -58,7 +61,8 @@ export async function POST(req: Request) {
           },
         ],
         temperature: 0.8,
-        maxTokens: 300,
+        maxTokens: 2048,
+        reasoningEffort: "low",
       }),
     );
 

@@ -8,11 +8,15 @@
  *
  * Env:
  *   GROQ_API_KEY   — required (https://console.groq.com/keys, free tier works)
- *   GROQ_MODEL     — optional, defaults to "llama-3.3-70b-versatile"
+ *   GROQ_MODEL     — optional, defaults to "openai/gpt-oss-120b"
  *
- * NOTE: Groq deprecates/renames models over time — if requests start
- * returning 404 "model_deprecated", set GROQ_MODEL to a current model from
- * https://console.groq.com/docs/models.
+ * NOTE: Groq deprecates/renames models over time. llama-3.3-70b-versatile
+ * and llama-3.1-8b-instant were removed on 2026-08-16 (404). The replacement
+ * is openai/gpt-oss-120b — a reasoning model, so reasoning tokens count
+ * against max_tokens. Raise maxTokens and pass reasoningEffort "low" for
+ * short dialogue, or the reply comes back empty. If requests 404 again, pick
+ * a current id from https://console.groq.com/docs/models or
+ * GET https://api.groq.com/openai/v1/models.
  *
  * Transient failures (429 / 5xx / transport blips) should be sent through
  * `withGroqRetry()` — exponential backoff is the remedy for rate-limit
@@ -26,7 +30,7 @@ export function getGroqApiKey(): string {
 }
 
 export function getGroqModelName(): string {
-  return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  return process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 }
 
 export function isGroqConfigured(): boolean {
@@ -47,6 +51,12 @@ export interface GroqChatOptions {
    * word "JSON" to appear somewhere in the messages when this is on.
    */
   jsonMode?: boolean;
+  /**
+   * GPT-OSS reasoning effort (`reasoning_effort`). Only sent when set.
+   * Reasoning tokens share the max_tokens budget — use "low" for short
+   * dialogue so the visible reply is not starved.
+   */
+  reasoningEffort?: "low" | "medium" | "high";
   /** Defaults to getGroqModelName(). */
   model?: string;
 }
@@ -93,6 +103,9 @@ export async function groqChatComplete(
       max_tokens: options.maxTokens ?? 1024,
       ...(options.jsonMode
         ? { response_format: { type: "json_object" } }
+        : {}),
+      ...(options.reasoningEffort
+        ? { reasoning_effort: options.reasoningEffort }
         : {}),
     }),
   });
@@ -267,7 +280,7 @@ export function describeGroqError(err: unknown, model: string): string {
   if (status === 404) {
     return (
       `Groq model "${model}" was not found (404) — it is probably deprecated. ` +
-      `Set GROQ_MODEL to a current model (e.g. llama-3.3-70b-versatile).`
+      `Set GROQ_MODEL to a current model (e.g. openai/gpt-oss-120b).`
     );
   }
   if (status === 401) {
