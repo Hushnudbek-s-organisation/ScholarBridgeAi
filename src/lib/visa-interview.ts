@@ -7,6 +7,29 @@
 
 export type VisaOfficerGender = "male" | "female";
 
+export const VISA_LIVE_VOICES = [
+  "Puck",
+  "Charon",
+  "Kore",
+  "Fenrir",
+  "Aoede",
+] as const;
+
+export type VisaLiveVoice = (typeof VISA_LIVE_VOICES)[number];
+
+export function normalizeVisaLiveVoice(
+  value: unknown,
+  gender: VisaOfficerGender = "male",
+): VisaLiveVoice {
+  if (
+    typeof value === "string" &&
+    VISA_LIVE_VOICES.includes(value as VisaLiveVoice)
+  ) {
+    return value as VisaLiveVoice;
+  }
+  return gender === "female" ? "Kore" : "Charon";
+}
+
 export interface VisaCountry {
   code: string;
   name: string;
