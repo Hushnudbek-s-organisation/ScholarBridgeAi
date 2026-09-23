@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
+import { AiFormattedText } from "./AiFormattedText";
 import { 
   Sparkles, 
   Search, 
@@ -279,9 +280,7 @@ export function DashboardView({
             </button>
           </div>
 
-          <div className="prose prose-indigo max-w-none text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-            {aiEvaluation}
-          </div>
+          <AiFormattedText text={aiEvaluation} className="text-xs sm:text-sm text-slate-700" />
         </div>
       )}
 

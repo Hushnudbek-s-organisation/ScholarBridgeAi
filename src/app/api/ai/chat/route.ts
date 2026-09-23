@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { callAI } from "@/lib/ai";
+import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { eq } from "drizzle-orm";
 import { localeToLanguageName } from "@/i18n/config";
 
@@ -33,7 +34,11 @@ export async function POST(req: Request) {
 
     const systemInstruction = `${languageInstruction}You are ScholarBridgeAI, an expert, encouraging, and knowledgeable study-abroad counselor.
 You guide students on international university selection, scholarships (Fulbright, Chevening, DAAD, Erasmus, etc.), SOP writing, LOR requests, IELTS/GRE strategy, post-study work visas (OPT, PGWP, UK Graduate Visa, Germany Job Seeker), and financial proof.
-Be concise, practical, well-formatted with markdown lists, bold text, and clear bullet points.
+Be concise and practical.
+FORMAT RULES (follow exactly):
+- Plain markdown only: one short heading (## or ###), bold for key terms, short bullet points.
+- NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences.
+- At most 1-2 emojis in the whole reply.
 ${profileContext}`;
 
     let historyText = "";
@@ -49,58 +54,63 @@ ${profileContext}`;
     let reply = await callAI(fullPrompt, systemInstruction, { taskType: "general", profileId: profileId ?? null });
 
     if (!reply) {
-      // Intelligent fallback responses based on query topic
+      // Intelligent fallback responses based on query topic.
+      // Same style as the FORMAT RULES: short heading + bullets, at most
+      // 1-2 emojis, no tables / HTML / entities. Each fallback is passed
+      // through normalizeAiReply so it is byte-identical to a live reply.
       const queryLower = message.toLowerCase();
 
+      let fallback: string;
       if (queryLower.includes("visa") || queryLower.includes("work permit") || queryLower.includes("opt") || queryLower.includes("pgwp")) {
-        reply = `### 🌐 International Post-Study Work Visas Overview
+        fallback = `### Post-Study Work Visas: Top Destinations
 
-Here is how top study destinations compare regarding post-graduation work opportunities:
+How the main study destinations compare on post-graduation work:
 
-1. **🇨🇦 Canada (PGWP):** Up to **3 Years** work permit upon completing a 2-year degree program. Direct points for Express Entry PR.
-2. **🇺🇸 United States (OPT / STEM OPT):** 1 year standard OPT + **2 additional years extension** for STEM majors (3 years total!).
-3. **🇬🇧 United Kingdom (Graduate Route):** **2 Years** post-study work visa for Master's/Bachelor's and 3 years for PhD graduates.
-4. **🇩🇪 Germany (Job Seeker Visa):** **18 Months** residence permit to search for a job in line with your degree. Fast-track permanent residency in 21-24 months.
-5. **🇦🇺 Australia (Temporary Graduate Visa Subclass 485):** **2 to 4 Years** depending on degree level and regional campus location.
+- **Canada (PGWP):** up to 3 years of work permit after a 2-year degree, with direct points toward permanent residency.
+- **United States (OPT / STEM OPT):** 1 year of standard OPT plus a 2-year STEM extension (3 years total for STEM majors).
+- **United Kingdom (Graduate Route):** 2 years post-study work for bachelor's and master's graduates, 3 years for PhD.
+- **Germany (Job Seeker Visa):** 18 months to find a job in your field, with fast-track permanent residency.
+- **Australia (Subclass 485):** 2 to 4 years depending on degree level and location.
 
-💡 **Pro Tip:** Make sure your target major is officially classified under **STEM (Science, Tech, Engineering, Math)** if applying to the US!`;
+**Pro tip:** if applying to the US, make sure your major is officially classified as STEM (science, tech, engineering, math).`;
       } else if (queryLower.includes("scholarship") || queryLower.includes("funding") || queryLower.includes("tuition")) {
-        reply = `### 💰 High-Value Full Scholarships for International Students
+        fallback = `### High-Value Scholarships for International Students
 
-Here are top fully-funded scholarships aligned with your target profile:
+Top fully-funded options for an international profile like yours:
 
-* **🇺🇸 Fulbright Foreign Student Program:** Full tuition, monthly stipend, health insurance, airfare to USA.
-* **🇬🇧 Chevening Scholarship:** Fully funded 1-year Master's in the UK, including fees, living stipend, and travel.
-* **🇩🇪 DAAD EPOS / TUM Merit Grants:** Complete tuition coverage + €934-€1,200 monthly allowance in Germany.
-* **🇪🇺 Erasmus Mundus Joint Master:** €1,400/month stipend + zero tuition across multiple European capitals.
-* **🇯🇵 MEXT Japanese Government:** 144,000 JPY/month stipend, 100% tuition coverage, flight allowance.
+- **Fulbright Foreign Student Program (US):** full tuition, monthly stipend, health insurance, and round-trip airfare.
+- **Chevening Scholarship (UK):** fully funded 1-year master's, including fees, living stipend, and travel.
+- **DAAD EPOS / TUM Merit Grants (Germany):** full tuition plus a 934–1,200 EUR monthly allowance.
+- **Erasmus Mundus Joint Master (EU):** zero tuition plus about 1,400 EUR per month across multiple countries.
+- **MEXT (Japan):** 100% tuition coverage, 144,000 JPY monthly stipend, and flight allowance.
 
-💡 **Key Deadline Reminder:** Most major government scholarships close application portals **6 to 9 months BEFORE** the academic intake starts!`;
+**Key deadline:** most government scholarship portals close 6–9 months before the intake starts.`;
       } else if (queryLower.includes("sop") || queryLower.includes("essay") || queryLower.includes("statement")) {
-        reply = `### ✍️ Winning SOP Structure (5-Step Framework)
+        fallback = `### Winning SOP Structure (5-Step Framework)
 
-To write a compelling Statement of Purpose that stands out to committee members:
+A Statement of Purpose that stands out to admissions committees:
 
-1. **Hook Paragraph (10%):** Start with a specific problem or real-world challenge that ignited your interest in your field.
-2. **Academic Foundations (25%):** Highlight core undergraduate courses, top grades, and key concepts mastered.
-3. **Projects & Industry Impact (30%):** Detail hands-on software/research projects, metrics achieved, and problem-solving skills.
-4. **Why This University (20%):** Mention specific faculty members, specialized labs, and 2 exact elective modules!
-5. **Future Vision (15%):** Articulate 3-year and 10-year post-graduation career goals.
+1. **Hook (10%):** open with a specific problem or real challenge that sparked your interest in the field.
+2. **Academics (25%):** core courses, strong grades, and the key concepts you mastered.
+3. **Projects & Impact (30%):** hands-on work with concrete metrics and clear problem-solving.
+4. **Why This University (20%):** name specific faculty, labs, and 2 exact elective modules.
+5. **Future Vision (15%):** your 3-year and 10-year career goals.
 
-Need help generating a draft? Use our **AI SOP Assistant** in the main menu!`;
+Need a draft? Use the **AI SOP Assistant** in the main menu.`;
       } else {
-        reply = `### 🎓 ScholarBridgeAI Guidance
+        fallback = `### ScholarBridgeAI Guidance
 
-Thank you for your question regarding **"${message}"**!
+Thank you for your question regarding **"${message}"**.
 
-Here are key action items to keep in mind:
+Action items to keep in mind:
 
-1. **Profile Calibration:** Ensure your GPA, IELTS/TOEFL scores, and annual budget match target university cutoffs.
-2. **Document Readiness:** Secure official university transcripts, 2-3 academic recommendation letters (LORs), and an updated Europass or Harvard-format CV.
-3. **Application Deadlines:** Fall intake applications typically open in September and close between December and March.
+1. **Profile calibration:** make sure your GPA, test scores, and budget match your target university cutoffs.
+2. **Documents:** official transcripts, 2–3 recommendation letters (LORs), and an updated CV.
+3. **Deadlines:** fall intake applications usually open in September and close between December and March.
 
-You can use the **University Explorer** to compare tuition and acceptance rates, or use our **AI Profile Evaluator** for an in-depth readiness breakdown!`;
+You can compare tuition and acceptance rates in the **University Explorer**, or run the **AI Profile Evaluator** for a full readiness breakdown.`;
       }
+      reply = normalizeAiReply(fallback);
     }
 
     return NextResponse.json({ reply });

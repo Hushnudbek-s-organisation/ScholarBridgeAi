@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
+    "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically"
   },

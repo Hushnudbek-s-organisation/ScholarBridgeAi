@@ -14,6 +14,7 @@ import {
   Award
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { AiFormattedText } from "./AiFormattedText";
 
 interface AiChatMentorProps {
   activeProfile: StudentProfile | null;
@@ -139,13 +140,13 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
             </div>
 
             <div
-              className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+              className={`min-w-0 p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                 m.sender === "user"
-                  ? "bg-indigo-600 text-white rounded-tr-none shadow-xs"
-                  : "bg-white text-slate-800 rounded-tl-none border border-slate-200 shadow-xs whitespace-pre-wrap"
+                  ? "whitespace-pre-wrap bg-indigo-600 text-white rounded-tr-none shadow-xs"
+                  : "bg-white text-slate-800 rounded-tl-none border border-slate-200 shadow-xs"
               }`}
             >
-              {m.text}
+              {m.sender === "ai" ? <AiFormattedText text={m.text} /> : m.text}
             </div>
           </div>
         ))}
