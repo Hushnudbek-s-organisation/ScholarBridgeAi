@@ -13,6 +13,7 @@ import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
 import { TaskRoadmap } from "@/components/TaskRoadmap";
 import { AiChatMentor } from "@/components/AiChatMentor";
+import { VisaSpeakingAssistant } from "@/components/VisaSpeakingAssistant";
 import { ForumSection } from "@/components/ForumSection";
 import { CoursesSection } from "@/components/CoursesSection";
 import { PaymentsSection } from "@/components/PaymentsSection";
@@ -582,6 +583,8 @@ export default function Home() {
         )}
 
         {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
+
+        {activeTab === "visa" && <VisaSpeakingAssistant activeProfile={activeProfile} />}
 
         {activeTab === "forum" && (
           <PremiumGate

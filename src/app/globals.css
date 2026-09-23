@@ -15,3 +15,19 @@
 .animate-fadeIn {
   animation: fadeInUp 0.35s ease-out both;
 }
+
+/* Visa Speaking Assistant — officer speaking equalizer bars */
+@keyframes visa-eq {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.visa-eq-bar {
+  transform-origin: bottom;
+  animation: visa-eq 0.9s ease-in-out infinite;
+}
