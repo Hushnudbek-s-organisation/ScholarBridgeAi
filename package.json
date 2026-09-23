@@ -9,12 +9,10 @@
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
-    "test:gemini": "tsx scripts/check-gemini.ts",
+    "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically"
   },
   "dependencies": {
-    "@google/genai": "^2.24.0",
-    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.117.0",
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",

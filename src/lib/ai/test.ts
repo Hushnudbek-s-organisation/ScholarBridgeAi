@@ -92,11 +92,11 @@ export async function testProviderConnection(
         });
         break;
       }
-      case "gemini": {
-        res = await probe(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-          { method: "GET" }
-        );
+      case "groq": {
+        res = await probe("https://api.groq.com/openai/v1/models", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${key}` },
+        });
         break;
       }
       default: {

@@ -263,7 +263,7 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Gemini AI Evaluation Report Output Modal/Card */}
+      {/* Groq AI Evaluation Report Output Modal/Card */}
       {aiEvaluation && (
         <div className="bg-white rounded-2xl p-6 border-2 border-indigo-200 shadow-lg space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">

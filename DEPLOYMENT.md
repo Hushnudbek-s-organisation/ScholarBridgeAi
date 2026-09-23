@@ -21,7 +21,7 @@ service.
      and only after reviewing what it will change.
 5. After the first deploy, set the **secret** env vars in the web service's
    **Environment** tab:
-   - `GEMINI_API_KEY` — required for AI features (Gemini 2.5 Flash)
+   - `GROQ_API_KEY` — required for AI features (Groq, default model `llama-3.3-70b-versatile`)
    - `NEXT_PUBLIC_APP_URL` — your public app URL (e.g.
      `https://scholarbridge-ai.onrender.com`)
    - Optional payment keys if you configure real Payme/Click:
@@ -47,7 +47,7 @@ service.
 | Variable                     | Required | Purpose                                   |
 | ---------------------------- | :------: | ----------------------------------------- |
 | `DATABASE_URL`               |   Yes    | Postgres connection (auto-set by blueprint) |
-| `GEMINI_API_KEY`             |   Yes    | Gemini 2.5 Flash for all AI features      |
+| `GROQ_API_KEY`               |   Yes    | Groq (llama-3.3-70b-versatile) for all AI features |
 | `NEXT_PUBLIC_APP_URL`        |   No     | Public URL used for referral links        |
 | `PAYME_MERCHANT_ID`/`KEY`/`PASSWORD` | No | Real Payme merchant creds         |
 | `CLICK_SERVICE_ID`/`MERCHANT_ID`/`MERCHANT_USER_ID`/`SECRET_KEY` | No | Real Click creds |

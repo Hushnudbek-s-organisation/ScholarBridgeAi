@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import {
-  createGeminiModel,
-  describeGeminiError,
-  getGeminiModelName,
-  isGeminiConfigured,
-  withGeminiRetry,
-} from "@/lib/gemini";
+  describeGroqError,
+  getGroqModelName,
+  groqChatComplete,
+  isGroqConfigured,
+  withGroqRetry,
+} from "@/lib/groq";
 import {
   buildAnalysisPrompt,
   getVisaCountry,
@@ -21,9 +21,9 @@ import {
  */
 export async function POST(req: Request) {
   try {
-    if (!isGeminiConfigured()) {
+    if (!isGroqConfigured()) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured on the server." },
+        { error: "GROQ_API_KEY is not configured on the server." },
         { status: 503 },
       );
     }
@@ -43,31 +43,19 @@ export async function POST(req: Request) {
         ? body.uiLanguage.trim().slice(0, 40)
         : "English";
 
-    const model = createGeminiModel();
-    if (!model) {
-      return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured on the server." },
-        { status: 503 },
-      );
-    }
-
-    const result = await withGeminiRetry(() =>
-      model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: buildAnalysisPrompt(country, history, uiLanguage) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json",
-        },
+    // The analysis prompt asks for "JSON ONLY" (Groq's json_object mode
+    // requires the word "JSON" in the messages).
+    const result = await withGroqRetry(() =>
+      groqChatComplete({
+        model: getGroqModelName(),
+        messages: [{ role: "user", content: buildAnalysisPrompt(country, history, uiLanguage) }],
+        temperature: 0.3,
+        maxTokens: 1024,
+        jsonMode: true,
       }),
     );
 
-    const analysis = parseAnalysisJson(result.response.text());
+    const analysis = parseAnalysisJson(result.text);
     if (!analysis) {
       return NextResponse.json(
         { error: "Could not parse the AI analysis. Please try again." },
@@ -79,7 +67,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("Visa analyze error:", err);
     return NextResponse.json(
-      { error: describeGeminiError(err, getGeminiModelName()) },
+      { error: describeGroqError(err, getGroqModelName()) },
       { status: 500 },
     );
   }

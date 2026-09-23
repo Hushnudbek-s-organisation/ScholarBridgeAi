@@ -1,7 +1,7 @@
 {
   "meta": {
     "appName": "ScholarBridge",
-    "aiBadge": "Gemini AI",
+    "aiBadge": "Groq AI",
     "tagline": "Глобальный приём и поиск стипендий"
   },
   "nav": {
@@ -257,7 +257,7 @@
   "dashboard": {
     "activeApplicant": "Активный заявитель: {name}",
     "admissionsIndex": "Индекс поступления",
-    "aiReportTitle": "Стратегическая оценка ScholarBridgeAI Gemini AI",
+    "aiReportTitle": "Стратегическая оценка ScholarBridgeAI Groq AI",
     "analyzing": "Анализ профиля...",
     "budgetBadge": "Лимит бюджета",
     "chatToolCta": "Открыть ИИ-чат",
@@ -289,7 +289,7 @@
     "reachExamples": "MIT, Оксфорд, ETH Zurich",
     "reachLabel": "🚀 Reach (20-30%)",
     "reachText": "Амбициозные вузы из мировой топ-10.",
-    "runAudit": "Запустить ИИ-аудит Gemini",
+    "runAudit": "Запустить ИИ-аудит Groq",
     "safetyExamples": "Университет Мельбурна, UBC",
     "safetyLabel": "🛡️ Safety (80%+)",
     "safetyText": "Гарантированные запасные варианты поступления и финансирования.",
@@ -345,7 +345,7 @@
     "answers": "Ответов: {count}",
     "answerIn": "Отвечайте на языке: {language}",
     "analyzing": "Анализ вашего интервью…",
-    "analyzingHint": "Gemini оценивает уверенность, убедительность и уровень языка.",
+    "analyzingHint": "Groq оценивает уверенность, убедительность и уровень языка.",
     "confidence": "Уверенность",
     "persuasiveness": "Убедительность",
     "languageLevel": "Уровень языка",

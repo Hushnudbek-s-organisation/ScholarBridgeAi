@@ -61,7 +61,7 @@ function check(name: string, fn: () => void) {
 // Provider registry
 // ---------------------------------------------------------------------------
 check("registry exposes exactly 4 providers", () => {
-  assert.deepEqual(AI_PROVIDER_IDS, ["openrouter", "openai", "anthropic", "gemini"]);
+  assert.deepEqual(AI_PROVIDER_IDS, ["openrouter", "openai", "anthropic", "groq"]);
 });
 
 check("every provider id has meta", () => {
@@ -101,7 +101,7 @@ check("key env vars follow *_API_KEY naming", () => {
 
 check("isAIProviderId validates ids (case-sensitive)", () => {
   assert.equal(isAIProviderId("openrouter"), true);
-  assert.equal(isAIProviderId("gemini"), true);
+  assert.equal(isAIProviderId("groq"), true);
   assert.equal(isAIProviderId("OPENAI"), false);
   assert.equal(isAIProviderId("bogus"), false);
   assert.equal(isAIProviderId(null), false);
@@ -263,27 +263,27 @@ check("resolveProviderForTask defaults to openrouter", () => {
 
 check("resolveProviderForTask: DB (admin panel) wins over env", () => {
   assert.equal(
-    resolveProviderForTask("essay", { ai_provider_essay: "openai" }, { AI_PROVIDER_ESSAY: "gemini" }),
+    resolveProviderForTask("essay", { ai_provider_essay: "openai" }, { AI_PROVIDER_ESSAY: "groq" }),
     "openai"
   );
 });
 
 check("resolveProviderForTask: DB default provider is respected", () => {
   assert.equal(
-    resolveProviderForTask("essay", { ai_default_provider: "anthropic" }, { AI_PROVIDER_ESSAY: "gemini" }),
+    resolveProviderForTask("essay", { ai_default_provider: "anthropic" }, { AI_PROVIDER_ESSAY: "groq" }),
     "anthropic"
   );
 });
 
 check("resolveProviderForTask: task mapping beats DB default", () => {
   assert.equal(
-    resolveProviderForTask("essay", { ai_default_provider: "anthropic", ai_provider_essay: "gemini" }, {}),
-    "gemini"
+    resolveProviderForTask("essay", { ai_default_provider: "anthropic", ai_provider_essay: "groq" }, {}),
+    "groq"
   );
 });
 
 check("resolveProviderForTask: env wins over default", () => {
-  assert.equal(resolveProviderForTask("essay", {}, { AI_PROVIDER_ESSAY: "gemini" }), "gemini");
+  assert.equal(resolveProviderForTask("essay", {}, { AI_PROVIDER_ESSAY: "groq" }), "groq");
 });
 
 check("resolveProviderForTask: unknown provider id falls back to default", () => {

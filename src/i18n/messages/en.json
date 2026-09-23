@@ -1,7 +1,7 @@
 {
   "meta": {
     "appName": "ScholarBridge",
-    "aiBadge": "Gemini AI",
+    "aiBadge": "Groq AI",
     "tagline": "Global Admissions & Scholarship Discovery"
   },
   "nav": {
@@ -257,7 +257,7 @@
   "dashboard": {
     "activeApplicant": "Active Applicant: {name}",
     "admissionsIndex": "Admissions Index",
-    "aiReportTitle": "ScholarBridgeAI Gemini AI Strategic Evaluation",
+    "aiReportTitle": "ScholarBridgeAI Groq AI Strategic Evaluation",
     "analyzing": "Analyzing Profile...",
     "budgetBadge": "Budget Limit",
     "chatToolCta": "Open AI Chat",
@@ -289,7 +289,7 @@
     "reachExamples": "MIT, Oxford, ETH Zurich",
     "reachLabel": "🚀 Reach (20-30%)",
     "reachText": "Aspirational top-10 world institutions.",
-    "runAudit": "Run Gemini AI Audit",
+    "runAudit": "Run Groq AI Audit",
     "safetyExamples": "U of Melbourne, UBC",
     "safetyLabel": "🛡️ Safety (80%+)",
     "safetyText": "Guaranteed admission & funding backups.",
@@ -345,7 +345,7 @@
     "answers": "{count} answers",
     "answerIn": "Answer in {language}",
     "analyzing": "Analyzing your interview…",
-    "analyzingHint": "Gemini is scoring confidence, persuasion and language level.",
+    "analyzingHint": "Groq is scoring confidence, persuasion and language level.",
     "confidence": "Confidence",
     "persuasiveness": "Persuasiveness",
     "languageLevel": "Language level",

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import {
-  createGeminiModel,
-  describeGeminiError,
-  getGeminiModelName,
-  isGeminiConfigured,
-  withGeminiRetry,
-} from "@/lib/gemini";
+  describeGroqError,
+  getGroqModelName,
+  groqChatComplete,
+  isGroqConfigured,
+  withGroqRetry,
+} from "@/lib/groq";
 import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
@@ -23,9 +23,9 @@ import {
  */
 export async function POST(req: Request) {
   try {
-    if (!isGeminiConfigured()) {
+    if (!isGroqConfigured()) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured on the server." },
+        { error: "GROQ_API_KEY is not configured on the server." },
         { status: 503 },
       );
     }
@@ -44,29 +44,25 @@ export async function POST(req: Request) {
     const history = sanitizeHistory(body?.messages);
     const profile = (body?.profile || null) as VisaApplicantProfile | null;
 
-    const model = createGeminiModel(
-      buildOfficerSystemPrompt(country, gender, profile),
-    );
-    if (!model) {
-      return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured on the server." },
-        { status: 503 },
-      );
-    }
-
-    const result = await withGeminiRetry(() =>
-      model.generateContent({
-        contents: [
+    const result = await withGroqRetry(() =>
+      groqChatComplete({
+        model: getGroqModelName(),
+        messages: [
+          {
+            role: "system",
+            content: buildOfficerSystemPrompt(country, gender, profile),
+          },
           {
             role: "user",
-            parts: [{ text: buildInterviewUserPrompt(country, history) }],
+            content: buildInterviewUserPrompt(country, history),
           },
         ],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 300 },
+        temperature: 0.8,
+        maxTokens: 300,
       }),
     );
 
-    const reply = result.response.text().trim();
+    const reply = result.text.trim();
     if (!reply) {
       return NextResponse.json(
         { error: "The AI officer returned an empty reply. Please try again." },
@@ -78,7 +74,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("Visa chat error:", err);
     return NextResponse.json(
-      { error: describeGeminiError(err, getGeminiModelName()) },
+      { error: describeGroqError(err, getGroqModelName()) },
       { status: 500 },
     );
   }

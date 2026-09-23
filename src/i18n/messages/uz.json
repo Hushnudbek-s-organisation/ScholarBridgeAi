@@ -1,7 +1,7 @@
 {
   "meta": {
     "appName": "ScholarBridge",
-    "aiBadge": "Gemini AI",
+    "aiBadge": "Groq AI",
     "tagline": "Global qabul va stipendiya izlash"
   },
   "nav": {
@@ -257,7 +257,7 @@
   "dashboard": {
     "activeApplicant": "Faol ariza beruvchi: {name}",
     "admissionsIndex": "Qabul indeksi",
-    "aiReportTitle": "ScholarBridgeAI Gemini AI strategik bahosi",
+    "aiReportTitle": "ScholarBridgeAI Groq AI strategik bahosi",
     "analyzing": "Profil tahlil qilinmoqda...",
     "budgetBadge": "Byudjet chegarasi",
     "chatToolCta": "AI chatni ochish",
@@ -289,7 +289,7 @@
     "reachExamples": "MIT, Oxford, ETH Zurich",
     "reachLabel": "🚀 Reach (20-30%)",
     "reachText": "Dunyoning top-10 orzu universitetlari.",
-    "runAudit": "Gemini AI auditini ishga tushirish",
+    "runAudit": "Groq AI auditini ishga tushirish",
     "safetyExamples": "Melbourne universiteti, UBC",
     "safetyLabel": "🛡️ Safety (80%+)",
     "safetyText": "Qabul va moliyalashtirish bo'yicha kafolatli zaxira variantlar.",
@@ -345,7 +345,7 @@
     "answers": "{count} ta javob",
     "answerIn": "{language} tilida javob bering",
     "analyzing": "Suhbatingiz tahlil qilinmoqda…",
-    "analyzingHint": "Gemini ishonch, ishontirish va til darajasini baholamoqda.",
+    "analyzingHint": "Groq ishonch, ishontirish va til darajasini baholamoqda.",
     "confidence": "O‘ziga ishonch",
     "persuasiveness": "Ishontirish",
     "languageLevel": "Til darajasi",
