@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
+    "test:gemini": "tsx scripts/check-gemini.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically"
   },
   "dependencies": {
