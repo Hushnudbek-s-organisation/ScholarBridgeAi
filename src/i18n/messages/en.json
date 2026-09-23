@@ -375,7 +375,20 @@
     "backToInterview": "Back to interview",
     "transcriptTitle": "Conversation",
     "emptyTranscript": "Your conversation will appear here.",
-    "voiceUnavailable": "Voice playback is unavailable here — follow the subtitles."
+    "voiceUnavailable": "Voice playback is unavailable here — follow the subtitles.",
+    "liveVoiceTitle": "Gemini Live voice",
+    "liveVoiceHint": "Choose one of the fast prebuilt Live API voices. The token locks this choice server-side.",
+    "startShort": "Start",
+    "stop": "Stop",
+    "realtimeMode": "REAL-TIME",
+    "fallbackMode": "FALLBACK",
+    "connected": "Connected",
+    "connecting": "Connecting",
+    "liveTokenError": "Could not create a secure Gemini Live token.",
+    "liveUnsupported": "Gemini Live audio is not supported in this browser.",
+    "liveFallback": "Gemini Live is unavailable here, so the interview switched to browser speech fallback.",
+    "liveReconnecting": "Reconnecting Gemini Live…",
+    "interrupted": "Playback stopped. You can continue answering."
   },
   "strength": {
     "title": "Profile Strength",

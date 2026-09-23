@@ -375,7 +375,20 @@
     "backToInterview": "Назад к интервью",
     "transcriptTitle": "Разговор",
     "emptyTranscript": "Ваш разговор появится здесь.",
-    "voiceUnavailable": "Озвучка недоступна — читайте субтитры."
+    "voiceUnavailable": "Озвучка недоступна — читайте субтитры.",
+    "liveVoiceTitle": "Голос Gemini Live",
+    "liveVoiceHint": "Выберите один из быстрых встроенных голосов Live API. Этот выбор блокируется в токене на сервере.",
+    "startShort": "Начать",
+    "stop": "Стоп",
+    "realtimeMode": "REAL-TIME",
+    "fallbackMode": "РЕЗЕРВ",
+    "connected": "Подключено",
+    "connecting": "Подключение",
+    "liveTokenError": "Не удалось создать защищённый токен Gemini Live.",
+    "liveUnsupported": "Gemini Live audio не поддерживается в этом браузере.",
+    "liveFallback": "Gemini Live здесь недоступен, интервью переключено на резервный режим браузерной речи.",
+    "liveReconnecting": "Повторное подключение Gemini Live…",
+    "interrupted": "Воспроизведение остановлено. Можно продолжать отвечать."
   },
   "strength": {
     "title": "Сила профиля",

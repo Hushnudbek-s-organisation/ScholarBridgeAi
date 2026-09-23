@@ -17,7 +17,7 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:
 // Provider registry
 // ---------------------------------------------------------------------------
 
-export type AIProviderId = "openrouter" | "openai" | "anthropic" | "groq";
+export type AIProviderId = "openrouter" | "openai" | "anthropic" | "groq" | "gemini";
 
 export interface AIProviderMeta {
   id: AIProviderId;
@@ -33,7 +33,9 @@ export interface AIProviderMeta {
   keyShape: string;
 }
 
-export const AI_PROVIDER_IDS: AIProviderId[] = ["openrouter", "openai", "anthropic", "groq"];
+// "gemini" serves the Gemini Live voice interview (visa speaking assistant) —
+// it has no chat adapter in ./index.ts, which degrades to openrouter for chat tasks.
+export const AI_PROVIDER_IDS: AIProviderId[] = ["openrouter", "openai", "anthropic", "groq", "gemini"];
 
 export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   openrouter: {
@@ -67,6 +69,14 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
     keyEnvVar: "GROQ_API_KEY",
     modelEnvVar: "GROQ_MODEL",
     keyShape: "gsk_…",
+  },
+  gemini: {
+    id: "gemini",
+    label: "Gemini (Live voice)",
+    defaultModel: "gemini-3.1-flash-live-preview",
+    keyEnvVar: "GEMINI_API_KEY",
+    modelEnvVar: "GEMINI_LIVE_MODEL",
+    keyShape: "AIza…",
   },
 };
 

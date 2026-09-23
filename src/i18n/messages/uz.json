@@ -375,7 +375,20 @@
     "backToInterview": "Suhbatga qaytish",
     "transcriptTitle": "Muloqot",
     "emptyTranscript": "Muloqotingiz shu yerda ko‘rinadi.",
-    "voiceUnavailable": "Ovozli ijro mavjud emas — subtitrlardan foydalaning."
+    "voiceUnavailable": "Ovozli ijro mavjud emas — subtitrlardan foydalaning.",
+    "liveVoiceTitle": "Gemini Live ovozi",
+    "liveVoiceHint": "Live API uchun tezkor tayyor ovozlardan birini tanlang. Bu tanlov token ichida serverda qulflanadi.",
+    "startShort": "Boshlash",
+    "stop": "To‘xtat",
+    "realtimeMode": "REAL-TIME",
+    "fallbackMode": "ZAXIRA",
+    "connected": "Ulangan",
+    "connecting": "Ulanmoqda",
+    "liveTokenError": "Xavfsiz Gemini Live tokenini yaratib bo‘lmadi.",
+    "liveUnsupported": "Bu brauzer Gemini Live audio rejimini qo‘llab-quvvatlamaydi.",
+    "liveFallback": "Gemini Live hozir ishlamadi, suhbat brauzer speech zaxira rejimiga o‘tdi.",
+    "liveReconnecting": "Gemini Live qayta ulanmoqda…",
+    "interrupted": "Ijro to‘xtatildi. Javob berishda davom etishingiz mumkin."
   },
   "strength": {
     "title": "Profil kuchi",
