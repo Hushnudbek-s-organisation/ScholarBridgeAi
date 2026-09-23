@@ -17,7 +17,7 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:
 // Provider registry
 // ---------------------------------------------------------------------------
 
-export type AIProviderId = "openrouter" | "openai" | "anthropic" | "gemini";
+export type AIProviderId = "openrouter" | "openai" | "anthropic" | "groq";
 
 export interface AIProviderMeta {
   id: AIProviderId;
@@ -33,13 +33,13 @@ export interface AIProviderMeta {
   keyShape: string;
 }
 
-export const AI_PROVIDER_IDS: AIProviderId[] = ["openrouter", "openai", "anthropic", "gemini"];
+export const AI_PROVIDER_IDS: AIProviderId[] = ["openrouter", "openai", "anthropic", "groq"];
 
 export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   openrouter: {
     id: "openrouter",
     label: "OpenRouter",
-    defaultModel: "google/gemini-2.5-flash",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct",
     keyEnvVar: "OPENROUTER_API_KEY",
     modelEnvVar: "OPENROUTER_MODEL",
     keyShape: "sk-or-v1-…",
@@ -60,13 +60,13 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
     modelEnvVar: "ANTHROPIC_MODEL",
     keyShape: "sk-ant-…",
   },
-  gemini: {
-    id: "gemini",
-    label: "Google Gemini",
-    defaultModel: "gemini-2.5-flash",
-    keyEnvVar: "GEMINI_API_KEY",
-    modelEnvVar: "GEMINI_MODEL",
-    keyShape: "AIza…",
+  groq: {
+    id: "groq",
+    label: "Groq",
+    defaultModel: "llama-3.3-70b-versatile",
+    keyEnvVar: "GROQ_API_KEY",
+    modelEnvVar: "GROQ_MODEL",
+    keyShape: "gsk_…",
   },
 };
 

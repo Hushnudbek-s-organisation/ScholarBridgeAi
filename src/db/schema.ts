@@ -416,7 +416,7 @@ export const appConfig = pgTable("app_config", {
  */
 export const aiProviderCredentials = pgTable("ai_provider_credentials", {
   id: serial("id").primaryKey(),
-  provider: text("provider").notNull().unique(), // openrouter | openai | anthropic | gemini
+  provider: text("provider").notNull().unique(), // openrouter | openai | anthropic | groq
   apiKeyEnc: text("api_key_enc"), // encrypted payload, never plaintext
   model: text("model"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

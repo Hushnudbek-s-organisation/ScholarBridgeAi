@@ -77,7 +77,7 @@ export default function PrivacyPage() {
                 Your data is stored in a Postgres database hosted via Supabase (the database provider), and the application itself is hosted on Render.com. Both providers maintain their own security measures, encryption at rest, and access controls. Backups are managed by Supabase per its retention policy.
               </p>
               <p className="mt-2">
-                AI provider credentials (OpenRouter, OpenAI, Anthropic, Gemini) are stored encrypted (AES-256-GCM, &quot;enc:v1:&quot; prefix) server-side and never returned by any API.
+                AI provider credentials (OpenRouter, OpenAI, Anthropic, Groq) are stored encrypted (AES-256-GCM, &quot;enc:v1:&quot; prefix) server-side and never returned by any API.
               </p>
             </section>
 

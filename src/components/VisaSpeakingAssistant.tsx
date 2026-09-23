@@ -342,8 +342,6 @@ export function VisaSpeakingAssistant({
   const [analysis, setAnalysis] = useState<VisaAnalysis | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
-  const [liveSessionActive, setLiveSessionActive] = useState(false);
-  const [liveTokenError, setLiveTokenError] = useState<string | null>(null);
 
   // Refs for async-safe flow (session tokens, streams, recognition handles).
   const sessionRef = useRef(0);
@@ -366,10 +364,6 @@ export function VisaSpeakingAssistant({
   const meterRafRef = useRef(0);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VisaEngine | null>(null);
-  // Live audio pipeline refs (Gemini Live API via ephemeral token)
-  const liveSessionRef = useRef<unknown>(null);
-  const liveMicCtxRef = useRef<AudioContext | null>(null);
-  const livePlayCtxRef = useRef<AudioContext | null>(null);
 
   const country = getVisaCountry(countryCode);
   const lastOfficer = [...messages]
@@ -844,50 +838,6 @@ export function VisaSpeakingAssistant({
       runAnalysis,
     };
   });
-
-  // Live audio pipeline: tries ephemeral token + Gemini Live session.
-  // If anything fails (no server key, unsupported browser feature, network),
-  // falls back silently to SpeechRecognition + speechSynthesis mode.
-  useEffect(() => {
-    if (screen !== "interview" || !configRef.current) return;
-    let cancelled = false;
-
-    async function initLive() {
-      try {
-        const res = await fetch("/api/visa/live-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            countryCode: configRef.current?.countryCode,
-            gender: configRef.current?.gender,
-            profile: activeProfile
-              ? {
-                  name: activeProfile.name,
-                  degreeLevel: activeProfile.degreeLevel,
-                  targetMajor: activeProfile.targetMajor,
-                }
-              : null,
-            voice: "Puck",
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok || !data?.token) {
-          setLiveTokenError(typeof data?.error === "string" ? data.error : "Live API unavailable.");
-          return;
-        }
-        // Token received — session ready for AudioWorklet activation.
-        // The full AudioWorklet pipeline is embedded below for activation.
-        setLiveSessionActive(true);
-        setLiveTokenError(null);
-      } catch (e) {
-        if (cancelled) return;
-        setLiveTokenError("Live session could not start.");
-      }
-    }
-    void initLive();
-    return () => { cancelled = true; };
-  }, [screen, activeProfile]);
 
   // ===========================================================================
   // RENDER

@@ -47,7 +47,7 @@ interface SettingsPayload {
   defaults: { defaultProvider: string; encryption: { explicitSecret: boolean } };
 }
 
-const PROVIDER_OPTIONS = ["openrouter", "openai", "anthropic", "gemini"];
+const PROVIDER_OPTIONS = ["openrouter", "openai", "anthropic", "groq"];
 
 export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
   const [data, setData] = useState<SettingsPayload | null>(null);

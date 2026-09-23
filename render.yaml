@@ -29,11 +29,11 @@ services:
           property: connectionString
       - key: NODE_VERSION
         value: "22"
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
-      # Visa Speaking Assistant model — 1.x/2.0 families are retired (404).
-      - key: GEMINI_MODEL
-        value: "gemini-3.8-flash"
+      # Visa Speaking Assistant model — see https://console.groq.com/docs/models
+      - key: GROQ_MODEL
+        value: "llama-3.3-70b-versatile"
       - key: NEXT_PUBLIC_APP_URL
         sync: false
       # Optional payment keys (only needed if you configure real Payme/Click).

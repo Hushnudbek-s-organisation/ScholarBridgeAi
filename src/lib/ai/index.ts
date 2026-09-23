@@ -8,7 +8,7 @@
  *      AI_PROVIDER_GENERAL | AI_PROVIDER_SEARCH | AI_PROVIDER_DOCUMENT_ANALYSIS
  *   3. default "openrouter"
  * API keys resolve the same way: admin panel credential (encrypted in DB) →
- * env (OPENROUTER_API_KEY | OPENAI_API_KEY | ANTHROPIC_API_KEY | GEMINI_API_KEY).
+ * env (OPENROUTER_API_KEY | OPENAI_API_KEY | ANTHROPIC_API_KEY | GROQ_API_KEY).
  *
  * All API keys stay server-side. No provider-specific logic in the frontend.
  */
@@ -46,7 +46,7 @@ export interface AIResponse {
   costEstimate: number;
 }
 
-export type AIProviderName = "openai" | "anthropic" | "gemini" | "openrouter";
+export type AIProviderName = "openai" | "anthropic" | "groq" | "openrouter";
 
 export interface AIProviderAdapter {
   name: AIProviderName;
@@ -71,7 +71,7 @@ const openrouter: AIProviderAdapter = {
         "X-Title": "ScholarBridge",
       },
       body: JSON.stringify({
-        model: cfg.model || "google/gemini-2.5-flash",
+        model: cfg.model || "meta-llama/llama-3.3-70b-instruct",
         messages: [
           ...(req.systemInstruction ? [{ role: "system", content: req.systemInstruction }] : []),
           { role: "user", content: req.prompt },
@@ -166,36 +166,41 @@ const anthropic: AIProviderAdapter = {
   },
 };
 
-const gemini: AIProviderAdapter = {
-  name: "gemini",
+/**
+ * Groq exposes an OpenAI-compatible REST API, so the adapter mirrors the
+ * OpenAI one with Groq's base URL. Free keys: https://console.groq.com/keys
+ */
+const groq: AIProviderAdapter = {
+  name: "groq",
   async call(req, cfg) {
     if (!cfg.apiKey) return null;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || "gemini-2.5-flash"}:generateContent?key=${cfg.apiKey}`;
-    const res = await fetch(url, {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cfg.apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: req.prompt }] }],
-        systemInstruction: req.systemInstruction
-          ? { parts: [{ text: req.systemInstruction }] }
-          : undefined,
-        generationConfig: {
-          temperature: req.temperature ?? 0.6,
-          maxOutputTokens: req.maxTokens ?? 4096,
-        },
+        model: cfg.model || "llama-3.3-70b-versatile",
+        messages: [
+          ...(req.systemInstruction ? [{ role: "system", content: req.systemInstruction }] : []),
+          { role: "user", content: req.prompt },
+        ],
+        temperature: req.temperature ?? 0.6,
+        max_tokens: req.maxTokens ?? 4096,
       }),
     });
     if (!res.ok) {
-      console.warn("Gemini error:", res.status, await res.text());
+      console.warn("Groq error:", res.status, await res.text());
       return null;
     }
     const data = await res.json();
     return {
-      text: data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
-      provider: "gemini",
-      model: cfg.model || "gemini-2.5-flash",
-      promptTokens: 0,
-      completionTokens: 0,
+      text: data?.choices?.[0]?.message?.content ?? "",
+      provider: "groq",
+      model: data?.model || cfg.model || "unknown",
+      promptTokens: data?.usage?.prompt_tokens ?? 0,
+      completionTokens: data?.usage?.completion_tokens ?? 0,
       costEstimate: 0,
     };
   },
@@ -205,7 +210,7 @@ export const PROVIDERS: Record<AIProviderName, AIProviderAdapter> = {
   openrouter,
   openai,
   anthropic,
-  gemini,
+  groq,
 };
 
 // ---------------------------------------------------------------------------
