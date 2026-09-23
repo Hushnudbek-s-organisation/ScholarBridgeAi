@@ -4,6 +4,7 @@ import {
   describeGeminiError,
   getGeminiModelName,
   isGeminiConfigured,
+  withGeminiRetry,
 } from "@/lib/gemini";
 import {
   buildAnalysisPrompt,
@@ -50,19 +51,21 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: buildAnalysisPrompt(country, history, uiLanguage) }],
+    const result = await withGeminiRetry(() =>
+      model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: buildAnalysisPrompt(country, history, uiLanguage) }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json",
         },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json",
-      },
-    });
+      }),
+    );
 
     const analysis = parseAnalysisJson(result.response.text());
     if (!analysis) {

@@ -4,6 +4,7 @@ import {
   describeGeminiError,
   getGeminiModelName,
   isGeminiConfigured,
+  withGeminiRetry,
 } from "@/lib/gemini";
 import {
   buildInterviewUserPrompt,
@@ -53,15 +54,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: buildInterviewUserPrompt(country, history) }],
-        },
-      ],
-      generationConfig: { temperature: 0.8, maxOutputTokens: 300 },
-    });
+    const result = await withGeminiRetry(() =>
+      model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: buildInterviewUserPrompt(country, history) }],
+          },
+        ],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 300 },
+      }),
+    );
 
     const reply = result.response.text().trim();
     if (!reply) {
