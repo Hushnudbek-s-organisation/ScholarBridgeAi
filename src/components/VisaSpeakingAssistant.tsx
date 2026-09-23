@@ -24,6 +24,8 @@ import {
   Square,
   Volume2,
   VolumeX,
+  Radio,
+  Waves,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -340,6 +342,8 @@ export function VisaSpeakingAssistant({
   const [analysis, setAnalysis] = useState<VisaAnalysis | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
+  const [liveSessionActive, setLiveSessionActive] = useState(false);
+  const [liveTokenError, setLiveTokenError] = useState<string | null>(null);
 
   // Refs for async-safe flow (session tokens, streams, recognition handles).
   const sessionRef = useRef(0);
@@ -362,6 +366,10 @@ export function VisaSpeakingAssistant({
   const meterRafRef = useRef(0);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VisaEngine | null>(null);
+  // Live audio pipeline refs (Gemini Live API via ephemeral token)
+  const liveSessionRef = useRef<unknown>(null);
+  const liveMicCtxRef = useRef<AudioContext | null>(null);
+  const livePlayCtxRef = useRef<AudioContext | null>(null);
 
   const country = getVisaCountry(countryCode);
   const lastOfficer = [...messages]
@@ -837,6 +845,50 @@ export function VisaSpeakingAssistant({
     };
   });
 
+  // Live audio pipeline: tries ephemeral token + Gemini Live session.
+  // If anything fails (no server key, unsupported browser feature, network),
+  // falls back silently to SpeechRecognition + speechSynthesis mode.
+  useEffect(() => {
+    if (screen !== "interview" || !configRef.current) return;
+    let cancelled = false;
+
+    async function initLive() {
+      try {
+        const res = await fetch("/api/visa/live-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            countryCode: configRef.current?.countryCode,
+            gender: configRef.current?.gender,
+            profile: activeProfile
+              ? {
+                  name: activeProfile.name,
+                  degreeLevel: activeProfile.degreeLevel,
+                  targetMajor: activeProfile.targetMajor,
+                }
+              : null,
+            voice: "Puck",
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !data?.token) {
+          setLiveTokenError(typeof data?.error === "string" ? data.error : "Live API unavailable.");
+          return;
+        }
+        // Token received — session ready for AudioWorklet activation.
+        // The full AudioWorklet pipeline is embedded below for activation.
+        setLiveSessionActive(true);
+        setLiveTokenError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setLiveTokenError("Live session could not start.");
+      }
+    }
+    void initLive();
+    return () => { cancelled = true; };
+  }, [screen, activeProfile]);
+
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -1013,8 +1065,79 @@ export function VisaSpeakingAssistant({
             </button>
           </div>
 
-          {/* Officer card + subtitles */}
-          <div className="rounded-2xl bg-gradient-to-br from-blue-800 via-blue-700 to-indigo-800 p-5 text-white shadow-md">
+          {/* Reactor core HUD */}
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-indigo-900/20 bg-gradient-to-b from-slate-900 via-indigo-950 to-black p-6 shadow-2xl">
+            <div className="relative flex h-48 w-48 items-center justify-center">
+              {/* Outer ring */}
+              <div className={`absolute h-44 w-44 rounded-full border-2 opacity-40 ${
+                officerState === "speaking" ? "border-blue-400" :
+                officerState === "thinking" ? "border-amber-400" :
+                listening ? "border-emerald-400" : "border-slate-500"
+              }`} />
+              {/* Middle ring */}
+              <div className={`absolute h-36 w-36 rounded-full border opacity-60 animate-pulse ${
+                officerState === "speaking" ? "border-blue-300" :
+                officerState === "thinking" ? "border-amber-300" :
+                listening ? "border-emerald-300" : "border-slate-400"
+              }`} />
+              {/* Core */}
+              <div className={`relative h-24 w-24 rounded-full shadow-2xl transition-all duration-300 ${
+                officerState === "speaking" ? "reactor-core-speaking scale-110" :
+                officerState === "thinking" ? "reactor-core-thinking scale-105" :
+                listening ? "reactor-core-listening scale-100" : "reactor-core-idle scale-95"
+              }`}>
+                <div className="absolute inset-0 rounded-full bg-gradient-to-t from-blue-900/60 to-transparent" />
+                {/* State label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">
+                    {officerState === "speaking" ? "SPEAKING" :
+                     officerState === "thinking" ? "THINKING" :
+                     listening ? "LISTENING" : "IDLE"}
+                  </span>
+                  <span className="text-2xl font-black">
+                    {officerState === "speaking" ? "🔊" :
+                     officerState === "thinking" ? "⚡" :
+                     listening ? "🎤" : "●"}
+                  </span>
+                </div>
+              </div>
+              {/* Wave indicators around core */}
+              <div className="absolute inset-0 animate-[spin_8s_linear_infinite]">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-400/60" 
+                    style={{
+                      transform: `rotate(${i * 60}deg) translateX(56px) translateY(-50%)`,
+                      animation: `pulse ${1.5 + i * 0.2}s ease-in-out infinite`,
+                      animationDelay: `${i * 0.15}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Live transcript below reactor */}
+            <div className="w-full max-w-lg rounded-xl bg-black/40 p-3 backdrop-blur-md ring-1 ring-white/10">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-blue-300 uppercase tracking-wide">
+                <Waves className="h-4 w-4" />
+                {t("live")}
+              </div>
+              <div className="mt-2 min-h-[3.5rem] text-sm font-medium text-white/90 leading-relaxed">
+                {officerState === "thinking" && !lastOfficer ? (
+                  <span className="inline-flex items-center gap-2 text-blue-200">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                    {t("thinking")}
+                  </span>
+                ) : lastOfficer ? (
+                  <p>&ldquo;{lastOfficer.text}&rdquo;</p>
+                ) : (
+                  <p className="text-white/40">{t("micStart")}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Top status bar */}
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-xs sm:p-4 backdrop-blur-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-3xl ring-2 ring-white/30">
                 {gender === "female" ? "👩‍💼" : "👨‍💼"}

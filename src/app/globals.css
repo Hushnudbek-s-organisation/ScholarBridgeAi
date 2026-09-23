@@ -31,3 +31,54 @@
   transform-origin: bottom;
   animation: visa-eq 0.9s ease-in-out infinite;
 }
+
+/* HUD reactor core animations */
+@keyframes reactor-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 0 60px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 0 0 90px rgba(59, 130, 246, 0.5);
+  }
+}
+
+@keyframes reactor-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wave-flow {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.reactor-core-idle {
+  animation: reactor-pulse 3s ease-in-out infinite;
+}
+
+.reactor-core-thinking {
+  animation: reactor-pulse 1.2s ease-in-out infinite;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #312e81 100%);
+}
+
+.reactor-core-speaking {
+  animation: reactor-pulse 0.8s ease-in-out infinite;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #3730a3 100%);
+}
+
+.reactor-core-listening {
+  animation: reactor-pulse 2s ease-in-out infinite;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
+}
+
+.wave-bar {
+  animation: visa-eq 0.6s ease-in-out infinite;
+}
