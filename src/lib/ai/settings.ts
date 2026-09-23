@@ -63,7 +63,7 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   groq: {
     id: "groq",
     label: "Groq",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "openai/gpt-oss-120b",
     keyEnvVar: "GROQ_API_KEY",
     modelEnvVar: "GROQ_MODEL",
     keyShape: "gsk_…",

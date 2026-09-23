@@ -31,9 +31,11 @@ services:
         value: "22"
       - key: GROQ_API_KEY
         sync: false
-      # Visa Speaking Assistant model — see https://console.groq.com/docs/models
+      # Visa Speaking Assistant + AI model. Unset uses the same code default.
+      # llama-3.3-70b-versatile was removed by Groq on 2026-08-16.
+      # Current models: https://console.groq.com/docs/models
       - key: GROQ_MODEL
-        value: "llama-3.3-70b-versatile"
+        value: "openai/gpt-oss-120b"
       - key: NEXT_PUBLIC_APP_URL
         sync: false
       # Optional payment keys (only needed if you configure real Payme/Click).

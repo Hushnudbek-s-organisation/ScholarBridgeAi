@@ -44,14 +44,16 @@ export async function POST(req: Request) {
         : "English";
 
     // The analysis prompt asks for "JSON ONLY" (Groq's json_object mode
-    // requires the word "JSON" in the messages).
+    // requires the word "JSON" in the messages). gpt-oss reasoning tokens
+    // share max_tokens, so the budget is 2048 with low effort.
     const result = await withGroqRetry(() =>
       groqChatComplete({
         model: getGroqModelName(),
         messages: [{ role: "user", content: buildAnalysisPrompt(country, history, uiLanguage) }],
         temperature: 0.3,
-        maxTokens: 1024,
+        maxTokens: 2048,
         jsonMode: true,
+        reasoningEffort: "low",
       }),
     );
 
