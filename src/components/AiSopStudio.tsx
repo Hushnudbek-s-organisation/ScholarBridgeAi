@@ -14,6 +14,8 @@ import {
   Zap,
   BookOpen
 } from "lucide-react";
+import { toPlainText } from "@/lib/ai/format-reply";
+import { AiFormattedText } from "./AiFormattedText";
 
 interface AiSopStudioProps {
   activeProfile: StudentProfile | null;
@@ -221,7 +223,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
 
                 {generatedSop && (
                   <button
-                    onClick={() => copyToClipboard(generatedSop)}
+                    onClick={() => copyToClipboard(toPlainText(generatedSop))}
                     className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors"
                   >
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
@@ -231,8 +233,8 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
               </div>
 
               {generatedSop ? (
-                <div className="prose prose-indigo max-w-none text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto pr-2">
-                  {generatedSop}
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <AiFormattedText text={generatedSop} className="text-xs sm:text-sm text-slate-700" />
                 </div>
               ) : (
                 <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
@@ -299,8 +301,8 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
             </h3>
 
             {sopReview ? (
-              <div className="prose prose-indigo max-w-none text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto pr-2">
-                {sopReview}
+              <div className="max-h-[600px] overflow-y-auto pr-2">
+                <AiFormattedText text={sopReview} className="text-xs sm:text-sm text-slate-700" />
               </div>
             ) : (
               <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
