@@ -15,9 +15,15 @@ interface NotificationItem {
 
 interface NotificationBellProps {
   profileId: number | null;
+  /**
+   * Which way the dropdown opens. Use "up" when the bell sits at the BOTTOM
+   * of the screen (desktop sidebar footer) so the panel isn't clipped by the
+   * viewport edge; "down" (default) for top headers.
+   */
+  placement?: "up" | "down";
 }
 
-export function NotificationBell({ profileId }: NotificationBellProps) {
+export function NotificationBell({ profileId, placement = "down" }: NotificationBellProps) {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

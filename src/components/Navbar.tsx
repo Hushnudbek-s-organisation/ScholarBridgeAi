@@ -23,6 +23,7 @@ import {
   LogOut,
   CalendarClock,
   Headset,
+  Mic,
 } from "lucide-react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
@@ -95,6 +96,7 @@ export function Navbar({
     { id: "sop", label: t("sop"), icon: FileText, premium: true },
     { id: "tasks", label: t("tasks"), icon: CheckSquare, premium: true },
     { id: "chat", label: t("chat"), icon: Bot },
+    { id: "visa", label: t("visa"), icon: Mic },
     { id: "forum", label: t("forum"), icon: MessagesSquare, premium: true },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
     { id: "courses", label: t("courses"), icon: Video, premium: true, hidden: true },
@@ -219,7 +221,8 @@ export function Navbar({
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">{t("studentProfile")}</p>
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">{ProfileChip}</div>
-            <NotificationBell profileId={activeProfileId ?? null} />
+            {/* Bell is at the bottom of the viewport here → panel opens upward. */}
+            <NotificationBell profileId={activeProfileId ?? null} placement="up" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
