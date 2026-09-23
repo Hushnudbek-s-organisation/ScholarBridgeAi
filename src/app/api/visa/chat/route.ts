@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createGeminiModel, isGeminiConfigured } from "@/lib/gemini";
+import {
+  createGeminiModel,
+  describeGeminiError,
+  getGeminiModelName,
+  isGeminiConfigured,
+} from "@/lib/gemini";
 import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
@@ -70,7 +75,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("Visa chat error:", err);
     return NextResponse.json(
-      { error: "The AI officer is unavailable right now. Please try again." },
+      { error: describeGeminiError(err, getGeminiModelName()) },
       { status: 500 },
     );
   }
