@@ -11,6 +11,7 @@ import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { mockUniversityListPayload } from "@/lib/mock-universities";
+import { paginatedPayload } from "@/lib/pagination";
 
 /**
  * Resilient university select: tries the full schema first. If the database
@@ -286,10 +287,18 @@ export async function GET(req: Request) {
       results.sort((a, b) => a.worldRanking - b.worldRanking);
     }
 
-    return NextResponse.json({ universities: results });
+    // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
+    // Without those params the full list is returned (admin tools, ...).
+    return NextResponse.json(
+      paginatedPayload("universities", results, searchParams),
+    );
   } catch (error) {
     console.error("GET /api/universities error:", error);
     // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
-    return NextResponse.json(mockUniversityListPayload());
+    const payload = mockUniversityListPayload();
+    const { searchParams } = new URL(req.url);
+    return NextResponse.json(
+      paginatedPayload("universities", payload.universities, searchParams),
+    );
   }
 }

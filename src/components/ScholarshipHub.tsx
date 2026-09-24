@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { StudentProfile } from "./Navbar";
+import { Pagination } from "./Pagination";
+import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { 
   Award, 
   Search, 
@@ -70,9 +72,24 @@ export function ScholarshipHub({
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedCoverage, setSelectedCoverage] = useState("All");
 
-  useEffect(() => {
-    fetchScholarships();
-  }, [activeProfile?.id, selectedCountry, selectedCoverage]);
+  // Pagination: exactly 8 rows per page on every screen. The grid below is
+  // `grid-cols-1 md:grid-cols-2`, so 8 / 16 cards.
+  const perPage = useResponsivePerPage({ base: 1, md: 2 });
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const resultsTopRef = useRef<HTMLDivElement>(null);
+
+  // Restart numbering from page 1 whenever the result-set identity changes
+  // (filters, search, profile, or page size). Adjusted during render (the
+  // React-endorsed alternative to a reset effect), so the debounced fetch
+  // below always fires once - already with the correct page.
+  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, search, perPage].join("|");
+  const [prevResultKey, setPrevResultKey] = useState(resultKey);
+  if (resultKey !== prevResultKey) {
+    setPrevResultKey(resultKey);
+    setPage(1);
+  }
 
   const fetchScholarships = async () => {
     setLoading(true);
@@ -81,11 +98,25 @@ export function ScholarshipHub({
       if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
       if (selectedCountry !== "All") params.set("country", selectedCountry);
       if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
+      if (search.trim()) params.set("search", search.trim());
+      params.set("page", page.toString());
+      params.set("perPage", perPage.toString());
 
       const res = await fetch(`/api/scholarships?${params.toString()}`);
       const data = await res.json();
       if (data.scholarships) {
         setScholarships(data.scholarships);
+        setTotalCount(
+          typeof data.total === "number" ? data.total : data.scholarships.length,
+        );
+        setTotalPages(
+          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1,
+        );
+        // The server clamps out-of-range pages - sync so the UI numbering
+        // always matches the returned slice.
+        if (typeof data.page === "number" && data.page !== page) {
+          setPage(data.page);
+        }
       }
     } catch (err) {
       console.error("Error fetching scholarships:", err);
@@ -94,16 +125,20 @@ export function ScholarshipHub({
     }
   };
 
-  const filtered = scholarships.filter((s) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      s.title.toLowerCase().includes(q) ||
-      s.provider.toLowerCase().includes(q) ||
-      s.country.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q)
-    );
-  });
+  useEffect(() => {
+    const t = setTimeout(() => fetchScholarships(), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, search, page, perPage]);
+
+  // Search + filters run server-side (see fetchScholarships above) so the
+  // numbered pages below always match the filtered result set.
+  const filtered = scholarships;
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+    resultsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="space-y-6">
@@ -164,6 +199,15 @@ export function ScholarshipHub({
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Results Count */}
+      <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
+        <span>
+          Showing {totalCount === 0 ? 0 : (page - 1) * perPage + 1}-
+          {(page - 1) * perPage + filtered.length} of {totalCount} scholarships
+        </span>
+        <span className="shrink-0">Page {page} of {totalPages}</span>
       </div>
 
       {/* Grid List */}
@@ -340,6 +384,16 @@ export function ScholarshipHub({
             );
           })}
         </div>
+      )}
+
+      {/* Numbered pages (Google-style). Renders nothing while loading, when
+          empty, or when everything fits on a single page. */}
+      {!loading && filtered.length > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
       )}
     </div>
   );
