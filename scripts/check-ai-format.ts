@@ -7,6 +7,10 @@
  * AiFormattedText renderer is used by chat / SOP studio / dashboard, and the
  * four AI routes carry the FORMAT RULES.
  *
+ * It also server-renders the REAL AiFormattedText component (bold / italic /
+ * link / nested / unclosed markers) — the tab-freeze regression test: a
+ * shared /g regex once made renderInline() loop forever on ANY markup.
+ *
  * Run:  npm run test:ai-format
  * Exit 0 + "AI format test passed (N assertions)" on success.
  */
@@ -326,6 +330,86 @@ check("OpenRouter default model id is unchanged", () => {
 check("package.json exposes test:ai-format", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.ok(pkg.scripts["test:ai-format"].startsWith("tsx "));
+});
+
+// ---------------------------------------------------------------------------
+// 9. AiFormattedText rendering — the REAL component (tab-freeze regression)
+// ---------------------------------------------------------------------------
+// renderInline() recurses into bold/italic/link content. It used to scan with
+// a SHARED module-level /g regex: the inner scan rewound the outer scan's
+// lastIndex, the same token matched again and again — an infinite loop that
+// froze the tab ("Page is not responding") on ANY reply containing **bold**,
+// *italic* or [link](...). These renders must complete (fast); if the bug
+// ever comes back, this script will hang exactly on the regressed check.
+const { AiFormattedText } = await import("../src/components/AiFormattedText");
+const ReactModule = await import("react");
+const { renderToString } = await import("react-dom/server");
+
+function renderMd(text: string): string {
+  const started = performance.now();
+  const html = renderToString(ReactModule.createElement(AiFormattedText, { text }));
+  const ms = performance.now() - started;
+  // A hang never reaches this line (sync code) — the budget below guards
+  // against slow-but-terminating regressions instead.
+  assert.ok(ms < 5000, `render took ${ms.toFixed(0)}ms for ${text.length} chars (suspected hang)`);
+  return html;
+}
+
+check("renders bold/italic/code/link without hanging", () => {
+  const html = renderMd(
+    "Hello **bold** and *italic* plus `code` and a [link](https://example.com/x). Second **pair** here."
+  );
+  assert.ok(html.includes("<strong"), "bold becomes <strong>");
+  assert.ok(html.includes("<em>"), "italic becomes <em>");
+  assert.ok(html.includes("<code"), "code becomes <code>");
+  assert.ok(html.includes('<a href="https://example.com/x"'), "https link becomes <a>");
+});
+
+check("renders nested markup (bold>italic, link>bold) without hanging", () => {
+  const html = renderMd("Nested **bold *and italic* inside** plus [**bold link**](https://example.com).");
+  assert.ok(html.includes("<strong"), "outer bold survives nesting");
+  assert.ok(html.includes("<em>"), "inner italic survives nesting");
+  assert.ok(html.includes("bold link"), "link text survives nesting");
+});
+
+check("renders unclosed markers as plain text (model cut off mid-marker)", () => {
+  const html = renderMd("Cut off **unclosed bold and *unclosed italic and [broken](link");
+  assert.ok(html.includes("unclosed bold"), "unclosed bold text kept");
+  assert.ok(!html.includes("<strong"), "no phantom <strong> for unclosed markers");
+});
+
+check("renders a full AI evaluation reply (headings, lists, many bolds)", () => {
+  const reply = [
+    "### Overall Profile Score & Readiness Assessment",
+    "**Profile Readiness Score: 82 / 100** *(Competitive Global Candidate)*",
+    "- **Target Tier:** Top 30 to Top 100 for Master in Computer Science.",
+    "- **Academic Index:** GPA of **3.7/4.0** with IELTS **7.5**.",
+    "",
+    "### Tailored University Strategy",
+    "1. **Reach:** Oxford, MIT, ETH Zurich.",
+    "2. **Match:** TUM, Toronto, TU Delft.",
+    "> Quote: apply early for **maximum** aid.",
+  ].join("\\n");
+  const html = renderMd(reply);
+  assert.ok(html.includes("<h2") || html.includes("<h3"), "heading rendered");
+  assert.ok(html.includes("<li"), "list items rendered");
+  assert.ok(html.includes("Profile Readiness Score"), "body text kept");
+  assert.ok((html.match(/<strong/g) || []).length >= 5, "all bolds rendered");
+});
+
+check("model HTML/script never becomes a real element (XSS)", () => {
+  const html = renderMd('Hi <script>alert("x")</script><img src=x onerror=alert(1)> **bold**');
+  assert.ok(!html.includes("<script"), "no <script> element");
+  assert.ok(!html.includes("onerror="), "no event-handler attribute");
+  assert.ok(html.includes("<strong"), "legit markdown still renders");
+});
+
+check("non-http(s) link targets render as text, never as clickable links", () => {
+  const html = renderMd("Click [me](javascript:alert) and [file](ftp://x/y).");
+  assert.ok(!html.includes('href="javascript'), "no javascript: href");
+  assert.ok(!html.includes("href=\"ftp:"), "no ftp: href");
+  assert.ok(!html.includes("<a "), "no anchor for unsafe targets");
+  assert.ok(html.includes("me") && html.includes("file"), "link text kept");
 });
 
 // ---------------------------------------------------------------------------

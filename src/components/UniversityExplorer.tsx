@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
+import { Pagination } from "./Pagination";
+import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { 
   Search, 
@@ -85,26 +87,53 @@ export function UniversityExplorer({
   const [selectedUniId, setSelectedUniId] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState("rank");
 
-  useEffect(() => {
-    const t = setTimeout(() => fetchUniversities(), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedLevel, maxTuition, search, sortBy]);
+  // Pagination: exactly 8 rows per page on every screen. The grid below is
+  // `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`, so 8 / 16 / 24 cards.
+  const perPage = useResponsivePerPage({ base: 1, md: 2, lg: 3 });
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const resultsTopRef = useRef<HTMLDivElement>(null);
+
+  // Compare selections may span multiple pages - the modal loads the full
+  // filtered list on open so every selected university appears in the table.
+  const [comparePool, setComparePool] = useState<University[] | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+
+  // Restart numbering from page 1 whenever the result-set identity changes
+  // (filters, search, sort, profile, or page size). Adjusted during render
+  // (the React-endorsed alternative to a reset effect), so the debounced
+  // fetch below always fires once - already with the correct page.
+  const resultKey = [activeProfile?.id, selectedCountry, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
+  const [prevResultKey, setPrevResultKey] = useState(resultKey);
+  if (resultKey !== prevResultKey) {
+    setPrevResultKey(resultKey);
+    setPage(1);
+  }
+
+  // Shared filter params (no pagination) - reused by the compare modal so it
+  // loads the same filtered list the grid is paginating through.
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
+    if (selectedCountry !== "All") params.set("country", selectedCountry);
+    // For an active student, the catalogue is always locked to the degree
+    // selected in their profile. Guests may still use the level filter.
+    const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
+    if (effectiveLevel !== "All") params.set("degreeLevel", effectiveLevel);
+    if (maxTuition < 70000) params.set("maxTuition", maxTuition.toString());
+    if (search.trim()) params.set("search", search.trim());
+    if (sortBy !== "rank") params.set("sort", sortBy);
+    return params;
+  };
 
   const fetchUniversities = async () => {
     setLoading(true);
     setFetchError("");
     try {
-      const params = new URLSearchParams();
-      if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
-      if (selectedCountry !== "All") params.set("country", selectedCountry);
-      // For an active student, the catalogue is always locked to the degree
-      // selected in their profile. Guests may still use the level filter.
-      const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
-      if (effectiveLevel !== "All") params.set("degreeLevel", effectiveLevel);
-      if (maxTuition < 70000) params.set("maxTuition", maxTuition.toString());
-      if (search.trim()) params.set("search", search.trim());
-      if (sortBy !== "rank") params.set("sort", sortBy);
+      const params = buildFilterParams();
+      params.set("page", page.toString());
+      params.set("perPage", perPage.toString());
 
       const res = await fetch(`/api/universities?${params.toString()}`);
       const data = await res.json();
@@ -120,6 +149,17 @@ export function UniversityExplorer({
       }
       if (data.universities) {
         setUniversities(data.universities);
+        setTotalCount(
+          typeof data.total === "number" ? data.total : data.universities.length,
+        );
+        setTotalPages(
+          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1,
+        );
+        // The server clamps out-of-range pages - sync so the UI numbering
+        // always matches the returned slice.
+        if (typeof data.page === "number" && data.page !== page) {
+          setPage(data.page);
+        }
       }
     } catch (err: any) {
       console.error("Error fetching universities:", err);
@@ -128,6 +168,12 @@ export function UniversityExplorer({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchUniversities(), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile?.id, selectedCountry, selectedLevel, maxTuition, search, sortBy, page, perPage]);
 
   const filteredUniversities = universities;
 
@@ -145,7 +191,32 @@ export function UniversityExplorer({
     });
   };
 
-  const comparedUniversities = universities.filter((u) => compareIds.includes(u.id));
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+    resultsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openCompareModal = async () => {
+    setShowCompareModal(true);
+    // Selections may live on other pages - load the full filtered list
+    // (same filters, no pagination) so every selected row appears.
+    setCompareLoading(true);
+    try {
+      const res = await fetch(`/api/universities?${buildFilterParams().toString()}`);
+      const data = await res.json();
+      setComparePool(
+        res.ok && Array.isArray(data.universities) ? data.universities : universities,
+      );
+    } catch {
+      setComparePool(universities);
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const comparedUniversities = (comparePool ?? universities).filter((u) =>
+    compareIds.includes(u.id),
+  );
 
   if (selectedUniId != null) {
     return <UniversityDetail universityId={selectedUniId} onBack={() => setSelectedUniId(null)} />;
@@ -168,7 +239,7 @@ export function UniversityExplorer({
 
           {compareIds.length > 0 && (
             <button
-              onClick={() => setShowCompareModal(true)}
+              onClick={openCompareModal}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-xl text-xs shadow-md hover:shadow-indigo-200 transition-all"
             >
               <Columns className="h-4 w-4" />
@@ -262,11 +333,13 @@ export function UniversityExplorer({
       </div>
 
       {/* Results Count & Active Info */}
-      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+      <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
-          Showing {filteredUniversities.length} {activeProfile?.degreeLevel || selectedLevel !== "All" ? `${activeProfile?.degreeLevel || selectedLevel} ` : ""}matched university programs
+          Showing {totalCount === 0 ? 0 : (page - 1) * perPage + 1}-
+          {(page - 1) * perPage + filteredUniversities.length} of {totalCount}{" "}
+          {activeProfile?.degreeLevel || selectedLevel !== "All" ? `${activeProfile?.degreeLevel || selectedLevel} ` : ""}matched university programs
         </span>
-        <span>Sorted by Match Score & Fit</span>
+        <span className="shrink-0">Page {page} of {totalPages}</span>
       </div>
 
       {/* University Cards Grid */}
@@ -506,6 +579,16 @@ export function UniversityExplorer({
         </div>
       )}
 
+      {/* Numbered pages (Google-style). Renders nothing while loading, on
+          error, when empty, or when everything fits on a single page. */}
+      {!loading && !fetchError && filteredUniversities.length > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
+      )}
+
       {/* Side-by-Side Comparison Modal */}
       {showCompareModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -524,6 +607,11 @@ export function UniversityExplorer({
             </div>
 
             <div className="p-6 overflow-x-auto">
+              {compareLoading ? (
+                <p className="py-8 text-center text-xs font-medium text-slate-500">
+                  Loading selected universities...
+                </p>
+              ) : (
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
@@ -589,6 +677,7 @@ export function UniversityExplorer({
                   </tr>
                 </tbody>
               </table>
+              )}
             </div>
           </div>
         </div>

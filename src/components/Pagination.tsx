@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,6 +13,13 @@ interface PaginationProps {
   totalPages: number;
   /** Page numbers shown on each side of the active page. Default: 1 (Google-style). */
   siblingCount?: number;
+  /**
+   * Optional client-side mode: when provided, renders `<button>`s calling
+   * `onPageChange(page)` instead of `<Link>`s - for tab views without URL
+   * routing (dashboard UniversityExplorer / ScholarshipHub). When omitted,
+   * the classic `?page=` link mode is used (server-rendered pages).
+   */
+  onPageChange?: (page: number) => void;
 }
 
 type PageItem = number | "ellipsis-start" | "ellipsis-end";
@@ -50,10 +58,59 @@ const numberButtonClass = (isActive: boolean) =>
       : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
   ].join(" ");
 
+interface PageControlProps {
+  page: number;
+  /** `?page=` URL for link mode (ignored when `onSelect` is set). */
+  href: string;
+  /** When set, renders a `<button>` calling `onSelect(page)` instead. */
+  onSelect?: (page: number) => void;
+  className: string;
+  ariaLabel: string;
+  ariaCurrent?: "page";
+  children: ReactNode;
+}
+
+// One clickable element for both modes: <Link> for `?page=` server pages,
+// <button> when the parent drives pagination via state (`onPageChange`).
+function PageControl({
+  page,
+  href,
+  onSelect,
+  className,
+  ariaLabel,
+  ariaCurrent,
+  children,
+}: PageControlProps) {
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(page)}
+        className={`${className} cursor-pointer`}
+        aria-label={ariaLabel}
+        aria-current={ariaCurrent}
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className={className}
+      aria-label={ariaLabel}
+      aria-current={ariaCurrent}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function PaginationInner({
   currentPage,
   totalPages,
   siblingCount = 1,
+  onPageChange,
 }: PaginationProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -89,14 +146,16 @@ function PaginationInner({
       className="mt-8 flex flex-wrap items-center justify-center gap-1.5"
     >
       {hasPrevious ? (
-        <Link
+        <PageControl
+          page={currentPage - 1}
           href={createPageHref(currentPage - 1)}
+          onSelect={onPageChange}
           className={arrowClass(true)}
-          aria-label="Go to previous page"
+          ariaLabel="Go to previous page"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Previous</span>
-        </Link>
+        </PageControl>
       ) : (
         <span className={arrowClass(false)} aria-disabled="true">
           <ChevronLeft className="h-4 w-4" aria-hidden />
@@ -114,27 +173,31 @@ function PaginationInner({
             …
           </span>
         ) : (
-          <Link
+          <PageControl
             key={item}
+            page={item}
             href={createPageHref(item)}
-            aria-label={`Go to page ${item}`}
-            aria-current={item === currentPage ? "page" : undefined}
+            onSelect={onPageChange}
+            ariaLabel={`Go to page ${item}`}
+            ariaCurrent={item === currentPage ? "page" : undefined}
             className={numberButtonClass(item === currentPage)}
           >
             {item}
-          </Link>
+          </PageControl>
         ),
       )}
 
       {hasNext ? (
-        <Link
+        <PageControl
+          page={currentPage + 1}
           href={createPageHref(currentPage + 1)}
+          onSelect={onPageChange}
           className={arrowClass(true)}
-          aria-label="Go to next page"
+          ariaLabel="Go to next page"
         >
           <span className="hidden sm:inline">Next</span>
           <ChevronRight className="h-4 w-4" aria-hidden />
-        </Link>
+        </PageControl>
       ) : (
         <span className={arrowClass(false)} aria-disabled="true">
           <span className="hidden sm:inline">Next</span>
@@ -153,6 +216,10 @@ function PaginationInner({
  * `currentPage` + `totalPages` from your Server Component:
  *
  *   <Pagination currentPage={currentPage} totalPages={totalPages} />
+ *
+ * Client-side (state-driven) mode for tab views without URL routing:
+ *
+ *   <Pagination currentPage={page} totalPages={total} onPageChange={setPage} />
  *
  * Wrapped in `<Suspense>` so it's safe to drop into statically-rendered
  * pages too (`useSearchParams()` requires a Suspense boundary).

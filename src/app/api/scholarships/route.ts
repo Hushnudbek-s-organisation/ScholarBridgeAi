@@ -10,6 +10,7 @@ import { calculateScholarshipMatch } from "@/lib/matching";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
+import { paginatedPayload } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   try {
@@ -165,7 +166,11 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.json({ scholarships: results });
+    // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
+    // Without those params the full list is returned (admin tools, ...).
+    return NextResponse.json(
+      paginatedPayload("scholarships", results, searchParams),
+    );
   } catch (error) {
     console.error("GET /api/scholarships error:", error);
     return NextResponse.json({ error: "Failed to fetch scholarships" }, { status: 500 });

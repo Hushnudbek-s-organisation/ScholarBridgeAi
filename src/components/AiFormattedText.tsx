@@ -33,9 +33,13 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   let last = 0;
   let key = 0;
   let match: RegExpExecArray | null;
-  INLINE_TOKEN.lastIndex = 0;
+  // Fresh instance per call: this function recurses into bold/italic/link
+  // content, and a shared /g regex keeps ONE mutable lastIndex — the inner
+  // scan would rewind the outer scan onto the same token forever (tab freeze:
+  // "Page is not responding"). Never exec the shared INLINE_TOKEN directly.
+  const tokenRe = new RegExp(INLINE_TOKEN);
 
-  while ((match = INLINE_TOKEN.exec(text)) !== null) {
+  while ((match = tokenRe.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
     const k = `${keyPrefix}-${key++}`;
     const [, code, bold, uBold, italic, link] = match;
