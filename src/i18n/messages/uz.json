@@ -367,6 +367,7 @@
     "statScholarshipsSub": "Saqlangan dasturlar",
     "statShortlisted": "Tanlangan dasturlar",
     "statShortlistedSub": "Kuzatuvdagi universitetlar",
+    "statShortlistedPrograms": "{n} dastur",
     "statSop": "AI SOP va tekshiruv studiyasi",
     "statSopReady": "Tayyor",
     "statSopSub": "Insho yarating yoki baholang",
@@ -442,7 +443,10 @@
     "liveUnsupported": "Bu brauzer Gemini Live audio rejimini qo‘llab-quvvatlamaydi.",
     "liveFallback": "Gemini Live hozir ishlamadi, suhbat brauzer speech zaxira rejimiga o‘tdi.",
     "liveReconnecting": "Gemini Live qayta ulanmoqda…",
-    "interrupted": "Ijro to‘xtatildi. Javob berishda davom etishingiz mumkin."
+    "interrupted": "Ijro to‘xtatildi. Javob berishda davom etishingiz mumkin.",
+    "practiceHistory": "Amaliyot tarixi",
+    "session": "Sessiya",
+    "trendUp": "{n} sessiya davomida {delta} ball oshdi"
   },
   "strength": {
     "title": "Profil kuchi",

@@ -23,6 +23,8 @@ export interface CompareUniversity {
   postStudyWorkVisaYears?: number | null;
   internationalStudentsPercentage?: number | null;
   programMajor?: string | null;
+  /** How many open scholarships cover this university's country (0 = none). */
+  scholarshipCount?: number | null;
 }
 
 export interface CompareContext {
@@ -60,9 +62,12 @@ const usd = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
 
 export function compareUniversities(
   unis: CompareUniversity[],
-  ctx: CompareContext = {}
+  ctx: CompareContext = {},
+  /** Pre-computed personalized rows (e.g. profile match, admission estimate).
+   *  Injected first, so the student's own fit is the table's headline. */
+  extraRows: CompareRow[] = []
 ): CompareResult {
-  const rows: CompareRow[] = [];
+  const rows: CompareRow[] = [...extraRows];
   const list = unis.slice(0, 6); // more than six columns is unreadable
 
   const addRow = (
@@ -143,6 +148,11 @@ export function compareUniversities(
     format: (v) => `${Math.round(v as number)}%`,
     reason: (w) => `${w.name} has the largest international community.`,
   });
+  addRow("scholarships", "Scholarships in country", (u) => u.scholarshipCount, {
+    better: "high",
+    format: (v) => `${Math.round(v as number)}`,
+    reason: (w) => `${w.name} has the most scholarship options in ${w.country ?? "its country"}.`,
+  });
 
   // --- Text rows: no winner, just the facts --------------------------------
   for (const [key, label, pick] of [
@@ -190,6 +200,34 @@ export function compareUniversities(
       values,
       winner: gpaWinner,
       winnerReason: gpaWinner !== null ? "Largest margin above the published minimum." : undefined,
+      allUnknown: Object.values(values).every((v) => v === null),
+    });
+  }
+
+  if (ctx.ielts != null) {
+    const values: Record<number, string | null> = {};
+    const margins: { u: CompareUniversity; margin: number }[] = [];
+    for (const u of list) {
+      if (u.minIelts == null) {
+        values[u.id] = null;
+        continue;
+      }
+      const margin = ctx.ielts - u.minIelts;
+      values[u.id] = margin >= 0 ? `Meets it (+${margin.toFixed(1)})` : `Below by ${Math.abs(margin).toFixed(1)}`;
+      margins.push({ u, margin });
+    }
+    let ieltsWinner: Winner = null;
+    if (margins.length >= 2) {
+      const bestMargin = Math.max(...margins.map((m) => m.margin));
+      const tied = margins.filter((m) => m.margin === bestMargin);
+      if (tied.length === 1) ieltsWinner = tied[0].u.id;
+    }
+    rows.push({
+      key: "ieltsFit",
+      label: "Your IELTS vs minimum",
+      values,
+      winner: ieltsWinner,
+      winnerReason: ieltsWinner !== null ? "Largest margin above the published minimum." : undefined,
       allUnknown: Object.values(values).every((v) => v === null),
     });
   }

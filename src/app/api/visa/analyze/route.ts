@@ -15,6 +15,9 @@ import {
 import { scoreVisaInterview, visaChanceDisclaimer } from "@/lib/visaScoring";
 import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request";
+import { db } from "@/db";
+import { aiEvaluations } from "@/db/schema";
+import { requireProfileAccess } from "@/lib/auth";
 
 /**
  * POST /api/visa/analyze
@@ -54,6 +57,36 @@ export async function POST(req: Request) {
       homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
       destination: country.name,
     });
+
+    // Practice history (spec §13): when a signed-in profile is passed, persist
+    // the rubric so the student can watch scores rise across sessions.
+    const profileId = Number(body?.profileId) || null;
+    if (profileId) {
+      const access = await requireProfileAccess(req, profileId);
+      if (access.ok) {
+        try {
+          await db.insert(aiEvaluations).values({
+            profileId,
+            evaluationType: "Visa Practice",
+            content: JSON.stringify({
+              total: rubric.scores.total,
+              purposeOfStudy: rubric.scores.purposeOfStudy,
+              funding: rubric.scores.funding,
+              homeTies: rubric.scores.homeTies,
+              nonImmigrantIntent: rubric.scores.nonImmigrantIntent,
+              specificity: rubric.scores.specificity,
+              languageClarity: rubric.scores.languageClarity,
+              country: country.name,
+              homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
+              answerCount: rubric.answerCount,
+            }),
+          });
+        } catch (persistErr) {
+          // History is a nice-to-have — never fail the analysis for it.
+          console.error("Visa history persist error:", persistErr);
+        }
+      }
+    }
 
     if (!isGroqConfigured()) {
       // No model available — the rubric is still a complete, honest answer.

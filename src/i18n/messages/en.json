@@ -367,6 +367,7 @@
     "statScholarshipsSub": "Saved aid programs",
     "statShortlisted": "Shortlisted Programs",
     "statShortlistedSub": "Universities in tracker",
+    "statShortlistedPrograms": "{n} programs",
     "statSop": "AI SOP & Review Studio",
     "statSopReady": "Ready",
     "statSopSub": "Draft or evaluate essay",
@@ -442,7 +443,10 @@
     "liveUnsupported": "Gemini Live audio is not supported in this browser.",
     "liveFallback": "Gemini Live is unavailable here, so the interview switched to browser speech fallback.",
     "liveReconnecting": "Reconnecting Gemini Live…",
-    "interrupted": "Playback stopped. You can continue answering."
+    "interrupted": "Playback stopped. You can continue answering.",
+    "practiceHistory": "Practice history",
+    "session": "Session",
+    "trendUp": "Up {delta} points over {n} sessions"
   },
   "strength": {
     "title": "Profile Strength",

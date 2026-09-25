@@ -367,6 +367,7 @@
     "statScholarshipsSub": "Сохранённые программы",
     "statShortlisted": "Отобранные программы",
     "statShortlistedSub": "Университеты в трекере",
+    "statShortlistedPrograms": "{n} программ",
     "statSop": "ИИ SOP и студия проверки",
     "statSopReady": "Готово",
     "statSopSub": "Создайте или оцените эссе",
@@ -442,7 +443,10 @@
     "liveUnsupported": "Gemini Live audio не поддерживается в этом браузере.",
     "liveFallback": "Gemini Live здесь недоступен, интервью переключено на резервный режим браузерной речи.",
     "liveReconnecting": "Повторное подключение Gemini Live…",
-    "interrupted": "Воспроизведение остановлено. Можно продолжать отвечать."
+    "interrupted": "Воспроизведение остановлено. Можно продолжать отвечать.",
+    "practiceHistory": "История тренировок",
+    "session": "Сессия",
+    "trendUp": "На {delta} очков выше за {n} сессий"
   },
   "strength": {
     "title": "Сила профиля",

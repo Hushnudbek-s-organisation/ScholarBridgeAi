@@ -16,7 +16,7 @@
 
 import EmbeddedPostgres from "embedded-postgres";
 import { execSync } from "child_process";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 let passed = 0;
 let failed = 0;
@@ -199,6 +199,19 @@ async function main() {
     }
     return { status: res.status, body };
   }
+
+  /** Notification lookup by (profileId, type) and optional link. */
+  const andEq = (profileId: number, type: string, link?: string) =>
+    link
+      ? and(
+          eq(schema.notifications.profileId, profileId),
+          eq(schema.notifications.type, type),
+          eq(schema.notifications.link, link)
+        )
+      : and(
+          eq(schema.notifications.profileId, profileId),
+          eq(schema.notifications.type, type)
+        );
 
   // -----------------------------------------------------------------------
   section("1. /api/planning — costs, portfolio, CV and comparison from real rows");
@@ -974,6 +987,236 @@ async function main() {
     body: JSON.stringify({ essayVersionId: openEssay.id, hook: 50, total: 50 }),
   });
   check("after closing, new reviews are refused again (403)", reviewAfterClose.status === 403, `got ${reviewAfterClose.status}`);
+
+  // -----------------------------------------------------------------------
+  section("9. /api/saved-programs — program shortlist (spec §24)");
+
+  const [prog] = await db
+    .insert(schema.universityPrograms)
+    .values({
+      universityId: uniA.id,
+      name: "M.Sc. Computer Science",
+      field: "Computer Science",
+      degree: "Master's",
+      durationYears: 2,
+      tuitionAmount: 1500,
+    })
+    .returning();
+
+  const { GET: spGet, POST: spPost, DELETE: spDelete } = await import(
+    "../src/app/api/saved-programs/route"
+  );
+
+  const spMissing = await call(spGet as any, "/api/saved-programs");
+  check("saved-programs GET: profileId required", spMissing.status === 400, `got ${spMissing.status}`);
+
+  const spAdd = await call(spPost as any, "/api/saved-programs", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({ profileId: profile.id, programId: prog.id }),
+  });
+  check("saved-programs POST: owner saves", spAdd.status === 200 && spAdd.body?.saved?.id != null, `got ${spAdd.status}`);
+
+  const spDup = await call(spPost as any, "/api/saved-programs", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({ profileId: profile.id, programId: prog.id }),
+  });
+  check("saved-programs POST: idempotent, no duplicate row", spDup.status === 200 && spDup.body?.saved?.id === spAdd.body?.saved?.id);
+
+  const spPhantom = await call(spPost as any, "/api/saved-programs", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({ profileId: profile.id, programId: 999999 }),
+  });
+  check("saved-programs POST: phantom program refused", spPhantom.status === 404, `got ${spPhantom.status}`);
+
+  const spList = await call(spGet as any, `/api/saved-programs?profileId=${profile.id}`);
+  check(
+    "saved-programs GET: count and program join are right",
+    spList.status === 200 && spList.body?.count === 1 && spList.body?.savedPrograms?.[0]?.program?.name === "M.Sc. Computer Science",
+    JSON.stringify(spList.body).slice(0, 200)
+  );
+
+  const spOther = await call(spGet as any, `/api/saved-programs?profileId=${other.id}`, {
+    headers: { cookie: `sb_session=${bekzodToken}` },
+  });
+  check("saved-programs GET: another profile sees nothing", spOther.status === 200 && spOther.body?.count === 0);
+
+  const spDelBlocked = await call(spDelete as any, `/api/saved-programs?id=${spAdd.body?.saved?.id}`, {
+    method: "DELETE",
+    headers: { cookie: `sb_session=${bekzodToken}` },
+  });
+  check("saved-programs DELETE: stranger refused", spDelBlocked.status === 403, `got ${spDelBlocked.status}`);
+
+  const spDel = await call(spDelete as any, `/api/saved-programs?id=${spAdd.body?.saved?.id}`, { method: "DELETE" });
+  check("saved-programs DELETE: owner removes", spDel.status === 200);
+  const spAfter = await call(spGet as any, `/api/saved-programs?profileId=${profile.id}`);
+  check("saved-programs: the row is gone", spAfter.body?.count === 0);
+
+  // -----------------------------------------------------------------------
+  section("10. /api/visa/history + analyze persistence (spec §13)");
+
+  const { GET: visaHistory } = await import("../src/app/api/visa/history/route");
+  const { POST: visaAnalyze } = await import("../src/app/api/visa/analyze/route");
+
+  // Seed one past session exactly the way POST /api/visa/analyze stores it.
+  await db.insert(schema.aiEvaluations).values({
+    profileId: profile.id,
+    evaluationType: "Visa Practice",
+    content: JSON.stringify({
+      total: 61,
+      purposeOfStudy: 60,
+      funding: 55,
+      homeTies: 62,
+      nonImmigrantIntent: 58,
+      specificity: 64,
+      languageClarity: 62,
+      country: "United States",
+      homeCountry: "Germany",
+      answerCount: 5,
+    }),
+  });
+
+  const vhMissing = await call(visaHistory as any, "/api/visa/history");
+  check("visa history GET: profileId required", vhMissing.status === 400);
+
+  const vh1 = await call(visaHistory as any, `/api/visa/history?profileId=${profile.id}`);
+  check(
+    "visa history GET: the seeded session is returned",
+    vh1.status === 200 && vh1.body?.count === 1 && vh1.body?.sessions?.[0]?.total === 61,
+    JSON.stringify(vh1.body).slice(0, 200)
+  );
+
+  const vhBlocked = await call(visaHistory as any, `/api/visa/history?profileId=${profile.id}`, {
+    headers: { cookie: `sb_session=${bekzodToken}` },
+  });
+  check("visa history GET: stranger refused", vhBlocked.status === 403, `got ${vhBlocked.status}`);
+
+  // A fresh analysis WITH profileId persists a second session. The rubric is
+  // deterministic, so this works with no model configured.
+  const va1 = await call(visaAnalyze as any, "/api/visa/analyze", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({
+      countryCode: "US",
+      profileId: profile.id,
+      messages: [
+        { role: "officer", text: "Why do you want to study in the United States?" },
+        { role: "user", text: "I want to pursue a master's in computer science because the machine learning curriculum is world-class." },
+      ],
+    }),
+  });
+  check("visa analyze: succeeds with profileId", va1.status === 200, `got ${va1.status} ${JSON.stringify(va1.body).slice(0, 120)}`);
+
+  const vh2 = await call(visaHistory as any, `/api/visa/history?profileId=${profile.id}`);
+  check(
+    "visa history: the new session is appended, oldest first",
+    vh2.body?.count === 2 && vh2.body?.sessions?.[0]?.total === 61 && (vh2.body?.sessions?.[1]?.total ?? 0) > 0,
+    JSON.stringify(vh2.body).slice(0, 300)
+  );
+
+  // Without profileId the analysis still works but nothing is persisted.
+  const before = vh2.body?.count;
+  const va2 = await call(visaAnalyze as any, "/api/visa/analyze", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({
+      countryCode: "US",
+      messages: [
+        { role: "officer", text: "What will you study?" },
+        { role: "user", text: "Computer science, specifically data engineering, at a university in the United States." },
+      ],
+    }),
+  });
+  check("visa analyze: anonymous run still answers", va2.status === 200);
+  const vh3 = await call(visaHistory as any, `/api/visa/history?profileId=${profile.id}`);
+  check("visa history: anonymous run is not persisted", vh3.body?.count === before);
+
+  // -----------------------------------------------------------------------
+  section("11. /api/notifications/sweep — smart types (spec §25)");
+
+  const { POST: sweep } = await import("../src/app/api/notifications/sweep/route");
+
+  // A saved university whose IELTS bar (8.0) the student (7.5) does not clear.
+  const [uniC] = await db
+    .insert(schema.universities)
+    .values({
+      name: "ETH Zurich",
+      country: "Switzerland",
+      city: "Zurich",
+      worldRanking: 20,
+      programMajor: "Computer Science",
+      description: "A public research university.",
+      websiteUrl: "https://ethz.ch",
+      minIelts: 8.0,
+      minGpa: 3.5,
+    })
+    .returning();
+
+  // uniA is already saved for the profile by the seed above.
+  await db.insert(schema.savedUniversities).values([
+    { profileId: profile.id, universityId: uniC.id },
+  ]);
+
+  // A scholarship in a saved country the student has NOT saved yet.
+  const [sch2] = await db
+    .insert(schema.scholarships)
+    .values({
+      title: "Test Foundation Grant",
+      provider: "Test Foundation",
+      country: "Germany",
+      coverageType: "full",
+      amountUsdValue: 15000,
+      deadline: "2027-01-15",
+      deadlineDate: new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10),
+      description: "A grant for international students in Germany.",
+      requirements: "Bachelor degree with a strong GPA.",
+      websiteUrl: "https://example.org/test-foundation",
+    })
+    .returning();
+
+  // Two essay versions: 61 -> 76 (a 15-point improvement).
+  await db.insert(schema.essayVersions).values([
+    { profileId: profile.id, content: "First draft.", wordCount: 4, rubricTotal: 61 },
+    { profileId: profile.id, content: "Second draft.", wordCount: 4, rubricTotal: 76 },
+  ]);
+
+  const sw1 = await call(sweep as any, "/api/notifications/sweep", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({ profileId: profile.id }),
+  });
+  check(
+    "sweep: runs and creates the smart notifications",
+    sw1.status === 200 && sw1.body?.ok === true && sw1.body?.created >= 3,
+    `created=${sw1.body?.created}`
+  );
+
+  const [gapN] = await db
+    .select()
+    .from(schema.notifications)
+    .where(andEq(profile.id, "requirement_gap"));
+  check("sweep: requirement_gap flags the 8.0-IELTS university", gapN !== undefined && /IELTS/.test(gapN.title), gapN?.title);
+
+  const [schN] = await db
+    .select()
+    .from(schema.notifications)
+    .where(andEq(profile.id, "scholarship_opened", `/scholarships?id=${sch2.id}`));
+  check("sweep: scholarship_opened names the matching scholarship", schN !== undefined && /Test Foundation Grant/.test(schN.title), schN?.title);
+
+  const [essayN] = await db
+    .select()
+    .from(schema.notifications)
+    .where(andEq(profile.id, "essay_improved"));
+  check("sweep: essay_improved reports the 15-point gain", essayN !== undefined && /15/.test(essayN.title), essayN?.title);
+
+  const sw2 = await call(sweep as any, "/api/notifications/sweep", {
+    method: "POST",
+    headers: { ...json({}) },
+    body: JSON.stringify({ profileId: profile.id }),
+  });
+  check("sweep: a second run creates nothing new", sw2.body?.created === 0, `created=${sw2.body?.created}`);
 
   // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres

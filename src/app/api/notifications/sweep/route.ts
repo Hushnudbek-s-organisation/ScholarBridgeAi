@@ -4,11 +4,16 @@ import { db } from "@/db";
 import {
   scholarships,
   savedScholarships,
+  savedUniversities,
+  universities,
+  studentProfiles,
+  essayVersions,
   applicationTasks,
   notifications,
 } from "@/db/schema";
-import { eq, and, gte, lt, isNull } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { createNotification } from "@/lib/notifications";
+import { calculateScholarshipMatch } from "@/lib/matching";
 
 /**
  * Deadline notification sweep (spec §20, §21).
@@ -118,6 +123,159 @@ export async function POST(req: Request) {
               type: "milestone_due",
               title: `Milestone due: ${t.title}`,
               body: `Your task "${t.title}" is due in ${daysLeft} day${daysLeft === 1 ? "" : "s"} (${due.toLocaleDateString()}).`,
+              link,
+            });
+            created += 1;
+          }
+        }
+      }
+    }
+
+    // ---------- 3) Scholarships matching the profile (spec §25, 🟢) ----------
+    if (profileId) {
+      const [profile] = await db
+        .select()
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId));
+
+      if (profile) {
+        // The raw profile row satisfies StudentProfileData (the matcher only
+        // reads the fields it declares) — same pattern as /api/scholarships.
+        const profileData = profile;
+
+        // --- 3a) A strong scholarship in a country of a saved university that
+        // --- the student has not saved yet — "New scholarship matches you".
+        const savedUnis = await db
+          .select()
+          .from(savedUniversities)
+          .where(eq(savedUniversities.profileId, profileId));
+        const uniRows =
+          savedUnis.length > 0
+            ? await db
+                .select()
+                .from(universities)
+                .where(inArray(universities.id, savedUnis.map((s) => s.universityId)))
+            : [];
+        const countries = [...new Set(uniRows.map((u) => u.country))];
+
+        const savedSchIds = new Set(
+          (await db
+            .select()
+            .from(savedScholarships)
+            .where(eq(savedScholarships.profileId, profileId))
+          ).map((s) => s.scholarshipId)
+        );
+
+        if (countries.length > 0) {
+          const candidates = await db
+            .select()
+            .from(scholarships)
+            .where(inArray(scholarships.country, countries));
+
+          let notified = 0;
+          for (const sch of candidates) {
+            if (notified >= 3) break; // never spam the bell in one sweep
+            if (savedSchIds.has(sch.id)) continue;
+            const match = calculateScholarshipMatch(profileData, sch);
+            if (match.matchScore == null || match.matchScore < 60) continue;
+            const link = `/scholarships?id=${sch.id}`;
+            const [existing] = await db
+              .select()
+              .from(notifications)
+              .where(
+                and(
+                  eq(notifications.profileId, profileId),
+                  eq(notifications.type, "scholarship_opened"),
+                  eq(notifications.link, link)
+                )
+              );
+            if (existing) continue;
+            await createNotification({
+              profileId,
+              type: "scholarship_opened",
+              title: `New scholarship matches your profile: ${sch.title}`,
+              body: `${sch.title} (${sch.country}) scores ${match.matchScore}% fit against your profile.`,
+              link,
+            });
+            created += 1;
+            notified += 1;
+          }
+        }
+
+        // --- 3b) Saved universities the student cannot meet yet (spec §25).
+        const withMinIelts = uniRows.filter((u) => u.minIelts != null);
+        if (withMinIelts.length > 0) {
+          const missing =
+            profile.ieltsScore == null
+              ? withMinIelts.length
+              : withMinIelts.filter((u) => (profile.ieltsScore as number) < (u.minIelts as number))
+                  .length;
+          if (missing > 0) {
+            const link = "/profile?gap=ielts";
+            const [existing] = await db
+              .select()
+              .from(notifications)
+              .where(
+                and(
+                  eq(notifications.profileId, profileId),
+                  eq(notifications.type, "requirement_gap"),
+                  eq(notifications.link, link)
+                )
+              );
+            if (!existing) {
+              const highest = Math.max(...withMinIelts.map((u) => u.minIelts as number));
+              const body =
+                profile.ieltsScore == null
+                  ? `You have saved ${missing} universit${missing === 1 ? "y" : "ies"} that require IELTS, but your profile has no IELTS score yet (highest requirement: ${highest}).`
+                  : `Your IELTS ${profile.ieltsScore} is below the requirement of ${missing} saved universit${missing === 1 ? "y" : "ies"} (highest requirement: ${highest}).`;
+              await createNotification({
+                profileId,
+                type: "requirement_gap",
+                title:
+                  profile.ieltsScore == null
+                    ? "IELTS score missing for your saved universities"
+                    : "IELTS below the requirement of saved universities",
+                body,
+                link,
+              });
+              created += 1;
+            }
+          }
+        }
+      }
+    }
+
+    // ---------- 4) Essay improved between versions (spec §25, 🟢) ----------
+    if (profileId) {
+      const latestTwo = await db
+        .select()
+        .from(essayVersions)
+        .where(eq(essayVersions.profileId, profileId))
+        .orderBy(desc(essayVersions.id))
+        .limit(2);
+
+      if (latestTwo.length === 2) {
+        const [latest, previous] = latestTwo;
+        const prevTotal = previous.rubricTotal != null ? Number(previous.rubricTotal) : null;
+        const lastTotal = latest.rubricTotal != null ? Number(latest.rubricTotal) : null;
+        if (prevTotal != null && lastTotal != null && lastTotal >= prevTotal + 5) {
+          const link = `/sop?version=${latest.id}`;
+          const [existing] = await db
+            .select()
+            .from(notifications)
+            .where(
+              and(
+                eq(notifications.profileId, profileId),
+                eq(notifications.type, "essay_improved"),
+                eq(notifications.link, link)
+              )
+            );
+          if (!existing) {
+            await createNotification({
+              profileId,
+              type: "essay_improved",
+              title: `Your essay improved by ${lastTotal - prevTotal} points`,
+              body: `Version ${latest.id} scored ${lastTotal} vs ${prevTotal} in version ${previous.id}. Keep going.`,
               link,
             });
             created += 1;

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { savedScholarships, savedUniversities, scholarships, studentProfiles, universities } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { calculateCosts, assessPortfolio, type ScholarshipInput } from "@/lib/costs";
 import { buildCv, renderCvText } from "@/lib/cv";
-import { compareUniversities, type CompareUniversity } from "@/lib/compare";
+import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
 import { gpaTo4 } from "@/lib/similarProfiles";
+import { calculateUniversityMatch } from "@/lib/matching";
+import { estimateAdmissionChance } from "@/lib/chancing";
 
 /**
  * Planning studio (Phase 3): cost calculator, scholarship portfolio, CV
@@ -126,6 +128,14 @@ export async function GET(req: Request) {
     });
 
     // --- Comparison ----------------------------------------------------------
+    // How many open scholarships cover each country — factual counts, never
+    // an invented "scholarship potential" figure.
+    const countryCounts = await db
+      .select({ country: scholarships.country, n: sql<number>`count(*)::int` })
+      .from(scholarships)
+      .groupBy(scholarships.country);
+    const schCountByCountry = new Map(countryCounts.map((r) => [r.country, r.n]));
+
     const compareList: CompareUniversity[] = uniRows.map((u) => ({
       id: u.id,
       name: u.name,
@@ -141,14 +151,55 @@ export async function GET(req: Request) {
       postStudyWorkVisaYears: u.postStudyWorkVisaYears,
       internationalStudentsPercentage: u.internationalStudentsPercentage,
       programMajor: u.programMajor,
+      scholarshipCount: schCountByCountry.get(u.country) ?? 0,
     }));
 
-    const comparison = compareUniversities(compareList, {
-      gpa4: gpaTo4(profile.gpa, profile.gpaScale),
-      ielts: profile.ieltsScore,
-      sat: profile.satScore,
-      budgetAnnualUsd: profile.budgetAnnualUsd,
+    // Personalized headline rows (spec §23): how THIS student fits each
+    // university — profile match % and the admission estimate stay two
+    // separate numbers, per the standing rule.
+    const pickWinner = (items: { id: number; score: number }[]): number | null => {
+      if (items.length < 2) return null;
+      const best = Math.max(...items.map((i) => i.score));
+      const tied = items.filter((i) => i.score === best);
+      return tied.length === 1 ? tied[0].id : null;
+    };
+
+    const chanced = compareList.map((u) => {
+      // The full university row satisfies both matchers (fit + chancing);
+      // the raw profile row satisfies StudentProfileData / ChancingProfile.
+      const uni = uniRows.find((r) => r.id === u.id)!;
+      const match = calculateUniversityMatch(profile, uni).matchScore;
+      const adm = estimateAdmissionChance(profile, uni);
+      return { id: u.id, match, low: adm.admission.low, high: adm.admission.high, mid: adm.admission.mid };
     });
+
+    const matchRow: CompareRow = {
+      key: "profileMatch",
+      label: "Your profile match",
+      values: Object.fromEntries(chanced.map((c) => [c.id, `${Math.round(c.match)}%`])),
+      winner: pickWinner(chanced.map((c) => ({ id: c.id, score: c.match }))),
+      winnerReason: "Highest fit with your profile.",
+      allUnknown: chanced.length === 0,
+    };
+    const admissionRow: CompareRow = {
+      key: "admissionEstimate",
+      label: "Admission estimate",
+      values: Object.fromEntries(chanced.map((c) => [c.id, `${c.low}–${c.high}%`])),
+      winner: pickWinner(chanced.map((c) => ({ id: c.id, score: c.mid }))),
+      winnerReason: "Highest estimated chance of admission.",
+      allUnknown: chanced.length === 0,
+    };
+
+    const comparison = compareUniversities(
+      compareList,
+      {
+        gpa4: gpaTo4(profile.gpa, profile.gpaScale),
+        ielts: profile.ieltsScore,
+        sat: profile.satScore,
+        budgetAnnualUsd: profile.budgetAnnualUsd,
+      },
+      [matchRow, admissionRow]
+    );
 
     return NextResponse.json({
       costs,

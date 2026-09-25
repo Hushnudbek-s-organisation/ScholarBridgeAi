@@ -76,6 +76,42 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
   const [scholarship, setScholarship] = useState("");
   const [consent, setConsent] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Analytics extras (spec §33): upcoming deadlines + scholarship matches.
+  // Fetched, never hardcoded — null until the response arrives.
+  const [deadlineCount, setDeadlineCount] = useState<number | null>(null);
+  const [scholarshipMatchCount, setScholarshipMatchCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [dlRes, schRes] = await Promise.all([
+          fetch(`/api/deadlines?profileId=${activeProfile.id}`),
+          fetch(`/api/scholarships?profileId=${activeProfile.id}&limit=200`),
+        ]);
+        if (cancelled) return;
+        if (dlRes.ok) {
+          const dl = await dlRes.json();
+          const s = dl.summary;
+          setDeadlineCount(s ? (s.critical ?? 0) + (s.soon ?? 0) : null);
+        }
+        if (schRes.ok) {
+          const sch = await schRes.json();
+          if (Array.isArray(sch.scholarships)) {
+            setScholarshipMatchCount(
+              sch.scholarships.filter((x: { matchScore?: number | null }) => (x.matchScore ?? 0) >= 60).length
+            );
+          }
+        }
+      } catch {
+        // Leave the stats as "—" rather than showing a wrong number.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
 
   const load = useCallback(async () => {
     if (!activeProfile?.id) return;
@@ -182,15 +218,20 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { label: "Applications", value: rows.length },
+          { label: "Applied", value: rows.length },
           { label: "Submitted", value: submitted },
+          { label: "In progress", value: Math.max(0, rows.length - submitted) },
           { label: "Decisions", value: decided },
           { label: "Accepted", value: accepted },
+          { label: "Scholarship matches", value: scholarshipMatchCount },
+          { label: "Deadlines ≤45d", value: deadlineCount },
         ].map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
-            <div className="text-2xl font-extrabold text-slate-900">{stat.value}</div>
+            <div className="text-2xl font-extrabold text-slate-900">
+              {stat.value === null || stat.value === undefined ? "—" : stat.value}
+            </div>
             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{stat.label}</div>
           </div>
         ))}

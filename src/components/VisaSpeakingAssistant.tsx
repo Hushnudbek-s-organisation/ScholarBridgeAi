@@ -647,6 +647,24 @@ export function VisaSpeakingAssistant({
     chanceDisclaimer?: string;
   };
   const [analysis, setAnalysis] = useState<VisaAnalysisResponse | null>(null);
+  // Practice history (spec §13) — saved sessions from /api/visa/history,
+  // oldest first. Shows the student their progress across sessions.
+  const [practiceHistory, setPracticeHistory] = useState<
+    { sessions: { id: number; total: number; country: string | null; createdAt: string }[]; count: number } | null
+  >(null);
+
+  const loadPracticeHistory = async () => {
+    if (!activeProfile?.id) return;
+    try {
+      const res = await fetch(`/api/visa/history?profileId=${activeProfile.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPracticeHistory({ sessions: data.sessions ?? [], count: data.count ?? 0 });
+      }
+    } catch {
+      // History is decorative — never break the result screen for it.
+    }
+  };
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
   const [outputLevel, setOutputLevel] = useState(0);
@@ -1522,6 +1540,8 @@ export function VisaSpeakingAssistant({
             messages: messagesRef.current,
             uiLanguage: localeToLanguageName(locale),
             homeCountry: activeProfile?.country || undefined,
+            // Saves this session to the student's practice history (spec §13).
+            profileId: activeProfile?.id ?? undefined,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -1535,6 +1555,8 @@ export function VisaSpeakingAssistant({
         }
         setAnalysis(data as VisaAnalysisResponse);
         setScreen("result");
+        // The session was just persisted server-side — refresh the trend.
+        void loadPracticeHistory();
       } catch (e) {
         if (sessionRef.current !== token || !mountedRef.current) return;
         setAnalyzeError(e instanceof Error ? e.message : t("analyzeError"));
@@ -2212,6 +2234,65 @@ export function VisaSpeakingAssistant({
                   Not substantively answered: {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Practice history (spec §13) — session-by-session progress. The
+              last entry is the session that was just analysed. */}
+          {practiceHistory && practiceHistory.count > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-900">
+                {t("practiceHistory")}
+              </h3>
+              {practiceHistory.sessions.length >= 2 && (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {(() => {
+                    const first = practiceHistory.sessions[0].total;
+                    const last = practiceHistory.sessions[practiceHistory.sessions.length - 1].total;
+                    const delta = last - first;
+                    return delta > 0
+                      ? t("trendUp", { n: practiceHistory.sessions.length, delta })
+                      : "";
+                  })()}
+                </p>
+              )}
+              <ul className="mt-3 space-y-1.5">
+                {practiceHistory.sessions.map((s, i) => {
+                  const prev = i > 0 ? practiceHistory.sessions[i - 1].total : null;
+                  const delta = prev == null ? null : s.total - prev;
+                  const isCurrent = i === practiceHistory.sessions.length - 1;
+                  return (
+                    <li
+                      key={s.id}
+                      className={`flex items-center justify-between rounded-xl px-3 py-2 ${
+                        isCurrent ? "bg-emerald-50" : "bg-slate-50"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold text-slate-700">
+                        {t("session")} {i + 1}
+                        {s.country ? ` · ${s.country}` : ""}
+                        {isCurrent && (
+                          <span className="ml-2 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            now
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-baseline gap-1.5">
+                        {delta != null && delta !== 0 && (
+                          <span
+                            className={`text-[10px] font-bold ${
+                              delta > 0 ? "text-emerald-600" : "text-red-600"
+                            }`}
+                          >
+                            {delta > 0 ? `+${delta}` : delta}
+                          </span>
+                        )}
+                        <span className="text-sm font-extrabold text-slate-900">{s.total}%</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 

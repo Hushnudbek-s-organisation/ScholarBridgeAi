@@ -80,3 +80,21 @@ FROM (VALUES
 WHERE NOT EXISTS (
   SELECT 1 FROM opportunities o WHERE o.title = v.title
 );
+
+-- ===========================================================================
+-- Saved programs (spec §24 — program shortlist) + notification types (§25)
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS saved_programs (
+  id SERIAL PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES student_profiles(id) ON DELETE CASCADE,
+  program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (profile_id, program_id)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_programs_profile ON saved_programs(profile_id);
+
+-- Extend the default notification types for existing preference rows
+-- (new types: requirement_gap, essay_improved — spec §25).
+UPDATE notification_preferences
+SET types = '["scholarship_opened", "deadline_approaching", "deadline_changed", "milestone_due", "requirement_gap", "essay_improved"]'
+WHERE types NOT LIKE '%requirement_gap%';

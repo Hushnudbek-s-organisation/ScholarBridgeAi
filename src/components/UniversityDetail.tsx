@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   Award,
   ArrowRight,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 import { formatMoney, formatCount, formatNumber } from "@/lib/format";
 
@@ -127,6 +129,7 @@ interface SourceData {
 
 interface UniversityDetailProps {
   universityId: number;
+  activeProfile?: { id: number; country?: string | null } | null;
   onBack: () => void;
 }
 
@@ -182,7 +185,7 @@ function Field({ label, value, icon }: { label: string; value: string; icon?: Re
   );
 }
 
-export function UniversityDetail({ universityId, onBack }: UniversityDetailProps) {
+export function UniversityDetail({ universityId, activeProfile, onBack }: UniversityDetailProps) {
   const [uni, setUni] = useState<UniversityDetailData | null>(null);
   const [programs, setPrograms] = useState<ProgramData[]>([]);
   const [cycles, setCycles] = useState<CycleData[]>([]);
@@ -196,6 +199,67 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
   const [reqsExpanded, setReqsExpanded] = useState(false);
   const [showAllPrograms, setShowAllPrograms] = useState(false);
   const [expandedProgramReqs, setExpandedProgramReqs] = useState<Record<number, boolean>>({});
+  // Saved programs (spec §24) — programId -> saved-row id, for save/unsave.
+  const [savedProgramIds, setSavedProgramIds] = useState<Record<number, number>>({});
+  const [savingProgramId, setSavingProgramId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/saved-programs?profileId=${activeProfile.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && Array.isArray(data.savedPrograms)) {
+            const map: Record<number, number> = {};
+            for (const row of data.savedPrograms) {
+              if (row.programId) map[row.programId] = row.id;
+            }
+            setSavedProgramIds(map);
+          }
+        }
+      } catch {
+        // Shortlist state is decorative — ignore offline/failed loads.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
+  const toggleSaveProgram = async (programId: number) => {
+    if (!activeProfile?.id || savingProgramId != null) return;
+    const existingRowId = savedProgramIds[programId];
+    setSavingProgramId(programId);
+    try {
+      if (existingRowId != null) {
+        await fetch(`/api/saved-programs?id=${existingRowId}`, { method: "DELETE" });
+        setSavedProgramIds((prev) => {
+          const next = { ...prev };
+          delete next[programId];
+          return next;
+        });
+      } else {
+        const res = await fetch("/api/saved-programs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileId: activeProfile.id, programId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSavedProgramIds((prev) => ({
+            ...prev,
+            [programId]: data.saved?.id ?? -1,
+          }));
+        }
+      }
+    } catch {
+      // Keep the previous state on failure.
+    } finally {
+      setSavingProgramId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -621,11 +685,34 @@ export function UniversityDetail({ universityId, onBack }: UniversityDetailProps
                           {fmtValue(p.degree)} · {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || "years"}` : "Duration not specified"} · {fmtValue(p.studyMode)}
                         </p>
                       </div>
-                      {p.programUrl && (
-                        <a href={p.programUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 shrink-0" title="View program">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Save to shortlist (spec §24) — only for signed-in students */}
+                        {activeProfile?.id != null && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSaveProgram(p.id)}
+                            disabled={savingProgramId != null}
+                            className={`rounded-lg p-1.5 transition-colors ${
+                              savedProgramIds[p.id] != null
+                                ? "bg-violet-600 text-white hover:bg-violet-700"
+                                : "text-slate-400 hover:bg-violet-50 hover:text-violet-600"
+                            } disabled:opacity-50`}
+                            title={savedProgramIds[p.id] != null ? "Remove from shortlist" : "Save to shortlist"}
+                            aria-pressed={savedProgramIds[p.id] != null}
+                          >
+                            {savedProgramIds[p.id] != null ? (
+                              <BookmarkCheck className="h-4 w-4" />
+                            ) : (
+                              <Bookmark className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
+                        {p.programUrl && (
+                          <a href={p.programUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 shrink-0" title="View program">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
                       <span><b>Tuition:</b> {fmtMoney(p.tuitionAmount, p.tuitionCurrency)}</span>

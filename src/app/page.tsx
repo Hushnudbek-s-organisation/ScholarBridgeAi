@@ -86,6 +86,7 @@ export default function Home() {
   // Saved Data
   const [savedUniversities, setSavedUniversities] = useState<SavedUniversityItem[]>([]);
   const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
+  const [savedProgramCount, setSavedProgramCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
 
   // Referral system: capture ?ref=CODE from the URL and keep it for up to
@@ -170,11 +171,23 @@ export default function Home() {
     }
   }, []);
 
+  // Spec §24 — how many specific programmes the student has shortlisted.
+  const fetchSavedProgramCount = useCallback(async (profileId: number) => {
+    try {
+      const res = await fetch(`/api/saved-programs?profileId=${profileId}`);
+      const data = await res.json();
+      if (typeof data.count === "number") setSavedProgramCount(data.count);
+    } catch (err) {
+      console.error("Error fetching saved program count:", err);
+    }
+  }, []);
+
   const hydrateProfileData = useCallback((profileId: number) => {
     void fetchSavedUniversities(profileId);
     void fetchSavedScholarships(profileId);
+    void fetchSavedProgramCount(profileId);
     void fetchTaskCount(profileId);
-  }, [fetchSavedScholarships, fetchSavedUniversities, fetchTaskCount]);
+  }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount, fetchTaskCount]);
 
   /** Load the full profile list — only used by the profile picker. */
   const loadAllProfiles = useCallback(async () => {
@@ -607,6 +620,7 @@ export default function Home() {
               onNavigateTab={setActiveTab}
               savedUniCount={savedUniversities.length}
               savedScholarshipCount={savedScholarships.length}
+              savedProgramCount={savedProgramCount}
               taskCount={taskCount}
               onEditProfile={() => {
                 setIsNewProfile(false);

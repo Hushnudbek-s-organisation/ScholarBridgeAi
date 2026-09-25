@@ -198,6 +198,13 @@ export const savedUniversities = pgTable("saved_universities", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const savedPrograms = pgTable("saved_programs", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+  programId: integer("program_id").references(() => universityPrograms.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const savedScholarships = pgTable("saved_scholarships", {
   id: serial("id").primaryKey(),
   profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
@@ -517,7 +524,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   inApp: boolean("in_app").notNull().default(true),
   email: boolean("email").notNull().default(false),
   push: boolean("push").notNull().default(false),
-  types: text("types").notNull().default("[\"scholarship_opened\",\"deadline_approaching\",\"deadline_changed\",\"milestone_due\"]"),
+  types: text("types").notNull().default("[\"scholarship_opened\",\"deadline_approaching\",\"deadline_changed\",\"milestone_due\",\"requirement_gap\",\"essay_improved\"]"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
