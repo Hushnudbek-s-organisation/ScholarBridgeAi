@@ -55,7 +55,6 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
             </div>
             <span className="font-extrabold text-slate-900 tracking-tight">{tm("appName")}</span>
