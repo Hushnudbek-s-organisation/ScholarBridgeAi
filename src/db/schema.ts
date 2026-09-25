@@ -5,8 +5,8 @@ export const studentProfiles = pgTable("student_profiles", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   // Sign up / sign in: scrypt hash of the account password (never plain text).
-  // NULL for legacy profiles that predate passwords (e.g. the admin account —
-  // those still use the username+email admin sign-in).
+  // NULL for legacy profiles until a password is set (or ADMIN_PASSWORD seeds
+  // one for the admin account).
   passwordHash: text("password_hash"),
   degreeLevel: text("degree_level").notNull().default("Master"),
   targetMajor: text("target_major").notNull().default("Computer Science"),
