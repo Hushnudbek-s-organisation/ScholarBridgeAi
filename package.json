@@ -17,7 +17,10 @@
     "test:roadmap": "tsx scripts/check-roadmap.ts",
     "test:documents": "tsx scripts/check-documents.ts",
     "test:essays": "tsx scripts/check-essays.ts",
-    "test:visa": "tsx scripts/check-visa-similar.ts"
+    "test:visa": "tsx scripts/check-visa-similar.ts",
+    "test:costs": "tsx scripts/check-costs.ts",
+    "test:cv": "tsx scripts/check-cv.ts",
+    "test:compare": "tsx scripts/check-compare.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

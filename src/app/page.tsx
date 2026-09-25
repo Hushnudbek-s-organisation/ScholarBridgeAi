@@ -15,6 +15,7 @@ import { NextActionsPanel } from "@/components/NextActionsPanel";
 import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
 import { EssayRubricStudio } from "@/components/EssayRubricStudio";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
+import { PlanningStudio } from "@/components/PlanningStudio";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -683,6 +684,9 @@ export default function Home() {
 
         {/* #10 Accepted students with a similar profile */}
         {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
+
+        {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
+        {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}
 
         {/* Universal application tracker + outcomes flywheel (#12) */}
         {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
