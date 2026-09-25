@@ -1,6 +1,6 @@
 # ScholarBridge AI — To'liq hisobot
 
-Branch: `arena/01a0d7e1-scholarbridgeai` · asos: `17068cc` · 13 commit · 144 fayl · +16 719 / −523 qator
+Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 15 commit · 154 fayl · +18 800 / −526 qator
 
 ---
 
@@ -8,14 +8,14 @@ Branch: `arena/01a0d7e1-scholarbridgeai` · asos: `17068cc` · 13 commit · 144 
 
 | Ko'rsatkich | Son |
 |---|---|
-| Mantiq kutubxonalari (`src/lib/*.ts`) | 40 |
-| API route'lar | 78 |
+| Mantiq kutubxonalari (`src/lib/*.ts`) | 42 |
+| API route'lar | 82 |
 | Ma'lumotlar bazasi jadvallari | 54 |
-| UI komponentlar | 58 |
-| Test skriptlar | 17 |
-| Foydalanuvchi tab'lari | 23 |
-| Unit assertion'lar | 498 (+ 52 security) |
-| Integratsion assertion'lar | 79 (haqiqiy PostgreSQL) |
+| UI komponentlar | 60 |
+| Test skriptlar | 19 |
+| Foydalanuvchi tab'lari | 24 |
+| Unit assertion'lar | 565 (+ 52 security) |
+| Integratsion assertion'lar | 87 (haqiqiy PostgreSQL) |
 
 ---
 
@@ -278,6 +278,35 @@ Tayyor bo'lmaganda modul `forbiddenClaims` qaytaradi: `"predicted probability"`,
 
 `GET /api/chancing` javobida `dataset` maydoni bor.
 
+### 2.18 Scholarship essay adapter (#18)
+
+**Fayl:** `src/lib/essayAdapter.ts` → `scoreEssayFit`, `adaptationPlan`, `rankScholarships`
+
+Bitta insho → N ta scholarship. Oltita deterministik signal (jami 100):
+
+| Signal | Og'irlik |
+|---|---|
+| So'z chegarasi (scholarship'nin nashr qilingan talabidan parse qilinadi) | 20 |
+| Tema qoplamasi (scholarship qaysi mavzuni atasa, inshoda shu bo'lishi kerak) | 30 |
+| Mutaxassislik (eligible ro'yxat) | 15 |
+| Mamlakat (eligible ro'yxat) | 10 |
+| GPA (minimaga qarshi, 4.0 scale'da) | 10 |
+| Ingliz tili (IELTS yoki TOEFL `(t−40)/12`) | 15 |
+
+Nimani rad etadi: chegara nashr qilinmagan bo'lsa → neytral ball (mag'lubiyat emas); profil maydoni bo'sh bo'lsa → "tekshirib bo'lmaydi" gap (jim o'tish emas); scholarship matnida tema atalmagan bo'lsa → gap bo'lmaydi. Har bir gapga aniq moslash qadami bor (`adaptationPlan`). AI rewrite (`/api/essay-adapter/adapt`) ustiga qo'yiladi: model ishlamasa `adapted: null` + deterministik plan qaytadi — hech narsa bo'lmagandek qilinmaydi.
+
+### 2.19 Recommendation letter helper (#20)
+
+**Fayl:** `src/lib/recLetter.ts` → `buildRecLetterBrief`
+
+Recommender uchun brif: talking points, maktub tuzilmasi, kamchiliklar ro'yxati, amaliy checklist — **faqat profil'da mavjud bo'lgan ma'lumotlardan**. Bo'sh maydon `dataMissing`ga tushadi, o'ylab topilmaydi. GPA har doim 4.0 scale'ga konvert qilinadi (3.7/5 → 2.96/4.0).
+
+### 2.20 Profile strength dashboard + extracurricular analyzer (#21, #22)
+
+**Fayl:** `src/lib/chancing.ts` → `profileStrength`, `analyzeExtracurriculars`, `profileCompletenessRatio` + yangi `/api/profile-strength` route
+
+Har o'lchovga bitta raqam: academics, tests, extracurriculars, leadership, awards, essays, financial + overall va completeness %. Essays bo'limi so'nggi inshoning rubrik ballidan olindi. Extracurricular analyzer: leadership / impact / consistency / academicFit + "keyingi 3 oy" uchun aniq takliflar.
+
 ---
 
 ## 3. Ma'lumotlar bazasi
@@ -306,7 +335,7 @@ Tayyor bo'lmaganda modul `forbiddenClaims` qaytaradi: `"predicted probability"`,
 - So'rov hajmi chegaralari (`src/lib/request.ts`)
 - To'lov webhook imzolari (`src/lib/payments.ts`)
 - Audit log (`src/lib/audit.ts`)
-- IDOR himoyasi — 31 ta route `requireProfileAccess`, 6 tasi (`/documents`, `/essays`, `/applications`, `/applications/outcome`, `/saved-universities`, `/saved-scholarships`) qator darajasida `requireRowAccess` chaqiradi: avval qator olinadi, keyin egalik tekshiriladi
+- IDOR himoyasi — 34 ta route `requireProfileAccess`, 6 tasi (`/documents`, `/essays`, `/applications`, `/applications/outcome`, `/saved-universities`, `/saved-scholarships`) qator darajasida `requireRowAccess` chaqiradi: avval qator olinadi, keyin egalik tekshiriladi. `/essay-adapter` route'larida essay versiyasi egaligi `WHERE profileId = sessiya` orqali isbotlanadi (boshqa talabaning versiyasini o'qib bo'lmaydi)
 - Ochiq qolgan 6 ta route tekshirildi va ochiq katalog hisoblanadi: `/courses`, `/courses/[id]`, `/scholarships`, `/universities` (faqat GET, faqat ommaviy ma'lumot), `/track` (throttle'langan beacon), `/premium/status` (`optionalProfileAccess`)
 
 **npm audit:** `next@16.2.6` critical → `16.3.6` ga tuzatildi. Qolgan 4 ta moderate — `esbuild <=0.24.2` (`drizzle-kit → @esbuild-kit/esm-loader` orqali). Yagona yechim — breaking downgrade, shuning uchun rad etildi va hujjatlashtirildi.
@@ -362,9 +391,11 @@ npm run test:mentors     # 37
 npm run test:parent      # 41
 npm run test:dataset     # 50
 npm run test:render      # 26
+npm run test:essay-adapter  # 39
+npm run test:rec-letter     # 28
 ```
 
-Jami: **498 passed, 0 failed.**
+Jami: **565 passed, 0 failed.**
 
 **Xavfsizlik va statik tekshiruvlar:**
 
@@ -379,7 +410,7 @@ DATABASE_URL="postgresql://user:pass@127.0.0.1:5432/db" npm run build
 
 ```bash
 npm install --no-save embedded-postgres   # bir marta
-npm run test:integration                  # 79 passed, 0 failed
+npm run test:integration                  # 87 passed, 0 failed
 ```
 
 Bu `embedded-postgres` bilan jarayon ichida haqiqiy Postgres serverini ishga
@@ -394,11 +425,34 @@ Uch yo'nalishni qoplaydi:
 | `/api/planning`, `/api/mentors`, `/api/parent-share` | Xarajatlar nashr qilingan raqamlardan quriladi, mentor mosligi real qatorga qarshi, ota-ona token'ining to'liq hayot sikli |
 | IDOR (21 assert) | Oltita qator-egalik route'ida begona rad etiladi, qator yozilmaydi, egasi muvaffaqiyatli |
 | `/api/chancing` (27 assert) | `Match %` va `Admission %` alohida qoladi; rozilik berilgan natijalar `dataBasis`ni o'zgartiradi, rozilik berilmaganlari ko'rinmas |
+| `/api/profile-strength` (8 assert) | 7 bo'lim real profile'dan quriladi, ballar 0–100 da, anonim 401, boshqa sessiya faqat o'z profile'ni ko'radi |
 
-**Umumiy jami: 498 + 52 + 79 = 629 assertion, 0 failed.**
+**Umumiy jami: 565 + 52 + 87 = 704 assertion, 0 failed.**
 
 > **Tuzatilgan da'vo.** Bu hisobotning avvalgi versiyasida "sandbox'da
 > Postgres yo'q, shuning uchun DB bilan ishlaydigan route'lar bu yerda ishga
 > tushirilmadi" deb yozilgan edi. Bu noto'g'ri edi — men imkoniyatni
 > tekshirmasdan, taxminimni fakt sifatida yozgan edim. Yuqoridagi integratsion
 > test aynan shu bo'shliqni yopadi.
+
+---
+
+## 8. Qolgan ishlar (halol ro'yxat)
+
+Strategiyaning 34 ta funksiyasidan hali qilinmaganlar:
+
+| # | Funksiya | Holat | Nega hozir qilinmadi |
+|---|---|---|---|
+| 13 | Voice AI interview (mikrofon) | PR #22 ochiq (Gemini Live) | Merge kutilmoqda — kod tayyor |
+| 24 | Essay peer review | Qilinmagan | Forum g'oyasiga asoslanadi; alohida dizayn kerak |
+| 26 | Personalized opportunities feed | Qilinmagan | Data manbasi kerak (scholarships + competitions + research) |
+| 27 | Competition / olympiad finder | Qilinmagan | Haqiqiy dataset kerak |
+| 28 | Research / internship opportunities | Qilinmagan | Haqiqiy dataset kerak |
+| 29 | Country comparison | Qilinmagan | Visa/work-rights ma'lumotlari bazada yo'q |
+
+**Data qoidasi (strategiya):** bu funksiyalar uchun boshqa saytlardan
+profil yoki ro'yxat scraping qilinmaydi. Dataset o'z platformamizdan o'sadi:
+`applications` + `application_outcomes` + `shareConsent` — har bir natija
+ro'yxatiga profil snapshot'i bilan kiradi (accepted ham, rejected ham).
+Competition/internship/research uchun birinchi qadam — manba ro'yxatini
+foydalanuvchi bilan kelishish, keyin kichik, tekshirilgan starter dataset.
