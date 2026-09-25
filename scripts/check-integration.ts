@@ -16,6 +16,7 @@
 
 import EmbeddedPostgres from "embedded-postgres";
 import { execSync } from "child_process";
+import { eq } from "drizzle-orm";
 
 let passed = 0;
 let failed = 0;
@@ -307,6 +308,221 @@ async function main() {
     return { status: res.status };
   })();
   check("the old link stops working after revocation", afterRevoke.status === 404, `got ${afterRevoke.status}`);
+
+  // -----------------------------------------------------------------------
+  // 5. IDOR — row ids are guessable, so every mutating route has to prove
+  // ownership before it writes. I previously verified this by reading the
+  // six `requireRowAccess` call sites. Reading is weaker than running: a
+  // route can call the gate and still mutate first, or pick up the wrong id.
+  // These assertions hit the real gate against the real database.
+  //
+  // Each check is paired: the stranger is refused AND the owner succeeds.
+  // Without the owner half, a route that rejects everything would look safe.
+  section("5. IDOR — the six row-owning routes");
+
+  // Rows belonging to the *other* student.
+  const [otherApp] = await db
+    .insert(schema.applications)
+    .values({ profileId: other.id, universityId: uniB.id, status: "Saved" })
+    .returning();
+  const [otherDoc] = await db
+    .insert(schema.applicationDocuments)
+    .values({
+      profileId: other.id,
+      entityType: "general",
+      documentType: "passport",
+      label: "Bekzod passport",
+      isRequired: true,
+      status: "missing",
+    })
+    .returning();
+  const [otherSaved] = await db
+    .insert(schema.savedUniversities)
+    .values({ profileId: other.id, universityId: uniB.id })
+    .returning();
+  const [otherSchSaved] = await db
+    .insert(schema.savedScholarships)
+    .values({ profileId: other.id, scholarshipId: sch.id })
+    .returning();
+  const [otherEssay] = await db
+    .insert(schema.essayVersions)
+    .values({
+      profileId: other.id,
+      content: "Bekzod's own draft.",
+      wordCount: 3,
+    })
+    .returning();
+
+  const { PATCH: docPatch, DELETE: docDelete } = await import("../src/app/api/documents/route");
+  const { PATCH: appPatch, DELETE: appDelete } = await import("../src/app/api/applications/route");
+  const { POST: outcomePost } = await import("../src/app/api/applications/outcome/route");
+  const { PATCH: suPatch, DELETE: suDelete } = await import("../src/app/api/saved-universities/route");
+  const { PATCH: ssPatch, DELETE: ssDelete } = await import("../src/app/api/saved-scholarships/route");
+  const { DELETE: essayDelete } = await import("../src/app/api/essays/route");
+
+  const json = (o: unknown) => ({ "Content-Type": "application/json" });
+
+  // -- documents ---------------------------------------------------------
+  const docBlocked = await call(docPatch as any, "/api/documents", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: otherDoc.id, status: "uploaded" }),
+  });
+  check("documents PATCH: stranger refused", docBlocked.status === 403, `got ${docBlocked.status}`);
+
+  const [docNow] = await db
+    .select()
+    .from(schema.applicationDocuments)
+    .where(eq(schema.applicationDocuments.id, otherDoc.id));
+  check("documents PATCH: the row was not written", docNow.status === "missing", `got ${docNow.status}`);
+
+  const [ownDoc] = await db
+    .insert(schema.applicationDocuments)
+    .values({
+      profileId: profile.id,
+      entityType: "general",
+      documentType: "passport",
+      label: "Aziza passport",
+      isRequired: true,
+      status: "missing",
+    })
+    .returning();
+  const docOwn = await call(docPatch as any, "/api/documents", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: ownDoc.id, status: "uploaded" }),
+  });
+  check("documents PATCH: the owner succeeds", docOwn.status === 200, `got ${docOwn.status}`);
+
+  const docDelBlocked = await call(docDelete as any, `/api/documents?id=${otherDoc.id}`, { method: "DELETE" });
+  check("documents DELETE: stranger refused", docDelBlocked.status === 403, `got ${docDelBlocked.status}`);
+
+  // -- applications ------------------------------------------------------
+  const appBlocked = await call(appPatch as any, "/api/applications", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: otherApp.id, status: "Submitted" }),
+  });
+  check("applications PATCH: stranger refused", appBlocked.status === 403, `got ${appBlocked.status}`);
+
+  const [appNow] = await db
+    .select()
+    .from(schema.applications)
+    .where(eq(schema.applications.id, otherApp.id));
+  check("applications PATCH: the row was not written", appNow.status === "Saved", `got ${appNow.status}`);
+
+  const appDelBlocked = await call(appDelete as any, `/api/applications?id=${otherApp.id}`, { method: "DELETE" });
+  check("applications DELETE: stranger refused", appDelBlocked.status === 403, `got ${appDelBlocked.status}`);
+
+  // -- outcome (the data flywheel) ---------------------------------------
+  const outcomeBlocked = await call(outcomePost as any, "/api/applications/outcome", {
+    method: "POST",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ applicationId: otherApp.id, result: "accepted", consented: true }),
+  });
+  check("outcome POST: stranger refused", outcomeBlocked.status === 403, `got ${outcomeBlocked.status}`);
+
+  const [leakedOutcomes] = await db
+    .select()
+    .from(schema.applicationOutcomes)
+    .where(eq(schema.applicationOutcomes.applicationId, otherApp.id));
+  check(
+    "outcome POST: no dataset row was created from the refused call",
+    leakedOutcomes === undefined,
+    JSON.stringify(leakedOutcomes)?.slice(0, 120)
+  );
+
+  const [ownApp] = await db
+    .insert(schema.applications)
+    .values({ profileId: profile.id, universityId: uniA.id, status: "Submitted" })
+    .returning();
+  const outcomeOwn = await call(outcomePost as any, "/api/applications/outcome", {
+    method: "POST",
+    headers: { ...json({}), cookie },
+    // The route reads `shareConsent`, not `consented`.
+    body: JSON.stringify({ applicationId: ownApp.id, result: "waitlisted", shareConsent: true }),
+  });
+  // NextResponse.json() with no explicit status is 200, not 201.
+  check("outcome POST: the owner succeeds", outcomeOwn.status === 200, `got ${outcomeOwn.status}`);
+  check(
+    "outcome POST: the result is recorded with consent",
+    outcomeOwn.body?.outcome?.result === "waitlisted" &&
+      outcomeOwn.body?.outcome?.shareConsent === true
+  );
+  // The snapshot is stored as separate columns, not a JSON blob — that is
+  // what makes it queryable for the model later.
+  check(
+    "outcome POST: the profile snapshot is taken at decision time",
+    outcomeOwn.body?.outcome?.snapshotGpa === 3.7 &&
+      outcomeOwn.body?.outcome?.snapshotIelts === 7.5 &&
+      outcomeOwn.body?.outcome?.snapshotMajor === "Computer Science",
+    JSON.stringify({
+      gpa: outcomeOwn.body?.outcome?.snapshotGpa,
+      ielts: outcomeOwn.body?.outcome?.snapshotIelts,
+      major: outcomeOwn.body?.outcome?.snapshotMajor,
+    })
+  );
+
+  // -- saved-universities ------------------------------------------------
+  const suBlocked = await call(suPatch as any, "/api/saved-universities", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: otherSaved.id, status: "Applied" }),
+  });
+  check("saved-universities PATCH: stranger refused", suBlocked.status === 403, `got ${suBlocked.status}`);
+
+  const suDelBlocked = await call(suDelete as any, `/api/saved-universities?id=${otherSaved.id}`, {
+    method: "DELETE",
+  });
+  check("saved-universities DELETE: stranger refused", suDelBlocked.status === 403, `got ${suDelBlocked.status}`);
+
+  const [suStill] = await db
+    .select()
+    .from(schema.savedUniversities)
+    .where(eq(schema.savedUniversities.id, otherSaved.id));
+  check("saved-universities: the row still exists", suStill !== undefined);
+
+  // -- saved-scholarships ------------------------------------------------
+  const ssBlocked = await call(ssPatch as any, "/api/saved-scholarships", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: otherSchSaved.id, status: "Applied" }),
+  });
+  check("saved-scholarships PATCH: stranger refused", ssBlocked.status === 403, `got ${ssBlocked.status}`);
+
+  const ssDelBlocked = await call(ssDelete as any, `/api/saved-scholarships?id=${otherSchSaved.id}`, {
+    method: "DELETE",
+  });
+  check("saved-scholarships DELETE: stranger refused", ssDelBlocked.status === 403, `got ${ssDelBlocked.status}`);
+
+  // -- essays ------------------------------------------------------------
+  const essayBlocked = await call(essayDelete as any, `/api/essays?id=${otherEssay.id}`, {
+    method: "DELETE",
+  });
+  check("essays DELETE: stranger refused", essayBlocked.status === 403, `got ${essayBlocked.status}`);
+
+  const [essayStill] = await db
+    .select()
+    .from(schema.essayVersions)
+    .where(eq(schema.essayVersions.id, otherEssay.id));
+  check("essays DELETE: the row still exists", essayStill !== undefined);
+
+  // A nonexistent id must not become an ownership bypass. It comes back 404
+  // rather than 403, which is the better answer: 403 would confirm the row
+  // exists to someone who is not allowed to see it.
+  const ghost = await call(appPatch as any, "/api/applications", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: 999999, status: "Submitted" }),
+  });
+  check("a nonexistent row id is refused, not treated as owned", ghost.status === 404, `got ${ghost.status}`);
+
+  const ghostDoc = await call(docPatch as any, "/api/documents", {
+    method: "PATCH",
+    headers: { ...json({}), cookie },
+    body: JSON.stringify({ id: 999999, status: "uploaded" }),
+  });
+  check("documents: a ghost id is also refused", ghostDoc.status === 404, `got ${ghostDoc.status}`);
 
   // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
