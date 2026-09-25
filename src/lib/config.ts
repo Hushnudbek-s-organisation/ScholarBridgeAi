@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { appConfig } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { DEFAULT_HIDDEN_NAV_ITEMS } from "@/lib/navSections";
 
 /**
  * Centralized app configuration (spec §3 — NO hardcoded data).
@@ -37,6 +38,10 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   // Branding (editable from Admin → Settings)
   branding_logo_url: "",
   branding_favicon_url: "",
+  // Sidebar navigation (editable from Admin → Navigation) — JSON array of
+  // hidden section ids. Default comes from navSections.ts so the client and
+  // the server always agree.
+  nav_hidden_items: JSON.stringify(DEFAULT_HIDDEN_NAV_ITEMS),
 };
 
 const cache = new Map<string, string | null>();
@@ -73,7 +78,9 @@ export async function setConfig(key: string, value: string, description?: string
     await db.insert(appConfig).values({
       key,
       value,
-      description: description ?? CONFIG_DEFAULTS[key] ? undefined : description,
+      // NOTE: the old expression here had broken operator precedence
+      // (`a ?? b ? c : d`), so a provided description was silently dropped.
+      description: description ?? undefined,
     });
   }
   cache.set(key, value);

@@ -1,8 +1,9 @@
 "use client";
 
 import { BrandingImage } from "./BrandingImage";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { DEFAULT_HIDDEN_NAV_ITEMS } from "@/lib/navSections";
 import { 
   GraduationCap, 
   Home, 
@@ -120,6 +121,44 @@ export function Navbar({
   const t = useTranslations("nav");
   const tm = useTranslations("meta");
 
+  // Admin → Navigation: sections hidden for EVERYONE (admin included).
+  // Defaults apply on first paint so removed sections never flash, then the
+  // server value replaces them without a reload.
+  const [hiddenItems, setHiddenItems] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
+
+  useEffect(() => {
+    let alive = true;
+    const loadHidden = async () => {
+      try {
+        const res = await fetch("/api/config/nav", { cache: "no-store" });
+        const data = await res.json();
+        if (alive && Array.isArray(data.hidden)) {
+          setHiddenItems(
+            data.hidden.filter((v: unknown): v is string => typeof v === "string")
+          );
+        }
+      } catch {
+        // offline / API down — keep the defaults, the sidebar still works.
+      }
+    };
+    void loadHidden();
+    // Fired by Admin → Navigation after a save — updates the open sidebar live.
+    const onUpdate = () => void loadHidden();
+    window.addEventListener("scholarbridge:nav-updated", onUpdate);
+    return () => {
+      alive = false;
+      window.removeEventListener("scholarbridge:nav-updated", onUpdate);
+    };
+  }, []);
+
+  // If the admin hides the section the user is currently on, land them back
+  // on the dashboard instead of leaving a nav-less page.
+  useEffect(() => {
+    if (activeTab !== "dashboard" && hiddenItems.includes(activeTab)) {
+      setActiveTab("dashboard");
+    }
+  }, [hiddenItems, activeTab, setActiveTab]);
+
   const navItems = [
     { id: "dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { id: "universities", label: t("universities"), icon: Search },
@@ -153,10 +192,13 @@ export function Navbar({
     { id: "consulting", label: t("consulting"), icon: Headset, hidden: true },
   ];
 
-  // Admin sees an extra management tab. Hidden items stay in the code but are
-  // never rendered (feature not ready — no dead navigation).
+  // Admin sees an extra management tab. `hidden: true` items stay in the code
+  // but are never rendered (feature not ready — no dead navigation), and
+  // `hiddenItems` is the live Admin → Navigation list (applies to everyone).
   const isAdmin = !!activeProfile?.isAdmin;
-  const visibleItems = navItems.filter((item) => !item.hidden);
+  const visibleItems = navItems.filter(
+    (item) => !item.hidden && !hiddenItems.includes(item.id)
+  );
   const displayItems = isAdmin
     ? [...visibleItems, { id: "admin", label: t("adminPanel"), icon: Crown, premium: false, hidden: false }]
     : visibleItems;

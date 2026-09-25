@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { StudentProfile } from "./Navbar";
-import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award } from "lucide-react";
+import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Target } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 import { STUDY_FIELD_CATEGORIES, STUDY_FIELDS } from "@/lib/studyFields";
 
@@ -22,6 +22,22 @@ interface ProfileModalProps {
   }) => Promise<void>;
 }
 
+/**
+ * Render a stored list field (JSON array or legacy comma text) as editable
+ * comma-separated text. The form sends it back as a plain comma string —
+ * PUT /api/profiles/:id accepts that for every jsonListField.
+ */
+const toList = (raw?: string | null): string => {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.join(", ");
+  } catch {
+    // legacy comma-separated text
+  }
+  return String(raw);
+};
+
 export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: ProfileModalProps) {
   const [formData, setFormData] = useState<{
     name: string;
@@ -34,12 +50,35 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     toeflScore: number | string;
     satScore: number | string;
     greScore: number | string;
+    actScore: number | string;
+    duolingoScore: number | string;
     budgetAnnualUsd: number;
+    familyIncomeUsd: number | string;
     preferredCountries: string[];
+    targetUniversities: string;
+    careerGoal: string;
     needScholarship: boolean;
+    needsFinancialAid: boolean;
+    requiresFullScholarship: boolean;
+    country: string;
+    age: number | string;
+    graduationYear: number | string;
     extracurriculars: string;
     workExperienceYears: number;
     researchPublications: number;
+    apCourses: string;
+    ibCourses: string;
+    aLevelSubjects: string;
+    leadership: string;
+    volunteering: string;
+    sports: string;
+    clubs: string;
+    researchExperience: string;
+    projects: string;
+    olympiads: string;
+    awards: string;
+    competitions: string;
+    certificates: string;
     password: string;
   }>({
     name: "",
@@ -54,12 +93,35 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     toeflScore: "",
     satScore: "",
     greScore: "",
+    actScore: "",
+    duolingoScore: "",
     budgetAnnualUsd: 25000,
+    familyIncomeUsd: "",
     preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+    targetUniversities: "",
+    careerGoal: "",
     needScholarship: true,
+    needsFinancialAid: false,
+    requiresFullScholarship: false,
+    country: "",
+    age: "",
+    graduationYear: "",
     extracurriculars: "",
     workExperienceYears: 0,
     researchPublications: 0,
+    apCourses: "",
+    ibCourses: "",
+    aLevelSubjects: "",
+    leadership: "",
+    volunteering: "",
+    sports: "",
+    clubs: "",
+    researchExperience: "",
+    projects: "",
+    olympiads: "",
+    awards: "",
+    competitions: "",
+    certificates: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,12 +154,35 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         toeflScore: profile.toeflScore ?? "",
         satScore: profile.satScore ?? "",
         greScore: profile.greScore ?? "",
+        actScore: profile.actScore ?? "",
+        duolingoScore: profile.duolingoScore ?? "",
         budgetAnnualUsd: profile.budgetAnnualUsd || 25000,
+        familyIncomeUsd: profile.familyIncomeUsd ?? "",
         preferredCountries: countries,
+        targetUniversities: toList(profile.targetUniversities),
+        careerGoal: profile.careerGoal || "",
         needScholarship: profile.needScholarship ?? true,
+        needsFinancialAid: profile.needsFinancialAid ?? false,
+        requiresFullScholarship: profile.requiresFullScholarship ?? false,
+        country: profile.country || "",
+        age: profile.age ?? "",
+        graduationYear: profile.graduationYear ?? "",
         extracurriculars: profile.extracurriculars || "",
         workExperienceYears: profile.workExperienceYears || 0,
         researchPublications: profile.researchPublications || 0,
+        apCourses: toList(profile.apCourses),
+        ibCourses: toList(profile.ibCourses),
+        aLevelSubjects: toList(profile.aLevelSubjects),
+        leadership: toList(profile.leadership),
+        volunteering: toList(profile.volunteering),
+        sports: toList(profile.sports),
+        clubs: toList(profile.clubs),
+        researchExperience: toList(profile.researchExperience),
+        projects: toList(profile.projects),
+        olympiads: toList(profile.olympiads),
+        awards: toList(profile.awards),
+        competitions: toList(profile.competitions),
+        certificates: toList(profile.certificates),
         password: "", // never pre-filled — a new value only on change
       });
     } else if (isNew) {
@@ -114,12 +199,35 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         toeflScore: "",
         satScore: "",
         greScore: "",
+        actScore: "",
+        duolingoScore: "",
         budgetAnnualUsd: 25000,
+        familyIncomeUsd: "",
         preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+        targetUniversities: "",
+        careerGoal: "",
         needScholarship: true,
+        needsFinancialAid: false,
+        requiresFullScholarship: false,
+        country: "",
+        age: "",
+        graduationYear: "",
         extracurriculars: "",
         workExperienceYears: 0,
         researchPublications: 0,
+        apCourses: "",
+        ibCourses: "",
+        aLevelSubjects: "",
+        leadership: "",
+        volunteering: "",
+        sports: "",
+        clubs: "",
+        researchExperience: "",
+        projects: "",
+        olympiads: "",
+        awards: "",
+        competitions: "",
+        certificates: "",
         password: "",
       });
     }
@@ -179,16 +287,22 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     try {
       const {
         gpa, ieltsScore, toeflScore, satScore, greScore,
+        actScore, duolingoScore, age, graduationYear, familyIncomeUsd,
         ...rest
       } = formData;
       await onSave({
         ...rest,
-        // Empty test-score fields are saved as null (NULL in DB), never 0.
+        // Empty numeric fields are saved as null (NULL in DB), never 0.
         gpa: gpa === "" ? null : Number(gpa),
         ieltsScore: ieltsScore === "" ? null : Number(ieltsScore),
         toeflScore: toeflScore === "" ? null : Number(toeflScore),
         satScore: satScore === "" ? null : Number(satScore),
         greScore: greScore === "" ? null : Number(greScore),
+        actScore: actScore === "" ? null : Number(actScore),
+        duolingoScore: duolingoScore === "" ? null : Number(duolingoScore),
+        age: age === "" ? null : Number(age),
+        graduationYear: graduationYear === "" ? null : Number(graduationYear),
+        familyIncomeUsd: familyIncomeUsd === "" ? null : Number(familyIncomeUsd),
         preferredCountries: JSON.stringify(formData.preferredCountries),
       });
       onClose();
@@ -289,6 +403,50 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Personal details */}
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-sky-600" />
+              Personal Details
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Country of Residence</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Uzbekistan"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Age</label>
+                <input
+                  type="number"
+                  min="14"
+                  max="99"
+                  value={formData.age || ""}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="18"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Graduation Year</label>
+                <input
+                  type="number"
+                  min="2020"
+                  max="2040"
+                  value={formData.graduationYear || ""}
+                  onChange={(e) => setFormData({ ...formData, graduationYear: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="2027"
+                />
+              </div>
             </div>
           </div>
 
@@ -414,6 +572,64 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   placeholder="e.g. 320"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">ACT Score</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="36"
+                  value={formData.actScore || ""}
+                  onChange={(e) => setFormData({ ...formData, actScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="e.g. 32"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Duolingo English</label>
+                <input
+                  type="number"
+                  min="10"
+                  max="160"
+                  value={formData.duolingoScore || ""}
+                  onChange={(e) => setFormData({ ...formData, duolingoScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="e.g. 120"
+                />
+              </div>
+            </div>
+
+            {/* Course rigor */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">AP Courses</label>
+                <input
+                  type="text"
+                  value={formData.apCourses}
+                  onChange={(e) => setFormData({ ...formData, apCourses: e.target.value })}
+                  className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Calculus AB, Physics C"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">IB Courses</label>
+                <input
+                  type="text"
+                  value={formData.ibCourses}
+                  onChange={(e) => setFormData({ ...formData, ibCourses: e.target.value })}
+                  className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Math HL, English HL"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">A-Level Subjects</label>
+                <input
+                  type="text"
+                  value={formData.aLevelSubjects}
+                  onChange={(e) => setFormData({ ...formData, aLevelSubjects: e.target.value })}
+                  className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Maths, Physics"
+                />
+              </div>
             </div>
           </div>
 
@@ -456,6 +672,46 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     <span className="text-xs font-semibold text-slate-800">Requires Full/Partial Scholarships</span>
                     <p className="text-[11px] text-slate-500">Prioritizes universities with financial aid & grant funds</p>
                   </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Family Income (USD / year)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">$</span>
+                  <input
+                    type="number"
+                    step="500"
+                    min="0"
+                    value={formData.familyIncomeUsd || ""}
+                    onChange={(e) => setFormData({ ...formData, familyIncomeUsd: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                    className="w-full pl-7 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="12000"
+                  />
+                </div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.needsFinancialAid}
+                    onChange={(e) => setFormData({ ...formData, needsFinancialAid: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-800">Needs financial aid?</span>
+                </label>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.requiresFullScholarship}
+                    onChange={(e) => setFormData({ ...formData, requiresFullScholarship: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-800">Require a full scholarship?</span>
                 </label>
               </div>
             </div>
@@ -531,6 +787,92 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 placeholder="e.g. Hackathon winner, Vice President of Tech Club, Peer Tutor in Data Structures..."
               />
+            </div>
+          </div>
+
+          {/* Extracurricular detail (from My Profile) */}
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-teal-600" />
+              Extracurriculars
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {([
+                ["leadership", "Leadership", "Student Council VP, Club President"],
+                ["volunteering", "Volunteering", "Red Crescent volunteer"],
+                ["sports", "Sports", "Football team captain"],
+                ["clubs", "Clubs", "Debate club, Robotics"],
+                ["researchExperience", "Research", "NLP research assistant"],
+                ["projects", "Projects", "Open-source contributor"],
+              ] as const).map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Achievements (from My Profile) */}
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+              <Trophy className="h-3.5 w-3.5 text-amber-600" />
+              Achievements
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {([
+                ["olympiads", "Olympiads", "National Math Olympiad — 2nd place"],
+                ["awards", "Awards", "President's scholarship"],
+                ["competitions", "Competitions", "ACM ICPC regional"],
+                ["certificates", "Certificates", "AWS Certified, Google UX"],
+              ] as const).map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Goals (from My Profile) */}
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+              <Target className="h-3.5 w-3.5 text-indigo-600" />
+              Goals
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Universities</label>
+                <input
+                  type="text"
+                  value={formData.targetUniversities}
+                  onChange={(e) => setFormData({ ...formData, targetUniversities: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="TUM, Purdue"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Career Goal</label>
+                <textarea
+                  rows={2}
+                  value={formData.careerGoal}
+                  onChange={(e) => setFormData({ ...formData, careerGoal: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="ML engineer working on healthcare AI"
+                />
+              </div>
             </div>
           </div>
 
