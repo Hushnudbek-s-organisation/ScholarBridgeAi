@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { sql } from "drizzle-orm";
+import { sanitizeProfile } from "@/lib/password";
 
 /**
  * Admin sign-in: username (full name) + email of the owner's admin account.
@@ -10,7 +11,9 @@ import { sql } from "drizzle-orm";
  *
  * NOTE: this is a lightweight security gate until real auth is added.
  * The admin credentials are ADMIN_NAME / ADMIN_EMAIL (defaults: Hushnudbek /
- * hushnudbek@gmail.com), seeded by src/db/seed.ts on every load.
+ * hushnudbek@gmail.com), seeded by src/db/seed.ts on every load. If the
+ * owner sets a password (ADMIN_PASSWORD env or Edit Profile), they can also
+ * sign in through the regular "My account" email+password form.
  */
 export async function POST(req: Request) {
   try {
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid username or email" }, { status: 401 });
     }
 
-    return NextResponse.json({ profile });
+    return NextResponse.json({ profile: sanitizeProfile(profile) });
   } catch (error) {
     console.error("POST /api/auth/admin-login error:", error);
     return NextResponse.json({ error: "Sign-in failed" }, { status: 500 });

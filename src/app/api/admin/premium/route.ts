@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { studentProfiles, payments, subscriptions } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
 import { eq, and, ilike } from "drizzle-orm";
+import { sanitizeProfile } from "@/lib/password";
 
 export async function POST(req: Request) {
   try {
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    return NextResponse.json({ subscription, profile });
+    return NextResponse.json({ subscription, profile: sanitizeProfile(profile) });
   } catch (error) {
     console.error("POST /api/admin/premium error:", error);
     return NextResponse.json({ error: "Failed to grant premium" }, { status: 500 });

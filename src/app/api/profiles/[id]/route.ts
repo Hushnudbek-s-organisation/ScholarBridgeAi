@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { hashPassword, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { isAdmin } from "@/lib/admin";
 
@@ -28,7 +29,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ profile });
+    // Never send the password hash to the browser.
+    return NextResponse.json({ profile: sanitizeProfile(profile) });
   } catch (error) {
     console.error("GET /api/profiles/[id] error:", error);
     return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });
@@ -52,10 +54,44 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       countriesStr = JSON.stringify(body.preferredCountries);
     }
 
+    // Email change: it must not collide with another account's email
+    // (one account per email — that's what makes sign-in work).
+    const [current] = await db
+      .select({ email: studentProfiles.email })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, profileId));
+    if (!current) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+    if (
+      typeof body.email === "string" &&
+      body.email.trim() &&
+      body.email.trim().toLowerCase() !== current.email.trim().toLowerCase()
+    ) {
+      const [taken] = await db
+        .select({ id: studentProfiles.id })
+        .from(studentProfiles)
+        .where(sql`lower(${studentProfiles.email}) = ${body.email.trim().toLowerCase()} AND ${studentProfiles.id} != ${profileId}`)
+        .limit(1);
+      if (taken) {
+        return NextResponse.json(
+          { error: "This email is already used by another account" },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Password change: only when a new one (min 6 chars) is supplied.
+    const newPasswordHash =
+      typeof body.password === "string" && body.password.trim().length >= 6
+        ? hashPassword(body.password.trim())
+        : undefined;
+
     const [updatedProfile] = await db.update(studentProfiles)
       .set({
         name: body.name ?? undefined,
         email: body.email ?? undefined,
+        passwordHash: newPasswordHash,
         degreeLevel: body.degreeLevel !== undefined ? body.degreeLevel : undefined,
         targetMajor: body.targetMajor !== undefined ? body.targetMajor : undefined,
         gpa: body.gpa !== undefined ? Number(body.gpa) : undefined,
@@ -103,9 +139,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    return NextResponse.json({ profile: updatedProfile });
+    return NextResponse.json({ profile: sanitizeProfile(updatedProfile) });
   } catch (error) {
     console.error("PUT /api/profiles/[id] error:", error);
+    // Race on the unique email index.
+    if ((error as { code?: string })?.code === "23505") {
+      return NextResponse.json(
+        { error: "This email is already used by another account" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   }
 }

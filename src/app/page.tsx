@@ -225,6 +225,24 @@ export default function Home() {
     setView("wizard");
   };
 
+  /**
+   * Logout: drops the active session (the account itself stays in the
+   * database — the student gets back in later with email + password via
+   * Sign in, from this device or any other).
+   */
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("scholarbridge_active_profile");
+    } catch {
+      // ignore
+    }
+    setActiveProfile(null);
+    setActiveTab("dashboard");
+    setIsProfileModalOpen(false);
+    setIsPickerOpen(false);
+    setView("landing");
+  };
+
   const fetchSavedUniversities = async (profileId: number) => {
     try {
       const res = await fetch(`/api/saved-universities?profileId=${profileId}`);
@@ -262,7 +280,7 @@ export default function Home() {
     }
   };
 
-  const handleSaveProfile = async (formData: Omit<Partial<StudentProfile>, "gpa"> & { gpa?: number | null }) => {
+  const handleSaveProfile = async (formData: Omit<Partial<StudentProfile>, "gpa"> & { gpa?: number | null; password?: string }) => {
     // NOTE: errors are intentionally NOT swallowed here — they propagate to
     // ProfileModal so the user sees a clear message instead of a silent fail.
     if (isNewProfile) {
@@ -494,6 +512,7 @@ export default function Home() {
         onSwitchProfile={openProfilePicker}
         onStartOnboarding={startOnboarding}
         onLocaleChange={handleLocaleChange}
+        onLogout={handleLogout}
       />
 
       <div className="flex-1 min-w-0 flex flex-col">

@@ -3,7 +3,11 @@ import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, da
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
+  // Sign up / sign in: scrypt hash of the account password (never plain text).
+  // NULL for legacy profiles that predate passwords (e.g. the admin account —
+  // those still use the username+email admin sign-in).
+  passwordHash: text("password_hash"),
   degreeLevel: text("degree_level").notNull().default("Master"),
   targetMajor: text("target_major").notNull().default("Computer Science"),
   gpa: doublePrecision("gpa").notNull().default(3.5),

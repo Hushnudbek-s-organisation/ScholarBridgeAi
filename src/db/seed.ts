@@ -17,6 +17,7 @@ import {
   badges,
 } from "./schema";
 import { eq, sql } from "drizzle-orm";
+import { hashPassword } from "@/lib/password";
 
 /** Local 8-char referral code generator (avoids importing gamification here). */
 function makeReferralCode(): string {
@@ -34,8 +35,14 @@ export async function seedDatabase() {
     // form always has a target. Credentials are configurable via env vars:
     //   ADMIN_NAME  (default "Hushnudbek")
     //   ADMIN_EMAIL (default "hushnudbek@gmail.com")
+    //   ADMIN_PASSWORD (optional, min 6 chars) — the admin's sign-in
+    //     password. When set AND the admin account has no password yet, the
+    //     seed applies it (stored as a scrypt hash). Once the owner changes
+    //     the password from Edit Profile, the seed never overwrites it.
     const adminName = process.env.ADMIN_NAME || "Hushnudbek";
     const adminEmail = (process.env.ADMIN_EMAIL || "hushnudbek@gmail.com").toLowerCase();
+    const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
+    const adminHasPassword = adminPassword.length >= 6;
     try {
       const [adminProfile] = await db
         .select()
@@ -43,7 +50,10 @@ export async function seedDatabase() {
         .where(sql`lower(${studentProfiles.email}) = ${adminEmail}`)
         .limit(1);
       if (adminProfile) {
-        if (!adminProfile.isAdmin || adminProfile.name !== adminName) {
+        // Set the env password only while the account has none — a password
+        // the owner set later (Edit Profile) is never clobbered on reload.
+        const needsPassword = adminHasPassword && !adminProfile.passwordHash;
+        if (!adminProfile.isAdmin || adminProfile.name !== adminName || needsPassword) {
           await db
             .update(studentProfiles)
             .set({
@@ -51,9 +61,13 @@ export async function seedDatabase() {
               isAdmin: true,
               onboardingCompleted: true,
               onboardingStep: 8,
+              ...(needsPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
             })
             .where(eq(studentProfiles.id, adminProfile.id));
-          console.log(`Ensured admin account "${adminName}" (profile ${adminProfile.id}).`);
+          console.log(
+            `Ensured admin account "${adminName}" (profile ${adminProfile.id})` +
+              (needsPassword ? " — password set from ADMIN_PASSWORD." : ".")
+          );
         }
       } else {
         const [created] = await db
@@ -71,6 +85,7 @@ export async function seedDatabase() {
             isAdmin: true,
             onboardingCompleted: true,
             onboardingStep: 8,
+            ...(adminHasPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
           })
           .returning();
         console.log(`Created admin account "${adminName}" (${adminEmail}, profile ${created.id}).`);
