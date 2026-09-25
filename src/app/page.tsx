@@ -471,11 +471,27 @@ export default function Home() {
     openProfilePicker();
   };
 
+  const profilePicker = (
+    <ProfilePicker
+      key={isPickerOpen ? "open" : "closed"}
+      open={isPickerOpen}
+      deviceProfiles={deviceProfiles}
+      currentId={activeProfile?.id ?? null}
+      onClose={() => setIsPickerOpen(false)}
+      onSelect={handlePickProfile}
+      onAddNew={handleAddNewFromPicker}
+      onAdminLogin={handleAdminLogin}
+    />
+  );
+
   // ---- First visit: English landing page ----
   if (view === "landing") {
     return (
       <LocaleProvider>
-        <LandingPage onStart={startOnboarding} onEnterApp={enterApp} onSignIn={openProfilePicker} />
+        <>
+          <LandingPage onStart={startOnboarding} onEnterApp={enterApp} onSignIn={openProfilePicker} />
+          {profilePicker}
+        </>
       </LocaleProvider>
     );
   }
@@ -678,16 +694,7 @@ export default function Home() {
       />
 
       {/* Profile picker — only THIS device's accounts + admin sign-in */}
-      <ProfilePicker
-        key={isPickerOpen ? "open" : "closed"}
-        open={isPickerOpen}
-        deviceProfiles={deviceProfiles}
-        currentId={activeProfile?.id ?? null}
-        onClose={() => setIsPickerOpen(false)}
-        onSelect={handlePickProfile}
-        onAddNew={handleAddNewFromPicker}
-        onAdminLogin={handleAdminLogin}
-      />
+      {profilePicker}
       </div>
     </LocaleProvider>
   );
