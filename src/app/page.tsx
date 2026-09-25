@@ -8,6 +8,16 @@ import { UniversityExplorer } from "@/components/UniversityExplorer";
 import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
+import { ChancingPanel } from "@/components/ChancingPanel";
+import { CompleteProfileForm } from "@/components/CompleteProfileForm";
+import { ApplicationCenter } from "@/components/ApplicationCenter";
+import { NextActionsPanel } from "@/components/NextActionsPanel";
+import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
+import { EssayRubricStudio } from "@/components/EssayRubricStudio";
+import { SimilarProfiles } from "@/components/SimilarProfiles";
+import { PlanningStudio } from "@/components/PlanningStudio";
+import { MentorMarketplace } from "@/components/MentorMarketplace";
+import { ParentDashboard } from "@/components/ParentDashboard";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -41,6 +51,7 @@ export default function Home() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerMessage, setPickerMessage] = useState("");
 
   // IDs of the accounts created / signed-in WITHIN THIS BROWSER. Other
   // people's accounts are never shown — only these.
@@ -174,46 +185,58 @@ export default function Home() {
   }, []);
 
   /**
-   * On mount, restore ONLY the profile this browser signed in with
-   * (localStorage). If there is none, show the English landing page.
-   * Other profiles are never auto-loaded.
+   * On mount, restore the session from the server-signed cookie.
+   *
+   * The id in localStorage is only a hint: identity comes from
+   * GET /api/auth/session, which validates the HttpOnly session cookie. A
+   * stale or hand-edited local id therefore can never log anyone in.
    */
   const loadStoredProfile = useCallback(async () => {
     try {
-      const storedId = Number(localStorage.getItem("scholarbridge_active_profile"));
-      if (storedId) {
-        const res = await fetch(`/api/profiles/${storedId}`);
-        const data = await res.json();
-        if (res.ok && data.profile) {
-          setActiveProfile(data.profile);
-          rememberProfile(storedId);
-          hydrateProfileData(storedId);
-          setView("app");
-          // Fire-and-forget: check for approaching deadlines → notifications.
-          try {
-            fetch("/api/notifications/sweep", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ profileId: storedId }),
-            }).catch(() => {});
-          } catch {
-            // ignore
-          }
-          // Fire-and-forget: auto-build the personalized roadmap.
-          try {
-            fetch("/api/roadmap/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ profileId: storedId }),
-            }).catch(() => {});
-          } catch {
-            // ignore
-          }
-          return;
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.profile) {
+        const storedId = Number(data.profile.id);
+        setActiveProfile(data.profile);
+        rememberProfile(storedId);
+        try {
+          localStorage.setItem("scholarbridge_active_profile", String(storedId));
+        } catch {
+          // ignore
         }
+        hydrateProfileData(storedId);
+        setView("app");
+        // Fire-and-forget: check for approaching deadlines → notifications.
+        try {
+          fetch("/api/notifications/sweep", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profileId: storedId }),
+          }).catch(() => {});
+        } catch {
+          // ignore
+        }
+        // Fire-and-forget: auto-build the personalized roadmap.
+        try {
+          fetch("/api/roadmap/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profileId: storedId }),
+          }).catch(() => {});
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      // No (or an expired) session — drop the stale local hint so the next
+      // load does not pretend an account is active.
+      try {
+        localStorage.removeItem("scholarbridge_active_profile");
+      } catch {
+        // ignore
       }
     } catch (err) {
-      console.error("Error restoring profile:", err);
+      console.error("Error restoring session:", err);
     }
     setView("landing");
   }, [hydrateProfileData, rememberProfile]);
@@ -228,10 +251,31 @@ export default function Home() {
   /** Open the profile picker for sign-in or switching accounts. */
   const openProfilePicker = useCallback(async () => {
     await loadAllProfiles();
+    setPickerMessage("");
     setIsPickerOpen(true);
   }, [loadAllProfiles]);
 
-  const handlePickProfile = (p: StudentProfile) => {
+  /**
+   * Picking an account that this device used before is a convenience only: the
+   * server still has to confirm the session cookie belongs to that account.
+   * If it does not (new browser, expired session, different user), the picker
+   * stays open so the person signs in with email + password.
+   */
+  const handlePickProfile = async (p: StudentProfile) => {
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.session?.profileId !== p.id) {
+        setPickerMessage(
+          "Please sign in with your email and password to open this account."
+        );
+        return;
+      }
+    } catch {
+      setPickerMessage("Could not verify your session. Please sign in again.");
+      return;
+    }
+
     setActiveProfile(p);
     setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
@@ -257,6 +301,13 @@ export default function Home() {
    * Sign in, from this device or any other).
    */
   const handleLogout = () => {
+    // Clear the server-side session cookie too — otherwise the browser would
+    // still be authenticated after "logging out".
+    try {
+      fetch("/api/auth/sign-out", { method: "POST" }).catch(() => {});
+    } catch {
+      // ignore
+    }
     try {
       localStorage.removeItem("scholarbridge_active_profile");
     } catch {
@@ -310,6 +361,16 @@ export default function Home() {
       setProfiles((prev) => prev.map((p) => (p.id === data.profile.id ? data.profile : p)));
       setActiveProfile(data.profile);
     }
+  };
+
+  /**
+   * Complete-profile editor writes through PUT /api/profiles/:id itself (it owns
+   * the full field set), so here we only fold the returned row back into state —
+   * otherwise the chancing engine would keep scoring a stale profile.
+   */
+  const handleProfileUpdated = (updated: StudentProfile) => {
+    setProfiles((prev) => prev.map((profile) => (profile.id === updated.id ? updated : profile)));
+    setActiveProfile(updated);
   };
 
   // University Handlers
@@ -474,6 +535,7 @@ export default function Home() {
       onClose={() => setIsPickerOpen(false)}
       onSelect={handlePickProfile}
       onAddNew={handleAddNewFromPicker}
+      notice={pickerMessage}
     />
   );
 
@@ -534,17 +596,21 @@ export default function Home() {
             onComplete={handleWizardComplete}
           />
         ) : activeTab === "dashboard" && (
-          <DashboardView
-            profile={activeProfile}
-            onNavigateTab={setActiveTab}
-            savedUniCount={savedUniversities.length}
-            savedScholarshipCount={savedScholarships.length}
-            taskCount={taskCount}
-            onEditProfile={() => {
-              setIsNewProfile(false);
-              setIsProfileModalOpen(true);
-            }}
-          />
+          <div className="space-y-4">
+            {/* #4 Personalized Roadmap — the centrepiece: three actions */}
+            <NextActionsPanel activeProfile={activeProfile} onNavigate={setActiveTab} />
+            <DashboardView
+              profile={activeProfile}
+              onNavigateTab={setActiveTab}
+              savedUniCount={savedUniversities.length}
+              savedScholarshipCount={savedScholarships.length}
+              taskCount={taskCount}
+              onEditProfile={() => {
+                setIsNewProfile(false);
+                setIsProfileModalOpen(true);
+              }}
+            />
+          </div>
         )}
 
         {activeTab === "universities" && (
@@ -584,7 +650,11 @@ export default function Home() {
             description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
             onUpgrade={() => setActiveTab("payments")}
           >
-            <AiSopStudio activeProfile={activeProfile} />
+            <div className="space-y-4">
+              <AiSopStudio activeProfile={activeProfile} />
+              {/* #8 Advanced Essay AI — deterministic rubric + version history */}
+              <EssayRubricStudio activeProfile={activeProfile} />
+            </div>
           </PremiumGate>
         )}
 
@@ -598,6 +668,34 @@ export default function Home() {
             <TaskRoadmap activeProfile={activeProfile} />
           </PremiumGate>
         )}
+
+        {/* Complete Student Profile (#1) */}
+        {activeTab === "profile" && activeProfile && (
+          <CompleteProfileForm
+            key={`profile-${activeProfile.id}`}
+            activeProfile={activeProfile}
+            onSaved={handleProfileUpdated}
+          />
+        )}
+
+        {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
+        {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+
+        {/* #3 AI Admissions Advisor */}
+        {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
+
+        {/* #10 Accepted students with a similar profile */}
+        {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
+
+        {/* Phase 4 — mentor marketplace + parent dashboard */}
+        {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
+        {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
+
+        {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
+        {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}
+
+        {/* Universal application tracker + outcomes flywheel (#12) */}
+        {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
 
         {activeTab === "deadlines" && (
           <PremiumGate

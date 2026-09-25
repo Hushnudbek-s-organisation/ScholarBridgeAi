@@ -4,6 +4,8 @@ import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/sc
 import { eq, and, count, asc, desc } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
 import { notifyAdmins } from "@/lib/notifications";
+import { requireProfileAccess } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   try {
@@ -56,6 +58,17 @@ export async function POST(req: Request) {
     if (!threadId || !authorId || !replyBody) {
       return NextResponse.json({ error: "threadId, authorId and body are required" }, { status: 400 });
     }
+
+    // The author must be the signed-in caller; community writes are throttled.
+    const access = await requireProfileAccess(req, authorId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
+    const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
+    if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 
     // Prevent posting to a locked thread.
     const [thread] = await db.select().from(forumThreads).where(eq(forumThreads.id, Number(threadId)));

@@ -3,12 +3,29 @@ import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
+import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
+import { clampArray, clampString } from "@/lib/request";
 import { eq } from "drizzle-orm";
 import { localeToLanguageName } from "@/i18n/config";
 
 export async function POST(req: Request) {
   try {
-    const { message, profileId, chatHistory } = await req.json();
+    // Size cap + rate limit + ownership of `profileId` (see lib/ai/guard).
+    const guarded = await guardAiRequest(req);
+    if (!guarded.ok) return guarded.response;
+
+    const profileId = guarded.profileId;
+    const message = safePromptFields(guarded.body).message;
+    // Only the last 6 turns are used — cap the array and every entry too.
+    const chatHistory = clampArray<{ sender?: unknown; text?: unknown }>(
+      guarded.body.chatHistory,
+      12
+    )
+      .slice(-6)
+      .map((h) => ({
+        sender: h?.sender === "user" ? "user" : "assistant",
+        text: clampString(h?.text, 4000),
+      }));
 
     if (!message) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });

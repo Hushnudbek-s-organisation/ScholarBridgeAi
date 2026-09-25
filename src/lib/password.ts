@@ -10,6 +10,43 @@ import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 const SCRYPT_KEYLEN = 64;
 const SALT_BYTES = 16;
 
+/**
+ * Minimum password length enforced server-side (and mirrored in the UI copy).
+ * Short passwords are the cheapest way into an account — 8 is the floor.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/** Reject the most common passwords outright. */
+const BLOCKED_PASSWORDS = new Set([
+  "password",
+  "password1",
+  "password123",
+  "12345678",
+  "123456789",
+  "1234567890",
+  "qwerty123",
+  "qwertyuiop",
+  "iloveyou",
+  "admin123",
+  "scholarbridge",
+  "scholarbridgeai",
+]);
+
+/**
+ * Validate a password. Returns null when acceptable, otherwise the reason it
+ * was rejected (safe to show to the user).
+ */
+export function passwordPolicyError(plain: string): string | null {
+  if (typeof plain !== "string" || plain.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  if (plain.length > 200) return "Password is too long (max 200 characters)";
+  if (BLOCKED_PASSWORDS.has(plain.toLowerCase())) {
+    return "This password is too common — please choose another one";
+  }
+  return null;
+}
+
 /** Hash a plain-text password with a fresh random salt. */
 export function hashPassword(plain: string): string {
   const salt = randomBytes(SALT_BYTES).toString("hex");

@@ -5,12 +5,22 @@
 import { AGENT_CONFIG } from "./config";
 import { isSameDomain } from "./domain";
 import { isResearchContentType } from "./urlFilter";
+import { unsafeOutboundReason } from "@/lib/ssrf";
 
 const cache = new Map<string, { html: string; at: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /** Fetch a page's text content with retries. Returns null on final failure. */
 export async function fetchPageText(url: string): Promise<string | null> {
+  // SSRF guard: the agent follows URLs taken from web content and admin input,
+  // so it must never be steered at localhost, the cloud metadata endpoint or
+  // any private network address.
+  const unsafe = unsafeOutboundReason(url);
+  if (unsafe) {
+    console.warn(`[research-agent] refused to fetch ${url}: ${unsafe}`);
+    return null;
+  }
+
   const cached = cache.get(url);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.html;
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReports } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,8 +12,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { status, adminProfileId } = body; // 'resolved' | 'dismissed'
 
     // Only admins may resolve/dismiss reports.
-    if (!(await isAdmin(adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     if (!["resolved", "dismissed"].includes(status)) {

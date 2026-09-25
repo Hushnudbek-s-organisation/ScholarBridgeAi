@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { setConfig } from "@/lib/config";
 import { supabaseStorageUrl } from "@/lib/branding";
 
@@ -17,8 +17,12 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const adminProfileId = form.get("adminProfileId");
-    if (!(await isAdmin(typeof adminProfileId === "string" ? adminProfileId : null))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(request);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const kind = form.get("kind");

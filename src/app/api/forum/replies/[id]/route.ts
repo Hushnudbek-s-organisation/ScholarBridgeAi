@@ -2,25 +2,22 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReplies, studentProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { authenticate } from "@/lib/auth";
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const replyId = parseInt(id, 10);
-    const { searchParams } = new URL(req.url);
-
-    // Authenticate the requester.
-    const requesterId = Number(searchParams.get("requesterId"));
-    if (!Number.isFinite(requesterId) || requesterId <= 0) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    // Authenticate the requester from the signed session cookie — the
+    // `requesterId` query parameter was forgeable and is ignored.
+    const auth = await authenticate(req);
+    if (!auth.ok) {
+      return NextResponse.json(
+        { error: auth.error, code: auth.code },
+        { status: auth.status }
+      );
     }
-    const [requester] = await db
-      .select({ id: studentProfiles.id, isAdmin: studentProfiles.isAdmin })
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, requesterId));
-    if (!requester) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
+    const requester = { id: auth.session.profile.id, isAdmin: auth.session.isAdmin };
 
     // Only the reply author or an admin may delete the reply.
     const [reply] = await db

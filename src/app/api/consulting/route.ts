@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { consultingRequests } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -32,6 +33,13 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const profileId = Number(searchParams.get("profileId"));
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }

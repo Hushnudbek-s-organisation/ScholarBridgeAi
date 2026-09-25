@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { getReferralOverview, applyReferralCode } from "@/lib/referrals";
 
 export async function GET(req: Request) {
@@ -9,6 +10,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
     const profileId = parseInt(profileIdStr, 10);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     const overview = await getReferralOverview(profileId);
     return NextResponse.json(overview);
   } catch (error) {

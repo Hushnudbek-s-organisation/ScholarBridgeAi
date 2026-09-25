@@ -339,7 +339,31 @@ export function VisaSpeakingAssistant({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
-  const [analysis, setAnalysis] = useState<VisaAnalysis | null>(null);
+  /**
+   * The response now carries a deterministic rubric computed from the transcript
+   * and a disclaimer for the model's own probability. `estimated_visa_chance`
+   * is the model's opinion, not a prediction — see lib/visaScoring.
+   */
+  type VisaAnalysisResponse = VisaAnalysis & {
+    aiAvailable?: boolean;
+    rubric?: {
+      scores: {
+        purposeOfStudy: number;
+        funding: number;
+        homeTies: number;
+        nonImmigrantIntent: number;
+        specificity: number;
+        languageClarity: number;
+        total: number;
+      };
+      risks: { code: string; message: string; severity: "high" | "medium" | "low" }[];
+      unanswered: string[];
+      answerCount: number;
+      averageAnswerWords: number;
+    };
+    chanceDisclaimer?: string;
+  };
+  const [analysis, setAnalysis] = useState<VisaAnalysisResponse | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
 
@@ -732,16 +756,19 @@ export function VisaSpeakingAssistant({
             countryCode: c.code,
             messages: messagesRef.current,
             uiLanguage: localeToLanguageName(locale),
+            homeCountry: activeProfile?.country || undefined,
           }),
         });
         const data = await res.json().catch(() => ({}));
         if (sessionRef.current !== token || !mountedRef.current) return;
-        if (!res.ok || typeof data?.recommendations !== "string") {
+        // A rubric-only response (no AI provider configured) is still a real
+        // result — only reject when neither half arrived.
+        if (!res.ok || (typeof data?.recommendations !== "string" && !data?.rubric)) {
           throw new Error(
             typeof data?.error === "string" ? data.error : t("analyzeError"),
           );
         }
-        setAnalysis(data as VisaAnalysis);
+        setAnalysis(data as VisaAnalysisResponse);
         setScreen("result");
       } catch (e) {
         if (sessionRef.current !== token || !mountedRef.current) return;
@@ -1332,6 +1359,85 @@ export function VisaSpeakingAssistant({
       {/* ============================ RESULT ============================ */}
       {screen === "result" && analysis && country && (
         <div className="space-y-4">
+          {/* #9 — the rubric is computed from what was actually said, so it
+              renders even when no AI provider is configured. */}
+          {analysis.rubric && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-900">Answer rubric</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Computed from your transcript — not from the model, so the same answers always
+                score the same.
+              </p>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    ["purposeOfStudy", "Purpose of study"],
+                    ["funding", "Funding explained"],
+                    ["homeTies", "Ties to home country"],
+                    ["nonImmigrantIntent", "Non-immigrant intent"],
+                    ["specificity", "Specific detail"],
+                    ["languageClarity", "Language clarity"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key}>
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-600">
+                      <span>{label}</span>
+                      <span>{analysis.rubric!.scores[key]}</span>
+                    </div>
+                    <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-blue-600"
+                        style={{ width: `${analysis.rubric!.scores[key]}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span className="text-xs font-bold text-slate-600">Overall readiness</span>
+                <span className="text-lg font-extrabold text-slate-900">
+                  {analysis.rubric.scores.total}
+                  <span className="text-xs font-bold text-slate-400">/100</span>
+                </span>
+              </div>
+
+              {analysis.rubric.risks.length > 0 && (
+                <ul className="mt-3 space-y-1.5">
+                  {analysis.rubric.risks.map((risk, i) => (
+                    <li key={`${risk.code}-${i}`} className="flex flex-wrap items-start gap-2">
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+                          risk.severity === "high"
+                            ? "border-red-200 bg-red-50 text-red-700"
+                            : risk.severity === "medium"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-slate-200 bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {risk.severity}
+                      </span>
+                      <span className="min-w-0 flex-1 text-xs text-slate-700">{risk.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {analysis.rubric.unanswered.length > 0 && (
+                <p className="mt-3 text-[11px] text-slate-500">
+                  Not substantively answered: {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {analysis.chanceDisclaimer && (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
+              {analysis.chanceDisclaimer}
+            </p>
+          )}
+
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xs">
             <p className="text-3xl leading-none">{country.flag}</p>
             <h2 className="mt-2 text-lg font-extrabold text-slate-900">

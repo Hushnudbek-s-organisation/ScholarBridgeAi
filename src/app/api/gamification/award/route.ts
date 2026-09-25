@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,6 +11,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { profileId, points, reason, relatedEntityId } = body;
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     if (!profileId || !points) {
       return NextResponse.json({ error: "profileId and points are required" }, { status: 400 });

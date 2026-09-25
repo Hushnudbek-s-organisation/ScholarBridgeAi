@@ -13,7 +13,7 @@
  * masked in responses.
  */
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { getConfig, setConfig } from "@/lib/config";
 import {
   AI_TASKS,
@@ -41,7 +41,13 @@ async function getDefaultProvider(): Promise<string> {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) return forbidden();
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     const providers = await getPublicCredentials();
     const defaultProvider = await getDefaultProvider();
@@ -78,7 +84,13 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) return forbidden();
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     // --- Credential update (provider + apiKey/model) ---
     if (body.provider) {
@@ -150,7 +162,13 @@ export async function PUT(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) return forbidden();
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     const provider = String(body.provider ?? "");
     if (!isAIProviderId(provider)) {

@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { createNotification } from "@/lib/notifications";
+import { requireProfileAccess } from "@/lib/auth";
 
 /**
  * Personalized application roadmap (spec §25).
@@ -24,6 +25,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
     const pid = Number(profileId);
+
+    const access = await requireProfileAccess(req, pid);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     let generated = 0;
 

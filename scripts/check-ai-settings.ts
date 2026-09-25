@@ -375,13 +375,17 @@ check("schema.ts defines ai_provider_credentials table", () => {
   assert.match(schema, /apiKeyEnc: text\("api_key_enc"\)/);
 });
 
-check("admin API route exists with GET/PUT/POST + isAdmin guard", () => {
+check("admin API route exists with GET/PUT/POST + session-based admin guard", () => {
   const route = readFileSync(join(ROOT, "src/app/api/admin/ai-settings/route.ts"), "utf8");
   assert.match(route, /export async function GET/);
   assert.match(route, /export async function PUT/);
   assert.match(route, /export async function POST/);
-  assert.match(route, /isAdmin/);
+  // Admin access is verified from the signed session cookie (requireAdmin),
+  // never from a client-supplied id.
+  assert.match(route, /requireAdmin\(/);
+  assert.match(route, /from "@\/lib\/auth"/);
   assert.match(route, /validateApiKey/);
+  assert.doesNotMatch(route, /await isAdmin\(/);
 });
 
 check("admin AI settings component exists", () => {

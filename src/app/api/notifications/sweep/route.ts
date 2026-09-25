@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import {
   scholarships,
@@ -23,6 +24,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profileId = body.profileId ? Number(body.profileId) : null;
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     // Optional window override (default 14 days).
     const windowDays = Number(body.windowDays || 14);

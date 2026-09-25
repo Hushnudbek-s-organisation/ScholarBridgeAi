@@ -2,29 +2,31 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { hashPassword, sanitizeProfile } from "@/lib/password";
+import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
+import { clampString, readJsonBody } from "@/lib/request";
 
 /**
- * Authorization: the profile owner may read/update their own profile; an
- * admin (is_admin) may read/update/delete any profile. A bare profileId in
- * the body is never enough — the requester must prove who they are via
- * requesterId (and admins additionally via is_admin).
+ * Authorization: identity comes from the signed session cookie — never from an
+ * id in the body or the URL. The owner may read/update their own profile; a
+ * live admin (is_admin) may read/update/delete any profile.
  */
-async function canModify(requesterId: unknown, targetProfileId: number): Promise<"own" | "admin" | false> {
-  const id = Number(requesterId);
-  if (!Number.isFinite(id) || id <= 0) return false;
-  if (id === targetProfileId) return "own";
-  return (await isAdmin(id)) ? "admin" : false;
-}
-
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const profileId = parseInt(id, 10);
+
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
-    
+
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
@@ -37,17 +39,69 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+
+/**
+ * Field coercers for the "complete profile" inputs.
+ *
+ * `undefined` means "not sent" → the column is left untouched. An empty
+ * string/array means "cleared" → NULL. Values are never invented.
+ */
+function numField(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function boolField(value: unknown): boolean | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return Boolean(value);
+}
+
+function textField(value: unknown, max: number): string | null | undefined {
+  if (value === undefined) return undefined;
+  const text = clampString(value, max);
+  return text.length ? text : null;
+}
+
+/** Accept an array (or a JSON/comma string) and store it as a JSON array. */
+function jsonListField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const items = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  const clean = items
+    .map((item) => clampString(typeof item === "string" ? item : JSON.stringify(item), 300))
+    .filter(Boolean)
+    .slice(0, 60);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const profileId = parseInt(id, 10);
-    const body = await req.json();
 
-    // Authorization: own profile or admin.
-    const access = await canModify(body.requesterId ?? body.userId, profileId);
-    if (!access) {
-      return NextResponse.json({ error: "Forbidden: you can only edit your own profile" }, { status: 403 });
+    // Authorization: session owner or live admin. `requesterId` in the body is
+    // ignored — it was forgeable.
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
+
+    const parsed = await readJsonBody<Record<string, any>>(req);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const body = parsed.body;
 
     let countriesStr = body.preferredCountries;
     if (Array.isArray(body.preferredCountries)) {
@@ -81,16 +135,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    // Password change: only when a new one (min 6 chars) is supplied.
-    const newPasswordHash =
-      typeof body.password === "string" && body.password.trim().length >= 6
-        ? hashPassword(body.password.trim())
-        : undefined;
+    // Password change: only when a new one is supplied, and it must satisfy
+    // the password policy (min 8 chars, not a common password).
+    const newPasswordPlain =
+      typeof body.password === "string" && body.password.trim() ? body.password.trim() : "";
+    if (newPasswordPlain) {
+      const policyError = passwordPolicyError(newPasswordPlain);
+      if (policyError) {
+        return NextResponse.json({ error: policyError, code: "weak_password" }, { status: 400 });
+      }
+    }
+    const newPasswordHash = newPasswordPlain ? hashPassword(newPasswordPlain) : undefined;
 
     const [updatedProfile] = await db.update(studentProfiles)
       .set({
-        name: body.name ?? undefined,
-        email: body.email ?? undefined,
+        name: body.name !== undefined ? clampString(body.name, 120) : undefined,
+        email: body.email !== undefined ? clampString(body.email, 320) : undefined,
         passwordHash: newPasswordHash,
         degreeLevel: body.degreeLevel !== undefined ? body.degreeLevel : undefined,
         targetMajor: body.targetMajor !== undefined ? body.targetMajor : undefined,
@@ -108,6 +168,38 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         workExperienceYears: body.workExperienceYears !== undefined ? Number(body.workExperienceYears) : undefined,
         researchPublications: body.researchPublications !== undefined ? Number(body.researchPublications) : undefined,
         preferredLocale: body.preferredLocale !== undefined ? body.preferredLocale : undefined,
+        // --- Complete profile (Academic / Personal / Financial / Activities /
+        //     Achievements / Goals). Never invent values: absent fields stay
+        //     untouched, empty ones become NULL (spec §19).
+        actScore: numField(body.actScore),
+        duolingoScore: numField(body.duolingoScore),
+        apCourses: jsonListField(body.apCourses),
+        ibCourses: jsonListField(body.ibCourses),
+        aLevelSubjects: jsonListField(body.aLevelSubjects),
+        courseworkNotes: textField(body.courseworkNotes, 2000),
+        country: textField(body.country, 80),
+        age: numField(body.age),
+        graduationYear: numField(body.graduationYear),
+        familyIncomeUsd: numField(body.familyIncomeUsd),
+        needsFinancialAid: boolField(body.needsFinancialAid),
+        requiresFullScholarship: boolField(body.requiresFullScholarship),
+        leadership: jsonListField(body.leadership),
+        volunteering: jsonListField(body.volunteering),
+        sports: jsonListField(body.sports),
+        clubs: jsonListField(body.clubs),
+        researchExperience: jsonListField(body.researchExperience),
+        projects: jsonListField(body.projects),
+        olympiads: jsonListField(body.olympiads),
+        awards: jsonListField(body.awards),
+        competitions: jsonListField(body.competitions),
+        certificates: jsonListField(body.certificates),
+        targetUniversities: jsonListField(body.targetUniversities),
+        careerGoal: textField(body.careerGoal, 500),
+        // NOT NULL column — only ever true/false, never null.
+        dataShareConsent:
+          body.dataShareConsent === undefined ? undefined : Boolean(body.dataShareConsent),
+        dataShareConsentAt:
+          body.dataShareConsent === true && !body.dataShareConsentAt ? new Date() : undefined,
         // Onboarding wizard persistence (resume support)
         onboardingStep: body.onboardingStep !== undefined ? Number(body.onboardingStep) : undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
@@ -139,7 +231,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    return NextResponse.json({ profile: sanitizeProfile(updatedProfile) });
+    const response = NextResponse.json({ profile: sanitizeProfile(updatedProfile) });
+    // Changing the password rotates the session fingerprint — hand back a
+    // freshly signed cookie so the owner is not logged out by their own edit.
+    if (newPasswordHash && updatedProfile) {
+      response.headers.set(
+        "Set-Cookie",
+        sessionCookieHeader({ id: updatedProfile.id, passwordHash: newPasswordHash }, req)
+      );
+    }
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   } catch (error) {
     console.error("PUT /api/profiles/[id] error:", error);
     // Race on the unique email index.
@@ -157,11 +259,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   try {
     const { id } = await params;
     const profileId = parseInt(id, 10);
-    const { searchParams } = new URL(req.url);
 
-    // Only an admin may delete a profile (deleting is destructive).
-    if (!(await isAdmin(searchParams.get("requesterId")))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    // Only a live admin may delete a profile (deleting is destructive).
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
     await db.delete(studentProfiles).where(eq(studentProfiles.id, profileId));

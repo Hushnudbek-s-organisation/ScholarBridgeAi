@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { runRefresh, listRefreshJobs } from "@/lib/refresh";
 
 /** POST: trigger a manual refresh (admin). GET: list refresh jobs. */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const scope = body.scope === "universities" ? "universities" : body.scope === "scholarships" ? "scholarships" : "all";
     const result = await runRefresh(scope);
@@ -21,8 +25,12 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const jobs = await listRefreshJobs();
     return NextResponse.json({ jobs });

@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { instructors, courseCategories } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { eq, asc } from "drizzle-orm";
 
 /** GET: list instructors and categories (admin). */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const instructorRows = await db.select().from(instructors).orderBy(asc(instructors.sortOrder));
     const categoryRows = await db.select().from(courseCategories).orderBy(asc(courseCategories.sortOrder));
@@ -24,8 +28,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     if (body.type === "instructor") {
@@ -69,8 +77,12 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const type = searchParams.get("type");
     const id = Number(searchParams.get("id"));

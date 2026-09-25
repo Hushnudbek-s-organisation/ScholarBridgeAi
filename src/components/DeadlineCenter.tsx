@@ -9,11 +9,13 @@ import {
   Award,
   CheckSquare,
   Clock,
+  FileText,
+  FlaskConical,
 } from "lucide-react";
 
 interface DeadlineItem {
   id: string;
-  type: "scholarship" | "university" | "milestone";
+  type: "scholarship" | "university" | "milestone" | "application" | "test";
   title: string;
   subtitle: string;
   date: string | null;
@@ -21,6 +23,8 @@ interface DeadlineItem {
   daysRemaining: number | null;
   source: string | null;
   saved: boolean;
+  /** 🔴 critical (≤14d) · 🟠 soon (≤45d) · 🟡 planned · past · undated */
+  urgency?: "critical" | "soon" | "planned" | "past" | "undated";
 }
 
 interface DeadlineCenterProps {
@@ -40,6 +44,26 @@ const TYPE_META: Record<DeadlineItem["type"], { label: string; icon: React.React
     label: "Milestone",
     icon: <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />,
   },
+  application: {
+    label: "Application",
+    icon: <FileText className="h-3.5 w-3.5 text-rose-500" />,
+  },
+  test: {
+    label: "Test",
+    icon: <FlaskConical className="h-3.5 w-3.5 text-sky-500" />,
+  },
+};
+
+/** Urgency buckets the user asked for: 🔴 critical · 🟠 soon · 🟡 planned. */
+const URGENCY_META: Record<
+  NonNullable<DeadlineItem["urgency"]>,
+  { dot: string; label: string; chip: string }
+> = {
+  critical: { dot: "🔴", label: "Critical", chip: "bg-red-50 text-red-700 border-red-200" },
+  soon: { dot: "🟠", label: "Soon", chip: "bg-orange-50 text-orange-700 border-orange-200" },
+  planned: { dot: "🟡", label: "Planned", chip: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  past: { dot: "⚪", label: "Passed", chip: "bg-slate-100 text-slate-500 border-slate-200" },
+  undated: { dot: "⚪", label: "No date", chip: "bg-slate-100 text-slate-500 border-slate-200" },
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -76,9 +100,8 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId]);
 
-  const urgentCount = items.filter(
-    (i) => i.daysRemaining !== null && i.daysRemaining >= 0 && i.daysRemaining <= 14 && i.status !== "COMPLETED"
-  ).length;
+  const urgentCount = items.filter((i) => i.urgency === "critical").length;
+  const soonCount = items.filter((i) => i.urgency === "soon").length;
   const openCount = items.filter((i) => i.status === "OPEN").length;
 
   return (
@@ -98,6 +121,11 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
           {urgentCount > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[10px] font-bold text-red-600">
               <Clock className="h-3 w-3" /> {urgentCount} urgent (≤14 days)
+            </span>
+          )}
+          {soonCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2.5 py-1 text-[10px] font-bold text-orange-600">
+              🟠 {soonCount} soon (≤45 days)
             </span>
           )}
           {openCount > 0 && (
@@ -131,6 +159,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
               const days = item.daysRemaining;
               const isUrgent = days !== null && days >= 0 && days <= 14 && item.status !== "COMPLETED";
               const isOverdue = days !== null && days < 0;
+              const urgency = URGENCY_META[item.urgency ?? (isOverdue ? "past" : "undated")];
               return (
                 <li key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60">
                   <div className="h-9 w-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
@@ -145,6 +174,14 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
                         }`}
                       >
                         {item.status}
+                      </span>
+                      {/* 🔴 critical · 🟠 soon · 🟡 planned */}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${urgency.chip}`}
+                        title={`${urgency.label}${days !== null ? ` — ${days} days` : ""}`}
+                      >
+                        <span aria-hidden>{urgency.dot}</span>
+                        {urgency.label}
                       </span>
                     </div>
                     <p className="truncate text-[11px] text-slate-500">{item.subtitle}</p>

@@ -4,6 +4,9 @@ import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategorie
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
 import { notifyAdmins } from "@/lib/notifications";
+import { requireProfileAccess } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { clampString } from "@/lib/request";
 
 const PAGE_SIZE = 10;
 
@@ -111,6 +114,22 @@ export async function POST(req: Request) {
 
     if (!categoryId || !authorId || !title || !threadBody) {
       return NextResponse.json({ error: "categoryId, authorId, title and body are required" }, { status: 400 });
+    }
+
+    // The author must be the signed-in caller (no posting as someone else),
+    // and community writes are throttled.
+    const access = await requireProfileAccess(req, authorId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
+    const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
+    if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
+
+    if (clampString(title, 200).length === 0 || clampString(threadBody, 20000).length === 0) {
+      return NextResponse.json({ error: "Title and body must not be empty" }, { status: 400 });
     }
 
     const [thread] = await db

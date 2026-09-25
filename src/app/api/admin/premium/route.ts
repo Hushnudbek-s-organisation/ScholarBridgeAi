@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles, payments, subscriptions } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { eq, and, ilike } from "drizzle-orm";
 import { sanitizeProfile } from "@/lib/password";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     // Locate the recipient profile by explicit profileId (exact, most
@@ -82,8 +86,12 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const adminProfileId = searchParams.get("adminProfileId");
-    if (!(await isAdmin(adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const profileId = Number(searchParams.get("profileId"));
     if (!profileId) {

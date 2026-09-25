@@ -1,0 +1,52 @@
+# GitHub Actions workflow — SECURITY CHECKS
+#
+# This file cannot be committed to .github/workflows/ by the automation
+# account (GitHub Apps need the extra `workflows` permission to create or
+# update workflow files). Copy it into place once, manually:
+#
+#   cp ci/security-ci.yml .github/workflows/ci.yml
+#   git add .github/workflows/ci.yml && git commit -m 'ci: add security checks'
+#
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Dependency audit (high+)
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Security regression tests
+        run: npm run test:security
+
+      - name: AI settings tests
+        run: npm run test:ai-settings
+
+      - name: AI format tests
+        run: npm run test:ai-format
+
+      - name: i18n message parity
+        run: npm run check:i18n
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci

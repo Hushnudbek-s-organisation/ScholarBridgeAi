@@ -226,7 +226,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     if (step === 0 && step0Invalid) {
       setError(
         isNewAccount
-          ? "Full name, email and a password (at least 6 characters) are required — you'll sign in with this email + password"
+          ? "Full name, email and a password (at least 8 characters) are required — you'll sign in with this email + password"
           : "Full name and email are required"
       );
       return;
@@ -363,7 +363,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 <input
                   type="password"
                   className={inputCls}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
                   autoComplete="new-password"

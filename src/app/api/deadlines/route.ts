@@ -1,20 +1,48 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
-import { universities, scholarships, savedUniversities, savedScholarships, applicationTasks } from "@/db/schema";
+import {
+  universities,
+  scholarships,
+  savedUniversities,
+  savedScholarships,
+  applicationTasks,
+  applications,
+  testBookings,
+} from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
 
 /**
- * Unified deadline center (spec §21). Merges:
- *  - university application deadlines (saved universities)
+ * Unified deadline center (spec §21 + user request #10). Merges:
+ *  - university application deadlines (applications table + saved universities)
  *  - scholarship deadlines (with computed status)
+ *  - test dates (IELTS / SAT / TOEFL / Duolingo / GRE)
  *  - user-created milestones (applicationTasks)
- * Each item has date, type, source, status, days remaining.
+ * Each item carries date, type, source, status, days remaining and an urgency
+ * bucket (🔴 critical ≤14d, 🟠 soon ≤45d, 🟡 planned) so the calendar can be
+ * read at a glance.
  */
+
+/** Urgency bucket from days remaining — the user asked for 🔴🟠🟡. */
+function urgencyFor(daysRemaining: number | null): "critical" | "soon" | "planned" | "past" | "undated" {
+  if (daysRemaining === null) return "undated";
+  if (daysRemaining < 0) return "past";
+  if (daysRemaining <= 14) return "critical";
+  if (daysRemaining <= 45) return "soon";
+  return "planned";
+}
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const profileId = Number(searchParams.get("profileId"));
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
@@ -98,6 +126,47 @@ export async function GET(req: Request) {
       });
     }
 
+    // --- Application deadlines (from the universal tracker) ---
+    const apps = await db
+      .select()
+      .from(applications)
+      .where(eq(applications.profileId, profileId));
+    for (const a of apps) {
+      if (a.status === "withdrawn") continue;
+      const due = a.deadline ? new Date(a.deadline) : null;
+      items.push({
+        id: `app-${a.id}`,
+        type: "application",
+        title: `${a.universityName}${a.programName ? ` — ${a.programName}` : ""}`,
+        subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · ") || "Application",
+        date: due ? due.toISOString() : null,
+        status: a.status,
+        daysRemaining: due ? Math.ceil((due.getTime() - now.getTime()) / 86400000) : null,
+        source: a.portalUrl || null,
+        saved: true,
+      });
+    }
+
+    // --- Test dates (IELTS / SAT / TOEFL / Duolingo / GRE) ---
+    const bookings = await db
+      .select()
+      .from(testBookings)
+      .where(eq(testBookings.profileId, profileId));
+    for (const b of bookings) {
+      const testDay = new Date(b.testDate);
+      items.push({
+        id: `test-${b.id}`,
+        type: "test",
+        title: `${b.testType.toUpperCase()} test${b.location ? ` — ${b.location}` : ""}`,
+        subtitle: b.registered ? "Registered" : "Not registered yet",
+        date: testDay.toISOString(),
+        status: b.registered ? "REGISTERED" : "PENDING",
+        daysRemaining: Math.ceil((testDay.getTime() - now.getTime()) / 86400000),
+        source: null,
+        saved: true,
+      });
+    }
+
     // Sort: items with dates first, nearest first; items without dates last.
     items.sort((a, b) => {
       if (!a.date && !b.date) return 0;
@@ -106,7 +175,12 @@ export async function GET(req: Request) {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    return NextResponse.json({ items });
+    // Urgency buckets: 🔴 critical (≤14d) · 🟠 soon (≤45d) · 🟡 planned
+    const withUrgency = items.map((item) => ({ ...item, urgency: urgencyFor(item.daysRemaining) }));
+    const critical = withUrgency.filter((i) => i.urgency === "critical").length;
+    const soon = withUrgency.filter((i) => i.urgency === "soon").length;
+
+    return NextResponse.json({ items: withUrgency, summary: { critical, soon, total: withUrgency.length } });
   } catch (error) {
     console.error("GET /api/deadlines error:", error);
     return NextResponse.json({ error: "Failed to load deadlines" }, { status: 500 });

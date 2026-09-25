@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReports, studentProfiles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin, requireProfileAccess } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { notifyAdmins } from "@/lib/notifications";
 
 export async function GET(req: Request) {
@@ -12,8 +13,12 @@ export async function GET(req: Request) {
     const adminProfileId = searchParams.get("adminProfileId");
 
     // Reports are sensitive — only admins may list them.
-    if (!(await isAdmin(adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const rows = await db
@@ -48,6 +53,18 @@ export async function POST(req: Request) {
     if (!reporterId || !targetType || !targetId || !reason) {
       return NextResponse.json({ error: "reporterId, targetType, targetId and reason are required" }, { status: 400 });
     }
+
+    // The reporter must be the signed-in caller; reporting is throttled so it
+    // cannot be used to spam/DoS the moderation queue.
+    const access = await requireProfileAccess(req, reporterId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
+    const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
+    if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 
     const [report] = await db
       .insert(forumReports)
