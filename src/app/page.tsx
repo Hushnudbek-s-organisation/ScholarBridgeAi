@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Navbar, StudentProfile } from "@/components/Navbar";
 import { ProfileModal } from "@/components/ProfileModal";
 import { DashboardView } from "@/components/DashboardView";
@@ -54,16 +54,17 @@ export default function Home() {
     }
   });
 
-  const rememberProfile = (id: number) => {
-    try {
-      const arr = [...myProfileIds];
-      if (!arr.includes(id)) arr.push(id);
-      localStorage.setItem("scholarbridge_device_profiles", JSON.stringify(arr));
-      setMyProfileIds(arr);
-    } catch {
-      // ignore
-    }
-  };
+  const rememberProfile = useCallback((id: number) => {
+    setMyProfileIds((prev) => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      try {
+        localStorage.setItem("scholarbridge_device_profiles", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   // Only profiles this browser owns — used by the picker.
   const deviceProfiles = profiles.filter((p) => myProfileIds.includes(p.id));
@@ -118,16 +119,51 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    if (activeProfile?.id) {
-      fetchSavedUniversities(activeProfile.id);
-      fetchSavedScholarships(activeProfile.id);
-      fetchTaskCount(activeProfile.id);
+  const fetchSavedUniversities = useCallback(async (profileId: number) => {
+    try {
+      const res = await fetch(`/api/saved-universities?profileId=${profileId}`);
+      const data = await res.json();
+      if (data.savedUniversities) {
+        setSavedUniversities(data.savedUniversities);
+      }
+    } catch (err) {
+      console.error("Error fetching saved universities:", err);
     }
-  }, [activeProfile?.id]);
+  }, []);
+
+  const fetchSavedScholarships = useCallback(async (profileId: number) => {
+    try {
+      const res = await fetch(`/api/saved-scholarships?profileId=${profileId}`);
+      const data = await res.json();
+      if (data.savedScholarships) {
+        setSavedScholarships(data.savedScholarships);
+      }
+    } catch (err) {
+      console.error("Error fetching saved scholarships:", err);
+    }
+  }, []);
+
+  const fetchTaskCount = useCallback(async (profileId: number) => {
+    try {
+      const res = await fetch(`/api/tasks?profileId=${profileId}`);
+      const data = await res.json();
+      if (data.tasks) {
+        const pending = data.tasks.filter((t: { isCompleted: boolean }) => !t.isCompleted);
+        setTaskCount(pending.length);
+      }
+    } catch (err) {
+      console.error("Error fetching task count:", err);
+    }
+  }, []);
+
+  const hydrateProfileData = useCallback((profileId: number) => {
+    void fetchSavedUniversities(profileId);
+    void fetchSavedScholarships(profileId);
+    void fetchTaskCount(profileId);
+  }, [fetchSavedScholarships, fetchSavedUniversities, fetchTaskCount]);
 
   /** Load the full profile list — only used by the profile picker. */
-  const loadAllProfiles = async () => {
+  const loadAllProfiles = useCallback(async () => {
     try {
       const res = await fetch("/api/profiles");
       const data = await res.json();
@@ -135,14 +171,14 @@ export default function Home() {
     } catch (err) {
       console.error("Error fetching profiles:", err);
     }
-  };
+  }, []);
 
   /**
    * On mount, restore ONLY the profile this browser signed in with
    * (localStorage). If there is none, show the English landing page.
    * Other profiles are never auto-loaded.
    */
-  const loadStoredProfile = async () => {
+  const loadStoredProfile = useCallback(async () => {
     try {
       const storedId = Number(localStorage.getItem("scholarbridge_active_profile"));
       if (storedId) {
@@ -151,6 +187,7 @@ export default function Home() {
         if (res.ok && data.profile) {
           setActiveProfile(data.profile);
           rememberProfile(storedId);
+          hydrateProfileData(storedId);
           setView("app");
           // Fire-and-forget: check for approaching deadlines → notifications.
           try {
@@ -179,18 +216,20 @@ export default function Home() {
       console.error("Error restoring profile:", err);
     }
     setView("landing");
-  };
+  }, [hydrateProfileData, rememberProfile]);
 
   useEffect(() => {
-    loadStoredProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timer = window.setTimeout(() => {
+      void loadStoredProfile();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadStoredProfile]);
 
   /** Open the profile picker (admin sign-in, switching accounts). */
-  const openProfilePicker = async () => {
+  const openProfilePicker = useCallback(async () => {
     await loadAllProfiles();
     setIsPickerOpen(true);
-  };
+  }, [loadAllProfiles]);
 
   const handlePickProfile = (p: StudentProfile) => {
     setActiveProfile(p);
@@ -200,6 +239,7 @@ export default function Home() {
     } catch {
       // ignore
     }
+    hydrateProfileData(p.id);
     setIsPickerOpen(false);
     setView("app");
     setActiveTab("dashboard");
@@ -215,6 +255,7 @@ export default function Home() {
     } catch {
       // ignore
     }
+    hydrateProfileData(p.id);
     setIsPickerOpen(false);
     setView("app");
     setActiveTab("admin");
@@ -237,47 +278,13 @@ export default function Home() {
       // ignore
     }
     setActiveProfile(null);
+    setSavedUniversities([]);
+    setSavedScholarships([]);
+    setTaskCount(0);
     setActiveTab("dashboard");
     setIsProfileModalOpen(false);
     setIsPickerOpen(false);
     setView("landing");
-  };
-
-  const fetchSavedUniversities = async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/saved-universities?profileId=${profileId}`);
-      const data = await res.json();
-      if (data.savedUniversities) {
-        setSavedUniversities(data.savedUniversities);
-      }
-    } catch (err) {
-      console.error("Error fetching saved universities:", err);
-    }
-  };
-
-  const fetchSavedScholarships = async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/saved-scholarships?profileId=${profileId}`);
-      const data = await res.json();
-      if (data.savedScholarships) {
-        setSavedScholarships(data.savedScholarships);
-      }
-    } catch (err) {
-      console.error("Error fetching saved scholarships:", err);
-    }
-  };
-
-  const fetchTaskCount = async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/tasks?profileId=${profileId}`);
-      const data = await res.json();
-      if (data.tasks) {
-        const pending = data.tasks.filter((t: { isCompleted: boolean }) => !t.isCompleted);
-        setTaskCount(pending.length);
-      }
-    } catch (err) {
-      console.error("Error fetching task count:", err);
-    }
   };
 
   const handleSaveProfile = async (formData: Omit<Partial<StudentProfile>, "gpa"> & { gpa?: number | null; password?: string }) => {
@@ -299,6 +306,7 @@ export default function Home() {
       setProfiles((prev) => [data.profile, ...prev]);
       setActiveProfile(data.profile);
       rememberProfile(data.profile.id);
+      hydrateProfileData(data.profile.id);
       try {
         localStorage.setItem("scholarbridge_active_profile", String(data.profile.id));
       } catch {
@@ -458,6 +466,7 @@ export default function Home() {
     } catch {
       // ignore
     }
+    hydrateProfileData(updated.id);
     setView("app");
     setActiveTab("dashboard");
   };

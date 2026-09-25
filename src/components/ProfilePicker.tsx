@@ -245,11 +245,11 @@ export function ProfilePicker({
             </form>
           </div>
 
-          {/* ===== Admin sign-in (username + email) ===== */}
+          {/* ===== Admin sign in (username + email) ===== */}
           <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
             <div className="flex items-center gap-2 mb-1">
               <Lock className="h-3.5 w-3.5 text-amber-500" />
-              <p className="text-xs font-extrabold text-slate-800">Admin sign-in</p>
+              <p className="text-xs font-extrabold text-slate-800">Admin sign in</p>
               <span className="inline-flex items-center gap-0.5 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white ml-auto">
                 <Crown className="h-2.5 w-2.5 text-amber-300" /> OWNER ONLY
               </span>
