@@ -1,6 +1,6 @@
 # ScholarBridge AI — To'liq hisobot
 
-Branch: `arena/01a0d7e1-scholarbridgeai` · HEAD: `c581d56` · 7 commit · 141 fayl · +15 441 / −523 qator
+Branch: `arena/01a0d7e1-scholarbridgeai` · asos: `17068cc` · 13 commit · 144 fayl · +16 719 / −523 qator
 
 ---
 
@@ -12,9 +12,10 @@ Branch: `arena/01a0d7e1-scholarbridgeai` · HEAD: `c581d56` · 7 commit · 141 f
 | API route'lar | 78 |
 | Ma'lumotlar bazasi jadvallari | 54 |
 | UI komponentlar | 58 |
-| Test skriptlar | 15 |
+| Test skriptlar | 17 |
 | Foydalanuvchi tab'lari | 23 |
-| Unit assertion'lar | 472 (+ 52 security) |
+| Unit assertion'lar | 498 (+ 52 security) |
+| Integratsion assertion'lar | 79 (haqiqiy PostgreSQL) |
 
 ---
 
@@ -346,6 +347,8 @@ Uchalasi ham faqat `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` —
 
 ## 7. Tekshiruv buyruqlari
 
+**Unit testlar** — sof `src/lib/*.ts` mantiqi, baza talab qilmaydi:
+
 ```bash
 npm run test:chancing    # 52
 npm run test:roadmap     # 51
@@ -358,10 +361,44 @@ npm run test:compare     # 32
 npm run test:mentors     # 37
 npm run test:parent      # 41
 npm run test:dataset     # 50
+npm run test:render      # 26
+```
+
+Jami: **498 passed, 0 failed.**
+
+**Xavfsizlik va statik tekshiruvlar:**
+
+```bash
 npm run test:security    # 52 assertion
 npm run check:i18n
 npm run typecheck
 DATABASE_URL="postgresql://user:pass@127.0.0.1:5432/db" npm run build
 ```
 
-Jami: **472 assertion, 0 failed.**
+**Integratsion test** — haqiqiy route'lar haqiqiy PostgreSQL'ga qarshi:
+
+```bash
+npm install --no-save embedded-postgres   # bir marta
+npm run test:integration                  # 79 passed, 0 failed
+```
+
+Bu `embedded-postgres` bilan jarayon ichida haqiqiy Postgres serverini ishga
+tushiradi va `drizzle-kit push` orqali `src/db/schema.ts` dan real sxemani
+quradi. `package.json`ga yozilmaydi (`--no-save`), shuning uchun standart
+`npm test` yo'lidan tashqarida saqlangan.
+
+Uch yo'nalishni qoplaydi:
+
+| Bo'lim | Nima sinovdan o'tadi |
+|---|---|
+| `/api/planning`, `/api/mentors`, `/api/parent-share` | Xarajatlar nashr qilingan raqamlardan quriladi, mentor mosligi real qatorga qarshi, ota-ona token'ining to'liq hayot sikli |
+| IDOR (21 assert) | Oltita qator-egalik route'ida begona rad etiladi, qator yozilmaydi, egasi muvaffaqiyatli |
+| `/api/chancing` (27 assert) | `Match %` va `Admission %` alohida qoladi; rozilik berilgan natijalar `dataBasis`ni o'zgartiradi, rozilik berilmaganlari ko'rinmas |
+
+**Umumiy jami: 498 + 52 + 79 = 629 assertion, 0 failed.**
+
+> **Tuzatilgan da'vo.** Bu hisobotning avvalgi versiyasida "sandbox'da
+> Postgres yo'q, shuning uchun DB bilan ishlaydigan route'lar bu yerda ishga
+> tushirilmadi" deb yozilgan edi. Bu noto'g'ri edi — men imkoniyatni
+> tekshirmasdan, taxminimni fakt sifatida yozgan edim. Yuqoridagi integratsion
+> test aynan shu bo'shliqni yopadi.
