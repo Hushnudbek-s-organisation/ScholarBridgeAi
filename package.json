@@ -24,7 +24,8 @@
     "test:mentors": "tsx scripts/check-mentors.ts",
     "test:parent": "tsx scripts/check-parent.ts",
     "test:dataset": "tsx scripts/check-dataset.ts",
-    "test:render": "tsx scripts/check-render.ts"
+    "test:render": "tsx scripts/check-render.ts",
+    "test:integration": "tsx scripts/check-integration.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",
