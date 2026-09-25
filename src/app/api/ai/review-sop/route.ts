@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
+import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { localeToLanguageName } from "@/i18n/config";
 
 export async function POST(req: Request) {
   try {
-    const { sopText, targetUniversity, targetMajor, language } = await req.json();
+    // Size cap + rate limit (see lib/ai/guard).
+    const guarded = await guardAiRequest(req, { bodyLimit: 256 * 1024 });
+    if (!guarded.ok) return guarded.response;
+
+    const { sopText, targetUniversity, targetMajor, language } = safePromptFields(guarded.body);
 
     if (!sopText || sopText.trim().length < 50) {
       return NextResponse.json({ error: "Please provide a valid SOP draft text (at least 50 characters)" }, { status: 400 });

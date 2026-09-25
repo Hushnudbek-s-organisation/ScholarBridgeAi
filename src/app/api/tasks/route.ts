@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { applicationTasks, universities } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -13,6 +14,13 @@ export async function GET(req: Request) {
     }
 
     const profileId = parseInt(profileIdStr, 10);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     const tasks = await db
       .select({
         id: applicationTasks.id,
@@ -41,6 +49,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { profileId, universityId, title, category, dueDate, priority } = body;
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     if (!profileId || !title) {
       return NextResponse.json({ error: "profileId and title are required" }, { status: 400 });

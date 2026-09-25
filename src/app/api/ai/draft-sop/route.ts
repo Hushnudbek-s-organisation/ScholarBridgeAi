@@ -3,12 +3,18 @@ import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
+import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { eq } from "drizzle-orm";
 import { localeToLanguageName } from "@/i18n/config";
 
 export async function POST(req: Request) {
   try {
-    const { profileId, universityName, programName, personalHook, careerGoals } = await req.json();
+    // Size cap + rate limit + ownership of `profileId` (see lib/ai/guard).
+    const guarded = await guardAiRequest(req);
+    if (!guarded.ok) return guarded.response;
+
+    const profileId = guarded.profileId;
+    const { universityName, programName, personalHook, careerGoals } = safePromptFields(guarded.body);
 
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });

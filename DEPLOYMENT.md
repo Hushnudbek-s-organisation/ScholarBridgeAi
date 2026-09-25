@@ -21,6 +21,15 @@ service.
      and only after reviewing what it will change.
 5. After the first deploy, set the **secret** env vars in the web service's
    **Environment** tab:
+   - `SESSION_SECRET` — **required.** Signs the HttpOnly session cookie that
+     authenticates every API call. Generate one with
+     `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
+     Rotating it signs everybody out (that is the intended emergency lever).
+   - `AI_KEYS_ENCRYPTION_SECRET` — encrypts AI provider keys saved from
+     Admin → AI Settings (>= 16 chars).
+   - `ADMIN_PASSWORD` — bootstrap password for the seeded admin account
+     (>= 8 chars). Sign in with `ADMIN_EMAIL` + this password, then change it
+     from Edit Profile.
    - `GROQ_API_KEY` — required for AI features (Groq, default model `openai/gpt-oss-120b`)
    - `GROQ_MODEL` — optional. Set to `openai/gpt-oss-120b` or delete it so the
      code default applies. Do **not** leave `llama-3.3-70b-versatile`: Groq
@@ -50,6 +59,7 @@ service.
 | Variable                     | Required | Purpose                                   |
 | ---------------------------- | :------: | ----------------------------------------- |
 | `DATABASE_URL`               |   Yes    | Postgres connection (auto-set by blueprint) |
+| `SESSION_SECRET`             |   Yes    | Signs the session cookie (>= 32 chars)      |
 | `GROQ_API_KEY`               |   Yes    | Groq (`openai/gpt-oss-120b`) for all AI features |
 | `GROQ_MODEL`                 |    No    | Model override; default `openai/gpt-oss-120b` |
 | `NEXT_PUBLIC_APP_URL`        |   No     | Public URL used for referral links        |
@@ -63,6 +73,20 @@ service.
 
 > **SSL note:** If the app can't connect to Postgres, append `?sslmode=require`
 > to the `DATABASE_URL` (or use the Internal URL Render provides).
+
+## Security checklist (do once per environment)
+
+Full details in [`SECURITY.md`](./SECURITY.md).
+
+- [ ] `SESSION_SECRET` set (>= 32 random chars) — without it the signing key is
+      derived from `DATABASE_URL`, which is only acceptable in local dev.
+- [ ] `AI_KEYS_ENCRYPTION_SECRET` set, so admin-saved provider keys survive a
+      `DATABASE_URL` rotation.
+- [ ] Admin signed in with a real password (>= 8 chars) and `ADMIN_PASSWORD`
+      removed from the environment afterwards.
+- [ ] `PAYME_*` / `CLICK_*` set **or** payments knowingly disabled — both
+      webhooks fail closed while their credentials are missing.
+- [ ] `npm run test:security` and `npm audit --audit-level=high` are green in CI.
 
 ## Admin → Analytics (statistika)
 

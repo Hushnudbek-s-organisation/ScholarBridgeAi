@@ -3,6 +3,7 @@
  * The agent is NOT hardwired to one search service.
  */
 import { isSameDomain } from "./domain";
+import { unsafeOutboundReason } from "@/lib/ssrf";
 
 export interface SearchResult {
   url: string;
@@ -78,6 +79,12 @@ export class WebSearchProvider implements SearchProvider {
   async search(query: string): Promise<SearchResult[]> {
     if (!this.endpoint || !this.apiKey) {
       console.warn("[research-agent] WebSearchProvider not configured — skipping search:", query);
+      return [];
+    }
+    // The search endpoint comes from env/config — keep it out of private ranges.
+    const unsafe = unsafeOutboundReason(this.endpoint);
+    if (unsafe) {
+      console.warn(`[research-agent] refusing search endpoint ${this.endpoint}: ${unsafe}`);
       return [];
     }
     try {

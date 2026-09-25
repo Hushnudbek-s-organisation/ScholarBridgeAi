@@ -14,6 +14,8 @@ import {
   type VisaApplicantProfile,
   type VisaOfficerGender,
 } from "@/lib/visa-interview";
+import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request";
 
 /**
  * POST /api/visa/chat
@@ -23,6 +25,11 @@ import {
  */
 export async function POST(req: Request) {
   try {
+    // This endpoint calls a paid model and is reachable anonymously — throttle
+    // it per IP so it cannot be used as a free AI proxy.
+    const limit = checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
+
     if (!isGroqConfigured()) {
       return NextResponse.json(
         { error: "GROQ_API_KEY is not configured on the server." },
@@ -30,7 +37,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody<Record<string, any>>(req, 128 * 1024);
+    const body = parsed.ok ? parsed.body : {};
     const country = getVisaCountry(body?.countryCode);
     if (!country) {
       return NextResponse.json(

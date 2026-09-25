@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { lessonProgress, lessons, courseModules, courses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -9,6 +10,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { profileId, lessonId, watchedSeconds } = body;
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     if (!profileId || !lessonId || typeof watchedSeconds !== "number") {
       return NextResponse.json({ error: "profileId, lessonId and watchedSeconds are required" }, { status: 400 });

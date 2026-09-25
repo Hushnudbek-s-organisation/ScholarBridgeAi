@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumThreads, studentProfiles, forumCategories, forumLikes } from "@/db/schema";
 import { eq, and, count, sql } from "drizzle-orm";
+import { authenticate } from "@/lib/auth";
 
-/** Resolve the requester profile; returns null when not authenticated. */
-async function getRequester(requesterId: unknown): Promise<{ id: number; isAdmin: boolean } | null> {
-  const id = Number(requesterId);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  const [profile] = await db
-    .select({ id: studentProfiles.id, isAdmin: studentProfiles.isAdmin })
-    .from(studentProfiles)
-    .where(eq(studentProfiles.id, id));
-  return profile ?? null;
+/**
+ * Resolve the requester from the signed session cookie. The old
+ * `requesterId` query/body parameter was forgeable, so it is ignored.
+ */
+async function getRequester(req: Request): Promise<{ id: number; isAdmin: boolean } | null> {
+  const auth = await authenticate(req);
+  if (!auth.ok) return null;
+  return { id: auth.session.profile.id, isAdmin: auth.session.isAdmin };
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -67,10 +67,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     const threadId = parseInt(id, 10);
     const body = await req.json();
-    const { title, body: threadBody, isPinned, isLocked, requesterId } = body;
+    const { title, body: threadBody, isPinned, isLocked } = body;
 
     // Pin/lock/title/body changes are moderator actions — admin only.
-    const requester = await getRequester(requesterId);
+    const requester = await getRequester(req);
     if (!requester) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
@@ -104,8 +104,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   try {
     const { id } = await params;
     const threadId = parseInt(id, 10);
-    const { searchParams } = new URL(req.url);
-    const requester = await getRequester(searchParams.get("requesterId"));
+    const requester = await getRequester(req);
 
     if (!requester) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });

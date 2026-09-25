@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { runBatch } from "@/lib/research-agent/run-batch";
 import { createRun, setRun, appendProgress } from "@/lib/research-agent/registry";
 import { AGENT_CONFIG } from "@/lib/research-agent/config";
@@ -12,8 +12,12 @@ import type { RunRequest } from "@/lib/research-agent/types";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const ids = Array.isArray(body.universityIds)

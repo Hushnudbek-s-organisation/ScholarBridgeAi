@@ -12,6 +12,8 @@ interface ProfilePickerProps {
   onClose: () => void;
   onSelect: (profile: StudentProfile) => void;
   onAddNew: () => void;
+  /** Server-side hint (e.g. "sign in to open this account"). */
+  notice?: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export function ProfilePicker({
   onClose,
   onSelect,
   onAddNew,
+  notice,
 }: ProfilePickerProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -141,6 +144,12 @@ export function ProfilePicker({
               </div>
             )}
           </div>
+
+          {notice && (
+            <div className="mx-6 mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {notice}
+            </div>
+          )}
 
           {/* ===== Email + password sign-in (any device; students and admins) ===== */}
           <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">

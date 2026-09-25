@@ -41,6 +41,7 @@ export default function Home() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerMessage, setPickerMessage] = useState("");
 
   // IDs of the accounts created / signed-in WITHIN THIS BROWSER. Other
   // people's accounts are never shown — only these.
@@ -174,46 +175,58 @@ export default function Home() {
   }, []);
 
   /**
-   * On mount, restore ONLY the profile this browser signed in with
-   * (localStorage). If there is none, show the English landing page.
-   * Other profiles are never auto-loaded.
+   * On mount, restore the session from the server-signed cookie.
+   *
+   * The id in localStorage is only a hint: identity comes from
+   * GET /api/auth/session, which validates the HttpOnly session cookie. A
+   * stale or hand-edited local id therefore can never log anyone in.
    */
   const loadStoredProfile = useCallback(async () => {
     try {
-      const storedId = Number(localStorage.getItem("scholarbridge_active_profile"));
-      if (storedId) {
-        const res = await fetch(`/api/profiles/${storedId}`);
-        const data = await res.json();
-        if (res.ok && data.profile) {
-          setActiveProfile(data.profile);
-          rememberProfile(storedId);
-          hydrateProfileData(storedId);
-          setView("app");
-          // Fire-and-forget: check for approaching deadlines → notifications.
-          try {
-            fetch("/api/notifications/sweep", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ profileId: storedId }),
-            }).catch(() => {});
-          } catch {
-            // ignore
-          }
-          // Fire-and-forget: auto-build the personalized roadmap.
-          try {
-            fetch("/api/roadmap/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ profileId: storedId }),
-            }).catch(() => {});
-          } catch {
-            // ignore
-          }
-          return;
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.profile) {
+        const storedId = Number(data.profile.id);
+        setActiveProfile(data.profile);
+        rememberProfile(storedId);
+        try {
+          localStorage.setItem("scholarbridge_active_profile", String(storedId));
+        } catch {
+          // ignore
         }
+        hydrateProfileData(storedId);
+        setView("app");
+        // Fire-and-forget: check for approaching deadlines → notifications.
+        try {
+          fetch("/api/notifications/sweep", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profileId: storedId }),
+          }).catch(() => {});
+        } catch {
+          // ignore
+        }
+        // Fire-and-forget: auto-build the personalized roadmap.
+        try {
+          fetch("/api/roadmap/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profileId: storedId }),
+          }).catch(() => {});
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      // No (or an expired) session — drop the stale local hint so the next
+      // load does not pretend an account is active.
+      try {
+        localStorage.removeItem("scholarbridge_active_profile");
+      } catch {
+        // ignore
       }
     } catch (err) {
-      console.error("Error restoring profile:", err);
+      console.error("Error restoring session:", err);
     }
     setView("landing");
   }, [hydrateProfileData, rememberProfile]);
@@ -228,10 +241,31 @@ export default function Home() {
   /** Open the profile picker for sign-in or switching accounts. */
   const openProfilePicker = useCallback(async () => {
     await loadAllProfiles();
+    setPickerMessage("");
     setIsPickerOpen(true);
   }, [loadAllProfiles]);
 
-  const handlePickProfile = (p: StudentProfile) => {
+  /**
+   * Picking an account that this device used before is a convenience only: the
+   * server still has to confirm the session cookie belongs to that account.
+   * If it does not (new browser, expired session, different user), the picker
+   * stays open so the person signs in with email + password.
+   */
+  const handlePickProfile = async (p: StudentProfile) => {
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.session?.profileId !== p.id) {
+        setPickerMessage(
+          "Please sign in with your email and password to open this account."
+        );
+        return;
+      }
+    } catch {
+      setPickerMessage("Could not verify your session. Please sign in again.");
+      return;
+    }
+
     setActiveProfile(p);
     setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
@@ -257,6 +291,13 @@ export default function Home() {
    * Sign in, from this device or any other).
    */
   const handleLogout = () => {
+    // Clear the server-side session cookie too — otherwise the browser would
+    // still be authenticated after "logging out".
+    try {
+      fetch("/api/auth/sign-out", { method: "POST" }).catch(() => {});
+    } catch {
+      // ignore
+    }
     try {
       localStorage.removeItem("scholarbridge_active_profile");
     } catch {
@@ -474,6 +515,7 @@ export default function Home() {
       onClose={() => setIsPickerOpen(false)}
       onSelect={handlePickProfile}
       onAddNew={handleAddNewFromPicker}
+      notice={pickerMessage}
     />
   );
 

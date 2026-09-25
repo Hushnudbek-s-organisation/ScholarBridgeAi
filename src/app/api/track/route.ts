@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordVisit, visitorCookieHeader, VISITOR_COOKIE, readCookie, type VisitEventType } from "@/lib/visits";
+import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 /**
  * POST /api/track — anonymous traffic beacon.
@@ -16,6 +17,11 @@ const str = (v: unknown, max = 400): string | null =>
 
 export async function POST(req: Request) {
   try {
+    // Cheap insert, but still throttled so the beacon cannot be used to flood
+    // the analytics table.
+    const limit = checkRateLimit(`beacon:${clientIp(req)}`, LIMITS.beacon);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
+
     let body: Record<string, unknown> = {};
     try {
       body = (await req.json()) as Record<string, unknown>;

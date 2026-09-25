@@ -7,6 +7,8 @@ import {
   paymeConfig,
   clickConfig,
 } from "@/lib/payments";
+import { requireProfileAccess } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
@@ -19,6 +21,17 @@ export async function POST(req: Request) {
     if (!["payme", "click"].includes(provider)) {
       return NextResponse.json({ error: "provider must be 'payme' or 'click'" }, { status: 400 });
     }
+
+    // A payment must be started by the account it belongs to.
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
+    const limit = checkRateLimit(`payments:${access.session.profile.id}`, LIMITS.payment);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     // Price from app_config (spec §3, §18 — no hardcoded amounts).
     const priceUzs = await getPremiumPriceUzs();

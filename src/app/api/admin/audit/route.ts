@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { getAuditLogs } from "@/lib/audit";
 
 /** GET: audit/change history (spec §10, §11). */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const logs = await getAuditLogs({
       entityType: searchParams.get("entityType") || undefined,

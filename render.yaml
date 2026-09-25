@@ -29,6 +29,17 @@ services:
           property: connectionString
       - key: NODE_VERSION
         value: "22"
+      # Signs the HttpOnly session cookie (sb_session). REQUIRED in
+      # production: >= 32 random chars. Generate with
+      #   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+      - key: SESSION_SECRET
+        sync: false
+      # Encrypts AI provider keys stored from the admin panel (>= 16 chars).
+      - key: AI_KEYS_ENCRYPTION_SECRET
+        sync: false
+      # Bootstrap password for the seeded admin account (>= 8 chars).
+      - key: ADMIN_PASSWORD
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       # Visa Speaking Assistant + AI model. Unset uses the same code default.

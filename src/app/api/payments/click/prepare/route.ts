@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { clickConfig, clickSignString, md5Hex, verifyClickSignature } from "@/lib/payments";
+import {
+  clickConfig,
+  clickSignString,
+  isClickConfigured,
+  md5Hex,
+  verifyClickSignature,
+} from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +30,17 @@ export async function POST(req: Request) {
       sign_time,
       sign_string,
     } = p;
+
+    // Fail closed: without a real merchant secret there is nothing to verify
+    // a signature against, so no callback may ever credit a subscription.
+    if (!isClickConfigured()) {
+      return NextResponse.json({
+        click_trans_id: String(p?.click_trans_id || ""),
+        merchant_trans_id: String(p?.merchant_trans_id || ""),
+        error: -1,
+        error_note: "MERCHANT_NOT_CONFIGURED",
+      });
+    }
 
     const cfg = clickConfig();
     const amountInt = Number(amount);

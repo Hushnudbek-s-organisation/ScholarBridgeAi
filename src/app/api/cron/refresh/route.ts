@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runRefresh } from "@/lib/refresh";
 import { getConfig } from "@/lib/config";
+import { safeEqual } from "@/lib/payments";
 
 /**
  * Cron endpoint — callable by Render Cron, cron-job.org, or any scheduler
@@ -15,7 +16,8 @@ export async function GET(req: Request) {
     const secret = process.env.CRON_SECRET;
     if (secret) {
       const auth = req.headers.get("authorization") || "";
-      if (auth !== `Bearer ${secret}`) {
+      // Constant-time compare so the shared secret cannot be probed byte by byte.
+      if (!safeEqual(auth, `Bearer ${secret}`)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } else {

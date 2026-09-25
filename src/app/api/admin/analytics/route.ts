@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { getAnalyticsOverview, normalizeDays } from "@/lib/analytics";
 
 /**
@@ -21,8 +21,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const adminProfileId = searchParams.get("adminProfileId");
 
-    if (!(await isAdmin(adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const days = normalizeDays(searchParams.get("days"));

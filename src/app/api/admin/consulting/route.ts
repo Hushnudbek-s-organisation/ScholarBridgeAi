@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { consultingRequests, studentProfiles } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { eq, desc, inArray } from "drizzle-orm";
 
 /** GET: all consulting requests (admin). */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    if (!(await isAdmin(searchParams.get("adminProfileId")))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const rows = await db
       .select()
@@ -41,8 +45,12 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    if (!(await isAdmin(body.adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
     const id = Number(body.id);
     if (!id) {

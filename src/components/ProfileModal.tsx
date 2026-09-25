@@ -12,8 +12,8 @@ interface ProfileModalProps {
   onClose: () => void;
   profile: StudentProfile | null;
   /**
-   * `password` is accepted on create (required, min 6 chars — the account's
-   * sign-in key) and on edit (optional, min 6 chars — changes the password;
+   * `password` is accepted on create (required, min 8 chars — the account's
+   * sign-in key) and on edit (optional, min 8 chars — changes the password;
    * empty = keep the current one).
    */
   onSave: (data: Omit<Partial<StudentProfile>, "gpa"> & {
@@ -261,11 +261,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     autoComplete="new-password"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">
@@ -285,7 +285,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     autoComplete="new-password"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">
-                    Enter at least 6 characters to change the sign-in password.
+                    Enter at least 8 characters to change the sign-in password.
                   </p>
                 </div>
               )}

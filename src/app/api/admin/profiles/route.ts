@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/auth";
 import { findActiveSubscription, subscriptionIsActive } from "@/lib/payments";
 import { desc } from "drizzle-orm";
 import { sanitizeProfile } from "@/lib/password";
@@ -10,8 +10,12 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const adminProfileId = searchParams.get("adminProfileId");
-    if (!(await isAdmin(adminProfileId))) {
-      return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const profiles = await db

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { optionalProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import {
   courses,
@@ -19,6 +20,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;
+    const access = await optionalProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     if (!course) {

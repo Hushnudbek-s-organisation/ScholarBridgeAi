@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { quizzes, quizQuestions, quizAttempts, lessons, courseModules, courses } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -9,6 +10,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { quizId, profileId, answers } = body;
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     if (!quizId || !profileId || !Array.isArray(answers)) {
       return NextResponse.json({ error: "quizId, profileId and answers are required" }, { status: 400 });

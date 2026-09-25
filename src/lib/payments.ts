@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, subscriptions, studentProfiles } from "@/db/schema";
@@ -25,7 +25,7 @@ export async function getPremiumPeriodDays(): Promise<number> {
 // ---------------------------------------------------------------------------
 export function paymeConfig() {
   return {
-    merchantId: process.env.PAYME_MERCHANT_ID || "demo-payme-merchant",
+    merchantId: process.env.PAYME_MERCHANT_ID || "",
     key: process.env.PAYME_KEY || "",
     password: process.env.PAYME_PASSWORD || "",
   };
@@ -33,11 +33,61 @@ export function paymeConfig() {
 
 export function clickConfig() {
   return {
-    serviceId: process.env.CLICK_SERVICE_ID || "demo-click-service",
-    merchantId: process.env.CLICK_MERCHANT_ID || "demo-click-merchant",
-    merchantUserId: process.env.CLICK_MERCHANT_USER_ID || "demo-click-user",
-    secretKey: process.env.CLICK_SECRET_KEY || "demo-click-secret",
+    serviceId: process.env.CLICK_SERVICE_ID || "",
+    merchantId: process.env.CLICK_MERCHANT_ID || "",
+    merchantUserId: process.env.CLICK_MERCHANT_USER_ID || "",
+    // NEVER a demo fallback: a hard-coded secret in the repo would let anyone
+    // forge a payment callback and grant themselves premium for free.
+    secretKey: process.env.CLICK_SECRET_KEY || "",
   };
+}
+
+/** True when real Payme merchant credentials are present. */
+export function isPaymeConfigured(): boolean {
+  const cfg = paymeConfig();
+  return Boolean(cfg.merchantId && (cfg.key || cfg.password));
+}
+
+/** True when real Click credentials are present. */
+export function isClickConfigured(): boolean {
+  const cfg = clickConfig();
+  return Boolean(cfg.serviceId && cfg.secretKey);
+}
+
+/**
+ * Verify the Payme merchant credentials sent by Payme on every callback.
+ * Payme signs in with HTTP Basic auth (merchant id as the login and the
+ * merchant key/password as the secret). Without this check the webhook is an
+ * open endpoint that would happily mark any transaction as paid.
+ */
+export function verifyPaymeAuth(authorizationHeader: string | null): boolean {
+  const cfg = paymeConfig();
+  if (!cfg.merchantId) return false; // not configured → reject, never "allow all"
+  if (!authorizationHeader) return false;
+
+  const match = /^Basic\s+(.+)$/i.exec(authorizationHeader.trim());
+  if (!match) return false;
+  let decoded: string;
+  try {
+    decoded = Buffer.from(match[1], "base64").toString("utf8");
+  } catch {
+    return false;
+  }
+  const idx = decoded.indexOf(":");
+  if (idx === -1) return false;
+  const login = decoded.slice(0, idx);
+  const secret = decoded.slice(idx + 1);
+
+  const expectedSecret = cfg.password || cfg.key;
+  return safeEqual(login, cfg.merchantId) && safeEqual(secret, expectedSecret);
+}
+
+/** Constant-time string comparison (no early exit on the first wrong byte). */
+export function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
 }
 
 export const ACCOUNT_KEY = "profile_id";
@@ -139,7 +189,9 @@ export function md5Hex(value: string): string {
 }
 
 export function verifyClickSignature(signString: string, expected: string): boolean {
-  return signString.toLowerCase() === expected.toLowerCase();
+  // Constant-time compare; an empty signature must never match.
+  if (!signString || !expected) return false;
+  return safeEqual(signString.toLowerCase(), expected.toLowerCase());
 }
 
 // ---------------------------------------------------------------------------

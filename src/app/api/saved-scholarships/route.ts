@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { savedScholarships, scholarships } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -13,6 +14,13 @@ export async function GET(req: Request) {
     }
 
     const profileId = parseInt(profileIdStr, 10);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     const saved = await db
       .select({
         id: savedScholarships.id,
@@ -41,6 +49,14 @@ export async function POST(req: Request) {
 
     if (!profileId || !scholarshipId) {
       return NextResponse.json({ error: "profileId and scholarshipId are required" }, { status: 400 });
+    }
+
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
     }
 
     const existing = await db
@@ -80,6 +96,16 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    // Row ids are guessable — confirm the row belongs to the caller.
+    const [target] = await db.select().from(savedScholarships).where(eq(savedScholarships.id, id));
+    const rowAccess = await requireRowAccess(req, target);
+    if (!rowAccess.ok) {
+      return NextResponse.json(
+        { error: rowAccess.error, code: rowAccess.code },
+        { status: rowAccess.status }
+      );
+    }
+
     const [updated] = await db
       .update(savedScholarships)
       .set({
@@ -106,6 +132,17 @@ export async function DELETE(req: Request) {
     }
 
     const id = parseInt(idStr, 10);
+
+    // Row ids are guessable — confirm the row belongs to the caller.
+    const [target] = await db.select().from(savedScholarships).where(eq(savedScholarships.id, id));
+    const rowAccess = await requireRowAccess(req, target);
+    if (!rowAccess.ok) {
+      return NextResponse.json(
+        { error: rowAccess.error, code: rowAccess.code },
+        { status: rowAccess.status }
+      );
+    }
+
     await db.delete(savedScholarships).where(eq(savedScholarships.id, id));
 
     return NextResponse.json({ success: true });

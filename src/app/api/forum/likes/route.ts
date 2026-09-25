@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { forumLikes, forumThreads, forumReplies } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
+import { requireProfileAccess } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   try {
@@ -53,6 +55,17 @@ export async function POST(req: Request) {
     if (!userId || !targetType || !targetId) {
       return NextResponse.json({ error: "userId, targetType and targetId are required" }, { status: 400 });
     }
+
+    // Liking is a write attributed to a user — it must be the caller.
+    const access = await requireProfileAccess(req, userId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
+    const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
+    if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 
     const existing = await db
       .select()

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { optionalProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -20,6 +21,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;
+    const access = await optionalProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
 
     if (!profileId) {
       return NextResponse.json({ isPremium: false, plan: "free" });

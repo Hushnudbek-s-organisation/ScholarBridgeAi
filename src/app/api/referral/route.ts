@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { getReferralStatus, activateReferralReward } from "@/lib/referrals";
 
 /**
@@ -16,6 +17,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
     const profileId = parseInt(profileIdStr, 10);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId) {
       return NextResponse.json({ error: "Invalid profileId" }, { status: 400 });
     }
@@ -39,6 +47,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profileId = Number(body.profileId);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }

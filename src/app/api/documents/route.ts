@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import {
   applicationDocuments,
@@ -19,6 +20,13 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const profileId = Number(searchParams.get("profileId"));
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
@@ -104,6 +112,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profileId = Number(body.profileId);
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error, code: access.code },
+        { status: access.status }
+      );
+    }
     if (!profileId || !body.label) {
       return NextResponse.json({ error: "profileId and label are required" }, { status: 400 });
     }
