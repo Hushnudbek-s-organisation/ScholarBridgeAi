@@ -525,6 +525,215 @@ async function main() {
   check("documents: a ghost id is also refused", ghostDoc.status === 404, `got ${ghostDoc.status}`);
 
   // -----------------------------------------------------------------------
+  // 6. /api/chancing — the flagship route, and the one carrying the standing
+  // requirement that Fit and Admission stay SEPARATE numbers. That has been
+  // asserted in unit tests against synthetic inputs. Here it is asserted
+  // against rows fetched from the database, plus the two claims about data
+  // that only a real corpus can settle: that consented outcomes change the
+  // basis, and that non-consented ones do not.
+  section("6. /api/chancing — Fit and Admission stay separate");
+
+  const { GET: chancingGet } = await import("../src/app/api/chancing/route");
+  const ch = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
+
+  check("responds 200", ch.status === 200, `got ${ch.status} ${JSON.stringify(ch.body)?.slice(0, 200)}`);
+  check(
+    "both saved universities are estimated",
+    ch.body?.results?.length === 2,
+    `got ${ch.body?.results?.length}`
+  );
+
+  const first = ch.body?.results?.[0] ?? {};
+
+  // --- the standing requirement -----------------------------------------
+  check("Match % is present as its own number", typeof first.fitScore === "number", JSON.stringify(first.fitScore));
+  check(
+    "Admission % is present as its own number",
+    typeof first.admission?.mid === "number",
+    JSON.stringify(first.admission)
+  );
+  check(
+    "Fit and Admission are NOT the same number",
+    first.fitScore !== first.admission?.mid,
+    `fit=${first.fitScore} admission=${first.admission?.mid}`
+  );
+  check(
+    "Admission carries an honest range, not just a point",
+    typeof first.admission?.low === "number" &&
+      typeof first.admission?.high === "number" &&
+      first.admission.low <= first.admission.mid &&
+      first.admission.mid <= first.admission.high,
+    JSON.stringify(first.admission)
+  );
+  check("Admission is labelled with a band", typeof first.admission?.label === "string" && first.admission.label.length > 0);
+
+  const SUBS = [
+    "academicFit",
+    "testFit",
+    "extracurricularFit",
+    "majorFit",
+    "internationalFactors",
+    "financialFit",
+  ];
+  check(
+    "all six sub-scores are returned",
+    SUBS.every((k) => typeof first.subScores?.[k] === "number"),
+    JSON.stringify(first.subScores)
+  );
+
+  check("the 'Why?' positives list is present", Array.isArray(first.positives));
+  check("the 'Why?' negatives list is present", Array.isArray(first.negatives));
+  check(
+    "the reasons are non-empty for a real profile",
+    (first.positives?.length ?? 0) + (first.negatives?.length ?? 0) > 0
+  );
+  check(
+    "fit reasons come from the university match, not the estimate",
+    Array.isArray(first.fitReasons) && first.fitReasons.length > 0
+  );
+
+  // --- honesty about the basis ------------------------------------------
+  check(
+    "with no consented outcomes the basis is the public estimate",
+    first.dataBasis === "public-estimate",
+    `got ${first.dataBasis}`
+  );
+  check(
+    "the disclaimer says it is not a guarantee",
+    /not a guarantee/i.test(first.disclaimer ?? ""),
+    first.disclaimer
+  );
+  check("the dataset readiness gate is reported", ch.body?.dataset?.stage != null, JSON.stringify(ch.body?.dataset?.stage));
+  check(
+    "the readiness gate refuses an ML claim on an empty corpus",
+    ch.body?.dataset?.allowed?.mlModel === false,
+    JSON.stringify(ch.body?.dataset?.allowed)
+  );
+  check(
+    "the gate names what the product must not claim yet",
+    Array.isArray(ch.body?.dataset?.forbiddenClaims) &&
+      ch.body.dataset.forbiddenClaims.includes("guaranteed admission"),
+    JSON.stringify(ch.body?.dataset?.forbiddenClaims)
+  );
+
+  // --- consented outcomes change the basis -------------------------------
+  // Twelve consented results at one university: enough to cross the blending
+  // floor, so the estimate should start citing ScholarBridge data.
+  const consentApps = await db
+    .insert(schema.applications)
+    .values(
+      Array.from({ length: 12 }, () => ({
+        profileId: other.id,
+        universityId: uniA.id,
+        status: "Decision",
+      }))
+    )
+    .returning();
+
+  await db.insert(schema.applicationOutcomes).values(
+    consentApps.map((a, i) => ({
+      applicationId: a.id,
+      profileId: other.id,
+      universityId: uniA.id,
+      result: i < 4 ? "accepted" : i < 9 ? "rejected" : "waitlisted",
+      shareConsent: true,
+      snapshotGpa: 3.4,
+      snapshotMajor: "Computer Science",
+      snapshotCountry: "Uzbekistan",
+    }))
+  );
+
+  const ch2 = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
+  const tumRow = (ch2.body?.results ?? []).find((r: any) => r.universityId === uniA.id);
+
+  // Section 5 already recorded one consented outcome at this university
+  // (the owner's own POST), so the corpus here is 12 + 1. That overlap is
+  // worth keeping: it confirms the earlier POST really persisted a row.
+  const EXPECTED_SAMPLE = 13;
+
+  check(
+    "consented outcomes move the basis off the public estimate",
+    tumRow?.dataBasis === "hybrid" || tumRow?.dataBasis === "scholarbridge-data",
+    `got ${tumRow?.dataBasis}, sample=${tumRow?.sampleSize}`
+  );
+  check(
+    "the sample size reflects the consented rows",
+    tumRow?.sampleSize === EXPECTED_SAMPLE,
+    `got ${tumRow?.sampleSize}, expected ${EXPECTED_SAMPLE}`
+  );
+  check(
+    "the disclaimer now cites the blended sample",
+    new RegExp(`Blended with ${EXPECTED_SAMPLE} ScholarBridge`).test(tumRow?.disclaimer ?? ""),
+    tumRow?.disclaimer
+  );
+  check(
+    "Fit stays its own number even after blending",
+    typeof tumRow?.fitScore === "number" && tumRow.fitScore !== tumRow?.admission?.mid,
+    `fit=${tumRow?.fitScore} admission=${tumRow?.admission?.mid}`
+  );
+
+  // --- non-consented outcomes must NOT be used ---------------------------
+  // This is the privacy claim: a student who never agreed cannot have their
+  // result folded into anyone's estimate. Assert it by watching the basis
+  // and the sample count stay exactly where they were.
+  const privateApps = await db
+    .insert(schema.applications)
+    .values(
+      Array.from({ length: 20 }, () => ({
+        profileId: other.id,
+        universityId: uniB.id,
+        status: "Decision",
+      }))
+    )
+    .returning();
+
+  await db.insert(schema.applicationOutcomes).values(
+    privateApps.map((a, i) => ({
+      applicationId: a.id,
+      profileId: other.id,
+      universityId: uniB.id,
+      result: i < 18 ? "accepted" : "rejected",
+      shareConsent: false, // never consented
+      snapshotGpa: 3.9,
+      snapshotMajor: "Computer Science",
+    }))
+  );
+
+  const ch3 = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
+  const lmuRow = (ch3.body?.results ?? []).find((r: any) => r.universityId === uniB.id);
+  const tumRow3 = (ch3.body?.results ?? []).find((r: any) => r.universityId === uniA.id);
+
+  check(
+    "non-consented outcomes are not counted in the sample",
+    lmuRow?.sampleSize === 0,
+    `got ${lmuRow?.sampleSize}`
+  );
+  check(
+    "a university with only non-consented data stays on the public estimate",
+    lmuRow?.dataBasis === "public-estimate",
+    `got ${lmuRow?.dataBasis}`
+  );
+  check(
+    "the consented university's sample is unchanged by the new rows",
+    tumRow3?.sampleSize === EXPECTED_SAMPLE,
+    `got ${tumRow3?.sampleSize}, expected ${EXPECTED_SAMPLE}`
+  );
+  check(
+    "the readiness gate counts only consented rows",
+    ch3.body?.dataset?.records === EXPECTED_SAMPLE,
+    `got ${ch3.body?.dataset?.records}, expected ${EXPECTED_SAMPLE} (the 20 non-consented rows must be invisible)`
+  );
+  check(
+    "the readiness gate still refuses an ML claim",
+    ch3.body?.dataset?.allowed?.mlModel === false,
+    JSON.stringify(ch3.body?.dataset?.allowed)
+  );
+
+  // --- authorisation -----------------------------------------------------
+  const chForeign = await call(chancingGet as any, `/api/chancing?profileId=${other.id}`);
+  check("another student's chancing is refused", chForeign.status === 403, `got ${chForeign.status}`);
+
+  // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which
   // surfaces as an unhandled fatal and fails the run even though every
