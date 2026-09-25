@@ -545,37 +545,44 @@ Uch yo'nalishni qoplaydi:
 
 ## 8. Qolgan ishlar (halol ro'yxat)
 
-Strategiyaning 34 ta funksiyasidan oldin qilinmagan bo'lgan 6 tasi endi
-barchasi shu branchda ishlaydi:
+**34 ta funksiyadan qolgan: 0 ta.** Barchasi shu branchda ishlaydi va
+test bilan qoplangan. Eng so'nggi bosqichda (`8b7574c`) spec nozikliklari
+bo'yicha topilgan 6 ta bo'shliq ham yopildi:
 
-| # | Funksiya | Holat |
-|---|---|---|
-| 13/14 | Voice AI interview (mikrofon) | **Bajarildi** — PR #22 cherry-pick qilindi, Gemini→multi-provider mainline'ga moslandi (§2.24) |
-| 24 | Essay peer review | **Bajarildi** — ochish/yopish, anonim sharhlar, o'rtachalar (§2.21) |
-| 26 | Personalized opportunities feed | **Bajarildi** — profilga moslashgan "NEW FOR YOU" feed (§2.22) |
-| 27 | Competition / olympiad finder | **Bajarildi** — `opportunities` katalogi, competition turi + filter (§2.22) |
-| 28 | Research / internship opportunities | **Bajarildi** — research/internship/summer_school turlari, admin CRUD (§2.22) |
-| 29 | Country comparison | **Bajarildi** — nashr qilingan ma'lumotlar bilan, work rights ixtiro qilinmaydi (§2.23) |
+| # | Funksiya | Fayl | API | Test |
+|---|---|---|---|---|
+| 13 | Viza amaliyot tarixi | `src/lib/visaScoring.ts`, `VisaSpeakingAssistant.tsx` | `GET /api/visa/history` | integration §10 (7 assert) |
+| 18 | Essay adapter | `src/lib/essayAdapter.ts` (426 q) | `POST /api/essay-adapter` (141 q) | `test:essay-adapter` (39) |
+| 20 | Tavsiya xati | `src/lib/recLetter.ts` (150 q), `RecLetterPanel.tsx` (187 q) | `POST /api/recommendation-letter` (90 q) | `test:rec-letter` (28) |
+| 22 | Profile strength | `ProfileStrengthPanel.tsx` (164 q) | `GET /api/profile-strength` (86 q) | integration §7 (8 assert) |
+| 25 | Aqlli notification'lar | `src/app/api/notifications/sweep/route.ts` | `POST /api/notifications/sweep` | integration §11 (5 assert) |
+| 24 | Program shortlist | `saved_programs` jadval, `UniversityDetail.tsx` | `GET/POST/DELETE /api/saved-programs` | integration §9 (9 assert) |
 
-**Halol cheklovlari (nima hali ham yo'q):**
+Avvalroq bajarilgan so'nggi 6 xususiyat: 13/14 (voice), 24 (essay peer
+review), 26–28 (opportunities), 29 (country compare) — §2.21–§2.24.
 
-- `opportunities` starter katalogi 11 ta haqiqiy, barqaror, xalqaro tan olingan
-  dasturdan iborat. To'liq mamlakat bo'ylab ro'yxat admin panel orqali o'sadi —
-  avtomatik ro'yxat tuzish (scraping) strategiya bo'yicha **majburiy rad etilgan**.
+**Halol cheklovlari (nima hali ham yo'q va nega):**
+
+- `opportunities` starter katalogi 11 ta haqiqiy, barqaror, xalqaro tan
+  olingan dasturdan iborat. To'liq mamlakat bo'ylab ro'yxat admin panel
+  orqali o'sadi — avtomatik ro'yxat tuzish (scraping) strategiya bo'yicha
+  **majburiy rad etilgan**.
 - Mamlakat taqqoslashida visa/work rights raqamlari bazada nashr etilmaganligi
   sababli doim "nashr etilmagan" ko'rinadi — bu to'g'ri xatar, xato emas.
   Agar owner buni bazaga qo'shmoqchi bo'lsa, `universities`/yangi jadvalga
   qo'shish kerak, keyin `countryCompare.ts` avtomatik oladi.
-- Gemini Live ovoz intervyu faqat `GEMINI_API_KEY` serverda bo'lganda ishlaydi;
-  key bo'lmasa Web Speech fallback'iga o'tadi (hujjatlashtirilgan).
+- Gemini Live ovoz intervyu faqat `GEMINI_API_KEY` serverda bo'lganda
+  ishlaydi; key bo'lmasa Web Speech fallback'iga o'tadi (hujjatlashtirilgan).
+- Navbar'da 3 ta tab hali yashirin: `tracker`, `deadlines`, `courses`
+  (komponentlari bor va ishlaydi, menyu'da ochish — owner qarori).
 
-**Foydalanuvchiga qolgan qo'lda ishlar:**
-1. `supabase/add_opportunities_essay_reviews.sql` ni Supabase SQL Editor'da
-   ishga tushirish (yangi 4-chi SQL fayl — §6).
-2. PR #32 ni merge qilish, PR #31 ni yopish, PR #22 ni yopish (kodi shu
-   branchga cherry-pick qilindi).
-3. `cp ci/security-ci.yml .github/workflows/ci.yml` (avtomatizatsiya hisobida
-   workflows ruxsati yo'q).
+**Foydalanuvchiga qolgan qo'lda ishlar (men bajarmayman):**
+
+| # | Ish | Fayl/API | Izoh |
+|---|---|---|---|
+| 1 | 4 ta SQL faylni Supabase SQL Editor'da ishga tushirish | `supabase/*.sql` | oxirgisi: `add_opportunities_essay_reviews.sql` (100 q) — ichida `saved_programs` + notification migratsiyasi ham bor |
+| 2 | CI'ni joyga qo'yish | `cp ci/security-ci.yml .github/workflows/ci.yml` | workflows ruxsati agentda yo'q |
+| 3 | PR'lar | — | #32 merge, #31 yopish, #22 owner'ga |
 
 **Data qoidasi (strategiya) — o'zgarmadi:** boshqa saytlardan profil yoki
 ro'yxat scraping qilinmaydi. Asosiy dataset o'z platformamizdan o'sadi:
