@@ -219,7 +219,13 @@ export function UniversityExplorer({
   );
 
   if (selectedUniId != null) {
-    return <UniversityDetail universityId={selectedUniId} onBack={() => setSelectedUniId(null)} />;
+    return (
+      <UniversityDetail
+        universityId={selectedUniId}
+        activeProfile={activeProfile}
+        onBack={() => setSelectedUniId(null)}
+      />
+    );
   }
 
   return (

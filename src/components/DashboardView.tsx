@@ -26,6 +26,7 @@ interface DashboardViewProps {
   onNavigateTab: (tab: string) => void;
   savedUniCount: number;
   savedScholarshipCount: number;
+  savedProgramCount: number;
   taskCount: number;
   onEditProfile: () => void;
 }
@@ -35,6 +36,7 @@ export function DashboardView({
   onNavigateTab,
   savedUniCount,
   savedScholarshipCount,
+  savedProgramCount,
   taskCount,
   onEditProfile,
 }: DashboardViewProps) {
@@ -218,7 +220,12 @@ export function DashboardView({
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">{savedUniCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">{t("statShortlistedSub")}</p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {t("statShortlistedSub")}
+            {savedProgramCount > 0 && (
+              <span className="text-indigo-600 font-semibold"> · {t("statShortlistedPrograms", { n: savedProgramCount })}</span>
+            )}
+          </p>
         </div>
 
         <div 

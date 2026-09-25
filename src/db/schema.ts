@@ -198,6 +198,13 @@ export const savedUniversities = pgTable("saved_universities", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const savedPrograms = pgTable("saved_programs", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+  programId: integer("program_id").references(() => universityPrograms.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const savedScholarships = pgTable("saved_scholarships", {
   id: serial("id").primaryKey(),
   profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
@@ -517,7 +524,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   inApp: boolean("in_app").notNull().default(true),
   email: boolean("email").notNull().default(false),
   push: boolean("push").notNull().default(false),
-  types: text("types").notNull().default("[\"scholarship_opened\",\"deadline_approaching\",\"deadline_changed\",\"milestone_due\"]"),
+  types: text("types").notNull().default("[\"scholarship_opened\",\"deadline_approaching\",\"deadline_changed\",\"milestone_due\",\"requirement_gap\",\"essay_improved\"]"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -588,6 +595,9 @@ export const essayVersions = pgTable(
     rubricFit: integer("rubric_fit"),
     rubricTotal: integer("rubric_total"),
     aiFeedback: text("ai_feedback"),
+    // #24 Peer review — the author explicitly opens a version for other
+    // students to review; closed by default, never inferred.
+    openForReview: boolean("open_for_review").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -970,5 +980,56 @@ export const mentorRequests = pgTable(
   (table) => [
     index("idx_mentor_requests_profile").on(table.profileId),
     index("idx_mentor_requests_mentor").on(table.mentorId, table.status),
+  ]
+);
+
+// ---------------------------------------------------------------------------
+// #26/#27/#28 — Personalized opportunities: competitions, research,
+// internships, summer schools. A curated, admin-managed catalog — the
+// platform never scrapes third-party lists.
+// ---------------------------------------------------------------------------
+
+export const opportunities = pgTable(
+  "opportunities",
+  {
+    id: serial("id").primaryKey(),
+    type: text("type").notNull().default("competition"), // competition | research | internship | summer_school
+    title: text("title").notNull(),
+    provider: text("provider").notNull().default(""),
+    country: text("country"), // null = international
+    fields: text("fields").notNull().default('["All"]'), // JSON list, e.g. ["Computer Science"]
+    level: text("level").notNull().default("any"), // high_school | undergrad | grad | phd | any
+    deadlineDate: date("deadline_date"), // null = recurring/unknown — never guessed
+    url: text("url").notNull().default(""),
+    description: text("description").notNull().default(""),
+    isVerified: boolean("is_verified").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_opportunities_type").on(table.type),
+    index("idx_opportunities_deadline").on(table.deadlineDate),
+  ]
+);
+
+// #24 — Peer review of essays the author opened for review.
+export const essayReviews = pgTable(
+  "essay_reviews",
+  {
+    id: serial("id").primaryKey(),
+    essayVersionId: integer("essay_version_id").references(() => essayVersions.id, { onDelete: "cascade" }).notNull(),
+    authorProfileId: integer("author_profile_id").notNull(),
+    reviewerProfileId: integer("reviewer_profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    hook: integer("hook"),
+    structure: integer("structure"),
+    specificity: integer("specificity"),
+    language: integer("language"),
+    fit: integer("fit"),
+    total: integer("total"),
+    comment: text("comment").notNull().default(""),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_essay_reviews_version").on(table.essayVersionId),
+    index("idx_essay_reviews_reviewer").on(table.reviewerProfileId),
   ]
 );

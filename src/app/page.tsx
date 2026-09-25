@@ -9,11 +9,14 @@ import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ChancingPanel } from "@/components/ChancingPanel";
+import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
 import { CompleteProfileForm } from "@/components/CompleteProfileForm";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { NextActionsPanel } from "@/components/NextActionsPanel";
 import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
 import { EssayRubricStudio } from "@/components/EssayRubricStudio";
+import { CountryComparePanel } from "@/components/CountryComparePanel";
+import { OpportunitiesPanel } from "@/components/OpportunitiesPanel";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
 import { PlanningStudio } from "@/components/PlanningStudio";
 import { MentorMarketplace } from "@/components/MentorMarketplace";
@@ -83,6 +86,7 @@ export default function Home() {
   // Saved Data
   const [savedUniversities, setSavedUniversities] = useState<SavedUniversityItem[]>([]);
   const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
+  const [savedProgramCount, setSavedProgramCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
 
   // Referral system: capture ?ref=CODE from the URL and keep it for up to
@@ -167,11 +171,23 @@ export default function Home() {
     }
   }, []);
 
+  // Spec §24 — how many specific programmes the student has shortlisted.
+  const fetchSavedProgramCount = useCallback(async (profileId: number) => {
+    try {
+      const res = await fetch(`/api/saved-programs?profileId=${profileId}`);
+      const data = await res.json();
+      if (typeof data.count === "number") setSavedProgramCount(data.count);
+    } catch (err) {
+      console.error("Error fetching saved program count:", err);
+    }
+  }, []);
+
   const hydrateProfileData = useCallback((profileId: number) => {
     void fetchSavedUniversities(profileId);
     void fetchSavedScholarships(profileId);
+    void fetchSavedProgramCount(profileId);
     void fetchTaskCount(profileId);
-  }, [fetchSavedScholarships, fetchSavedUniversities, fetchTaskCount]);
+  }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount, fetchTaskCount]);
 
   /** Load the full profile list — only used by the profile picker. */
   const loadAllProfiles = useCallback(async () => {
@@ -604,6 +620,7 @@ export default function Home() {
               onNavigateTab={setActiveTab}
               savedUniCount={savedUniversities.length}
               savedScholarshipCount={savedScholarships.length}
+              savedProgramCount={savedProgramCount}
               taskCount={taskCount}
               onEditProfile={() => {
                 setIsNewProfile(false);
@@ -681,6 +698,9 @@ export default function Home() {
         {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
         {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
 
+        {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
+        {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}
+
         {/* #3 AI Admissions Advisor */}
         {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
 
@@ -690,6 +710,12 @@ export default function Home() {
         {/* Phase 4 — mentor marketplace + parent dashboard */}
         {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
         {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
+
+        {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
+        {activeTab === "opportunities" && <OpportunitiesPanel />}
+
+        {/* #29 — country comparison on published data only */}
+        {activeTab === "compare" && <CountryComparePanel />}
 
         {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
         {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}

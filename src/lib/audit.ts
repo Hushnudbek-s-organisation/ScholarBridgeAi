@@ -3,7 +3,7 @@ import { auditLogs } from "@/db/schema";
 import { desc, eq, and } from "drizzle-orm";
 
 export type AuditActor = "ADMIN" | "AUTOMATED_SYSTEM" | "AI" | "EXTERNAL_SOURCE";
-export type AuditEntityType = "university" | "scholarship";
+export type AuditEntityType = "university" | "scholarship" | "opportunity";
 
 interface AuditEntry {
   entityType: AuditEntityType;

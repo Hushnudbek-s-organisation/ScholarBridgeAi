@@ -131,7 +131,8 @@ section("5. Data gaps are surfaced, not hidden");
 
 const gaps = compareUniversities([
   uni({ id: 1, name: "Sparse", annualTuitionUsd: null, acceptanceRate: null, annualLivingEstUsd: null }),
-  elite,
+  // Fully documented — including the scholarship-count row.
+  { ...elite, scholarshipCount: 10 },
 ]);
 check("a university with missing data is reported", gaps.dataGaps.some((g) => g.universityId === 1));
 check("the missing fields are listed by label", gaps.dataGaps.find((g) => g.universityId === 1)!.missing.includes("Annual tuition"));
@@ -147,6 +148,52 @@ section("7. Determinism");
 const a = compareUniversities([cheap, elite], { gpa4: 3.5, budgetAnnualUsd: 40000 });
 const b = compareUniversities([cheap, elite], { gpa4: 3.5, budgetAnnualUsd: 40000 });
 check("the same input gives the same table", JSON.stringify(a) === JSON.stringify(b));
+
+section("8. IELTS fit and scholarship counts (spec §23)");
+
+const ieltsA = { ...cheap, minIelts: 6.0 };
+const ieltsB = { ...elite, minIelts: 7.0 };
+const withIelts = compareUniversities([ieltsA, ieltsB], { ielts: 6.5 });
+const ieltsFit = withIelts.rows.find((r) => r.key === "ieltsFit")!;
+check("an IELTS row appears when the student has a score", Boolean(ieltsFit));
+check("an IELTS above the minimum is marked as meeting it", /Meets it \(\+0.5\)/.test(String(ieltsFit.values[ieltsA.id])));
+check("an IELTS below the minimum is marked as short", /Below by 0.5/.test(String(ieltsFit.values[ieltsB.id])));
+check("the larger IELTS margin wins the row", ieltsFit.winner === ieltsA.id);
+
+const noIelts = compareUniversities([cheap, elite], { gpa4: 3.5 });
+check("no IELTS row without an IELTS score", !noIelts.rows.some((r) => r.key === "ieltsFit"));
+
+const withSch = compareUniversities([
+  { ...cheap, scholarshipCount: 12 },
+  { ...elite, scholarshipCount: 4 },
+]);
+const schRow = withSch.rows.find((r) => r.key === "scholarships")!;
+check("more scholarships in-country wins", schRow.winner === cheap.id);
+check("the scholarship count is rendered as a number", schRow.values[cheap.id] === "12");
+check("no scholarship row when the count is unknown", !noIelts.rows.some((r) => r.key === "scholarships"));
+
+section("9. Personalized rows are injected (spec §23)");
+
+const matchRow = {
+  key: "profileMatch",
+  label: "Your profile match",
+  values: { [cheap.id]: "90%", [elite.id]: "55%" },
+  winner: cheap.id,
+  winnerReason: "Highest fit with your profile.",
+  allUnknown: false,
+};
+const admissionRow = {
+  key: "admissionEstimate",
+  label: "Admission estimate",
+  values: { [cheap.id]: "45–70%", [elite.id]: "5–15%" },
+  winner: cheap.id,
+  allUnknown: false,
+};
+
+const withExtra = compareUniversities([cheap, elite], {}, [matchRow, admissionRow]);
+check("personalized rows are prepended to the table", withExtra.rows[0].key === "profileMatch" && withExtra.rows[1].key === "admissionEstimate");
+check("personalized wins count in the tally", withExtra.scores[cheap.id].wins >= 2);
+check("match and admission stay two separate rows", withExtra.rows.filter((r) => r.key === "profileMatch" || r.key === "admissionEstimate").length === 2);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

@@ -12,6 +12,7 @@ import {
   Target, 
   Search, 
   Award, 
+  Activity,
   CheckSquare, 
   FileText, 
   Bot, 
@@ -29,6 +30,8 @@ import {
   CalendarClock,
   Headset,
   Mic,
+  Compass,
+  Globe2,
 } from "lucide-react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
@@ -123,10 +126,15 @@ export function Navbar({
     { id: "scholarships", label: t("scholarships"), icon: Award },
     { id: "profile", label: t("completeProfile"), icon: GraduationCap },
     { id: "chancing", label: t("chances"), icon: Target },
+    // #21 + #22 — profile strength dashboard + extracurricular analysis
+    { id: "strength", label: t("strength"), icon: Activity },
     { id: "advisor", label: t("advisor"), icon: Bot },
     { id: "similar", label: t("similarProfiles"), icon: Users },
     { id: "planning", label: t("planning"), icon: Calculator },
     { id: "mentors", label: t("mentors"), icon: Handshake },
+    // #26/#27/#28 — personalized opportunities feed + #29 country comparison
+    { id: "opportunities", label: t("opportunities"), icon: Compass },
+    { id: "compare", label: t("compare"), icon: Globe2 },
     { id: "parent", label: t("parent"), icon: Home },
     { id: "applications", label: t("myApplications"), icon: CheckSquare },
     { id: "tracker", label: t("tracker"), icon: GraduationCap, hidden: true },

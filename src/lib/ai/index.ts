@@ -17,6 +17,7 @@ import {
   resolveCredential,
   resolveProviderForTask,
   taskProviderConfigKey,
+  type AIProviderId,
 } from "./settings";
 import { getConfig } from "@/lib/config";
 import { resolveProviderCredential } from "./credentials";
@@ -217,7 +218,7 @@ export const PROVIDERS: Record<AIProviderName, AIProviderAdapter> = {
 // Task → provider mapping (spec §12)
 // ---------------------------------------------------------------------------
 
-export function providerForTask(taskType: string): { name: AIProviderName; apiKey?: string; model?: string } {
+export function providerForTask(taskType: string): { name: AIProviderId; apiKey?: string; model?: string } {
   const name = resolveProviderForTask(taskType, {}, process.env);
   const cfg = resolveCredential(name, null, process.env);
   return { name, apiKey: cfg.apiKey, model: cfg.model };
@@ -232,7 +233,7 @@ export function providerForTask(taskType: string): { name: AIProviderName; apiKe
  */
 export async function resolveRuntimeProvider(
   taskType: string
-): Promise<{ name: AIProviderName; apiKey?: string; apiKeySource: "db" | "env" | "none"; model?: string }> {
+): Promise<{ name: AIProviderId; apiKey?: string; apiKeySource: "db" | "env" | "none"; model?: string }> {
   const dbProviders: Record<string, string> = {};
   try {
     const defaultProvider = await getConfig("ai_default_provider");
@@ -264,7 +265,21 @@ export async function isAiConfigured(taskType: string): Promise<boolean> {
 export async function aiGenerate(req: AIRequest): Promise<AIResponse | null> {
   const taskType = req.taskType || "general";
   const providerCfg = await resolveRuntimeProvider(taskType);
-  const adapter = PROVIDERS[providerCfg.name];
+  const adapter = PROVIDERS[providerCfg.name as AIProviderName];
+
+  if (!adapter) {
+    // A provider with no chat adapter (today: "gemini" — it powers the Gemini
+    // Live voice interview, not chat). Degrade to openrouter, never crash.
+    const fbCred = await resolveProviderCredential("openrouter");
+    if (fbCred.apiKey) {
+      const fb = await PROVIDERS.openrouter.call(req, {
+        apiKey: fbCred.apiKey,
+        model: fbCred.model,
+      });
+      if (fb) return { ...fb, provider: `${fb.provider}:fallback` };
+    }
+    return null;
+  }
 
   try {
     const response = await adapter.call(req, {

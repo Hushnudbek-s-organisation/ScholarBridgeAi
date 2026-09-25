@@ -2,11 +2,12 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
 import { ScholarshipsManager } from "./admin/ScholarshipsManager";
+import { OpportunitiesManager } from "./admin/OpportunitiesManager";
 import { PremiumManager } from "./admin/PremiumManager";
 import { AuditLogViewer } from "./admin/AuditLogViewer";
 import { ConfigManager } from "./admin/ConfigManager";
@@ -39,7 +40,7 @@ interface AdminPanelProps {
   activeProfile: StudentProfile | null;
 }
 
-type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research";
+type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "opportunities" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research";
 
 export function AdminPanel({ activeProfile }: AdminPanelProps) {
   // Analytics first: the owner opens the panel to see how the platform is doing.
@@ -54,6 +55,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
     { id: "universities", label: "Universities", icon: <Building2 className="h-4 w-4" /> },
     { id: "courses", label: "Courses & Videos", icon: <Video className="h-4 w-4" /> },
     { id: "scholarships", label: "Scholarships", icon: <Award className="h-4 w-4" /> },
+    { id: "opportunities", label: "Opportunities", icon: <Compass className="h-4 w-4" /> },
     { id: "premium", label: "Premium Gifts", icon: <Gift className="h-4 w-4" /> },
     { id: "audit", label: "Audit Log", icon: <History className="h-4 w-4" /> },
     { id: "verify", label: "Verification", icon: <BadgeCheck className="h-4 w-4" /> },
@@ -107,6 +109,9 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       )}
       {tab === "scholarships" && (
         <ErrorBoundary><ScholarshipsManager adminProfileId={activeProfile.id} /></ErrorBoundary>
+      )}
+      {tab === "opportunities" && (
+        <ErrorBoundary><OpportunitiesManager adminProfileId={activeProfile.id} /></ErrorBoundary>
       )}
       {tab === "premium" && (
         <ErrorBoundary><PremiumManager adminProfileId={activeProfile.id} /></ErrorBoundary>

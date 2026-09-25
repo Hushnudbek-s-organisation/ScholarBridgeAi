@@ -15,10 +15,13 @@
  */
 
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import { NextIntlClientProvider } from "next-intl";
 import { PlanningStudio } from "../src/components/PlanningStudio";
 import { MentorMarketplace } from "../src/components/MentorMarketplace";
 import { ParentDashboard } from "../src/components/ParentDashboard";
+import { LandingPage } from "../src/components/LandingPage";
 
 let passed = 0;
 let failed = 0;
@@ -113,6 +116,36 @@ section("5. Rendering is deterministic");
 const a = render(components[0][1](profile)).html;
 const b = render(components[0][1](profile)).html;
 check("the same props give the same markup", a === b);
+
+// ---------------------------------------------------------------------------
+section("6. LandingPage renders (i18n-wrapped) and stays honest");
+
+const loadMessages = (locale: string) =>
+  JSON.parse(readFileSync(new URL(`../src/i18n/messages/${locale}.json`, import.meta.url), "utf8"));
+const renderLanding = (locale: string) =>
+  render(
+    React.createElement(NextIntlClientProvider, {
+      locale,
+      messages: loadMessages(locale),
+      children: React.createElement(LandingPage, { onStart: () => {}, onSignIn: () => {} }),
+    })
+  );
+
+for (const locale of ["en", "uz", "ru"]) {
+  const { html, error } = renderLanding(locale);
+  check(`LandingPage renders in ${locale}`, error === null, error ?? "");
+  check(`LandingPage produces substantial markup in ${locale}`, html.length > 3000, `only ${html.length} chars`);
+}
+
+const landingHtml = renderLanding("en").html;
+check("landing has a Sign in button (not 'Log in')", /Sign in/.test(landingHtml) && !/Log in/.test(landingHtml));
+check("landing has the hero heading", /Your path to university/.test(landingHtml));
+check("landing lists the how-it-works steps", /Build your profile/.test(landingHtml) && /Find your fit/.test(landingHtml));
+check(
+  "landing keeps admission estimate honest (no invented probability)",
+  /Admission estimate/.test(landingHtml) && /intentionally does not invent a probability/i.test(landingHtml)
+);
+check("landing footer links to privacy and terms", /\/privacy/.test(landingHtml) && /\/terms/.test(landingHtml));
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

@@ -60,9 +60,14 @@ function check(name: string, fn: () => void) {
 // ---------------------------------------------------------------------------
 // Provider registry
 // ---------------------------------------------------------------------------
-check("registry exposes exactly 4 providers", () => {
-  assert.deepEqual(AI_PROVIDER_IDS, ["openrouter", "openai", "anthropic", "groq"]);
+// 4 chat providers + "gemini" (voice-only — powers the Gemini Live visa
+// speaking assistant; it deliberately has NO chat adapter in ai/index.ts,
+// which degrades to openrouter for chat tasks).
+check("registry exposes exactly 5 providers (4 chat + 1 voice-only)", () => {
+  assert.deepEqual(AI_PROVIDER_IDS, ["openrouter", "openai", "anthropic", "groq", "gemini"]);
 });
+
+const CHAT_PROVIDER_IDS = AI_PROVIDER_IDS.filter((id) => id !== "gemini");
 
 check("every provider id has meta", () => {
   for (const id of AI_PROVIDER_IDS) assert.ok(AI_PROVIDERS[id], `missing meta for ${id}`);
@@ -343,11 +348,16 @@ check("providerForTask returns name + env key (env-only mode)", () => {
   assert.equal(r.model, AI_PROVIDERS.openrouter.defaultModel);
 });
 
-check("PROVIDERS exposes an adapter with call() for every provider", () => {
-  for (const id of AI_PROVIDER_IDS) {
+check("PROVIDERS exposes a call() adapter for every CHAT provider (gemini is voice-only)", () => {
+  for (const id of CHAT_PROVIDER_IDS) {
     assert.ok(aiCore.PROVIDERS[id as keyof typeof aiCore.PROVIDERS]);
     assert.equal(typeof aiCore.PROVIDERS[id as keyof typeof aiCore.PROVIDERS].call, "function");
   }
+});
+
+check("gemini is registered for credentials but has no chat adapter", () => {
+  assert.ok(settings.AI_PROVIDERS.gemini, "gemini must exist in the credential registry");
+  assert.equal((aiCore.PROVIDERS as Record<string, unknown>).gemini, undefined);
 });
 
 check("isAiConfigured resolves without a DB and reports false", async () => {
@@ -356,7 +366,8 @@ check("isAiConfigured resolves without a DB and reports false", async () => {
 
 check("credentials.getPublicCredentials returns safe views (no raw keys)", async () => {
   const views = await credentials.getPublicCredentials();
-  assert.equal(views.length, 4);
+  assert.equal(views.length, 5); // 4 chat + gemini (voice-only)
+  assert.ok(views.some((v) => v.provider === "gemini"), "gemini appears in the public view");
   for (const v of views) {
     assert.equal(typeof v.keyHint, "string");
     assert.ok(!v.keyHint.includes("sk-") || v.keyHint.startsWith("••••"), "keyHint must be masked");

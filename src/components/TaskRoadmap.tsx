@@ -126,6 +126,23 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
     return true;
   });
 
+  // Monthly plan (spec §4): the same tasks grouped by due-date month, so the
+  // student sees "September → October → November" at a glance, not just a
+  // flat list. Month names follow the browser locale.
+  const monthPlan: { key: string; label: string; tasks: TaskItem[] }[] = [];
+  for (const t of [...filteredTasks].sort((a, b) => a.dueDate.localeCompare(b.dueDate))) {
+    const d = new Date(`${t.dueDate}T00:00:00`);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    let bucket = monthPlan.find((m) => m.key === key);
+    if (!bucket) {
+      bucket = { key, label, tasks: [] };
+      monthPlan.push(bucket);
+    }
+    bucket.tasks.push(t);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header & Progress Bar */}
@@ -242,6 +259,51 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
             </button>
           </div>
         </form>
+      )}
+
+      {/* Monthly plan — grouped view of the same tasks (spec §4) */}
+      {!loading && monthPlan.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {monthPlan.map((m) => {
+            const done = m.tasks.filter((t) => t.isCompleted).length;
+            return (
+              <div key={m.key} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
+                    {m.label}
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {done}/{m.tasks.length}
+                  </span>
+                </div>
+                <ul className="mt-3 space-y-1.5">
+                  {m.tasks.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleTask(t.id, t.isCompleted)}
+                        aria-label={`Mark ${t.title} ${t.isCompleted ? "incomplete" : "complete"}`}
+                        className={`h-5 w-5 shrink-0 rounded-md border flex items-center justify-center transition-colors ${
+                          t.isCompleted
+                            ? "bg-emerald-600 border-emerald-600 text-white"
+                            : "border-slate-300 hover:border-indigo-500 bg-white"
+                        }`}
+                      >
+                        {t.isCompleted && <Check className="h-3.5 w-3.5" />}
+                      </button>
+                      <span
+                        className={`truncate text-xs font-semibold ${
+                          t.isCompleted ? "line-through text-slate-400" : "text-slate-700"
+                        }`}
+                      >
+                        {t.title}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Task List */}
