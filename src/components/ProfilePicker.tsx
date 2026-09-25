@@ -1,16 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  User,
-  ShieldCheck,
-  Crown,
-  X,
-  Lock,
-  LogIn,
-  Loader2,
-  Plus,
-} from "lucide-react";
+import { ShieldCheck, X, LogIn, Loader2, Plus } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 
 interface ProfilePickerProps {
@@ -21,14 +12,11 @@ interface ProfilePickerProps {
   onClose: () => void;
   onSelect: (profile: StudentProfile) => void;
   onAddNew: () => void;
-  /** Called with the admin profile after a successful username+email sign-in. */
-  onAdminLogin: (profile: StudentProfile) => void;
 }
 
 /**
- * Sign-in window. Shows ONLY the accounts created on this device, plus a
- * username+email sign-in form for the owner's admin account (Hushnudbek).
- * Other people's accounts are never listed here.
+ * Sign-in window. Shows only accounts used on this device and the standard
+ * email + password sign-in form, which works for both students and admins.
  */
 export function ProfilePicker({
   open,
@@ -37,73 +25,40 @@ export function ProfilePicker({
   onClose,
   onSelect,
   onAddNew,
-  onAdminLogin,
 }: ProfilePickerProps) {
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [password, setPassword] = useState("");
+  const [signInError, setSignInError] = useState("");
+  const [signInBusy, setSignInBusy] = useState(false);
 
-  // Student sign-in (email + password) — the account pair created at sign up,
-  // so it works from ANY device / after clearing this browser.
-  const [siEmail, setSiEmail] = useState("");
-  const [siPassword, setSiPassword] = useState("");
-  const [siError, setSiError] = useState("");
-  const [siBusy, setSiBusy] = useState(false);
-
-  const handleStudentSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!siEmail.trim() || !siPassword.trim()) {
-      setSiError("Enter both email and password");
+    if (!email.trim() || !password.trim()) {
+      setSignInError("Enter both email and password");
       return;
     }
-    setSiBusy(true);
-    setSiError("");
+
+    setSignInBusy(true);
+    setSignInError("");
     try {
       const res = await fetch("/api/auth/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: siEmail.trim(), password: siPassword }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok || !data.profile) {
         throw new Error(data.error || "Sign-in failed");
       }
       onSelect(data.profile as StudentProfile);
-    } catch (err: any) {
-      setSiError(err.message || "Sign-in failed");
+    } catch (err: unknown) {
+      setSignInError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
-      setSiBusy(false);
+      setSignInBusy(false);
     }
   };
 
   if (!open) return null;
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim() || !email.trim()) {
-      setLoginError("Enter both username and email");
-      return;
-    }
-    setBusy(true);
-    setLoginError("");
-    try {
-      const res = await fetch("/api/auth/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), email: email.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.profile) {
-        throw new Error(data.error || "Sign-in failed");
-      }
-      onAdminLogin(data.profile as StudentProfile);
-    } catch (err: any) {
-      setLoginError(err.message || "Sign-in failed");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -125,7 +80,7 @@ export function ProfilePicker({
         </div>
 
         <div className="p-4 max-h-[60vh] overflow-y-auto space-y-5">
-          {/* ===== Accounts created on THIS device ===== */}
+          {/* ===== Accounts used on THIS device ===== */}
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
               My accounts on this device ({deviceProfiles.length})
@@ -185,16 +140,9 @@ export function ProfilePicker({
                 })}
               </div>
             )}
-
-            <button
-              onClick={onAddNew}
-              className="mt-2.5 w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" /> Create a new account
-            </button>
           </div>
 
-          {/* ===== Student sign-in (email + password, any device) ===== */}
+          {/* ===== Email + password sign-in (any device; students and admins) ===== */}
           <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">
             <div className="flex items-center gap-2 mb-1">
               <LogIn className="h-3.5 w-3.5 text-indigo-500" />
@@ -208,34 +156,36 @@ export function ProfilePicker({
               account — works even from a new phone or browser.
             </p>
 
-            <form onSubmit={handleStudentSignIn} className="space-y-2.5">
+            <form onSubmit={handleSignIn} className="space-y-2.5">
               <input
                 type="email"
-                value={siEmail}
-                onChange={(e) => setSiEmail(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                autoComplete="off"
+                autoComplete="email"
+                required
               />
               <input
                 type="password"
-                value={siPassword}
-                onChange={(e) => setSiPassword(e.target.value)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                autoComplete="off"
+                autoComplete="current-password"
+                required
               />
-              {siError && (
+              {signInError && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
-                  {siError}
+                  {signInError}
                 </div>
               )}
               <button
                 type="submit"
-                disabled={siBusy}
+                disabled={signInBusy}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors"
               >
-                {siBusy ? (
+                {signInBusy ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <LogIn className="h-3.5 w-3.5" />
@@ -245,57 +195,12 @@ export function ProfilePicker({
             </form>
           </div>
 
-          {/* ===== Admin sign in (username + email) ===== */}
-          <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Lock className="h-3.5 w-3.5 text-amber-500" />
-              <p className="text-xs font-extrabold text-slate-800">Admin sign in</p>
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white ml-auto">
-                <Crown className="h-2.5 w-2.5 text-amber-300" /> OWNER ONLY
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-3">
-              Enter your username and email to open the Admin Panel account.
-              Other students&apos; profiles stay private. (A password can also
-              be set — then sign in via the &quot;My account&quot; form above.)
-            </p>
-
-            <form onSubmit={handleLogin} className="space-y-2.5">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username (full name)"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                autoComplete="off"
-              />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                autoComplete="off"
-              />
-              {loginError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
-                  {loginError}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60 transition-colors"
-              >
-                {busy ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <LogIn className="h-3.5 w-3.5" />
-                )}
-                Sign in to Admin
-              </button>
-            </form>
-          </div>
+          <button
+            onClick={onAddNew}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> Create a new account
+          </button>
         </div>
       </div>
     </div>

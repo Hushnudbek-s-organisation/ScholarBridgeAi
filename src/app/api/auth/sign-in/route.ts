@@ -5,10 +5,10 @@ import { sql } from "drizzle-orm";
 import { sanitizeProfile, verifyPassword } from "@/lib/password";
 
 /**
- * Student sign-in: email + password (the pair created at sign up).
+ * Account sign-in: email + password (the pair created at sign up).
  * Works from ANY device/browser — the account lives in the database, not in
- * localStorage. Legacy accounts without a password (e.g. the owner's admin
- * account) get a clear hint to use the Admin sign-in instead.
+ * localStorage. This endpoint also authenticates admin profiles; admin status
+ * changes the access they receive after sign-in, not the authentication flow.
  */
 export async function POST(req: Request) {
   try {
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "This account has no password set yet. Open it once on this device (from “My accounts on this device”), then set a password in Edit Profile — or use Admin sign-in for the owner account.",
+            "This account has no password set yet. Set one in Edit Profile on a device where the account is available, or configure ADMIN_PASSWORD for the seeded admin account.",
         },
         { status: 403 }
       );

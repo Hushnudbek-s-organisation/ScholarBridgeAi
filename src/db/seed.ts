@@ -35,10 +35,10 @@ export async function seedDatabase() {
     // form always has a target. Credentials are configurable via env vars:
     //   ADMIN_NAME  (default "Hushnudbek")
     //   ADMIN_EMAIL (default "hushnudbek@gmail.com")
-    //   ADMIN_PASSWORD (optional, min 6 chars) — the admin's sign-in
-    //     password. When set AND the admin account has no password yet, the
-    //     seed applies it (stored as a scrypt hash). Once the owner changes
-    //     the password from Edit Profile, the seed never overwrites it.
+    //   ADMIN_PASSWORD (optional, min 6 chars) — bootstrap password for the
+    //     standard email+password sign-in. When set AND the admin account has
+    //     no password yet, the seed applies it (stored as a scrypt hash). Once
+    //     the owner changes it from Edit Profile, the seed never overwrites it.
     const adminName = process.env.ADMIN_NAME || "Hushnudbek";
     const adminEmail = (process.env.ADMIN_EMAIL || "hushnudbek@gmail.com").toLowerCase();
     const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();

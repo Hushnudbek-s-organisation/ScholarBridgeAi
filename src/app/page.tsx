@@ -35,7 +35,7 @@ export default function Home() {
   const [view, setView] = useState<"landing" | "wizard" | "app">("landing");
 
   // Profile management — the app works with ONE signed-in profile per browser.
-  // `profiles` is only used by the profile picker (admin sign-in etc.).
+  // `profiles` is used by the picker to show this device's saved accounts.
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<StudentProfile | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -225,7 +225,7 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [loadStoredProfile]);
 
-  /** Open the profile picker (admin sign-in, switching accounts). */
+  /** Open the profile picker for sign-in or switching accounts. */
   const openProfilePicker = useCallback(async () => {
     await loadAllProfiles();
     setIsPickerOpen(true);
@@ -233,6 +233,7 @@ export default function Home() {
 
   const handlePickProfile = (p: StudentProfile) => {
     setActiveProfile(p);
+    setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
     try {
       localStorage.setItem("scholarbridge_active_profile", String(p.id));
@@ -242,23 +243,7 @@ export default function Home() {
     hydrateProfileData(p.id);
     setIsPickerOpen(false);
     setView("app");
-    setActiveTab("dashboard");
-  };
-
-  /** Admin sign-in (username + email) — instantly opens the admin account. */
-  const handleAdminLogin = (p: StudentProfile) => {
-    setActiveProfile(p);
-    rememberProfile(p.id);
-    setProfiles((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
-    try {
-      localStorage.setItem("scholarbridge_active_profile", String(p.id));
-    } catch {
-      // ignore
-    }
-    hydrateProfileData(p.id);
-    setIsPickerOpen(false);
-    setView("app");
-    setActiveTab("admin");
+    setActiveTab(p.isAdmin ? "admin" : "dashboard");
   };
 
   const handleAddNewFromPicker = () => {
@@ -474,8 +459,8 @@ export default function Home() {
   // "Start for free" → step-by-step onboarding wizard.
   const startOnboarding = () => setView("wizard");
 
-  // Existing users (e.g. the admin) pick their profile from the sign-in
-  // window instead of being auto-dropped onto the first profile.
+  // Existing users, including admins, sign in from the shared account picker
+  // instead of being auto-dropped onto the first profile.
   const enterApp = () => {
     openProfilePicker();
   };
@@ -489,7 +474,6 @@ export default function Home() {
       onClose={() => setIsPickerOpen(false)}
       onSelect={handlePickProfile}
       onAddNew={handleAddNewFromPicker}
-      onAdminLogin={handleAdminLogin}
     />
   );
 
@@ -702,7 +686,7 @@ export default function Home() {
         onSave={handleSaveProfile}
       />
 
-      {/* Profile picker — only THIS device's accounts + admin sign-in */}
+      {/* Profile picker — this device's accounts plus email/password sign-in */}
       {profilePicker}
       </div>
     </LocaleProvider>

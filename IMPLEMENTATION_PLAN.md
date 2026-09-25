@@ -16,7 +16,7 @@ Qoida: mavjud arxitektura buzilmaydi, faqat kengaytiriladi
 | Backend | Next.js API route handler'lar (~45 ta endpoint) |
 | ORM | Drizzle ORM + node-postgres (drizzle-kit push, migratsiya fayllari yo'q) |
 | Baza | PostgreSQL (Supabase) — 29 ta jadval |
-| Auth | **HAQIQIY AUTH YO'Q** — demo profil switcher + admin-login (Hushnudbek username+email) |
+| Auth | Email + password verification via `/api/auth/sign-in`; active profile is stored client-side (no server session) |
 | AI | OpenRouter (yaqinda Gemini'dan ko'chirildi), bitta `callAI()` — src/lib/ai.ts |
 | To'lov | Payme + Click (demo darajasida), `PREMIUM_PRICE_UZS = 59000` qattiq kodlangan |
 | i18n | en/uz/ru (next-intl + custom provider + middleware) |
@@ -38,7 +38,7 @@ Qoida: mavjud arxitektura buzilmaydi, faqat kengaytiriladi
 
 ### 1.3 API endpoint'lar (45 ta)
 
-`admin/*` (5: universities, scholarships, courses, premium, profiles) · `ai/*` (4: chat, draft-sop, evaluate-profile, review-sop) · `auth/admin-login` · `payments/*` (5: initiate, click/prepare, click/complete, payme/webhook, route) · `premium/status` · `certificates/*` (2) · `courses/*` (4) · `forum/*` (8) · `gamification/*` (3) · `profiles/*` (2) · `quizzes/attempt` · `referral(s)` (2) · `saved-*` (2) · `scholarships`, `universities`, `tasks`, `health`
+`admin/*` (5: universities, scholarships, courses, premium, profiles) · `ai/*` (4: chat, draft-sop, evaluate-profile, review-sop) · `auth/sign-in` (email + password) · `payments/*` (5: initiate, click/prepare, click/complete, payme/webhook, route) · `premium/status` · `certificates/*` (2) · `courses/*` (4) · `forum/*` (8) · `gamification/*` (3) · `profiles/*` (2) · `quizzes/attempt` · `referral(s)` (2) · `saved-*` (2) · `scholarships`, `universities`, `tasks`, `health`
 
 ### 1.4 Komponentlar (30+)
 
