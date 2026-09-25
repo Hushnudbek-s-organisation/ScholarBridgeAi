@@ -8,6 +8,9 @@ import { UniversityExplorer } from "@/components/UniversityExplorer";
 import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
+import { ChancingPanel } from "@/components/ChancingPanel";
+import { CompleteProfileForm } from "@/components/CompleteProfileForm";
+import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -353,6 +356,16 @@ export default function Home() {
     }
   };
 
+  /**
+   * Complete-profile editor writes through PUT /api/profiles/:id itself (it owns
+   * the full field set), so here we only fold the returned row back into state —
+   * otherwise the chancing engine would keep scoring a stale profile.
+   */
+  const handleProfileUpdated = (updated: StudentProfile) => {
+    setProfiles((prev) => prev.map((profile) => (profile.id === updated.id ? updated : profile)));
+    setActiveProfile(updated);
+  };
+
   // University Handlers
   const handleSaveUniversity = async (universityId: number) => {
     if (!activeProfile) return;
@@ -640,6 +653,21 @@ export default function Home() {
             <TaskRoadmap activeProfile={activeProfile} />
           </PremiumGate>
         )}
+
+        {/* Complete Student Profile (#1) */}
+        {activeTab === "profile" && activeProfile && (
+          <CompleteProfileForm
+            key={`profile-${activeProfile.id}`}
+            activeProfile={activeProfile}
+            onSaved={handleProfileUpdated}
+          />
+        )}
+
+        {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
+        {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+
+        {/* Universal application tracker + outcomes flywheel (#12) */}
+        {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
 
         {activeTab === "deadlines" && (
           <PremiumGate

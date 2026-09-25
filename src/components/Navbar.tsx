@@ -5,6 +5,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { 
   GraduationCap, 
+  Target, 
   Search, 
   Award, 
   CheckSquare, 
@@ -58,6 +59,32 @@ export interface StudentProfile {
   // Onboarding wizard
   onboardingStep?: number | null;
   onboardingCompleted?: boolean | null;
+  // Complete profile (Academic / Personal / Financial / Activities / Goals)
+  actScore?: number | null;
+  duolingoScore?: number | null;
+  apCourses?: string | null;
+  ibCourses?: string | null;
+  aLevelSubjects?: string | null;
+  courseworkNotes?: string | null;
+  country?: string | null;
+  age?: number | null;
+  graduationYear?: number | null;
+  familyIncomeUsd?: number | null;
+  needsFinancialAid?: boolean | null;
+  requiresFullScholarship?: boolean | null;
+  leadership?: string | null;
+  volunteering?: string | null;
+  sports?: string | null;
+  clubs?: string | null;
+  researchExperience?: string | null;
+  projects?: string | null;
+  olympiads?: string | null;
+  awards?: string | null;
+  competitions?: string | null;
+  certificates?: string | null;
+  targetUniversities?: string | null;
+  careerGoal?: string | null;
+  dataShareConsent?: boolean | null;
 }
 
 interface NavbarProps {
@@ -90,7 +117,10 @@ export function Navbar({
     { id: "dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { id: "universities", label: t("universities"), icon: Search },
     { id: "scholarships", label: t("scholarships"), icon: Award },
-    { id: "tracker", label: t("tracker"), icon: GraduationCap },
+    { id: "profile", label: t("completeProfile"), icon: GraduationCap },
+    { id: "chancing", label: t("chances"), icon: Target },
+    { id: "applications", label: t("myApplications"), icon: CheckSquare },
+    { id: "tracker", label: t("tracker"), icon: GraduationCap, hidden: true },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
     { id: "deadlines", label: t("deadlines"), icon: CalendarClock, premium: true, hidden: true },
     { id: "sop", label: t("sop"), icon: FileText, premium: true },

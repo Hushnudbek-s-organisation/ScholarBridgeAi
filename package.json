@@ -11,8 +11,9 @@
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
     "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:groq": "tsx scripts/check-groq.ts",
-    "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
-    "test:security": "tsx scripts/check-security.ts"
+    "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
+    "test:security": "tsx scripts/check-security.ts",
+    "test:chancing": "tsx scripts/check-chancing.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

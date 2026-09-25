@@ -32,6 +32,42 @@ export const studentProfiles = pgTable("student_profiles", {
   // --- Referral-gifted premium (stackable 30-day grants) ---
   isPremium: boolean("is_premium").notNull().default(false),
   premiumUntil: timestamp("premium_until"),
+  // --- Complete profile (supabase/add_profile_chancing_applications.sql) ---
+  // Everything here is NULL until the student fills it in — the app must never
+  // invent academic data (spec §19).
+  // Academic
+  actScore: integer("act_score"),
+  duolingoScore: integer("duolingo_score"),
+  apCourses: text("ap_courses"), // JSON array
+  ibCourses: text("ib_courses"), // JSON array
+  aLevelSubjects: text("a_level_subjects"), // JSON array
+  courseworkNotes: text("coursework_notes"),
+  // Personal
+  country: text("country"),
+  age: integer("age"),
+  graduationYear: integer("graduation_year"),
+  // Financial
+  familyIncomeUsd: integer("family_income_usd"),
+  needsFinancialAid: boolean("needs_financial_aid"),
+  requiresFullScholarship: boolean("requires_full_scholarship"),
+  // Extracurriculars (structured JSON arrays)
+  leadership: text("leadership"),
+  volunteering: text("volunteering"),
+  sports: text("sports"),
+  clubs: text("clubs"),
+  researchExperience: text("research_experience"),
+  projects: text("projects"),
+  // Achievements
+  olympiads: text("olympiads"),
+  awards: text("awards"),
+  competitions: text("competitions"),
+  certificates: text("certificates"),
+  // Goals
+  targetUniversities: text("target_universities"),
+  careerGoal: text("career_goal"),
+  // Anonymous outcomes dataset consent
+  dataShareConsent: boolean("data_share_consent").notNull().default(false),
+  dataShareConsentAt: timestamp("data_share_consent_at"),
   // --- Onboarding wizard progress ---
   onboardingStep: integer("onboarding_step").notNull().default(0),
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
@@ -732,5 +768,100 @@ export const siteVisits = pgTable(
     index("site_visits_created_at_idx").on(table.createdAt),
     index("site_visits_visitor_id_idx").on(table.visitorId),
     index("site_visits_event_type_created_at_idx").on(table.eventType, table.createdAt),
+  ]
+);
+
+
+/**
+ * Universal application tracker (supabase/add_profile_chancing_applications.sql).
+ *
+ * One row per (student, university/program, round). Status walks the real
+ * application lifecycle so the roadmap, deadline calendar and analytics all
+ * read from the same source of truth.
+ */
+export const applications = pgTable(
+  "applications",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    universityId: integer("university_id").references(() => universities.id, { onDelete: "set null" }),
+    universityName: text("university_name").notNull().default(""),
+    programName: text("program_name"),
+    applicationRound: text("application_round"), // ED | EA | RD | Rolling | Winter | Summer
+    intakeTerm: text("intake_term"), // Fall 2027 | Spring 2027
+    deadline: date("deadline"),
+    status: text("status").notNull().default("not_started"),
+    submittedAt: timestamp("submitted_at"),
+    applicationFeePaid: boolean("application_fee_paid").notNull().default(false),
+    feeAmount: integer("fee_amount"),
+    portalUrl: text("portal_url"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_applications_profile").on(table.profileId),
+    index("idx_applications_university").on(table.universityId),
+    index("idx_applications_deadline").on(table.deadline),
+  ]
+);
+
+/**
+ * Application outcomes — ScholarBridge's OWN admissions dataset.
+ *
+ * Every result is stored, rejections included: a model trained only on
+ * acceptances learns "every strong student gets in". Rows with
+ * `shareConsent = true` may be used (anonymously) to improve the chancing
+ * engine; rows without consent are never used outside the owner's account.
+ */
+export const applicationOutcomes = pgTable(
+  "application_outcomes",
+  {
+    id: serial("id").primaryKey(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    universityId: integer("university_id").references(() => universities.id, { onDelete: "set null" }),
+    result: text("result").notNull(), // accepted | rejected | waitlisted | deferred | withdrawn
+    decidedAt: date("decided_at"),
+    scholarshipAmountUsd: integer("scholarship_amount_usd"),
+    scholarshipName: text("scholarship_name"),
+    notes: text("notes"),
+    // Profile snapshot at decision time — the training row for the model.
+    snapshotGpa: doublePrecision("snapshot_gpa"),
+    snapshotGpaScale: doublePrecision("snapshot_gpa_scale"),
+    snapshotIelts: doublePrecision("snapshot_ielts"),
+    snapshotToefl: integer("snapshot_toefl"),
+    snapshotSat: integer("snapshot_sat"),
+    snapshotAct: integer("snapshot_act"),
+    snapshotMajor: text("snapshot_major"),
+    snapshotCountry: text("snapshot_country"),
+    snapshotExtracurriculars: text("snapshot_extracurriculars"),
+    shareConsent: boolean("share_consent").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_outcomes_application").on(table.applicationId),
+    index("idx_outcomes_profile").on(table.profileId),
+    index("idx_outcomes_university_result").on(table.universityId, table.result),
+    index("idx_outcomes_consent").on(table.shareConsent),
+  ]
+);
+
+/** IELTS / SAT / TOEFL / Duolingo test dates for the unified calendar. */
+export const testBookings = pgTable(
+  "test_bookings",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    testType: text("test_type").notNull(), // ielts | toefl | sat | act | duolingo | gre
+    testDate: date("test_date").notNull(),
+    location: text("location"),
+    registered: boolean("registered").notNull().default(false),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_test_bookings_profile").on(table.profileId),
+    index("idx_test_bookings_date").on(table.testDate),
   ]
 );

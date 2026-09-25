@@ -39,6 +39,49 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+
+/**
+ * Field coercers for the "complete profile" inputs.
+ *
+ * `undefined` means "not sent" → the column is left untouched. An empty
+ * string/array means "cleared" → NULL. Values are never invented.
+ */
+function numField(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function boolField(value: unknown): boolean | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return Boolean(value);
+}
+
+function textField(value: unknown, max: number): string | null | undefined {
+  if (value === undefined) return undefined;
+  const text = clampString(value, max);
+  return text.length ? text : null;
+}
+
+/** Accept an array (or a JSON/comma string) and store it as a JSON array. */
+function jsonListField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const items = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  const clean = items
+    .map((item) => clampString(typeof item === "string" ? item : JSON.stringify(item), 300))
+    .filter(Boolean)
+    .slice(0, 60);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -125,6 +168,38 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         workExperienceYears: body.workExperienceYears !== undefined ? Number(body.workExperienceYears) : undefined,
         researchPublications: body.researchPublications !== undefined ? Number(body.researchPublications) : undefined,
         preferredLocale: body.preferredLocale !== undefined ? body.preferredLocale : undefined,
+        // --- Complete profile (Academic / Personal / Financial / Activities /
+        //     Achievements / Goals). Never invent values: absent fields stay
+        //     untouched, empty ones become NULL (spec §19).
+        actScore: numField(body.actScore),
+        duolingoScore: numField(body.duolingoScore),
+        apCourses: jsonListField(body.apCourses),
+        ibCourses: jsonListField(body.ibCourses),
+        aLevelSubjects: jsonListField(body.aLevelSubjects),
+        courseworkNotes: textField(body.courseworkNotes, 2000),
+        country: textField(body.country, 80),
+        age: numField(body.age),
+        graduationYear: numField(body.graduationYear),
+        familyIncomeUsd: numField(body.familyIncomeUsd),
+        needsFinancialAid: boolField(body.needsFinancialAid),
+        requiresFullScholarship: boolField(body.requiresFullScholarship),
+        leadership: jsonListField(body.leadership),
+        volunteering: jsonListField(body.volunteering),
+        sports: jsonListField(body.sports),
+        clubs: jsonListField(body.clubs),
+        researchExperience: jsonListField(body.researchExperience),
+        projects: jsonListField(body.projects),
+        olympiads: jsonListField(body.olympiads),
+        awards: jsonListField(body.awards),
+        competitions: jsonListField(body.competitions),
+        certificates: jsonListField(body.certificates),
+        targetUniversities: jsonListField(body.targetUniversities),
+        careerGoal: textField(body.careerGoal, 500),
+        // NOT NULL column — only ever true/false, never null.
+        dataShareConsent:
+          body.dataShareConsent === undefined ? undefined : Boolean(body.dataShareConsent),
+        dataShareConsentAt:
+          body.dataShareConsent === true && !body.dataShareConsentAt ? new Date() : undefined,
         // Onboarding wizard persistence (resume support)
         onboardingStep: body.onboardingStep !== undefined ? Number(body.onboardingStep) : undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
