@@ -22,7 +22,8 @@
     "test:cv": "tsx scripts/check-cv.ts",
     "test:compare": "tsx scripts/check-compare.ts",
     "test:mentors": "tsx scripts/check-mentors.ts",
-    "test:parent": "tsx scripts/check-parent.ts"
+    "test:parent": "tsx scripts/check-parent.ts",
+    "test:dataset": "tsx scripts/check-dataset.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

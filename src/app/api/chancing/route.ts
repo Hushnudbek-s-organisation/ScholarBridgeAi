@@ -16,8 +16,85 @@ import {
   type ChancingUniversity,
   type OutcomeSample,
 } from "@/lib/chancing";
+import { assessDataset, type DatasetCounts } from "@/lib/dataset";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Whole-corpus dataset readiness (strategy section).
+ *
+ * The chancing engine blends per-university outcomes, but the promise is to
+ * grow 1k -> 100k records before any ML model is trained. This reports where
+ * that corpus actually stands so the UI can stop short of claiming a model.
+ *
+ * Everything here is consented rows only.
+ */
+async function datasetReadiness() {
+  try {
+    const [byResult, breadth, students, fresh] = await Promise.all([
+      db
+        .select({
+          result: applicationOutcomes.result,
+          total: sql<number>`count(*)::int`,
+        })
+        .from(applicationOutcomes)
+        .where(eq(applicationOutcomes.shareConsent, true))
+        .groupBy(applicationOutcomes.result),
+      db
+        .select({
+          unis: sql<number>`count(distinct ${applicationOutcomes.universityId})::int`,
+          majors: sql<number>`count(distinct ${applicationOutcomes.snapshotMajor})::int`,
+          countries: sql<number>`count(distinct ${applicationOutcomes.snapshotCountry})::int`,
+        })
+        .from(applicationOutcomes)
+        .where(eq(applicationOutcomes.shareConsent, true)),
+      db
+        .select({ n: sql<number>`count(distinct ${applicationOutcomes.profileId})::int` })
+        .from(applicationOutcomes)
+        .where(eq(applicationOutcomes.shareConsent, true)),
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(applicationOutcomes)
+        .where(
+          and(
+            eq(applicationOutcomes.shareConsent, true),
+            sql`${applicationOutcomes.createdAt} >= now() - interval '5 years'`
+          )
+        ),
+    ]);
+
+    const tally: Record<string, number> = {};
+    let consented = 0;
+    for (const row of byResult) {
+      const v = Number(row.total) || 0;
+      tally[row.result] = v;
+      consented += v;
+    }
+    const recent = Number(fresh[0]?.n) || 0;
+
+    const counts: DatasetCounts = {
+      totalOutcomes: consented,
+      consentedOutcomes: consented,
+      withoutConsent: 0,
+      accepted: tally.accepted ?? 0,
+      rejected: tally.rejected ?? 0,
+      waitlisted: tally.waitlisted ?? 0,
+      deferred: tally.deferred ?? 0,
+      withdrawn: tally.withdrawn ?? 0,
+      distinctUniversities: Number(breadth[0]?.unis) || 0,
+      distinctMajors: Number(breadth[0]?.majors) || 0,
+      distinctCountries: Number(breadth[0]?.countries) || 0,
+      distinctStudents: Number(students[0]?.n) || 0,
+      freshShare: consented > 0 ? recent / consented : 0,
+    };
+
+    return assessDataset(counts);
+  } catch (error) {
+    // A readiness read must never break the estimate itself.
+    console.error("datasetReadiness error:", error);
+    return null;
+  }
+}
 
 /** Map a student_profiles row onto the chancing input shape. */
 function toChancingProfile(row: typeof studentProfiles.$inferSelect): ChancingProfile {
@@ -216,7 +293,9 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ results });
+    const dataset = await datasetReadiness();
+
+    return NextResponse.json({ results, dataset });
   } catch (error) {
     console.error("GET /api/chancing error:", error);
     return NextResponse.json({ error: "Failed to estimate admission chances" }, { status: 500 });
