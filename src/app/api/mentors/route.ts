@@ -27,7 +27,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
-    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+    // Select only the five columns the match needs. A bare `.select()` loads
+    // the whole row — including password_hash — into memory for nothing.
+    const [profile] = await db
+      .select({
+        country: studentProfiles.country,
+        targetMajor: studentProfiles.targetMajor,
+        degreeLevel: studentProfiles.degreeLevel,
+        needsFinancialAid: studentProfiles.needsFinancialAid,
+        preferredLocale: studentProfiles.preferredLocale,
+      })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, profileId));
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }

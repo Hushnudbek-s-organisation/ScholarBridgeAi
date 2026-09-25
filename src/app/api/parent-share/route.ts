@@ -74,21 +74,33 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "This link is not valid." }, { status: 400 });
     }
 
-    const rows = await db
-      .select()
+    // Select ONLY the two columns the token scan needs. A bare `.select()`
+    // would pull every sharing-enabled profile's full row — including
+    // password_hash — into memory on every single lookup.
+    const candidates = await db
+      .select({ id: studentProfiles.id, token: studentProfiles.parentShareToken })
       .from(studentProfiles)
       .where(and(eq(studentProfiles.parentShareEnabled, true), isNotNull(studentProfiles.parentShareToken)));
 
     // Constant-time comparison: never let response timing narrow the search.
     const wanted = Buffer.from(token, "utf8");
-    let profile: (typeof rows)[number] | undefined;
-    for (const row of rows) {
-      const candidate = Buffer.from(String(row.parentShareToken), "utf8");
+    let matchedId: number | null = null;
+    for (const row of candidates) {
+      const candidate = Buffer.from(String(row.token), "utf8");
       if (candidate.length === wanted.length && timingSafeEqual(candidate, wanted)) {
-        profile = row;
+        matchedId = row.id;
         break;
       }
     }
+    if (matchedId === null) {
+      return NextResponse.json({ error: "This link is not valid or has been revoked." }, { status: 404 });
+    }
+
+    // Now fetch one row — the matched profile — rather than all of them.
+    const [profile] = await db
+      .select()
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, matchedId));
     if (!profile) {
       return NextResponse.json({ error: "This link is not valid or has been revoked." }, { status: 404 });
     }
