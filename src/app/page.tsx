@@ -504,6 +504,21 @@ export default function Home() {
     }
   };
 
+  /**
+   * Deep links that used to open the full-page "My Profile" section now open
+   * the Edit Profile modal instead — every field from My Profile lives there
+   * now (the My Profile sidebar entry was removed). All other targets navigate
+   * as before.
+   */
+  const handleNavigateTab = (tab: string) => {
+    if (tab === "profile") {
+      setIsNewProfile(false);
+      setIsProfileModalOpen(true);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   // ---- Landing / onboarding flow ----
   const handleWizardCreated = (created: StudentProfile) => {
     setProfiles((prev) => [created, ...prev]);
@@ -614,10 +629,10 @@ export default function Home() {
         ) : activeTab === "dashboard" && (
           <div className="space-y-4">
             {/* #4 Personalized Roadmap — the centrepiece: three actions */}
-            <NextActionsPanel activeProfile={activeProfile} onNavigate={setActiveTab} />
+            <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
             <DashboardView
               profile={activeProfile}
-              onNavigateTab={setActiveTab}
+              onNavigateTab={handleNavigateTab}
               savedUniCount={savedUniversities.length}
               savedScholarshipCount={savedScholarships.length}
               savedProgramCount={savedProgramCount}

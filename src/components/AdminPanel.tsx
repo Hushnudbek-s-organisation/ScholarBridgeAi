@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
@@ -17,6 +17,7 @@ import { VerificationManager } from "./admin/VerificationManager";
 import { ConsultingManager } from "./admin/ConsultingManager";
 import { AnalyticsDashboard } from "./admin/AnalyticsDashboard";
 import { ReportsManager } from "./admin/ReportsManager";
+import { NavManager } from "./admin/NavManager";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 /**
@@ -40,7 +41,7 @@ interface AdminPanelProps {
   activeProfile: StudentProfile | null;
 }
 
-type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "opportunities" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research";
+type AdminTab = "analytics" | "universities" | "courses" | "scholarships" | "opportunities" | "premium" | "audit" | "refresh" | "config" | "ai" | "verify" | "consulting" | "reports" | "research" | "navigation";
 
 export function AdminPanel({ activeProfile }: AdminPanelProps) {
   // Analytics first: the owner opens the panel to see how the platform is doing.
@@ -64,6 +65,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
     { id: "research", label: "Research Agent", icon: <Bot className="h-4 w-4" /> },
     { id: "ai", label: "AI Settings", icon: <KeyRound className="h-4 w-4" /> },
     { id: "refresh", label: "Data Refresh", icon: <RefreshCw className="h-4 w-4" /> },
+    { id: "navigation", label: "Navigation", icon: <Menu className="h-4 w-4" /> },
     { id: "config", label: "Settings", icon: <Settings2 className="h-4 w-4" /> },
   ];
 
@@ -121,6 +123,9 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       )}
       {tab === "refresh" && (
         <ErrorBoundary><RefreshCenter adminProfileId={activeProfile.id} /></ErrorBoundary>
+      )}
+      {tab === "navigation" && (
+        <ErrorBoundary><NavManager adminProfileId={activeProfile.id} /></ErrorBoundary>
       )}
       {tab === "config" && (
         <ErrorBoundary><ConfigManager adminProfileId={activeProfile.id} /></ErrorBoundary>
