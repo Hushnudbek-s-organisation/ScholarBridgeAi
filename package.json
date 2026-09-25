@@ -13,7 +13,8 @@
     "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
     "test:security": "tsx scripts/check-security.ts",
-    "test:chancing": "tsx scripts/check-chancing.ts"
+    "test:chancing": "tsx scripts/check-chancing.ts",
+    "test:roadmap": "tsx scripts/check-roadmap.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

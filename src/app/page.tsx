@@ -11,6 +11,8 @@ import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ChancingPanel } from "@/components/ChancingPanel";
 import { CompleteProfileForm } from "@/components/CompleteProfileForm";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
+import { NextActionsPanel } from "@/components/NextActionsPanel";
+import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -589,17 +591,21 @@ export default function Home() {
             onComplete={handleWizardComplete}
           />
         ) : activeTab === "dashboard" && (
-          <DashboardView
-            profile={activeProfile}
-            onNavigateTab={setActiveTab}
-            savedUniCount={savedUniversities.length}
-            savedScholarshipCount={savedScholarships.length}
-            taskCount={taskCount}
-            onEditProfile={() => {
-              setIsNewProfile(false);
-              setIsProfileModalOpen(true);
-            }}
-          />
+          <div className="space-y-4">
+            {/* #4 Personalized Roadmap — the centrepiece: three actions */}
+            <NextActionsPanel activeProfile={activeProfile} onNavigate={setActiveTab} />
+            <DashboardView
+              profile={activeProfile}
+              onNavigateTab={setActiveTab}
+              savedUniCount={savedUniversities.length}
+              savedScholarshipCount={savedScholarships.length}
+              taskCount={taskCount}
+              onEditProfile={() => {
+                setIsNewProfile(false);
+                setIsProfileModalOpen(true);
+              }}
+            />
+          </div>
         )}
 
         {activeTab === "universities" && (
@@ -665,6 +671,9 @@ export default function Home() {
 
         {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
         {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+
+        {/* #3 AI Admissions Advisor */}
+        {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
 
         {/* Universal application tracker + outcomes flywheel (#12) */}
         {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}

@@ -119,6 +119,7 @@ export function Navbar({
     { id: "scholarships", label: t("scholarships"), icon: Award },
     { id: "profile", label: t("completeProfile"), icon: GraduationCap },
     { id: "chancing", label: t("chances"), icon: Target },
+    { id: "advisor", label: t("advisor"), icon: Bot },
     { id: "applications", label: t("myApplications"), icon: CheckSquare },
     { id: "tracker", label: t("tracker"), icon: GraduationCap, hidden: true },
     // Hidden until ready: code kept, UI hidden (feature not yet live).
