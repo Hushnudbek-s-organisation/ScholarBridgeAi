@@ -1,6 +1,6 @@
 # ScholarBridge AI — To'liq hisobot
 
-Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 20 commit · 176 fayl · +24 324 / −1 307 qator
+Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 22 commit · 182 fayl · +25 480 / −1 318 qator
 
 ---
 
@@ -9,13 +9,13 @@ Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 20 commit · 176 
 | Ko'rsatkich | Son |
 |---|---|
 | Mantiq kutubxonalari (`src/lib/*.ts`) | 46 |
-| API route'lar | 87 |
-| Ma'lumotlar bazasi jadvallari | 56 |
+| API route'lar | 89 |
+| Ma'lumotlar bazasi jadvallari | 57 |
 | UI komponentlar | 62 |
 | Test skriptlar (`scripts/check-*`) | 23 |
 | Foydalanuvchi tab'lari | 26 |
-| Unit assertion'lar | 623 (+ 52 security) |
-| Integratsion assertion'lar | 115 (haqiqiy PostgreSQL) |
+| Unit assertion'lar | 758 (+ 52 security) |
+| Integratsion assertion'lar | 136 (haqiqiy PostgreSQL) |
 
 ---
 
@@ -94,6 +94,8 @@ Deterministik qism — `src/lib/nextActions.ts` va `src/lib/advisor.ts` — `tes
 - o'ylab topilgan raqamlar rad etiladi
 - qoidaga asoslangan maslahat mustaqil turadi
 
+UI (`TaskRoadmap.tsx`) shuningdek **oylik reja** ko'rinishini beradi: bir xil vazifalar due-date oyiga guruhlantiriladi (Sentyabr → Oktabr → Noyabr), har oyda ✓/□ belgilari va `x/y` hisobi, tepada esa `Progress: x of y — %` progress bar'ı.
+
 ### 2.6 Deadline kalendari
 
 Barcha sanalar bir joyda: universitet, grant, IELTS, SAT, ariza, tavsiyanoma, moliya.
@@ -110,6 +112,8 @@ Holatlar: `not_started → in_progress → submitted → accepted/rejected/waitl
 `snapshotGpa`, `snapshotGpaScale`, `snapshotIelts`, `snapshotToefl`, `snapshotSat`, `snapshotAct`, `snapshotMajor`, `snapshotCountry`, `snapshotExtracurriculars`.
 
 Schema sharhi sababni yozadi: *"faqat qabullarga o'rgatilgan model 'har bir kuchli talaba qabul qilinadi'ni o'rganadi."* Shuning uchun **rad etishlar ham saqlanadi**.
+
+**Application analytics** (spec §33): panel tepasida 7 ta jonli statistika — Applied, Submitted, In progress, Decisions, Accepted, Scholarship matches, Deadlines ≤45d. Barchasi API'dan olinadi (`/api/applications`, `/api/deadlines`, `/api/scholarships`); javob kelmaguncha "—" ko'rsatiladi, raqam ixtiro qilinmaydi.
 
 ### 2.8 Hujjat tekshiruvchi
 
@@ -155,6 +159,8 @@ Blokerlar:
 6 ta mezon + `total`. Xavf kodlari: `immigrant_intent`, `weak_purpose`, `funding_not_stated`, `no_home_ties`, `hedging`, `no_answers`.
 
 `visaChanceDisclaimer(n)` har doim `n%` **va** "opinion"/"not a prediction" so'zlarini o'z ichiga oladi. `visaChanceDisclaimer(null)` esa "No probability is shown" deydi.
+
+**Amaliyot tarixi** (spec §13): kirgan talaba har bir `POST /api/visa/analyze` da deterministik rubrikani saqlaydi (`ai_evaluations`, `evaluationType: "Visa Practice"`); `GET /api/visa/history` eng so'nggi 20 sessiyani qaytaradi. Natija ekrani "Practice history" kartasida Session 1 61% → 2 72% → 3 82% tendensiyasini ko'rsatadi (har sessiyada +Δ ball). Anonim ishlatishda hech narsa saqlanmaydi.
 
 ### 2.11 O'xshash profillar
 
@@ -210,7 +216,12 @@ Har bir qator g'olibni **va negaligini** aytadi. Yoki g'olib yo'qligini:
 - hech narsa e'lon qilinmagan → qator butunlay tushirib qoldiriladi
 - bo'sh katak `null` (0 emas), UI "not published" ko'rsatadi
 
-6 ta universitetgacha. `gpaFit` va `budgetFit` talabaning o'z raqamlarini tekshiradi.
+6 ta universitetgacha. `gpaFit`, `ieltsFit` va `budgetFit` talabaning o'z raqamlarini tekshiradi.
+
+**Yangi qatorlar** (spec §23 nozikliklari):
+- `ieltsFit` — "Your IELTS vs minimum" (`Meets it (+0.5)` / `Below by 0.5`), eng katta margin g'olib.
+- `scholarships` — "Scholarships in country" (mamlakatdagi ochiq grantlar soni, haqiqiy `count(*)`).
+- Shaxsiylashtirilgan sarlavha qatorlari — `/api/planning` ularni `extraRows` orqali birinchi joyga qo'yadi: **Your profile match** (`matchScore`%) va **Admission estimate** (`low–high%` band). Bu ikki raqam **ajratib turiladi** — match qabul ehtimoli emas.
 
 Bir xil universitetlar → "The published data does not separate these universities."
 
@@ -368,6 +379,28 @@ Tugma "Log in" emas — **Sign in** (profil tanlovini ochadi); "Get started"
 onboarding'ni boshlaydi; footer /privacy va /terms ga olib boradi.
 To'liq lokalizatsiya: `landing` namespace 3 til × 93 kalit.
 
+### 2.26 Aqlli bildirishnomalar (spec §25)
+
+**Fayl:** `src/app/api/notifications/sweep/route.ts`
+
+Sweep endi 5 xil tur yaratadi (barchasi idempotent — `(type, profile_id, link)` bo'yicha):
+
+| Tur | Qachon |
+|---|---|
+| `deadline_approaching` | saqlangan grantning muddati ≤N kunda |
+| `milestone_due` | vazifa muddati ≤N kunda |
+| `scholarship_opened` | saqlangan universitet mamlakati bo'yicha profilga mos (≥60%) va hali saqlanmagan yangi grant (bir sweep'da ≤3 ta) |
+| `requirement_gap` | saqlangan universitetlar IELTS talabini profildagi IELTS qoplamasa (yoki IELTS umuman yo'q) |
+| `essay_improved` | so'nggi insho versiyasi oldingisidan ≥5 ball yuqori |
+
+Yangi turlar `notification_preferences` default'lari hamda 4-qi SQL migratsiyasiga qo'shildi.
+
+### 2.27 Dasturlar shortlist'i (spec §24)
+
+**Jadval:** `saved_programs` (profile ↔ program, `UNIQUE (profile_id, program_id)`)
+
+`UniversityDetail`'da har bir program kartasida save/unsave tugmasi; `/api/saved-programs` (GET/POST/DELETE) IDOR himoyasida — begona cookie 403, phantom program id 404. Dashboard shortlist kartasi universitetlar soni yonida "· N dastur" ko'rsatadi.
+
 ---
 
 ## 3. Ma'lumotlar bazasi
@@ -432,7 +465,7 @@ Loyiha qoidasiga ko'ra `drizzle-kit push` **hech qachon** avtomatik ishga tushir
 | `supabase/add_profile_chancing_applications.sql` | 135 | profil, chancing, applications, outcomes |
 | `supabase/add_documents_essays.sql` | 43 | documents ustunlari + `essay_versions` |
 | `supabase/add_mentors_parent.sql` | 66 | `mentors`, `mentor_requests`, 4 ta `parent_share_*` |
-| `supabase/add_opportunities_essay_reviews.sql` | 82 | `essay_versions.open_for_review`, `essay_reviews`, `opportunities` + 11 ta haqiqiy starter dastur |
+| `supabase/add_opportunities_essay_reviews.sql` | 100 | `essay_versions.open_for_review`, `essay_reviews`, `opportunities` + 11 ta haqiqiy starter dastur + **`saved_programs`** + `notification_preferences` default'lari kengaytmasi |
 
 Uchalasi ham faqat `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` — mavjud ma'lumot o'chmaydi.
 
@@ -450,7 +483,7 @@ npm run test:essays      # 36
 npm run test:visa        # 50
 npm run test:costs       # 44
 npm run test:cv          # 44
-npm run test:compare     # 32
+npm run test:compare     # 43
 npm run test:mentors     # 37
 npm run test:parent      # 41
 npm run test:dataset     # 50
@@ -462,7 +495,7 @@ npm run test:opportunities    # 14
 npm run test:essay-reviews    # 16
 ```
 
-Jami: **623 passed, 0 failed.**
+Jami: **758 passed, 0 failed.**
 
 **Xavfsizlik va statik tekshiruvlar:**
 
@@ -477,7 +510,7 @@ DATABASE_URL="postgresql://user:pass@127.0.0.1:5432/db" npm run build
 
 ```bash
 npm install --no-save embedded-postgres   # bir marta
-npm run test:integration                  # 115 passed, 0 failed
+npm run test:integration                  # 136 passed, 0 failed
 ```
 
 Bu `embedded-postgres` bilan jarayon ichida haqiqiy Postgres serverini ishga
@@ -496,8 +529,11 @@ Uch yo'nalishni qoplaydi:
 | `/api/opportunities` (7 assert) | Katalog ochiq, lekin ball faqat sessiyaning o'z profile'iga hisoblanadi; anonim `match: null`; type filter; mismatch flag'lanadi, yashirin qilinmaydi |
 | `/api/countries/compare` (8 assert) | O'rtachalar faqat nashr qilingan qiymatlardan; work rights hech qachon ixtiro qilinmaydi; noma'lum mamlakat → null, NaN yo'q |
 | `/api/essays/reviews` (13 assert) | Ochiq inshoga boshqa talaba sharh qo'yadi; yopiq → 403; muallif o'z inshosini → 403; anonim → 401; o'rtachalar muallifda; sharhlovchi anonim; toggle'da IDOR 404; yopgach sharhlar yana rad etiladi |
+| `/api/saved-programs` (9 assert) | Egasi saqlaydi; takror POST idempotent; phantom program 404; boshqa profil bo'sh ko'radi; begona DELETE 403; egasi o'chiradi |
+| `/api/visa/history` + analyze (7 assert) | Seed sessiya qaytadi; begona 403; profileId bilan analyze ikkinchi sessiyani qo'shadi (eng eski birinchi); anonim analyze javob beradi lekin saqlamaydi |
+| `/api/notifications/sweep` (5 assert) | Aqlli turlar yaratiladi; `requirement_gap` 8.0-IELTS universitetni belgilaydi; `scholarship_opened` grantni nomlaydi; `essay_improved` +15 ballni aytadi; ikkinchi sweep hech narsa yaratmaydi |
 
-**Umumiy jami: 623 + 52 + 115 = 790 assertion, 0 failed.**
+**Umumiy jami: 758 + 52 + 136 = 946 assertion, 0 failed.**
 
 > **Tuzatilgan da'vo.** Bu hisobotning avvalgi versiyasida "sandbox'da
 > Postgres yo'q, shuning uchun DB bilan ishlaydigan route'lar bu yerda ishga
