@@ -15,6 +15,8 @@
     "similarProfiles": "O'xshash talabalar",
     "planning": "Rejalashtirish",
     "mentors": "Mentorlar",
+    "opportunities": "Imkoniyatlar",
+    "compare": "Mamlakatlar",
     "parent": "Ota-onalar",
     "myApplications": "Arizalarim",
     "sop": "AI SOP va insholar",
@@ -411,5 +413,37 @@
     "generate": "Brif yasash",
     "copy": "Hammasini nusxalash",
     "copied": "Nusxalandi"
+  },
+  "countryCompare": {
+    "title": "Mamlakatlar taqqoslash",
+    "subtitle": "Yo'nalish mamlakatlari faqat ma'lumotbazamizda mavjud ma'lumotlar (universitetlar va grantlar) bo'yicha taqqoslanadi — hech narsa xotiradan to'ldirilmaydi.",
+    "country": "Mamlakat",
+    "universities": "Universitetlar",
+    "avgTuition": "O'rtacha tuish haqi / yil",
+    "avgLiving": "O'rtacha yashash / yil",
+    "avgIelts": "O'rtacha min. IELTS",
+    "scholarships": "Grantlar",
+    "potentialFunding": "Potensial mablag'",
+    "workRights": "Ish qilish huquqlari",
+    "notPublished": "ma'lumotbazada nashr etilmagan",
+    "publishedNote": "Qavs ichidagi son = o'rtacha hisobga qancha nashr etilgan qiymat kiritilgan. Nashr etilmagan qiymatlar hech qachon nol deb hisoblanmaydi.",
+    "compare": "Taqqoslash",
+    "noResults": "Tanlangan mamlakatlar uchun ma'lumot yo'q — yuqoridagi ro'yxatdan tanlang."
+  },
+  "opportunities": {
+    "title": "Siz uchun imkoniyatlar",
+    "subtitle": "Tanlangan tanlovlar, tadqiqot dasturlari, internshiplar va yozgi maktablar — profilga moslab hisoblangan.",
+    "competition": "Tanlovlar",
+    "research": "Tadqiqot",
+    "internship": "Internshiplar",
+    "summerSchool": "Yozgi maktablar",
+    "scoredFor": "profilga mos:",
+    "verified": "tasdiqlangan",
+    "view": "Rasmiy sayt",
+    "fields": "Sohalar",
+    "deadline": "Muddat",
+    "recurring": "Takrorlanuvchi dastur — shu yilgi muddatni rasmiy sahifada ko'ring",
+    "noResults": "Bu toifada hali imkoniyat yo'q.",
+    "loading": "Imkoniyatlar yuklanmoqda…"
   }
 }

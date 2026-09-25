@@ -180,3 +180,48 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Failed to delete essay" }, { status: 500 });
   }
 }
+
+/**
+ * #24 — Peer review toggle.
+ *
+ * PATCH /api/essays { id, openForReview: boolean }
+ *
+ * Only the author can open (or close) their own version for peer review.
+ * This is deliberately separate from the stateless PUT scorer above — a
+ * review flag is persisted state, not a computation.
+ */
+export async function PATCH(req: Request) {
+  try {
+    const access = await requireProfileAccess(req, undefined);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    }
+    const me = access.session.profile.id;
+    const parsed = await readJsonBody<Record<string, unknown>>(req);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const id = Number(parsed.body.id);
+    if (!id) {
+      return NextResponse.json({ error: "essay id is required" }, { status: 400 });
+    }
+    const open = parsed.body.openForReview === true;
+
+    const rows = await db
+      .select()
+      .from(essayVersions)
+      .where(and(eq(essayVersions.id, id), eq(essayVersions.profileId, me)))
+      .limit(1);
+    if (!rows.length) {
+      return NextResponse.json({ error: "Essay not found" }, { status: 404 });
+    }
+    await db
+      .update(essayVersions)
+      .set({ openForReview: open })
+      .where(eq(essayVersions.id, id));
+    return NextResponse.json({ id, openForReview: open });
+  } catch (error) {
+    console.error("PATCH /api/essays error:", error);
+    return NextResponse.json({ error: "Failed to update essay" }, { status: 500 });
+  }
+}

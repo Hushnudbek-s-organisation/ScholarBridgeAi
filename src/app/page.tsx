@@ -15,6 +15,8 @@ import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { NextActionsPanel } from "@/components/NextActionsPanel";
 import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
 import { EssayRubricStudio } from "@/components/EssayRubricStudio";
+import { CountryComparePanel } from "@/components/CountryComparePanel";
+import { OpportunitiesPanel } from "@/components/OpportunitiesPanel";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
 import { PlanningStudio } from "@/components/PlanningStudio";
 import { MentorMarketplace } from "@/components/MentorMarketplace";
@@ -694,6 +696,12 @@ export default function Home() {
         {/* Phase 4 — mentor marketplace + parent dashboard */}
         {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
         {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
+
+        {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
+        {activeTab === "opportunities" && <OpportunitiesPanel />}
+
+        {/* #29 — country comparison on published data only */}
+        {activeTab === "compare" && <CountryComparePanel />}
 
         {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
         {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}

@@ -15,6 +15,8 @@
     "similarProfiles": "Students Like Me",
     "planning": "Planning",
     "mentors": "Mentors",
+    "opportunities": "Opportunities",
+    "compare": "Country Compare",
     "parent": "Parents",
     "myApplications": "Applications",
     "sop": "AI SOP & Essays",
@@ -411,5 +413,37 @@
     "generate": "Build brief",
     "copy": "Copy all",
     "copied": "Copied"
+  },
+  "countryCompare": {
+    "title": "Country Comparison",
+    "subtitle": "Destination countries compared on data we actually have in the database — universities and scholarships. Nothing is filled in from memory.",
+    "country": "Country",
+    "universities": "Universities",
+    "avgTuition": "Avg. tuition / year",
+    "avgLiving": "Avg. living / year",
+    "avgIelts": "Avg. min. IELTS",
+    "scholarships": "Scholarships",
+    "potentialFunding": "Potential funding",
+    "workRights": "Work rights",
+    "notPublished": "not published in the database",
+    "publishedNote": "The number in parentheses = how many published values were used for the average. Unpublished values are never counted as zero.",
+    "compare": "Compare",
+    "noResults": "No data for the selected countries — pick from the list above."
+  },
+  "opportunities": {
+    "title": "Opportunities for You",
+    "subtitle": "Curated competitions, research programs, internships and summer schools — matched to your profile.",
+    "competition": "Competitions",
+    "research": "Research",
+    "internship": "Internships",
+    "summerSchool": "Summer schools",
+    "scoredFor": "scored for",
+    "verified": "verified",
+    "view": "Official site",
+    "fields": "Fields",
+    "deadline": "Deadline",
+    "recurring": "Recurring program — check the official page for this year's date",
+    "noResults": "No opportunities in this category yet.",
+    "loading": "Loading opportunities…"
   }
 }

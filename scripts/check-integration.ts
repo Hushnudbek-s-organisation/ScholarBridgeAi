@@ -803,6 +803,179 @@ async function main() {
   );
 
   // -----------------------------------------------------------------------
+  // 8. #26/#27/#28 opportunities + #29 country comparison + #24 peer review
+  //    on real rows. The schema above already contains the new tables
+  //    (drizzle-kit push runs at the top of this file).
+  section("8a. /api/opportunities — curated feed, scored per session");
+
+  await db.insert(schema.opportunities).values([
+    {
+      type: "competition",
+      title: "International Collegiate Programming Contest",
+      provider: "ICPC Foundation",
+      country: null,
+      fields: '["Computer Science", "Mathematics"]',
+      level: "undergrad",
+      deadlineDate: null,
+      url: "https://icpc.global",
+      description: "Team programming contest, 100+ countries.",
+      isVerified: true,
+    },
+    {
+      type: "internship",
+      title: "Germany Biotech Internship",
+      provider: "Example Biotech",
+      country: "Germany",
+      fields: '["Biology"]',
+      level: "grad",
+      deadlineDate: "2026-12-15",
+      url: "https://example.com",
+      description: "Summer biotech internship.",
+      isVerified: false,
+    },
+  ]);
+
+  const { GET: oppGet } = await import("../src/app/api/opportunities/route");
+  const opp = await call(oppGet as any, "/api/opportunities");
+  check("responds 200", opp.status === 200, `got ${opp.status} ${JSON.stringify(opp.body)?.slice(0, 200)}`);
+  check("counts by type are right", opp.body?.counts?.competition === 1 && opp.body?.counts?.internship === 1, JSON.stringify(opp.body?.counts));
+  check("the signed-in profile gets a numeric match", Array.isArray(opp.body?.items) && opp.body.items.every((o: any) => typeof o.match === "number" && o.match >= 0 && o.match <= 100));
+  check("scored for the profile's major", opp.body?.scoredFor === "Computer Science", `got ${opp.body?.scoredFor}`);
+  const icpcRow = opp.body?.items?.find((o: any) => o.title.startsWith("International"));
+  check("CS undergrad scores high on the CS contest", icpcRow && icpcRow.match >= 70, `got ${icpcRow?.match}`);
+  const biotechRow = opp.body?.items?.find((o: any) => o.title.startsWith("Germany"));
+  check("level/field mismatch is flagged, not hidden", biotechRow && biotechRow.flags.length >= 1 && biotechRow.match < icpcRow.match, `flags=${JSON.stringify(biotechRow?.flags)}`);
+
+  const oppAnon = await (async () => {
+    const res = await (oppGet as any)(new Request("http://localhost/api/opportunities"));
+    return { status: res.status, body: await res.json().catch(() => null) };
+  })();
+  check("anonymous still gets the catalog, unscored", oppAnon.status === 200 && oppAnon.body?.items?.every((o: any) => o.match === null) && oppAnon.body?.scoredFor === null);
+
+  const oppFiltered = await call(oppGet as any, "/api/opportunities?type=internship");
+  check("type filter works", oppFiltered.status === 200 && oppFiltered.body?.count === 1 && oppFiltered.body.items[0].type === "internship");
+
+  // -----------------------------------------------------------------------
+  section("8b. /api/countries/compare — published data only, work rights null");
+
+  const { GET: compareGet } = await import("../src/app/api/countries/compare/route");
+  const cmp = await call(compareGet as any, "/api/countries/compare?countries=Germany");
+  check("responds 200", cmp.status === 200, `got ${cmp.status}`);
+  const de = cmp.body?.countries?.[0];
+  check("Germany row found", de?.country === "Germany");
+  check("university count = the two seeded rows", de?.universities === 2, `got ${de?.universities}`);
+  check("tuition average from published values", de?.tuition?.avgUsd === 1500 && de?.tuition?.published === 2, JSON.stringify(de?.tuition));
+  check("scholarship total from the seeded row", de?.scholarships?.totalUsd === 9000 && de?.scholarships?.count === 1, JSON.stringify(de?.scholarships));
+  check("work rights are NEVER invented", de?.workRights === null);
+
+  const cmpAnon = await (async () => {
+    const res = await (compareGet as any)(new Request("http://localhost/api/countries/compare"));
+    return { status: res.status, body: await res.json().catch(() => null) };
+  })();
+  check("default = top countries, public like the catalog", cmpAnon.status === 200 && cmpAnon.body?.countries?.some((c: any) => c.country === "Germany"));
+
+  const cmpUnknown = await call(compareGet as any, "/api/countries/compare?countries=Atlantis");
+  const atl = cmpUnknown.body?.countries?.[0];
+  check("unknown country → zeros and nulls, no NaN", atl?.universities === 0 && atl?.tuition?.avgUsd === null && !JSON.stringify(atl).includes("NaN"));
+
+  // -----------------------------------------------------------------------
+  section("8c. /api/essays/reviews — peer review, author≠reviewer, anonymized");
+
+  const { POST: essayPost, PATCH: essayPatch } = await import("../src/app/api/essays/route");
+  const { GET: reviewsGet, POST: reviewsPost } = await import("../src/app/api/essays/reviews/route");
+
+  const essayContent = "I have always believed that engineering is a way to give back. In my hometown, my father taught me to fix radios with whatever was on hand, and that habit of turning a broken thing into a working one followed me into programming. When I led our school's first robotics team, we did not have a budget, so we printed our own brackets and wrote our own controllers. The lesson I carry is not that we won — we came second — but that constraints are where engineers are made.";
+  const [openEssay] = await db
+    .insert(schema.essayVersions)
+    .values({ profileId: profile.id, title: "My SOP", content: essayContent, openForReview: true })
+    .returning();
+  const [closedEssay] = await db
+    .insert(schema.essayVersions)
+    .values({ profileId: profile.id, title: "Closed draft", content: "A closed draft nobody may review yet." })
+    .returning();
+
+  const bekzodToken = signSessionToken({ id: other.id, passwordHash: other.passwordHash });
+  const asBekzod = async (path: string, init: RequestInit = {}) => {
+    const req = new Request(`http://localhost${path}`, { ...init, headers: { cookie: `sb_session=${bekzodToken}` } });
+    const res = await (reviewsPost as any)(req);
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+
+  const reviewOk = await asBekzod("/api/essays/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      essayVersionId: openEssay.id,
+      hook: 80,
+      structure: 74,
+      specificity: 82,
+      language: 78,
+      fit: 76,
+      total: 78,
+      comment: "Strong opening image; tighten the second paragraph.",
+    }),
+  });
+  check("another student can review an OPEN essay", reviewOk.status === 200 && typeof reviewOk.body?.id === "number", `got ${reviewOk.status} ${JSON.stringify(reviewOk.body)}`);
+
+  const reviewClosed = await asBekzod("/api/essays/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ essayVersionId: closedEssay.id, hook: 50, total: 50 }),
+  });
+  check("a CLOSED essay refuses reviews (403)", reviewClosed.status === 403, `got ${reviewClosed.status}`);
+
+  // Author reviews their own essay → 403 (the `call` helper = owner cookie).
+  const reviewSelf = await call(reviewsPost as any, "/api/essays/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ essayVersionId: openEssay.id, hook: 99, total: 99 }),
+  });
+  check("the author cannot review their own essay (403)", reviewSelf.status === 403, `got ${reviewSelf.status}`);
+
+  const anonReview = await (reviewsGet as any)(new Request("http://localhost/api/essays/reviews?essayVersionId=" + openEssay.id));
+  check("anonymous review reads are refused (401)", anonReview.status === 401, `got ${anonReview.status}`);
+
+  const myReviews = await call(reviewsGet as any, `/api/essays/reviews?essayVersionId=${openEssay.id}`);
+  check("the author sees the review + average", myReviews.status === 200 && myReviews.body?.reviews?.length === 1 && myReviews.body?.aggregate?.count === 1 && myReviews.body?.aggregate?.avg?.hook === 80, JSON.stringify(myReviews.body?.aggregate));
+  check("reviewer is anonymized", String(myReviews.body?.reviews?.[0]?.reviewer ?? "").startsWith("Student #"), JSON.stringify(myReviews.body?.reviews?.[0]));
+  check("own version reports openForReview", myReviews.body?.openForReview === true);
+
+  const openList = await (async () => {
+    const req = new Request("http://localhost/api/essays/reviews?open=1", { headers: { cookie: `sb_session=${bekzodToken}` } });
+    const res = await (reviewsGet as any)(req);
+    return { status: res.status, body: await res.json().catch(() => null) };
+  })();
+  const openRow = openList.body?.items?.find((e: any) => e.id === openEssay.id);
+  check("the open list shows the open essay, not the closed one", openList.status === 200 && !!openRow && !openList.body?.items?.some((e: any) => e.id === closedEssay.id));
+  check("the author is anonymized in the open list", openRow && String(openRow.author).startsWith("Student #") && !JSON.stringify(openRow).includes("Aziza"));
+
+  // Toggle it closed — only the author can, and it takes effect immediately.
+  const idorToggle = await (async () => {
+    const req = new Request("http://localhost/api/essays", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie: `sb_session=${bekzodToken}` },
+      body: JSON.stringify({ id: openEssay.id, openForReview: false }),
+    });
+    const res = await (essayPatch as any)(req);
+    return { status: res.status };
+  })();
+  check("another student cannot toggle someone else's essay (404)", idorToggle.status === 404, `got ${idorToggle.status}`);
+
+  const closeRes = await call(essayPatch as any, "/api/essays", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: openEssay.id, openForReview: false }),
+  });
+  check("the author closes their own version", closeRes.status === 200 && closeRes.body?.openForReview === false, `got ${closeRes.status} ${JSON.stringify(closeRes.body)}`);
+
+  const reviewAfterClose = await asBekzod("/api/essays/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ essayVersionId: openEssay.id, hook: 50, total: 50 }),
+  });
+  check("after closing, new reviews are refused again (403)", reviewAfterClose.status === 403, `got ${reviewAfterClose.status}`);
+
+  // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which
   // surfaces as an unhandled fatal and fails the run even though every
