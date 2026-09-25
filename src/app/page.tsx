@@ -13,6 +13,8 @@ import { CompleteProfileForm } from "@/components/CompleteProfileForm";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { NextActionsPanel } from "@/components/NextActionsPanel";
 import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
+import { EssayRubricStudio } from "@/components/EssayRubricStudio";
+import { SimilarProfiles } from "@/components/SimilarProfiles";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -645,7 +647,11 @@ export default function Home() {
             description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
             onUpgrade={() => setActiveTab("payments")}
           >
-            <AiSopStudio activeProfile={activeProfile} />
+            <div className="space-y-4">
+              <AiSopStudio activeProfile={activeProfile} />
+              {/* #8 Advanced Essay AI — deterministic rubric + version history */}
+              <EssayRubricStudio activeProfile={activeProfile} />
+            </div>
           </PremiumGate>
         )}
 
@@ -674,6 +680,9 @@ export default function Home() {
 
         {/* #3 AI Admissions Advisor */}
         {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
+
+        {/* #10 Accepted students with a similar profile */}
+        {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
 
         {/* Universal application tracker + outcomes flywheel (#12) */}
         {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}

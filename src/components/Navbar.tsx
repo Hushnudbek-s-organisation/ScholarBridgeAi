@@ -5,6 +5,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { 
   GraduationCap, 
+  Users, 
   Target, 
   Search, 
   Award, 
@@ -120,6 +121,7 @@ export function Navbar({
     { id: "profile", label: t("completeProfile"), icon: GraduationCap },
     { id: "chancing", label: t("chances"), icon: Target },
     { id: "advisor", label: t("advisor"), icon: Bot },
+    { id: "similar", label: t("similarProfiles"), icon: Users },
     { id: "applications", label: t("myApplications"), icon: CheckSquare },
     { id: "tracker", label: t("tracker"), icon: GraduationCap, hidden: true },
     // Hidden until ready: code kept, UI hidden (feature not yet live).

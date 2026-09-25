@@ -24,9 +24,37 @@ interface DocItem {
   entityName: string | null;
 }
 
+interface DocIssue {
+  documentId: number;
+  severity: "blocker" | "warning" | "info";
+  code: string;
+  message: string;
+}
+
+interface DocCheck {
+  issues: DocIssue[];
+  readiness: number;
+  requiredTotal: number;
+  requiredUploaded: number;
+  blockers: number;
+  warnings: number;
+}
+
+interface Suggested {
+  documentType: string;
+  label: string;
+  why: string;
+}
+
 interface DocumentChecklistProps {
   profileId: number | null;
 }
+
+const SEVERITY_STYLE: Record<DocIssue["severity"], { chip: string; label: string }> = {
+  blocker: { chip: "bg-red-50 text-red-700 border-red-200", label: "Blocks submission" },
+  warning: { chip: "bg-amber-50 text-amber-700 border-amber-200", label: "Warning" },
+  info: { chip: "bg-slate-100 text-slate-600 border-slate-200", label: "Note" },
+};
 
 export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
   const [docs, setDocs] = useState<DocItem[]>([]);
@@ -34,6 +62,8 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [check, setCheck] = useState<DocCheck | null>(null);
+  const [suggested, setSuggested] = useState<Suggested[]>([]);
 
   const load = async () => {
     if (!profileId) return;
@@ -41,7 +71,11 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
     try {
       const res = await fetch(`/api/documents?profileId=${profileId}`);
       const data = await res.json();
-      if (res.ok && data.documents) setDocs(data.documents);
+      if (res.ok && data.documents) {
+        setDocs(data.documents);
+        setCheck(data.check ?? null);
+        setSuggested(data.suggested ?? []);
+      }
     } catch (err) {
       console.error("Failed to load documents:", err);
     } finally {
@@ -118,11 +152,24 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
           <FileCheck2 className="h-5 w-5 text-violet-600" />
         </div>
         <div>
-          <h2 className="text-sm font-extrabold text-slate-800">Document Checklist</h2>
+          <h2 className="text-sm font-extrabold text-slate-800">Document Checker</h2>
           <p className="text-xs text-slate-500">
-            {done} ready · {missing} missing — requirements come from each scholarship's data
+            {done} ready · {missing} missing
+            {check && check.blockers > 0 ? ` · ${check.blockers} blocking problem${check.blockers === 1 ? "" : "s"}` : ""}
           </p>
         </div>
+        {check && (
+          <div className="ml-auto text-center">
+            <div
+              className={`text-xl font-extrabold ${
+                check.readiness >= 80 ? "text-emerald-600" : check.readiness >= 40 ? "text-amber-600" : "text-red-600"
+              }`}
+            >
+              {check.readiness}%
+            </div>
+            <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">ready</div>
+          </div>
+        )}
         <button
           onClick={load}
           className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
@@ -134,6 +181,51 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
       {message && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
           {message}
+        </div>
+      )}
+
+      {/* The checker: what is WRONG, not just what is missing */}
+      {check && check.issues.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+          <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+            Problems found ({check.blockers} blocking · {check.warnings} warning)
+          </h3>
+          <ul className="mt-2 space-y-1.5">
+            {check.issues
+              .slice()
+              .sort((a, b) => (a.severity === "blocker" ? -1 : b.severity === "blocker" ? 1 : 0))
+              .map((issue, i) => {
+                const style = SEVERITY_STYLE[issue.severity];
+                const doc = docs.find((d) => d.id === issue.documentId);
+                return (
+                  <li key={`${issue.documentId}-${issue.code}-${i}`} className="flex flex-wrap items-start gap-2">
+                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${style.chip}`}>
+                      {style.label}
+                    </span>
+                    <span className="min-w-0 flex-1 text-xs text-slate-700">
+                      {doc ? <b className="font-bold text-slate-900">{doc.label}: </b> : null}
+                      {issue.message}
+                    </span>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+      )}
+
+      {/* Universal requirements the student has not added yet */}
+      {suggested.length > 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4">
+          <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+            Usually required, not on your list yet
+          </h3>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {suggested.map((s) => (
+              <li key={`${s.documentType}-${s.label}`} className="text-xs text-slate-600">
+                <b className="font-bold text-slate-800">{s.label}</b> — {s.why}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
-import { requireProfileAccess } from "@/lib/auth";
+import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import {
   applicationDocuments,
   savedScholarships,
+  studentProfiles,
   savedUniversities,
   scholarships,
   universities,
 } from "@/db/schema";
 import { eq, inArray, and } from "drizzle-orm";
+import { checkDocuments, expectedDocuments, type DocumentRow } from "@/lib/documents";
+
+/** Valid `status` values — anything else is ignored rather than stored. */
+const DOC_STATUSES: readonly string[] = ["missing", "uploaded", "not_required"];
 
 /**
  * Document checklist (spec §24).
@@ -100,7 +105,26 @@ export async function GET(req: Request) {
       entityName: r.entityType === "scholarship" ? schMap.get(r.entityId as number) : r.entityType === "university" ? uniMap.get(r.entityId as number) : null,
     }));
 
-    return NextResponse.json({ documents: docs });
+    // --- Document checker (#7) --------------------------------------------
+    // A checklist says what is missing; this says what is WRONG with what was
+    // already uploaded — expired, oversized, the wrong format.
+    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+    const intakeParam = searchParams.get("intakeDate");
+    const intake = intakeParam && !Number.isNaN(new Date(intakeParam).getTime()) ? new Date(intakeParam) : null;
+
+    const check = checkDocuments(rows as DocumentRow[], {
+      today: new Date(),
+      intakeDate: intake,
+    });
+
+    const existingTypes = new Set(rows.map((r) => r.documentType));
+    const suggested = expectedDocuments({
+      country: profile?.country,
+      degreeLevel: profile?.degreeLevel,
+      needsVisa: true,
+    }).filter((d) => !existingTypes.has(d.documentType));
+
+    return NextResponse.json({ documents: docs, check, suggested });
   } catch (error) {
     console.error("GET /api/documents error:", error);
     return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
@@ -150,11 +174,29 @@ export async function PATCH(req: Request) {
     if (!id) {
       return NextResponse.json({ error: "document id is required" }, { status: 400 });
     }
+
+    // Row ids are guessable — confirm the row belongs to the caller before
+    // mutating it. Without this any signed-in student could edit anyone's
+    // documents (IDOR).
+    const [target] = await db.select().from(applicationDocuments).where(eq(applicationDocuments.id, id));
+    const rowAccess = await requireRowAccess(req, target);
+    if (!rowAccess.ok) {
+      return NextResponse.json(
+        { error: rowAccess.error, code: rowAccess.code },
+        { status: rowAccess.status }
+      );
+    }
+
     const [doc] = await db
       .update(applicationDocuments)
       .set({
-        status: body.status ?? undefined,
+        status: DOC_STATUSES.includes(String(body.status)) ? String(body.status) : undefined,
         fileUrl: body.fileUrl ?? undefined,
+        fileName: body.fileName ?? undefined,
+        fileSizeBytes: body.fileSizeBytes != null ? Number(body.fileSizeBytes) : undefined,
+        expiresAt: body.expiresAt ?? undefined,
+        uploadedAt:
+          body.status === "uploaded" && !target.uploadedAt ? new Date() : body.uploadedAt ?? undefined,
         updatedAt: new Date(),
       })
       .where(eq(applicationDocuments.id, id))
@@ -174,6 +216,17 @@ export async function DELETE(req: Request) {
     if (!id) {
       return NextResponse.json({ error: "document id is required" }, { status: 400 });
     }
+
+    // Same IDOR guard as PATCH — deletion by id must be scoped to the owner.
+    const [target] = await db.select().from(applicationDocuments).where(eq(applicationDocuments.id, id));
+    const rowAccess = await requireRowAccess(req, target);
+    if (!rowAccess.ok) {
+      return NextResponse.json(
+        { error: rowAccess.error, code: rowAccess.code },
+        { status: rowAccess.status }
+      );
+    }
+
     await db.delete(applicationDocuments).where(eq(applicationDocuments.id, id));
     return NextResponse.json({ success: true });
   } catch (error) {

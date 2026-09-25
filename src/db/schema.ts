@@ -546,7 +546,48 @@ export const applicationDocuments = pgTable("application_documents", {
   deadlineDate: date("deadline_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  // --- Document checker (supabase/add_documents_essays.sql) ---
+  /** Passports, IELTS/TOEFL results and bank letters expire — the checker needs the date. */
+  expiresAt: date("expires_at"),
+  fileName: text("file_name"),
+  fileSizeBytes: integer("file_size_bytes"),
+  uploadedAt: timestamp("uploaded_at"),
 });
+
+/**
+ * Essay versions (Phase 2, item #8).
+ *
+ * Every draft is kept so the student can see what changed between version 2 and
+ * version 5, and so a rubric score can be compared over time. The rubric fields
+ * are COMPUTED by src/lib/essay.ts — the model writes `aiFeedback`, never the
+ * numbers.
+ */
+export const essayVersions = pgTable(
+  "essay_versions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    universityId: integer("university_id").references(() => universities.id, { onDelete: "set null" }),
+    essayType: text("essay_type").notNull().default("sop"), // sop | personal_statement | why_us | supplemental | scholarship
+    title: text("title").notNull().default(""),
+    content: text("content").notNull().default(""),
+    wordCount: integer("word_count").notNull().default(0),
+    charCount: integer("char_count").notNull().default(0),
+    versionNumber: integer("version_number").notNull().default(1),
+    rubricHook: integer("rubric_hook"),
+    rubricStructure: integer("rubric_structure"),
+    rubricSpecificity: integer("rubric_specificity"),
+    rubricLanguage: integer("rubric_language"),
+    rubricFit: integer("rubric_fit"),
+    rubricTotal: integer("rubric_total"),
+    aiFeedback: text("ai_feedback"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_essay_versions_profile").on(table.profileId),
+    index("idx_essay_versions_profile_type").on(table.profileId, table.essayType, table.versionNumber),
+  ]
+);
 
 // ---------------------------------------------------------------------------
 // 9. EDUCATIONAL VIDEO PLATFORM (spec §26)
