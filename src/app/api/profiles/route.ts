@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { seedDatabase } from "@/db/seed";
+import { hashPassword, sanitizeProfile } from "@/lib/password";
 import { awardPoints } from "@/lib/gamification";
 import { ensureReferralCode, applyReferralCodeToProfile } from "@/lib/referrals";
 import { recordVisit } from "@/lib/visits";
@@ -21,7 +23,8 @@ export async function GET() {
   try {
     await seedDatabase();
     const profiles = await db.select().from(studentProfiles);
-    return NextResponse.json({ profiles });
+    // Never send password hashes to the browser.
+    return NextResponse.json({ profiles: profiles.map((p) => sanitizeProfile(p)) });
   } catch (error) {
     console.error("GET /api/profiles error:", error);
     if (isMissingColumnsError(error)) {
@@ -40,7 +43,28 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
+
+    // Sign up: one account per email (case-insensitive). If the email already
+    // has an account, the visitor must sign in instead of creating a second
+    // profile — otherwise email+password sign-in would be ambiguous.
+    const emailInput = typeof body.email === "string" ? body.email.trim() : "";
+    if (emailInput) {
+      const [existing] = await db
+        .select({ id: studentProfiles.id })
+        .from(studentProfiles)
+        .where(sql`lower(${studentProfiles.email}) = ${emailInput.toLowerCase()}`)
+        .limit(1);
+      if (existing) {
+        return NextResponse.json(
+          {
+            error:
+              "An account with this email already exists. Close this window and use Sign in instead.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // Parse preferredCountries if passed as array
     let countriesStr = "[\"United States\", \"United Kingdom\", \"Canada\"]";
     if (body.preferredCountries) {
@@ -81,6 +105,13 @@ export async function POST(req: Request) {
       workExperienceYears: numOrNull(body.workExperienceYears) ?? 0,
       researchPublications: numOrNull(body.researchPublications) ?? 0,
       preferredLocale: body.preferredLocale || "en",
+      // Sign-up password: stored ONLY as a scrypt hash (never plain text).
+      // Short/missing values stay NULL — the account simply can't use
+      // email+password sign-in yet (it can be set later from Edit Profile).
+      passwordHash:
+        typeof body.password === "string" && body.password.trim().length >= 6
+          ? hashPassword(body.password.trim())
+          : null,
     }).returning();
 
     // Analytics: attribute the signup to the anonymous visitor cookie so the
@@ -118,9 +149,19 @@ export async function POST(req: Request) {
       console.error("Failed to set up referral for new profile:", err);
     }
 
-    return NextResponse.json({ profile: newProfile });
+    return NextResponse.json({ profile: sanitizeProfile(newProfile) });
   } catch (error) {
     console.error("POST /api/profiles error:", error);
+    // Unique-violation on email (race, or the legacy default email reused).
+    if ((error as { code?: string })?.code === "23505") {
+      return NextResponse.json(
+        {
+          error:
+            "An account with this email already exists. Close this window and use Sign in instead.",
+        },
+        { status: 409 }
+      );
+    }
     if (isMissingColumnsError(error)) {
       return NextResponse.json(
         {

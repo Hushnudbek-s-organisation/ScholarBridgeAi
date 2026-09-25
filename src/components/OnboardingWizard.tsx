@@ -33,6 +33,7 @@ interface OnboardingWizardProps {
 interface FormState {
   name: string;
   email: string;
+  password: string;
   degreeLevel: string;
   targetMajor: string;
   gpa: string;
@@ -69,7 +70,7 @@ const COUNTRIES = [
 const DEGREES = ["Bachelor", "Master", "PhD"];
 
 const STEPS = [
-  { id: 0, title: "Name & Email", icon: User },
+  { id: 0, title: "Name, Email & Password", icon: User },
   { id: 1, title: "Target Degree", icon: GraduationCap },
   { id: 2, title: "Target Major", icon: Compass },
   { id: 3, title: "Academic Performance", icon: BookOpen },
@@ -97,6 +98,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const [form, setForm] = useState<FormState>({
     name: profile?.name || "",
     email: profile?.email || "",
+    password: "",
     degreeLevel: profile?.degreeLevel || "",
     targetMajor: profile?.targetMajor === "Computer Science" ? "" : profile?.targetMajor || "",
     gpa: profile?.gpa ? String(profile.gpa) : "",
@@ -165,13 +167,19 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
       };
 
       if (createdId == null) {
-        // Step 1: create the profile (name + email are mandatory here).
-        // The referral code from the URL (?ref=) is applied server-side.
+        // Step 1: create the profile (name + email + password are mandatory
+        // here — this pair is what the student signs in with later, from any
+        // device). The referral code from the URL (?ref=) is applied
+        // server-side.
         let created: StudentProfile;
         const res = await fetch("/api/profiles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, referralCode: storedReferralCode() }),
+          body: JSON.stringify({
+            ...payload,
+            password: form.password,
+            referralCode: storedReferralCode(),
+          }),
         });
         const data = await res.json();
         if (!res.ok || !data.profile) {
@@ -207,9 +215,20 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     }
   };
 
+  /** Step 1 requirements for a BRAND-NEW account (password = sign-in key). */
+  const isNewAccount = createdId == null;
+  const step0Invalid =
+    !form.name.trim() ||
+    !form.email.trim() ||
+    (isNewAccount && form.password.trim().length < 6);
+
   const handleNext = async () => {
-    if (step === 0 && (!form.name.trim() || !form.email.trim())) {
-      setError("Full name and email are required");
+    if (step === 0 && step0Invalid) {
+      setError(
+        isNewAccount
+          ? "Full name, email and a password (at least 6 characters) are required — you'll sign in with this email + password"
+          : "Full name and email are required"
+      );
       return;
     }
     if (step === STEPS.length - 1) {
@@ -278,8 +297,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const StepIcon = stepInfo.icon;
   const progressPct = Math.round((step / (STEPS.length - 1)) * 100);
   const isLast = step === STEPS.length - 1;
-  const nextDisabled =
-    saving || (step === 0 && (!form.name.trim() || !form.email.trim()));
+  const nextDisabled = saving || (step === 0 && step0Invalid);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -317,7 +335,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
         )}
 
-        {/* STEP 1 — Name & email (mandatory) */}
+        {/* STEP 1 — Name, email & password (mandatory on new accounts) */}
         {step === 0 && (
           <div className="space-y-4">
             <div>
@@ -339,6 +357,24 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 onChange={(e) => set("email", e.target.value)}
               />
             </div>
+            {isNewAccount && (
+              <div>
+                <label className={labelCls}>Password *</label>
+                <input
+                  type="password"
+                  className={inputCls}
+                  placeholder="At least 6 characters"
+                  value={form.password}
+                  onChange={(e) => set("password", e.target.value)}
+                  autoComplete="new-password"
+                />
+                <p className="text-[11px] text-slate-400 mt-2">
+                  You&apos;ll sign in later with this email + password — from any
+                  device or after logging out. It&apos;s stored encrypted (hashed),
+                  never in plain text.
+                </p>
+              </div>
+            )}
             <p className="text-[11px] text-slate-400">
               You can update these later anytime from &quot;Edit Profile&quot;.
             </p>

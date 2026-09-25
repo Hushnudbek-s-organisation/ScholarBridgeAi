@@ -4,6 +4,7 @@ import { studentProfiles } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
 import { findActiveSubscription, subscriptionIsActive } from "@/lib/payments";
 import { desc } from "drizzle-orm";
+import { sanitizeProfile } from "@/lib/password";
 
 export async function GET(req: Request) {
   try {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
       const sub = await findActiveSubscription(profile.id);
       const active = subscriptionIsActive(sub);
       enriched.push({
-        ...profile,
+        ...sanitizeProfile(profile),
         isPremium: active,
         premiumUntil: active && sub ? sub.currentPeriodEnd : null,
       });

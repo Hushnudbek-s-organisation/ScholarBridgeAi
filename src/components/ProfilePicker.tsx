@@ -44,6 +44,39 @@ export function ProfilePicker({
   const [loginError, setLoginError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Student sign-in (email + password) — the account pair created at sign up,
+  // so it works from ANY device / after clearing this browser.
+  const [siEmail, setSiEmail] = useState("");
+  const [siPassword, setSiPassword] = useState("");
+  const [siError, setSiError] = useState("");
+  const [siBusy, setSiBusy] = useState(false);
+
+  const handleStudentSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siEmail.trim() || !siPassword.trim()) {
+      setSiError("Enter both email and password");
+      return;
+    }
+    setSiBusy(true);
+    setSiError("");
+    try {
+      const res = await fetch("/api/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: siEmail.trim(), password: siPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.profile) {
+        throw new Error(data.error || "Sign-in failed");
+      }
+      onSelect(data.profile as StudentProfile);
+    } catch (err: any) {
+      setSiError(err.message || "Sign-in failed");
+    } finally {
+      setSiBusy(false);
+    }
+  };
+
   if (!open) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -161,6 +194,57 @@ export function ProfilePicker({
             </button>
           </div>
 
+          {/* ===== Student sign-in (email + password, any device) ===== */}
+          <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <LogIn className="h-3.5 w-3.5 text-indigo-500" />
+              <p className="text-xs font-extrabold text-slate-800">My account</p>
+              <span className="inline-flex items-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[9px] font-bold text-white ml-auto">
+                ANY DEVICE
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-3">
+              Sign in with the email + password you chose when creating the
+              account — works even from a new phone or browser.
+            </p>
+
+            <form onSubmit={handleStudentSignIn} className="space-y-2.5">
+              <input
+                type="email"
+                value={siEmail}
+                onChange={(e) => setSiEmail(e.target.value)}
+                placeholder="Email"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoComplete="off"
+              />
+              <input
+                type="password"
+                value={siPassword}
+                onChange={(e) => setSiPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoComplete="off"
+              />
+              {siError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+                  {siError}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={siBusy}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+              >
+                {siBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <LogIn className="h-3.5 w-3.5" />
+                )}
+                Sign in
+              </button>
+            </form>
+          </div>
+
           {/* ===== Admin sign-in (username + email) ===== */}
           <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -172,7 +256,8 @@ export function ProfilePicker({
             </div>
             <p className="text-[11px] text-slate-500 mb-3">
               Enter your username and email to open the Admin Panel account.
-              Other students&apos; profiles stay private.
+              Other students&apos; profiles stay private. (A password can also
+              be set — then sign in via the &quot;My account&quot; form above.)
             </p>
 
             <form onSubmit={handleLogin} className="space-y-2.5">
