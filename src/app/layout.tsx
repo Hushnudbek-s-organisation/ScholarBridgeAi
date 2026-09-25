@@ -4,6 +4,12 @@ import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
 import { getBranding } from "@/lib/branding";
 
+// The middleware sends a per-request nonce-based CSP. Next.js can only stamp
+// that nonce on its <script> tags when the page is rendered per request —
+// statically prerendered HTML has no nonce, so the browser blocks every
+// script, React never hydrates and no button (Sign in / Get started) works.
+export const dynamic = "force-dynamic";
+
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
 
