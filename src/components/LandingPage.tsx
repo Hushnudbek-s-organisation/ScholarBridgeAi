@@ -3,7 +3,10 @@
 import { BrandingImage } from "./BrandingImage";
 import React from "react";
 import { useTranslations } from "next-intl";
-import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowRight, Award, Bot, CheckCircle2, ClipboardCheck, Crown, FileText, GraduationCap,
+  LayoutDashboard, Mic, Search, ShieldCheck, Sparkles, Wallet, Trophy,
+} from "lucide-react";
 
 interface LandingPageProps {
   onStart: () => void;
@@ -55,13 +58,22 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
   ];
 
   const mockSidebar = [
-    { label: nav("dashboard"), active: true },
-    { label: nav("universities") },
-    { label: nav("scholarships") },
-    { label: nav("chances") },
-    { label: nav("myApplications") },
-    { label: nav("deadlines") },
-    { label: nav("advisor") },
+    { label: nav("dashboard"), icon: LayoutDashboard, active: true },
+    { label: nav("universities"), icon: Search },
+    { label: nav("scholarships"), icon: Award },
+    { label: nav("myApplications"), icon: GraduationCap },
+    { label: "AI SOP & Essays", icon: FileText, pro: true },
+    { label: "Tasks & Roadmap", icon: ClipboardCheck, pro: true },
+    { label: "AI Mentor", icon: Bot },
+    { label: "Visa Speaking", icon: Mic },
+    { label: "Premium", icon: Crown },
+  ];
+
+  const mockStats = [
+    { label: "Shortlisted Programs", value: "12", sub: "Universities in tracker", icon: GraduationCap, tone: "bg-indigo-50 text-indigo-600" },
+    { label: "Scholarships Tracked", value: "5", sub: "Saved aid programs", icon: Award, tone: "bg-emerald-50 text-emerald-600" },
+    { label: "Pending Milestones", value: "7", sub: "Tasks pending", icon: CheckCircle2, tone: "bg-amber-50 text-amber-600" },
+    { label: "AI SOP Studio", value: "Ready", sub: "Draft or evaluate", icon: FileText, tone: "bg-violet-50 text-violet-600" },
   ];
 
   return (
@@ -143,75 +155,91 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               )}
             </div>
 
-            {/* Dashboard mock (decorative product preview) */}
-            <div className="relative mx-auto w-full max-w-[650px]">
-              <div className="overflow-hidden rounded-[25px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 lg:rotate-[1.2deg]">
-                <div className="flex h-[46px] items-center gap-1.5 border-b border-slate-200 px-4">
+            {/* Dashboard preview (mirrors the real in-app dashboard) */}
+            <div className="relative mx-auto w-full max-w-[680px]">
+              <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 lg:rotate-[1.2deg]">
+                <div className="flex h-[36px] items-center gap-1.5 border-b border-slate-200 px-4">
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
                 </div>
-                <div className="grid grid-cols-[145px_1fr] min-h-[420px]">
-                  <aside className="hidden border-r border-slate-200 bg-slate-50/80 p-3 sm:block">
-                    <div className="px-2 pb-4 pt-1 text-[11px] font-extrabold tracking-wide text-slate-700">{tm("appName").toUpperCase()}</div>
-                    {mockSidebar.map((s) => (
+                <div className="grid min-h-[420px] grid-cols-1 sm:grid-cols-[150px_1fr]">
+                  <aside className="hidden border-r border-slate-200 bg-white p-2.5 sm:block">
+                    <div className="mb-3 flex items-center gap-1.5 px-1">
+                      <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-md ring-1 ring-slate-200">
+                        <BrandingImage alt={t("logoAlt")} className="h-6 w-6 object-cover" />
+                      </span>
+                      <span className="text-[11px] font-extrabold text-slate-800">ScholarBridge</span>
+                      <span className="rounded bg-indigo-50 px-1 text-[7px] font-bold text-indigo-600">AI</span>
+                    </div>
+                    {mockSidebar.map(({ label, icon: Icon, active, pro }) => (
                       <div
-                        key={s.label}
-                        className={`mb-0.5 rounded-lg px-2.5 py-2 text-[11px] ${s.active ? "bg-indigo-100 font-extrabold text-indigo-700" : "text-slate-500"}`}
+                        key={label}
+                        className={`mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[9px] font-semibold ${
+                          active
+                            ? "bg-indigo-600 text-white"
+                            : pro
+                            ? "border border-amber-200 text-amber-700"
+                            : "text-slate-600"
+                        }`}
                       >
-                        {s.label}
+                        <Icon className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{label}</span>
+                        {pro && <span className="ml-auto rounded bg-amber-100 px-1 text-[6px] font-bold">PRO</span>}
                       </div>
                     ))}
                   </aside>
-                  <div className="p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                      <div className="text-base font-extrabold sm:text-lg">{t("mockTitle")}</div>
-                      <div className="h-7 w-7 rounded-full bg-indigo-100" />
-                    </div>
-                    <div className="mb-3 grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-slate-200 p-3">
-                        <small className="text-[9px] font-bold text-slate-400">{t("mockStrength")}</small>
-                        <strong className="mt-0.5 block text-lg font-black">84%</strong>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 p-3">
-                        <small className="text-[9px] font-bold text-slate-400">{t("mockMatched")}</small>
-                        <strong className="mt-0.5 block text-lg font-black">42</strong>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 p-3">
-                        <small className="text-[9px] font-bold text-slate-400">{t("mockScholarships")}</small>
-                        <strong className="mt-0.5 block text-lg font-black text-emerald-600">18</strong>
-                      </div>
-                    </div>
-                    <div className="mb-2.5 rounded-2xl border border-slate-200 p-3.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="text-xs font-extrabold">{t("mockSchool1")}</div>
-                          <div className="text-[9px] text-slate-400">{t("mockSchool1Sub")}</div>
+                  <div className="bg-slate-50 p-3 sm:p-4">
+                    <div className="flex gap-3 rounded-2xl bg-gradient-to-br from-[#12143a] via-[#1b1f5e] to-[#2a3ba8] p-4 text-white">
+                      <div className="min-w-0 flex-1">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[8px] font-semibold">
+                          <Sparkles className="h-2.5 w-2.5 text-amber-300" /> Active Applicant
+                        </span>
+                        <div className="mt-2 text-[13px] font-extrabold leading-tight sm:text-[15px]">
+                          Global Admissions &amp; Scholarship Discovery Hub
                         </div>
-                        <div className="text-base font-black text-indigo-600">92%</div>
+                        <p className="mt-1.5 text-[8px] leading-snug text-slate-300">
+                          Matching your academic credentials (GPA 4.7/5) for Bachelor in Computer Science across top universities.
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1 text-[7px] font-semibold">
+                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><GraduationCap className="h-2.5 w-2.5" /> Bachelor</span>
+                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><Wallet className="h-2.5 w-2.5" /> <span className="text-emerald-300">$25 000/yr</span></span>
+                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><Trophy className="h-2.5 w-2.5" /> <span className="text-amber-300">0 Pubs</span></span>
+                        </div>
                       </div>
-                      <div className="my-2.5 h-[5px] rounded-full bg-slate-100">
-                        <span className="block h-full w-[92%] rounded-full bg-gradient-to-r from-indigo-600 to-violet-500" />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag1")}</span>
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag2")}</span>
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag3")}</span>
+                      <div className="hidden w-[110px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/5 p-2 sm:flex">
+                        <div className="text-[7px] font-bold tracking-wider text-slate-300">ADMISSIONS INDEX</div>
+                        <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/60">
+                          <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
+                        </div>
+                        <div className="text-[7px] font-semibold">Needs Strengthening</div>
+                        <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900">
+                          <Bot className="h-2.5 w-2.5" /> Run AI Audit
+                        </div>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-3.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="text-xs font-extrabold">{t("mockActions")}</div>
-                          <div className="text-[9px] text-slate-400">{t("mockActionsSub")}</div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {mockStats.map(({ label, value, sub, icon: Icon, tone }) => (
+                        <div key={label} className="rounded-xl border border-slate-200 bg-white p-2">
+                          <div className="flex items-start justify-between gap-1">
+                            <small className="text-[7px] font-semibold text-slate-500">{label}</small>
+                            <span className={`grid h-4 w-4 place-items-center rounded ${tone}`}><Icon className="h-2.5 w-2.5" /></span>
+                          </div>
+                          <strong className="mt-1 block text-base font-black">{value}</strong>
+                          <span className="text-[7px] text-slate-400">{sub}</span>
                         </div>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-700">{t("mockPriority")}</span>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-700">
+                        <Bot className="h-3 w-3" /> ScholarBridgeAI Strategic Evaluation
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag4")}</span>
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag5")}</span>
-                        <span className="rounded-md bg-slate-50 px-1.5 py-1 text-[8px] font-semibold text-slate-500">{t("mockTag6")}</span>
-                      </div>
+                      <div className="mt-2 text-[9px] font-bold">Overall Profile Score &amp; Readiness</div>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-3.5 text-[8px] text-slate-600">
+                        <li>Score: 78 / 100</li>
+                        <li>Percentile: ≈ 85th among international CS applicants</li>
+                        <li>Key strength: GPA 4.7/5 — consistent academic performance</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
