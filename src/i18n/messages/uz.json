@@ -39,7 +39,8 @@
     "edit": "Tahrirlash",
     "logout": "Chiqish",
     "logoAlt": "ScholarBridge logotipi",
-    "visa": "Viza suhbati"
+    "visa": "Viza suhbati",
+    "strength": "Profil kuchi"
   },
   "language": {
     "label": "Til",
@@ -373,5 +374,42 @@
     "transcriptTitle": "Muloqot",
     "emptyTranscript": "Muloqotingiz shu yerda ko‘rinadi.",
     "voiceUnavailable": "Ovozli ijro mavjud emas — subtitrlardan foydalaning."
+  },
+  "strength": {
+    "title": "Profil kuchi",
+    "subtitle": "Har o‘lchovga bitta ball — faqat haqiqiy ma‘lumotlardan hisoblanadi, o‘ylab topilmaydi.",
+    "overall": "Umumiy",
+    "completeness": "Profil to‘liqligi",
+    "noteLow": "Profilingiz deyarli bo‘sh — haqiqiy ballarni ko‘rish uchun profilni to‘ldiring.",
+    "essaysHint": "So‘nggi insho rubrik balli ishlatiladi. AI SOP & Essays bo‘limida insho yozing.",
+    "section": {
+      "academics": "Akademik",
+      "tests": "Testlar",
+      "extracurriculars": "Qo‘shimcha faoliyat",
+      "leadership": "Liderlik",
+      "awards": "Mukofotlar",
+      "essays": "Insholar",
+      "financial": "Moliya"
+    },
+    "extraTitle": "Qo‘shimcha faoliyat tahlili",
+    "extraLeadership": "Liderlik",
+    "impact": "Ta‘sir",
+    "consistency": "Muntazamlik",
+    "academicFit": "Akademik moslik",
+    "suggestions": "Keyingi 3 oyda nima qilish",
+    "loading": "Profil kuchi yuklanmoqda…"
+  },
+  "recLetter": {
+    "title": "Tavsiyanoma yordamchisi",
+    "subtitle": "Tavsiyachingiz uchun ma‘lumotga asoslangan brif — faqat haqiqiy profilangizdan quriladi.",
+    "talkingPoints": "Muloqot nuqtalari (haqiqiy ma‘lumotlaringiz)",
+    "outline": "Maktub tuzilmasi (taklif)",
+    "dataMissing": "Maktub kuchliroq bo‘lishi uchun profilga qo‘shing",
+    "checklist": "Yuborishdan oldin",
+    "universityPlaceholder": "Universitet nomi (ixtiyoriy)",
+    "deadlinePlaceholder": "Deadline (ixtiyoriy)",
+    "generate": "Brif yasash",
+    "copy": "Hammasini nusxalash",
+    "copied": "Nusxalandi"
   }
 }

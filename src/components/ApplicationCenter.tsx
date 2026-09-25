@@ -10,6 +10,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { RecLetterPanel } from "./RecLetterPanel";
 
 /**
  * Universal application tracker (#12) + the outcomes flywheel.
@@ -391,6 +392,9 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
           </div>
         </div>
       )}
+
+      {/* #20 Recommendation letter helper — brief built from real profile data */}
+      <RecLetterPanel />
     </div>
   );
 }

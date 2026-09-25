@@ -9,6 +9,7 @@ import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ChancingPanel } from "@/components/ChancingPanel";
+import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
 import { CompleteProfileForm } from "@/components/CompleteProfileForm";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { NextActionsPanel } from "@/components/NextActionsPanel";
@@ -680,6 +681,9 @@ export default function Home() {
 
         {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
         {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+
+        {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
+        {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}
 
         {/* #3 AI Admissions Advisor */}
         {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}

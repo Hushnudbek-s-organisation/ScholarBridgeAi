@@ -39,7 +39,8 @@
     "edit": "Edit",
     "logout": "Log out",
     "logoAlt": "ScholarBridge Logo",
-    "visa": "Visa Speaking"
+    "visa": "Visa Speaking",
+    "strength": "Profile Strength"
   },
   "language": {
     "label": "Language",
@@ -373,5 +374,42 @@
     "transcriptTitle": "Conversation",
     "emptyTranscript": "Your conversation will appear here.",
     "voiceUnavailable": "Voice playback is unavailable here — follow the subtitles."
+  },
+  "strength": {
+    "title": "Profile Strength",
+    "subtitle": "One score per dimension — computed from your real data, never invented.",
+    "overall": "Overall",
+    "completeness": "Profile completeness",
+    "noteLow": "Your profile is mostly empty — fill it in to see real scores.",
+    "essaysHint": "The latest essay rubric score is used. Write an essay in AI SOP & Essays to fill this in.",
+    "section": {
+      "academics": "Academics",
+      "tests": "Tests",
+      "extracurriculars": "Extracurriculars",
+      "leadership": "Leadership",
+      "awards": "Awards",
+      "essays": "Essays",
+      "financial": "Financial"
+    },
+    "extraTitle": "Extracurricular analysis",
+    "extraLeadership": "Leadership",
+    "impact": "Impact",
+    "consistency": "Consistency",
+    "academicFit": "Academic fit",
+    "suggestions": "What to do in the next 3 months",
+    "loading": "Loading profile strength…"
+  },
+  "recLetter": {
+    "title": "Recommendation letter helper",
+    "subtitle": "A data-driven brief for your recommender — built only from your real profile.",
+    "talkingPoints": "Talking points (your real data)",
+    "outline": "Suggested letter outline",
+    "dataMissing": "Add these to the profile so the letter is stronger",
+    "checklist": "Before you send",
+    "universityPlaceholder": "University name (optional)",
+    "deadlinePlaceholder": "Deadline (optional)",
+    "generate": "Build brief",
+    "copy": "Copy all",
+    "copied": "Copied"
   }
 }

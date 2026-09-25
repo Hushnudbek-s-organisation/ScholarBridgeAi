@@ -25,6 +25,8 @@
     "test:parent": "tsx scripts/check-parent.ts",
     "test:dataset": "tsx scripts/check-dataset.ts",
     "test:render": "tsx scripts/check-render.ts",
+    "test:essay-adapter": "tsx scripts/check-essay-adapter.ts",
+    "test:rec-letter": "tsx scripts/check-rec-letter.ts",
     "test:integration": "tsx scripts/check-integration.ts"
   },
   "dependencies": {

@@ -12,6 +12,7 @@ import {
   Target, 
   Search, 
   Award, 
+  Activity,
   CheckSquare, 
   FileText, 
   Bot, 
@@ -123,6 +124,8 @@ export function Navbar({
     { id: "scholarships", label: t("scholarships"), icon: Award },
     { id: "profile", label: t("completeProfile"), icon: GraduationCap },
     { id: "chancing", label: t("chances"), icon: Target },
+    // #21 + #22 — profile strength dashboard + extracurricular analysis
+    { id: "strength", label: t("strength"), icon: Activity },
     { id: "advisor", label: t("advisor"), icon: Bot },
     { id: "similar", label: t("similarProfiles"), icon: Users },
     { id: "planning", label: t("planning"), icon: Calculator },

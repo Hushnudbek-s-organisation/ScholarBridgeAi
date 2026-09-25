@@ -100,6 +100,62 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // #18 Scholarship essay adapter — score this essay against saved scholarships
+  interface FitMatch {
+    scholarshipId: number;
+    title: string;
+    fit: number;
+    matched: string[];
+    gaps: string[];
+    plan: string[];
+  }
+  const [fitMatches, setFitMatches] = useState<FitMatch[] | null>(null);
+  const [fitBusy, setFitBusy] = useState(false);
+  const [fitError, setFitError] = useState("");
+  const [adapted, setAdapted] = useState<Record<number, { text: string | null; source: string }>>({});
+  const [adaptingId, setAdaptingId] = useState<number | null>(null);
+
+  const analyzeFit = async () => {
+    if (text.trim().length < 50) return;
+    setFitBusy(true);
+    setFitError("");
+    setFitMatches(null);
+    setAdapted({});
+    try {
+      const res = await fetch("/api/essay-adapter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ essayText: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not score the fit");
+      setFitMatches(data.matches ?? []);
+    } catch (err) {
+      setFitError(err instanceof Error ? err.message : "Could not score the fit");
+    } finally {
+      setFitBusy(false);
+    }
+  };
+
+  const adaptEssay = async (scholarshipId: number) => {
+    setAdaptingId(scholarshipId);
+    setFitError("");
+    try {
+      const res = await fetch("/api/essay-adapter/adapt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ essayText: text, scholarshipId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not adapt the essay");
+      setAdapted((prev) => ({ ...prev, [scholarshipId]: { text: data.adapted, source: data.source } }));
+    } catch (err) {
+      setFitError(err instanceof Error ? err.message : "Could not adapt the essay");
+    } finally {
+      setAdaptingId(null);
+    }
+  };
+
   const loadVersions = useCallback(async () => {
     if (!activeProfile?.id) return;
     try {
@@ -346,6 +402,102 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           )}
         </div>
       )}
+
+      {/* #18 Scholarship essay adapter — one essay vs. the saved scholarships */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+              <Sparkles className="h-3.5 w-3.5" /> Scholarship fit
+            </h3>
+            <p className="mt-0.5 max-w-xl text-[11px] text-slate-500">
+              Score this essay against your saved scholarships — word limit, themes, major, country, GPA and English.
+            </p>
+          </div>
+          <button
+            onClick={() => void analyzeFit()}
+            disabled={fitBusy || text.trim().length < 50}
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {fitBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Analyze fit"}
+          </button>
+        </div>
+        {text.trim().length < 50 && (
+          <p className="mt-2 text-[11px] text-slate-400">Write at least 50 characters first.</p>
+        )}
+        {fitError && <p className="mt-2 text-xs font-semibold text-rose-600">{fitError}</p>}
+
+        {fitMatches && (
+          <div className="mt-3 space-y-3">
+            {fitMatches.length === 0 && (
+              <p className="text-xs text-slate-400">No saved scholarships yet — save some in the Scholarship Hub.</p>
+            )}
+            {fitMatches.map((m) => {
+              const a = adapted[m.scholarshipId];
+              return (
+                <div key={m.scholarshipId} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-800">{m.title}</span>
+                    <span className="text-sm font-black text-indigo-700">{m.fit}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${m.fit}%` }} />
+                  </div>
+                  {m.matched.length > 0 && (
+                    <ul className="mt-2 space-y-0.5">
+                      {m.matched.map((s, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-[11px] text-emerald-700">
+                          <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" /> {s}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {m.gaps.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {m.gaps.map((s, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-[11px] text-amber-700">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {s}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {m.plan.length > 0 && (
+                    <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-[11px] text-slate-600">
+                      {m.plan.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ol>
+                  )}
+                  <button
+                    onClick={() => void adaptEssay(m.scholarshipId)}
+                    disabled={adaptingId !== null}
+                    className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+                  >
+                    {adaptingId === m.scholarshipId ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Adapt essay with AI"
+                    )}
+                  </button>
+                  {a && (
+                    <div className="mt-2">
+                      {a.text ? (
+                        <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100">
+                          {a.text}
+                        </pre>
+                      ) : (
+                        <p className="text-[11px] font-semibold text-amber-700">
+                          AI is unavailable right now — follow the plan above by hand.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {versions.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">

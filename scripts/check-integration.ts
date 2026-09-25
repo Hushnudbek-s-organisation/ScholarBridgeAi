@@ -734,6 +734,75 @@ async function main() {
   check("another student's chancing is refused", chForeign.status === 403, `got ${chForeign.status}`);
 
   // -----------------------------------------------------------------------
+  // 7. /api/profile-strength — the strength dashboard (#22) and extracurricular
+  // analysis (#21) on the real profile. No row id in the URL: the session
+  // decides whose profile is scored, so the contract to prove is (a) the owner
+  // gets real numbers, (b) anonymous is refused, (c) another session can never
+  // see the owner's profile.
+  section("7. /api/profile-strength — strength dashboard from the real profile");
+
+  const { GET: strengthGet } = await import("../src/app/api/profile-strength/route");
+  const ps = await call(strengthGet as any, "/api/profile-strength");
+  check("responds 200", ps.status === 200, `got ${ps.status} ${JSON.stringify(ps.body)?.slice(0, 200)}`);
+  check("reports 7 sections", Array.isArray(ps.body?.strength?.sections) && ps.body.strength.sections.length === 7);
+  check(
+    "all section scores stay in 0–100",
+    ps.body?.strength?.sections?.every((s: any) => typeof s.score === "number" && s.score >= 0 && s.score <= 100)
+  );
+  check(
+    "overall and completeness are percentages",
+    typeof ps.body?.strength?.overall === "number" && ps.body.strength.overall >= 0 && ps.body.strength.overall <= 100 &&
+    typeof ps.body?.strength?.completeness === "number" && ps.body.strength.completeness >= 0 && ps.body.strength.completeness <= 100
+  );
+  check(
+    "the seeded profile scores above empty",
+    (ps.body?.strength?.completeness ?? 0) > 0 && (ps.body?.strength?.overall ?? 0) > 0,
+    `completeness=${ps.body?.strength?.completeness} overall=${ps.body?.strength?.overall}`
+  );
+  check(
+    "extracurricular analysis returns four scores and suggestions",
+    typeof ps.body?.extracurriculars?.leadership === "number" &&
+    typeof ps.body?.extracurriculars?.impact === "number" &&
+    typeof ps.body?.extracurriculars?.consistency === "number" &&
+    typeof ps.body?.extracurriculars?.academicFit === "number" &&
+    Array.isArray(ps.body?.extracurriculars?.suggestions) && ps.body.extracurriculars.suggestions.length > 0
+  );
+
+  const psAnon = await (async () => {
+    const res = await (strengthGet as any)(new Request("http://localhost/api/profile-strength"));
+    return { status: res.status };
+  })();
+  check("anonymous is refused", psAnon.status === 401, `got ${psAnon.status}`);
+
+  // Schema defaults are demo values, so a fresh profile is NOT empty — seed
+  // an explicitly different GPA to prove the session is isolated, not just
+  // that two profiles happen to differ.
+  const [otherWithHash] = await db
+    .insert(schema.studentProfiles)
+    .values({
+      name: "Second Student",
+      email: "second@example.com",
+      passwordHash: profile.passwordHash,
+      gpa: 2.5,
+      workExperienceYears: 0,
+    })
+    .returning();
+  const otherToken = signSessionToken({ id: otherWithHash.id, passwordHash: otherWithHash.passwordHash });
+  const psOther = await (async () => {
+    const res = await (strengthGet as any)(
+      new Request("http://localhost/api/profile-strength", { headers: { cookie: `sb_session=${otherToken}` } })
+    );
+    return { status: res.status, body: await res.json().catch(() => null) };
+  })();
+  const ownerAcademics = ps.body?.strength?.sections?.find((s: any) => s.key === "academics")?.score;
+  const otherAcademics = psOther.body?.strength?.sections?.find((s: any) => s.key === "academics")?.score;
+  check(
+    "a different session sees only its own profile (GPA 2.5, not the owner's 3.5)",
+    psOther.status === 200 && otherAcademics < ownerAcademics,
+    `got ${psOther.status} academics=${otherAcademics} vs owner ${ownerAcademics}`
+  );
+
+  // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which
   // surfaces as an unhandled fatal and fails the run even though every
