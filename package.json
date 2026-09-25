@@ -20,7 +20,9 @@
     "test:visa": "tsx scripts/check-visa-similar.ts",
     "test:costs": "tsx scripts/check-costs.ts",
     "test:cv": "tsx scripts/check-cv.ts",
-    "test:compare": "tsx scripts/check-compare.ts"
+    "test:compare": "tsx scripts/check-compare.ts",
+    "test:mentors": "tsx scripts/check-mentors.ts",
+    "test:parent": "tsx scripts/check-parent.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.0",

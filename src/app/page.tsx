@@ -16,6 +16,8 @@ import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
 import { EssayRubricStudio } from "@/components/EssayRubricStudio";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
 import { PlanningStudio } from "@/components/PlanningStudio";
+import { MentorMarketplace } from "@/components/MentorMarketplace";
+import { ParentDashboard } from "@/components/ParentDashboard";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ConsultingSection } from "@/components/ConsultingSection";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -684,6 +686,10 @@ export default function Home() {
 
         {/* #10 Accepted students with a similar profile */}
         {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
+
+        {/* Phase 4 — mentor marketplace + parent dashboard */}
+        {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
+        {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
 
         {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
         {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}

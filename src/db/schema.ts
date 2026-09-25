@@ -32,6 +32,13 @@ export const studentProfiles = pgTable("student_profiles", {
   // --- Referral-gifted premium (stackable 30-day grants) ---
   isPremium: boolean("is_premium").notNull().default(false),
   premiumUntil: timestamp("premium_until"),
+  // --- Parent dashboard access (supabase/add_mentors_parent.sql) ---
+  // The student grants this; it is read-only and never exposes the password,
+  // essays or private messages.
+  parentShareEnabled: boolean("parent_share_enabled").notNull().default(false),
+  parentShareEmail: text("parent_share_email"),
+  parentShareToken: text("parent_share_token"),
+  parentShareCreatedAt: timestamp("parent_share_created_at"),
   // --- Complete profile (supabase/add_profile_chancing_applications.sql) ---
   // Everything here is NULL until the student fills it in — the app must never
   // invent academic data (spec §19).
@@ -904,5 +911,64 @@ export const testBookings = pgTable(
   (table) => [
     index("idx_test_bookings_profile").on(table.profileId),
     index("idx_test_bookings_date").on(table.testDate),
+  ]
+);
+
+/**
+ * Mentors (Phase 4 — mentor marketplace).
+ *
+ * Distinct from `instructors`, who teach courses. A mentor is someone who has
+ * already walked the exact path the student is planning: same country, same
+ * university, often the same scholarship. That lived path is the thing a
+ * rules engine cannot produce.
+ */
+export const mentors = pgTable(
+  "mentors",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    displayName: text("display_name").notNull(),
+    headline: text("headline").notNull().default(""),
+    bio: text("bio").notNull().default(""),
+    photoUrl: text("photo_url"),
+    country: text("country"),
+    city: text("city"),
+    university: text("university"),
+    program: text("program"),
+    degreeLevel: text("degree_level"),
+    scholarshipName: text("scholarship_name"),
+    expertise: text("expertise").notNull().default("[]"), // JSON array
+    languages: text("languages").notNull().default("[]"), // JSON array
+    hourlyRateUsd: integer("hourly_rate_usd"),
+    freeSessions: boolean("free_sessions").notNull().default(false),
+    isVerified: boolean("is_verified").notNull().default(false),
+    verificationNote: text("verification_note"),
+    isActive: boolean("is_active").notNull().default(true),
+    ratingAverage: doublePrecision("rating_average"),
+    ratingCount: integer("rating_count").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_mentors_active").on(table.isActive, table.isVerified),
+    index("idx_mentors_country").on(table.country),
+  ]
+);
+
+/** Mentor contact requests. */
+export const mentorRequests = pgTable(
+  "mentor_requests",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    mentorId: integer("mentor_id").references(() => mentors.id, { onDelete: "cascade" }).notNull(),
+    topic: text("topic").notNull(),
+    message: text("message").notNull().default(""),
+    status: text("status").notNull().default("pending"), // pending | accepted | declined | completed | cancelled
+    scheduledAt: timestamp("scheduled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_mentor_requests_profile").on(table.profileId),
+    index("idx_mentor_requests_mentor").on(table.mentorId, table.status),
   ]
 );
