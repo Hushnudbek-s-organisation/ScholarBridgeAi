@@ -1,6 +1,6 @@
 # ScholarBridge AI — To'liq hisobot
 
-Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 18 commit · 175 fayl · +23 611 / −1 002 qator
+Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 20 commit · 176 fayl · +24 324 / −1 307 qator
 
 ---
 
@@ -14,7 +14,7 @@ Branch: `arena/01a0d901-scholarbridgeai` · asos: `17068cc` · 18 commit · 175 
 | UI komponentlar | 62 |
 | Test skriptlar (`scripts/check-*`) | 23 |
 | Foydalanuvchi tab'lari | 26 |
-| Unit assertion'lar | 612 (+ 52 security) |
+| Unit assertion'lar | 623 (+ 52 security) |
 | Integratsion assertion'lar | 115 (haqiqiy PostgreSQL) |
 
 ---
@@ -356,6 +356,18 @@ PR #22 branchga cherry-pick qilindi (original muallif saqlangan) va Gemini'dan G
 - Live token server-tomonli yaratiladi, kalit brauzerga **hech qachon** bormaydi; kalit shaklidagi tokenlar javobda `redactGeminiSecrets` bilan tozalangan.
 - Kalit bo'lmasa yoki brauzer qo'llab-quvvatlamasa — Web Speech API fallback'iga o'tadi (hujjatlashtirilgan, 404/503 xatolariga backoff bilan retry).
 
+### 2.25 Landing page (qayta qurilgan)
+
+**Fayl:** `src/components/LandingPage.tsx`
+
+Namunaviy dizayn bo'yicha qayta qurildi: sarlavha navi (anchor bo'ylab siljish),
+hero + mahsulot dashboard mockup'i, 4 qadamli "qanday ishlaydi", 6 xususiyatli
+qorong'u bo'lim, **halol chancing bo'limi** (admission ehtimoli maxsus "—" —
+platforma ehtimollikni ixtiro qilmaydi, izoh bilan), roadmap, iqtibos va CTA.
+Tugma "Log in" emas — **Sign in** (profil tanlovini ochadi); "Get started"
+onboarding'ni boshlaydi; footer /privacy va /terms ga olib boradi.
+To'liq lokalizatsiya: `landing` namespace 3 til × 93 kalit.
+
 ---
 
 ## 3. Ma'lumotlar bazasi
@@ -442,7 +454,7 @@ npm run test:compare     # 32
 npm run test:mentors     # 37
 npm run test:parent      # 41
 npm run test:dataset     # 50
-npm run test:render      # 26
+npm run test:render      # 37
 npm run test:essay-adapter  # 39
 npm run test:rec-letter     # 28
 npm run test:country-compare  # 17
@@ -450,7 +462,7 @@ npm run test:opportunities    # 14
 npm run test:essay-reviews    # 16
 ```
 
-Jami: **612 passed, 0 failed.**
+Jami: **623 passed, 0 failed.**
 
 **Xavfsizlik va statik tekshiruvlar:**
 
@@ -485,7 +497,7 @@ Uch yo'nalishni qoplaydi:
 | `/api/countries/compare` (8 assert) | O'rtachalar faqat nashr qilingan qiymatlardan; work rights hech qachon ixtiro qilinmaydi; noma'lum mamlakat → null, NaN yo'q |
 | `/api/essays/reviews` (13 assert) | Ochiq inshoga boshqa talaba sharh qo'yadi; yopiq → 403; muallif o'z inshosini → 403; anonim → 401; o'rtachalar muallifda; sharhlovchi anonim; toggle'da IDOR 404; yopgach sharhlar yana rad etiladi |
 
-**Umumiy jami: 612 + 52 + 115 = 779 assertion, 0 failed.**
+**Umumiy jami: 623 + 52 + 115 = 790 assertion, 0 failed.**
 
 > **Tuzatilgan da'vo.** Bu hisobotning avvalgi versiyasida "sandbox'da
 > Postgres yo'q, shuning uchun DB bilan ishlaydigan route'lar bu yerda ishga
