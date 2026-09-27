@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6366F1" />
+  <title>Dashboard &amp; Audit — ScholarBridge AI</title>
+  <meta name="description" content="ScholarBridge AI dashboard — admissions overview, applications, deadlines and smart AI tools." />
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS (Play CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brand: { DEFAULT: '#6366F1', 50: '#EEF2FF', 100: '#E0E7FF', 500: '#6366F1', 600: '#4F46E5', 700: '#4338CA' } },
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'] },
+          boxShadow: {
+            card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.06)',
+            'card-hover': '0 12px 32px -8px rgb(79 70 229 / 0.18)',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Tailwind component helpers -->
+  <style type="text/tailwindcss">
+    .badge          { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none; }
+    .icon-chip      { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl; }
+    .icon-btn       { @apply flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-all duration-300 hover:bg-gray-200/70 hover:text-gray-800; }
+    .dropdown       { @apply pointer-events-none opacity-0 scale-95 transition-all duration-200 ease-out; }
+    .dropdown.show  { @apply pointer-events-auto opacity-100 scale-100; }
+    .task-check.checked                          { @apply border-brand-500 bg-brand-500 text-white; }
+    .task-check.checked ~ .task-body .task-title { @apply text-gray-400 line-through; }
+  </style>
+
+  <style>
+    /* ---------- Keyframe animations ---------- */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* "backwards" fill: during the stagger delay the element holds the `from`
+       state, but AFTER the animation finishes the element returns to its
+       natural styles, so hover transforms/transitions keep working. */
+    .fade-up { animation: fadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: var(--d, 0s); }
+
+    /* ---------- Progress bars (filled from 0% by JS on load) ---------- */
+    .progress-fill { width: 0%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* ---------- Mobile sidebar slide-in ---------- */
+    #sidebar { transition: transform 0.3s ease-in-out; }
+    @media (max-width: 767px) {
+      #sidebar { transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); box-shadow: 0 25px 60px -12px rgb(0 0 0 / 0.55); }
+    }
+    #overlay { transition: opacity 0.3s ease-in-out; }
+    #overlay.show { opacity: 1; pointer-events: auto; }
+
+    /* ---------- Sidebar scrollbar ---------- */
+    #sidebarNav::-webkit-scrollbar { width: 5px; }
+    #sidebarNav::-webkit-scrollbar-thumb { background: rgb(55 65 81 / 0.7); border-radius: 999px; }
+
+    :focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; border-radius: 6px; }
+    ::selection { background: #c7d2fe; color: #1e1b4b; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .progress-fill { width: var(--final-width, 0%); }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-gray-800 antialiased">
+
+  <!-- ======================= SIDEBAR ======================= -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col bg-gray-900 text-gray-300" aria-label="Main navigation">
+
+    <!-- Logo -->
+    <div class="flex h-[68px] shrink-0 items-center gap-3 border-b border-gray-800 px-5 md:justify-center lg:justify-start">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-lg shadow-brand-500/40">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+      </div>
+      <div class="leading-tight md:hidden lg:block">
+        <p class="text-[15px] font-bold text-white">ScholarBridge <span class="text-indigo-400">AI</span></p>
+        <p class="text-[9px] font-medium uppercase tracking-[0.18em] text-gray-500">Admissions copilot</p>
+      </div>
+      <button id="closeSidebar" class="ml-auto rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white md:hidden" aria-label="Close menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-5 w-5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Nav -->
+    <nav id="sidebarNav" class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+
+      <!-- Main menu -->
+      <a href="#" aria-current="page" title="Dashboard & Audit"
+         class="group flex items-center gap-3 rounded-xl bg-brand-500 px-3 py-2.5 text-white shadow-lg shadow-brand-500/30 transition-all duration-300 hover:bg-brand-600 md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span class="text-sm font-semibold md:hidden lg:inline">Dashboard &amp; Audit</span>
+      </a>
+
+      <a href="#" title="University Explorer"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
+        <span class="text-sm font-medium md:hidden lg:inline">University Explorer</span>
+      </a>
+
+      <a href="#" title="Scholarships Hub"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+        <span class="text-sm font-medium md:hidden lg:inline">Scholarships Hub</span>
+      </a>
+
+      <a href="#" title="My Applications"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span class="text-sm font-medium md:hidden lg:inline">My Applications</span>
+      </a>
+
+      <a href="#" title="My Chances"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span class="text-sm font-medium md:hidden lg:inline">My Chances</span>
+      </a>
+
+      <!-- SMART TOOLS -->
+      <div class="!mt-5 border-t border-gray-800 pt-4">
+        <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 md:hidden lg:block">Smart Tools</p>
+
+        <!-- AI Tools (accordion) -->
+        <button id="aiToolsBtn" type="button" title="AI Tools" aria-expanded="false"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M12 3l1.9 5.7a2 2 0 0 0 1.3 1.3L21 12l-5.7 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.7a2 2 0 0 0-1.3-1.3L3 12l5.7-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
+          <span class="flex-1 text-left text-sm font-medium md:hidden lg:inline">AI Tools</span>
+          <svg id="aiToolsChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 text-gray-500 transition-transform duration-300 md:hidden lg:inline"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <div id="aiToolsMenu" class="hidden space-y-0.5 pb-1">
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
+            <span class="md:hidden lg:inline">SOP Writer</span>
+          </a>
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
+            <span class="md:hidden lg:inline">CV Analyzer</span>
+          </a>
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
+            <span class="md:hidden lg:inline">Scholarship Match</span>
+          </a>
+        </div>
+
+        <a href="#" title="Community Forum"
+           class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+          <span class="text-sm font-medium md:hidden lg:inline">Community Forum</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Bottom pinned section -->
+    <div class="shrink-0 space-y-1 px-3 pb-2">
+      <a href="#" title="Premium"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-amber-300 transition-all duration-300 hover:bg-gray-800 md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-amber-400 transition-transform duration-300 group-hover:scale-110"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/></svg>
+        <span class="text-sm font-semibold md:hidden lg:inline">Premium</span>
+        <span class="badge ml-auto bg-amber-400/15 text-amber-300 md:hidden lg:inline-flex">PRO</span>
+      </a>
+      <a href="#" title="Rewards & Referrals"
+         class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
+        <span class="text-sm font-medium md:hidden lg:inline">Rewards &amp; Referrals</span>
+      </a>
+    </div>
+
+    <!-- Profile -->
+    <div class="shrink-0 border-t border-gray-800 p-3">
+      <div class="flex items-center gap-3 rounded-xl p-2 transition-colors duration-300 hover:bg-gray-800 md:justify-center lg:justify-start">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-600 text-xs font-bold text-white ring-2 ring-gray-700">SU</div>
+        <div class="min-w-0 flex-1 md:hidden lg:block">
+          <p class="truncate text-sm font-semibold text-white">Hakimov H.</p>
+          <p class="text-[11px] text-gray-500">Free Plan</p>
+        </div>
+        <button class="rounded-lg p-1.5 text-gray-500 transition-all duration-300 hover:bg-gray-700 hover:text-red-400 md:hidden lg:block" title="Log out" aria-label="Log out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile overlay -->
+  <div id="overlay" class="pointer-events-none fixed inset-0 z-40 bg-gray-900/60 opacity-0 backdrop-blur-sm md:hidden"></div>
+
+  <!-- ======================= HEADER + MAIN ======================= -->
+  <div class="md:ml-20 lg:ml-[250px]">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-30 border-b border-gray-200/70 bg-slate-50/85 backdrop-blur-md">
+      <div class="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-3 sm:px-6">
+        <button id="menuBtn" class="icon-btn -ml-2 md:hidden" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-5 w-5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+
+        <!-- Search -->
+        <div class="relative min-w-0 flex-1 sm:max-w-xl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" placeholder="Search universities, scholarships..."
+                 class="w-full rounded-full border border-transparent bg-gray-100 py-2.5 pl-10 pr-4 text-base text-gray-700 placeholder-gray-400 shadow-inner transition-all duration-300 focus:border-indigo-200 focus:bg-white focus:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 sm:text-sm" />
+        </div>
+
+        <div class="ml-auto flex items-center gap-1 sm:gap-2">
+          <!-- Notifications -->
+          <button class="icon-btn relative hover:scale-105" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="absolute right-2 top-2 flex h-2.5 w-2.5">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-50"></span>
+            </span>
+          </button>
+
+          <!-- Language switcher -->
+          <div class="relative" data-dropdown>
+            <button id="langBtn" class="flex items-center gap-2 rounded-full px-2.5 py-2 text-sm font-semibold text-gray-600 transition-all duration-300 hover:bg-gray-200/70 hover:scale-105 sm:px-3" aria-haspopup="listbox" aria-expanded="false">
+              <span id="langFlag" class="flex">
+                <svg viewBox="0 0 60 30" class="h-4 w-6 rounded-[3px] shadow-sm" aria-hidden="true"><defs><clipPath id="f-uk"><rect width="60" height="30" rx="3"/></clipPath></defs><g clip-path="url(#f-uk)"><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="2.5"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>
+              </span>
+              <span id="langLabel" class="hidden sm:inline">EN</span>
+              <svg id="langChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-gray-400 transition-transform duration-300"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+
+            <div id="langMenu" class="dropdown absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-gray-100 bg-white py-1.5 shadow-xl" role="listbox">
+              <button class="lang-opt flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600" data-lang="EN" role="option" aria-selected="true">
+                <svg viewBox="0 0 60 30" class="h-4 w-6 rounded-[3px] shadow-sm" aria-hidden="true"><defs><clipPath id="f-uk-2"><rect width="60" height="30" rx="3"/></clipPath></defs><g clip-path="url(#f-uk-2)"><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="2.5"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>
+                <span class="flex-1 text-left">English</span>
+                <svg class="opt-check h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <button class="lang-opt flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600" data-lang="RU" role="option" aria-selected="false">
+                <svg viewBox="0 0 60 30" class="h-4 w-6 rounded-[3px] shadow-sm" aria-hidden="true"><defs><clipPath id="f-ru"><rect width="60" height="30" rx="3"/></clipPath></defs><g clip-path="url(#f-ru)"><rect width="60" height="30" fill="#fff"/><rect y="10" width="60" height="10" fill="#0039A6"/><rect y="20" width="60" height="10" fill="#D52B1E"/></g></svg>
+                <span class="flex-1 text-left">Русский</span>
+                <svg class="opt-check hidden h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <button class="lang-opt flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600" data-lang="UZ" role="option" aria-selected="false">
+                <svg viewBox="0 0 60 30" class="h-4 w-6 rounded-[3px] shadow-sm" aria-hidden="true"><defs><clipPath id="f-uz"><rect width="60" height="30" rx="3"/></clipPath></defs><g clip-path="url(#f-uz)"><rect width="60" height="30" fill="#0099B5"/><rect y="10" width="60" height="10" fill="#fff"/><rect y="20" width="60" height="10" fill="#1EB53A"/><rect y="9.5" width="60" height="1.2" fill="#CE1126"/><rect y="19.3" width="60" height="1.2" fill="#CE1126"/><circle cx="9.5" cy="5" r="3.2" fill="#fff"/><circle cx="11" cy="4.4" r="2.7" fill="#0099B5"/></g></svg>
+                <span class="flex-1 text-left">O'zbekcha</span>
+                <svg class="opt-check hidden h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
+
+      <!-- ============ Welcome banner ============ -->
+      <section class="fade-up relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white shadow-lg shadow-brand-500/25 sm:p-8" style="--d:0s">
+        <div class="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-28 right-32 h-64 w-64 rounded-full bg-white/5"></div>
+        <div class="pointer-events-none absolute -left-10 -bottom-16 h-40 w-40 rounded-full bg-indigo-400/20 blur-2xl"></div>
+
+        <div class="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div class="max-w-2xl">
+            <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Welcome back, Hushnudbek! 👋</h1>
+            <p class="mt-2 text-sm leading-relaxed text-indigo-100 sm:text-base">
+              You are on track for the <span class="font-semibold text-white">Fall 2024</span> admissions cycle.
+              3 applications are in progress and 1 deadline is approaching — keep the momentum going.
+            </p>
+          </div>
+          <button class="shrink-0 rounded-xl bg-white px-6 py-3 text-sm font-bold text-brand-600 shadow-md transition-all duration-300 ease-in-out hover:scale-105 hover:bg-indigo-50 hover:shadow-xl active:scale-95">
+            Resume Application
+          </button>
+        </div>
+      </section>
+
+      <!-- ============ Stat cards ============ -->
+      <section class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4" aria-label="Statistics">
+
+        <!-- Profile Strength -->
+        <article class="fade-up group rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.08s">
+          <div class="flex items-start justify-between">
+            <div class="icon-chip bg-indigo-50 text-brand-500 transition-transform duration-300 group-hover:scale-110">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span class="badge bg-emerald-50 text-emerald-600">▲ +5%</span>
+          </div>
+          <p class="mt-4 text-sm font-medium text-gray-500">Profile Strength</p>
+          <p class="mt-1 flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-gray-900"><span class="count" data-count="85">0</span>%</span>
+            <span class="text-sm font-semibold text-emerald-500">Excellent</span>
+          </p>
+          <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+            <div class="progress-fill h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" data-progress="85%" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </article>
+
+        <!-- Saved Universities -->
+        <article class="fade-up group rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.14s">
+          <div class="flex items-start justify-between">
+            <div class="icon-chip bg-violet-50 text-violet-500 transition-transform duration-300 group-hover:scale-110">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+            </div>
+          </div>
+          <p class="mt-4 text-sm font-medium text-gray-500">Saved Universities</p>
+          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="12">0</span></p>
+          <p class="mt-1 text-xs text-gray-400">Across 3 countries</p>
+        </article>
+
+        <!-- Active Applications -->
+        <article class="fade-up group rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.2s">
+          <div class="flex items-start justify-between">
+            <div class="icon-chip bg-sky-50 text-sky-500 transition-transform duration-300 group-hover:scale-110">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+          </div>
+          <p class="mt-4 text-sm font-medium text-gray-500">Active Applications</p>
+          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="3">0</span></p>
+          <p class="mt-1 text-xs text-gray-400">2 in drafting, 1 submitted</p>
+        </article>
+
+        <!-- Upcoming Deadlines -->
+        <article class="fade-up group rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.26s">
+          <div class="flex items-start justify-between">
+            <div class="icon-chip bg-red-50 text-red-500 transition-transform duration-300 group-hover:scale-110">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <span class="badge animate-pulse bg-red-50 text-red-600">Urgent</span>
+          </div>
+          <p class="mt-4 text-sm font-medium text-gray-500">Upcoming Deadlines</p>
+          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="1">0</span></p>
+          <p class="mt-1 text-xs font-medium text-red-400">MEXT Scholarship in 5 days</p>
+        </article>
+      </section>
+
+      <!-- ============ Bottom section ============ -->
+      <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        <!-- Application Status (2/3) -->
+        <article class="fade-up rounded-2xl border border-gray-100 bg-white shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover lg:col-span-2" style="--d:.32s">
+          <div class="flex items-center justify-between px-5 pt-5 sm:px-6">
+            <h2 class="text-base font-bold text-gray-900 sm:text-lg">Application Status</h2>
+            <a href="#" class="group inline-flex items-center gap-1 text-sm font-semibold text-brand-500 transition-colors hover:text-brand-700">
+              View All
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+          </div>
+
+          <div class="mt-4 overflow-x-auto pb-2">
+            <table class="w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr class="border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-400">
+                  <th scope="col" class="px-5 py-3 font-semibold sm:px-6">University / Program</th>
+                  <th scope="col" class="px-4 py-3 font-semibold">Progress</th>
+                  <th scope="col" class="px-4 py-3 font-semibold">Status</th>
+                  <th scope="col" class="px-5 py-3 text-right font-semibold sm:px-6">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <tr class="transition-colors duration-200 hover:bg-slate-50/80">
+                  <td class="px-5 py-4 sm:px-6">
+                    <div class="flex items-center gap-3">
+                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[10px] font-bold text-blue-600">TUM</div>
+                      <div class="min-w-0">
+                        <p class="truncate font-semibold text-gray-900">Technical University of Munich</p>
+                        <p class="text-xs text-gray-500">MSc Computer Science</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="flex items-center gap-2">
+                      <div class="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100 sm:w-24">
+                        <div class="progress-fill h-full rounded-full bg-brand-500" data-progress="65%"></div>
+                      </div>
+                      <span class="text-xs font-semibold text-gray-500">65%</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4"><span class="badge bg-blue-50 text-blue-600">Drafting</span></td>
+                  <td class="px-5 py-4 text-right sm:px-6">
+                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-400 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr class="transition-colors duration-200 hover:bg-slate-50/80">
+                  <td class="px-5 py-4 sm:px-6">
+                    <div class="flex items-center gap-3">
+                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[10px] font-bold text-sky-600">YU</div>
+                      <div class="min-w-0">
+                        <p class="truncate font-semibold text-gray-900">Yonsei University</p>
+                        <p class="text-xs text-gray-500">Global MBA</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="flex items-center gap-2">
+                      <div class="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100 sm:w-24">
+                        <div class="progress-fill h-full rounded-full bg-brand-500" data-progress="20%"></div>
+                      </div>
+                      <span class="text-xs font-semibold text-gray-500">20%</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4"><span class="badge bg-gray-100 text-gray-600">Gathering Docs</span></td>
+                  <td class="px-5 py-4 text-right sm:px-6">
+                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-400 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- What should I do next? (1/3) -->
+        <article class="fade-up flex flex-col rounded-2xl border border-gray-100 bg-white shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.4s">
+          <div class="flex items-center justify-between px-5 pt-5 sm:px-6">
+            <h2 class="text-base font-bold text-gray-900 sm:text-lg">What should I do next?</h2>
+            <span class="badge bg-indigo-50 text-brand-600">2 tasks</span>
+          </div>
+
+          <div class="flex-1 space-y-3 p-4 sm:p-5">
+            <!-- Task 1 -->
+            <div class="flex gap-3 rounded-xl border border-transparent p-3 transition-all duration-300 hover:border-indigo-100 hover:bg-indigo-50/60">
+              <button class="task-check mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-gray-300 text-transparent transition-all duration-300 hover:border-brand-500" role="checkbox" aria-checked="false" aria-label="Mark task complete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <div class="task-body min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Prepare MEXT Japanese Gov Scholarship</p>
+                  <span class="badge bg-red-100 text-red-600">Overdue</span>
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-gray-500">Due in 5 days. You have missing info.</p>
+              </div>
+            </div>
+
+            <!-- Task 2 -->
+            <div class="flex gap-3 rounded-xl border border-transparent p-3 transition-all duration-300 hover:border-indigo-100 hover:bg-indigo-50/60">
+              <button class="task-check mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-gray-300 text-transparent transition-all duration-300 hover:border-brand-500" role="checkbox" aria-checked="false" aria-label="Mark task complete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <div class="task-body min-w-0">
+                <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Finalize Statement of Purpose (TUM)</p>
+                <a href="#" class="group mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand-500 transition-colors hover:text-brand-700">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-12"><path d="M12 3l1.9 5.7a2 2 0 0 0 1.3 1.3L21 12l-5.7 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.7a2 2 0 0 0-1.3-1.3L3 12l5.7-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
+                  Open AI Tool
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-4 pb-5 sm:px-5">
+            <button class="w-full rounded-xl border-2 border-indigo-100 py-2.5 text-sm font-bold text-brand-600 transition-all duration-300 ease-in-out hover:scale-[1.02] hover:border-brand-500 hover:bg-brand-500 hover:text-white hover:shadow-lg hover:shadow-brand-500/30 active:scale-[0.99]">
+              View All Tasks
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <p class="pb-4 text-center text-xs text-gray-400">ScholarBridge AI · Your bridge to global education</p>
+    </main>
+  </div>
+
+  <!-- ======================= FLOATING HELP BUTTON ======================= -->
+  <div class="fixed bottom-5 right-5 z-[35] flex flex-col items-end gap-3">
+    <!-- Help panel -->
+    <div id="helpPanel" class="dropdown w-72 origin-bottom-right rounded-2xl border border-gray-100 bg-white p-3 shadow-2xl" data-dropdown>
+      <div class="px-2 pb-2 pt-1">
+        <p class="text-sm font-bold text-gray-900">Need a hand? 🤝</p>
+        <p class="mt-0.5 text-xs text-gray-500">Ask the AI assistant or browse quick help.</p>
+      </div>
+      <div class="space-y-1">
+        <button class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600">💬&nbsp; Ask AI Assistant</button>
+        <button class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600">📚&nbsp; FAQ &amp; Guides</button>
+        <button class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-indigo-50 hover:text-brand-600">✉️&nbsp; Contact Support</button>
+      </div>
+    </div>
+
+    <button id="fabBtn" class="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-xl shadow-brand-500/40 transition-all duration-300 ease-in-out hover:scale-105 hover:bg-brand-600 active:scale-95" aria-label="Help & chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </button>
+  </div>
+
+  <!-- ======================= SCRIPTS ======================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* ---------- Mobile sidebar ---------- */
+      var sidebar = document.getElementById('sidebar');
+      var overlay = document.getElementById('overlay');
+
+      function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+      function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+      document.getElementById('menuBtn').addEventListener('click', openSidebar);
+      document.getElementById('closeSidebar').addEventListener('click', closeSidebar);
+      overlay.addEventListener('click', closeSidebar);
+
+      /* ---------- Progress bars: animate 0% -> target on load ---------- */
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          document.querySelectorAll('.progress-fill').forEach(function (bar) {
+            var target = bar.dataset.progress || '0%';
+            bar.style.setProperty('--final-width', target); /* fallback for reduced-motion */
+            bar.style.width = target;
+          });
+        }, reduceMotion ? 0 : 250);
+      });
+
+      /* ---------- Animated counters ---------- */
+      document.querySelectorAll('.count').forEach(function (el) {
+        var target = parseInt(el.dataset.count, 10) || 0;
+        if (reduceMotion) { el.textContent = String(target); return; }
+        var duration = 1000;
+        var start = null;
+        function tick(now) {
+          if (start === null) start = now;
+          var p = Math.min((now - start) / duration, 1);
+          var eased = 1 - Math.pow(1 - p, 3); /* ease-out cubic */
+          el.textContent = String(Math.round(target * eased));
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+
+      /* ---------- Task checkboxes ---------- */
+      document.querySelectorAll('.task-check').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var done = btn.classList.toggle('checked');
+          btn.setAttribute('aria-checked', done ? 'true' : 'false');
+        });
+      });
+
+      /* ---------- AI Tools accordion (sidebar) ---------- */
+      var aiBtn = document.getElementById('aiToolsBtn');
+      var aiMenu = document.getElementById('aiToolsMenu');
+      var aiChevron = document.getElementById('aiToolsChevron');
+      aiBtn.addEventListener('click', function () {
+        var isOpen = !aiMenu.classList.contains('hidden');
+        aiMenu.classList.toggle('hidden', isOpen);
+        aiChevron.classList.toggle('rotate-180', !isOpen);
+        aiBtn.setAttribute('aria-expanded', String(!isOpen));
+      });
+
+      /* ---------- Dropdowns: language + help panel ---------- */
+      var langMenu = document.getElementById('langMenu');
+      var langChevron = document.getElementById('langChevron');
+      var helpPanel = document.getElementById('helpPanel');
+
+      function closeAllDropdowns() {
+        [langMenu, helpPanel].forEach(function (d) { d.classList.remove('show'); });
+        langChevron.classList.remove('rotate-180');
+        document.getElementById('langBtn').setAttribute('aria-expanded', 'false');
+      }
+
+      document.getElementById('langBtn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = !langMenu.classList.contains('show');
+        closeAllDropdowns();
+        if (willOpen) {
+          langMenu.classList.add('show');
+          langChevron.classList.add('rotate-180');
+          this.setAttribute('aria-expanded', 'true');
+        }
+      });
+
+      document.getElementById('fabBtn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = !helpPanel.classList.contains('show');
+        closeAllDropdowns();
+        if (willOpen) helpPanel.classList.add('show');
+      });
+
+      /* Language selection */
+      document.querySelectorAll('.lang-opt').forEach(function (opt) {
+        opt.addEventListener('click', function (e) {
+          e.stopPropagation();
+          document.getElementById('langLabel').textContent = opt.dataset.lang;
+          document.getElementById('langFlag').innerHTML = opt.querySelector('svg').outerHTML;
+          document.querySelectorAll('.lang-opt').forEach(function (o) {
+            var active = o === opt;
+            o.setAttribute('aria-selected', String(active));
+            o.querySelector('.opt-check').classList.toggle('hidden', !active);
+          });
+          closeAllDropdowns();
+        });
+      });
+
+      /* Items inside help panel close it */
+      helpPanel.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', closeAllDropdowns);
+      });
+
+      /* Click outside -> close dropdowns */
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-dropdown]') && !e.target.closest('#fabBtn')) {
+          closeAllDropdowns();
+        }
+      });
+
+      /* Escape -> close everything */
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeAllDropdowns();
+          closeSidebar();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
