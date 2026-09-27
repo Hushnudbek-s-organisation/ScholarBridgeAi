@@ -2,11 +2,23 @@
 
 import React, { useEffect, useState } from "react";
 import { Menu, Eye, EyeOff, Lock, Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
+  NAV_GROUPS,
   NAV_SECTIONS,
+  navLabelKey,
   parseHiddenNav,
 } from "@/lib/navSections";
+
+const GROUP_KEY: Record<string, string> = {
+  start: "groupStart",
+  explore: "groupExplore",
+  plan: "groupPlan",
+  apply: "groupApply",
+  help: "groupHelp",
+  account: "groupAccount",
+};
 
 interface NavManagerProps {
   adminProfileId: number;
@@ -24,6 +36,7 @@ interface NavManagerProps {
  * Country Compare, Parents) start OFF and can be brought back here at any time.
  */
 export function NavManager({ adminProfileId }: NavManagerProps) {
+  const tn = useTranslations("nav");
   const [hidden, setHidden] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
@@ -134,8 +147,14 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : (
+          <div>
+          {NAV_GROUPS.map((group) => (
+          <div key={group}>
+          <p className="border-b border-slate-100 bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {tn(GROUP_KEY[group])}
+          </p>
           <ul className="divide-y divide-slate-100">
-            {NAV_SECTIONS.map((section) => {
+            {NAV_SECTIONS.filter((section) => section.group === group).map((section) => {
               const visible = !hidden.includes(section.id);
               const saving = savingId === section.id;
               return (
@@ -146,8 +165,13 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-extrabold text-slate-800">
-                        {section.label}
+                        {tn(navLabelKey(section.id))}
                       </span>
+                      {section.isNew && (
+                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
+                          {tn("new")}
+                        </span>
+                      )}
                       <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
                         {section.id}
                       </code>
@@ -191,6 +215,9 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
               );
             })}
           </ul>
+          </div>
+          ))}
+          </div>
         )}
       </div>
 

@@ -498,9 +498,16 @@ async function main() {
 
   check("every /api/admin route verifies the session with requireAdmin", () => {
     const missing: string[] = [];
+    // Growth routes go through guardAdmin()/makeAdminCrud(), which must
+    // themselves call requireAdmin — verified here so the shortcut stays safe.
+    const growthApi = readFileSync(join(process.cwd(), "src/lib/growth/api.ts"), "utf8");
+    const guardBody = growthApi.slice(growthApi.indexOf("export async function guardAdmin"));
+    assert.match(guardBody.slice(0, guardBody.indexOf("\n}\n")), /requireAdmin\(req\)/);
+    const crud = readFileSync(join(process.cwd(), "src/lib/growth/adminCrud.ts"), "utf8");
+    assert.equal((crud.match(/await guardAdmin\(req/g) ?? []).length, 4);
     for (const file of routeFiles.filter((f) => f.includes(`${apiDir}/admin`))) {
       const src = readFileSync(file, "utf8");
-      if (!/requireAdmin\(/.test(src)) missing.push(file);
+      if (!/requireAdmin\(|guardAdmin\(req|makeAdminCrud\(/.test(src)) missing.push(file);
     }
     assert.deepEqual(missing, []);
   });

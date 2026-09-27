@@ -32,7 +32,8 @@
     "test:country-compare": "tsx scripts/check-country-compare.ts",
     "test:opportunities": "tsx scripts/check-opportunities.ts",
     "test:essay-reviews": "tsx scripts/check-essay-reviews.ts",
-    "test:integration": "tsx scripts/check-integration.ts"
+    "test:integration": "tsx scripts/check-integration.ts",
+    "test:growth": "tsx scripts/check-growth.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

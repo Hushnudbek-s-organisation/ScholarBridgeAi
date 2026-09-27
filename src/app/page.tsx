@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar, StudentProfile } from "@/components/Navbar";
 import { ProfileModal } from "@/components/ProfileModal";
 import { DashboardView } from "@/components/DashboardView";
@@ -40,6 +40,30 @@ import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { trackScreen } from "@/lib/tracker";
 import { PageTransition } from "@/components/motion";
+import { NAV_SECTIONS } from "@/lib/navSections";
+import { JourneyGuide } from "@/components/JourneyGuide";
+import { SectionIntro } from "@/components/SectionIntro";
+import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
+import { AnswerVault } from "@/components/growth/AnswerVault";
+import { GoalPlanner } from "@/components/growth/GoalPlanner";
+import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
+import { SuccessStories } from "@/components/growth/SuccessStories";
+
+/** Tabs that may appear in the URL hash (#scholarships …) for deep links. */
+const LINKABLE_TABS = new Set<string>([
+  ...NAV_SECTIONS.map((s) => s.id).filter((id) => id !== "profile"),
+  "admin",
+  "tracker",
+  "deadlines",
+  "courses",
+  "consulting",
+]);
+
+function tabFromHash(): string | null {
+  if (typeof window === "undefined") return null;
+  const id = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+  return LINKABLE_TABS.has(id) ? id : null;
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -223,6 +247,9 @@ export default function Home() {
         }
         hydrateProfileData(storedId);
         setView("app");
+        // Deep link (#autopilot, #stories …) wins over the default tab.
+        const linked = tabFromHash();
+        if (linked && (linked !== "admin" || data.profile.isAdmin)) setActiveTab(linked);
         // Fire-and-forget: check for approaching deadlines → notifications.
         try {
           fetch("/api/notifications/sweep", {
@@ -257,6 +284,35 @@ export default function Home() {
     }
     setView("landing");
   }, [hydrateProfileData, rememberProfile]);
+
+  // Keep the URL hash in step with the open section so the browser Back
+  // button works and a section can be shared/bookmarked (#scholarships).
+  const hashSynced = useRef(false);
+  useEffect(() => {
+    if (view !== "app") return;
+    const want = `#${activeTab}`;
+    if (window.location.hash === want) {
+      hashSynced.current = true;
+      return;
+    }
+    const url = `${window.location.pathname}${window.location.search}${want}`;
+    if (hashSynced.current) window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    hashSynced.current = true;
+  }, [activeTab, view]);
+
+  useEffect(() => {
+    const onNav = () => {
+      const linked = tabFromHash();
+      if (linked) setActiveTab(linked);
+    };
+    window.addEventListener("popstate", onNav);
+    window.addEventListener("hashchange", onNav);
+    return () => {
+      window.removeEventListener("popstate", onNav);
+      window.removeEventListener("hashchange", onNav);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -518,6 +574,7 @@ export default function Home() {
       return;
     }
     setActiveTab(tab);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // ---- Landing / onboarding flow ----
@@ -619,7 +676,7 @@ export default function Home() {
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Sections swap with a short cross-fade + lift. Keyed on what is
             actually on screen so the wizard and every tab participate. */}
         <PageTransition
@@ -630,6 +687,8 @@ export default function Home() {
           }
           distance={14}
         >
+          {/* One-line "what is this page?" banner for newcomers (admin-editable) */}
+          {!(activeProfile && !activeProfile.onboardingCompleted) && <SectionIntro section={activeTab} />}
           {/* Onboarding wizard — shown for profiles that haven't completed
               the step-by-step setup yet. Resumes from the saved step. */}
           {activeProfile && !activeProfile.onboardingCompleted ? (
@@ -639,6 +698,8 @@ export default function Home() {
             />
           ) : activeTab === "dashboard" && (
             <div className="space-y-4">
+              {/* "Your path" — the 8-step journey; one highlighted next step */}
+              <JourneyGuide profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
               {/* #4 Personalized Roadmap — the centrepiece: three actions */}
               <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
               <DashboardView
@@ -794,14 +855,30 @@ export default function Home() {
 
           {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
 
+          {/* Growth features (CollegeVine / ApplyBoard / ScholarshipOwl /
+              Crimson / AdmitSee-inspired, adapted) */}
+          {activeTab === "autopilot" && (
+            <ScholarshipAutopilot
+              activeProfile={activeProfile}
+              onSaveScholarship={async (id) => {
+                await handleSaveScholarship(id);
+              }}
+              onNavigate={handleNavigateTab}
+            />
+          )}
+          {activeTab === "vault" && <AnswerVault activeProfile={activeProfile} />}
+          {activeTab === "goals" && <GoalPlanner activeProfile={activeProfile} />}
+          {activeTab === "departure" && <DepartureChecklist activeProfile={activeProfile} onNavigate={handleNavigateTab} />}
+          {activeTab === "stories" && <SuccessStories activeProfile={activeProfile} />}
+
           {/* SEO/AEO: FAQ har bir bo'limda sahifa pastida ko'rinadi */}
-          <FaqSection />
+          {activeTab !== "admin" && <FaqSection />}
 
         </PageTransition>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white pt-6 pb-24 lg:pb-6 mt-12 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>

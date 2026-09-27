@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, index, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
@@ -1032,4 +1032,147 @@ export const essayReviews = pgTable(
     index("idx_essay_reviews_version").on(table.essayVersionId),
     index("idx_essay_reviews_reviewer").on(table.reviewerProfileId),
   ]
+);
+
+// ---------------------------------------------------------------------------
+// Growth features (supabase/add_growth_features.sql). Ideas taken from
+// AdmitYogi/AdmitSee (success stories), ScholarshipOwl (scholarship autopilot,
+// reusable answers), Crimson (goal planner) and ApplyBoard (departure
+// checklist) — adapted, not copied. Every catalogue here is admin-managed.
+// The same DDL runs lazily from `src/lib/growth/db.ts` so a deploy never
+// needs a manual migration first.
+// ---------------------------------------------------------------------------
+
+/** Admitted-student stories: user-submitted, admin-moderated. */
+export const successStories = pgTable(
+  "success_stories",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    displayName: text("display_name").notNull().default("Anonymous"),
+    homeCountry: text("home_country"),
+    admittedUniversity: text("admitted_university").notNull(),
+    admittedCountry: text("admitted_country"),
+    otherAdmits: text("other_admits").notNull().default("[]"), // JSON list of names
+    degreeLevel: text("degree_level"),
+    major: text("major"),
+    intakeYear: integer("intake_year"),
+    gpa: doublePrecision("gpa"),
+    gpaScale: doublePrecision("gpa_scale"),
+    ielts: doublePrecision("ielts"),
+    toefl: integer("toefl"),
+    sat: integer("sat"),
+    activities: text("activities").notNull().default("[]"), // JSON list
+    awards: text("awards").notNull().default("[]"), // JSON list
+    essayTitle: text("essay_title"),
+    essayExcerpt: text("essay_excerpt"),
+    advice: text("advice"),
+    scholarshipName: text("scholarship_name"),
+    scholarshipAmountUsd: integer("scholarship_amount_usd"),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected
+    isVerified: boolean("is_verified").notNull().default(false),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    adminNote: text("admin_note"),
+    views: integer("views").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_success_stories_status").on(table.status),
+    index("idx_success_stories_profile").on(table.profileId),
+  ]
+);
+
+/** Admin library of goals students can adopt (Academic / Activities / Skills / Career). */
+export const goalTemplates = pgTable("goal_templates", {
+  id: serial("id").primaryKey(),
+  pillar: text("pillar").notNull().default("academic"), // academic | activities | skills | career
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  steps: text("steps").notNull().default("[]"), // JSON list of step strings
+  level: text("level").notNull().default("any"), // any | high_school | undergrad | grad
+  estWeeks: integer("est_weeks"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** A student's adopted (or custom) goal with its own step progress. */
+export const studentGoals = pgTable(
+  "student_goals",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    templateId: integer("template_id").references(() => goalTemplates.id, { onDelete: "set null" }),
+    pillar: text("pillar").notNull().default("academic"),
+    title: text("title").notNull(),
+    steps: text("steps").notNull().default("[]"), // JSON [{ text, done }]
+    status: text("status").notNull().default("active"), // active | done
+    targetDate: date("target_date"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_student_goals_profile").on(table.profileId)]
+);
+
+/** Admin-managed common application questions ("write once, reuse everywhere"). */
+export const answerPrompts = pgTable("answer_prompts", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull().default("general"), // general | motivation | career | leadership | challenge | community
+  question: text("question").notNull(),
+  hint: text("hint").notNull().default(""),
+  wordLimit: integer("word_limit"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** The student's saved answer to one prompt. */
+export const answerVault = pgTable(
+  "answer_vault",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    promptId: integer("prompt_id").references(() => answerPrompts.id, { onDelete: "cascade" }).notNull(),
+    answer: text("answer").notNull().default(""),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_answer_vault_profile_prompt").on(table.profileId, table.promptId)]
+);
+
+/** Scholarship autopilot decisions: hidden ("not for me") or applied. */
+export const scholarshipDecisions = pgTable(
+  "scholarship_decisions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    scholarshipId: integer("scholarship_id").references(() => scholarships.id, { onDelete: "cascade" }).notNull(),
+    status: text("status").notNull(), // hidden | applied
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_scholarship_decisions_profile_sch").on(table.profileId, table.scholarshipId)]
+);
+
+/** Admin-managed "after the offer" checklist items, grouped by phase. */
+export const checklistItems = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  phase: text("phase").notNull().default("offer"), // offer | visa | money | housing | travel | arrival
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  linkTab: text("link_tab"), // optional in-app section id
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Which checklist items a student has ticked. */
+export const studentChecklist = pgTable(
+  "student_checklist",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    itemId: integer("item_id").references(() => checklistItems.id, { onDelete: "cascade" }).notNull(),
+    doneAt: timestamp("done_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_student_checklist_profile_item").on(table.profileId, table.itemId)]
 );

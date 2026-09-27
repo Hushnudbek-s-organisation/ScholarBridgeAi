@@ -167,6 +167,10 @@ export const LIMITS = {
   contact: { limit: 5, windowMs: 60 * 60_000 },
   /** Admin mutations: 240 / 10 min per admin. */
   adminWrite: { limit: 240, windowMs: 10 * 60_000 },
+  /** Everyday student writes (goals, answers, checklist ticks): 180 / 10 min per account. */
+  userWrite: { limit: 180, windowMs: 10 * 60_000 },
+  /** Success-story submissions: 5 / hour per account (admin-moderated). */
+  storySubmit: { limit: 5, windowMs: 60 * 60_000 },
   /** Analytics beacon: 60 / min per visitor. */
   beacon: { limit: 60, windowMs: 60_000 },
 } as const;
