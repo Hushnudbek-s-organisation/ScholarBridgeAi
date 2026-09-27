@@ -4,6 +4,7 @@
  * it without an import cycle.)
  */
 import { eq, lt } from "drizzle-orm";
+import { configuredAppUrl } from "@/lib/appUrl";
 import { db } from "@/db";
 import { studentProfiles, telegramLinks, telegramMessages } from "@/db/schema";
 import { tgEditMessage, tgSendMessage, type InlineButton, type Keyboard } from "./api";
@@ -107,12 +108,14 @@ export async function editOrSend(
 }
 
 export function publicSiteUrl(settings: Pick<TelegramSettings, "siteUrl">): string {
-  // Fall back to the deployment URL when the admin has not saved one yet.
-  return settings.siteUrl || process.env.NEXT_PUBLIC_APP_URL || "";
+  // The canonical deployment URL (APP_URL) wins so a domain move is a config
+  // change only; the address saved when the webhook was connected is the
+  // fallback for deployments that have not set APP_URL.
+  return configuredAppUrl() || settings.siteUrl || "";
 }
 
 export function siteButton(siteUrl: string, lang: BotLang, link?: string | null, label?: string): InlineButton[] {
-  const url = appLink(siteUrl || process.env.NEXT_PUBLIC_APP_URL || "", link ?? null);
+  const url = appLink(siteUrl || configuredAppUrl(), link ?? null);
   return isButtonUrl(url) ? [{ text: label ?? BOT_TEXTS[lang].openSite, url }] : [];
 }
 
@@ -121,8 +124,13 @@ export function siteButton(siteUrl: string, lang: BotLang, link?: string | null,
  * Telegram only opens https Mini Apps, so anything else yields null.
  */
 export function miniAppUrl(settings: Pick<TelegramSettings, "siteUrl">): string | null {
+  return miniAppUrlFor(publicSiteUrl(settings));
+}
+
+/** Mini App URL for an explicit site base (used right after setWebhook). */
+export function miniAppUrlFor(site: string): string | null {
   const override = process.env.TELEGRAM_MINI_APP_URL?.trim();
-  const url = override || (publicSiteUrl(settings) ? `${publicSiteUrl(settings).replace(/\/+$/, "")}/tg` : "");
+  const url = override || (site ? `${site.replace(/\/+$/, "")}/tg` : "");
   return isButtonUrl(url) ? url : null;
 }
 

@@ -14,7 +14,13 @@ export type AuditEntityType =
   | "checklist_item"
   | "config"
   // Account ↔ Telegram connections (entityId = profile id).
-  | "telegram_link";
+  | "telegram_link"
+  // Global AI provider configuration (entityId = 0). Never contains keys.
+  | "ai_provider"
+  // Platform ownership + transfers (entityId = transfer id, 0 = singleton).
+  | "ownership"
+  // Admin role grants/revocations by the owner (entityId = profile id).
+  | "admin_role";
 
 interface AuditEntry {
   entityType: AuditEntityType;

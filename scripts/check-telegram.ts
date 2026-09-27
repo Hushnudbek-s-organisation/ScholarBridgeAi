@@ -360,7 +360,11 @@ check("every drizzle column exists in the DDL", () => {
   const schema = read("src/db/schema.ts");
   const start = schema.indexOf('export const telegramLinks = pgTable("telegram_links"');
   assert.ok(start > 0);
-  const block = schema.slice(start);
+  // The Telegram tables form one contiguous block; stop at the first
+  // non-Telegram table declared after it (e.g. the ownership tables).
+  const after = schema.slice(start + 1);
+  const next = /export const \w+ = pgTable\(\s*"(?!telegram_)/.exec(after);
+  const block = schema.slice(start, next ? start + 1 + next.index : undefined);
   const cols = [...block.matchAll(/\b(?:text|integer|bigint|boolean|timestamp|serial)\("([a-z_]+)"/g)].map((m) => m[1]);
   assert.ok(cols.length >= 30, `found ${cols.length} columns`);
   const ddl = TELEGRAM_DDL.toLowerCase();

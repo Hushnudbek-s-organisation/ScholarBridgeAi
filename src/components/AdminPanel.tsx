@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send, Crown } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
@@ -13,6 +13,7 @@ import { PremiumManager } from "./admin/PremiumManager";
 import { AuditLogViewer } from "./admin/AuditLogViewer";
 import { ConfigManager } from "./admin/ConfigManager";
 import { AiSettingsManager } from "./admin/AiSettingsManager";
+import { OwnershipManager } from "./admin/OwnershipManager";
 import { RefreshCenter } from "./admin/RefreshCenter";
 import { VerificationManager } from "./admin/VerificationManager";
 import { ConsultingManager } from "./admin/ConsultingManager";
@@ -71,7 +72,8 @@ type AdminTab =
   | "goalLibrary"
   | "vaultPrompts"
   | "checklist"
-  | "telegram";
+  | "telegram"
+  | "ownership";
 
 type AdminGroup = "home" | "content" | "community" | "growth" | "money" | "system";
 
@@ -98,6 +100,7 @@ const SECTIONS: { id: AdminTab; group: AdminGroup; icon: React.ComponentType<{ c
   { id: "config", group: "system", icon: Settings2 },
   { id: "ai", group: "system", icon: KeyRound },
   { id: "audit", group: "system", icon: History },
+  { id: "ownership", group: "system", icon: Crown, isNew: true },
 ];
 
 const GROUPS: AdminGroup[] = ["home", "content", "community", "growth", "money", "system"];
@@ -222,6 +225,8 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
         return <GuideManager />;
       case "telegram":
         return <TelegramManager />;
+      case "ownership":
+        return <OwnershipManager />;
       case "goalLibrary":
         return (
           <CatalogManager

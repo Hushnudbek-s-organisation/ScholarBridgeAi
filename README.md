@@ -13,6 +13,12 @@ Put `DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge` and a
 `SESSION_SECRET` in `.env.local` (see `.env.example`). No Docker needed —
 the database comes from the `embedded-postgres` dev dependency.
 
+## Deployment, handover, security
+
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) — any Node host + PostgreSQL/Supabase, domain (`APP_URL`), AI providers, Telegram webhook/Mini App, moving hosts, full environment table.
+- [`docs/HANDOVER.md`](./docs/HANDOVER.md) — platform owner transfer (Admin → Ownership) and the manual checklist for external accounts.
+- [`SECURITY.md`](./SECURITY.md) — security model and audit log.
+
 ## Telegram bot + Mini App
 
 The ScholarBridge Telegram bot is a second front door to the **same** account,

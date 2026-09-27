@@ -11,7 +11,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appConfig } from "@/db/schema";
-import { decryptApiKey, encryptApiKey } from "@/lib/ai/settings";
+import { decryptWithRotation, encryptApiKey } from "@/lib/ai/settings";
 import { sessionSecret } from "@/lib/auth";
 import { createHmac } from "crypto";
 import { looksLikeBotToken, parseTelegramSettings, type TelegramSettings } from "./core";
@@ -42,7 +42,13 @@ async function load() {
   let storedToken: string | null = null;
   try {
     settings = parseTelegramSettings(await readKey(SETTINGS_KEY));
-    storedToken = decryptApiKey(await readKey(TOKEN_KEY));
+    // Rotation-aware (AI_KEYS_ENCRYPTION_SECRET_PREVIOUS): a token encrypted
+    // with an old secret keeps working and is re-encrypted with the current one.
+    const { key, rotated } = decryptWithRotation(await readKey(TOKEN_KEY));
+    storedToken = key;
+    if (key && rotated) {
+      await writeKey(TOKEN_KEY, encryptApiKey(key), "Telegram bot token (encrypted)").catch(() => undefined);
+    }
   } catch (err) {
     console.warn("[telegram] settings read failed, using defaults:", err instanceof Error ? err.message : err);
   }

@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { absolutizeLink } from "@/lib/clientUrl";
 
 interface ReferralProgramCardProps {
   activeProfile: StudentProfile;
@@ -45,7 +46,7 @@ export function ReferralProgramCard({ activeProfile }: ReferralProgramCardProps)
       try {
         const res = await fetch(`/api/referral?profileId=${activeProfile.id}`);
         const data = await res.json();
-        if (!cancelled && res.ok && data.code) setStatus(data);
+        if (!cancelled && res.ok && data.code) setStatus({ ...data, link: absolutizeLink(String(data.link ?? "")) });
       } catch (err) {
         console.error("Failed to load referral status:", err);
       } finally {

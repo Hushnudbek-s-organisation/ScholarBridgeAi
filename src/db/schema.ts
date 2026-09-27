@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
@@ -1267,4 +1268,46 @@ export const telegramUpdates = pgTable(
     receivedAt: timestamp("received_at").defaultNow().notNull(),
   },
   (table) => [index("idx_telegram_updates_received").on(table.receivedAt)]
+);
+
+/**
+ * Platform ownership (singleton, id = 1) — who owns this ScholarBridge
+ * instance inside the app. Separate from infrastructure/third-party accounts
+ * (hosting, Supabase, BotFather, AI providers), which the app cannot move.
+ * Mirrors src/lib/ownership/ddl.ts (applied lazily) and
+ * supabase/add_ownership.sql.
+ */
+export const platformOwnership = pgTable(
+  "platform_ownership",
+  {
+    id: integer("id").primaryKey().default(1),
+    ownerProfileId: integer("owner_profile_id").references(() => studentProfiles.id, { onDelete: "restrict" }).notNull(),
+    source: text("source").notNull().default("bootstrap"), // bootstrap | transfer
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [check("platform_ownership_id_check", sql`${table.id} = 1`)]
+);
+
+/** Ownership transfer requests + history (see src/lib/ownership/state.ts). */
+export const ownershipTransfers = pgTable(
+  "ownership_transfers",
+  {
+    id: serial("id").primaryKey(),
+    fromProfileId: integer("from_profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    toProfileId: integer("to_profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    status: text("status").notNull().default("pending"), // pending | accepted | completed | rejected | expired | cancelled
+    retainPreviousAdmin: boolean("retain_previous_admin").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    decidedAt: timestamp("decided_at"),
+    decidedBy: integer("decided_by").references(() => studentProfiles.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    uniqueIndex("ownership_transfers_one_open").on(sql`(true)`).where(sql`status IN ('pending', 'accepted')`),
+    index("ownership_transfers_to_idx").on(table.toProfileId, table.status),
+    check("ownership_transfers_status_check", sql`${table.status} IN ('pending', 'accepted', 'completed', 'rejected', 'expired', 'cancelled')`),
+    check("ownership_transfers_check", sql`${table.fromProfileId} <> ${table.toProfileId}`),
+  ]
 );

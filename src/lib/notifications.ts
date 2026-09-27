@@ -4,6 +4,9 @@ import { eq, sql } from "drizzle-orm";
 import { deliverTelegramNotification } from "@/lib/telegram/service";
 import { toNotifyLang, type NotifyLang, type NotifyText } from "@/lib/notificationTexts";
 
+/** Types that bypass the in-app type/inApp preferences (security notices). */
+const MANDATORY_IN_APP_TYPES = new Set(["security"]);
+
 /**
  * Notification helper (spec §20). Creates an in-app notification if the user
  * has not disabled the type, and mirrors it to the user's Telegram chat when
@@ -24,8 +27,10 @@ export async function createNotification(input: {
       .from(notificationPreferences)
       .where(eq(notificationPreferences.profileId, input.profileId));
 
+    // Security notices (ownership transfer, admin access changes) are always
+    // recorded in-app: they must not be silently dropped by type preferences.
     let enabled = true;
-    if (prefs) {
+    if (prefs && !MANDATORY_IN_APP_TYPES.has(input.type)) {
       try {
         const types = JSON.parse(prefs.types || "[]") as string[];
         enabled = prefs.inApp && (types.includes(input.type) || types.length === 0);

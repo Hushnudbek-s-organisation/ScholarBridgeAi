@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 const FALLBACK_LOGO_URL = "/icon-192.png";
-const DEFAULT_LOGO_URL = "https://llwrzitajdsnqzpvflnj.supabase.co/storage/v1/object/public/LOGO/logo.png";
+// Bundled icon first; the configured logo (/api/config/branding) replaces it.
+const DEFAULT_LOGO_URL = "/icon-512.png";
 
 /** Client image wrapper so an admin branding change is reflected without a redeploy. */
 export function BrandingImage({ className, alt }: { className?: string; alt: string }) {

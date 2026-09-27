@@ -289,7 +289,7 @@ export const BOT_TEXTS: Record<BotLang, Texts> = {
       `👋 Salom, <b>${escapeHtml(name)}</b>! Telegram akkauntingiz ScholarBridge'ga ulangan.\n` +
       `Bildirishnomalar: ${notify ? "✅ yoqilgan" : "⏸ o'chirilgan"}.\n\n/help — buyruqlar ro'yxati`,
     help:
-      "<b>Buyruqlar</b>\n/account — ulangan akkaunt va tarif\n/profile — profilim\n/universities [so'z] — universitet qidirish\n/scholarships [so'z] — stipendiya qidirish\n/saved — saqlanganlar\n/applications — arizalarim\n/deadlines — yaqin muddatlar (Premium)\n/next — keyingi qadam\n/advisor savol — AI maslahatchi\n/settings — bildirishnoma va eslatmalar\n/website — saytni ochish\n/unlink — Telegramni uzish\n/help — yordam",
+      "<b>Buyruqlar</b>\n/menu — asosiy menyu\n/account — ulangan akkaunt va tarif\n/profile — profilim\n/universities [so'z] — universitet qidirish\n/scholarships [so'z] — stipendiya qidirish\n/saved — saqlanganlar\n/applications — arizalarim\n/deadlines — yaqin muddatlar (Premium)\n/next — keyingi qadam\n/advisor savol — AI maslahatchi\n/settings — bildirishnoma va eslatmalar\n/website — saytni ochish\n/unlink — Telegramni uzish\n/help — yordam",
     openSite: "🌐 Saytni ochish",
     expired: "⌛ Bu havolaning muddati tugagan. Saytda qaytadan «Telegram orqali kirish» tugmasini bosing.",
     alreadyUsed: "Bu havola boshqa Telegram akkaunt tomonidan ishlatilgan. Saytda yangi urinish boshlang.",
@@ -326,7 +326,7 @@ export const BOT_TEXTS: Record<BotLang, Texts> = {
       `👋 Здравствуйте, <b>${escapeHtml(name)}</b>! Ваш Telegram привязан к ScholarBridge.\n` +
       `Уведомления: ${notify ? "✅ включены" : "⏸ выключены"}.\n\n/help — список команд`,
     help:
-      "<b>Команды</b>\n/account — аккаунт и тариф\n/profile — мой профиль\n/universities [слово] — поиск университетов\n/scholarships [слово] — поиск стипендий\n/saved — сохранённое\n/applications — мои заявки\n/deadlines — ближайшие дедлайны (Premium)\n/next — следующий шаг\n/advisor вопрос — AI-консультант\n/settings — уведомления и напоминания\n/website — открыть сайт\n/unlink — отвязать Telegram\n/help — помощь",
+      "<b>Команды</b>\n/menu — главное меню\n/account — аккаунт и тариф\n/profile — мой профиль\n/universities [слово] — поиск университетов\n/scholarships [слово] — поиск стипендий\n/saved — сохранённое\n/applications — мои заявки\n/deadlines — ближайшие дедлайны (Premium)\n/next — следующий шаг\n/advisor вопрос — AI-консультант\n/settings — уведомления и напоминания\n/website — открыть сайт\n/unlink — отвязать Telegram\n/help — помощь",
     openSite: "🌐 Открыть сайт",
     expired: "⌛ Срок действия ссылки истёк. Нажмите на сайте «Войти через Telegram» ещё раз.",
     alreadyUsed: "Эта ссылка уже использована другим аккаунтом Telegram. Начните новую попытку на сайте.",
@@ -363,7 +363,7 @@ export const BOT_TEXTS: Record<BotLang, Texts> = {
       `👋 Hi, <b>${escapeHtml(name)}</b>! Your Telegram is connected to ScholarBridge.\n` +
       `Notifications: ${notify ? "✅ on" : "⏸ off"}.\n\n/help — list of commands`,
     help:
-      "<b>Commands</b>\n/account — account and plan\n/profile — my profile\n/universities [word] — search universities\n/scholarships [word] — search scholarships\n/saved — saved items\n/applications — my applications\n/deadlines — upcoming deadlines (Premium)\n/next — next best step\n/advisor question — AI advisor\n/settings — alerts and reminders\n/website — open the website\n/unlink — disconnect Telegram\n/help — help",
+      "<b>Commands</b>\n/menu — main menu\n/account — account and plan\n/profile — my profile\n/universities [word] — search universities\n/scholarships [word] — search scholarships\n/saved — saved items\n/applications — my applications\n/deadlines — upcoming deadlines (Premium)\n/next — next best step\n/advisor question — AI advisor\n/settings — alerts and reminders\n/website — open the website\n/unlink — disconnect Telegram\n/help — help",
     openSite: "🌐 Open website",
     expired: "⌛ This link has expired. Press “Sign in with Telegram” on the website again.",
     alreadyUsed: "This link was already used by another Telegram account. Start a new attempt on the website.",

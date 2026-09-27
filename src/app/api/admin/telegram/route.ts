@@ -15,7 +15,8 @@ import {
   TELEGRAM_NOTIFICATION_TYPES,
 } from "@/lib/telegram/core";
 import { broadcast, getLinkByProfile, linkedUsers, recentMessages, sendToChat, telegramStats, unlinkProfile } from "@/lib/telegram/service";
-import { miniAppUrl } from "@/lib/telegram/messaging";
+import { miniAppUrl, miniAppUrlFor, publicSiteUrl } from "@/lib/telegram/messaging";
+import { appUrlSource, configuredAppUrl } from "@/lib/appUrl";
 import { lastSweep, recordSweep, runScheduledTelegramJobs } from "@/lib/notificationSweep";
 import { getBotToken, getTelegramSettings, saveBotToken, saveTelegramSettings, webhookSecret } from "@/lib/telegram/settings";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
@@ -89,13 +90,19 @@ export async function GET(req: Request) {
       linkedUsers({ q: url.searchParams.get("q") ?? "" }),
       recentMessages(40),
     ]);
-    const base = settings.siteUrl || requestOrigin(req);
+    const base = publicSiteUrl(settings) || requestOrigin(req);
+    // After a domain move the webhook stays registered on the old address
+    // until the admin reconnects it — surface that instead of failing quietly.
+    const canonical = configuredAppUrl();
     return NextResponse.json(
       {
         settings,
         token: { set: Boolean(tokenInfo.token), source: tokenInfo.source, masked: maskToken(tokenInfo.token) },
         webhookUrl: base ? `${base}/api/telegram/webhook` : null,
-        suggestedSiteUrl: requestOrigin(req),
+        suggestedSiteUrl: canonical || requestOrigin(req),
+        appUrl: { value: canonical || null, source: appUrlSource() },
+        webhookBaseMismatch: Boolean(canonical && settings.siteUrl && settings.siteUrl !== canonical),
+        registeredSiteUrl: settings.siteUrl || null,
         types: TELEGRAM_NOTIFICATION_TYPES,
         stats,
         users,
@@ -177,7 +184,7 @@ export async function POST(req: Request) {
     }
 
     if (action === "setWebhook") {
-      const base = normalizeSiteUrl(parsed.body.url) || settings.siteUrl || requestOrigin(req);
+      const base = normalizeSiteUrl(parsed.body.url) || configuredAppUrl() || settings.siteUrl || requestOrigin(req);
       if (!base || !base.startsWith("https://")) {
         return tgJsonError(400, "Telegram needs a public https:// address. Set the site URL first.", "bad_site_url");
       }
@@ -201,7 +208,7 @@ export async function POST(req: Request) {
       // Menu button → Mini App (https only; best effort).
       // The address the webhook was just set on IS the public site: buttons,
       // deep links and the Mini App all use it.
-      const appUrl = miniAppUrl({ siteUrl: base });
+      const appUrl = miniAppUrlFor(base);
       if (appUrl) {
         await tgCall(token, "setChatMenuButton", { menu_button: { type: "web_app", text: "ScholarBridge", web_app: { url: appUrl } } });
       }

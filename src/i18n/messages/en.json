@@ -922,7 +922,8 @@
       "config": "Settings",
       "ai": "AI settings",
       "audit": "Audit log",
-      "telegram": "Telegram bot"
+      "telegram": "Telegram bot",
+      "ownership": "Ownership"
     },
     "desc": {
       "overview": "What needs attention today and the key numbers.",
@@ -946,7 +947,8 @@
       "config": "Site-wide settings.",
       "ai": "AI provider keys and models.",
       "audit": "Who changed what, and when.",
-      "telegram": "Connect the bot, sign-in with codes, notifications, broadcast and delivery log."
+      "telegram": "Connect the bot, sign-in with codes, notifications, broadcast and delivery log.",
+      "ownership": "Platform owner, safe ownership transfer and administrators."
     }
   },
   "adminGrowth": {
@@ -1390,6 +1392,102 @@
     "miniAppReady": "Mini App: {url} (set as the bot’s menu button when the webhook is connected).",
     "miniAppNeedsHttps": "Mini App: needs a public https site URL.",
     "sweepRun": "Run now",
-    "sweepDone": "Done: {profiles} accounts, {created} reminders, {retried} retries delivered."
+    "sweepDone": "Done: {profiles} accounts, {created} reminders, {retried} retries delivered.",
+    "appUrlFrom": "Canonical URL (APP_URL): {url} — from {source}.",
+    "appUrlMissing": "APP_URL is not set: links use the address saved here. Set APP_URL when you move hosts.",
+    "appUrlMismatch": "The saved address differs from APP_URL. Re-register the webhook, otherwise the bot keeps linking to the old domain."
+  },
+  "adminOwnership": {
+    "title": "Platform ownership",
+    "intro": "The owner is the highest role inside ScholarBridge. Only the owner appoints admins and transfers ownership to another admin. External accounts (hosting, bot, AI) are not transferred automatically — see the checklist below.",
+    "owner": "Current owner",
+    "since": "Since",
+    "youAreOwner": "You own this platform",
+    "notOwner": "You are an admin, not the owner",
+    "noOwner": "No owner yet (there is no administrator).",
+    "refresh": "Refresh",
+    "startTitle": "Transfer ownership",
+    "startIntro": "The new owner must be an existing admin. They accept with their password, then you confirm with yours. The offer expires after {hours} hours.",
+    "targetEmail": "New owner's account email",
+    "retainAdmin": "Keep my admin access after the transfer",
+    "note": "Note (optional)",
+    "typeConfirm": "Type {phrase} to confirm",
+    "password": "Your account password",
+    "startBtn": "Start transfer",
+    "openTitle": "Open transfer",
+    "from": "From",
+    "to": "To",
+    "expires": "Expires",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "confirm": "Confirm transfer",
+    "waitingTarget": "Waiting for the new owner to accept.",
+    "waitingOwner": "Accepted — the current owner must confirm.",
+    "confirmHint": "Ownership moves immediately when you confirm.",
+    "acceptHint": "You were offered ownership of this platform. After you accept, the current owner confirms the transfer.",
+    "adminsTitle": "Administrators",
+    "adminsIntro": "Only the owner grants or removes admin access. Every change is audited.",
+    "email": "Account email",
+    "grant": "Make admin",
+    "revoke": "Remove admin",
+    "ownerBadge": "Owner",
+    "historyTitle": "History",
+    "historyEmpty": "No transfers yet.",
+    "checklistTitle": "Handover checklist",
+    "checklistIntro": "The app only transfers in-app ownership. These external accounts must be moved manually.",
+    "automatic": "Automatic",
+    "manual": "Manual",
+    "done": "Done",
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "check": {
+      "app_owner": {
+        "label": "Platform owner role",
+        "detail": "Moves to the new owner when the transfer is confirmed."
+      },
+      "admin_access": {
+        "label": "Admin access",
+        "detail": "The new owner is (and stays) an admin; the previous owner keeps admin only if chosen."
+      },
+      "ai_keys": {
+        "label": "AI provider accounts & billing",
+        "detail": "Keys saved in Admin → AI keep working but belong to the previous owner's provider accounts. The new owner should create their own keys and replace them (rotation), then the old ones should be revoked at the provider."
+      },
+      "telegram_bot": {
+        "label": "Telegram bot",
+        "detail": "Manual Telegram ownership transfer may be required: in @BotFather use /mybots → Bot Settings → Transfer Ownership (Telegram requirements apply), or create a new bot and replace TELEGRAM_BOT_TOKEN."
+      },
+      "hosting": {
+        "label": "Hosting (e.g. Render/Vercel)",
+        "detail": "Transfer the service/project or redeploy under the new owner's account and copy the environment variables."
+      },
+      "database": {
+        "label": "Database / Supabase project",
+        "detail": "Transfer the project to the new owner's organisation (or migrate the data)."
+      },
+      "domain": {
+        "label": "Domain & DNS",
+        "detail": "Move the domain registrar account or update DNS; then set APP_URL and re-register the Telegram webhook."
+      },
+      "payments": {
+        "label": "Payment merchant accounts",
+        "detail": "Payme/Click merchant contracts are legal agreements and are not transferred by the app."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "detail": "Rotate SESSION_SECRET (signs everyone out), CRON_SECRET, TELEGRAM_WEBHOOK_SECRET and AI_KEYS_ENCRYPTION_SECRET (keep the old one in AI_KEYS_ENCRYPTION_SECRET_PREVIOUS, then re-encrypt keys)."
+      },
+      "search_console": {
+        "label": "Google Search Console",
+        "detail": "Add the new owner as an owner of the property; update GOOGLE_SITE_VERIFICATION if needed."
+      }
+    }
   }
 }

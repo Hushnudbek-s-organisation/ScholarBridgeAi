@@ -128,6 +128,8 @@ request is made.
 ```bash
 npm run test:security   # 50 assertions over auth, rate limits, SSRF, payments, CSP
 npm run test:ai-settings
+npm run test:ownership     # ownership state machine, races, authz (embedded Postgres)
+npm run test:portability   # APP_URL, config allowlist/export/import, RLS script
 npm run typecheck
 npm run build
 npm audit --audit-level=high
@@ -193,3 +195,15 @@ by `npm run test:security`).
   are per-instance if you scale horizontally (move to Redis/Postgres then).
 - Next 16 renamed `middleware.ts` → `proxy.ts`; the old name still works but
   is deprecated (`npx @next/codemod@canary middleware-to-proxy .`).
+
+## 11. 2026-09 portability, ownership and AI audit
+
+| Severity | Issue | Fix |
+| --- | --- | --- |
+| High | Supabase's default grants let the public `anon`/`authenticated` roles read every `public` table (password hashes, Telegram chat ids) with the anon key. | `supabase/enable_rls.sql`: RLS on every app-owned table, public roles revoked, read-only catalogue policy for `universities`/`scholarships`. The app is table owner and unaffected. Run once per Supabase project (`DEPLOYMENT.md` §2). Tested against a Supabase-like role setup (`npm run test:portability`). |
+| High | Any admin could delete any profile, including the only owner; the seed promoted the **first profile** to admin when no admin existed, and force-promoted `ADMIN_EMAIL` on every restart. | Platform ownership with a server-side state machine (`src/lib/ownership/*`, Admin → Ownership): owner-only admin grants/revokes, password re-entry, one-open-transfer unique index, row locks on confirm, expiry, audit + notifications. Owner profile delete → 409. Seed no longer promotes anyone once an owner exists and never promotes a random profile. `npm run test:ownership`. |
+| Medium | `PUT /api/admin/config` wrote **any** key unvalidated — including the encrypted Telegram token and internal sweep state — and accepted invalid AI providers. | One allowlist + per-key validation (`src/lib/configPortability.ts`) for PUT, export and import; changes are audited and rate-limited. |
+| Medium | Rotating `AI_KEYS_ENCRYPTION_SECRET` made the panel-stored Telegram token unreadable (bot stops). | Rotation-aware decryption with automatic re-encryption. |
+| Medium | Security notices (ownership) were dropped for users with default notification preferences. | `security` notifications are always recorded in-app. |
+| Low | Research agent hardwired to OpenRouter; env AI provider choices masked by DB defaults; AI errors could echo keys. | Universal provider layer (`src/lib/ai`): admin-selected provider/model per task, explicit fallback only, disabled list, key redaction in logs/errors. |
+| Low | Deploy domain / Supabase project / personal admin email hardcoded in docs and a UI placeholder. | `APP_URL` layer (`src/lib/appUrl.ts`); links built from configuration; checked by `npm run test:portability`. |

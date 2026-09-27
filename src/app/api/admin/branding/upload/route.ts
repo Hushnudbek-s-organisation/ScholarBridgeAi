@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { setConfig } from "@/lib/config";
-import { supabaseStorageUrl } from "@/lib/branding";
+import { brandingBucket, supabaseBaseUrl, supabaseStorageUrl } from "@/lib/branding";
 
 const ALLOWED = new Map([
   ["image/png", "png"],
@@ -35,16 +35,19 @@ export async function POST(request: Request) {
     if (!extension) return NextResponse.json({ error: "Use PNG, JPG, WEBP or ICO" }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 400 });
 
-    const supabaseUrl = (process.env.SUPABASE_URL || "https://llwrzitajdsnqzpvflnj.supabase.co").replace(/\/$/, "");
+    // Never fall back to a hardcoded project: the service key must only ever
+    // be sent to the project this deployment is configured for.
+    const supabaseUrl = supabaseBaseUrl();
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceKey) {
-      return NextResponse.json({ error: "Storage is not configured. Add SUPABASE_SERVICE_ROLE_KEY on the server." }, { status: 503 });
+    if (!serviceKey || !supabaseUrl) {
+      return NextResponse.json({ error: "Storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server." }, { status: 503 });
     }
+    const bucket = brandingBucket();
 
     // Keep stable filenames so all pages use the latest asset. The timestamp
     // in the saved URL also avoids stale CDN/browser caches after replacement.
     const path = `${kind}.${extension}`;
-    const upload = await fetch(`${supabaseUrl}/storage/v1/object/LOGO/${path}`, {
+    const upload = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${path}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${serviceKey}`,
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
     if (!upload.ok) {
       const detail = await upload.text();
       console.error("Supabase branding upload failed:", detail);
-      return NextResponse.json({ error: "Storage upload failed. Check that the LOGO bucket exists." }, { status: 502 });
+      return NextResponse.json({ error: "Storage upload failed. Check that the branding bucket exists." }, { status: 502 });
     }
 
     const url = `${supabaseStorageUrl(path)}?v=${Date.now()}`;

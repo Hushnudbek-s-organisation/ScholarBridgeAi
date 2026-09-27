@@ -37,8 +37,9 @@ import {
 import { logRunStart, logRunFinish, buildReport } from "./audit";
 import { normalizeNameKey, normalizeUrl, toNumber, normalizeCurrency, toIsoDate } from "./normalize";
 import { isResearchSourceUrl, rejectSourceReason } from "./urlFilter";
-import { createAIProvider } from "./ai/openrouter";
-import { resolveProviderCredential } from "@/lib/ai/credentials";
+import { NullAIProvider, createAIProvider } from "./ai/openrouter";
+import { resolveRuntimeProvider } from "@/lib/ai/index";
+import { AI_PROVIDERS, providerBaseUrl } from "@/lib/ai/settings";
 import { validateAIEvidence, aiEvidenceToSourceEvidence } from "./ai/validate";
 import { decideFinalClassification } from "./ai/decide";
 import { hasContentEvidenceFor } from "./extract";
@@ -76,12 +77,10 @@ export async function runUniversity(
   const evidence: SourceEvidence[] = [];
   // AI provider (server-side only) — deterministic rules run first; AI is a
   // fallback/assist and NEVER auto-verifies anything (spec §2, §3, §14).
-  // The OpenRouter key/model resolve from the admin panel (DB) with env fallback.
-  const aiCreds = await resolveProviderCredential("openrouter");
-  const aiProvider: AIProvider = createAIProvider({
-    apiKey: aiCreds.apiKey,
-    model: aiCreds.model,
-  });
+  // Provider = the admin's "document" task mapping (Admin → AI), same
+  // resolution as every other AI feature. OpenAI-compatible providers share
+  // one client; others (Anthropic) fall back to the deterministic rules.
+  const aiProvider: AIProvider = await researchAIProvider();
   const aiSession = {
     status: (aiProvider.available ? "available" : "unavailable") as "available" | "unavailable",
     provider: aiProvider.name,
@@ -1367,4 +1366,22 @@ function best(evidence: SourceEvidence[], field: string): SourceEvidence | null 
 /** Normalized program name key (dedupe). */
 export function programKey(name: string): string {
   return normalizeNameKey(name);
+}
+
+/** AI assist for the research agent, per the admin's "document" task mapping. */
+async function researchAIProvider(): Promise<AIProvider> {
+  const runtime = await resolveRuntimeProvider("document").catch(() => null);
+  if (!runtime || runtime.disabled || !runtime.apiKey) return new NullAIProvider();
+  const meta = AI_PROVIDERS[runtime.name];
+  const base = providerBaseUrl(runtime.name);
+  if (meta.protocol !== "openai" || !base) {
+    console.warn(`[research-agent] ${meta.label} has no OpenAI-compatible chat API — using deterministic rules only`);
+    return new NullAIProvider();
+  }
+  return createAIProvider({
+    apiKey: runtime.apiKey,
+    model: runtime.model,
+    endpoint: `${base}/chat/completions`,
+    providerName: meta.label,
+  });
 }

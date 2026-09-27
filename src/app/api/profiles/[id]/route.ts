@@ -7,6 +7,8 @@ import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { currentOwnerId } from "@/lib/ownership/service";
+import { writeAudit } from "@/lib/audit";
 import { isUniqueViolation } from "@/lib/db-errors";
 
 /**
@@ -303,7 +305,27 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
+    if (!Number.isInteger(profileId) || profileId <= 0) {
+      return NextResponse.json({ error: "Invalid profile id" }, { status: 400 });
+    }
+    // The platform owner cannot be deleted — transfer ownership first.
+    if ((await currentOwnerId()) === profileId) {
+      return NextResponse.json(
+        { error: "This account owns the platform. Transfer ownership before deleting it.", code: "owner_protected" },
+        { status: 409 }
+      );
+    }
+
     await db.delete(studentProfiles).where(eq(studentProfiles.id, profileId));
+    await writeAudit({
+      entityType: "admin_role",
+      entityId: profileId,
+      fieldChanged: "profile_deleted",
+      oldValue: null,
+      newValue: true,
+      source: `admin:${access.session.profile.id}`,
+      actor: "ADMIN",
+    }).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/profiles/[id] error:", error);

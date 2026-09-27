@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
+import { siteUrlForRequest } from "@/lib/requestAppUrl";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const SITE_URL = await siteUrlForRequest();
   return [
     {
       url: `${SITE_URL}/`,

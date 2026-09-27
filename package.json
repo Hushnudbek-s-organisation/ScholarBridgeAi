@@ -35,7 +35,9 @@
     "test:integration": "tsx scripts/check-integration.ts",
     "test:growth": "tsx scripts/check-growth.ts",
     "test:telegram": "tsx scripts/check-telegram.ts",
-    "test:telegram-integration": "tsx scripts/check-telegram-integration.ts"
+    "test:telegram-integration": "tsx scripts/check-telegram-integration.ts",
+    "test:ownership": "tsx scripts/check-ownership.ts",
+    "test:portability": "tsx scripts/check-portability.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

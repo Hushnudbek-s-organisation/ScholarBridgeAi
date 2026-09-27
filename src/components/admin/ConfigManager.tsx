@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Settings2, Loader2, RefreshCw, Save, Upload, Image as ImageIcon } from "lucide-react";
+import { Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
 
 interface ConfigManagerProps {
   adminProfileId: number;
@@ -134,6 +134,8 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
         </div>
       </div>
 
+      <ConfigTransferCard onApplied={load} />
+
       {message && (
         <div className={`rounded-xl px-4 py-3 text-xs font-semibold ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
           {message.text}
@@ -188,6 +190,105 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface ImportPlanView {
+  changes: { key: string; from: string | null; to: string }[];
+  unchanged: string[];
+  rejected: { key: string; reason: string }[];
+  modelChanges: { provider: string; from: string | null; to: string }[];
+}
+
+/**
+ * Move NON-SECRET settings between deployments: download an export, upload
+ * it on the new host, review the dry run, then apply. Keys/tokens are never
+ * part of the file (they stay in env vars / Admin → AI).
+ */
+function ConfigTransferCard({ onApplied }: { onApplied: () => void }) {
+  const [payload, setPayload] = useState<unknown>(null);
+  const [plan, setPlan] = useState<ImportPlanView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const post = async (dryRun: boolean, body: unknown) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/config/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: body, dryRun }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setPlan(json.plan as ImportPlanView);
+      if (!dryRun) {
+        setMsg({ ok: true, text: `Applied ${json.applied} change(s).` });
+        setPayload(null);
+        onApplied();
+      }
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Import failed" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onFile = async (file: File) => {
+    setPlan(null);
+    try {
+      const parsed = JSON.parse(await file.text());
+      setPayload(parsed);
+      await post(true, parsed);
+    } catch {
+      setMsg({ ok: false, text: "The file is not valid JSON." });
+    }
+  };
+
+  const pending = plan ? plan.changes.length + plan.modelChanges.length : 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+      <div>
+        <h3 className="text-sm font-extrabold text-slate-800">Export / import settings</h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Copies prices, limits, AI provider choices and models, navigation and guide texts to another deployment.
+          Secrets (API keys, bot token, passwords) are never exported — set them on the new host.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <a href="/api/admin/config/export" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+          <Download className="h-3.5 w-3.5" /> Export (JSON)
+        </a>
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Import…
+          <input type="file" accept="application/json,.json" className="sr-only" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onFile(file); e.currentTarget.value = ""; }} />
+        </label>
+      </div>
+      {plan && (
+        <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600 space-y-1" aria-live="polite">
+          <p className="font-bold text-slate-700">
+            {pending} change(s) · {plan.unchanged.length} unchanged · {plan.rejected.length} rejected
+          </p>
+          {plan.changes.map((c) => (
+            <p key={c.key} className="font-mono break-all">{c.key}: {c.from ?? "(default)"} → {c.to.length > 80 ? c.to.slice(0, 80) + "…" : c.to}</p>
+          ))}
+          {plan.modelChanges.map((m) => (
+            <p key={m.provider} className="font-mono">model {m.provider}: {m.from ?? "(default)"} → {m.to}</p>
+          ))}
+          {plan.rejected.map((r) => (
+            <p key={r.key} className="font-mono text-red-600">✗ {r.key}: {r.reason}</p>
+          ))}
+          {payload !== null && pending > 0 && (
+            <button onClick={() => void post(false, payload)} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+              <Save className="h-3 w-3" /> Apply {pending} change(s)
+            </button>
+          )}
+        </div>
+      )}
+      {msg && <p className={`text-[11px] font-semibold ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>}
     </div>
   );
 }

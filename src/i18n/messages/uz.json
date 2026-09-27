@@ -922,7 +922,8 @@
       "config": "Sozlamalar",
       "ai": "AI sozlamalari",
       "audit": "O'zgarishlar jurnali",
-      "telegram": "Telegram bot"
+      "telegram": "Telegram bot",
+      "ownership": "Egalik"
     },
     "desc": {
       "overview": "Bugun e'tibor talab qiladigan ishlar va asosiy raqamlar.",
@@ -946,7 +947,8 @@
       "config": "Umumiy sayt sozlamalari.",
       "ai": "AI provayder kalitlari va modellari.",
       "audit": "Kim, nimani va qachon o'zgartirgani.",
-      "telegram": "Botni ulash, kod bilan kirish, bildirishnomalar, hammaga xabar va yuborish jurnali."
+      "telegram": "Botni ulash, kod bilan kirish, bildirishnomalar, hammaga xabar va yuborish jurnali.",
+      "ownership": "Platforma egasi, egalikni xavfsiz o'tkazish va adminlar."
     }
   },
   "adminGrowth": {
@@ -1390,6 +1392,102 @@
     "miniAppReady": "Mini App: {url} (webhook ulanganda bot menyu tugmasiga qo’yiladi).",
     "miniAppNeedsHttps": "Mini App uchun ochiq https sayt manzili kerak.",
     "sweepRun": "Hozir ishga tushirish",
-    "sweepDone": "Tayyor: {profiles} akkaunt, {created} eslatma, {retried} ta qayta yuborildi."
+    "sweepDone": "Tayyor: {profiles} akkaunt, {created} eslatma, {retried} ta qayta yuborildi.",
+    "appUrlFrom": "Asosiy manzil (APP_URL): {url} — {source} dan.",
+    "appUrlMissing": "APP_URL sozlanmagan: havolalar shu yerda saqlangan manzildan olinadi. Hosting ko‘chirilganda APP_URL ni o‘rnating.",
+    "appUrlMismatch": "Saqlangan manzil APP_URL dan farq qiladi. Webhook’ni qayta o‘rnating, aks holda bot eski domenga yo‘naltiradi."
+  },
+  "adminOwnership": {
+    "title": "Platforma egaligi",
+    "intro": "Ega — bu ScholarBridge ichidagi eng yuqori huquq. Faqat ega adminlarni tayinlaydi va egalikni boshqa adminga o'tkazadi. Tashqi hisoblar (hosting, bot, AI) avtomatik o'tmaydi — pastdagi ro'yxatga qarang.",
+    "owner": "Joriy ega",
+    "since": "Qachondan",
+    "youAreOwner": "Siz platforma egasisiz",
+    "notOwner": "Siz admin, lekin ega emassiz",
+    "noOwner": "Ega hali belgilanmagan (admin yo'q).",
+    "refresh": "Yangilash",
+    "startTitle": "Egalikni o'tkazish",
+    "startIntro": "Yangi ega mavjud admin bo'lishi kerak. U parol bilan qabul qiladi, keyin siz parol bilan yakuniy tasdiqlaysiz. Taklif {hours} soatdan keyin o'z-o'zidan bekor bo'ladi.",
+    "targetEmail": "Yangi egasining email manzili",
+    "retainAdmin": "O'tkazilgandan keyin admin bo'lib qolaman",
+    "note": "Izoh (ixtiyoriy)",
+    "typeConfirm": "Tasdiqlash uchun {phrase} deb yozing",
+    "password": "Hisobingiz paroli",
+    "startBtn": "O'tkazishni boshlash",
+    "openTitle": "Faol o'tkazish",
+    "from": "Kimdan",
+    "to": "Kimga",
+    "expires": "Muddati",
+    "accept": "Qabul qilish",
+    "reject": "Rad etish",
+    "cancel": "Bekor qilish",
+    "confirm": "Yakuniy tasdiqlash",
+    "waitingTarget": "Yangi ega qabul qilishini kutmoqda.",
+    "waitingOwner": "Qabul qilindi — joriy ega yakuniy tasdiqlashi kerak.",
+    "confirmHint": "Tasdiqlaganingizda egalik darhol o'tadi.",
+    "acceptHint": "Sizga platforma egaligi taklif qilindi. Qabul qilganingizdan keyin joriy ega yakuniy tasdiqlaydi.",
+    "adminsTitle": "Adminlar",
+    "adminsIntro": "Faqat ega admin huquqini beradi yoki oladi. Har bir o'zgarish auditga yoziladi.",
+    "email": "Hisob email manzili",
+    "grant": "Admin qilish",
+    "revoke": "Adminlikni olish",
+    "ownerBadge": "Ega",
+    "historyTitle": "Tarix",
+    "historyEmpty": "Hali o'tkazishlar bo'lmagan.",
+    "checklistTitle": "Topshirish ro'yxati",
+    "checklistIntro": "Ilova faqat ichki egalikni o'tkazadi. Quyidagi tashqi hisoblarni qo'lda o'tkazish kerak.",
+    "automatic": "Avtomatik",
+    "manual": "Qo'lda",
+    "done": "Bajarildi",
+    "status": {
+      "pending": "Kutilmoqda",
+      "accepted": "Qabul qilindi",
+      "completed": "Yakunlandi",
+      "rejected": "Rad etildi",
+      "expired": "Muddati tugadi",
+      "cancelled": "Bekor qilindi"
+    },
+    "check": {
+      "app_owner": {
+        "label": "Platforma egasi roli",
+        "detail": "Tasdiqlanganda yangi egaga o'tadi."
+      },
+      "admin_access": {
+        "label": "Admin huquqi",
+        "detail": "Yangi ega admin bo'lib qoladi; oldingi ega faqat tanlansa admin qoladi."
+      },
+      "ai_keys": {
+        "label": "AI provayder hisoblari va to'lovlar",
+        "detail": "Admin → AI'dagi kalitlar ishlashda davom etadi, lekin ular oldingi egasining hisoblariga tegishli. Yangi ega o'z kalitlarini yaratib almashtirsin, eskilari provayderda o'chirilsin."
+      },
+      "telegram_bot": {
+        "label": "Telegram bot",
+        "detail": "Telegram egaligini qo'lda o'tkazish kerak bo'lishi mumkin: @BotFather → /mybots → Bot Settings → Transfer Ownership (Telegram talablari amal qiladi) yoki yangi bot yaratib TELEGRAM_BOT_TOKEN'ni almashtiring."
+      },
+      "hosting": {
+        "label": "Hosting (Render/Vercel)",
+        "detail": "Servisni yangi egaga o'tkazing yoki uning hisobida qayta deploy qilib, env o'zgaruvchilarni ko'chiring."
+      },
+      "database": {
+        "label": "Ma'lumotlar bazasi / Supabase",
+        "detail": "Loyihani yangi egasining tashkilotiga o'tkazing (yoki ma'lumotlarni ko'chiring)."
+      },
+      "domain": {
+        "label": "Domen va DNS",
+        "detail": "Registrator hisobini o'tkazing yoki DNS'ni yangilang; so'ng APP_URL'ni o'rnating va Telegram webhook'ni qayta ro'yxatdan o'tkazing."
+      },
+      "payments": {
+        "label": "To'lov merchant hisoblari",
+        "detail": "Payme/Click shartnomalari yuridik hujjat — ilova ularni o'tkazmaydi."
+      },
+      "secrets": {
+        "label": "Maxfiy kalitlar",
+        "detail": "SESSION_SECRET (hammani chiqaradi), CRON_SECRET, TELEGRAM_WEBHOOK_SECRET va AI_KEYS_ENCRYPTION_SECRET'ni almashtiring (eskisini AI_KEYS_ENCRYPTION_SECRET_PREVIOUS'ga qo'yib, kalitlarni qayta shifrlang)."
+      },
+      "search_console": {
+        "label": "Google Search Console",
+        "detail": "Yangi egani property egasi sifatida qo'shing; kerak bo'lsa GOOGLE_SITE_VERIFICATION'ni yangilang."
+      }
+    }
   }
 }

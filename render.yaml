@@ -37,6 +37,12 @@ services:
       # Encrypts AI provider keys stored from the admin panel (>= 16 chars).
       - key: AI_KEYS_ENCRYPTION_SECRET
         sync: false
+      # Bootstrap admin (used only while no platform owner exists; after an
+      # ownership transfer the seed never re-promotes it). Set in the dashboard.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_NAME
+        sync: false
       # Bootstrap password for the seeded admin account (>= 8 chars).
       - key: ADMIN_PASSWORD
         sync: false
@@ -47,8 +53,17 @@ services:
       # Current models: https://console.groq.com/docs/models
       - key: GROQ_MODEL
         value: "openai/gpt-oss-120b"
+      # Canonical public URL (https://your-domain, no trailing slash). When
+      # unset, Render's RENDER_EXTERNAL_URL is used automatically.
+      - key: APP_URL
+        sync: false
+      # Legacy name, still honoured after APP_URL.
       - key: NEXT_PUBLIC_APP_URL
         sync: false
+      # Google Search Console HTML-tag token (public, not a secret). The
+      # HTML-file method is also served from public/google*.html.
+      - key: GOOGLE_SITE_VERIFICATION
+        value: "EZ2ipQrYUQxTQEBlEGYcqAOfVHm6pc0oIm1BYkN2VTs"
       # Optional payment keys (only needed if you configure real Payme/Click).
       - key: PAYME_MERCHANT_ID
         sync: false

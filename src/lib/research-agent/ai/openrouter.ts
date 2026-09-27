@@ -9,6 +9,7 @@
  * - Webpage text is UNTRUSTED DATA: the system prompt forbids following
  *   instructions found inside pages; no credentials are ever sent.
  */
+import { configuredAppUrl } from "@/lib/appUrl";
 import type {
   AIExtractionResult,
   AIPageInput,
@@ -21,6 +22,14 @@ const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 export interface OpenRouterOptions {
   apiKey?: string;
   model?: string;
+  /**
+   * Chat-completions URL of any OpenAI-compatible provider (OpenAI, Groq,
+   * Google, custom). Default: OpenRouter. The URL comes from the server-side
+   * provider registry (lib/ai/settings), never from user input.
+   */
+  endpoint?: string;
+  /** Display name in run reports (default "OpenRouter"). */
+  providerName?: string;
   siteUrl?: string;
   appName?: string;
   fetchFn?: typeof fetch;
@@ -96,7 +105,8 @@ function tokenSafeContent(mainContent: string): string {
 }
 
 export class OpenRouterAIProvider implements AIProvider {
-  readonly name = "OpenRouter";
+  readonly name: string;
+  private readonly endpoint: string;
   readonly model: string;
   readonly available: boolean;
   private readonly apiKey: string | undefined;
@@ -109,9 +119,12 @@ export class OpenRouterAIProvider implements AIProvider {
   private readonly cache = new Map<string, unknown>();
 
   constructor(opts: OpenRouterOptions = {}) {
+    this.name = opts.providerName ?? "OpenRouter";
+    this.endpoint = opts.endpoint ?? OPENROUTER_ENDPOINT;
     this.apiKey = opts.apiKey ?? process.env.OPENROUTER_API_KEY;
     this.model = opts.model ?? process.env.OPENROUTER_MODEL ?? "openrouter/free";
-    this.siteUrl = opts.siteUrl ?? process.env.OPENROUTER_SITE_URL ?? undefined;
+    // Attribution only: explicit env, else the deployment URL (never hardcoded).
+    this.siteUrl = opts.siteUrl ?? (process.env.OPENROUTER_SITE_URL || configuredAppUrl() || undefined);
     this.appName = opts.appName ?? process.env.OPENROUTER_APP_NAME ?? "ScholarBridge";
     this.fetchFn = opts.fetchFn ?? fetch;
     this.retryDelaysMs = opts.retryDelaysMs ?? [800, 2000];
@@ -159,8 +172,11 @@ export class OpenRouterAIProvider implements AIProvider {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
     };
-    if (this.siteUrl) headers["HTTP-Referer"] = this.siteUrl;
-    if (this.appName) headers["X-Title"] = this.appName;
+    // OpenRouter attribution headers only go to OpenRouter.
+    if (this.endpoint === OPENROUTER_ENDPOINT) {
+      if (this.siteUrl) headers["HTTP-Referer"] = this.siteUrl;
+      if (this.appName) headers["X-Title"] = this.appName;
+    }
 
     const body = JSON.stringify({
       model: this.model,
@@ -176,7 +192,7 @@ export class OpenRouterAIProvider implements AIProvider {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 30000);
-        const res = await this.fetchFn(OPENROUTER_ENDPOINT, {
+        const res = await this.fetchFn(this.endpoint, {
           method: "POST",
           headers,
           body,
@@ -189,18 +205,18 @@ export class OpenRouterAIProvider implements AIProvider {
             await sleep(this.retryDelaysMs[attempt]);
             continue;
           }
-          console.warn(`[research-agent] OpenRouter HTTP ${res.status} after retries — fallback to deterministic rules`);
+          console.warn(`[research-agent] ${this.name} HTTP ${res.status} after retries — fallback to deterministic rules`);
           return null;
         }
         if (!res.ok) {
-          console.warn(`[research-agent] OpenRouter HTTP ${res.status} — fallback to deterministic rules`);
+          console.warn(`[research-agent] ${this.name} HTTP ${res.status} — fallback to deterministic rules`);
           return null;
         }
         const data = await res.json();
         const content = data?.choices?.[0]?.message?.content;
         const parsed = parseModelJson<T>(content);
         if (parsed === null) {
-          console.warn("[research-agent] OpenRouter returned malformed JSON — fallback to deterministic rules");
+          console.warn(`[research-agent] ${this.name} returned malformed JSON — fallback to deterministic rules`);
         }
         return parsed;
       } catch (err) {
@@ -209,7 +225,7 @@ export class OpenRouterAIProvider implements AIProvider {
           await sleep(this.retryDelaysMs[attempt]);
           continue;
         }
-        console.warn(`[research-agent] OpenRouter request failed: ${(err as Error)?.message} — fallback to deterministic rules`);
+        console.warn(`[research-agent] ${this.name} request failed: ${(err as Error)?.message} — fallback to deterministic rules`);
         return null;
       }
     }

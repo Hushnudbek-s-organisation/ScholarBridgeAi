@@ -46,6 +46,8 @@ interface AdminData {
   token: { set: boolean; source: "admin" | "env" | "none"; masked: string };
   webhookUrl: string | null;
   suggestedSiteUrl: string;
+  appUrl?: { value: string | null; source: string | null };
+  webhookBaseMismatch?: boolean;
   types: string[];
   stats: {
     links: { total: number; reachable: number; blocked: number };
@@ -312,10 +314,16 @@ export function TelegramManager() {
           <input
             value={draft.siteUrl}
             onChange={(e) => setDraft({ ...draft, siteUrl: e.target.value })}
-            placeholder={data.suggestedSiteUrl || "https://scholarbridge.uz"}
+            placeholder={data.suggestedSiteUrl || "https://"}
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
           <p className="mt-1 text-[11px] text-slate-400">{t("siteUrlHint")}</p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            {data.appUrl?.value ? t("appUrlFrom", { url: data.appUrl.value, source: data.appUrl.source ?? "" }) : t("appUrlMissing")}
+          </p>
+          {data.webhookBaseMismatch && (
+            <p role="alert" className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800">{t("appUrlMismatch")}</p>
+          )}
           {data.webhookUrl && (
             <p className="mt-2 break-all rounded-lg bg-slate-50 px-2.5 py-1.5 font-mono text-[11px] text-slate-600">{data.webhookUrl}</p>
           )}

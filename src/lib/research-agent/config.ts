@@ -1,3 +1,4 @@
+import { configuredAppUrl } from "@/lib/appUrl";
 /**
  * Agent configuration (spec §21 — cost control, no hardcoded magic numbers in logic).
  */
@@ -30,8 +31,11 @@ export const AGENT_CONFIG = {
   allowedCurrencies: new Set([
     "USD", "GBP", "EUR", "CHF", "CAD", "AUD", "HKD", "SGD", "JPY", "KRW", "UZS", "NZD", "CNY", "INR",
   ]),
-  userAgent:
-    "Mozilla/5.0 (compatible; ScholarBridgeResearchAgent/1.0; +https://scholarbridgeai-1.onrender.com)",
+  /** Identifies the crawler; the contact URL is the deployment's own APP_URL. */
+  get userAgent(): string {
+    const site = configuredAppUrl();
+    return `Mozilla/5.0 (compatible; ScholarBridgeResearchAgent/1.0${site ? `; +${site}` : ""})`;
+  },
   /** Never follow links to these (third-party aggregators are discovery-only). */
   aggregatorDomains: ["topuniversities.com", "universityrankings", "4icu.org", "collegedunia", "edurank"],
 };

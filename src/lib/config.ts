@@ -29,6 +29,7 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   ai_provider_general: "openrouter",
   ai_provider_search: "openrouter",
   ai_provider_document: "openrouter",
+  ai_provider_visa: "groq",
   // Data refresh (spec §9)
   refresh_interval_hours: "24",
   refresh_default_scope: "all",
@@ -45,6 +46,28 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
 };
 
 const cache = new Map<string, string | null>();
+/** Values an admin actually saved (no defaults) — null = never saved. */
+const storedCache = new Map<string, string | null>();
+
+/**
+ * The value saved in app_config, or null when the key was never saved.
+ * Use this when "not set" must fall through to env/auto (e.g. AI provider
+ * selection) instead of being masked by CONFIG_DEFAULTS.
+ */
+export async function getStoredConfig(key: string): Promise<string | null> {
+  if (storedCache.has(key)) return storedCache.get(key) ?? null;
+  const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
+  const value = row?.value ?? null;
+  storedCache.set(key, value);
+  return value;
+}
+
+/** Remove a saved value (falls back to defaults/env again). */
+export async function deleteConfig(key: string): Promise<void> {
+  await db.delete(appConfig).where(eq(appConfig.key, key));
+  cache.delete(key);
+  storedCache.delete(key);
+}
 
 /** Get a config value (cached per process). */
 export async function getConfig(key: string): Promise<string> {
@@ -84,6 +107,7 @@ export async function setConfig(key: string, value: string, description?: string
     });
   }
   cache.set(key, value);
+  storedCache.set(key, value);
   return getConfig(key);
 }
 
@@ -100,6 +124,11 @@ export async function getAllConfig(): Promise<{ key: string; value: string; desc
 
 /** Invalidate the cache after a direct DB change. */
 export function invalidateConfigCache(key?: string) {
-  if (key) cache.delete(key);
-  else cache.clear();
+  if (key) {
+    cache.delete(key);
+    storedCache.delete(key);
+  } else {
+    cache.clear();
+    storedCache.clear();
+  }
 }

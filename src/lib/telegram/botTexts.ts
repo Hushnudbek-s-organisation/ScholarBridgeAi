@@ -19,6 +19,7 @@ type Dict = {
   privateOnly: string;
   btnOpenApp: string;
   btnWebsite: string;
+  menu: Record<MenuItem, string>;
   websiteText: string;
   account: (a: { name: string; email: string; plan: string; notify: boolean; since: string }) => string;
   planNames: Record<"free" | "premium" | "admin", string>;
@@ -66,6 +67,10 @@ type Dict = {
   unknown: string;
 };
 
+/** Main-menu entries: each one runs the existing command of the same name. */
+export const MENU_ITEMS = ["universities", "scholarships", "applications", "deadlines", "next", "saved", "advisor", "profile", "settings", "account"] as const;
+export type MenuItem = (typeof MENU_ITEMS)[number];
+
 const PRESET_LABEL = {
   standard: "30 · 14 · 7 · 3 · 1 · 0",
   short: "7 · 3 · 1 · 0",
@@ -86,6 +91,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     linkRateLimited: "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.",
     privateOnly: "🔒 Maxfiylik uchun men bilan faqat shaxsiy chatda ishlang.",
     btnOpenApp: "📱 Ilovani ochish",
+    menu: { universities: "🎓 Universitetlar", scholarships: "💰 Grantlar", applications: "📋 Arizalarim", deadlines: "⏰ Muddatlar", next: "✅ Keyingi qadam", saved: "⭐ Saqlanganlar", advisor: "🤖 AI maslahatchi", profile: "👤 Profil", settings: "⚙️ Sozlamalar", account: "💳 Akkaunt" },
     btnWebsite: "🌐 Sayt",
     websiteText: "ScholarBridge saytining to'liq versiyasi:",
     account: (a) =>
@@ -149,6 +155,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     linkRateLimited: "Слишком много попыток. Попробуйте чуть позже.",
     privateOnly: "🔒 Ради приватности пользуйтесь мной только в личном чате.",
     btnOpenApp: "📱 Открыть приложение",
+    menu: { universities: "🎓 Университеты", scholarships: "💰 Стипендии", applications: "📋 Мои заявки", deadlines: "⏰ Дедлайны", next: "✅ Следующий шаг", saved: "⭐ Сохранённое", advisor: "🤖 AI-советник", profile: "👤 Профиль", settings: "⚙️ Настройки", account: "💳 Аккаунт" },
     btnWebsite: "🌐 Сайт",
     websiteText: "Полная версия ScholarBridge:",
     account: (a) =>
@@ -212,6 +219,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     linkRateLimited: "Too many attempts. Please try again a bit later.",
     privateOnly: "🔒 For your privacy, please use me in a private chat only.",
     btnOpenApp: "📱 Open app",
+    menu: { universities: "🎓 Universities", scholarships: "💰 Scholarships", applications: "📋 My applications", deadlines: "⏰ Deadlines", next: "✅ Next step", saved: "⭐ Saved", advisor: "🤖 AI advisor", profile: "👤 Profile", settings: "⚙️ Settings", account: "💳 Account" },
     btnWebsite: "🌐 Website",
     websiteText: "The full ScholarBridge website:",
     account: (a) =>

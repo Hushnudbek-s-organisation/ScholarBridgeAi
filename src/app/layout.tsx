@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
 import { getBranding } from "@/lib/branding";
+import { siteUrlForRequest } from "@/lib/requestAppUrl";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/motion";
 import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
@@ -14,19 +15,18 @@ import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 // script, React never hydrates and no button (Sign in / Get started) works.
 export const dynamic = "force-dynamic";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
-
 export async function generateMetadata(): Promise<Metadata> {
   const { logo, favicon } = await getBranding();
+  const SITE_URL = await siteUrlForRequest();
+  // Search Console ownership token belongs to whoever owns the domain, so it
+  // is configuration (GOOGLE_SITE_VERIFICATION), not code.
+  const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
   return {
   metadataBase: new URL(SITE_URL),
   manifest: "/manifest.json",
   // Google Search Console ownership verification (renders the
   // <meta name="google-site-verification" .../> tag in <head>).
-  verification: {
-    google: "EZ2ipQrYUQxTQEBlEGYcqAOfVHm6pc0oIm1BYkN2VTs",
-  },
+  ...(googleVerification ? { verification: { google: googleVerification } } : {}),
   title: {
     default: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
     template: "%s | ScholarBridgeAI",

@@ -629,6 +629,8 @@ export function VisaSpeakingAssistant({
    */
   type VisaAnalysisResponse = VisaAnalysis & {
     aiAvailable?: boolean;
+    /** Why the AI half is missing (safe, category-based server message). */
+    aiError?: string;
     rubric?: {
       scores: {
         purposeOfStudy: number;
@@ -2299,6 +2301,12 @@ export function VisaSpeakingAssistant({
           {analysis.chanceDisclaimer && (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
               {analysis.chanceDisclaimer}
+            </p>
+          )}
+
+          {analysis.aiError && (
+            <p role="status" className="rounded-xl bg-slate-100 px-4 py-3 text-[11px] leading-relaxed text-slate-600">
+              {analysis.aiError}
             </p>
           )}
 

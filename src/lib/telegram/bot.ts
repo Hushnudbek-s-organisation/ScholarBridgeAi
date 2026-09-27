@@ -17,7 +17,7 @@ import { hasFeature, getPremiumStatus } from "@/lib/premium";
 import { fmtDate } from "@/lib/notificationTexts";
 import { tgSendChatAction, type InlineButton, type Keyboard } from "./api";
 import * as app from "./appAdapter";
-import { CMD_TEXTS, markdownToTelegramHtml, maskEmail } from "./botTexts";
+import { CMD_TEXTS, MENU_ITEMS, markdownToTelegramHtml, maskEmail } from "./botTexts";
 import { BOT_TEXTS, escapeHtml, isTelegramPlaceholderEmail, type BotLang, type TelegramSettings } from "./core";
 import { handleLinkCallback, unlinkProfile, type TgUser } from "./linking";
 import { editOrSend, openAppButton, publicSiteUrl, sendToChat, siteButton, type LinkRow, type ProfileRow } from "./messaging";
@@ -34,7 +34,7 @@ export interface BotCtx {
 }
 
 export const BOT_COMMANDS = [
-  "start", "help", "account", "profile", "universities", "scholarships", "applications",
+  "start", "menu", "help", "account", "profile", "universities", "scholarships", "applications",
   "deadlines", "next", "advisor", "saved", "settings", "website", "unlink",
 ] as const;
 
@@ -42,7 +42,7 @@ export const BOT_COMMANDS = [
 const PUBLIC_COMMANDS = new Set(["start", "help", "website"]);
 
 /** Legacy aliases from the first bot version. */
-const ALIASES: Record<string, string> = { status: "account", stop: "notify_off", off: "notify_off", on: "notify_on", resume: "notify_on" };
+const ALIASES: Record<string, string> = { menu: "start", status: "account", stop: "notify_off", off: "notify_off", on: "notify_on", resume: "notify_on" };
 
 const T = (ctx: BotCtx) => CMD_TEXTS[ctx.lang];
 
@@ -52,6 +52,17 @@ function send(ctx: BotCtx, html: string, buttons: Keyboard = []) {
 
 function who(ctx: BotCtx): app.AppIdentity {
   return { profileId: ctx.link!.profileId, telegramUserId: ctx.link!.telegramUserId };
+}
+
+/** Main menu (two per row) + the app/site buttons. Each entry → `mn:<command>`. */
+function mainMenu(ctx: BotCtx): InlineButton[][] {
+  const rows: InlineButton[][] = [];
+  for (let i = 0; i < MENU_ITEMS.length; i += 2) {
+    rows.push(MENU_ITEMS.slice(i, i + 2).map((item) => ({ text: T(ctx).menu[item], callback_data: `mn:${item}` })));
+  }
+  const extra = appButtons(ctx);
+  if (extra.length) rows.push(extra);
+  return rows;
 }
 
 function appButtons(ctx: BotCtx, link?: string | null): InlineButton[] {
@@ -83,11 +94,11 @@ export async function runCommand(ctx: BotCtx, rawCmd: string, args: string): Pro
   switch (cmd) {
     case "start":
       if (ctx.link) {
-        return void (await send(ctx, BOT_TEXTS[ctx.lang].welcomeLinked(ctx.profile?.name ?? "", ctx.link.notifyEnabled), appButtons(ctx)));
+        return void (await send(ctx, BOT_TEXTS[ctx.lang].welcomeLinked(ctx.profile?.name ?? "", ctx.link.notifyEnabled), mainMenu(ctx)));
       }
       return void (await send(ctx, BOT_TEXTS[ctx.lang].welcome, siteButton(publicSiteUrl(ctx.settings), ctx.lang)));
     case "help":
-      return void (await send(ctx, ctx.link ? BOT_TEXTS[ctx.lang].help : BOT_TEXTS[ctx.lang].welcome, ctx.link ? [] : siteButton(publicSiteUrl(ctx.settings), ctx.lang)));
+      return void (await send(ctx, ctx.link ? BOT_TEXTS[ctx.lang].help : BOT_TEXTS[ctx.lang].welcome, ctx.link ? mainMenu(ctx) : siteButton(publicSiteUrl(ctx.settings), ctx.lang)));
     case "website": {
       const buttons = appButtons(ctx);
       return void (await send(ctx, buttons.length ? T(ctx).websiteText : T(ctx).unavailable, buttons));
@@ -350,7 +361,7 @@ async function settings(ctx: BotCtx, messageId: number | null) {
 // Callbacks
 // ---------------------------------------------------------------------------
 
-const CALLBACK_RE = /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off))$/;
+const CALLBACK_RE = /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off)|mn:(universities|scholarships|applications|deadlines|next|saved|advisor|profile|settings|account))$/;
 
 /** Handle a button press; returns the toast text for answerCallbackQuery. */
 export async function runCallback(ctx: BotCtx, data: string, messageId: number | null): Promise<string> {
@@ -381,6 +392,12 @@ export async function runCallback(ctx: BotCtx, data: string, messageId: number |
     }
     await unlinkProfile(ctx.link.profileId, "bot", { notify: false });
     await editOrSend(ctx.token, ctx.chatId, messageId, BOT_TEXTS[ctx.lang].unlinked, { kind: "reply", preview: "unlinked" });
+    return "";
+  }
+  if (m[10]) {
+    // Menu buttons are shortcuts for the commands — same code path, same
+    // server-side premium and permission checks.
+    await runCommand(ctx, m[10], "");
     return "";
   }
   if (m[8] || m[9]) {

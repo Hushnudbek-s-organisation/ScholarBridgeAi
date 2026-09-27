@@ -410,7 +410,34 @@ async function main() {
     await service.handleUpdate(cb(1001, "evil:payload"));
     check("unknown callback data is rejected safely", since(m).some((c) => c.method === "answerCallbackQuery") && (await linkOf(aziza.id))?.notifyEnabled === true);
 
-    check("every command has a handler path", BOT_COMMANDS.length === 14);
+    // Main menu: shortcuts over the same commands (same premium checks).
+    m = mark();
+    await service.handleUpdate(msg(1001, "/start"));
+    const menuMsg = since(m).find((c) => c.method === "sendMessage");
+    const menuData = buttonsOf(menuMsg).map((b) => b.callback_data).filter(Boolean) as string[];
+    check("/start (linked) shows the main menu", ["mn:universities", "mn:scholarships", "mn:applications", "mn:deadlines", "mn:saved", "mn:settings"].every((d) => menuData.includes(d)), menuData.join(","));
+    check("menu callback_data fits the 64-byte Telegram limit", menuData.every((d) => Buffer.byteLength(d) <= 64));
+    const textOf = (c: typeof menuMsg) => String(c?.body.text ?? "");
+    for (const cmd of ["applications", "deadlines", "saved"]) {
+      m = mark();
+      await service.handleUpdate(msg(1001, `/${cmd}`));
+      const viaCmd = textOf(since(m).find((c) => c.method === "sendMessage"));
+      m = mark();
+      await service.handleUpdate(cb(1001, `mn:${cmd}`));
+      const viaMenu = textOf(since(m).find((c) => c.method === "sendMessage"));
+      check(`menu "${cmd}" answers exactly like /${cmd} (same service, same premium rule)`, viaCmd.length > 0 && viaCmd === viaMenu);
+    }
+    m = mark();
+    await service.handleUpdate(msg(1001, "/menu"));
+    check("/menu re-opens the menu", buttonsOf(since(m).find((c) => c.method === "sendMessage")).some((b) => b.callback_data === "mn:next"));
+    m = mark();
+    await service.handleUpdate(cb(7777, "mn:applications"));
+    check("menu buttons do nothing for an unlinked Telegram", !since(m).some((c) => c.method === "sendMessage"));
+    m = mark();
+    await service.handleUpdate(cb(1001, "mn:unlink"));
+    check("menu cannot trigger commands outside the allowlist (e.g. unlink)", !since(m).some((c) => c.method === "sendMessage") && Boolean(await linkOf(aziza.id)));
+
+    check("every command has a handler path", BOT_COMMANDS.length === 15);
   }
 
   // ===========================================================================

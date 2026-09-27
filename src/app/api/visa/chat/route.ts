@@ -1,11 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  describeGroqError,
-  getGroqModelName,
-  groqChatComplete,
-  isGroqConfigured,
-  withGroqRetry,
-} from "@/lib/groq";
+import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
 import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
@@ -30,9 +24,10 @@ export async function POST(req: Request) {
     const limit = checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
-    if (!isGroqConfigured()) {
+    // Provider = admin's "visa" mapping (default Groq); see lib/ai/settings.
+    if (!(await isAiConfigured("visa"))) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured on the server." },
+        { error: "The AI provider for the visa interview is not configured on the server." },
         { status: 503 },
       );
     }
@@ -55,9 +50,12 @@ export async function POST(req: Request) {
     // gpt-oss is a reasoning model: reasoning tokens share max_tokens, so a
     // 300-token cap returns an empty spoken line. 2048 + low effort keeps
     // the officer reply short without starving the visible answer.
-    const result = await withGroqRetry(() =>
-      groqChatComplete({
-        model: getGroqModelName(),
+    // Transient failures retry on the same provider (3 attempts, backoff);
+    // an explicit admin fallback is used only after that.
+    const result = await aiChat(
+      {
+        taskType: "visa",
+        prompt: "",
         messages: [
           {
             role: "system",
@@ -71,10 +69,14 @@ export async function POST(req: Request) {
         temperature: 0.8,
         maxTokens: 2048,
         reasoningEffort: "low",
-      }),
+      },
+      { maxAttempts: 3 },
     );
+    if (!result.ok) {
+      return NextResponse.json({ error: describeAiError(result.error) }, { status: aiErrorStatus(result.error) });
+    }
 
-    const reply = result.text.trim();
+    const reply = result.response.text.trim();
     if (!reply) {
       return NextResponse.json(
         { error: "The AI officer returned an empty reply. Please try again." },
@@ -84,9 +86,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error("Visa chat error:", err);
+    console.error("Visa chat error:", (err as Error)?.message);
     return NextResponse.json(
-      { error: describeGroqError(err, getGroqModelName()) },
+      { error: "The visa interview is temporarily unavailable. Please try again." },
       { status: 500 },
     );
   }

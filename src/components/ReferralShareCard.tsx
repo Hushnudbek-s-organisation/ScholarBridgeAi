@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Gift, Copy, Check, Link2 } from "lucide-react";
+import { absolutizeLink } from "@/lib/clientUrl";
 
 interface ReferralShareCardProps {
   code: string;
@@ -10,7 +11,8 @@ interface ReferralShareCardProps {
   onApplyCode: (code: string) => Promise<boolean>;
 }
 
-export function ReferralShareCard({ code, link, onApplyCode }: ReferralShareCardProps) {
+export function ReferralShareCard({ code, link: rawLink, onApplyCode }: ReferralShareCardProps) {
+  const link = absolutizeLink(rawLink);
   const t = useTranslations("rewards");
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [applyValue, setApplyValue] = useState("");
