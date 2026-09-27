@@ -47,6 +47,8 @@ import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
 import { AnswerVault } from "@/components/growth/AnswerVault";
 import { GoalPlanner } from "@/components/growth/GoalPlanner";
 import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
+import { TelegramSettings } from "@/components/telegram/TelegramSettings";
+import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { SuccessStories } from "@/components/growth/SuccessStories";
 
 /** Tabs that may appear in the URL hash (#scholarships …) for deep links. */
@@ -700,6 +702,8 @@ export default function Home() {
             <div className="space-y-4">
               {/* "Your path" — the 8-step journey; one highlighted next step */}
               <JourneyGuide profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
+              {/* "Connect Telegram" nudge — only while not connected; dismissible */}
+              <TelegramNudge profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
               {/* #4 Personalized Roadmap — the centrepiece: three actions */}
               <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
               <DashboardView
@@ -870,6 +874,7 @@ export default function Home() {
           {activeTab === "goals" && <GoalPlanner activeProfile={activeProfile} />}
           {activeTab === "departure" && <DepartureChecklist activeProfile={activeProfile} onNavigate={handleNavigateTab} />}
           {activeTab === "stories" && <SuccessStories activeProfile={activeProfile} />}
+          {activeTab === "notifications" && <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />}
 
           {/* SEO/AEO: FAQ har bir bo'limda sahifa pastida ko'rinadi */}
           {activeTab !== "admin" && <FaqSection />}

@@ -1,11 +1,13 @@
 import { db } from "@/db";
 import { notifications, notificationPreferences, studentProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { deliverTelegramNotification } from "@/lib/telegram/service";
 
 /**
  * Notification helper (spec §20). Creates an in-app notification if the user
- * has not disabled the type. Email/push channels are stubbed — they activate
- * when SMTP/push infrastructure is connected.
+ * has not disabled the type, and mirrors it to the user's Telegram chat when
+ * they connected the bot (Admin → Telegram bot controls which types go out;
+ * the student can pause Telegram or mute single types). Email/push are stubs.
  */
 export async function createNotification(input: {
   profileId: number;
@@ -30,6 +32,10 @@ export async function createNotification(input: {
         enabled = prefs.inApp;
       }
     }
+
+    // Telegram is its own channel with its own switches (see telegram/core
+    // `shouldDeliver`); a failure there never blocks the in-app notification.
+    await deliverTelegramNotification(input);
 
     if (!enabled) return null;
 

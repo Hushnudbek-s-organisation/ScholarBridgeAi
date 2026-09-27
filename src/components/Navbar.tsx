@@ -40,6 +40,7 @@ import {
   X,
   Archive,
   ArrowLeftRight,
+  Send,
 } from "lucide-react";
 import { BrandingImage } from "./BrandingImage";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -157,6 +158,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   forum: MessagesSquare,
   payments: Crown,
   rewards: Gift,
+  notifications: Send,
   // hidden-until-ready sections
   tracker: GraduationCap,
   deadlines: CalendarClock,
@@ -287,6 +289,7 @@ export function Navbar({
         forum: t("forum"),
         payments: t("payments"),
         rewards: t("rewards"),
+        notifications: t("notifications"),
         tracker: t("tracker"),
         deadlines: t("deadlines"),
         courses: t("courses"),
@@ -340,6 +343,7 @@ export function Navbar({
         forum: th("forum"),
         payments: th("payments"),
         rewards: th("rewards"),
+        notifications: th("notifications"),
         admin: th("admin"),
       };
       return map[id];

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Bell, CheckCheck, Loader2, Settings2 } from "lucide-react";
 
 interface NotificationItem {
   id: number;
@@ -24,6 +25,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ profileId, placement = "down" }: NotificationBellProps) {
+  const t = useTranslations("bell");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -124,7 +126,8 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
       <button
         onClick={toggle}
         className="relative p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
-        title="Notifications"
+        title={t("title")}
+        aria-label={t("title")}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
@@ -146,27 +149,43 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
           style={panelWidth ? { width: panelWidth } : undefined}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <p className="text-xs font-extrabold text-slate-800">Notifications</p>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+            <p className="text-xs font-extrabold text-slate-800">{t("title")}</p>
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+                >
+                  <CheckCheck className="h-3 w-3" /> {t("markAll")}
+                </button>
+              )}
+              {/* Telegram & notification settings (hash deep-link → tab) */}
+              <a
+                href="#notifications"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-800"
+                title={t("settings")}
               >
-                <CheckCheck className="h-3 w-3" /> Mark all read
-              </button>
-            )}
+                <Settings2 className="h-3 w-3" /> {t("settings")}
+              </a>
+            </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center gap-2 p-6 text-xs text-slate-400">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
             </div>
           ) : items.length === 0 ? (
-            <p className="p-6 text-center text-xs text-slate-400">No notifications yet.</p>
+            <div className="p-6 text-center">
+              <p className="text-xs text-slate-400">{t("empty")}</p>
+              <a href="#notifications" onClick={() => setOpen(false)} className="mt-2 inline-block text-[11px] font-bold text-sky-600 hover:text-sky-800">
+                {t("emptyTelegram")}
+              </a>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {items.map((n) => (
-                <div key={n.id} className={`px-4 py-3 ${n.isRead ? "" : "bg-indigo-50/40"}`}>
+                <div key={n.id} className={`px-4 py-3 ${n.isRead ? "" : "bg-indigo-50"}`}>
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-slate-800">{n.title}</p>

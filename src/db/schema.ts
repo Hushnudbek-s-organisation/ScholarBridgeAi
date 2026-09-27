@@ -1176,3 +1176,72 @@ export const studentChecklist = pgTable(
   },
   (table) => [uniqueIndex("uq_student_checklist_profile_item").on(table.profileId, table.itemId)]
 );
+
+// ---------------------------------------------------------------------------
+// TELEGRAM BOT — sign-in codes + notification delivery
+// (supabase/add_telegram.sql; created lazily by src/lib/telegram/db.ts)
+// ---------------------------------------------------------------------------
+
+/** One Telegram chat linked to one ScholarBridge account. */
+export const telegramLinks = pgTable("telegram_links", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull().unique(),
+  // Telegram ids can exceed 32 bits — stored as text.
+  telegramUserId: text("telegram_user_id").notNull().unique(),
+  chatId: text("chat_id").notNull(),
+  username: text("username"),
+  firstName: text("first_name"),
+  languageCode: text("language_code"),
+  notifyEnabled: boolean("notify_enabled").notNull().default(true),
+  mutedTypes: text("muted_types").notNull().default("[]"), // JSON array of notification types
+  blocked: boolean("blocked").notNull().default(false), // user blocked the bot
+  linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  lastLoginAt: timestamp("last_login_at"),
+  lastMessageAt: timestamp("last_message_at"),
+});
+
+/**
+ * A sign-in (or "connect Telegram") attempt. The browser keeps a secret
+ * nonce; Telegram only ever sees the public start token. The 6-digit code the
+ * bot sends is valid only together with that nonce, so codes cannot be
+ * guessed across other people's attempts.
+ */
+export const telegramLoginRequests = pgTable("telegram_login_requests", {
+  id: serial("id").primaryKey(),
+  startToken: text("start_token").notNull().unique(),
+  nonceHash: text("nonce_hash").notNull(),
+  purpose: text("purpose").notNull().default("login"), // login | link
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }), // link: who asked
+  status: text("status").notNull().default("pending"), // pending | code_sent | used | failed | locked
+  failReason: text("fail_reason"),
+  telegramUserId: text("telegram_user_id"),
+  chatId: text("chat_id"),
+  username: text("username"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  languageCode: text("language_code"),
+  codeHash: text("code_hash"),
+  codeExpiresAt: timestamp("code_expires_at"),
+  codesSent: integer("codes_sent").notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+  ip: text("ip"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+/** Delivery log for the admin panel (codes are never stored). */
+export const telegramMessages = pgTable(
+  "telegram_messages",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    chatId: text("chat_id"),
+    kind: text("kind").notNull(), // code | notification | broadcast | test | login_alert | reply
+    type: text("type"),
+    preview: text("preview"),
+    status: text("status").notNull(), // sent | failed
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_telegram_messages_created").on(table.createdAt)]
+);

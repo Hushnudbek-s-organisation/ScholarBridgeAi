@@ -125,6 +125,7 @@ export const HELP_SECTIONS = [
   "visa",
   "forum",
   "rewards",
+  "notifications",
 ] as const;
 
 export type HelpSection = (typeof HELP_SECTIONS)[number];

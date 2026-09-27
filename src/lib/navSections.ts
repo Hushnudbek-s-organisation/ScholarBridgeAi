@@ -56,6 +56,7 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
   { id: "departure", group: "apply", label: "Departure Checklist", description: "NEW — after the offer: visa, money, housing, travel and arrival steps.", isNew: true },
   { id: "chat", group: "help", label: "AI Mentor", description: "AI mentor chat." },
   { id: "forum", group: "help", label: "Community Forum", description: "Premium — community discussions." },
+  { id: "notifications", group: "account", label: "Telegram & Notifications", description: "NEW — connect the Telegram bot (sign-in codes + alerts), pause it or choose which alerts to receive.", isNew: true },
   { id: "payments", group: "account", label: "Premium", description: "Premium subscription and payment history." },
   { id: "rewards", group: "account", label: "Rewards & Referrals", description: "Referral program, points and rewards." },
 ];
