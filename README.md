@@ -1,6 +1,22 @@
 # ScholarBridgeAi
 
-## Dashboard UI (static prototype)
+## Static UI prototypes (no build step)
+
+Two standalone pages built with plain HTML, Tailwind CSS (Play CDN) and vanilla
+JavaScript live in `public/`, so they are served as-is by the Next.js app
+(`npm run dev`) and require no build:
+
+- `/landing.html` — public marketing landing page (hero, "One Profile" steps,
+  dark feature grid, fit-vs-chance explainer, roadmap section, CTA, footer).
+- `/dashboard.html` — signed-in student dashboard.
+
+Quick local preview of just the static files:
+
+```bash
+npx serve public      # then open /landing.html or /dashboard.html
+```
+
+### Dashboard UI (static prototype)
 
 A fully responsive, interactive dashboard prototype for the ScholarBridge
 educational platform lives at [`public/dashboard.html`](public/dashboard.html).
