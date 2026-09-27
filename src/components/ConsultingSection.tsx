@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Headset, Send, Loader2, CheckCircle2, Clock } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 interface ConsultingSectionProps {
   activeProfile: StudentProfile | null;
@@ -38,7 +39,7 @@ export function ConsultingSection({ activeProfile }: ConsultingSectionProps) {
           profileId: activeProfile.id,
           topic,
           message,
-          preferredContact: preferredContact || activeProfile.email,
+          preferredContact: preferredContact || (isTelegramPlaceholderEmail(activeProfile.email) ? "Telegram" : activeProfile.email),
         }),
       });
       const data = await res.json();
@@ -73,7 +74,7 @@ export function ConsultingSection({ activeProfile }: ConsultingSectionProps) {
           <h3 className="text-base font-extrabold text-slate-900">Request sent!</h3>
           <p className="text-xs text-slate-600">
             Our team will review your request and contact you at{" "}
-            <b>{preferredContact || activeProfile?.email}</b>. Expect a reply within 1-2 business days.
+            <b>{preferredContact || (isTelegramPlaceholderEmail(activeProfile?.email) ? "Telegram" : activeProfile?.email)}</b>. Expect a reply within 1-2 business days.
           </p>
         </div>
       ) : (
@@ -119,7 +120,7 @@ export function ConsultingSection({ activeProfile }: ConsultingSectionProps) {
             <input
               value={preferredContact}
               onChange={(e) => setPreferredContact(e.target.value)}
-              placeholder={activeProfile?.email || "your contact"}
+              placeholder={(!isTelegramPlaceholderEmail(activeProfile?.email) && activeProfile?.email) || "your contact"}
               className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>

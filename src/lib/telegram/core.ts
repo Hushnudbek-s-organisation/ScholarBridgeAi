@@ -414,11 +414,4 @@ export function telegramDisplayName(u: { firstName?: string | null; lastName?: s
   return (full || (u.username ? `@${u.username}` : "") || "Telegram user").slice(0, 120);
 }
 
-/** Placeholder email for Telegram-only accounts (can be changed later). */
-export function telegramPlaceholderEmail(telegramUserId: string): string {
-  return `tg${telegramUserId.replace(/\D/g, "")}@telegram.scholarbridge.local`;
-}
-
-export function isTelegramPlaceholderEmail(email: string | null | undefined): boolean {
-  return !!email && /@telegram\.scholarbridge\.local$/i.test(email);
-}
+export { telegramPlaceholderEmail, isTelegramPlaceholderEmail } from "./placeholder";

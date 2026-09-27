@@ -225,24 +225,27 @@ export function TelegramManager() {
         {/* ---- Step 1: token ---- */}
         <Card icon={KeyRound} step={1} title={t("tokenTitle")} done={configured}>
           {configured ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              <div className="min-w-0 flex-1 text-[12px]">
-                <p className="font-bold text-slate-800">
-                  @{data.settings.botUsername} <span className="font-normal text-slate-500">· {data.settings.botName}</span>
-                </p>
-                <p className="font-mono text-[11px] text-slate-500">
-                  {data.token.masked} · {data.token.source === "env" ? t("sourceEnv") : t("sourceAdmin")}
-                </p>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1 text-[12px]">
+                  <p className="truncate font-bold text-slate-800">
+                    @{data.settings.botUsername} <span className="font-normal text-slate-500">· {data.settings.botName}</span>
+                  </p>
+                  <p className="break-all font-mono text-[11px] text-slate-500">{data.token.masked}</p>
+                  <p className="text-[11px] text-slate-500">{data.token.source === "env" ? t("sourceEnv") : t("sourceAdmin")}</p>
+                </div>
               </div>
-              <a href={`https://t.me/${data.settings.botUsername}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
-                {t("openBot")}
-              </a>
-              {data.token.source === "admin" && (
-                <button onClick={clearToken} disabled={busy === "clear"} className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50">
-                  <Trash2 className="inline h-3 w-3" /> {t("clearToken")}
-                </button>
-              )}
+              <div className="mt-2 flex flex-wrap gap-2 pl-6">
+                <a href={`https://t.me/${data.settings.botUsername}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
+                  {t("openBot")}
+                </a>
+                {data.token.source === "admin" && (
+                  <button onClick={clearToken} disabled={busy === "clear"} className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50">
+                    <Trash2 className="inline h-3 w-3" /> {t("clearToken")}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <ol className="mb-3 list-decimal space-y-1 pl-5 text-[12px] text-slate-600">
@@ -251,7 +254,7 @@ export function TelegramManager() {
               <li>{t("botfather3")}</li>
             </ol>
           )}
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row xl:flex-col 2xl:flex-row">
             <div className="relative flex-1">
               <input
                 type={showToken ? "text" : "password"}

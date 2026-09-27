@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { STUDY_FIELD_CATEGORIES } from "@/lib/studyFields";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 interface OnboardingWizardProps {
   /**
@@ -95,9 +96,12 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
+  // Telegram-only accounts carry a technical placeholder email; never show it
+  // as if the student had typed it, and keep the email optional for them.
+  const placeholderEmail = isTelegramPlaceholderEmail(profile?.email) ? profile!.email : "";
   const [form, setForm] = useState<FormState>({
     name: profile?.name || "",
-    email: profile?.email || "",
+    email: placeholderEmail ? "" : profile?.email || "",
     password: "",
     degreeLevel: profile?.degreeLevel || "",
     targetMajor: profile?.targetMajor === "Computer Science" ? "" : profile?.targetMajor || "",
@@ -145,7 +149,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     try {
       const payload: Record<string, unknown> = {
         name: form.name,
-        email: form.email,
+        email: form.email.trim() || placeholderEmail || form.email,
         degreeLevel: form.degreeLevel || "Master",
         targetMajor: form.targetMajor || "Computer Science",
         gpa: form.gpa ? Number(form.gpa) : 3.5,
@@ -219,7 +223,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const isNewAccount = createdId == null;
   const step0Invalid =
     !form.name.trim() ||
-    !form.email.trim() ||
+    (!form.email.trim() && !placeholderEmail) ||
     (isNewAccount && form.password.trim().length < 6);
 
   const handleNext = async () => {
@@ -348,7 +352,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>Email Address *</label>
+              <label className={labelCls}>Email Address {placeholderEmail ? "(optional)" : "*"}</label>
               <input
                 type="email"
                 className={inputCls}
@@ -356,6 +360,12 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
               />
+              {placeholderEmail && (
+                <p className="text-[11px] text-slate-400 mt-2">
+                  You signed in with Telegram, so an email is optional. Add one to also get
+                  email updates and to sign in with email + password later.
+                </p>
+              )}
             </div>
             {isNewAccount && (
               <div>

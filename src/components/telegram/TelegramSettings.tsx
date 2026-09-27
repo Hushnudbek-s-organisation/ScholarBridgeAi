@@ -7,6 +7,7 @@ import { AlertTriangle, BellRing, CheckCircle2, KeyRound, Loader2, Send, ShieldA
 import type { StudentProfile } from "../Navbar";
 import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "../growth/ui";
 import { TelegramCodeFlow } from "./TelegramCodeFlow";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 interface MeResponse {
   bot: { configured: boolean; botUsername: string | null; notificationsEnabled: boolean; loginEnabled: boolean };
@@ -99,7 +100,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
   if (loading) return <div className="space-y-5">{header}<LoadingBlock label={t("loading")} /></div>;
   if (error || !data) return <div className="space-y-5">{header}<ErrorNote message={error ?? ""} onRetry={load} retryLabel={t("retry")} /></div>;
 
-  const placeholderEmail = /@telegram\.scholarbridge\.local$/i.test(activeProfile.email);
+  const placeholderEmail = isTelegramPlaceholderEmail(activeProfile.email);
 
   if (!data.bot.configured) {
     return (
@@ -136,7 +137,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {/* ---- Connection card ---- */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           {link ? (
@@ -196,6 +197,27 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                       {t("cancel")}
                     </button>
                   </motion.div>
+                )}
+              </div>
+
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("activeTitle")}</p>
+                <ul className="space-y-2">
+                  {[
+                    { icon: BellRing, text: t("benefitAlerts"), on: link.notifyEnabled && data.bot.notificationsEnabled },
+                    { icon: KeyRound, text: t("benefitLogin"), on: data.bot.loginEnabled },
+                    { icon: ShieldAlert, text: t("benefitSecurity"), on: link.notifyEnabled && !link.mutedTypes.includes("login_alert") },
+                  ].map(({ icon: Icon, text, on }) => (
+                    <li key={text} className={`flex items-start gap-2.5 text-[13px] ${on ? "text-slate-700" : "text-slate-400 line-through"}`}>
+                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${on ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+                {data.bot.loginEnabled && (
+                  <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-800">{t("loginTip")}</p>
                 )}
               </div>
             </div>

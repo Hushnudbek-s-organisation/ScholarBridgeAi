@@ -48,6 +48,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ThemeSwitch, ThemeToggle } from "./ThemeToggle";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import { DEFAULT_HIDDEN_NAV_ITEMS, NAV_GROUPS, NAV_SECTIONS, type NavGroupId } from "@/lib/navSections";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 export interface StudentProfile {
   id: number;
@@ -527,7 +528,7 @@ export function Navbar({
             <span className="truncate">{activeProfile?.name || t("noProfile")}</span>
             {isAdmin && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-slate-600" />}
           </p>
-          <p className="truncate text-[10px] text-slate-500">{activeProfile?.email || t("studentProfile")}</p>
+          <p className="truncate text-[10px] text-slate-500">{activeProfile?.email && !isTelegramPlaceholderEmail(activeProfile.email) ? activeProfile.email : activeProfile?.email ? "Telegram" : t("studentProfile")}</p>
         </div>
         {!inDrawer && <NotificationBell profileId={activeProfileId ?? null} placement="up" />}
       </div>

@@ -10,6 +10,7 @@ import { recordVisit } from "@/lib/visits";
 import { authenticate, sessionCookieHeader } from "@/lib/auth";
 import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { clampString, readJsonBody } from "@/lib/request";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 /** Detect a schema-mismatch error (new columns missing in the database). */
 function isMissingColumnsError(err: unknown): boolean {
@@ -81,6 +82,14 @@ export async function POST(req: Request) {
     // profile — otherwise email+password sign-in would be ambiguous.
     const emailInput = clampString(body.email, 320).toLowerCase();
     if (emailInput && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailInput)) {
+      return NextResponse.json(
+        { error: "Please provide a valid email address", code: "invalid_email" },
+        { status: 400 }
+      );
+    }
+    // The Telegram placeholder domain is reserved for accounts created by the
+    // bot — letting anyone claim tg<id>@… would hijack that Telegram sign-in.
+    if (isTelegramPlaceholderEmail(emailInput)) {
       return NextResponse.json(
         { error: "Please provide a valid email address", code: "invalid_email" },
         { status: 400 }

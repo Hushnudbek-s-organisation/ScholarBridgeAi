@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ShieldCheck, X, LogIn, Loader2, Plus, Mail, Send } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { TelegramCodeFlow } from "./telegram/TelegramCodeFlow";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 interface ProfilePickerProps {
   open: boolean;
@@ -114,7 +115,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                 {deviceProfiles.map((p) => {
                   const isCurrent = p.id === currentId;
                   const isAdmin = !!p.isAdmin;
-                  const tgOnly = /@telegram\.scholarbridge\.local$/i.test(p.email);
+                  const tgOnly = isTelegramPlaceholderEmail(p.email);
                   return (
                     <button
                       key={p.id}

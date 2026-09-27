@@ -1278,7 +1278,9 @@
       "forum_thread": "New discussions (admins)",
       "forum_report": "Posts reported by users",
       "login_alert": "Someone signed in with your password"
-    }
+    },
+    "activeTitle": "Active for your account",
+    "loginTip": "Next time: press “Sign in” → Telegram tab — the bot sends you a code, no password needed."
   },
   "adminTelegram": {
     "loading": "Loading…",

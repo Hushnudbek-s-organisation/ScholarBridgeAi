@@ -1278,7 +1278,9 @@
       "forum_thread": "Yangi muhokamalar (adminlar)",
       "forum_report": "Foydalanuvchilar shikoyat qilgan postlar",
       "login_alert": "Kimdir parolingiz bilan kirdi"
-    }
+    },
+    "activeTitle": "Akkauntingizda faol",
+    "loginTip": "Keyingi safar: «Kirish» → Telegram yorlig'i — bot sizga kod yuboradi, parol shart emas."
   },
   "adminTelegram": {
     "loading": "Yuklanmoqda…",

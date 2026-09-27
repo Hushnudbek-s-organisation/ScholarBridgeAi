@@ -6,6 +6,7 @@ import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/passwo
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -138,6 +139,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       body.email.trim() &&
       body.email.trim().toLowerCase() !== current.email.trim().toLowerCase()
     ) {
+      // Reserved for bot-created accounts (see /api/profiles POST).
+      if (isTelegramPlaceholderEmail(body.email.trim())) {
+        return NextResponse.json(
+          { error: "Please provide a valid email address", code: "invalid_email" },
+          { status: 400 }
+        );
+      }
       const [taken] = await db
         .select({ id: studentProfiles.id })
         .from(studentProfiles)
@@ -166,7 +174,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const [updatedProfile] = await db.update(studentProfiles)
       .set({
         name: body.name !== undefined ? clampString(body.name, 120) : undefined,
-        email: body.email !== undefined ? clampString(body.email, 320) : undefined,
+        // An empty email would break sign-in — leave the stored one untouched.
+        email: body.email !== undefined ? clampString(body.email, 320) || undefined : undefined,
         passwordHash: newPasswordHash,
         // NOT NULL text columns: an empty/garbage value leaves them untouched.
         degreeLevel: clampString(body.degreeLevel, 60) || undefined,
