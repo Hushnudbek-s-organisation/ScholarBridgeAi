@@ -150,3 +150,46 @@ esbuild-kit dependency.
 Please do **not** open a public issue. Email the maintainers with a description,
 reproduction steps and the affected endpoint. We aim to acknowledge reports
 within 3 working days.
+
+
+## 9. 2026-09 audit — findings and fixes
+
+A hands-on audit ran the app against a real Postgres (`npm run db:dev`) and
+attacked it over HTTP. What held up, and what was fixed:
+
+**Verified working (no change needed)**
+
+- Session cookies are HttpOnly/SameSite=Lax, HMAC-signed; forged or tampered
+  tokens → 401. Client-asserted ids (`adminProfileId`, `profileId`) are ignored.
+- Non-admin → `/api/admin/*` → 403; user A reading/editing user B's data → 403.
+- Profile updates use a strict field whitelist (no mass assignment of
+  `isAdmin`, `isPremium`, `referralPoints`).
+- SQL is parameterised by Drizzle (no string-built queries with user input).
+- SSRF guard blocks loopback, private, link-local/metadata, decimal/hex/IPv6
+  encodings and non-http(s) schemes.
+- 256 KB JSON body cap → 413; payment webhooks and cron fail closed without
+  their secrets; `npm audit --omit=dev` reports 0 vulnerabilities.
+
+**Fixed**
+
+| Severity | Issue | Fix |
+| --- | --- | --- |
+| High | Per-IP rate limits keyed on the **leftmost** `X-Forwarded-For` entry, which the client controls. Sending a random fake IP per request bypassed sign-up, sign-in (per-IP) and anonymous AI limits (10/10 requests passed a 6/min limit). | `clientIp()` now uses the proxy-appended rightmost entry (`TRUSTED_PROXY_HOPS`, optional `CLIENT_IP_HEADER`). Regression tests added. |
+| Medium | `PUT /api/profiles/[id]` stored `NaN` in `gpa` for non-numeric input, and returned 500 for decimals sent to integer columns (TOEFL, SAT, age…) or an object for `preferredCountries`. | `optionalNumber` / `optionalScore` in `lib/request.ts`: finite-only, clamped, integer columns rounded, NOT NULL columns never nulled; text fields length-capped; locale whitelisted. |
+| Low | The AI chat served canned text indistinguishable from a real model answer when no provider was configured, and echoed the raw user message into rendered markdown. | Response carries `offline: true` and the UI labels it; the echo was removed. |
+| Low | Failed chat requests (401/429) left the UI silently waiting. | The chat now shows a clear error message. |
+
+**Framing policy.** `frame-ancestors 'none'` + `X-Frame-Options: DENY` in every
+environment except `next dev` (`NODE_ENV=development`), where the known
+preview hosts may embed the app. This is fail-closed: production, test and an
+unset `NODE_ENV` all get the strict policy (see `src/lib/security.ts`, covered
+by `npm run test:security`).
+
+**Still recommended (operational)**
+
+- Set `SESSION_SECRET` (>= 32 chars) in Render. Without it the signing key is
+  derived from `DATABASE_URL`.
+- The rate limiter is in-process memory: correct for one instance, but limits
+  are per-instance if you scale horizontally (move to Redis/Postgres then).
+- Next 16 renamed `middleware.ts` → `proxy.ts`; the old name still works but
+  is deprecated (`npx @next/codemod@canary middleware-to-proxy .`).

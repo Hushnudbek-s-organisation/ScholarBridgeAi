@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, locales } from "@/i18n/config";
+import { frameAncestors, strictTransportSecurity, xFrameOptions } from "@/lib/security";
 
 /**
  * Cryptographically random nonce using the Web Crypto API (the middleware runs
@@ -59,7 +60,9 @@ export function contentSecurityPolicy(nonce: string): string {
     // No plugins, no embedding this site in a frame (clickjacking), no
     // relative-base-tag hijacking.
     "object-src": ["'none'"],
-    "frame-ancestors": ["'none'"],
+    // Production: nobody may embed the app. Development: only the known
+    // preview hosts, so the app can be shown inside the IDE preview.
+    "frame-ancestors": frameAncestors(),
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
     "frame-src": ["'self'"],
@@ -79,19 +82,17 @@ function applySecurityHeaders(response: NextResponse, csp: string): NextResponse
     : "Content-Security-Policy";
   headers.set(headerName, csp);
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
+  // DENY everywhere except under `next dev` (see src/lib/security.ts).
+  const frameOptions = xFrameOptions();
+  if (frameOptions) headers.set("X-Frame-Options", frameOptions);
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   headers.set("X-DNS-Prefetch-Control", "off");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   // Only meaningful over HTTPS; browsers ignore it otherwise.
-  if (process.env.NODE_ENV === "production") {
-    headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
-    );
-  }
+  const hsts = strictTransportSecurity();
+  if (hsts) headers.set("Strict-Transport-Security", hsts);
   return response;
 }
 

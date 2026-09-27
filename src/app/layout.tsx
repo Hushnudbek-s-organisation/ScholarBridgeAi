@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
 import { getBranding } from "@/lib/branding";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { MotionProvider } from "@/components/motion";
+import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 
 // The middleware sends a per-request nonce-based CSP. Next.js can only stamp
 // that nonce on its <script> tags when the page is rendered per request —
@@ -92,13 +96,31 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // The middleware generates a fresh CSP nonce per request and forwards it on
+  // `x-nonce`. The pre-hydration theme script is inline, so it must carry that
+  // nonce or the browser will refuse to run it (and the theme would flash).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
+  // Server-side hint so the first render matches what the inline script
+  // painted, avoiding a hydration mismatch on the theme toggle.
+  const stored = (await cookies()).get(THEME_COOKIE)?.value;
+  const initialTheme = isThemeChoice(stored) ? stored : "system";
+
   return (
-    <html lang="uz">
+    <html lang="uz" suppressHydrationWarning>
+      <head>
+        {/* Applies the saved theme before first paint — no light/dark flash. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+      </head>
       <body className="bg-slate-100 text-slate-900 antialiased">
-        {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
-        <SiteTracker />
-        {children}
+        <ThemeProvider defaultTheme={initialTheme}>
+          <MotionProvider>
+            {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
+            <SiteTracker />
+            {children}
+          </MotionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

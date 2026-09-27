@@ -17,6 +17,7 @@
 process.env.DATABASE_URL = "postgresql://x:x@localhost:5432/x"; // dummy — no queries are executed
 process.env.SESSION_SECRET = "test-session-secret-that-is-long-enough-1234567890";
 
+import * as sec from "../src/lib/security";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
@@ -202,12 +203,55 @@ async function main() {
     assert.equal(res.headers.get("Retry-After"), "7");
   });
 
-  check("clientIp reads x-forwarded-for first", () => {
+  check("clientIp uses the proxy-appended (rightmost) X-Forwarded-For entry", () => {
     const mk = (h: Record<string, string>) =>
       ({ headers: new Headers(h) }) as unknown as Request;
-    assert.equal(rateLimit.clientIp(mk({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" })), "1.2.3.4");
-    assert.equal(rateLimit.clientIp(mk({ "x-real-ip": "5.6.7.8" })), "5.6.7.8");
-    assert.equal(rateLimit.clientIp(mk({})), "unknown");
+    // One trusted proxy (default): the rightmost entry is the real client.
+    assert.equal(rateLimit.clientIp(mk({ "x-forwarded-for": "1.2.3.4" }), {}), "1.2.3.4");
+    assert.equal(
+      rateLimit.clientIp(mk({ "x-forwarded-for": "6.6.6.6, 203.0.113.9" }), {}),
+      "203.0.113.9"
+    );
+    // Two trusted proxies: second from the right.
+    assert.equal(
+      rateLimit.clientIp(
+        mk({ "x-forwarded-for": "6.6.6.6, 203.0.113.9, 10.0.0.1" }),
+        { TRUSTED_PROXY_HOPS: "2" }
+      ),
+      "203.0.113.9"
+    );
+    // An edge-set header wins when configured.
+    assert.equal(
+      rateLimit.clientIp(
+        mk({ "x-forwarded-for": "6.6.6.6", "cf-connecting-ip": "198.51.100.7" }),
+        { CLIENT_IP_HEADER: "cf-connecting-ip" }
+      ),
+      "198.51.100.7"
+    );
+    assert.equal(rateLimit.clientIp(mk({ "x-real-ip": "5.6.7.8" }), {}), "5.6.7.8");
+    assert.equal(rateLimit.clientIp(mk({}), {}), "unknown");
+  });
+
+  check("a spoofed X-Forwarded-For prefix cannot mint a fresh rate-limit bucket", () => {
+    const mk = (xff: string) =>
+      ({ headers: new Headers({ "x-forwarded-for": xff }) }) as unknown as Request;
+    const real = "203.0.113.50";
+    const keys = new Set(
+      ["1.1.1.1", "2.2.2.2", "3.3.3.3", "9.9.9.9"].map((fake) =>
+        rateLimit.clientIp(mk(`${fake}, ${real}`), {})
+      )
+    );
+    assert.deepEqual([...keys], [real]);
+  });
+
+  check("framing is only relaxed under `next dev`, never in production", () => {
+    assert.deepEqual(sec.frameAncestors({ NODE_ENV: "production" }), ["'none'"]);
+    assert.deepEqual(sec.frameAncestors({ NODE_ENV: "test" }), ["'none'"]);
+    assert.deepEqual(sec.frameAncestors({}), ["'none'"]);
+    assert.equal(sec.xFrameOptions({ NODE_ENV: "production" }), "DENY");
+    assert.equal(sec.xFrameOptions({}), "DENY");
+    assert.ok(!sec.frameAncestors({ NODE_ENV: "development" }).includes("*"));
+    assert.equal(sec.xFrameOptions({ NODE_ENV: "development" }), null);
   });
 
   console.log("\n— SSRF guard —");

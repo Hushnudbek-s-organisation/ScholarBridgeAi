@@ -39,6 +39,7 @@ import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { trackScreen } from "@/lib/tracker";
+import { PageTransition } from "@/components/motion";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -619,172 +620,184 @@ export default function Home() {
 
       <div className="flex-1 min-w-0 flex flex-col">
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
-        {/* Onboarding wizard — shown for profiles that haven't completed
-            the step-by-step setup yet. Resumes from the saved step. */}
-        {activeProfile && !activeProfile.onboardingCompleted ? (
-          <OnboardingWizard
-            profile={activeProfile}
-            onComplete={handleWizardComplete}
-          />
-        ) : activeTab === "dashboard" && (
-          <div className="space-y-4">
-            {/* #4 Personalized Roadmap — the centrepiece: three actions */}
-            <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
-            <DashboardView
+        {/* Sections swap with a short cross-fade + lift. Keyed on what is
+            actually on screen so the wizard and every tab participate. */}
+        <PageTransition
+          transitionKey={
+            activeProfile && !activeProfile.onboardingCompleted
+              ? "onboarding"
+              : activeTab
+          }
+          distance={14}
+        >
+          {/* Onboarding wizard — shown for profiles that haven't completed
+              the step-by-step setup yet. Resumes from the saved step. */}
+          {activeProfile && !activeProfile.onboardingCompleted ? (
+            <OnboardingWizard
               profile={activeProfile}
-              onNavigateTab={handleNavigateTab}
-              savedUniCount={savedUniversities.length}
-              savedScholarshipCount={savedScholarships.length}
-              savedProgramCount={savedProgramCount}
-              taskCount={taskCount}
-              onEditProfile={() => {
-                setIsNewProfile(false);
-                setIsProfileModalOpen(true);
-              }}
+              onComplete={handleWizardComplete}
             />
-          </div>
-        )}
-
-        {activeTab === "universities" && (
-          <UniversityExplorer
-            activeProfile={activeProfile}
-            savedUniIds={savedUniIds}
-            onSaveUniversity={handleSaveUniversity}
-            onUnsaveUniversity={handleUnsaveUniversity}
-          />
-        )}
-
-        {activeTab === "scholarships" && (
-          <ScholarshipHub
-            activeProfile={activeProfile}
-            savedScholarshipIds={savedScholarshipIds}
-            onSaveScholarship={handleSaveScholarship}
-            onUnsaveScholarship={handleUnsaveScholarship}
-          />
-        )}
-
-        {activeTab === "tracker" && (
-          <ApplicationTracker
-            activeProfile={activeProfile}
-            savedUniversities={savedUniversities}
-            savedScholarships={savedScholarships}
-            onUpdateSavedUniStatus={handleUpdateSavedUniStatus}
-            onRemoveSavedUni={handleRemoveSavedUni}
-            onUpdateSavedScholarshipStatus={handleUpdateSavedScholarshipStatus}
-            onRemoveSavedScholarship={handleRemoveSavedScholarship}
-          />
-        )}
-
-        {activeTab === "sop" && (
-          <PremiumGate
-            profileId={activeProfile?.id ?? null}
-            title="AI SOP & Essays is Premium"
-            description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
-            onUpgrade={() => setActiveTab("payments")}
-          >
+          ) : activeTab === "dashboard" && (
             <div className="space-y-4">
-              <AiSopStudio activeProfile={activeProfile} />
-              {/* #8 Advanced Essay AI — deterministic rubric + version history */}
-              <EssayRubricStudio activeProfile={activeProfile} />
+              {/* #4 Personalized Roadmap — the centrepiece: three actions */}
+              <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
+              <DashboardView
+                profile={activeProfile}
+                onNavigateTab={handleNavigateTab}
+                savedUniCount={savedUniversities.length}
+                savedScholarshipCount={savedScholarships.length}
+                savedProgramCount={savedProgramCount}
+                taskCount={taskCount}
+                onEditProfile={() => {
+                  setIsNewProfile(false);
+                  setIsProfileModalOpen(true);
+                }}
+              />
             </div>
-          </PremiumGate>
-        )}
+          )}
 
-        {activeTab === "tasks" && (
-          <PremiumGate
-            profileId={activeProfile?.id ?? null}
-            title="Tasks & Roadmap is Premium"
-            description="Build and track your study-abroad application roadmap — an exclusive Premium feature."
-            onUpgrade={() => setActiveTab("payments")}
-          >
-            <TaskRoadmap activeProfile={activeProfile} />
-          </PremiumGate>
-        )}
+          {activeTab === "universities" && (
+            <UniversityExplorer
+              activeProfile={activeProfile}
+              savedUniIds={savedUniIds}
+              onSaveUniversity={handleSaveUniversity}
+              onUnsaveUniversity={handleUnsaveUniversity}
+            />
+          )}
 
-        {/* Complete Student Profile (#1) */}
-        {activeTab === "profile" && activeProfile && (
-          <CompleteProfileForm
-            key={`profile-${activeProfile.id}`}
-            activeProfile={activeProfile}
-            onSaved={handleProfileUpdated}
-          />
-        )}
+          {activeTab === "scholarships" && (
+            <ScholarshipHub
+              activeProfile={activeProfile}
+              savedScholarshipIds={savedScholarshipIds}
+              onSaveScholarship={handleSaveScholarship}
+              onUnsaveScholarship={handleUnsaveScholarship}
+            />
+          )}
 
-        {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
-        {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+          {activeTab === "tracker" && (
+            <ApplicationTracker
+              activeProfile={activeProfile}
+              savedUniversities={savedUniversities}
+              savedScholarships={savedScholarships}
+              onUpdateSavedUniStatus={handleUpdateSavedUniStatus}
+              onRemoveSavedUni={handleRemoveSavedUni}
+              onUpdateSavedScholarshipStatus={handleUpdateSavedScholarshipStatus}
+              onRemoveSavedScholarship={handleRemoveSavedScholarship}
+            />
+          )}
 
-        {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
-        {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}
+          {activeTab === "sop" && (
+            <PremiumGate
+              profileId={activeProfile?.id ?? null}
+              title="AI SOP & Essays is Premium"
+              description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
+              onUpgrade={() => setActiveTab("payments")}
+            >
+              <div className="space-y-4">
+                <AiSopStudio activeProfile={activeProfile} />
+                {/* #8 Advanced Essay AI — deterministic rubric + version history */}
+                <EssayRubricStudio activeProfile={activeProfile} />
+              </div>
+            </PremiumGate>
+          )}
 
-        {/* #3 AI Admissions Advisor */}
-        {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
+          {activeTab === "tasks" && (
+            <PremiumGate
+              profileId={activeProfile?.id ?? null}
+              title="Tasks & Roadmap is Premium"
+              description="Build and track your study-abroad application roadmap — an exclusive Premium feature."
+              onUpgrade={() => setActiveTab("payments")}
+            >
+              <TaskRoadmap activeProfile={activeProfile} />
+            </PremiumGate>
+          )}
 
-        {/* #10 Accepted students with a similar profile */}
-        {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
+          {/* Complete Student Profile (#1) */}
+          {activeTab === "profile" && activeProfile && (
+            <CompleteProfileForm
+              key={`profile-${activeProfile.id}`}
+              activeProfile={activeProfile}
+              onSaved={handleProfileUpdated}
+            />
+          )}
 
-        {/* Phase 4 — mentor marketplace + parent dashboard */}
-        {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
-        {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
+          {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
+          {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
 
-        {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
-        {activeTab === "opportunities" && <OpportunitiesPanel />}
+          {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
+          {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}
 
-        {/* #29 — country comparison on published data only */}
-        {activeTab === "compare" && <CountryComparePanel />}
+          {/* #3 AI Admissions Advisor */}
+          {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
 
-        {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
-        {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}
+          {/* #10 Accepted students with a similar profile */}
+          {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
 
-        {/* Universal application tracker + outcomes flywheel (#12) */}
-        {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
+          {/* Phase 4 — mentor marketplace + parent dashboard */}
+          {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
+          {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
 
-        {activeTab === "deadlines" && (
-          <PremiumGate
-            profileId={activeProfile?.id ?? null}
-            title="Deadline Center is Premium"
-            description="Track every scholarship, university and milestone deadline in one timeline — an exclusive Premium feature."
-            onUpgrade={() => setActiveTab("payments")}
-          >
-            <DeadlineCenter profileId={activeProfile?.id ?? null} />
-          </PremiumGate>
-        )}
+          {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
+          {activeTab === "opportunities" && <OpportunitiesPanel />}
 
-        {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
+          {/* #29 — country comparison on published data only */}
+          {activeTab === "compare" && <CountryComparePanel />}
 
-        {activeTab === "visa" && <VisaSpeakingAssistant activeProfile={activeProfile} />}
+          {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
+          {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}
 
-        {activeTab === "forum" && (
-          <PremiumGate
-            profileId={activeProfile?.id ?? null}
-            title="Community Forum is Premium"
-            description="Read community topics, join discussions and post your own threads — an exclusive Premium feature."
-            onUpgrade={() => setActiveTab("payments")}
-          >
-            <ForumSection activeProfile={activeProfile} isModerator={activeProfile?.isAdmin ?? false} />
-          </PremiumGate>
-        )}
+          {/* Universal application tracker + outcomes flywheel (#12) */}
+          {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
 
-        {activeTab === "courses" && (
-          <PremiumGate
-            profileId={activeProfile?.id ?? null}
-            title="Video Courses are Premium"
-            description="Watch video courses, take quizzes and earn certificates — an exclusive Premium feature."
-            onUpgrade={() => setActiveTab("payments")}
-          >
-            <CoursesSection activeProfile={activeProfile} />
-          </PremiumGate>
-        )}
+          {activeTab === "deadlines" && (
+            <PremiumGate
+              profileId={activeProfile?.id ?? null}
+              title="Deadline Center is Premium"
+              description="Track every scholarship, university and milestone deadline in one timeline — an exclusive Premium feature."
+              onUpgrade={() => setActiveTab("payments")}
+            >
+              <DeadlineCenter profileId={activeProfile?.id ?? null} />
+            </PremiumGate>
+          )}
 
-        {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
+          {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
 
-        {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+          {activeTab === "visa" && <VisaSpeakingAssistant activeProfile={activeProfile} />}
 
-        {activeTab === "consulting" && <ConsultingSection activeProfile={activeProfile} />}
+          {activeTab === "forum" && (
+            <PremiumGate
+              profileId={activeProfile?.id ?? null}
+              title="Community Forum is Premium"
+              description="Read community topics, join discussions and post your own threads — an exclusive Premium feature."
+              onUpgrade={() => setActiveTab("payments")}
+            >
+              <ForumSection activeProfile={activeProfile} isModerator={activeProfile?.isAdmin ?? false} />
+            </PremiumGate>
+          )}
 
-        {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
+          {activeTab === "courses" && (
+            <PremiumGate
+              profileId={activeProfile?.id ?? null}
+              title="Video Courses are Premium"
+              description="Watch video courses, take quizzes and earn certificates — an exclusive Premium feature."
+              onUpgrade={() => setActiveTab("payments")}
+            >
+              <CoursesSection activeProfile={activeProfile} />
+            </PremiumGate>
+          )}
 
-        {/* SEO/AEO: FAQ har bir bo'limda sahifa pastida ko'rinadi */}
-        <FaqSection />
+          {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
+
+          {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+
+          {activeTab === "consulting" && <ConsultingSection activeProfile={activeProfile} />}
+
+          {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
+
+          {/* SEO/AEO: FAQ har bir bo'limda sahifa pastida ko'rinadi */}
+          <FaqSection />
+
+        </PageTransition>
       </main>
 
       {/* Footer */}

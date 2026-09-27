@@ -1,5 +1,32 @@
 # ScholarBridgeAi
 
+## Local development
+
+```bash
+npm install
+npm run db:dev:init   # first time: starts a local Postgres (port 5433), pushes the schema, seeds
+npm run db:dev        # later runs: just start the local Postgres
+npm run dev           # in another terminal
+```
+
+Put `DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge` and a
+`SESSION_SECRET` in `.env.local` (see `.env.example`). No Docker needed —
+the database comes from the `embedded-postgres` dev dependency.
+
+## Theming & motion
+
+- **Dark mode** — a light / system / dark switch lives in the sidebar (desktop),
+  the header (mobile) and the landing page. The choice is saved in
+  `localStorage` and applied by a small inline script before first paint, so the
+  page never flashes the wrong theme. Implementation: `src/app/globals.css`
+  remaps Tailwind's colour variables under `.dark`, so existing components are
+  themed without per-element `dark:` classes. See the comment block at the top
+  of that file before adding new colours.
+- **Animations** — Framer Motion. Shared primitives live in
+  `src/components/motion` (`PageTransition`, `Reveal`, `RevealGroup`,
+  `AnimatedNumber`, `AnimatedBar`, `AnimatedRing`, shared variants). Every
+  animation respects the OS "reduce motion" setting via `MotionProvider`.
+
 ## Static UI prototypes (no build step)
 
 Two standalone pages built with plain HTML, Tailwind CSS (Play CDN) and vanilla

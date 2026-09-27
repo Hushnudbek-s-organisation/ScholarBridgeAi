@@ -25,3 +25,6 @@ yarn-error.log*
 
 # database dumps / archives
 *.zip
+
+# local embedded postgres data directory (scripts/dev-db.mjs)
+/.pgdata/

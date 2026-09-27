@@ -36,6 +36,19 @@ import {
 } from "lucide-react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeSwitch, ThemeToggle } from "./ThemeToggle";
+import { motion } from "framer-motion";
+import { staggerParent } from "./motion/variants";
+
+/** One nav row: fades up, staggered by the parent container. */
+const navItemVariants = {
+  hidden: { opacity: 0, x: -8 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const },
+  },
+};
 
 export interface StudentProfile {
   id: number;
@@ -249,43 +262,68 @@ export function Navbar({
   );
 
   const renderNav = (vertical: boolean) => (
-    <>
+    <motion.div
+      className={vertical ? "space-y-1" : "flex items-center gap-1"}
+      initial="hidden"
+      animate="visible"
+      variants={staggerParent(0.022, 0.02)}
+    >
       {displayItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
         const premium = (item as { premium?: boolean }).premium;
         const isAdminTab = item.id === "admin";
-        const activeCls = isActive
-          ? premium
-            ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 shadow-xs font-bold"
-            : isAdminTab
-            ? "bg-slate-900 text-white shadow-xs font-bold"
-            : "bg-indigo-600 text-white shadow-xs font-semibold"
+
+        // The active marker is a shared layout element: when the user picks a
+        // different section the pill glides across instead of blinking. The
+        // desktop sidebar and the mobile strip are both mounted at once (one
+        // is hidden by CSS), so each needs its own layoutId — sharing one
+        // would make the pill fly between the two containers.
+        const activeBg = premium
+          ? "bg-gradient-to-r from-amber-400 to-yellow-500"
+          : isAdminTab
+          ? "bg-slate-900"
+          : "bg-indigo-600";
+        const stateCls = isActive
+          ? `${premium ? "text-slate-900 font-bold" : "text-white font-semibold"}`
           : premium
           ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800 border border-amber-200"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-100";
+
         return (
-          <button
+          <motion.button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             title={item.label}
-            className={`flex items-center gap-2.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-150 ${
-              vertical
-                ? "w-full px-3 py-2.5 text-left"
-                : "px-3 py-2"
-            } ${activeCls}`}
+            variants={navItemVariants}
+            className={`relative flex items-center gap-2.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors duration-150 ${
+              vertical ? "w-full px-3 py-2.5 text-left" : "px-3 py-2"
+            } ${stateCls}`}
           >
-            <Icon className={`h-4 w-4 shrink-0 ${isActive ? "" : premium ? "text-amber-500" : "text-slate-500"}`} />
-            <span className={vertical ? "flex-1 truncate" : ""}>{item.label}</span>
+            {isActive && (
+              <motion.span
+                layoutId={`nav-active-${vertical ? "desktop" : "mobile"}`}
+                className={`absolute inset-0 rounded-lg shadow-xs ${activeBg}`}
+                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              />
+            )}
+            <Icon
+              className={`relative h-4 w-4 shrink-0 ${
+                isActive ? "" : premium ? "text-amber-500" : "text-slate-500"
+              }`}
+            />
+            <span className={`relative ${vertical ? "flex-1 truncate" : ""}`}>
+              {item.label}
+            </span>
             {premium && !isActive && (
-              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+              <span className="relative text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                 Pro
               </span>
             )}
-          </button>
+          </motion.button>
         );
       })}
-    </>
+    </motion.div>
   );
 
   return (
@@ -301,7 +339,7 @@ export function Navbar({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 no-scrollbar">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
           {renderNav(true)}
         </nav>
 
@@ -336,8 +374,11 @@ export function Navbar({
               <LogOut className="h-3 w-3" /> {t("logout")}
             </button>
           )}
-          <div className="pt-1">
+          <div className="pt-1 space-y-2">
             <LanguageSwitcher onLocaleChange={onLocaleChange} />
+            <div className="flex justify-center">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </aside>
@@ -359,6 +400,7 @@ export function Navbar({
 
             <div className="flex items-center gap-1.5 shrink-0">
               <NotificationBell profileId={activeProfileId ?? null} />
+              <ThemeSwitch />
               <LanguageSwitcher onLocaleChange={onLocaleChange} />
               <button
                 onClick={onSwitchProfile}
@@ -398,7 +440,7 @@ export function Navbar({
           )}
         </div>
         {/* Navigation Tabs (horizontal scroll) */}
-        <div className="flex overflow-x-auto space-x-1 py-2 px-3 sm:px-4 no-scrollbar border-t border-slate-100">
+        <div className="overflow-x-auto py-2 px-3 sm:px-4 no-scrollbar border-t border-slate-100">
           {renderNav(false)}
         </div>
       </header>

@@ -108,3 +108,45 @@ export function positiveInt(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
+
+/**
+ * Optional finite number for a PATCH/PUT field.
+ *
+ *   undefined          → undefined (field not sent: leave the column alone)
+ *   null / ""          → null      (field cleared)
+ *   finite number/str  → number, clamped to [min, max] when given
+ *   anything else      → undefined (garbage is ignored, never stored)
+ *
+ * `Number("abc")` is NaN, and Postgres happily stores NaN in a `real`/`double`
+ * column — which then poisons every average, sort and comparison downstream.
+ * Every numeric body field must go through this (or `positiveInt`).
+ */
+export function optionalNumber(
+  value: unknown,
+  opts: { min?: number; max?: number; integer?: boolean } = {}
+): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  let n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  if (opts.integer) n = Math.round(n);
+  if (opts.min !== undefined && n < opts.min) n = opts.min;
+  if (opts.max !== undefined && n > opts.max) n = opts.max;
+  return n;
+}
+
+/**
+ * Test score semantics: a missing, zero or negative score means "not taken"
+ * and is stored as NULL; garbage is ignored.
+ */
+export function optionalScore(
+  value: unknown,
+  max: number
+): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = optionalNumber(value, { max });
+  if (n === undefined) return undefined;
+  return n === null || n <= 0 ? null : n;
+}

@@ -1,5 +1,295 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   THEMING — light / dark
+   ---------------------------------------------------------------------------
+   The app has ~25k lines of markup written against Tailwind's default light
+   palette (`bg-white`, `text-slate-900`, `border-slate-200`, …). Rewriting
+   every component with `dark:` variants is not realistic, and doing it piecemeal
+   would leave the UI half-themed for months.
+
+   Instead the theme is applied at the *token* layer:
+
+     Tailwind 4 compiles `bg-slate-100` to `background-color: var(--color-slate-100)`.
+     Redefining those variables under `.dark` therefore re-themes every existing
+     component at once — cards, borders, body text, headings, hover states.
+
+   Two rules make it work:
+
+     1. The neutral ramp is *inverted* in dark mode: `slate-50` (lightest
+        surface) becomes the darkest, `slate-900` (darkest ink) becomes the
+        lightest. That is exactly right for TEXT, and for backgrounds that mean
+        "page"/"card"/"subtle fill".
+
+     2. A handful of classes mean the opposite — `bg-slate-900` is "this is a
+        deliberately dark panel", `bg-white` is "this is a card". Those are
+        pinned back to dark surfaces with explicit `.dark .bg-*` rules below.
+
+   Because these rules sit outside `@layer utilities` they win over the plain
+   utility classes. Do NOT hand-write `dark:` variants on an element that also
+   uses a remapped class — the remap will take precedence. Use the semantic
+   helpers at the bottom of this file instead.
+   =========================================================================== */
+
+/* Class-based dark mode (a `dark` class on <html>), not OS media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*  Neutral ramp — inverted for dark mode ---------------------------------- */
+.dark {
+  color-scheme: dark;
+
+  --color-slate-50: #0b1220; /* app background      */
+  --color-slate-100: #111a2e; /* raised surface      */
+  --color-slate-200: #22304d; /* borders, dividers   */
+  --color-slate-300: #33425f; /* strong borders      */
+  --color-slate-400: #8496b3; /* dimmest text        */
+  --color-slate-500: #a3b1c9; /* muted text          */
+  --color-slate-600: #cbd5e1; /* body text           */
+  --color-slate-700: #dde5ef; /* strong body text    */
+  --color-slate-800: #eaf0f8; /* headings            */
+  --color-slate-900: #f5f8fc; /* display text        */
+  --color-slate-950: #ffffff;
+}
+
+/*  Surfaces that must stay dark regardless of the inverted ramp ------------
+    `bg-slate-800/900/950` means "a dark panel" (hero blocks, the AI mentor
+    console, modals). Left to the ramp they would turn into near-white bands. */
+.dark .bg-slate-800 { background-color: #16213a; }
+.dark .bg-slate-900 { background-color: #0d1424; }
+.dark .bg-slate-950 { background-color: #060b16; }
+/* A dark *control* (primary button, selected tab, the sliding nav pill) sits
+   on a dark card in dark mode; lift it so the selected state still reads. */
+.dark button.bg-slate-900,
+.dark a.bg-slate-900,
+.dark span.bg-slate-900 {
+  background-color: #2a3a5c;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.dark .hover\:bg-slate-700:hover { background-color: #24334f; }
+.dark .hover\:bg-slate-800:hover { background-color: #1d2b47; }
+.dark .hover\:bg-slate-900:hover { background-color: #16213a; }
+.dark .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #22304d; }
+.dark .border-slate-800,
+.dark .border-slate-900 { border-color: #22304d; }
+
+/*  Dark gradient stops -------------------------------------------------------
+    `from-slate-900` / `to-slate-900` build the deliberately dark hero banners.
+    The gradient reads `var(--tw-gradient-from)` on the same element, so
+    overriding the stop variable here is enough — no need to touch `stops`. */
+.dark .from-slate-900 { --tw-gradient-from: #0d1424; }
+.dark .to-slate-900 { --tw-gradient-to: #0d1424; }
+.dark .from-slate-900\/85 { --tw-gradient-from: rgb(13 20 36 / 0.85); }
+.dark .from-slate-900\/80 { --tw-gradient-from: rgb(13 20 36 / 0.8); }
+.dark .to-slate-900\/85 { --tw-gradient-to: rgb(13 20 36 / 0.85); }
+.dark .via-slate-900\/20 { --tw-gradient-via: rgb(13 20 36 / 0.2); }
+
+/*  Light text on dark panels ------------------------------------------------
+    `text-slate-100/200/300` is used almost exclusively as light copy on the
+    deliberately dark panels above (hero cards, the AI console). The inverted
+    ramp would turn it into dark-on-dark, so it is pinned to light values. */
+.dark .text-slate-100 { color: #eef2f7; }
+.dark .text-slate-200 { color: #d5dde8; }
+.dark .text-slate-300 { color: #b4c0d3; }
+
+/*  Cards -------------------------------------------------------------------
+    `bg-white` is the card background. Low-opacity whites (`bg-white/10`) are
+    translucent overlays on top of coloured gradients and are left alone. */
+.dark .bg-white { background-color: #131c31; }
+.dark .bg-white\/95 { background-color: rgb(19 28 49 / 0.95); }
+.dark .bg-white\/90 { background-color: rgb(19 28 49 / 0.9); }
+.dark .bg-white\/85 { background-color: rgb(19 28 49 / 0.85); }
+.dark .hover\:bg-white:hover { background-color: #22304d; }
+
+/*  Accent tints -------------------------------------------------------
+    `bg-indigo-50` is a pale chip behind coloured text on a light card;
+    in dark mode the same chip must be a translucent accent wash, not a
+    pale block. Solid accent fills (`bg-indigo-600`) are deliberately NOT
+    touched, so primary buttons and gradients keep their brand colour. */
+
+  .dark .bg-indigo-50,
+  .dark .bg-indigo-100 { background-color: rgba(99,102,241, 0.16); }
+  .dark .border-indigo-100,
+  .dark .border-indigo-200,
+  .dark .border-indigo-300 { border-color: rgba(99,102,241, 0.38); }
+  .dark .text-indigo-500,
+  .dark .text-indigo-600,
+  .dark .text-indigo-700,
+  .dark .text-indigo-800,
+  .dark .text-indigo-900 { color: #a5b4fc; }
+
+  .dark .bg-violet-50,
+  .dark .bg-violet-100 { background-color: rgba(139,92,246, 0.16); }
+  .dark .border-violet-100,
+  .dark .border-violet-200,
+  .dark .border-violet-300 { border-color: rgba(139,92,246, 0.38); }
+  .dark .text-violet-500,
+  .dark .text-violet-600,
+  .dark .text-violet-700,
+  .dark .text-violet-800,
+  .dark .text-violet-900 { color: #c4b5fd; }
+
+  .dark .bg-purple-50,
+  .dark .bg-purple-100 { background-color: rgba(168,85,247, 0.16); }
+  .dark .border-purple-100,
+  .dark .border-purple-200,
+  .dark .border-purple-300 { border-color: rgba(168,85,247, 0.38); }
+  .dark .text-purple-500,
+  .dark .text-purple-600,
+  .dark .text-purple-700,
+  .dark .text-purple-800,
+  .dark .text-purple-900 { color: #d8b4fe; }
+
+  .dark .bg-blue-50,
+  .dark .bg-blue-100 { background-color: rgba(59,130,246, 0.16); }
+  .dark .border-blue-100,
+  .dark .border-blue-200,
+  .dark .border-blue-300 { border-color: rgba(59,130,246, 0.38); }
+  .dark .text-blue-500,
+  .dark .text-blue-600,
+  .dark .text-blue-700,
+  .dark .text-blue-800,
+  .dark .text-blue-900 { color: #93c5fd; }
+
+  .dark .bg-sky-50,
+  .dark .bg-sky-100 { background-color: rgba(14,165,233, 0.16); }
+  .dark .border-sky-100,
+  .dark .border-sky-200,
+  .dark .border-sky-300 { border-color: rgba(14,165,233, 0.38); }
+  .dark .text-sky-500,
+  .dark .text-sky-600,
+  .dark .text-sky-700,
+  .dark .text-sky-800,
+  .dark .text-sky-900 { color: #7dd3fc; }
+
+  .dark .bg-emerald-50,
+  .dark .bg-emerald-100 { background-color: rgba(16,185,129, 0.16); }
+  .dark .border-emerald-100,
+  .dark .border-emerald-200,
+  .dark .border-emerald-300 { border-color: rgba(16,185,129, 0.38); }
+  .dark .text-emerald-500,
+  .dark .text-emerald-600,
+  .dark .text-emerald-700,
+  .dark .text-emerald-800,
+  .dark .text-emerald-900 { color: #6ee7b7; }
+
+  .dark .bg-green-50,
+  .dark .bg-green-100 { background-color: rgba(34,197,94, 0.16); }
+  .dark .border-green-100,
+  .dark .border-green-200,
+  .dark .border-green-300 { border-color: rgba(34,197,94, 0.38); }
+  .dark .text-green-500,
+  .dark .text-green-600,
+  .dark .text-green-700,
+  .dark .text-green-800,
+  .dark .text-green-900 { color: #86efac; }
+
+  .dark .bg-teal-50,
+  .dark .bg-teal-100 { background-color: rgba(20,184,166, 0.16); }
+  .dark .border-teal-100,
+  .dark .border-teal-200,
+  .dark .border-teal-300 { border-color: rgba(20,184,166, 0.38); }
+  .dark .text-teal-500,
+  .dark .text-teal-600,
+  .dark .text-teal-700,
+  .dark .text-teal-800,
+  .dark .text-teal-900 { color: #5eead4; }
+
+  .dark .bg-amber-50,
+  .dark .bg-amber-100 { background-color: rgba(245,158,11, 0.16); }
+  .dark .border-amber-100,
+  .dark .border-amber-200,
+  .dark .border-amber-300 { border-color: rgba(245,158,11, 0.38); }
+  .dark .text-amber-500,
+  .dark .text-amber-600,
+  .dark .text-amber-700,
+  .dark .text-amber-800,
+  .dark .text-amber-900 { color: #fcd34d; }
+
+  .dark .bg-yellow-50,
+  .dark .bg-yellow-100 { background-color: rgba(234,179,8, 0.16); }
+  .dark .border-yellow-100,
+  .dark .border-yellow-200,
+  .dark .border-yellow-300 { border-color: rgba(234,179,8, 0.38); }
+  .dark .text-yellow-500,
+  .dark .text-yellow-600,
+  .dark .text-yellow-700,
+  .dark .text-yellow-800,
+  .dark .text-yellow-900 { color: #fde047; }
+
+  .dark .bg-orange-50,
+  .dark .bg-orange-100 { background-color: rgba(249,115,22, 0.16); }
+  .dark .border-orange-100,
+  .dark .border-orange-200,
+  .dark .border-orange-300 { border-color: rgba(249,115,22, 0.38); }
+  .dark .text-orange-500,
+  .dark .text-orange-600,
+  .dark .text-orange-700,
+  .dark .text-orange-800,
+  .dark .text-orange-900 { color: #fdba74; }
+
+  .dark .bg-red-50,
+  .dark .bg-red-100 { background-color: rgba(239,68,68, 0.16); }
+  .dark .border-red-100,
+  .dark .border-red-200,
+  .dark .border-red-300 { border-color: rgba(239,68,68, 0.38); }
+  .dark .text-red-500,
+  .dark .text-red-600,
+  .dark .text-red-700,
+  .dark .text-red-800,
+  .dark .text-red-900 { color: #fca5a5; }
+
+  .dark .bg-rose-50,
+  .dark .bg-rose-100 { background-color: rgba(244,63,94, 0.16); }
+  .dark .border-rose-100,
+  .dark .border-rose-200,
+  .dark .border-rose-300 { border-color: rgba(244,63,94, 0.38); }
+  .dark .text-rose-500,
+  .dark .text-rose-600,
+  .dark .text-rose-700,
+  .dark .text-rose-800,
+  .dark .text-rose-900 { color: #fda4af; }
+
+/*  Native controls, scrollbars and selection -------------------------------
+    `color-scheme` (set above) already darkens form controls and scrollbars;
+    these finish the job for custom-styled scroll areas. */
+.dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+.dark ::-webkit-scrollbar-track { background: #0b1220; }
+.dark ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 9999px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #3a4d75; }
+.dark ::selection { background: rgb(99 102 241 / 0.4); color: #f5f8fc; }
+
+/*  Smooth theme switch ----------------------------------------------------
+    Enabled for ~250ms while the theme flips so colours cross-fade instead of
+    snapping. `ThemeProvider` adds/removes the class; it is never left on (a
+    permanent global transition makes every hover feel sluggish and hurts
+    scroll performance). */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 250ms ease,
+    border-color 250ms ease,
+    color 250ms ease,
+    fill 250ms ease,
+    stroke 250ms ease !important;
+  transition-delay: 0ms !important;
+}
+
+/*  Reduced motion ---------------------------------------------------------
+    Honoured globally, in addition to Framer Motion's own `reducedMotion`
+    setting, so CSS keyframes and transitions calm down too. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Onboarding wizard step transition (smooth fade + slight slide up) */
 @keyframes fadeInUp {
   from {

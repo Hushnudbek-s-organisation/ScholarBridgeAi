@@ -82,22 +82,54 @@ export function resetRateLimits(): void {
 }
 
 /**
- * Client IP for limiting. Behind Render's proxy the real client address is in
- * `x-forwarded-for` (first hop); `x-real-ip` and `cf-connecting-ip` are
- * fallbacks. Unknown callers share the "unknown" bucket, which is fine because
- * every bucket key also includes the route and (usually) an account id.
+ * Client IP for rate limiting.
+ *
+ * SECURITY: `X-Forwarded-For` is `<whatever the client sent>, <added by
+ * proxy 1>, <added by proxy 2>…`. Each proxy *appends* the address it saw, so
+ * only the rightmost entries were written by infrastructure we trust. The
+ * leftmost entry is attacker-controlled: keying on it (as this function used
+ * to) let anyone reset every per-IP budget — anonymous AI calls, sign-up,
+ * sign-in — by sending a different fake `X-Forwarded-For` on each request.
+ *
+ * Configuration (env):
+ *   CLIENT_IP_HEADER    Optional single-value header set by your edge that the
+ *                       client cannot forge (e.g. `cf-connecting-ip` when the
+ *                       app is only reachable through Cloudflare). Takes
+ *                       priority when present.
+ *   TRUSTED_PROXY_HOPS  How many proxies append to X-Forwarded-For in front of
+ *                       the app (default 1 — one load balancer, e.g. Render).
+ *                       The client IP is the entry that many places from the
+ *                       right.
+ *
+ * Only the *last* X-Forwarded-For value is meaningful when a client sends the
+ * header several times; `Headers.get` joins duplicates with ", " in order, so
+ * counting from the right handles that case too.
  */
-export function clientIp(req: Request): string {
+export function clientIp(
+  req: Request,
+  env: Record<string, string | undefined> = process.env
+): string {
+  const customHeader = env.CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (customHeader) {
+    const value = req.headers.get(customHeader)?.split(",").pop()?.trim();
+    if (value) return value;
+  }
+
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = Math.max(1, Math.floor(Number(env.TRUSTED_PROXY_HOPS) || 1));
+    const chain = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (chain.length) {
+      // Nth from the right; if the chain is shorter than the configured hops
+      // the leftmost entry is the best we have.
+      return chain[Math.max(0, chain.length - hops)];
+    }
   }
-  return (
-    req.headers.get("x-real-ip")?.trim() ||
-    req.headers.get("cf-connecting-ip")?.trim() ||
-    "unknown"
-  );
+
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 /** Standard 429 response. */

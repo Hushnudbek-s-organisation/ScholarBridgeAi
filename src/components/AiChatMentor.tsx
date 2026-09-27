@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { AiFormattedText } from "./AiFormattedText";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface AiChatMentorProps {
   activeProfile: StudentProfile | null;
@@ -24,6 +25,10 @@ interface Message {
   id: string;
   sender: "user" | "ai";
   text: string;
+  /** Canned guidance served while no AI provider is reachable. */
+  offline?: boolean;
+  /** Request failed (rate limit, signed out…) — rendered as a notice. */
+  error?: boolean;
 }
 
 export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
@@ -74,15 +79,28 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
         }),
       });
 
-      const data = await res.json();
-      if (data.reply) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.reply) {
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             sender: "ai",
             text: data.reply,
+            offline: Boolean(data.offline),
           },
+        ]);
+      } else {
+        // Previously a 401/429 left the chat silently stuck with no answer.
+        const text =
+          res.status === 429
+            ? `You're sending messages too quickly. Please wait ${data.retryAfter ?? 60} seconds and try again.`
+            : res.status === 401
+            ? "Please sign in to chat with the AI mentor about your profile."
+            : data.error || "Something went wrong. Please try again.";
+        setMessages((prev) => [
+          ...prev,
+          { id: (Date.now() + 1).toString(), sender: "ai", text, error: true },
         ]);
       }
     } catch (err) {
@@ -124,9 +142,14 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
 
       {/* Messages Scroll View */}
       <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
+        <AnimatePresence initial={false}>
         {messages.map((m) => (
-          <div
+          <motion.div
             key={m.id}
+            layout="position"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
             className={`flex gap-3 max-w-3xl ${m.sender === "user" ? "ml-auto flex-row-reverse" : ""}`}
           >
             <div
@@ -143,19 +166,42 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
               className={`min-w-0 p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                 m.sender === "user"
                   ? "whitespace-pre-wrap bg-indigo-600 text-white rounded-tr-none shadow-xs"
+                  : m.error
+                  ? "bg-red-50 text-red-700 rounded-tl-none border border-red-200"
                   : "bg-white text-slate-800 rounded-tl-none border border-slate-200 shadow-xs"
               }`}
             >
-              {m.sender === "ai" ? <AiFormattedText text={m.text} /> : m.text}
+              {m.offline && (
+                <span className="mb-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                  Offline guidance · not a personalised AI answer
+                </span>
+              )}
+              {m.sender === "ai" && !m.error ? <AiFormattedText text={m.text} /> : m.text}
             </div>
-          </div>
+          </motion.div>
         ))}
+        </AnimatePresence>
 
         {loading && (
-          <div className="flex gap-3 items-center text-xs text-slate-500 italic">
-            <Bot className="h-5 w-5 text-indigo-600 animate-pulse" />
-            ScholarBridgeAI is typing thoughtful advice...
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex gap-3 items-center text-xs text-slate-500"
+            role="status"
+            aria-live="polite"
+          >
+            <Bot className="h-5 w-5 text-indigo-600" />
+            <span className="inline-flex gap-1" aria-label="ScholarBridgeAI is typing">
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-indigo-500"
+                  animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+                />
+              ))}
+            </span>
+          </motion.div>
         )}
       </div>
 
