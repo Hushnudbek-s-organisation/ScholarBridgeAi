@@ -4,7 +4,8 @@ import { forumReports, studentProfiles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin, requireProfileAccess } from "@/lib/auth";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
-import { notifyAdmins } from "@/lib/notifications";
+import { notifyAdminsLocalized } from "@/lib/notifications";
+import { NOTIFY_TEXTS } from "@/lib/notificationTexts";
 
 export async function GET(req: Request) {
   try {
@@ -80,11 +81,10 @@ export async function POST(req: Request) {
     // Notify every admin about the new report so it shows up in their
     // notification bell immediately (spec §20).
     try {
-      await notifyAdmins({
+      await notifyAdminsLocalized({
         type: "forum_report",
-        title: "🛡️ New forum report",
-        body: `${targetType === "thread" ? "Thread" : "Reply"} #${targetId} reported: ${String(reason).slice(0, 120)}`,
         link: `/forum?reports=open`,
+        text: (lang) => NOTIFY_TEXTS.adminForumReport(lang, { isThread: targetType === "thread", id: targetId, reason: String(reason) }),
       });
     } catch (err) {
       console.error("Failed to notify admins about report:", err);

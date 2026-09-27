@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { notifications, notificationPreferences, studentProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { deliverTelegramNotification } from "@/lib/telegram/service";
+import { toNotifyLang, type NotifyLang, type NotifyText } from "@/lib/notificationTexts";
 
 /**
  * Notification helper (spec §20). Creates an in-app notification if the user
@@ -84,6 +85,71 @@ export async function notifyAdmins(
       await notifyMany(adminIds, input);
     }
     return adminIds;
+  } catch (err) {
+    console.error("Failed to notify admins:", err);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Localised helpers — the text is rendered in each recipient's language
+// (profile locale → Telegram app language → English).
+// ---------------------------------------------------------------------------
+
+export async function profileLang(profileId: number): Promise<NotifyLang> {
+  let locale: string | null = null;
+  let tgLang: string | null = null;
+  try {
+    const [p] = await db
+      .select({ locale: studentProfiles.preferredLocale })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, profileId));
+    locale = p?.locale ?? null;
+  } catch {
+    // ignore
+  }
+  if (!locale) {
+    try {
+      // telegram_links may not exist yet (created lazily) — raw SQL + catch.
+      const res = await db.execute(sql`SELECT language_code FROM telegram_links WHERE profile_id = ${profileId} LIMIT 1`);
+      const rows = (res as unknown as { rows?: { language_code: string | null }[] }).rows ?? [];
+      tgLang = rows[0]?.language_code ?? null;
+    } catch {
+      // ignore
+    }
+  }
+  return toNotifyLang(locale, tgLang);
+}
+
+type LocalizedInput = {
+  type: string;
+  link?: string;
+  text: (lang: NotifyLang) => NotifyText;
+};
+
+export async function createLocalizedNotification(profileId: number, input: LocalizedInput) {
+  const lang = await profileLang(profileId);
+  const { title, body } = input.text(lang);
+  return createNotification({ profileId, type: input.type, link: input.link, title, body });
+}
+
+export async function notifyManyLocalized(profileIds: number[], input: LocalizedInput) {
+  let sent = 0;
+  for (const id of profileIds) {
+    if (await createLocalizedNotification(id, input)) sent += 1;
+  }
+  return sent;
+}
+
+export async function notifyAdminsLocalized(input: LocalizedInput): Promise<number[]> {
+  try {
+    const rows = await db
+      .select({ id: studentProfiles.id })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.isAdmin, true));
+    const ids = rows.map((r) => r.id);
+    await notifyManyLocalized(ids, input);
+    return ids;
   } catch (err) {
     console.error("Failed to notify admins:", err);
     return [];

@@ -104,7 +104,8 @@ export async function sendToChat(
 }
 
 function siteButton(siteUrl: string, lang: BotLang, link?: string | null, label?: string): InlineButton[] {
-  const url = appLink(siteUrl, link ?? null);
+  // Fall back to the deployment URL when the admin has not saved one yet.
+  const url = appLink(siteUrl || process.env.NEXT_PUBLIC_APP_URL || "", link ?? null);
   return isButtonUrl(url) ? [{ text: label ?? BOT_TEXTS[lang].openSite, url }] : [];
 }
 

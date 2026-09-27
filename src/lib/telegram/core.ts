@@ -394,8 +394,21 @@ export function appLink(siteUrl: string, link: string | null | undefined): strin
     }
   }
   const clean = link.startsWith("/") || link.startsWith("#") ? link : `/${link}`;
-  return clean.startsWith("#") ? `${base}/${clean}` : `${base}${clean}`;
+  if (clean.startsWith("#")) return `${base}/${clean}`;
+  // Notification links are written as paths (`/tasks?task=3`, `/forum`), but
+  // those sections live inside the single-page app → open its tab instead.
+  const first = clean.slice(1).split(/[/?#]/)[0];
+  if ((APP_TABS as readonly string[]).includes(first)) return `${base}/#${first}`;
+  return `${base}${clean}`;
 }
+
+/** Tabs of the app shell reachable by `#hash` (subset of navSections ids + admin). */
+export const APP_TABS = [
+  "dashboard", "universities", "scholarships", "autopilot", "opportunities", "compare", "profile",
+  "chancing", "strength", "goals", "stories", "similar", "planning", "advisor", "mentors", "parent",
+  "applications", "vault", "sop", "tasks", "visa", "departure", "chat", "forum", "notifications",
+  "payments", "rewards", "admin",
+] as const;
 
 /** Telegram only accepts https URLs in inline buttons (localhost is rejected). */
 export function isButtonUrl(url: string | null): url is string {

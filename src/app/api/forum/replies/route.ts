@@ -3,9 +3,10 @@ import { db } from "@/db";
 import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/schema";
 import { eq, and, count, asc, desc } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
-import { notifyAdmins } from "@/lib/notifications";
+import { createLocalizedNotification, notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 
 export async function GET(req: Request) {
   try {
@@ -96,13 +97,26 @@ export async function POST(req: Request) {
       console.error("Failed to award reply points:", err);
     }
 
-    // Notify admins about the new reply (site activity).
+    // Tell the thread author that someone answered (bell + Telegram) …
+    const snippet = String(replyBody);
+    const threadTitle = String(thread?.title || "");
+    if (thread && thread.authorId && thread.authorId !== Number(authorId)) {
+      try {
+        await createLocalizedNotification(thread.authorId, {
+          type: "forum_reply",
+          link: `/forum?thread=${thread.id}&reply=${reply.id}`,
+          text: (lang) => NOTIFY_TEXTS.forumReplyToAuthor(lang, { name: author?.name || someoneName(lang), thread: threadTitle, snippet }),
+        });
+      } catch (err) {
+        console.error("Failed to notify the thread author:", err);
+      }
+    }
+    // … and the admins (site activity).
     try {
-      await notifyAdmins({
+      await notifyAdminsLocalized({
         type: "forum_reply",
-        title: "💬 New forum reply",
-        body: `${author?.name || "A student"} replied in "${String(thread?.title || "").slice(0, 80)}": ${String(replyBody).slice(0, 100)}`,
         link: `/forum`,
+        text: (lang) => NOTIFY_TEXTS.adminForumReply(lang, { name: author?.name || someoneName(lang), thread: threadTitle, snippet }),
       });
     } catch (err) {
       console.error("Failed to notify admins about new reply:", err);

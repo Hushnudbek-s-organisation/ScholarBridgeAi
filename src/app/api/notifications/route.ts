@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { notifications, notificationPreferences } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, notLike } from "drizzle-orm";
+
+/** Hidden idempotency markers (`muted:<type>`, see lib/notificationSweep). */
+const visible = notLike(notifications.type, "muted:%");
 
 /** GET: list notifications for a profile (spec §20 — in-app channel). */
 export async function GET(req: Request) {
@@ -26,13 +29,13 @@ export async function GET(req: Request) {
       ? await db
           .select()
           .from(notifications)
-          .where(and(eq(notifications.profileId, profileId), eq(notifications.isRead, false)))
+          .where(and(eq(notifications.profileId, profileId), eq(notifications.isRead, false), visible))
           .orderBy(desc(notifications.createdAt))
           .limit(limit)
       : await db
           .select()
           .from(notifications)
-          .where(eq(notifications.profileId, profileId))
+          .where(and(eq(notifications.profileId, profileId), visible))
           .orderBy(desc(notifications.createdAt))
           .limit(limit);
 

@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { refreshJobs, scholarships, universities } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { computeScholarshipStatus } from "@/lib/scholarshipStatus";
+import { notifyScholarshipOpened } from "@/lib/notificationSweep";
 
 /**
  * Data-refresh pipeline (spec §5, §9).
@@ -71,6 +72,10 @@ export async function runRefresh(scope: "all" | "scholarships" | "universities")
             .set({ applicationStatus: status, lastUpdatedAt: new Date() })
             .where(eq(scholarships.id, s.id));
           result.changed += 1;
+          // Applications just opened → everyone who saved it (bell + Telegram).
+          if (status === "open") {
+            await notifyScholarshipOpened(s).catch((err) => console.warn("scholarship_opened notify failed:", err));
+          }
         }
       }
     }

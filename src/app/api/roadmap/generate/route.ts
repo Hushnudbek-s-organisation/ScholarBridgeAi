@@ -8,8 +8,9 @@ import {
   universities,
 } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { createNotification } from "@/lib/notifications";
+import { createLocalizedNotification } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
+import { NOTIFY_TEXTS } from "@/lib/notificationTexts";
 
 /**
  * Personalized application roadmap (spec §25).
@@ -156,12 +157,10 @@ export async function POST(req: Request) {
 
     // Notify the user that their roadmap was built.
     if (generated > 0) {
-      await createNotification({
-        profileId: pid,
+      await createLocalizedNotification(pid, {
         type: "milestone_due",
-        title: "Your roadmap is ready",
-        body: `We generated ${generated} new milestone${generated === 1 ? "" : "s"} based on your saved universities and scholarships.`,
         link: "/tasks",
+        text: (lang) => NOTIFY_TEXTS.roadmapReady(lang, { count: generated }),
       });
     }
 
