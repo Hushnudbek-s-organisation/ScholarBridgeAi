@@ -4,10 +4,14 @@ import { forumLikes, forumThreads, forumReplies } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
 import { requireProfileAccess } from "@/lib/auth";
+import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   try {
+    // Reading the forum is part of the Premium `forum` feature (not only the UI).
+    const member = await requireFeatureSession(req, "forum");
+    if (!member.ok) return member.response;
     const { searchParams } = new URL(req.url);
     const targetType = searchParams.get("targetType");
     const targetIdStr = searchParams.get("targetId");
@@ -64,6 +68,8 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "forum");
+    if (locked) return locked;
     const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
     if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 

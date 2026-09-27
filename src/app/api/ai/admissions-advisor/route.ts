@@ -147,7 +147,7 @@ export async function POST(req: Request) {
     let aiRejectedFor = "";
 
     if (question) {
-      const raw = await callAI(brief, ADVISOR_SYSTEM_PROMPT, { taskType: "admissions", profileId });
+      const raw = await callAI(brief, ADVISOR_SYSTEM_PROMPT, { taskType: "admissions", profileId: guarded.usageProfileId });
       if (raw) {
         const trust = isTrustworthyReply(raw, input);
         if (trust.ok) {

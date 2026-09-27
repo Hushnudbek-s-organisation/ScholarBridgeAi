@@ -8,7 +8,6 @@ export interface QuizQuestion {
   id: number;
   question: string;
   options: string[];
-  correctOptionIndex: number;
 }
 
 export interface Quiz {
@@ -28,7 +27,8 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
   const t = useTranslations("courses");
   const [answers, setAnswers] = useState<(number | null)[]>(quiz.questions.map(() => null));
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ score: number; passed: boolean; perQuestion: boolean[] } | null>(null);
+  const [result, setResult] = useState<{ score: number; passed: boolean; correctOptionIndexes: number[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const allAnswered = answers.every((a) => a !== null);
 
@@ -40,18 +40,28 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
   const handleSubmit = async () => {
     if (!allAnswered || submitting || result) return;
     setSubmitting(true);
+    setError(null);
     try {
       const res = await fetch("/api/quizzes/attempt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quizId: quiz.id, profileId, answers }),
       });
-      const data = await res.json();
-      const perQuestion = quiz.questions.map((q, i) => Number(answers[i]) === q.correctOptionIndex);
-      setResult({ score: data.score ?? 0, passed: data.passed ?? false, perQuestion });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // A failed request is not a failed quiz — never show it as a 0% score.
+        setError(typeof data?.error === "string" ? data.error : t("submitFailed"));
+        return;
+      }
+      setResult({
+        score: data.score ?? 0,
+        passed: data.passed ?? false,
+        correctOptionIndexes: Array.isArray(data.correctOptionIndexes) ? data.correctOptionIndexes : [],
+      });
       onCompleted({ score: data.score ?? 0, passed: data.passed ?? false });
     } catch (err) {
       console.error(err);
+      setError(t("submitFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +101,7 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
           <div className="space-y-1.5">
             {q.options.map((opt, optIndex) => {
               const selected = answers[qIndex] === optIndex;
-              const isCorrect = q.correctOptionIndex === optIndex;
+              const isCorrect = result?.correctOptionIndexes[qIndex] === optIndex;
               const showFeedback = !!result;
 
               let cls = "border-slate-200 hover:border-indigo-300 hover:bg-indigo-50";
@@ -119,6 +129,12 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
           </div>
         </div>
       ))}
+
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+          {error}
+        </p>
+      )}
 
       {!result && (
         <button

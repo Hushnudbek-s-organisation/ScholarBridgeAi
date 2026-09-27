@@ -180,7 +180,8 @@
     "courseProgress": "прогресс курса",
     "totalDuration": "Длительность",
     "back": "Назад",
-    "loading": "Загрузка..."
+    "loading": "Загрузка...",
+    "submitFailed": "Не удалось отправить тест. Попробуйте ещё раз."
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",

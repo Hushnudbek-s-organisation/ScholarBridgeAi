@@ -130,6 +130,7 @@ npm run test:security   # 50 assertions over auth, rate limits, SSRF, payments, 
 npm run test:ai-settings
 npm run test:ownership     # ownership state machine, races, authz (embedded Postgres)
 npm run test:portability   # APP_URL, config allowlist/export/import, RLS script
+npm run test:integration   # API routes against Postgres: IDOR, Premium on the API, AI quota
 npm run typecheck
 npm run build
 npm audit --audit-level=high
@@ -207,3 +208,30 @@ by `npm run test:security`).
 | Medium | Security notices (ownership) were dropped for users with default notification preferences. | `security` notifications are always recorded in-app. |
 | Low | Research agent hardwired to OpenRouter; env AI provider choices masked by DB defaults; AI errors could echo keys. | Universal provider layer (`src/lib/ai`): admin-selected provider/model per task, explicit fallback only, disabled list, key redaction in logs/errors. |
 | Low | Deploy domain / Supabase project / personal admin email hardcoded in docs and a UI placeholder. | `APP_URL` layer (`src/lib/appUrl.ts`); links built from configuration; checked by `npm run test:portability`. |
+
+## 12. 2026-09 full-system access audit
+
+Every API route was inventoried (method, authentication, ownership, Premium,
+rate limit) and the risky ones were attacked live with two accounts. Full
+report: `docs/AUDIT_2026-09.md`.
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| Critical | `PATCH`/`DELETE /api/tasks` had no authentication: anyone (even anonymous) could edit or delete any student's tasks by id. | Row-owner check (`requireRowAccess`), validation, body cap. |
+| Critical | Premium was enforced only by the website's `PremiumGate`: essays, AI SOP, tasks, forum and course APIs answered free accounts directly; the gate even mounted the locked section underneath the overlay. | `premiumGate` / `requireFeatureSession` (`src/lib/premium.ts`, reusing `hasFeature`) on every Premium API → `403 premium_required`. `/api/premium/status` returns per-feature access, `PremiumGate` takes a `feature` and never mounts locked content. |
+| Critical | `GET /api/gamification/leaderboard` (public) returned the top students' e-mail addresses. | Name + major only. |
+| Critical | `POST /api/forum/categories` had no authentication. | Admin only, validated, duplicate slug → 409. |
+| High | `POST /api/gamification/award` let a student award themselves any number of points. | Admin only, 1–10 000 points. |
+| High | `POST /api/referrals` and `POST /api/consulting` accepted any `profileId` without a session (referral farming → free Premium; spoofed requests). | Caller's own profile only (`requireProfileAccess`), rate-limited. |
+| High | `POST /api/visa/live-token` minted paid Gemini Live sessions for anonymous callers, unthrottled. | Session required, `LIMITS.visaLiveToken` (10/h), 16 KB body cap. |
+| High | The admin-configured daily AI limits (`ai_*_requests_per_day`, `ai_*_tokens_per_day`) were never enforced; a signed-in user could also drop `profileId` to be treated as anonymous. | `src/lib/ai/quota.ts` in `guardAiRequest`: rolling 24 h, per account from `ai_usage` (anonymous: per IP), admins exempt, `429 ai_quota_exceeded`. The caller is always resolved; usage is logged against the caller. Index `idx_ai_usage_profile_created` (`supabase/add_ai_usage_quota_index.sql`). Visa interview chat keeps its own per-IP limit (a single interview is many turns). |
+| Medium | No server-side CSRF check (only `SameSite=Lax`). | Middleware refuses API writes whose `Origin` is not this site (Host / X-Forwarded-Host / `APP_URL`); provider webhooks exempt; requests without `Origin` pass to route auth. |
+| Medium | Course payloads contained each quiz's correct answer before the attempt. | Answers are revealed only in the attempt response. |
+| Medium | On a database error the universities APIs served sample (fake) universities as if real. | `503 data_unavailable`; sample data removed. |
+| Medium | `test:integration` always exited 0 (embedded-postgres' exit hook overrode `process.exitCode`), so failures could not fail CI; it was not in CI either. | Explicit exit; added to `ci/security-ci.yml`. |
+| Low | Branding upload parsed the multipart body before the admin check and trusted the browser MIME type. | Auth first, size pre-check, magic-byte check. |
+| Low | FAQ JSON-LD was inlined without escaping `<`. | Escaped. |
+
+Regression guard: `npm run test:security` fails if any API write lacks an
+authentication call (outside a reviewed public allowlist) or a Premium API
+stops enforcing its feature.

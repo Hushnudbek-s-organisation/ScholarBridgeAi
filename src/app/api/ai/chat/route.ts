@@ -68,7 +68,7 @@ ${profileContext}`;
 
     const fullPrompt = `${historyText ? "CONVERSATION HISTORY:\n" + historyText + "\n\n" : ""}User Question: ${message}`;
 
-    let reply = await callAI(fullPrompt, systemInstruction, { taskType: "general", profileId: profileId ?? null });
+    let reply = await callAI(fullPrompt, systemInstruction, { taskType: "general", profileId: guarded.usageProfileId });
     // `offline` tells the client this is canned guidance, not a live model
     // answer, so it can be labelled honestly (the product promise is "no
     // invented facts" — an unlabelled template would quietly break that).

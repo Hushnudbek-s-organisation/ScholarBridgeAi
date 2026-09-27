@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { setConfig } from "@/lib/config";
-import { brandingBucket, supabaseBaseUrl, supabaseStorageUrl } from "@/lib/branding";
+import { brandingBucket, matchesImageSignature, supabaseBaseUrl, supabaseStorageUrl } from "@/lib/branding";
 
 const ALLOWED = new Map([
   ["image/png", "png"],
@@ -15,8 +15,8 @@ const MAX_BYTES = 5 * 1024 * 1024;
 /** Upload a site logo or favicon to the private server-side storage integration. */
 export async function POST(request: Request) {
   try {
-    const form = await request.formData();
-    const adminProfileId = form.get("adminProfileId");
+    // Authorize before reading the multipart body, so anonymous callers
+    // cannot make the server buffer large uploads.
     const access = await requireAdmin(request);
     if (!access.ok) {
       return NextResponse.json(
@@ -24,6 +24,11 @@ export async function POST(request: Request) {
         { status: access.status }
       );
     }
+    const declared = Number(request.headers.get("content-length") || 0);
+    if (declared > MAX_BYTES + 64 * 1024) {
+      return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 413 });
+    }
+    const form = await request.formData();
 
     const kind = form.get("kind");
     if (kind !== "logo" && kind !== "favicon") {
@@ -34,6 +39,10 @@ export async function POST(request: Request) {
     const extension = ALLOWED.get(file.type);
     if (!extension) return NextResponse.json({ error: "Use PNG, JPG, WEBP or ICO" }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 400 });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!matchesImageSignature(extension, bytes.subarray(0, 16))) {
+      return NextResponse.json({ error: "The file content is not a valid PNG, JPG, WEBP or ICO image" }, { status: 400 });
+    }
 
     // Never fall back to a hardcoded project: the service key must only ever
     // be sent to the project this deployment is configured for.
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
         "Content-Type": file.type,
         "x-upsert": "true",
       },
-      body: Buffer.from(await file.arrayBuffer()),
+      body: Buffer.from(bytes),
     });
     if (!upload.ok) {
       const detail = await upload.text();

@@ -10,7 +10,7 @@ import { localeToLanguageName } from "@/i18n/config";
 export async function POST(req: Request) {
   try {
     // Size cap + rate limit + ownership of `profileId` (see lib/ai/guard).
-    const guarded = await guardAiRequest(req);
+    const guarded = await guardAiRequest(req, { feature: "ai_essay" });
     if (!guarded.ok) return guarded.response;
 
     const profileId = guarded.profileId;
@@ -58,7 +58,7 @@ FORMAT RULES (follow exactly) — the draft is an ESSAY, not a report:
     let sopContent = await callAI(
       prompt,
       `You are an expert SOP editor and academic writing mentor. You ALWAYS write in the language requested by the user (${langName}), with perfect grammar, natural academic style, and zero code-switching or gibberish.`,
-      { taskType: "essay", profileId }
+      { taskType: "essay", profileId: guarded.usageProfileId }
     );
 
     if (!sopContent) {

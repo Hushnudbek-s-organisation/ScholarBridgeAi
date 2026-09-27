@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { forumThreads, studentProfiles, forumCategories, forumLikes } from "@/db/schema";
 import { eq, and, count, sql } from "drizzle-orm";
 import { authenticate } from "@/lib/auth";
+import { requireFeatureSession } from "@/lib/premium";
 
 /**
  * Resolve the requester from the signed session cookie. The old
@@ -16,6 +17,9 @@ async function getRequester(req: Request): Promise<{ id: number; isAdmin: boolea
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Reading the forum is part of the Premium `forum` feature (not only the UI).
+    const member = await requireFeatureSession(req, "forum");
+    if (!member.ok) return member.response;
     const { id } = await params;
     const threadId = parseInt(id, 10);
 

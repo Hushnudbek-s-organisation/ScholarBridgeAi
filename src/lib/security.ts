@@ -15,6 +15,8 @@
  * means a production deploy can never accidentally inherit the lax rule.
  */
 
+import { APP_URL_ENV_VARS, normalizeAppUrl } from "./appUrl";
+
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 /**
@@ -71,4 +73,67 @@ export function xFrameOptions(env: Record<string, string | undefined> = process.
 /** HSTS is only meaningful over HTTPS and only shipped in production. */
 export function strictTransportSecurity(): string | null {
   return IS_PRODUCTION ? "max-age=31536000; includeSubDomains; preload" : null;
+}
+
+// ---------------------------------------------------------------------------
+// CSRF: cross-site writes to the API
+// ---------------------------------------------------------------------------
+
+/**
+ * Endpoints called server-to-server by third parties. They carry their own
+ * authentication (merchant signatures, Telegram secret token, CRON_SECRET)
+ * and never a browser Origin — listed so a future provider change cannot be
+ * broken by the Origin rule.
+ */
+export const CSRF_EXEMPT_API_PREFIXES = ["/api/payments/payme/", "/api/payments/click/", "/api/telegram/webhook", "/api/cron/"];
+
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function hostOf(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  try {
+    return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Should this API request be refused as a cross-site write?
+ *
+ * The session cookie is SameSite=Lax, which already stops most cross-site
+ * POSTs in browsers; this is the server-side second layer. Browsers send an
+ * Origin header on every cross-origin write, so a write whose Origin is not
+ * this site is refused. Requests without an Origin (webhooks, curl, server to
+ * server) are not browser-driven CSRF and pass through to the route's own
+ * authentication. "This site" is the request Host, any X-Forwarded-Host set
+ * by the platform proxy, and the configured APP_URL (see lib/appUrl).
+ */
+export function isCrossSiteApiWrite(req: {
+  method: string;
+  pathname: string;
+  origin: string | null;
+  host: string | null;
+  forwardedHost: string | null;
+  env?: Record<string, string | undefined>;
+}): boolean {
+  if (!WRITE_METHODS.has(req.method.toUpperCase())) return false;
+  if (!req.pathname.startsWith("/api/")) return false;
+  if (CSRF_EXEMPT_API_PREFIXES.some((p) => req.pathname.startsWith(p))) return false;
+  if (req.origin === null || req.origin === undefined || req.origin === "") return false;
+  if (req.origin === "null") return true; // sandboxed iframe / data: URL
+  const originHost = hostOf(req.origin);
+  if (!originHost) return true;
+
+  const allowed = new Set<string>();
+  const add = (v: string | null | undefined) => {
+    const h = hostOf(v);
+    if (h) allowed.add(h);
+  };
+  add(req.host);
+  for (const h of String(req.forwardedHost ?? "").split(",")) add(h);
+  const env = req.env ?? process.env;
+  for (const name of APP_URL_ENV_VARS) add(normalizeAppUrl(env[name]));
+  return !allowed.has(originHost);
 }

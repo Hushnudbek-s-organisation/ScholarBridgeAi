@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { db } from "@/db";
 import { quizzes, quizQuestions, quizAttempts, lessons, courseModules, courses } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "courses");
+    if (locked) return locked;
 
     if (!quizId || !profileId || !Array.isArray(answers)) {
       return NextResponse.json({ error: "quizId, profileId and answers are required" }, { status: 400 });
@@ -81,6 +84,8 @@ export async function POST(req: Request) {
       passed,
       correct,
       total: questions.length,
+      // Revealed only after the attempt is recorded (the quiz payload omits them).
+      correctOptionIndexes: questions.map((q) => q.correctOptionIndex),
       passThreshold: quiz.passThreshold,
       award,
       certificate,

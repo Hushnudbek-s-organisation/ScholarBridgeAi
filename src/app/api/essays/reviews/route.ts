@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { essayReviews, essayVersions } from "@/db/schema";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { aggregateReviews, clampScore } from "@/lib/essayReviews";
 
 /**
@@ -28,6 +29,8 @@ export async function GET(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
     const me = access.session.profile.id;
 
     // ---- reviewer side: open essays -------------------------------------
@@ -110,6 +113,8 @@ export async function POST(req: Request) {
     if (!profile.ok) {
       return NextResponse.json({ error: profile.error, code: profile.code }, { status: profile.status });
     }
+    const locked = await premiumGate(profile.session.profile.id, "ai_essay");
+    if (locked) return locked;
     const me = profile.session.profile.id;
 
     let body: Record<string, any>;

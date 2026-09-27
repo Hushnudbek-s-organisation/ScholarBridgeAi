@@ -175,6 +175,8 @@ export const LIMITS = {
   telegramStart: { limit: 10, windowMs: 15 * 60_000 },
   /** Telegram code checks: 20 / 15 min per IP (each attempt also locks after 5 wrong codes). */
   telegramVerify: { limit: 20, windowMs: 15 * 60_000 },
+  /** Gemini Live visa-interview tokens (30-min paid sessions): 10 / hour per account. */
+  visaLiveToken: { limit: 10, windowMs: 60 * 60_000 },
   /** Analytics beacon: 60 / min per visitor. */
   beacon: { limit: 60, windowMs: 60_000 },
 } as const;

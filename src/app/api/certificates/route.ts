@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { db } from "@/db";
 import { certificates, courses } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -19,6 +20,8 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "courses");
+    if (locked) return locked;
 
     const rows = await db
       .select({

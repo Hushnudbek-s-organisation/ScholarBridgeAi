@@ -180,7 +180,8 @@
     "courseProgress": "kurs bosqichi",
     "totalDuration": "Davomiyligi",
     "back": "Orqaga",
-    "loading": "Yuklanmoqda..."
+    "loading": "Yuklanmoqda...",
+    "submitFailed": "Testni yuborib bo'lmadi. Qaytadan urinib ko'ring."
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",

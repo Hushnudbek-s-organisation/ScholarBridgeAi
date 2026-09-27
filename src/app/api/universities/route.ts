@@ -11,7 +11,6 @@ import {
 import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
-import { mockUniversityListPayload } from "@/lib/mock-universities";
 import { paginatedPayload } from "@/lib/pagination";
 
 /**
@@ -301,14 +300,13 @@ export async function GET(req: Request) {
     );
   } catch (error) {
     console.error("GET /api/universities error:", error);
-    // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
-    const payload = mockUniversityListPayload();
-    const { searchParams } = new URL(req.url);
-    // Marked so channels that must never show sample data (the Telegram bot
-    // and Mini App) can say "temporarily unavailable" instead.
+    // Never substitute sample universities: during a database outage students
+    // would be shown made-up data as if it were real. Clients show the error
+    // (the website's explorer / detail views, and the Telegram bot's
+    // "temporarily unavailable" message for 503).
     return NextResponse.json(
-      paginatedPayload("universities", payload.universities, searchParams),
-      { headers: { "X-Data-Source": "fallback" } },
+      { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
+      { status: 503 },
     );
   }
 }

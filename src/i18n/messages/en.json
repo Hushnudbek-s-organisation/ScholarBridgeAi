@@ -180,7 +180,8 @@
     "courseProgress": "course progress",
     "totalDuration": "Duration",
     "back": "Back",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "submitFailed": "Could not submit the quiz. Please try again."
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",

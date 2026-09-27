@@ -91,7 +91,8 @@ export function FaqSection() {
     <section className="mt-10" aria-label="Ko'p so'raladigan savollar">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        // "<" is escaped so FAQ text can never close the script tag early.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") }}
       />
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs p-5 sm:p-7">

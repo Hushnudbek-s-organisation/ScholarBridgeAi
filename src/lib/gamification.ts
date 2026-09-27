@@ -289,8 +289,8 @@ export async function getLeaderboard(limit = 20) {
       profileId: userPoints.profileId,
       totalPoints: userPoints.totalPoints,
       levelId: userPoints.currentLevel,
+      // Public endpoint: display name + major only — never e-mail addresses.
       name: studentProfiles.name,
-      email: studentProfiles.email,
       targetMajor: studentProfiles.targetMajor,
       levelName: levels.name,
       levelIcon: levels.iconUrl,

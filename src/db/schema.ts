@@ -543,7 +543,11 @@ export const aiUsage = pgTable("ai_usage", {
   costEstimate: doublePrecision("cost_estimate").notNull().default(0),
   status: text("status").notNull().default("success"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  // The daily AI quota counts one profile's requests in the last 24 hours on
+  // every AI call — without this index that is a full scan of ai_usage.
+  index("idx_ai_usage_profile_created").on(table.profileId, table.createdAt),
+]);
 
 // ---------------------------------------------------------------------------
 // 8. APPLICATION DOCUMENTS (spec §24)

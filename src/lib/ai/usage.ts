@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { aiUsage } from "@/db/schema";
-import { desc, gte, eq, and } from "drizzle-orm";
+import { desc, gte, eq, and, sql } from "drizzle-orm";
 
 interface UsageEntry {
   profileId: number | null;
@@ -27,27 +27,31 @@ export async function logAIUsage(entry: UsageEntry) {
   });
 }
 
-/** Count AI requests for a profile since a given timestamp (free quota). */
-export async function countAIRequestsSince(profileId: number, since: Date): Promise<number> {
-  const rows = await db
-    .select({ id: aiUsage.id })
+export interface AiUsageTotals {
+  requests: number;
+  tokens: number;
+  /** Timestamp of the oldest counted request (null when there are none). */
+  oldest: Date | null;
+}
+
+/** Requests + tokens a profile used since `since` — one aggregate query (daily quota). */
+export async function aiUsageSince(profileId: number, since: Date): Promise<AiUsageTotals> {
+  const [row] = await db
+    .select({
+      requests: sql<number>`count(*)::int`,
+      tokens: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)::int`,
+      oldest: sql<string | null>`min(${aiUsage.createdAt})`,
+    })
     .from(aiUsage)
     .where(and(eq(aiUsage.profileId, profileId), gte(aiUsage.createdAt, since)));
-  return rows.length;
+  return {
+    requests: Number(row?.requests ?? 0),
+    tokens: Number(row?.tokens ?? 0),
+    oldest: row?.oldest ? new Date(row.oldest) : null,
+  };
 }
 
 /** Recent usage for admin (spec §16). */
 export async function getRecentUsage(limit = 50) {
   return db.select().from(aiUsage).orderBy(desc(aiUsage.createdAt)).limit(limit);
-}
-
-/** Total tokens for a profile today (quota check). */
-export async function getDailyTokens(profileId: number): Promise<number> {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const rows = await db
-    .select({ pt: aiUsage.promptTokens, ct: aiUsage.completionTokens })
-    .from(aiUsage)
-    .where(and(eq(aiUsage.profileId, profileId), gte(aiUsage.createdAt, start)));
-  return rows.reduce((sum, r) => sum + (r.pt ?? 0) + (r.ct ?? 0), 0);
 }

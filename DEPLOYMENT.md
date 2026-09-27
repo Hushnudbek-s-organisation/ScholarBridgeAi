@@ -71,6 +71,10 @@ Hosting assumptions (all portable):
    `universities` / `scholarships` catalogue. The app is the table owner, so
    it is unaffected. Re-run it after adding tables. Verified by
    `npm run test:portability`.
+4. Run [`supabase/add_ai_usage_quota_index.sql`](./supabase/add_ai_usage_quota_index.sql)
+   (or `npm run db:push`): the daily AI limits (Admin → Settings,
+   `ai_*_requests_per_day` / `ai_*_tokens_per_day`) count each account's
+   recent AI requests on every AI call, and this index keeps that fast.
 
 ## 3. Domain and canonical URL
 
@@ -188,6 +192,7 @@ password, never commit.
 - [ ] `SESSION_SECRET` and `AI_KEYS_ENCRYPTION_SECRET` set to long random values.
 - [ ] Admin signed in with a real password; `ADMIN_PASSWORD` removed afterwards.
 - [ ] Supabase: `supabase/enable_rls.sql` executed (all tables `rls_enabled = true`).
+- [ ] `supabase/add_ai_usage_quota_index.sql` executed; daily AI limits reviewed in Admin → Settings.
 - [ ] `APP_URL` set; Telegram webhook registered against it.
 - [ ] `PAYME_*` / `CLICK_*` set **or** payments knowingly disabled.
 - [ ] `CRON_SECRET` set if an external scheduler is used.

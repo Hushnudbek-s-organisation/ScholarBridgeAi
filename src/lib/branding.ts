@@ -46,3 +46,24 @@ export function supabaseStorageUrl(path: string): string | null {
   const base = supabaseBaseUrl();
   return base ? `${base}/storage/v1/object/public/${brandingBucket()}/${path}` : null;
 }
+
+/**
+ * Does the file content really start like the declared image type? The
+ * browser-supplied MIME type is just a label — without this an admin session
+ * (or a stolen one) could store HTML/SVG under an image content type.
+ */
+export function matchesImageSignature(extension: string, head: Uint8Array): boolean {
+  const starts = (...bytes: number[]) => bytes.every((b, i) => head[i] === b);
+  switch (extension) {
+    case "png":
+      return starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    case "jpg":
+      return starts(0xff, 0xd8, 0xff);
+    case "webp":
+      return starts(0x52, 0x49, 0x46, 0x46) && head[8] === 0x57 && head[9] === 0x45 && head[10] === 0x42 && head[11] === 0x50;
+    case "ico":
+      return starts(0x00, 0x00, 0x01, 0x00);
+    default:
+      return false;
+  }
+}

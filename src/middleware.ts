@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, locales } from "@/i18n/config";
-import { frameAncestors, isMiniAppPath, miniAppFrameAncestors, strictTransportSecurity, xFrameOptions } from "@/lib/security";
+import { frameAncestors, isCrossSiteApiWrite, isMiniAppPath, miniAppFrameAncestors, strictTransportSecurity, xFrameOptions } from "@/lib/security";
 
 /**
  * Cryptographically random nonce using the Web Crypto API (the middleware runs
@@ -103,6 +103,25 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // API: only the CSRF check runs here — routes set their own responses.
+  if (pathname.startsWith("/api/")) {
+    const crossSite = isCrossSiteApiWrite({
+      method: request.method,
+      pathname,
+      origin: request.headers.get("origin"),
+      host: request.headers.get("host"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
+    });
+    if (crossSite) {
+      return NextResponse.json(
+        { error: "Cross-site request refused.", code: "cross_site_request" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.next();
+  }
+
   const nonce = randomNonce();
   const miniApp = isMiniAppPath(pathname);
   const csp = contentSecurityPolicy(nonce, { miniApp });
@@ -157,5 +176,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|.*\\..*).*)"],
+  // Pages (locale + security headers) and API writes (CSRF check only).
+  matcher: ["/((?!api|_next|.*\\..*).*)", "/api/:path*"],
 };

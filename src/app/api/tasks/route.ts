@@ -1,26 +1,44 @@
 import { NextResponse } from "next/server";
-import { requireProfileAccess } from "@/lib/auth";
+import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { applicationTasks, universities } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { premiumGate } from "@/lib/premium";
+import { clampString, positiveInt, readJsonBody } from "@/lib/request";
+
+/**
+ * Application tasks — the "Tasks & Roadmap" section, a Premium feature
+ * (`roadmap`). Every method checks ownership AND the plan server-side: the
+ * website's PremiumGate only decides what to render.
+ */
+
+const BODY_LIMIT = 16 * 1024;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function authError(access: { error: string; code: string; status: number }) {
+  return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+}
+
+/** A calendar date (YYYY-MM-DD) or undefined when not supplied; null when invalid. */
+function parseDueDate(value: unknown): string | undefined | null {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !DATE_RE.test(value) || Number.isNaN(Date.parse(value))) return null;
+  return value;
+}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const profileIdStr = searchParams.get("profileId");
-
-    if (!profileIdStr) {
+    const profileId = positiveInt(searchParams.get("profileId"));
+    if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
 
-    const profileId = parseInt(profileIdStr, 10);
     const access = await requireProfileAccess(req, profileId);
-    if (!access.ok) {
-      return NextResponse.json(
-        { error: access.error, code: access.code },
-        { status: access.status }
-      );
-    }
+    if (!access.ok) return authError(access);
+    const locked = await premiumGate(access.session.profile.id, "roadmap");
+    if (locked) return locked;
+
     const tasks = await db
       .select({
         id: applicationTasks.id,
@@ -47,28 +65,36 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { profileId, universityId, title, category, dueDate, priority } = body;
-    const access = await requireProfileAccess(req, profileId);
-    if (!access.ok) {
-      return NextResponse.json(
-        { error: access.error, code: access.code },
-        { status: access.status }
-      );
-    }
+    const parsed = await readJsonBody<Record<string, unknown>>(req, BODY_LIMIT);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
 
-    if (!profileId || !title) {
+    const profileId = positiveInt(body.profileId);
+    if (!profileId) {
       return NextResponse.json({ error: "profileId and title are required" }, { status: 400 });
+    }
+    const access = await requireProfileAccess(req, profileId);
+    if (!access.ok) return authError(access);
+    const locked = await premiumGate(access.session.profile.id, "roadmap");
+    if (locked) return locked;
+
+    const title = clampString(body.title, 300).trim();
+    if (!title) {
+      return NextResponse.json({ error: "profileId and title are required" }, { status: 400 });
+    }
+    const dueDate = parseDueDate(body.dueDate || undefined);
+    if (dueDate === null) {
+      return NextResponse.json({ error: "dueDate must be a YYYY-MM-DD date" }, { status: 400 });
     }
 
     const [newTask] = await db.insert(applicationTasks).values({
       profileId,
-      universityId: universityId ? Number(universityId) : null,
+      universityId: positiveInt(body.universityId),
       title,
-      category: category || "Document Prep",
-      dueDate: dueDate || new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+      category: clampString(body.category, 80).trim() || "Document Prep",
+      dueDate: dueDate ?? new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
       isCompleted: false,
-      priority: priority || "Medium",
+      priority: clampString(body.priority, 40).trim() || "Medium",
     }).returning();
 
     return NextResponse.json({ task: newTask });
@@ -78,24 +104,60 @@ export async function POST(req: Request) {
   }
 }
 
+/** Load the owner of a task so the caller can be checked against it. */
+async function findTaskOwner(id: number) {
+  const [row] = await db
+    .select({ id: applicationTasks.id, profileId: applicationTasks.profileId })
+    .from(applicationTasks)
+    .where(eq(applicationTasks.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
-    const { id, isCompleted, title, dueDate, priority, category } = body;
+    const parsed = await readJsonBody<Record<string, unknown>>(req, BODY_LIMIT);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
 
+    const id = positiveInt(body.id);
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    // Task ids are sequential — acting on one by id alone would let any
+    // visitor edit or delete another student's roadmap.
+    const access = await requireRowAccess(req, await findTaskOwner(id));
+    if (!access.ok) return authError(access);
+    const locked = await premiumGate(access.session.profile.id, "roadmap");
+    if (locked) return locked;
+
+    const patch: Partial<typeof applicationTasks.$inferInsert> = {};
+    if (body.isCompleted !== undefined) {
+      if (typeof body.isCompleted !== "boolean") {
+        return NextResponse.json({ error: "isCompleted must be true or false" }, { status: 400 });
+      }
+      patch.isCompleted = body.isCompleted;
+    }
+    if (body.title !== undefined) {
+      const title = clampString(body.title, 300).trim();
+      if (!title) return NextResponse.json({ error: "title cannot be empty" }, { status: 400 });
+      patch.title = title;
+    }
+    if (body.dueDate !== undefined) {
+      const dueDate = parseDueDate(body.dueDate);
+      if (!dueDate) return NextResponse.json({ error: "dueDate must be a YYYY-MM-DD date" }, { status: 400 });
+      patch.dueDate = dueDate;
+    }
+    if (body.priority !== undefined) patch.priority = clampString(body.priority, 40).trim() || "Medium";
+    if (body.category !== undefined) patch.category = clampString(body.category, 80).trim() || "Document Prep";
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
     const [updated] = await db
       .update(applicationTasks)
-      .set({
-        isCompleted: isCompleted !== undefined ? isCompleted : undefined,
-        title: title !== undefined ? title : undefined,
-        dueDate: dueDate !== undefined ? dueDate : undefined,
-        priority: priority !== undefined ? priority : undefined,
-        category: category !== undefined ? category : undefined,
-      })
+      .set(patch)
       .where(eq(applicationTasks.id, id))
       .returning();
 
@@ -109,13 +171,16 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const idStr = searchParams.get("id");
-
-    if (!idStr) {
+    const id = positiveInt(searchParams.get("id"));
+    if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const id = parseInt(idStr, 10);
+    const access = await requireRowAccess(req, await findTaskOwner(id));
+    if (!access.ok) return authError(access);
+    const locked = await premiumGate(access.session.profile.id, "roadmap");
+    if (locked) return locked;
+
     await db.delete(applicationTasks).where(eq(applicationTasks.id, id));
 
     return NextResponse.json({ success: true });

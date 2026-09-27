@@ -3,22 +3,36 @@ import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { consultingRequests } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { clampString, readJsonBody } from "@/lib/request";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
-/** POST: submit a consulting request (spec §27). */
+/** POST: submit a consulting request (spec §27) — for the caller's own profile only. */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { profileId, topic, message, preferredContact } = body;
-    if (!profileId || !topic) {
+    const parsed = await readJsonBody<Record<string, unknown>>(req, 16 * 1024);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const body = parsed.body;
+    const access = await requireProfileAccess(req, body.profileId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    }
+    const limit = checkRateLimit(`consulting:${access.session.profile.id}`, LIMITS.contact);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
+
+    const profileId = access.targetId!;
+    const topic = clampString(body.topic, 200).trim();
+    if (!topic) {
       return NextResponse.json({ error: "profileId and topic are required" }, { status: 400 });
     }
     const [row] = await db
       .insert(consultingRequests)
       .values({
-        profileId: Number(profileId),
-        topic: String(topic),
-        message: String(message || ""),
-        preferredContact: String(preferredContact || ""),
+        profileId,
+        topic,
+        message: clampString(body.message, 4000).trim(),
+        preferredContact: clampString(body.preferredContact, 200).trim(),
       })
       .returning();
     return NextResponse.json({ request: row });

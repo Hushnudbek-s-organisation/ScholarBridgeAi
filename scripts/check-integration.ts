@@ -16,7 +16,7 @@
 
 import EmbeddedPostgres from "embedded-postgres";
 import { execSync } from "child_process";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 let passed = 0;
 let failed = 0;
@@ -914,6 +914,28 @@ async function main() {
     return { status: res.status, body: await res.json().catch(() => null) };
   };
 
+  // The essay studio is a Premium feature (`ai_essay`), enforced by the API
+  // itself — a free account is refused before any review logic runs.
+  const reviewFree = await asBekzod("/api/essays/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ essayVersionId: openEssay.id, hook: 70, total: 70 }),
+  });
+  check(
+    "a FREE account is refused by the API itself (403 premium_required)",
+    reviewFree.status === 403 && reviewFree.body?.code === "premium_required" && reviewFree.body?.feature === "ai_essay",
+    `got ${reviewFree.status} ${JSON.stringify(reviewFree.body)}`
+  );
+
+  // Grant both students Premium the way the product does (referral grant:
+  // is_premium + premium_until) for the peer-review rules below; revoked at
+  // the end of this section so later sections keep testing free accounts.
+  const premiumUntil = new Date(Date.now() + 7 * 86400000);
+  await db
+    .update(schema.studentProfiles)
+    .set({ isPremium: true, premiumUntil })
+    .where(inArray(schema.studentProfiles.id, [profile.id, other.id]));
+
   const reviewOk = await asBekzod("/api/essays/reviews", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -986,7 +1008,119 @@ async function main() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ essayVersionId: openEssay.id, hook: 50, total: 50 }),
   });
-  check("after closing, new reviews are refused again (403)", reviewAfterClose.status === 403, `got ${reviewAfterClose.status}`);
+  check("after closing, new reviews are refused again (403, not a plan refusal)", reviewAfterClose.status === 403 && reviewAfterClose.body?.code !== "premium_required", `got ${reviewAfterClose.status} ${JSON.stringify(reviewAfterClose.body)}`);
+
+  await db
+    .update(schema.studentProfiles)
+    .set({ isPremium: false, premiumUntil: null })
+    .where(inArray(schema.studentProfiles.id, [profile.id, other.id]));
+
+  // -----------------------------------------------------------------------
+  section("8d. Access audit 2026-09 — ownership, Premium on the API, public data, AI quota");
+  {
+    const otherTok = signSessionToken({ id: other.id, passwordHash: other.passwordHash });
+    const asOther = { cookie: `sb_session=${otherTok}` };
+    const anon = { cookie: "" };
+    const json = { "Content-Type": "application/json" };
+    const setPremium = (ids: number[], on: boolean) =>
+      db
+        .update(schema.studentProfiles)
+        .set({ isPremium: on, premiumUntil: on ? new Date(Date.now() + 7 * 86400000) : null })
+        .where(inArray(schema.studentProfiles.id, ids));
+
+    // Tasks — IDOR (row ids are sequential) + Premium `roadmap` on every method.
+    const tasks = await import("../src/app/api/tasks/route");
+    const [task] = await db
+      .insert(schema.applicationTasks)
+      .values({ profileId: profile.id, title: "Private task", dueDate: "2027-01-10" })
+      .returning();
+    const freeList = await call(tasks.GET as any, `/api/tasks?profileId=${profile.id}`);
+    check("tasks: a FREE owner is refused by the API (403 premium_required)", freeList.status === 403 && freeList.body?.code === "premium_required", `got ${freeList.status}`);
+    await setPremium([profile.id, other.id], true);
+    const ownList = await call(tasks.GET as any, `/api/tasks?profileId=${profile.id}`);
+    check("tasks: a Premium owner lists their tasks", ownList.status === 200 && ownList.body?.tasks?.some((t: any) => t.id === task.id));
+    const anonPatch = await call(tasks.PATCH as any, "/api/tasks", { method: "PATCH", headers: { ...anon, ...json }, body: JSON.stringify({ id: task.id, title: "pwned" }) });
+    check("tasks: anonymous PATCH is refused (401)", anonPatch.status === 401, `got ${anonPatch.status}`);
+    const otherPatch = await call(tasks.PATCH as any, "/api/tasks", { method: "PATCH", headers: { ...asOther, ...json }, body: JSON.stringify({ id: task.id, title: "pwned" }) });
+    check("tasks: another Premium student cannot edit someone else's task (403)", otherPatch.status === 403, `got ${otherPatch.status}`);
+    const otherDelete = await call(tasks.DELETE as any, `/api/tasks?id=${task.id}`, { method: "DELETE", headers: asOther });
+    check("tasks: another student cannot delete someone else's task (403)", otherDelete.status === 403, `got ${otherDelete.status}`);
+    const [stillThere] = await db.select().from(schema.applicationTasks).where(eq(schema.applicationTasks.id, task.id));
+    check("tasks: the victim's task is untouched", stillThere?.title === "Private task");
+    const badDate = await call(tasks.PATCH as any, "/api/tasks", { method: "PATCH", headers: json, body: JSON.stringify({ id: task.id, dueDate: "next week" }) });
+    check("tasks: an invalid dueDate is rejected (400)", badDate.status === 400, `got ${badDate.status}`);
+    const ownPatch = await call(tasks.PATCH as any, "/api/tasks", { method: "PATCH", headers: json, body: JSON.stringify({ id: task.id, isCompleted: true }) });
+    check("tasks: the owner can complete their task", ownPatch.status === 200 && ownPatch.body?.task?.isCompleted === true, `got ${ownPatch.status}`);
+    await setPremium([profile.id, other.id], false);
+
+    // Forum — reading and writing need the `forum` feature; categories are admin-only.
+    const cats = await import("../src/app/api/forum/categories/route");
+    const threads = await import("../src/app/api/forum/threads/route");
+    const anonThreads = await call(threads.GET as any, "/api/forum/threads", { headers: anon });
+    check("forum: anonymous reads are refused (401)", anonThreads.status === 401, `got ${anonThreads.status}`);
+    const freeThreads = await call(threads.GET as any, "/api/forum/threads");
+    check("forum: a FREE account cannot read threads (403 premium_required)", freeThreads.status === 403 && freeThreads.body?.code === "premium_required", `got ${freeThreads.status}`);
+    const catAnon = await call(cats.POST as any, "/api/forum/categories", { method: "POST", headers: { ...anon, ...json }, body: JSON.stringify({ name: "Spam", slug: "spam" }) });
+    const catStudent = await call(cats.POST as any, "/api/forum/categories", { method: "POST", headers: json, body: JSON.stringify({ name: "Spam", slug: "spam" }) });
+    check("forum: categories cannot be created anonymously (401) or by a student (403)", catAnon.status === 401 && catStudent.status === 403, `got ${catAnon.status}/${catStudent.status}`);
+
+    // Public leaderboard — no e-mail addresses.
+    const lb = await import("../src/app/api/gamification/leaderboard/route");
+    const { awardPoints } = await import("../src/lib/gamification");
+    await awardPoints(profile.id, 5, "audit_check", null);
+    const board = await call(lb.GET as any, "/api/gamification/leaderboard", { headers: anon });
+    const rows: any[] = board.body?.leaderboard ?? [];
+    check("leaderboard: public rows carry no e-mail", board.status === 200 && rows.length > 0 && rows.every((r) => !("email" in r)), JSON.stringify(rows[0] ?? null));
+
+    // Manual point awards are admin-only (a student could top the board).
+    const award = await import("../src/app/api/gamification/award/route");
+    const selfAward = await call(award.POST as any, "/api/gamification/award", { method: "POST", headers: json, body: JSON.stringify({ profileId: profile.id, points: 999999 }) });
+    check("gamification: a student cannot award themselves points (403)", selfAward.status === 403, `got ${selfAward.status}`);
+
+    // Consulting / referrals act on the caller's own profile only.
+    const consulting = await import("../src/app/api/consulting/route");
+    const spoofConsult = await call(consulting.POST as any, "/api/consulting", { method: "POST", headers: { ...asOther, ...json }, body: JSON.stringify({ profileId: profile.id, topic: "spoofed" }) });
+    const anonConsult = await call(consulting.POST as any, "/api/consulting", { method: "POST", headers: { ...anon, ...json }, body: JSON.stringify({ profileId: profile.id, topic: "spoofed" }) });
+    check("consulting: requests cannot be filed for another profile (403) or anonymously (401)", spoofConsult.status === 403 && anonConsult.status === 401, `got ${spoofConsult.status}/${anonConsult.status}`);
+    const referralsRoute = await import("../src/app/api/referrals/route");
+    const spoofRef = await call(referralsRoute.POST as any, "/api/referrals", { method: "POST", headers: { ...asOther, ...json }, body: JSON.stringify({ profileId: profile.id, referralCode: "ANYCODE" }) });
+    check("referrals: a code cannot be applied to someone else's profile (403)", spoofRef.status === 403, `got ${spoofRef.status}`);
+
+    // Gemini Live tokens need an account.
+    const live = await import("../src/app/api/visa/live-token/route");
+    const anonLive = await call(live.POST as any, "/api/visa/live-token", { method: "POST", headers: { ...anon, ...json }, body: JSON.stringify({ countryCode: "US" }) });
+    check("visa live-token: anonymous minting is refused (401)", anonLive.status === 401, `got ${anonLive.status}`);
+
+    // Premium AI essay routes need an account with `ai_essay`.
+    const draft = await import("../src/app/api/ai/draft-sop/route");
+    const freeDraft = await call(draft.POST as any, "/api/ai/draft-sop", { method: "POST", headers: json, body: JSON.stringify({ profileId: profile.id, universityName: "X" }) });
+    const anonDraft = await call(draft.POST as any, "/api/ai/draft-sop", { method: "POST", headers: { ...anon, ...json }, body: JSON.stringify({ universityName: "X" }) });
+    check("AI draft-sop: FREE → 403 premium_required, anonymous → 401", freeDraft.status === 403 && freeDraft.body?.code === "premium_required" && anonDraft.status === 401, `got ${freeDraft.status}/${anonDraft.status}`);
+
+    // Daily AI quota (admin config), counted per account from ai_usage.
+    const { setConfig } = await import("../src/lib/config");
+    const { guardAiRequest } = await import("../src/lib/ai/guard");
+    const guardAs = (hdrs: Record<string, string>, body: Record<string, unknown>) =>
+      guardAiRequest(new Request("http://localhost/api/ai/chat", { method: "POST", headers: { ...json, ...hdrs }, body: JSON.stringify(body) }));
+    await setConfig("ai_free_requests_per_day", "2");
+    const under = await guardAs({ cookie }, { profileId: profile.id, message: "hi" });
+    check("AI quota: under the limit the request is allowed and charged to the caller", under.ok && under.usageProfileId === profile.id);
+    await db.insert(schema.aiUsage).values([
+      { profileId: profile.id, taskType: "general", provider: "test", model: "test" },
+      { profileId: profile.id, taskType: "general", provider: "test", model: "test" },
+    ]);
+    const over = await guardAs({ cookie }, { profileId: profile.id, message: "hi" });
+    const overBody = over.ok ? null : await over.response.json();
+    check("AI quota: at the limit → 429 ai_quota_exceeded", !over.ok && over.response.status === 429 && overBody?.code === "ai_quota_exceeded", JSON.stringify(overBody));
+    const noId = await guardAs({ cookie }, { message: "hi" });
+    check("AI quota: dropping profileId does not escape the account quota", !noId.ok && noId.response.status === 429);
+    await setPremium([profile.id], true);
+    const premiumOk = await guardAs({ cookie }, { message: "hi" });
+    check("AI quota: Premium uses the premium allowance", premiumOk.ok);
+    await setPremium([profile.id], false);
+    await setConfig("ai_free_requests_per_day", "5");
+    await db.delete(schema.aiUsage).where(eq(schema.aiUsage.profileId, profile.id));
+  }
 
   // -----------------------------------------------------------------------
   section("9. /api/saved-programs — program shortlist (spec §24)");
@@ -1249,4 +1383,8 @@ main()
     } catch {
       /* already down */
     }
+    // Exit explicitly: embedded-postgres registers async-exit-hook, whose
+    // `beforeExit` handler calls process.exit(0) and would silently turn a
+    // failed run (process.exitCode = 1) into a green one in CI.
+    process.exit(process.exitCode ?? 0);
   });

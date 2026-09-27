@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { essayVersions, savedScholarships, scholarships, studentProfiles } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import {
   adaptationPlan,
   scoreEssayFit,
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
     const profileId = access.targetId!;
     let body: Record<string, any>;
     try {

@@ -7,7 +7,7 @@ import { localeToLanguageName } from "@/i18n/config";
 export async function POST(req: Request) {
   try {
     // Size cap + rate limit (see lib/ai/guard).
-    const guarded = await guardAiRequest(req, { bodyLimit: 256 * 1024 });
+    const guarded = await guardAiRequest(req, { bodyLimit: 256 * 1024, feature: "ai_essay" });
     if (!guarded.ok) return guarded.response;
 
     const { sopText, targetUniversity, targetMajor, language } = safePromptFields(guarded.body);
@@ -44,7 +44,7 @@ FORMAT RULES (follow exactly):
 - Plain markdown only: short headings + short bullet points; bold for key terms.
 - NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences, at most 1-2 emojis in the whole reply.`;
 
-    let reviewResult = await callAI(prompt, "You are an elite admissions essay reviewer.", { taskType: "essay" });
+    let reviewResult = await callAI(prompt, "You are an elite admissions essay reviewer.", { taskType: "essay", profileId: guarded.usageProfileId });
 
     if (!reviewResult) {
       const wordCount = sopText.trim().split(/\s+/).length;

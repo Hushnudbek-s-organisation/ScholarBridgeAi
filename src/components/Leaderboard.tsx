@@ -9,7 +9,6 @@ export interface LeaderboardEntry {
   profileId: number;
   totalPoints: number;
   name: string;
-  email: string;
   targetMajor: string;
   levelName: string | null;
   levelIcon: string | null;

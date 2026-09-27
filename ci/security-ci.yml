@@ -52,6 +52,9 @@ jobs:
       - name: Telegram integration tests (embedded Postgres)
         run: npm run test:telegram-integration
 
+      - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
+        run: npm run test:integration
+
       - name: i18n message parity
         run: npm run check:i18n
 

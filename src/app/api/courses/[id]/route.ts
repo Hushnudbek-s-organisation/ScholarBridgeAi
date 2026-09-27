@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { optionalProfileAccess } from "@/lib/auth";
+import { requireProfileAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { db } from "@/db";
 import {
   courses,
@@ -20,13 +21,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;
-    const access = await optionalProfileAccess(req, profileId);
+    // Lessons (video URLs, content) and quizzes are the Premium course
+    // material — an account with the `courses` feature is required.
+    const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
       return NextResponse.json(
         { error: access.error, code: access.code },
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "courses");
+    if (locked) return locked;
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     if (!course) {
@@ -87,11 +92,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             id: quiz.id,
             title: quiz.title,
             passThreshold: quiz.passThreshold,
+            // The correct option is never sent before an attempt — it is
+            // graded server-side and revealed in the attempt response.
             questions: questions.map((q) => ({
               id: q.id,
               question: q.question,
               options: safeParse(q.options),
-              correctOptionIndex: q.correctOptionIndex,
             })),
           };
         }
