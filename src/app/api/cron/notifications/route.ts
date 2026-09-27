@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/payments";
-import { recordSweep, runSweepForLinkedUsers } from "@/lib/notificationSweep";
+import { recordSweep, runScheduledTelegramJobs } from "@/lib/notificationSweep";
 
 /**
  * Scheduled reminders — runs the notification sweep for every account that
@@ -22,7 +22,7 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const summary = await runSweepForLinkedUsers();
+    const summary = await runScheduledTelegramJobs();
     await recordSweep(summary, "cron");
     return NextResponse.json({ ok: true, ...summary });
   } catch (error) {

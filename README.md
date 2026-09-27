@@ -13,37 +13,68 @@ Put `DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge` and a
 `SESSION_SECRET` in `.env.local` (see `.env.example`). No Docker needed —
 the database comes from the `embedded-postgres` dev dependency.
 
-## Telegram bot (sign-in codes + notifications)
+## Telegram bot + Mini App
 
-Students can sign in with a one-time code sent by the ScholarBridge Telegram
-bot, and in-app notifications (deadlines, scholarships, forum replies, sign-in
-alerts) are mirrored to their Telegram chat.
+The ScholarBridge Telegram bot is a second front door to the **same** account,
+data and rules as the website — it calls the website's own API routes, so
+search, saved lists, applications, next actions, the AI advisor (same quotas)
+and Premium checks behave identically. The Mini App (`/tg`) is a compact
+version of the site inside Telegram.
 
-**Setup (admin, 2 minutes):**
+**Setup (admin):**
 
 1. In Telegram open **@BotFather** → `/newbot` → copy the token.
 2. Admin panel → *System* → **Telegram bot** → paste the token → *Check & save*
    (or set `TELEGRAM_BOT_TOKEN` on the server).
-3. Enter the public https site address → **Connect webhook**. Done — the
-   *Telegram* tab appears in the sign-in window.
+3. Enter the public **https** site address → **Connect webhook**. This also
+   registers the command menu and the *ScholarBridge* menu button that opens
+   the Mini App (`<site>/tg`, or `TELEGRAM_MINI_APP_URL`).
+4. Optional: point an external scheduler at `GET /api/cron/notifications`
+   with `Authorization: Bearer $CRON_SECRET` (the app also sweeps by itself
+   every `NOTIFICATION_SWEEP_HOURS`).
 
-Everything else (who may sign in, auto-signup, admin sign-in, which
-notification types are sent, broadcast, linked users, delivery log) is in the
-same admin section. Students manage their link and mute types under
-**Telegram & alerts**; the bot also understands `/status`, `/stop`, `/on`,
-`/unlink`.
+**Connecting an account** (students, under **Telegram & alerts**): press
+*Connect Telegram* → Telegram opens with a one-time link → the bot asks
+"Connect to *Name* (a•••@mail.com)?" → press **✅ Connect**. The link token is
+128-bit, single-use, valid 10 minutes and stored only as a SHA-256 hash; the
+bot never creates accounts (new users sign up on the website first). One
+Telegram per account and one account per Telegram, enforced by UNIQUE
+constraints; conflicting or concurrent attempts are refused, not merged.
+Disconnect from the website, the Mini App, the bot (`/unlink`) or the admin
+panel — every link/unlink is audited.
 
-**How the code flow stays safe:** the browser keeps a secret nonce, Telegram
-only sees a public start token; the 6-digit code is valid only with that nonce,
-expires after 5 minutes, allows 5 attempts, and only its HMAC is stored. The
-webhook checks Telegram's secret header, codes are never written to the log,
-and the placeholder e-mail domain of Telegram-only accounts is reserved.
+**Bot commands:** `/start` `/help` `/account` `/profile` `/universities [q]`
+`/scholarships [q]` `/saved` `/applications` `/deadlines` (Premium) `/next`
+`/advisor <question>` `/settings` `/website` `/unlink`. In groups the bot only
+answers "private chat only" — account data is never shown where others read.
+
+**Sign-in with a code:** accounts that connected Telegram can sign in with a
+6-digit code from the bot (bound to the browser's secret nonce, 5 minutes,
+5 attempts, stored as an HMAC, never logged).
+
+**Mini App security:** the page sends Telegram's signed `initData` to
+`POST /api/telegram/miniapp/auth`; the server verifies the HMAC with the bot
+token and `auth_date` freshness, then issues a 1-hour bearer session kept in
+page memory only. It cannot reach admin routes and dies when Telegram is
+disconnected. `/tg` may be framed by `https://web.telegram.org` only.
+
+**Reminders:** per-account offsets (default 30/14/7/3/1/0 days before a saved
+scholarship deadline or task due date, in `REMINDER_TIMEZONE`), one message
+per deadline+offset, nothing for unsaved scholarships, completed tasks or
+passed dates; failed deliveries are retried up to 3 times within 24 h, and
+stop when the user blocks the bot. Sweeps are serialised with Postgres
+advisory locks, so overlapping instances never double-send.
+
+**Webhook:** Telegram's secret header is checked (constant time) before the
+body is read; every `update_id` is claimed once in `telegram_updates`, so
+re-deliveries are ignored.
 
 **Local testing without Telegram:** `node scripts/telegram-mock.mjs` starts a
 fake Bot API on :8099 (set `TELEGRAM_API_BASE=http://127.0.0.1:8099`, and
 `TG_MOCK_FORWARD_TO=http://127.0.0.1:3000` so it delivers updates to the local
 webhook). Helpers: `GET /_messages`, `POST /_press {text,userId}`,
-`POST /_block`, `POST /_reset`. Tests: `npm run test:telegram`.
+`POST /_block`, `POST /_reset`. Tests: `npm run test:telegram` (static/unit)
+and `npm run test:telegram-integration` (real Postgres, stubbed Bot API).
 
 Tables are created automatically on first use; `supabase/add_telegram.sql`
 holds the same DDL for manual runs.

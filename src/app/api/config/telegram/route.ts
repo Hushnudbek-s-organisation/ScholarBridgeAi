@@ -15,7 +15,6 @@ export async function GET() {
       configured,
       botUsername: configured ? settings.botUsername : null,
       loginEnabled: configured && settings.loginEnabled,
-      signupEnabled: configured && settings.signupEnabled,
       notificationsEnabled: configured && settings.notificationsEnabled,
     },
     { headers: { "Cache-Control": "no-store" } }

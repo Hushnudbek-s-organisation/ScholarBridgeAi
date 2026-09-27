@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
@@ -1198,6 +1198,11 @@ export const telegramLinks = pgTable("telegram_links", {
   linkedAt: timestamp("linked_at").defaultNow().notNull(),
   lastLoginAt: timestamp("last_login_at"),
   lastMessageAt: timestamp("last_message_at"),
+  // Bot paging: the last search the user ran ({ kind, q, page }) so compact
+  // callback buttons (`pg:u:2`) never have to carry the query text.
+  lastQuery: text("last_query"),
+  // JSON array of reminder offsets in days (null → DEFAULT_REMINDER_DAYS).
+  reminderDays: text("reminder_days"),
 });
 
 /**
@@ -1241,7 +1246,25 @@ export const telegramMessages = pgTable(
     preview: text("preview"),
     status: text("status").notNull(), // sent | failed
     error: text("error"),
+    // Failed notification deliveries keep what is needed to retry them.
+    retryPayload: text("retry_payload"),
+    attempts: integer("attempts").notNull().default(1),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("idx_telegram_messages_created").on(table.createdAt)]
+);
+
+/**
+ * Processed webhook update ids — Telegram re-delivers an update when a
+ * response is slow, so the id is claimed with INSERT … ON CONFLICT before any
+ * work happens (works across server instances and restarts). Pruned by the
+ * reminder sweep after 7 days.
+ */
+export const telegramUpdates = pgTable(
+  "telegram_updates",
+  {
+    updateId: bigint("update_id", { mode: "number" }).primaryKey(),
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_telegram_updates_received").on(table.receivedAt)]
 );

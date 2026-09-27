@@ -18,9 +18,18 @@ interface MeResponse {
     mutedTypes: string[];
     blocked: boolean;
     linkedAt: string;
+    reminderDays: number[];
   } | null;
   types: string[];
+  defaultReminderDays: number[];
 }
+
+/** Same presets as the bot's /settings (validated again on the server). */
+const REMINDER_PRESETS = [
+  { id: "standard", days: [30, 14, 7, 3, 1, 0] },
+  { id: "short", days: [7, 3, 1, 0] },
+  { id: "off", days: [] as number[] },
+] as const;
 
 /** Types only admins ever receive. */
 const ADMIN_ONLY = new Set(["forum_report", "forum_thread"]);
@@ -55,7 +64,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
     return () => window.clearTimeout(id);
   }, [load, activeProfile?.id]);
 
-  const save = async (patch: { notifyEnabled?: boolean; mutedTypes?: string[] }) => {
+  const save = async (patch: { notifyEnabled?: boolean; mutedTypes?: string[]; reminderDays?: number[] }) => {
     if (!data?.link) return;
     const prev = data;
     setData({ ...data, link: { ...data.link, ...patch } });
@@ -264,6 +273,33 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
               onChange={(v) => save({ notifyEnabled: v })}
               label={t("notifyToggle")}
             />
+          </div>
+
+          <p className="mb-1 mt-5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("remindersTitle")}</p>
+          <p className="mb-2 text-[11px] text-slate-500">{t("remindersHint")}</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("remindersTitle")}>
+            {REMINDER_PRESETS.map((preset) => {
+              const current = (link?.reminderDays ?? data.defaultReminderDays).join(",");
+              const active = current === preset.days.join(",");
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={!link || !link.notifyEnabled || !data.bot.notificationsEnabled}
+                  onClick={() => !active && void save({ reminderDays: [...preset.days] })}
+                  className={`rounded-xl border px-3 py-2 text-left text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    active ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {t(`preset.${preset.id}`)}
+                  <span className={`block text-[10px] font-normal ${active ? "text-sky-50" : "text-slate-400"}`}>
+                    {preset.days.length ? t("presetDays", { days: preset.days.join(" · ") }) : t("presetNone")}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <p className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("typesTitle")}</p>

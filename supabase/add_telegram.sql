@@ -52,3 +52,15 @@ CREATE TABLE IF NOT EXISTS telegram_messages (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_telegram_messages_created ON telegram_messages(created_at);
+
+-- v2 (bot commands, Mini App, reminders): additive only.
+ALTER TABLE telegram_links ADD COLUMN IF NOT EXISTS last_query TEXT;
+ALTER TABLE telegram_links ADD COLUMN IF NOT EXISTS reminder_days TEXT;
+ALTER TABLE telegram_messages ADD COLUMN IF NOT EXISTS retry_payload TEXT;
+ALTER TABLE telegram_messages ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1;
+
+CREATE TABLE IF NOT EXISTS telegram_updates (
+  update_id BIGINT PRIMARY KEY,
+  received_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_updates_received ON telegram_updates(received_at);

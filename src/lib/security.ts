@@ -42,6 +42,23 @@ export function frameAncestors(env: Record<string, string | undefined> = process
 }
 
 /**
+ * Telegram Web (web.telegram.org/k, /a) shows Mini Apps in an iframe; the
+ * mobile and desktop clients use a webview (no framing). Only the Mini App
+ * page (/tg) may be framed, and only by Telegram.
+ */
+export const TELEGRAM_FRAME_ANCESTORS = ["https://web.telegram.org"];
+
+/** True for the Mini App page (also behind a locale prefix: /uz/tg). */
+export function isMiniAppPath(pathname: string): boolean {
+  return /^\/(?:(?:uz|ru|en)\/)?tg(?:\/|$)/.test(pathname);
+}
+
+/** frame-ancestors for the Mini App page. */
+export function miniAppFrameAncestors(env: Record<string, string | undefined> = process.env): string[] {
+  return isDevelopment(env) ? [...DEV_FRAME_ANCESTORS, ...TELEGRAM_FRAME_ANCESTORS] : [...TELEGRAM_FRAME_ANCESTORS];
+}
+
+/**
  * `X-Frame-Options` is the legacy, less flexible cousin of `frame-ancestors`.
  * It cannot express "allow these hosts", so in development we drop it
  * entirely and let the CSP do the job; browsers honour `frame-ancestors` and

@@ -81,10 +81,14 @@ export async function saveBotToken(token: string | null) {
 
 /**
  * Secret Telegram echoes in `X-Telegram-Bot-Api-Secret-Token` on every
- * webhook call. Derived from the session secret + bot id, so nothing extra
- * has to be configured and a new bot automatically gets a new secret.
+ * webhook call. TELEGRAM_WEBHOOK_SECRET when set (≥ 16 chars); otherwise
+ * derived from the session secret + bot id, so nothing extra has to be
+ * configured and a new bot automatically gets a new secret.
  */
 export function webhookSecret(token: string): string {
+  // Optional explicit value (Telegram allows 1–256 chars of A-Z a-z 0-9 _ -).
+  const explicit = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (explicit && /^[A-Za-z0-9_-]{16,256}$/.test(explicit)) return explicit;
   const botId = token.split(":")[0];
   return createHmac("sha256", sessionSecret()).update(`telegram-webhook:${botId}`).digest("base64url").slice(0, 48);
 }

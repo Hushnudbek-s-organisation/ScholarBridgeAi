@@ -1195,7 +1195,6 @@
     "signedIn": "Kirdingiz!",
     "linked": "Telegram ulandi!",
     "popupBlocked": "Brauzer yangi oyna ochmadi — quyidagi tugmani bosing.",
-    "newAccountNote": "Akkauntingiz yo'qmi? U avtomatik ochiladi. Email bilan akkauntingiz bormi? Avval email bilan kiring, keyin «Telegram va xabarlar» bo'limida Telegramni ulang — aks holda ikkinchi akkaunt ochilib qoladi.",
     "errors": {
       "wrong_code": "Kod noto'g'ri. Yana {left} ta urinish qoldi.",
       "locked": "Juda ko'p noto'g'ri kod. Qaytadan boshlang.",
@@ -1211,7 +1210,13 @@
       "bad_code_format": "Botdan kelgan 6 ta raqamni kiriting.",
       "forbidden": "Avval ulamoqchi bo'lgan akkauntingizga kiring.",
       "network": "Aloqa yo'q. Internetni tekshirib, qayta urinib ko'ring.",
-      "generic": "Nimadir xato ketdi. Qayta urinib ko'ring."
+      "generic": "Nimadir xato ketdi. Qayta urinib ko'ring.",
+      "already_linked": "Bu Telegram allaqachon akkauntingizga ulangan.",
+      "account_has_other": "Akkauntingiz boshqa Telegramga ulangan. Avval uni uzing.",
+      "cancelled": "Ulash Telegramda bekor qilindi.",
+      "conflict": "Xuddi shu paytda boshqa ulanish bo’ldi. Qaytadan boshlang.",
+      "invalid": "Bu havola endi yaroqsiz. Qaytadan boshlang.",
+      "unlinked": "Telegram uzildi."
     },
     "pageTitle": "Telegram va xabarlar",
     "pageSubtitle": "Kod bilan kiring va muhim xabarlarni telefoningizda oling.",
@@ -1280,7 +1285,21 @@
       "login_alert": "Kimdir parolingiz bilan kirdi"
     },
     "activeTitle": "Akkauntingizda faol",
-    "loginTip": "Keyingi safar: «Kirish» → Telegram yorlig'i — bot sizga kod yuboradi, parol shart emas."
+    "loginTip": "Keyingi safar: «Kirish» → Telegram yorlig'i — bot sizga kod yuboradi, parol shart emas.",
+    "linkHowStep2": "Bot qaysi ScholarBridge akkaunti ulanishini ko’rsatadi.",
+    "linkHowStep3": "Telegramda «✅ Ulash» tugmasini bosing — bu sahifa o’zi yangilanadi.",
+    "linkConfirmInBot": "{name} botni ochdi — tugatish uchun Telegramda «✅ Ulash» tugmasini bosing.",
+    "linkedAs": "{name} ulandi",
+    "loginLinkedOnly": "Telegram orqali kirish «Telegram va xabarlar» bo’limida Telegramni ulagan akkauntlar uchun ishlaydi. Yangimisiz? Avval email bilan akkaunt yarating.",
+    "remindersTitle": "Muddat eslatmalari",
+    "remindersHint": "Saqlangan muddatdan necha kun oldin bot eslatadi.",
+    "preset": {
+      "standard": "Standart",
+      "short": "Qisqa",
+      "off": "O’chiq"
+    },
+    "presetDays": "{days} kun oldin",
+    "presetNone": "Muddat eslatmalarisiz"
   },
   "adminTelegram": {
     "loading": "Yuklanmoqda…",
@@ -1326,8 +1345,6 @@
     "settingsTitle": "Bot nimalar qila oladi",
     "optLogin": "Telegram orqali kirish",
     "optLoginHint": "Kirish oynasida Telegram yorlig'ini ko'rsatadi.",
-    "optSignup": "Telegram orqali yangi akkaunt",
-    "optSignupHint": "Noma'lum Telegram foydalanuvchisiga avtomatik akkaunt ochiladi.",
     "optAdminLogin": "Adminlar Telegram orqali kira oladi",
     "optAdminLoginHint": "O'chirsangiz, admin akkauntlari faqat email va parol bilan kiradi.",
     "optNotify": "Bildirishnomalar yuborish",
@@ -1363,6 +1380,16 @@
       "test": "test",
       "login_alert": "xavfsizlik",
       "reply": "bot javobi"
-    }
+    },
+    "sweepTitle": "Muddat eslatmalari",
+    "sweepIntro": "Ulangan har bir akkaunt uchun saqlangan muddatlardan tanlangan kunlar oldin eslatmalar yaratiladi va yetkazilmagan xabarlar qayta yuboriladi. Har bir necha soatda o’zi va cron orqali ishlaydi.",
+    "sweepLast": "Oxirgi ishga tushish: {when} ({source}) — {profiles} akkaunt, {created} eslatma, {errors} xato.",
+    "sweepNever": "Hali ishga tushmagan.",
+    "cronReady": "Cron: {path} CRON_SECRET bilan himoyalangan.",
+    "cronMissing": "Cron: tashqi rejalashtiruvchi {path} ni chaqirishi uchun CRON_SECRET o’rnating.",
+    "miniAppReady": "Mini App: {url} (webhook ulanganda bot menyu tugmasiga qo’yiladi).",
+    "miniAppNeedsHttps": "Mini App uchun ochiq https sayt manzili kerak.",
+    "sweepRun": "Hozir ishga tushirish",
+    "sweepDone": "Tayyor: {profiles} akkaunt, {created} eslatma, {retried} ta qayta yuborildi."
   }
 }

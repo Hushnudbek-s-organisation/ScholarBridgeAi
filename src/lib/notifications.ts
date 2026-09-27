@@ -34,22 +34,24 @@ export async function createNotification(input: {
       }
     }
 
+    // Record first, deliver second: the in-app row (the sweep's de-dup key)
+    // exists before anything leaves the server.
+    const [row] = enabled
+      ? await db
+          .insert(notifications)
+          .values({
+            profileId: input.profileId,
+            type: input.type,
+            title: input.title,
+            body: input.body,
+            link: input.link ?? null,
+          })
+          .returning()
+      : [null];
+
     // Telegram is its own channel with its own switches (see telegram/core
     // `shouldDeliver`); a failure there never blocks the in-app notification.
     await deliverTelegramNotification(input);
-
-    if (!enabled) return null;
-
-    const [row] = await db
-      .insert(notifications)
-      .values({
-        profileId: input.profileId,
-        type: input.type,
-        title: input.title,
-        body: input.body,
-        link: input.link ?? null,
-      })
-      .returning();
     return row;
   } catch (err) {
     console.error("Failed to create notification:", err);

@@ -11,6 +11,7 @@ import { authenticate, sessionCookieHeader } from "@/lib/auth";
 import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { clampString, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 /** Detect a schema-mismatch error (new columns missing in the database). */
 function isMissingColumnsError(err: unknown): boolean {
@@ -214,7 +215,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("POST /api/profiles error:", error);
     // Unique-violation on email (race, or the legacy default email reused).
-    if ((error as { code?: string })?.code === "23505") {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         {
           error:

@@ -28,6 +28,7 @@ import {
 import { calculateScholarshipMatch } from "@/lib/matching";
 import { createNotification, profileLang } from "@/lib/notifications";
 import { NOTIFY_TEXTS, type NotifyLang } from "@/lib/notificationTexts";
+import { calendarDaysUntil, parseReminderDays, reminderBucket, reminderTimezone } from "@/lib/telegram/reminders";
 
 async function exists(profileId: number, type: string, link: string): Promise<boolean> {
   const [row] = await db
@@ -63,36 +64,84 @@ async function notifyOnce(profileId: number, type: string, link: string, title: 
   return true;
 }
 
-export async function runNotificationSweep(profileId: number, windowDays = 14): Promise<number> {
-  const now = new Date();
-  const horizon = new Date(now.getTime() + Math.min(Math.max(windowDays, 1), 90) * 86400000);
+/** The profile's reminder offsets (Telegram settings) — defaults when not connected. */
+async function reminderDaysFor(profileId: number): Promise<number[]> {
+  try {
+    const res = await db.execute(sql`SELECT reminder_days FROM telegram_links WHERE profile_id = ${profileId} LIMIT 1`);
+    const row = ((res as unknown as { rows?: { reminder_days: string | null }[] }).rows ?? [])[0];
+    return parseReminderDays(row?.reminder_days ?? null);
+  } catch {
+    return parseReminderDays(null); // telegram tables not created yet
+  }
+}
+
+/** Advisory-lock namespace for reminder sweeps (any constant int4). */
+const SWEEP_LOCK_NS = 740_221;
+
+/**
+ * Run `fn` only if no other instance/request is sweeping the same key right
+ * now. The lock is transaction-scoped on one pooled connection, so it is
+ * released automatically — even if the process dies mid-sweep. `null` means
+ * someone else holds it (skip; their run covers it).
+ */
+async function withSweepLock<T>(key: number, fn: () => Promise<T>): Promise<T | null> {
+  return db.transaction(async (tx) => {
+    const res = await tx.execute(sql`SELECT pg_try_advisory_xact_lock(${SWEEP_LOCK_NS}, ${key}) AS ok`);
+    const ok = ((res as unknown as { rows?: { ok: boolean }[] }).rows ?? [])[0]?.ok === true;
+    if (!ok) return null;
+    return fn();
+  });
+}
+
+/**
+ * Create the due reminders for one profile. Serialised per profile (the
+ * scheduler, the cron endpoint and the website's on-open sweep may overlap),
+ * so the "already sent?" check and the insert cannot interleave.
+ */
+export async function runNotificationSweep(profileId: number, windowDays = 14, now: Date = new Date()): Promise<number> {
+  const out = await withSweepLock(profileId, () => sweepProfile(profileId, windowDays, now));
+  return out ?? 0;
+}
+
+async function sweepProfile(profileId: number, _windowDays: number, now: Date): Promise<number> {
+  const tz = reminderTimezone();
+  const offsets = await reminderDaysFor(profileId);
   const lang: NotifyLang = await profileLang(profileId);
   let created = 0;
 
   // ---------- 1) Saved scholarships with upcoming deadlines ----------
+  // One reminder per (scholarship, due date, offset bucket): see
+  // telegram/reminders. Unsaved scholarships are simply not in this list, and
+  // a moved deadline produces fresh keys — stale dates are never re-sent.
   const saved = await db.select().from(savedScholarships).where(eq(savedScholarships.profileId, profileId));
   const savedIds = saved.map((s) => s.scholarshipId);
   const savedRows = savedIds.length ? await db.select().from(scholarships).where(inArray(scholarships.id, savedIds)) : [];
   for (const sch of savedRows) {
-    const deadline = sch.deadlineDate ? new Date(sch.deadlineDate) : null;
-    if (!deadline || deadline < now || deadline > horizon) continue;
-    const daysLeft = Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / 86400000));
-    const t = NOTIFY_TEXTS.deadlineApproaching(lang, { title: sch.title, daysLeft, date: deadline });
-    if (await notifyOnce(profileId, "deadline_approaching", `/scholarships?id=${sch.id}`, t.title, t.body)) created++;
+    if (!sch.deadlineDate) continue;
+    const due = String(sch.deadlineDate).slice(0, 10);
+    const daysLeft = calendarDaysUntil(due, now, tz);
+    if (daysLeft === null) continue;
+    const bucket = reminderBucket(daysLeft, offsets);
+    if (bucket === null) continue;
+    const t = NOTIFY_TEXTS.deadlineApproaching(lang, { title: sch.title, daysLeft, date: due });
+    if (await notifyOnce(profileId, "deadline_approaching", `/scholarships?id=${sch.id}&due=${due}&r=${bucket}`, t.title, t.body)) created++;
   }
 
   // ---------- 2) User milestones due soon ----------
+  // Completed tasks are filtered out, so ticking a task stops its reminders.
   const tasks = await db
     .select()
     .from(applicationTasks)
     .where(and(eq(applicationTasks.profileId, profileId), eq(applicationTasks.isCompleted, false)));
   for (const task of tasks) {
-    const due = task.dueDate ? new Date(task.dueDate) : null;
-    if (!due || due < now || due > horizon) continue;
-    const daysLeft = Math.max(1, Math.ceil((due.getTime() - now.getTime()) / 86400000));
+    if (!task.dueDate) continue;
+    const due = String(task.dueDate).slice(0, 10);
+    const daysLeft = calendarDaysUntil(due, now, tz);
+    if (daysLeft === null) continue;
+    const bucket = reminderBucket(daysLeft, offsets);
+    if (bucket === null) continue;
     const t = NOTIFY_TEXTS.milestoneDue(lang, { title: task.title, daysLeft, date: due });
-    // One reminder per task (the link carries the task id).
-    if (await notifyOnce(profileId, "milestone_due", `/tasks?task=${task.id}`, t.title, t.body)) created++;
+    if (await notifyOnce(profileId, "milestone_due", `/tasks?task=${task.id}&due=${due}&r=${bucket}`, t.title, t.body)) created++;
   }
 
   // ---------- 3) Matching scholarships + requirement gaps ----------
@@ -187,6 +236,31 @@ export async function runSweepForLinkedUsers(opts: { limit?: number } = {}): Pro
     }
   }
   return { profiles: ids.length, created, errors, startedAt, finishedAt: new Date().toISOString() };
+}
+
+/**
+ * Everything the scheduler / cron / admin "Run now" does in one go:
+ * reminders for every linked account, bounded retries of failed Telegram
+ * deliveries, and pruning of the webhook de-duplication table.
+ */
+export async function runScheduledTelegramJobs(): Promise<SweepSummary & { retried: number; retrySent: number; retryDropped: number; skipped?: boolean }> {
+  const startedAt = new Date().toISOString();
+  // One run at a time across all instances (key 0 is never a profile id).
+  const result = await withSweepLock(0, () => scheduledJobs());
+  return result ?? { profiles: 0, created: 0, errors: 0, startedAt, finishedAt: new Date().toISOString(), retried: 0, retrySent: 0, retryDropped: 0, skipped: true };
+}
+
+async function scheduledJobs() {
+  const summary = await runSweepForLinkedUsers();
+  let retry = { retried: 0, sent: 0, dropped: 0 };
+  try {
+    const { retryFailedDeliveries, pruneTelegramUpdates } = await import("@/lib/telegram/service");
+    retry = await retryFailedDeliveries();
+    await pruneTelegramUpdates();
+  } catch (err) {
+    console.warn("[sweep] telegram maintenance failed:", err instanceof Error ? err.message : err);
+  }
+  return { ...summary, retried: retry.retried, retrySent: retry.sent, retryDropped: retry.dropped, finishedAt: new Date().toISOString() };
 }
 
 async function saversOf(scholarshipId: number): Promise<number[]> {

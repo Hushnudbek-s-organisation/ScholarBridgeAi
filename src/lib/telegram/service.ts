@@ -1,393 +1,223 @@
 /**
- * Telegram bot — server logic: sign-in / connect attempts, webhook updates,
- * notification delivery, broadcasts and the delivery log.
+ * Telegram bot — server logic: webhook dispatch, code sign-in for LINKED
+ * accounts, notification delivery (+ retries), broadcasts and the log.
  *
- * SIGN-IN FLOW (nothing secret ever travels through the t.me link):
+ * Related modules:
+ *   linking.ts    connect / disconnect an account (confirmation button, cases A–G)
+ *   bot.ts        commands + inline buttons (adapter over the existing API routes)
+ *   messaging.ts  sending, delivery log, lookups
+ *
+ * SIGN-IN WITH A CODE (only for accounts that already connected Telegram —
+ * Telegram never creates accounts; new users sign up on the website):
  *  1. Browser → POST /api/auth/telegram/start → { id, nonce, deepLink }.
- *     The nonce stays in the browser; only its HMAC is stored.
- *  2. User opens t.me/<bot>?start=login_<startToken> and presses Start.
- *  3. Webhook receives `/start login_<token>` → the bot sends a 6-digit code
- *     to THAT chat and remembers which Telegram user claimed the attempt.
+ *     The nonce stays in the browser; only its HMAC is stored, and only the
+ *     SHA-256 of the deep-link token is stored.
+ *  2. User opens t.me/<bot>?start=login_<token> and presses Start.
+ *  3. Webhook receives `/start login_<token>` → if this Telegram is linked, the
+ *     bot sends a 6-digit code to THAT chat.
  *  4. Browser → POST /api/auth/telegram/verify { id, nonce, code } → session.
  *  A code is only valid together with the browser's nonce, expires after 5
  *  minutes, allows 5 wrong tries and can be used once.
  */
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles, telegramLinks, telegramLoginRequests, telegramMessages } from "@/db/schema";
+import { applicationTasks, savedScholarships, studentProfiles, telegramLinks, telegramLoginRequests, telegramMessages, telegramUpdates } from "@/db/schema";
 import { sessionSecret } from "@/lib/auth";
-import { tgSendMessage, type InlineButton } from "./api";
+import { tgAnswerCallback, tgSendMessage, type InlineButton } from "./api";
 import {
-  appLink,
   BOT_TEXTS,
   CODE_TTL_MS,
   escapeHtml,
   formatNotification,
+  hashStartToken,
   hmacHex,
-  isButtonUrl,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_REQUEST,
   newCode,
-  newNonce,
-  newStartToken,
   parseCommand,
   parseStartPayload,
   pickLang,
-  REQUEST_TTL_MS,
   safeEqualHex,
   shouldDeliver,
-  telegramDisplayName,
-  telegramPlaceholderEmail,
   type BotLang,
 } from "./core";
+import { CMD_TEXTS } from "./botTexts";
+import { runCallback, runCommand, type BotCtx } from "./bot";
+import { handleLinkStart, loadOwnedRequest, type TgUser } from "./linking";
+import {
+  getLinkByProfile,
+  getLinkByTelegramUser,
+  getProfileRow,
+  langOf,
+  logMessage,
+  markChatReachable,
+  publicSiteUrl,
+  sendToChat,
+  siteButton,
+  type LinkRow,
+  type ProfileRow,
+  type RetryPayload,
+} from "./messaging";
 import { ensureTelegramTables } from "./db";
 import { getBotToken, getTelegramSettings } from "./settings";
+import { calendarDaysUntil, reminderTimezone } from "./reminders";
 
-type LinkRow = typeof telegramLinks.$inferSelect;
-type RequestRow = typeof telegramLoginRequests.$inferSelect;
-type ProfileRow = typeof studentProfiles.$inferSelect;
-
-// ---------------------------------------------------------------------------
-// Delivery log + sending
-// ---------------------------------------------------------------------------
-
-export async function logMessage(entry: {
-  profileId?: number | null;
-  chatId?: string | null;
-  kind: string;
-  type?: string | null;
-  preview?: string | null;
-  ok: boolean;
-  error?: string | null;
-}) {
-  try {
-    await db.insert(telegramMessages).values({
-      profileId: entry.profileId ?? null,
-      chatId: entry.chatId ?? null,
-      kind: entry.kind,
-      type: entry.type ?? null,
-      preview: entry.preview ? entry.preview.slice(0, 160) : null,
-      status: entry.ok ? "sent" : "failed",
-      error: entry.error ? entry.error.slice(0, 300) : null,
-    });
-    // Keep the log small: prune rows older than 90 days now and then.
-    if (Math.random() < 0.02) {
-      await db.delete(telegramMessages).where(lt(telegramMessages.createdAt, new Date(Date.now() - 90 * 86_400_000)));
-    }
-  } catch (err) {
-    console.warn("[telegram] log write failed:", err instanceof Error ? err.message : err);
-  }
-}
-
-/** Send + log; marks the chat as blocked when Telegram answers 403. */
-export async function sendToChat(
-  token: string,
-  chatId: string,
-  html: string,
-  meta: { profileId?: number | null; kind: string; type?: string | null; preview?: string | null },
-  buttons: InlineButton[] = []
-): Promise<{ ok: boolean; error?: string }> {
-  const res = await tgSendMessage(token, chatId, html, buttons);
-  // Codes are never written to the log — only the fact that one was sent.
-  await logMessage({ ...meta, chatId, ok: res.ok, error: res.ok ? null : res.description });
-  if (!res.ok && res.error_code === 403) {
-    await db.update(telegramLinks).set({ blocked: true }).where(eq(telegramLinks.chatId, chatId)).catch(() => undefined);
-  }
-  if (res.ok) {
-    await db
-      .update(telegramLinks)
-      .set({ lastMessageAt: new Date(), blocked: false })
-      .where(eq(telegramLinks.chatId, chatId))
-      .catch(() => undefined);
-  }
-  return res.ok ? { ok: true } : { ok: false, error: res.description || "send failed" };
-}
-
-function siteButton(siteUrl: string, lang: BotLang, link?: string | null, label?: string): InlineButton[] {
-  // Fall back to the deployment URL when the admin has not saved one yet.
-  const url = appLink(siteUrl || process.env.NEXT_PUBLIC_APP_URL || "", link ?? null);
-  return isButtonUrl(url) ? [{ text: label ?? BOT_TEXTS[lang].openSite, url }] : [];
-}
+// Existing importers keep working.
+export { getLinkByProfile, logMessage, sendToChat } from "./messaging";
+export { startRequest, requestStatus, unlinkProfile } from "./linking";
 
 // ---------------------------------------------------------------------------
-// Lookups
+// Webhook updates
 // ---------------------------------------------------------------------------
 
-export async function getLinkByProfile(profileId: number): Promise<LinkRow | null> {
-  const [row] = await db.select().from(telegramLinks).where(eq(telegramLinks.profileId, profileId)).limit(1);
-  return row ?? null;
-}
-
-async function getLinkByTelegramUser(telegramUserId: string): Promise<LinkRow | null> {
-  const [row] = await db.select().from(telegramLinks).where(eq(telegramLinks.telegramUserId, telegramUserId)).limit(1);
-  return row ?? null;
-}
-
-async function getProfile(id: number): Promise<ProfileRow | null> {
-  const [row] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, id)).limit(1);
-  return row ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// 1. Start an attempt (browser)
-// ---------------------------------------------------------------------------
-
-export type StartResult =
-  | { ok: true; id: number; nonce: string; deepLink: string; botUsername: string; expiresAt: string }
-  | { ok: false; status: number; code: string; error: string };
-
-export async function startRequest(input: { purpose: "login" | "link"; profileId?: number | null; ip?: string }): Promise<StartResult> {
-  const settings = await getTelegramSettings();
-  const { token } = await getBotToken();
-  if (!token || !settings.botUsername) {
-    return { ok: false, status: 503, code: "not_configured", error: "The Telegram bot is not configured yet." };
-  }
-  if (input.purpose === "login" && !settings.loginEnabled) {
-    return { ok: false, status: 403, code: "login_disabled", error: "Signing in with Telegram is turned off." };
-  }
-
-  // Housekeeping: attempts older than a day are useless.
-  await db
-    .delete(telegramLoginRequests)
-    .where(lt(telegramLoginRequests.expiresAt, new Date(Date.now() - 86_400_000)))
-    .catch(() => undefined);
-
-  const nonce = newNonce();
-  const startToken = newStartToken();
-  const expiresAt = new Date(Date.now() + REQUEST_TTL_MS);
-  const [row] = await db
-    .insert(telegramLoginRequests)
-    .values({
-      startToken,
-      nonceHash: hmacHex(sessionSecret(), "tg-nonce", nonce),
-      purpose: input.purpose,
-      profileId: input.purpose === "link" ? input.profileId ?? null : null,
-      ip: input.ip ?? null,
-      expiresAt,
-    })
-    .returning({ id: telegramLoginRequests.id });
-
-  return {
-    ok: true,
-    id: row.id,
-    nonce,
-    botUsername: settings.botUsername,
-    deepLink: `https://t.me/${settings.botUsername}?start=${input.purpose}_${startToken}`,
-    expiresAt: expiresAt.toISOString(),
-  };
-}
-
-async function loadOwnedRequest(id: unknown, nonce: unknown): Promise<RequestRow | null> {
-  const rid = Number(id);
-  if (!Number.isInteger(rid) || rid <= 0 || typeof nonce !== "string" || nonce.length < 16 || nonce.length > 64) return null;
-  const [row] = await db.select().from(telegramLoginRequests).where(eq(telegramLoginRequests.id, rid)).limit(1);
-  if (!row) return null;
-  return safeEqualHex(row.nonceHash, hmacHex(sessionSecret(), "tg-nonce", nonce)) ? row : null;
-}
-
-/** Status for the browser's polling (never reveals the code). */
-export async function requestStatus(id: unknown, nonce: unknown) {
-  const row = await loadOwnedRequest(id, nonce);
-  if (!row) return null;
-  const expired = row.expiresAt.getTime() < Date.now() && row.status !== "used";
-  return {
-    status: expired ? "expired" : row.status,
-    failReason: row.failReason,
-    telegram: row.telegramUserId
-      ? { username: row.username, name: telegramDisplayName({ firstName: row.firstName, lastName: row.lastName, username: row.username }) }
-      : null,
-    codeExpiresAt: row.codeExpiresAt?.toISOString() ?? null,
-    expiresAt: row.expiresAt.toISOString(),
-    attemptsLeft: Math.max(0, MAX_CODE_ATTEMPTS - row.attempts),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// 2. Webhook updates (Telegram)
-// ---------------------------------------------------------------------------
-
-interface TgUser {
-  id: number;
-  is_bot?: boolean;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}
 interface TgChat {
   id: number;
   type: string;
 }
 export interface TgUpdate {
   update_id?: number;
-  message?: { chat: TgChat; from?: TgUser; text?: string };
+  message?: { message_id?: number; chat: TgChat; from?: TgUser; text?: string };
+  callback_query?: { id: string; from: TgUser; data?: string; message?: { message_id: number; chat: TgChat } };
   my_chat_member?: { chat: TgChat; from: TgUser; new_chat_member?: { status?: string } };
 }
 
-const seenUpdates = new Set<number>();
-function alreadySeen(id: number | undefined): boolean {
-  if (typeof id !== "number") return false;
-  if (seenUpdates.has(id)) return true;
-  seenUpdates.add(id);
-  if (seenUpdates.size > 2000) {
-    const first = seenUpdates.values().next().value;
-    if (first !== undefined) seenUpdates.delete(first);
-  }
-  return false;
+/**
+ * Claim an update id (persistent, works across instances and restarts).
+ * false → already processed (Telegram re-delivered it) or no id at all.
+ */
+export async function claimUpdate(updateId: unknown): Promise<boolean> {
+  if (typeof updateId !== "number" || !Number.isSafeInteger(updateId) || updateId < 0) return false;
+  const rows = await db.insert(telegramUpdates).values({ updateId }).onConflictDoNothing().returning({ id: telegramUpdates.updateId });
+  return rows.length > 0;
 }
 
-async function langFor(user: TgUser, link: LinkRow | null): Promise<BotLang> {
-  if (link) {
-    const p = await getProfile(link.profileId).catch(() => null);
-    if (p?.preferredLocale) return pickLang(p.preferredLocale);
-  }
-  return pickLang(user.language_code);
+export async function pruneTelegramUpdates(days = 7): Promise<void> {
+  await db.delete(telegramUpdates).where(lt(telegramUpdates.receivedAt, new Date(Date.now() - days * 86_400_000))).catch(() => undefined);
+}
+
+function argsOf(text: string | undefined): string {
+  if (!text) return "";
+  return text.trim().replace(/^\/[a-z_]+(?:@\w+)?/i, "").trim();
 }
 
 export async function handleUpdate(update: TgUpdate): Promise<void> {
-  if (alreadySeen(update.update_id)) return;
+  if (!(await claimUpdate(update.update_id))) return;
   const { token } = await getBotToken();
   if (!token) return;
   const settings = await getTelegramSettings();
 
   // The user blocked / unblocked the bot.
-  if (update.my_chat_member && update.my_chat_member.chat.type === "private") {
-    const status = update.my_chat_member.new_chat_member?.status;
-    const blocked = status === "kicked" || status === "left";
-    await db
-      .update(telegramLinks)
-      .set({ blocked })
-      .where(eq(telegramLinks.telegramUserId, String(update.my_chat_member.from.id)));
+  if (update.my_chat_member) {
+    if (update.my_chat_member.chat.type === "private") {
+      const status = update.my_chat_member.new_chat_member?.status;
+      const blocked = status === "kicked" || status === "left";
+      await db.update(telegramLinks).set({ blocked }).where(eq(telegramLinks.telegramUserId, String(update.my_chat_member.from.id)));
+    }
+    return;
+  }
+
+  // ---- inline buttons ----
+  const cq = update.callback_query;
+  if (cq) {
+    let toast = "";
+    try {
+      const chat = cq.message?.chat;
+      if (!chat || chat.type !== "private" || cq.from?.is_bot) {
+        toast = CMD_TEXTS[pickLang(cq.from?.language_code)].privateOnly;
+      } else {
+        const ctx = await buildCtx(token, String(chat.id), cq.from, settings);
+        toast = await runCallback(ctx, String(cq.data ?? ""), cq.message?.message_id ?? null);
+      }
+    } catch (err) {
+      console.error("[telegram] callback failed:", err instanceof Error ? err.message : err);
+      toast = CMD_TEXTS[pickLang(cq.from?.language_code)].error;
+    } finally {
+      // Always answer, or the button spins forever on the user's screen.
+      await tgAnswerCallback(token, cq.id, toast || undefined).catch(() => undefined);
+    }
     return;
   }
 
   const msg = update.message;
-  if (!msg || !msg.from || msg.from.is_bot || msg.chat.type !== "private") return;
-  const from = msg.from;
-  const chatId = String(msg.chat.id);
-  const tgUserId = String(from.id);
-  const link = await getLinkByTelegramUser(tgUserId);
+  if (!msg || !msg.from || msg.from.is_bot) return;
 
-  // Keep chat details fresh for linked users.
-  if (link && (link.chatId !== chatId || link.username !== (from.username ?? null) || link.blocked)) {
-    await db
-      .update(telegramLinks)
-      .set({ chatId, username: from.username ?? null, firstName: from.first_name ?? null, blocked: false })
-      .where(eq(telegramLinks.id, link.id));
-  }
-
-  const lang = await langFor(from, link);
-  const T = BOT_TEXTS[lang];
-  const reply = (html: string, kind = "reply", buttons: InlineButton[] = []) =>
-    sendToChat(token, chatId, html, { profileId: link?.profileId ?? null, kind, preview: kind === "code" ? null : html.replace(/<[^>]+>/g, "") }, buttons);
-
-  const payload = parseStartPayload(msg.text);
-  if (payload) {
-    await handleStart(payload, from, chatId, link, lang, token, settings.loginEnabled, settings.signupEnabled, settings.adminLoginEnabled);
+  // Groups / channels: never reveal account data where others can read it.
+  if (msg.chat.type !== "private") {
+    if (msg.text && parseCommand(msg.text)) {
+      await sendToChat(token, String(msg.chat.id), CMD_TEXTS[pickLang(msg.from.language_code)].privateOnly, { kind: "reply", preview: "private only" });
+    }
     return;
   }
 
-  const cmd = parseCommand(msg.text);
-  switch (cmd) {
-    case "start": {
-      if (link) {
-        const p = await getProfile(link.profileId);
-        await reply(T.welcomeLinked(p?.name ?? "", link.notifyEnabled), "reply", siteButton(settings.siteUrl, lang));
-      } else {
-        await reply(T.welcome, "reply", siteButton(settings.siteUrl, lang));
-      }
-      return;
-    }
-    case "status": {
-      if (!link) return void (await reply(T.notLinkedShort, "reply", siteButton(settings.siteUrl, lang)));
-      const p = await getProfile(link.profileId);
-      await reply(T.welcomeLinked(p?.name ?? "", link.notifyEnabled));
-      return;
-    }
-    case "stop":
-    case "off": {
-      if (!link) return void (await reply(T.notLinkedShort));
-      await db.update(telegramLinks).set({ notifyEnabled: false }).where(eq(telegramLinks.id, link.id));
-      await reply(T.notifyOff);
-      return;
-    }
-    case "on":
-    case "resume": {
-      if (!link) return void (await reply(T.notLinkedShort));
-      await db.update(telegramLinks).set({ notifyEnabled: true }).where(eq(telegramLinks.id, link.id));
-      await reply(T.notifyOn);
-      return;
-    }
-    case "unlink": {
-      if (!link) return void (await reply(T.notLinkedShort));
-      await db.delete(telegramLinks).where(eq(telegramLinks.id, link.id));
-      await sendToChat(token, chatId, T.unlinked, { profileId: link.profileId, kind: "reply", preview: "unlinked" });
-      return;
-    }
-    default:
-      await reply(link ? T.help : T.welcome, "reply", link ? [] : siteButton(settings.siteUrl, lang));
+  const chatId = String(msg.chat.id);
+  const ctx = await buildCtx(token, chatId, msg.from, settings);
+
+  const payload = parseStartPayload(msg.text);
+  if (payload) {
+    if (payload.purpose === "link") return void (await handleLinkStart(payload.token, msg.from, chatId, ctx.lang));
+    return void (await handleLoginStart(payload.token, msg.from, chatId, ctx.link, ctx.lang, token));
   }
+
+  const cmd = parseCommand(msg.text);
+  if (!cmd) {
+    // Plain text: point to the commands (or the website when not linked).
+    return void (await runCommand(ctx, "help", ""));
+  }
+  await runCommand(ctx, cmd, argsOf(msg.text));
+}
+
+async function buildCtx(token: string, chatId: string, from: TgUser, settings: Awaited<ReturnType<typeof getTelegramSettings>>): Promise<BotCtx> {
+  const tgUserId = String(from.id);
+  let link = await getLinkByTelegramUser(tgUserId);
+  // Keep chat details fresh for linked users.
+  if (link && (link.chatId !== chatId || link.username !== (from.username ?? null) || link.blocked)) {
+    const [row] = await db
+      .update(telegramLinks)
+      .set({ chatId, username: from.username ?? null, firstName: from.first_name ?? null, blocked: false })
+      .where(eq(telegramLinks.id, link.id))
+      .returning();
+    link = row ?? link;
+  }
+  const profile = link ? await getProfileRow(link.profileId) : null;
+  return { token, chatId, from, link, profile, lang: langOf(profile, from.language_code), settings };
 }
 
 async function failRequest(id: number, reason: string) {
   await db.update(telegramLoginRequests).set({ status: "failed", failReason: reason }).where(eq(telegramLoginRequests.id, id));
 }
 
-async function handleStart(
-  payload: { purpose: "login" | "link"; token: string },
-  from: TgUser,
-  chatId: string,
-  link: LinkRow | null,
-  lang: BotLang,
-  token: string,
-  loginEnabled: boolean,
-  signupEnabled: boolean,
-  adminLoginEnabled: boolean
-) {
+/** `/start login_<token>` — send a sign-in code, but only to a linked Telegram. */
+async function handleLoginStart(rawToken: string, from: TgUser, chatId: string, link: LinkRow | null, lang: BotLang, token: string) {
+  const settings = await getTelegramSettings();
   const T = BOT_TEXTS[lang];
   const tgUserId = String(from.id);
-  const say = (html: string) => sendToChat(token, chatId, html, { profileId: link?.profileId ?? null, kind: "reply", preview: html.replace(/<[^>]+>/g, "") });
+  const say = (html: string, buttons: InlineButton[] = []) =>
+    sendToChat(token, chatId, html, { profileId: link?.profileId ?? null, kind: "reply", preview: html.replace(/<[^>]+>/g, "") }, buttons);
 
-  const [req] = await db.select().from(telegramLoginRequests).where(eq(telegramLoginRequests.startToken, payload.token)).limit(1);
-  if (!req || req.purpose !== payload.purpose || req.expiresAt.getTime() < Date.now() || !["pending", "code_sent"].includes(req.status)) {
-    await say(T.expired);
-    return;
+  const [req] = await db.select().from(telegramLoginRequests).where(eq(telegramLoginRequests.startToken, hashStartToken(rawToken))).limit(1);
+  if (!req || req.purpose !== "login" || req.expiresAt.getTime() < Date.now() || !["pending", "code_sent"].includes(req.status)) {
+    return void (await say(T.expired));
   }
-  if (req.telegramUserId && req.telegramUserId !== tgUserId) {
-    await say(T.alreadyUsed);
-    return;
+  if (req.telegramUserId && req.telegramUserId !== tgUserId) return void (await say(T.alreadyUsed));
+  if (req.codesSent >= MAX_CODES_PER_REQUEST) return void (await say(T.tooMany));
+  if (!settings.loginEnabled) {
+    await failRequest(req.id, "login_disabled");
+    return void (await say(T.loginDisabled));
   }
-  if (req.codesSent >= MAX_CODES_PER_REQUEST) {
-    await say(T.tooMany);
-    return;
+  if (!link) {
+    // No auto-signup: the user creates the account on the website first.
+    await failRequest(req.id, "not_linked");
+    return void (await say(T.notLinked, siteButton(publicSiteUrl(settings), lang)));
   }
-
-  if (req.purpose === "login") {
-    if (!loginEnabled) {
-      await failRequest(req.id, "login_disabled");
-      await say(T.loginDisabled);
-      return;
-    }
-    if (link) {
-      const p = await getProfile(link.profileId);
-      if (p?.isAdmin && !adminLoginEnabled) {
-        await failRequest(req.id, "admin_blocked");
-        await say(T.adminBlocked);
-        return;
-      }
-    } else if (!signupEnabled) {
-      await failRequest(req.id, "not_linked");
-      await say(T.notLinked);
-      return;
-    }
-  } else if (link && link.profileId !== req.profileId) {
-    await failRequest(req.id, "linked_elsewhere");
-    await say(T.alreadyLinkedOther);
-    return;
+  const p = await getProfileRow(link.profileId);
+  if (p?.isAdmin && !settings.adminLoginEnabled) {
+    await failRequest(req.id, "admin_blocked");
+    return void (await say(T.adminBlocked));
   }
 
   const code = newCode();
-  await db
+  // Claim for this Telegram user (a concurrent Start from someone else loses).
+  const updated = await db
     .update(telegramLoginRequests)
     .set({
       status: "code_sent",
@@ -402,22 +232,29 @@ async function handleStart(
       codesSent: req.codesSent + 1,
       attempts: 0,
     })
-    .where(eq(telegramLoginRequests.id, req.id));
+    .where(
+      and(
+        eq(telegramLoginRequests.id, req.id),
+        eq(telegramLoginRequests.codesSent, req.codesSent),
+        sql`(${telegramLoginRequests.telegramUserId} IS NULL OR ${telegramLoginRequests.telegramUserId} = ${tgUserId})`
+      )
+    )
+    .returning({ id: telegramLoginRequests.id });
+  if (!updated.length) return void (await say(T.alreadyUsed));
 
-  await sendToChat(token, chatId, T.code(code, Math.round(CODE_TTL_MS / 60_000), req.purpose === "link" ? "link" : "login"), {
-    profileId: link?.profileId ?? req.profileId ?? null,
+  await sendToChat(token, chatId, T.code(code, Math.round(CODE_TTL_MS / 60_000), "login"), {
+    profileId: link.profileId,
     kind: "code",
-    type: req.purpose,
+    type: "login",
   });
 }
 
 // ---------------------------------------------------------------------------
-// 3. Verify the code (browser)
+// Verify the code (browser)
 // ---------------------------------------------------------------------------
 
 export type VerifyResult =
-  | { ok: true; kind: "login"; profile: ProfileRow; isNew: boolean }
-  | { ok: true; kind: "link"; link: LinkRow }
+  | { ok: true; kind: "login"; profile: ProfileRow }
   | { ok: false; status: number; code: string; error: string; attemptsLeft?: number };
 
 const fail = (status: number, code: string, error: string, attemptsLeft?: number): VerifyResult => ({
@@ -428,24 +265,14 @@ const fail = (status: number, code: string, error: string, attemptsLeft?: number
   ...(attemptsLeft !== undefined ? { attemptsLeft } : {}),
 });
 
-export async function verifyRequest(input: {
-  id: unknown;
-  nonce: unknown;
-  code: string;
-  sessionProfileId?: number | null;
-  onNewProfile?: (profile: ProfileRow) => Promise<void>;
-}): Promise<VerifyResult> {
+export async function verifyRequest(input: { id: unknown; nonce: unknown; code: string }): Promise<VerifyResult> {
   const req = await loadOwnedRequest(input.id, input.nonce);
   if (!req) return fail(400, "invalid_request", "This sign-in attempt is not valid. Please start again.");
+  if (req.purpose !== "login") return fail(400, "invalid_request", "Connecting Telegram is confirmed with the button in the bot.");
   if (req.status === "failed") return fail(409, req.failReason || "failed", "This attempt was refused by the bot.");
   if (req.status === "locked") return fail(429, "locked", "Too many wrong codes. Please start again.");
   if (req.status === "used") return fail(410, "expired", "This code was already used. Please start again.");
   if (req.status !== "code_sent" || !req.codeHash) return fail(400, "code_not_sent", "Open the bot and press Start first.");
-  // Connecting Telegram is only for the account that started it — checked
-  // before the code so a wrong session neither burns a try nor the attempt.
-  if (req.purpose === "link" && (!input.sessionProfileId || input.sessionProfileId !== req.profileId)) {
-    return fail(403, "forbidden", "Sign in to the account you are connecting first.");
-  }
   const now = Date.now();
   if (req.expiresAt.getTime() < now || (req.codeExpiresAt && req.codeExpiresAt.getTime() < now)) {
     return fail(410, "expired", "The code has expired. Press Start in the bot again for a new one.");
@@ -472,101 +299,24 @@ export async function verifyRequest(input: {
     .returning({ id: telegramLoginRequests.id });
   if (claimed.length === 0) return fail(410, "expired", "This code was already used. Please start again.");
 
-  const tgUserId = req.telegramUserId as string;
-  const chatId = req.chatId as string;
   const settings = await getTelegramSettings();
-
-  if (req.purpose === "link") {
-    if (!req.profileId) return fail(400, "invalid_request", "This attempt is not valid. Please start again.");
-    const existing = await getLinkByTelegramUser(tgUserId);
-    if (existing && existing.profileId !== req.profileId) {
-      return fail(409, "linked_elsewhere", "This Telegram is already connected to another account.");
-    }
-    // Replace any previous Telegram on this account.
-    await db.delete(telegramLinks).where(eq(telegramLinks.profileId, req.profileId));
-    const [link] = await db
-      .insert(telegramLinks)
-      .values({
-        profileId: req.profileId,
-        telegramUserId: tgUserId,
-        chatId,
-        username: req.username,
-        firstName: req.firstName,
-        languageCode: req.languageCode,
-      })
-      .returning();
-    const profile = await getProfile(req.profileId);
-    const { token } = await getBotToken();
-    if (token && profile) {
-      const lang = pickLang(profile.preferredLocale);
-      await sendToChat(token, chatId, BOT_TEXTS[lang].linkedOk(profile.name), { profileId: profile.id, kind: "reply", preview: "linked" }, siteButton(settings.siteUrl, lang));
-    }
-    return { ok: true, kind: "link", link };
-  }
-
-  // ---- login ----
   if (!settings.loginEnabled) return fail(403, "login_disabled", "Signing in with Telegram is turned off.");
-  let link = await getLinkByTelegramUser(tgUserId);
-  let profile: ProfileRow | null = link ? await getProfile(link.profileId) : null;
-  let isNew = false;
-
-  if (profile) {
-    if (profile.isAdmin && !settings.adminLoginEnabled) {
-      return fail(403, "admin_blocked", "Admin accounts must sign in with email and password.");
-    }
-  } else {
-    if (!settings.signupEnabled) return fail(403, "not_linked", "This Telegram is not connected to an account.");
-    const email = telegramPlaceholderEmail(tgUserId);
-    const [byEmail] = await db.select().from(studentProfiles).where(sql`lower(${studentProfiles.email}) = ${email}`).limit(1);
-    if (byEmail) {
-      profile = byEmail;
-    } else {
-      const [created] = await db
-        .insert(studentProfiles)
-        .values({
-          name: telegramDisplayName({ firstName: req.firstName, lastName: req.lastName, username: req.username }),
-          email,
-          preferredLocale: pickLang(req.languageCode),
-          preferredCountries: "[]",
-          ieltsScore: null,
-          toeflScore: null,
-          satScore: null,
-          greScore: null,
-          extracurriculars: "",
-          workExperienceYears: 0,
-          researchPublications: 0,
-          passwordHash: null,
-        })
-        .returning();
-      profile = created;
-      isNew = true;
-      if (input.onNewProfile) await input.onNewProfile(created).catch((e) => console.warn("[telegram] onNewProfile:", e));
-    }
-    if (link) await db.delete(telegramLinks).where(eq(telegramLinks.id, link.id));
-    await db.delete(telegramLinks).where(eq(telegramLinks.profileId, profile.id));
-    [link] = await db
-      .insert(telegramLinks)
-      .values({
-        profileId: profile.id,
-        telegramUserId: tgUserId,
-        chatId,
-        username: req.username,
-        firstName: req.firstName,
-        languageCode: req.languageCode,
-      })
-      .returning();
+  // The link is re-read now: an unlink between Start and verify wins.
+  const link = await getLinkByTelegramUser(req.telegramUserId as string);
+  const profile = link ? await getProfileRow(link.profileId) : null;
+  if (!link || !profile) return fail(403, "not_linked", "This Telegram is not connected to an account.");
+  if (profile.isAdmin && !settings.adminLoginEnabled) {
+    return fail(403, "admin_blocked", "Admin accounts must sign in with email and password.");
   }
-
   await db
     .update(telegramLinks)
-    .set({ lastLoginAt: new Date(), chatId, username: req.username, blocked: false })
-    .where(eq(telegramLinks.profileId, profile.id));
-
-  return { ok: true, kind: "login", profile, isNew };
+    .set({ lastLoginAt: new Date(), chatId: req.chatId ?? link.chatId, username: req.username, blocked: false })
+    .where(eq(telegramLinks.id, link.id));
+  return { ok: true, kind: "login", profile };
 }
 
 // ---------------------------------------------------------------------------
-// 4. Notifications
+// Notifications (+ bounded retries)
 // ---------------------------------------------------------------------------
 
 /** Deliver one notification to the profile's Telegram (if every switch allows it). */
@@ -584,14 +334,20 @@ export async function deliverTelegramNotification(input: {
     const settings = await getTelegramSettings();
     const link = await getLinkByProfile(input.profileId);
     if (!shouldDeliver({ settings, link, type: input.type, hasToken: true }) || !link) return false;
-    const profile = await getProfile(input.profileId);
+    const profile = await getProfileRow(input.profileId);
     const lang = pickLang(profile?.preferredLocale ?? link.languageCode);
     const res = await sendToChat(
       token,
       link.chatId,
       formatNotification(lang, input),
-      { profileId: input.profileId, kind: "notification", type: input.type, preview: input.title },
-      siteButton(settings.siteUrl, lang, input.link, BOT_TEXTS[lang].open)
+      {
+        profileId: input.profileId,
+        kind: "notification",
+        type: input.type,
+        preview: input.title,
+        retryPayload: { profileId: input.profileId, type: input.type, title: input.title, body: input.body, link: input.link ?? null },
+      },
+      siteButton(publicSiteUrl(settings), lang, input.link, BOT_TEXTS[lang].open)
     );
     return res.ok;
   } catch (err) {
@@ -600,11 +356,99 @@ export async function deliverTelegramNotification(input: {
   }
 }
 
+export const MAX_DELIVERY_ATTEMPTS = 3;
+
+/**
+ * Is a failed reminder still worth sending? Never re-send a reminder whose
+ * due date passed, whose scholarship was unsaved or whose task was completed.
+ */
+export async function isStaleNotification(p: RetryPayload, now: Date = new Date()): Promise<boolean> {
+  const link = p.link || "";
+  const due = /[?&]due=(\d{4}-\d{2}-\d{2})/.exec(link)?.[1];
+  if (due) {
+    const left = calendarDaysUntil(due, now, reminderTimezone());
+    if (left === null || left < 0) return true;
+  }
+  const sch = /^\/scholarships\?id=(\d+)/.exec(link)?.[1];
+  if (sch && p.type === "deadline_approaching") {
+    const [row] = await db
+      .select({ id: savedScholarships.id })
+      .from(savedScholarships)
+      .where(and(eq(savedScholarships.profileId, p.profileId), eq(savedScholarships.scholarshipId, Number(sch))))
+      .limit(1);
+    if (!row) return true;
+  }
+  const task = /^\/tasks\?task=(\d+)/.exec(link)?.[1];
+  if (task) {
+    const [row] = await db
+      .select({ done: applicationTasks.isCompleted })
+      .from(applicationTasks)
+      .where(and(eq(applicationTasks.id, Number(task)), eq(applicationTasks.profileId, p.profileId)))
+      .limit(1);
+    if (!row || row.done) return true;
+  }
+  return false;
+}
+
+/** Re-send failed notification deliveries from the last 24 h (up to 3 attempts each). */
+export async function retryFailedDeliveries(now: Date = new Date()): Promise<{ retried: number; sent: number; dropped: number }> {
+  const out = { retried: 0, sent: 0, dropped: 0 };
+  const { token } = await getBotToken();
+  if (!token) return out;
+  const settings = await getTelegramSettings();
+  const rows = await db
+    .select()
+    .from(telegramMessages)
+    .where(
+      and(
+        eq(telegramMessages.kind, "notification"),
+        eq(telegramMessages.status, "failed"),
+        isNotNull(telegramMessages.retryPayload),
+        lt(telegramMessages.attempts, MAX_DELIVERY_ATTEMPTS),
+        gt(telegramMessages.createdAt, new Date(now.getTime() - 86_400_000))
+      )
+    )
+    .orderBy(telegramMessages.createdAt)
+    .limit(100);
+  for (const row of rows) {
+    let payload: RetryPayload | null = null;
+    try {
+      payload = JSON.parse(row.retryPayload as string);
+    } catch {
+      payload = null;
+    }
+    const link = payload ? await getLinkByProfile(payload.profileId) : null;
+    if (!payload || !link || !shouldDeliver({ settings, link, type: payload.type, hasToken: true }) || (await isStaleNotification(payload, now))) {
+      await db.update(telegramMessages).set({ retryPayload: null }).where(eq(telegramMessages.id, row.id));
+      out.dropped++;
+      continue;
+    }
+    out.retried++;
+    const profile = await getProfileRow(payload.profileId);
+    const lang = pickLang(profile?.preferredLocale ?? link.languageCode);
+    const res = await tgSendMessage(token, link.chatId, formatNotification(lang, payload), siteButton(publicSiteUrl(settings), lang, payload.link, BOT_TEXTS[lang].open));
+    await markChatReachable(link.chatId, res.ok, res.error_code);
+    const attempts = row.attempts + 1;
+    await db
+      .update(telegramMessages)
+      .set({
+        attempts,
+        status: res.ok ? "sent" : "failed",
+        error: res.ok ? null : (res.description || "send failed").slice(0, 300),
+        // Done (sent), blocked (403) or out of attempts → stop retrying.
+        retryPayload: res.ok || res.error_code === 403 || attempts >= MAX_DELIVERY_ATTEMPTS ? null : row.retryPayload,
+      })
+      .where(eq(telegramMessages.id, row.id));
+    if (res.ok) out.sent++;
+  }
+  return out;
+}
+
 /** Security alert: somebody signed in with the account password. */
 export async function sendLoginAlert(profileId: number): Promise<void> {
   try {
     if (!(await ensureTelegramTables())) return;
-    const profile = await getProfile(profileId);
+    const profile = await getProfileRow(profileId);
     const lang = pickLang(profile?.preferredLocale);
     const when = `${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`;
     const text = BOT_TEXTS[lang].loginAlert(when);
@@ -636,7 +480,7 @@ export async function broadcast(text: string, opts: { includeMuted?: boolean; li
   for (const link of links) {
     const lang = pickLang(link.languageCode);
     const html = `${BOT_TEXTS[lang].broadcastHeader}\n\n${escapeHtml(text)}`;
-    const res = await sendToChat(token, link.chatId, html, { profileId: link.profileId, kind: "broadcast", preview: text }, siteButton(settings.siteUrl, lang));
+    const res = await sendToChat(token, link.chatId, html, { profileId: link.profileId, kind: "broadcast", preview: text }, siteButton(publicSiteUrl(settings), lang));
     if (res.ok) sent += 1;
     else failed += 1;
     await sleep(40);

@@ -44,6 +44,13 @@ const days = (lang: NotifyLang, n: number) => `${n} ${plural(lang, n, ["day", "d
 export const NOTIFY_TEXTS = {
   deadlineApproaching(lang: NotifyLang, p: { title: string; daysLeft: number; date: Date | string }): NotifyText {
     const t = cut(p.title, 150);
+    if (p.daysLeft <= 0) {
+      return {
+        uz: { title: `⏰ Bugun oxirgi kun: ${t}`, body: `«${t}» stipendiyasiga ariza topshirish muddati bugun tugaydi (${fmtDate(p.date)}).` },
+        ru: { title: `⏰ Сегодня последний день: ${t}`, body: `Дедлайн стипендии «${t}» — сегодня (${fmtDate(p.date)}).` },
+        en: { title: `⏰ Last day today: ${t}`, body: `The ${t} scholarship deadline is today (${fmtDate(p.date)}).` },
+      }[lang];
+    }
     const d = days(lang, p.daysLeft);
     return {
       uz: { title: `⏰ Muddat yaqin: ${t}`, body: `«${t}» stipendiyasiga ariza topshirish muddati ${d}dan keyin tugaydi (${fmtDate(p.date)}).` },
@@ -82,6 +89,13 @@ export const NOTIFY_TEXTS = {
 
   milestoneDue(lang: NotifyLang, p: { title: string; daysLeft: number; date: Date | string }): NotifyText {
     const t = cut(p.title, 150);
+    if (p.daysLeft <= 0) {
+      return {
+        uz: { title: `✅ Bugun muddat: ${t}`, body: `«${t}» vazifasining muddati bugun (${fmtDate(p.date)}).` },
+        ru: { title: `✅ Срок сегодня: ${t}`, body: `Срок задачи «${t}» — сегодня (${fmtDate(p.date)}).` },
+        en: { title: `✅ Due today: ${t}`, body: `Your task "${t}" is due today (${fmtDate(p.date)}).` },
+      }[lang];
+    }
     const d = days(lang, p.daysLeft);
     return {
       uz: { title: `✅ Vazifa muddati: ${t}`, body: `«${t}» vazifasini ${d} ichida bajarish kerak (${fmtDate(p.date)}).` },

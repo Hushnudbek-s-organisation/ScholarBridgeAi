@@ -6,8 +6,9 @@
  *   TG_MOCK_FORWARD_TO=http://127.0.0.1:3000  # deliver webhook calls to the local dev server
  *   TELEGRAM_API_BASE=http://127.0.0.1:8099   # in .env.local, then restart `next dev`
  *
- * Implements getMe, getWebhookInfo, setWebhook, deleteWebhook, setMyCommands
- * and sendMessage. Any token whose secret part starts with "bad" is rejected
+ * Implements getMe, getWebhookInfo, setWebhook, deleteWebhook, setMyCommands,
+ * setChatMenuButton, sendMessage, editMessageText, answerCallbackQuery and
+ * sendChatAction. Any token whose secret part starts with "bad" is rejected
  * with 401 (to test error handling).
  *
  * Test helpers (not part of the real API):
@@ -15,13 +16,20 @@
  *   POST /_press { text, userId?, firstName?, username?, languageCode? }
  *        → delivers a user message to the registered webhook, like a real
  *          user typing in the chat (e.g. text "/start login_<token>")
+ *   POST /_tap { data, userId?, messageId?, chatType? }
+ *        → the user pressed an inline button (callback_query with `data`)
+ *   GET  /_answers                 → answerCallbackQuery calls (toasts)
  *   POST /_block { userId }        → user blocked the bot (my_chat_member)
  *   POST /_reset                   → clear everything
  */
 import http from "node:http";
 
 const PORT = Number(process.env.TG_MOCK_PORT || 8099);
-let state = { webhook: null, secret: null, messages: [], commands: {}, updateId: 1000, messageId: 1 };
+// update_id keeps growing across /_reset, like real Telegram: the server
+// de-duplicates update ids, so reusing one would be (correctly) ignored.
+let lastUpdateId = Math.floor(Date.now() / 1000) * 100;
+const fresh = () => ({ webhook: null, secret: null, messages: [], answers: [], commands: {}, menuButton: null, updateId: lastUpdateId, messageId: 1 });
+let state = fresh();
 
 const json = (res, status, body) => {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -89,6 +97,21 @@ const server = http.createServer(async (req, res) => {
     };
     return json(res, 200, await deliver(update));
   }
+  if (url.pathname === "/_answers") return json(res, 200, { answers: state.answers, menuButton: state.menuButton, commands: state.commands });
+  if (url.pathname === "/_tap") {
+    const userId = Number(body.userId || 777000111);
+    const chatType = body.chatType || "private";
+    const update = {
+      update_id: ++state.updateId,
+      callback_query: {
+        id: `cq${state.updateId}`,
+        from: { id: userId, is_bot: false, first_name: body.firstName || "Test", username: body.username || "test_user", language_code: body.languageCode || "uz" },
+        data: String(body.data || ""),
+        message: { message_id: Number(body.messageId || state.messageId), chat: { id: chatType === "private" ? userId : -100500, type: chatType } },
+      },
+    };
+    return json(res, 200, await deliver(update));
+  }
   if (url.pathname === "/_block") {
     const userId = Number(body.userId || 777000111);
     const update = {
@@ -98,7 +121,8 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, await deliver(update));
   }
   if (url.pathname === "/_reset") {
-    state = { webhook: null, secret: null, messages: [], commands: {}, updateId: 1000, messageId: 1 };
+    lastUpdateId = state.updateId;
+    state = fresh();
     return json(res, 200, { ok: true });
   }
 
@@ -125,6 +149,21 @@ const server = http.createServer(async (req, res) => {
     case "setMyCommands":
       state.commands[body.language_code || "default"] = body.commands;
       return json(res, 200, { ok: true, result: true });
+    case "setChatMenuButton":
+      state.menuButton = body.menu_button || null;
+      return json(res, 200, { ok: true, result: true });
+    case "sendChatAction":
+      return json(res, 200, { ok: true, result: true });
+    case "answerCallbackQuery":
+      state.answers.push({ id: body.callback_query_id, text: body.text || "", at: new Date().toISOString() });
+      if (state.answers.length > 200) state.answers.shift();
+      return json(res, 200, { ok: true, result: true });
+    case "editMessageText": {
+      const target = state.messages.find((x) => x.message_id === Number(body.message_id) && String(x.chat_id) === String(body.chat_id));
+      if (!target) return json(res, 400, { ok: false, error_code: 400, description: "Bad Request: message to edit not found" });
+      Object.assign(target, { text: body.text, reply_markup: body.reply_markup, editedAt: new Date().toISOString() });
+      return json(res, 200, { ok: true, result: { message_id: target.message_id } });
+    }
     case "sendMessage": {
       if (String(body.chat_id) === "403403") {
         return json(res, 403, { ok: false, error_code: 403, description: "Forbidden: bot was blocked by the user" });

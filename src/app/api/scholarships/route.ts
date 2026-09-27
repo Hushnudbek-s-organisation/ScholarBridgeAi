@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authenticate } from "@/lib/auth";
 import { db } from "@/db";
 import {
   scholarships,
@@ -26,8 +27,14 @@ export async function GET(req: Request) {
     let profileData = null;
     if (profileIdStr) {
       const pId = parseInt(profileIdStr, 10);
-      const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-      if (p) profileData = p;
+      // Personalised matching reads private profile data (GPA, scores,
+      // degree), so only the owner — or an admin — gets it. Anyone else
+      // silently receives the public, unpersonalised list.
+      const auth = await authenticate(req);
+      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
+        if (p) profileData = p;
+      }
     }
 
     if (search) {

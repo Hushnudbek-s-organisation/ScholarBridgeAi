@@ -47,7 +47,7 @@ import {
   sanitizeSettingsPatch,
   shouldDeliver,
   telegramDisplayName,
-  telegramPlaceholderEmail,
+  hashStartToken,
 } from "../src/lib/telegram/core";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
 
@@ -78,7 +78,7 @@ check("settings: patch keeps only valid values (types whitelist, booleans, URL)"
   const next = sanitizeSettingsPatch(
     {
       loginEnabled: "yes", // not a boolean → ignored
-      signupEnabled: false,
+      signupEnabled: true, // removed setting (no automatic accounts) → dropped
       types: ["deadline_approaching", "evil_type", 5, "deadline_approaching"],
       siteUrl: "javascript:alert(1)",
       botUsername: "@Good_Bot",
@@ -87,7 +87,7 @@ check("settings: patch keeps only valid values (types whitelist, booleans, URL)"
     DEFAULT_TELEGRAM_SETTINGS
   );
   assert.equal(next.loginEnabled, DEFAULT_TELEGRAM_SETTINGS.loginEnabled);
-  assert.equal(next.signupEnabled, false);
+  assert.ok(!("signupEnabled" in next), "no automatic Telegram sign-up setting");
   assert.deepEqual(next.types, ["deadline_approaching"]);
   assert.equal(next.siteUrl, "");
   assert.equal(next.botUsername, "Good_Bot");
@@ -128,8 +128,11 @@ check("codes are 6 digits; tokens/nonces are URL-safe and unique", () => {
   }
   assert.ok(codes.size > 480, "codes should be random");
   const t = newStartToken();
-  assert.match(t, /^[A-Za-z0-9_-]{16}$/);
+  assert.match(t, /^[A-Za-z0-9_-]{22}$/, "16 random bytes (128 bits), base64url");
   assert.notEqual(newStartToken(), t);
+  assert.match(hashStartToken(t), /^[0-9a-f]{64}$/, "only a SHA-256 of the token is stored");
+  assert.equal(hashStartToken(t), hashStartToken(t));
+  assert.notEqual(hashStartToken(t), hashStartToken(newStartToken()));
   assert.ok(newNonce().length >= 32);
   assert.ok(MAX_CODE_ATTEMPTS >= 3 && MAX_CODE_ATTEMPTS <= 10);
 });
@@ -153,11 +156,12 @@ check("code input normalisation", () => {
 });
 
 check("/start payload + command parsing", () => {
-  assert.deepEqual(parseStartPayload("/start login_AbCdEf123456"), { purpose: "login", token: "AbCdEf123456" });
-  assert.deepEqual(parseStartPayload("/start@MyBot link_AbCdEf12"), { purpose: "link", token: "AbCdEf12" });
-  assert.equal(parseStartPayload("/start admin_AbCdEf12"), null);
+  assert.deepEqual(parseStartPayload("/start login_AbCdEf123456GhIjKl"), { purpose: "login", token: "AbCdEf123456GhIjKl" });
+  assert.deepEqual(parseStartPayload("/start@MyBot link_AbCdEf12AbCdEf12xy"), { purpose: "link", token: "AbCdEf12AbCdEf12xy" });
+  assert.equal(parseStartPayload("/start admin_AbCdEf12AbCdEf12xy"), null);
   assert.equal(parseStartPayload("/start login_x"), null, "too short");
-  assert.equal(parseStartPayload("/start login_AbCdEf12; DROP"), null);
+  assert.equal(parseStartPayload("/start login_AbCdEf12345678x"), null, "15 chars is below the minimum");
+  assert.equal(parseStartPayload("/start login_AbCdEf12AbCdEf12xy; DROP"), null);
   assert.equal(parseStartPayload(null), null);
   assert.equal(parseCommand("/STOP@MyBot now"), "stop");
   assert.equal(parseCommand("hello"), null);
@@ -211,10 +215,11 @@ check("language pick + bot texts exist in uz/ru/en; code message warns not to sh
   }
 });
 
-check("placeholder email helpers", () => {
-  const e = telegramPlaceholderEmail("12345");
-  assert.equal(e, "tg12345@telegram.scholarbridge.local");
-  assert.equal(telegramPlaceholderEmail("12;3<4"), "tg1234@telegram.scholarbridge.local");
+check("placeholder email: legacy addresses recognised, never generated", () => {
+  const e = "tg12345@telegram.scholarbridge.local";
+  const src = ["core", "placeholder", "service", "linking", "bot", "messaging"].map((f) => read(`src/lib/telegram/${f}.ts`)).join("\n");
+  assert.ok(!/export function telegramPlaceholderEmail/.test(src), "no placeholder-email generator");
+  assert.ok(!/`tg\$\{[^}]+\}@/.test(src), "no template that builds a placeholder email");
   assert.ok(isTelegramPlaceholderEmail(e));
   assert.ok(isTelegramPlaceholderEmail("TG1@Telegram.ScholarBridge.local"));
   assert.ok(!isTelegramPlaceholderEmail("a@telegram.scholarbridge.local.evil.com"));
@@ -280,20 +285,40 @@ check("/api/telegram/me requires a session; config endpoint exposes no secrets",
 });
 
 check("login codes are never written to the delivery log", () => {
-  assert.ok(/Codes are never written to the log/.test(service));
-  const logCall = service.slice(service.indexOf("async function sendToChat"), service.indexOf("function siteButton"));
+  const messaging = read("src/lib/telegram/messaging.ts");
+  assert.ok(/Codes are never written to the log/.test(messaging));
+  const logCall = messaging.slice(messaging.indexOf("async function sendToChat"), messaging.indexOf("function siteButton"));
+  assert.ok(logCall.length > 100, "sendToChat found");
   assert.ok(!/logMessage\(\{[^}]*html/.test(logCall), "html body (with the code) not logged");
   assert.ok(service.includes('hmacHex(sessionSecret(), "tg-code"'), "only an HMAC of the code is stored");
 });
 
-check("link verification checks the owner before counting an attempt", () => {
+check("code verification: owned attempt (nonce), login-only, single-use claim", () => {
   const i = service.indexOf("async function verifyRequest");
   assert.ok(i > 0);
   const body = service.slice(i, i + 6000);
-  const iOwner = body.search(/profileId\s*!==|profileId\s*!=/);
-  const iAttempt = body.search(/attempts:\s*(sql|req\.attempts|row\.attempts)/);
-  assert.ok(iOwner > 0, "owner check present");
-  assert.ok(iAttempt < 0 || iOwner < iAttempt, "owner check happens before the attempt counter");
+  const iOwner = body.indexOf("loadOwnedRequest(");
+  const iAttempt = body.search(/attempts\s*=\s*req\.attempts\s*\+\s*1/);
+  assert.ok(iOwner > 0, "attempt bound to the browser nonce");
+  assert.ok(iAttempt > 0 && iOwner < iAttempt, "ownership checked before the attempt counter");
+  assert.ok(/req\.purpose !== "login"/.test(body), "codes can only sign in — linking is confirmed in the bot");
+  assert.ok(/eq\(telegramLoginRequests\.status, "code_sent"\)/.test(body), "conditional code_sent → used claim");
+  assert.ok(body.indexOf("getLinkByTelegramUser(") > body.indexOf("claimed"), "link re-read after the claim");
+});
+
+check("link confirmation: atomic conditional claim + UNIQUE conflict handling", () => {
+  const linking = read("src/lib/telegram/linking.ts");
+  const i = linking.indexOf("export async function confirmLinkAttempt");
+  const body = linking.slice(i, i + 3000);
+  assert.ok(body.includes("db.transaction("), "single transaction");
+  for (const cond of ['eq(telegramLoginRequests.purpose, "link")', 'eq(telegramLoginRequests.status, "confirming")', "eq(telegramLoginRequests.telegramUserId, tgUserId)", "gt(telegramLoginRequests.expiresAt"]) {
+    assert.ok(body.includes(cond), `claim is conditional on ${cond}`);
+  }
+  assert.ok(body.includes("isUniqueViolation(err)"), "unique violation → conflict, not a crash");
+  assert.ok(/\.cause/.test(read("src/lib/db-errors.ts")) && read("src/lib/db-errors.ts").includes('"23505"'), "drizzle-wrapped pg errors are unwrapped");
+  const ddl = read("src/lib/telegram/ddl.ts");
+  assert.ok(/profile_id integer not null unique/i.test(ddl), "one Telegram per account");
+  assert.ok(/telegram_user_id text not null unique/i.test(ddl), "one account per Telegram");
 });
 
 check("notifications API: PUT/PATCH require auth (IDOR fix stays)", () => {
@@ -336,11 +361,11 @@ check("every drizzle column exists in the DDL", () => {
   const start = schema.indexOf('export const telegramLinks = pgTable("telegram_links"');
   assert.ok(start > 0);
   const block = schema.slice(start);
-  const cols = [...block.matchAll(/\b(?:text|integer|boolean|timestamp|serial)\("([a-z_]+)"\)/g)].map((m) => m[1]);
+  const cols = [...block.matchAll(/\b(?:text|integer|bigint|boolean|timestamp|serial)\("([a-z_]+)"/g)].map((m) => m[1]);
   assert.ok(cols.length >= 30, `found ${cols.length} columns`);
   const ddl = TELEGRAM_DDL.toLowerCase();
   for (const c of new Set(cols)) assert.ok(new RegExp(`\\b${c}\\b`).test(ddl), `column ${c} missing in DDL`);
-  for (const t of ["telegram_links", "telegram_login_requests", "telegram_messages"]) assert.ok(ddl.includes(t));
+  for (const t of ["telegram_links", "telegram_login_requests", "telegram_messages", "telegram_updates"]) assert.ok(ddl.includes(t));
 });
 
 console.log("\nTelegram — i18n");

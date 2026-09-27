@@ -34,7 +34,8 @@
     "test:essay-reviews": "tsx scripts/check-essay-reviews.ts",
     "test:integration": "tsx scripts/check-integration.ts",
     "test:growth": "tsx scripts/check-growth.ts",
-    "test:telegram": "tsx scripts/check-telegram.ts"
+    "test:telegram": "tsx scripts/check-telegram.ts",
+    "test:telegram-integration": "tsx scripts/check-telegram-integration.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -1195,7 +1195,6 @@
     "signedIn": "Signed in!",
     "linked": "Telegram connected!",
     "popupBlocked": "Your browser did not open a new tab — use the button below.",
-    "newAccountNote": "No account yet? One is created for you automatically. Already have an email account? Sign in with email first, then connect Telegram on the “Telegram & alerts” page — otherwise you will get a second account.",
     "errors": {
       "wrong_code": "That code is not correct. {left} tries left.",
       "locked": "Too many wrong codes. Please start again.",
@@ -1211,7 +1210,13 @@
       "bad_code_format": "Enter the 6 digits from the bot.",
       "forbidden": "Sign in to the account you are connecting first.",
       "network": "No connection. Check your internet and try again.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "already_linked": "This Telegram is already connected to your account.",
+      "account_has_other": "Your account is already connected to another Telegram. Disconnect it first.",
+      "cancelled": "Connection was cancelled in Telegram.",
+      "conflict": "Someone connected at the same moment. Please start again.",
+      "invalid": "This link is no longer valid. Please start again.",
+      "unlinked": "Telegram was disconnected."
     },
     "pageTitle": "Telegram & alerts",
     "pageSubtitle": "Sign in with a code and get important alerts on your phone.",
@@ -1280,7 +1285,21 @@
       "login_alert": "Someone signed in with your password"
     },
     "activeTitle": "Active for your account",
-    "loginTip": "Next time: press “Sign in” → Telegram tab — the bot sends you a code, no password needed."
+    "loginTip": "Next time: press “Sign in” → Telegram tab — the bot sends you a code, no password needed.",
+    "linkHowStep2": "The bot shows which ScholarBridge account will be connected.",
+    "linkHowStep3": "Press “✅ Connect” in Telegram — this page updates by itself.",
+    "linkConfirmInBot": "{name} opened the bot — press “✅ Connect” in Telegram to finish.",
+    "linkedAs": "Connected to {name}",
+    "loginLinkedOnly": "Telegram sign-in works for accounts that have connected Telegram in “Telegram & alerts”. New here? Create an account with email first.",
+    "remindersTitle": "Deadline reminders",
+    "remindersHint": "How many days before a saved deadline the bot reminds you.",
+    "preset": {
+      "standard": "Standard",
+      "short": "Short",
+      "off": "Off"
+    },
+    "presetDays": "{days} days before",
+    "presetNone": "No deadline reminders"
   },
   "adminTelegram": {
     "loading": "Loading…",
@@ -1326,8 +1345,6 @@
     "settingsTitle": "What the bot may do",
     "optLogin": "Sign in with Telegram",
     "optLoginHint": "Shows the Telegram tab in the sign-in window.",
-    "optSignup": "New accounts via Telegram",
-    "optSignupHint": "Unknown Telegram users get an account automatically.",
     "optAdminLogin": "Admins may use Telegram sign-in",
     "optAdminLoginHint": "Turn off to require email + password for admin accounts.",
     "optNotify": "Send notifications",
@@ -1363,6 +1380,16 @@
       "test": "test",
       "login_alert": "security",
       "reply": "bot reply"
-    }
+    },
+    "sweepTitle": "Deadline reminders",
+    "sweepIntro": "Reminders are created for every connected account (their chosen days before each saved deadline) and failed deliveries are retried. Runs on its own every few hours and on the cron endpoint.",
+    "sweepLast": "Last run: {when} ({source}) — {profiles} accounts, {created} reminders, {errors} errors.",
+    "sweepNever": "Not run yet.",
+    "cronReady": "Cron: {path} is protected by CRON_SECRET.",
+    "cronMissing": "Cron: set CRON_SECRET to allow an external scheduler to call {path}.",
+    "miniAppReady": "Mini App: {url} (set as the bot’s menu button when the webhook is connected).",
+    "miniAppNeedsHttps": "Mini App: needs a public https site URL.",
+    "sweepRun": "Run now",
+    "sweepDone": "Done: {profiles} accounts, {created} reminders, {retried} retries delivered."
   }
 }

@@ -1,7 +1,4 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { telegramLinks } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
@@ -17,7 +14,9 @@ import {
   sanitizeSettingsPatch,
   TELEGRAM_NOTIFICATION_TYPES,
 } from "@/lib/telegram/core";
-import { broadcast, getLinkByProfile, linkedUsers, recentMessages, sendToChat, telegramStats } from "@/lib/telegram/service";
+import { broadcast, getLinkByProfile, linkedUsers, recentMessages, sendToChat, telegramStats, unlinkProfile } from "@/lib/telegram/service";
+import { miniAppUrl } from "@/lib/telegram/messaging";
+import { lastSweep, recordSweep, runScheduledTelegramJobs } from "@/lib/notificationSweep";
 import { getBotToken, getTelegramSettings, saveBotToken, saveTelegramSettings, webhookSecret } from "@/lib/telegram/settings";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
 
@@ -28,7 +27,7 @@ export const maxDuration = 300; // broadcasts to many chats take a while
  * Admin → System → Telegram bot.
  *  GET              → settings, token status, stats, linked users, delivery log (+ live bot info with ?live=1)
  *  PUT              → { token?, clearToken?, ...settings } (a new token is verified with getMe first)
- *  POST { action }  → status | setWebhook | deleteWebhook | test | broadcast
+ *  POST { action }  → status | setWebhook | deleteWebhook | test | broadcast | sweep
  *  DELETE ?profileId=… → disconnect one student's Telegram
  */
 async function guard(req: Request, write = false) {
@@ -102,6 +101,9 @@ export async function GET(req: Request) {
         users,
         messages,
         myLink: Boolean(await getLinkByProfile(g.session.profile.id)),
+        miniAppUrl: miniAppUrl(settings),
+        lastSweep: await lastSweep(),
+        cron: { secretSet: Boolean(process.env.CRON_SECRET?.trim()), path: "/api/cron/notifications" },
         live: url.searchParams.get("live") === "1" && tokenInfo.token ? await liveInfo(tokenInfo.token) : null,
       },
       { headers: { "Cache-Control": "no-store" } }
@@ -183,7 +185,7 @@ export async function POST(req: Request) {
       const res = await tgCall(token, "setWebhook", {
         url,
         secret_token: webhookSecret(token),
-        allowed_updates: ["message", "my_chat_member"],
+        allowed_updates: ["message", "callback_query", "my_chat_member"],
         drop_pending_updates: true,
       });
       if (!res.ok) return tgJsonError(502, `Telegram: ${res.description ?? "setWebhook failed"}`, "webhook_failed");
@@ -191,12 +193,19 @@ export async function POST(req: Request) {
       for (const lang of ["uz", "ru", "en"] as const) {
         const lines = BOT_TEXTS[lang].help.split("\n").slice(1);
         const commands = lines
-          .map((l) => /^\/(\w+) — (.+)$/.exec(l))
+          .map((l) => /^\/(\w+)(?: [^—]+)? — (.+)$/.exec(l))
           .filter((m): m is RegExpExecArray => !!m)
           .map((m) => ({ command: m[1], description: m[2].slice(0, 256) }));
         await tgCall(token, "setMyCommands", { commands, ...(lang === "en" ? {} : { language_code: lang }) });
       }
-      if (!settings.siteUrl) await saveTelegramSettings({ ...settings, siteUrl: base });
+      // Menu button → Mini App (https only; best effort).
+      // The address the webhook was just set on IS the public site: buttons,
+      // deep links and the Mini App all use it.
+      const appUrl = miniAppUrl({ siteUrl: base });
+      if (appUrl) {
+        await tgCall(token, "setChatMenuButton", { menu_button: { type: "web_app", text: "ScholarBridge", web_app: { url: appUrl } } });
+      }
+      if (settings.siteUrl !== base) await saveTelegramSettings({ ...settings, siteUrl: base });
       await writeAudit({ entityType: "config", entityId: 0, fieldChanged: "telegram_webhook", newValue: url });
       return NextResponse.json({ ok: true, url });
     }
@@ -214,6 +223,14 @@ export async function POST(req: Request) {
       const lang = pickLang(g.session.profile.preferredLocale);
       const res = await sendToChat(token, link.chatId, BOT_TEXTS[lang].test, { profileId: link.profileId, kind: "test", preview: "admin test" });
       return res.ok ? NextResponse.json({ ok: true }) : tgJsonError(502, res.error || "send failed", "send_failed");
+    }
+
+    if (action === "sweep") {
+      const rl = checkRateLimit(`admin:tg-sweep:${g.session.profile.id}`, { limit: 6, windowMs: 60 * 60_000 });
+      if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
+      const summary = await runScheduledTelegramJobs();
+      await recordSweep(summary, "admin");
+      return NextResponse.json({ summary });
     }
 
     if (action === "broadcast") {
@@ -240,9 +257,8 @@ export async function DELETE(req: Request) {
   const profileId = Number(new URL(req.url).searchParams.get("profileId"));
   if (!Number.isInteger(profileId) || profileId <= 0) return tgJsonError(400, "profileId is required", "validation");
   try {
-    const rows = await db.delete(telegramLinks).where(eq(telegramLinks.profileId, profileId)).returning({ id: telegramLinks.id });
-    await writeAudit({ entityType: "config", entityId: profileId, fieldChanged: "telegram_link", oldValue: "linked", newValue: "removed by admin" });
-    return NextResponse.json({ removed: rows.length > 0 });
+    const removed = await unlinkProfile(profileId, "admin");
+    return NextResponse.json({ removed });
   } catch (err) {
     console.error("DELETE /api/admin/telegram error:", err);
     return tgJsonError(500, "Could not disconnect.");

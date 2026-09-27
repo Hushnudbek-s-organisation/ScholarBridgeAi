@@ -25,8 +25,8 @@ export function startNotificationScheduler() {
     if (g.__sbSweepRunning) return;
     g.__sbSweepRunning = true;
     try {
-      const { runSweepForLinkedUsers, recordSweep } = await import("@/lib/notificationSweep");
-      const summary = await runSweepForLinkedUsers();
+      const { runScheduledTelegramJobs, recordSweep } = await import("@/lib/notificationSweep");
+      const summary = await runScheduledTelegramJobs();
       await recordSweep(summary, "scheduler");
       if (summary.profiles > 0) {
         console.log(`[scheduler] reminder sweep: ${summary.profiles} accounts, ${summary.created} new notifications`);

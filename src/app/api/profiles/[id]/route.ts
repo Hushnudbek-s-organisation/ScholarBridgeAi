@@ -7,6 +7,7 @@ import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -281,7 +282,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   } catch (error) {
     console.error("PUT /api/profiles/[id] error:", error);
     // Race on the unique email index.
-    if ((error as { code?: string })?.code === "23505") {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: "This email is already used by another account" },
         { status: 409 }

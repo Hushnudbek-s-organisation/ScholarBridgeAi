@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { authenticate, sessionCookieHeader } from "@/lib/auth";
-import { awardPoints } from "@/lib/gamification";
+import { sessionCookieHeader } from "@/lib/auth";
 import { sanitizeProfile } from "@/lib/password";
 import { checkRateLimit, clientIp, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
-import { ensureReferralCode } from "@/lib/referrals";
 import { readJsonBody } from "@/lib/request";
-import { recordVisit } from "@/lib/visits";
 import { normalizeCodeInput } from "@/lib/telegram/core";
 import { verifyRequest } from "@/lib/telegram/service";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
@@ -13,9 +10,10 @@ import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
 export const dynamic = "force-dynamic";
 
 /**
- * POST { id, nonce, code } — check the 6-digit code the bot sent.
- *  - login attempt → signed session cookie (new account if allowed)
- *  - link attempt  → Telegram connected to the signed-in account
+ * POST { id, nonce, code } — check the 6-digit sign-in code the bot sent to a
+ * Telegram that is already connected to an account → signed session cookie.
+ * (Connecting Telegram is confirmed with a button in the bot, not a code, and
+ * Telegram never creates accounts.)
  */
 export async function POST(req: Request) {
   const ip = clientIp(req);
@@ -29,35 +27,15 @@ export async function POST(req: Request) {
   const code = normalizeCodeInput(parsed.body.code);
   if (!code) return tgJsonError(400, "Enter the 6-digit code from the bot.", "bad_code_format");
 
-  // Optional session: only needed (and checked) for "link" attempts.
-  const auth = await authenticate(req);
-  const sessionProfileId = auth.ok ? auth.session.profile.id : null;
-
   try {
-    const result = await verifyRequest({
-      id: parsed.body.id,
-      nonce: parsed.body.nonce,
-      code,
-      sessionProfileId,
-      onNewProfile: async (profile) => {
-        await recordVisit({ eventType: "signup", path: "/", profileId: profile.id, locale: profile.preferredLocale, headers: req.headers }).catch(() => undefined);
-        await awardPoints(profile.id, 20, "profile_created", profile.id).catch(() => undefined);
-        await ensureReferralCode(profile.id).catch(() => undefined);
-      },
-    });
+    const result = await verifyRequest({ id: parsed.body.id, nonce: parsed.body.nonce, code });
     if (!result.ok) {
       return tgJsonError(result.status, result.error, result.code, result.attemptsLeft !== undefined ? { attemptsLeft: result.attemptsLeft } : {});
-    }
-    if (result.kind === "link") {
-      return NextResponse.json(
-        { linked: true, username: result.link.username, firstName: result.link.firstName },
-        { headers: { "Cache-Control": "no-store" } }
-      );
     }
     const response = NextResponse.json({
       profile: sanitizeProfile(result.profile),
       session: { profileId: result.profile.id, isAdmin: Boolean(result.profile.isAdmin) },
-      isNew: result.isNew,
+      isNew: false,
     });
     response.headers.set("Set-Cookie", sessionCookieHeader(result.profile, req));
     response.headers.set("Cache-Control", "no-store");

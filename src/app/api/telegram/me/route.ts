@@ -6,7 +6,8 @@ import { authenticate } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request";
 import { BOT_TEXTS, parseMutedTypes, pickLang, TELEGRAM_NOTIFICATION_TYPES } from "@/lib/telegram/core";
-import { getLinkByProfile, sendToChat } from "@/lib/telegram/service";
+import { getLinkByProfile, sendToChat, unlinkProfile } from "@/lib/telegram/service";
+import { normalizeReminderDays, parseReminderDays, DEFAULT_REMINDER_DAYS } from "@/lib/telegram/reminders";
 import { getBotToken, getTelegramSettings } from "@/lib/telegram/settings";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The signed-in student's own Telegram connection.
- * GET → status · PUT { notifyEnabled?, mutedTypes? } · DELETE → disconnect
+ * GET → status · PUT { notifyEnabled?, mutedTypes?, reminderDays? } · DELETE → disconnect
  * POST { action: "test" } → send a test message to the connected chat.
  * Always acts on the session's profile — there is no id to tamper with.
  */
@@ -39,6 +40,7 @@ function present(link: typeof telegramLinks.$inferSelect | null) {
     mutedTypes: parseMutedTypes(link.mutedTypes),
     blocked: link.blocked,
     linkedAt: link.linkedAt,
+    reminderDays: parseReminderDays(link.reminderDays),
   };
 }
 
@@ -58,6 +60,7 @@ export async function GET(req: Request) {
         },
         link: present(link),
         types: settings.types,
+        defaultReminderDays: DEFAULT_REMINDER_DAYS,
       },
       { headers: { "Cache-Control": "no-store" } }
     );
@@ -70,7 +73,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   const g = await guard(req, true);
   if (!g.ok) return g.response;
-  const parsed = await readJsonBody<{ notifyEnabled?: unknown; mutedTypes?: unknown }>(req, 8192);
+  const parsed = await readJsonBody<{ notifyEnabled?: unknown; mutedTypes?: unknown; reminderDays?: unknown }>(req, 8192);
   if (!parsed.ok) return tgJsonError(parsed.status, parsed.error, parsed.code);
   const patch: Partial<typeof telegramLinks.$inferInsert> = {};
   if (typeof parsed.body.notifyEnabled === "boolean") patch.notifyEnabled = parsed.body.notifyEnabled;
@@ -79,6 +82,9 @@ export async function PUT(req: Request) {
     patch.mutedTypes = JSON.stringify(
       Array.from(new Set(parsed.body.mutedTypes.filter((t): t is string => typeof t === "string" && known.has(t))))
     );
+  }
+  if (Array.isArray(parsed.body.reminderDays)) {
+    patch.reminderDays = JSON.stringify(normalizeReminderDays(parsed.body.reminderDays));
   }
   if (Object.keys(patch).length === 0) return tgJsonError(400, "Nothing to update", "validation");
   try {
@@ -95,15 +101,8 @@ export async function DELETE(req: Request) {
   const g = await guard(req, true);
   if (!g.ok) return g.response;
   try {
-    const link = await getLinkByProfile(g.session.profile.id);
-    if (!link) return NextResponse.json({ unlinked: false });
-    await db.delete(telegramLinks).where(eq(telegramLinks.id, link.id));
-    const { token } = await getBotToken();
-    if (token) {
-      const lang = pickLang(g.session.profile.preferredLocale);
-      await sendToChat(token, link.chatId, BOT_TEXTS[lang].unlinked, { profileId: link.profileId, kind: "reply", preview: "unlinked" });
-    }
-    return NextResponse.json({ unlinked: true });
+    const unlinked = await unlinkProfile(g.session.profile.id, "website");
+    return NextResponse.json({ unlinked });
   } catch (err) {
     console.error("DELETE /api/telegram/me error:", err);
     return tgJsonError(500, "Could not disconnect.");

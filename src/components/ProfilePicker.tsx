@@ -23,7 +23,6 @@ interface TelegramPublicConfig {
   configured: boolean;
   botUsername: string | null;
   loginEnabled: boolean;
-  signupEnabled: boolean;
 }
 
 /**
@@ -186,7 +185,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                 <p className="text-sm font-extrabold text-slate-800">{tt("loginTitle")}</p>
                 <p className="mb-3 mt-0.5 text-[12px] text-slate-500">{tt("loginSubtitle")}</p>
                 <TelegramCodeFlow purpose="login" botUsername={tg?.botUsername} onLoggedIn={(p) => onSelect(p)} />
-                {tg?.signupEnabled && <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{tt("newAccountNote")}</p>}
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{tt("loginLinkedOnly")}</p>
               </div>
             ) : (
               <div>

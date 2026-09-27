@@ -26,7 +26,6 @@ import { api, ErrorNote, LoadingBlock, StatCard, Toast, useToast } from "../grow
 
 interface Settings {
   loginEnabled: boolean;
-  signupEnabled: boolean;
   adminLoginEnabled: boolean;
   notificationsEnabled: boolean;
   types: string[];
@@ -77,13 +76,25 @@ interface AdminData {
   }[];
   myLink: boolean;
   live: Live | null;
+  miniAppUrl: string | null;
+  lastSweep: {
+    source: string;
+    profiles: number;
+    created: number;
+    errors: number;
+    finishedAt: string;
+    retried?: number;
+    retrySent?: number;
+  } | null;
+  cron: { secretSet: boolean; path: string };
 }
 
 const MAX_BROADCAST = 3500;
 
 /**
  * Admin → System → Telegram bot: connect the bot (token + webhook), choose
- * what it may do (sign-in, sign-up, admin sign-in, notifications per type),
+ * what it may do (sign-in, admin sign-in, notifications per type), run the
+ * reminder sweep,
  * message everyone, see who is connected and what was delivered.
  */
 export function TelegramManager() {
@@ -176,6 +187,19 @@ export function TelegramManager() {
   const deleteWebhook = async () => {
     const r = await run("unhook", () => api("/api/admin/telegram", { method: "POST", body: JSON.stringify({ action: "deleteWebhook" }) }), t("webhookDeleted"));
     if (r) await check();
+  };
+
+  const runSweep = async () => {
+    const r = await run("sweep", () =>
+      api<{ summary: { profiles: number; created: number; errors: number; retrySent: number } }>("/api/admin/telegram", {
+        method: "POST",
+        body: JSON.stringify({ action: "sweep" }),
+      })
+    );
+    if (r) {
+      showToast(t("sweepDone", { profiles: r.summary.profiles, created: r.summary.created, retried: r.summary.retrySent }));
+      await load();
+    }
   };
 
   const sendTest = () => run("test", () => api("/api/admin/telegram", { method: "POST", body: JSON.stringify({ action: "test" }) }), t("testSent"));
@@ -354,7 +378,6 @@ export function TelegramManager() {
           {(
             [
               ["loginEnabled", t("optLogin"), t("optLoginHint")],
-              ["signupEnabled", t("optSignup"), t("optSignupHint")],
               ["adminLoginEnabled", t("optAdminLogin"), t("optAdminLoginHint")],
               ["notificationsEnabled", t("optNotify"), t("optNotifyHint")],
             ] as const
@@ -399,6 +422,37 @@ export function TelegramManager() {
           </button>
           <button onClick={saveSettings} disabled={!dirty || busy === "settings"} className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-600 disabled:opacity-40">
             {busy === "settings" && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {t("save")}
+          </button>
+        </div>
+      </Card>
+
+      {/* ---- Reminders + Mini App ---- */}
+      <Card icon={RefreshCw} title={t("sweepTitle")}>
+        <p className="mb-2 text-[12px] text-slate-600">{t("sweepIntro")}</p>
+        <p className="text-[12px] text-slate-700">
+          {data.lastSweep
+            ? t("sweepLast", {
+                when: new Date(data.lastSweep.finishedAt).toLocaleString(),
+                source: data.lastSweep.source,
+                profiles: data.lastSweep.profiles,
+                created: data.lastSweep.created,
+                errors: data.lastSweep.errors,
+              })
+            : t("sweepNever")}
+        </p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {data.cron.secretSet ? t("cronReady", { path: data.cron.path }) : t("cronMissing", { path: data.cron.path })}
+        </p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {data.miniAppUrl ? t("miniAppReady", { url: data.miniAppUrl }) : t("miniAppNeedsHttps")}
+        </p>
+        <div className="mt-3">
+          <button
+            onClick={runSweep}
+            disabled={!configured || busy === "sweep"}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {busy === "sweep" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t("sweepRun")}
           </button>
         </div>
       </Card>

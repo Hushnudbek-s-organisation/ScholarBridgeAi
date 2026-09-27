@@ -7,20 +7,23 @@ import { CheckCircle2, ExternalLink, Loader2, RotateCcw, Send, ShieldCheck } fro
 import type { StudentProfile } from "../Navbar";
 
 /**
- * "Get a code from the Telegram bot" flow, shared by sign-in and by
- * "connect Telegram" on the settings page.
+ * Telegram flows shared by sign-in and by "connect Telegram" (settings page).
  *
- *  1. press the button → a new tab opens t.me/<bot>?start=<token>
+ * Sign-in (purpose "login", accounts that already connected Telegram):
+ *  1. press the button → a new tab opens t.me/<bot>?start=login_<token>
  *  2. press Start in Telegram → the bot sends a 6-digit code
  *  3. type the code here (auto-submits on the 6th digit)
  *
- * The browser keeps a secret nonce for the attempt, so a code is useless
- * anywhere else. Status is polled so the screen reacts the moment the bot
- * has sent the code.
+ * Connect (purpose "link", signed-in users): steps 1–2 are the same, then the
+ * bot asks "Connect to <your account>?" and the user presses ✅ Connect in
+ * Telegram — no code to type. This screen polls and flips to "connected".
+ *
+ * The browser keeps a secret nonce for the attempt, so the status (and a
+ * code) is useless anywhere else.
  */
 
 type Purpose = "login" | "link";
-type Status = "idle" | "pending" | "code_sent" | "used" | "failed" | "locked" | "expired";
+type Status = "idle" | "pending" | "confirming" | "code_sent" | "used" | "failed" | "locked" | "expired";
 
 interface Attempt {
   id: number;
@@ -51,6 +54,12 @@ const KNOWN_ERRORS = new Set([
   "rate_limited",
   "bad_code_format",
   "forbidden",
+  "already_linked",
+  "account_has_other",
+  "cancelled",
+  "conflict",
+  "invalid",
+  "unlinked",
 ]);
 
 export function TelegramCodeFlow({
@@ -145,7 +154,7 @@ export function TelegramCodeFlow({
   };
 
   // ---- poll status while waiting ------------------------------------------
-  const live = !!attempt && (!status || status.status === "pending" || status.status === "code_sent");
+  const live = !!attempt && (!status || status.status === "pending" || status.status === "code_sent" || status.status === "confirming");
   useEffect(() => {
     if (!attempt || !live) return;
     let stop = false;
@@ -167,6 +176,11 @@ export function TelegramCodeFlow({
           return body;
         });
         if (body.status === "failed" && body.failReason) setError(errorText(body.failReason, ""));
+        // Connect flow: the user pressed ✅ Connect in the bot.
+        if (purpose === "link" && body.status === "used" && !doneRef.current) {
+          doneRef.current = true;
+          onLinked?.();
+        }
         if (body.status === "expired") setError(t("errors.expired"));
       } catch {
         // transient — next tick
@@ -178,7 +192,7 @@ export function TelegramCodeFlow({
       stop = true;
       window.clearInterval(id);
     };
-  }, [attempt, live, errorText, t]);
+  }, [attempt, live, errorText, t, purpose, onLinked]);
 
   // Countdown for the code's lifetime.
   useEffect(() => {
@@ -238,7 +252,8 @@ export function TelegramCodeFlow({
       : null;
   const mmss = secondsLeft !== null ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}` : "";
   const finished = status?.status === "failed" || status?.status === "locked" || status?.status === "expired";
-  const codeSent = status?.status === "code_sent";
+  const codeSent = status?.status === "code_sent" || status?.status === "confirming";
+  const tgName = status?.telegram?.username ? `@${status.telegram.username}` : status?.telegram?.name ?? "Telegram";
 
   // ---- render --------------------------------------------------------------
   if (!attempt) {
@@ -260,11 +275,11 @@ export function TelegramCodeFlow({
           </li>
           <li className="flex gap-2">
             <StepDot n={2} />
-            <span>{t("howStep2")}</span>
+            <span>{purpose === "link" ? t("linkHowStep2") : t("howStep2")}</span>
           </li>
           <li className="flex gap-2">
             <StepDot n={3} />
-            <span>{t("howStep3")}</span>
+            <span>{purpose === "link" ? t("linkHowStep3") : t("howStep3")}</span>
           </li>
         </ol>
         {error && <ErrorBox text={error} />}
@@ -284,9 +299,13 @@ export function TelegramCodeFlow({
           )}
           <div className="min-w-0 flex-1">
             <p className="text-[12px] font-bold text-slate-800">
-              {codeSent || status?.status === "used"
-                ? t("codeSent", { name: status?.telegram?.username ? `@${status.telegram.username}` : status?.telegram?.name ?? "Telegram" })
-                : t("waiting")}
+              {status?.status === "confirming"
+                ? t("linkConfirmInBot", { name: tgName })
+                : purpose === "link" && status?.status === "used"
+                  ? t("linkedAs", { name: tgName })
+                  : codeSent || status?.status === "used"
+                    ? t("codeSent", { name: tgName })
+                    : t("waiting")}
             </p>
             {!codeSent && status?.status !== "used" && (
               <p className="mt-0.5 text-[11px] text-slate-500">{t("step1", { bot: `@${bot}` })}</p>
@@ -306,7 +325,26 @@ export function TelegramCodeFlow({
         )}
       </div>
 
-      {/* Step 2 — enter the code */}
+      {purpose === "link" ? (
+        <div className="space-y-2">
+          {status?.status === "used" ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white">
+              <ShieldCheck className="h-4 w-4" /> {t("linked")}
+            </div>
+          ) : null}
+          <AnimatePresence>{error && <ErrorBox key="err" text={error} />}</AnimatePresence>
+          {status?.status !== "used" && (
+            <button
+              type="button"
+              onClick={reset}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> {t("restart")}
+            </button>
+          )}
+        </div>
+      ) : (
+      /* Step 2 — enter the code */
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -371,6 +409,7 @@ export function TelegramCodeFlow({
           </div>
         )}
       </form>
+      )}
     </div>
   );
 }

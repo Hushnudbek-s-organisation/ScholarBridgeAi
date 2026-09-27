@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { desc, eq, and } from "drizzle-orm";
 
-export type AuditActor = "ADMIN" | "AUTOMATED_SYSTEM" | "AI" | "EXTERNAL_SOURCE";
+export type AuditActor = "ADMIN" | "AUTOMATED_SYSTEM" | "AI" | "EXTERNAL_SOURCE" | "USER";
 export type AuditEntityType =
   | "university"
   | "scholarship"
@@ -12,7 +12,9 @@ export type AuditEntityType =
   | "goal_template"
   | "answer_prompt"
   | "checklist_item"
-  | "config";
+  | "config"
+  // Account ↔ Telegram connections (entityId = profile id).
+  | "telegram_link";
 
 interface AuditEntry {
   entityType: AuditEntityType;
