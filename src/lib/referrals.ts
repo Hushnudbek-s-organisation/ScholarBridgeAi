@@ -1,11 +1,14 @@
 import { eq, and, desc, isNotNull, isNull } from "drizzle-orm";
+import { configuredAppUrl } from "@/lib/appUrl";
 import { db } from "@/db";
 import { referrals, studentProfiles } from "@/db/schema";
 import { generateReferralCode, awardPoints, computeProfileCompleteness } from "@/lib/gamification";
 import { getConfigNumber } from "@/lib/config";
 
-export const REFERRAL_LINK_BASE =
-  process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
+/** Base for shareable referral links — the canonical APP_URL (see appUrl.ts). */
+export function referralLinkBase(): string {
+  return configuredAppUrl();
+}
 export const REFERRAL_PREMIUM_MULTIPLE = 5;
 export const REFERRAL_PREMIUM_DAYS = 30;
 
@@ -50,7 +53,7 @@ export async function getOrCreateReferralAnchor(profileId: number) {
 /** Fetch the referral overview for a profile (code, link, their referrals, incoming). */
 export async function getReferralOverview(profileId: number) {
   const anchor = await getOrCreateReferralAnchor(profileId);
-  const base = process.env.NEXT_PUBLIC_APP_URL || "";
+  const base = configuredAppUrl();
 
   const outgoing = await db
     .select({
@@ -358,7 +361,8 @@ export async function getReferralStatus(profileId: number) {
 
   return {
     code: profile.referralCode,
-    link: `${REFERRAL_LINK_BASE}/?ref=${profile.referralCode}`,
+    // Relative when no canonical URL is configured — the client prefixes its own origin.
+    link: `${referralLinkBase()}/?ref=${profile.referralCode}`,
     referralPoints: profile.referralPoints ?? 0,
     nextMilestone,
     isPremium: premiumActive,

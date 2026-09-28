@@ -323,8 +323,10 @@ check("visa (groq) and research-agent paths are untouched", () => {
 });
 
 check("OpenRouter default model id is unchanged", () => {
-  const aiIndex = read("src/lib/ai/index.ts");
-  assert.match(aiIndex, /meta-llama\/llama-3\.3-70b-instruct/);
+  // Task 7: adapters read defaults from the provider registry (settings.ts)
+  // instead of repeating them in index.ts — the model id itself is unchanged.
+  const settingsSrc = read("src/lib/ai/settings.ts");
+  assert.match(settingsSrc, /openrouter: \{[^}]*defaultModel: "meta-llama\/llama-3\.3-70b-instruct"/);
 });
 
 check("package.json exposes test:ai-format", () => {

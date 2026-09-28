@@ -17,6 +17,7 @@
 process.env.DATABASE_URL = "postgresql://x:x@localhost:5432/x"; // dummy — no queries are executed
 process.env.SESSION_SECRET = "test-session-secret-that-is-long-enough-1234567890";
 
+import * as sec from "../src/lib/security";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
@@ -202,12 +203,55 @@ async function main() {
     assert.equal(res.headers.get("Retry-After"), "7");
   });
 
-  check("clientIp reads x-forwarded-for first", () => {
+  check("clientIp uses the proxy-appended (rightmost) X-Forwarded-For entry", () => {
     const mk = (h: Record<string, string>) =>
       ({ headers: new Headers(h) }) as unknown as Request;
-    assert.equal(rateLimit.clientIp(mk({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" })), "1.2.3.4");
-    assert.equal(rateLimit.clientIp(mk({ "x-real-ip": "5.6.7.8" })), "5.6.7.8");
-    assert.equal(rateLimit.clientIp(mk({})), "unknown");
+    // One trusted proxy (default): the rightmost entry is the real client.
+    assert.equal(rateLimit.clientIp(mk({ "x-forwarded-for": "1.2.3.4" }), {}), "1.2.3.4");
+    assert.equal(
+      rateLimit.clientIp(mk({ "x-forwarded-for": "6.6.6.6, 203.0.113.9" }), {}),
+      "203.0.113.9"
+    );
+    // Two trusted proxies: second from the right.
+    assert.equal(
+      rateLimit.clientIp(
+        mk({ "x-forwarded-for": "6.6.6.6, 203.0.113.9, 10.0.0.1" }),
+        { TRUSTED_PROXY_HOPS: "2" }
+      ),
+      "203.0.113.9"
+    );
+    // An edge-set header wins when configured.
+    assert.equal(
+      rateLimit.clientIp(
+        mk({ "x-forwarded-for": "6.6.6.6", "cf-connecting-ip": "198.51.100.7" }),
+        { CLIENT_IP_HEADER: "cf-connecting-ip" }
+      ),
+      "198.51.100.7"
+    );
+    assert.equal(rateLimit.clientIp(mk({ "x-real-ip": "5.6.7.8" }), {}), "5.6.7.8");
+    assert.equal(rateLimit.clientIp(mk({}), {}), "unknown");
+  });
+
+  check("a spoofed X-Forwarded-For prefix cannot mint a fresh rate-limit bucket", () => {
+    const mk = (xff: string) =>
+      ({ headers: new Headers({ "x-forwarded-for": xff }) }) as unknown as Request;
+    const real = "203.0.113.50";
+    const keys = new Set(
+      ["1.1.1.1", "2.2.2.2", "3.3.3.3", "9.9.9.9"].map((fake) =>
+        rateLimit.clientIp(mk(`${fake}, ${real}`), {})
+      )
+    );
+    assert.deepEqual([...keys], [real]);
+  });
+
+  check("framing is only relaxed under `next dev`, never in production", () => {
+    assert.deepEqual(sec.frameAncestors({ NODE_ENV: "production" }), ["'none'"]);
+    assert.deepEqual(sec.frameAncestors({ NODE_ENV: "test" }), ["'none'"]);
+    assert.deepEqual(sec.frameAncestors({}), ["'none'"]);
+    assert.equal(sec.xFrameOptions({ NODE_ENV: "production" }), "DENY");
+    assert.equal(sec.xFrameOptions({}), "DENY");
+    assert.ok(!sec.frameAncestors({ NODE_ENV: "development" }).includes("*"));
+    assert.equal(sec.xFrameOptions({ NODE_ENV: "development" }), null);
   });
 
   console.log("\n— SSRF guard —");
@@ -454,9 +498,16 @@ async function main() {
 
   check("every /api/admin route verifies the session with requireAdmin", () => {
     const missing: string[] = [];
+    // Growth routes go through guardAdmin()/makeAdminCrud(), which must
+    // themselves call requireAdmin — verified here so the shortcut stays safe.
+    const growthApi = readFileSync(join(process.cwd(), "src/lib/growth/api.ts"), "utf8");
+    const guardBody = growthApi.slice(growthApi.indexOf("export async function guardAdmin"));
+    assert.match(guardBody.slice(0, guardBody.indexOf("\n}\n")), /requireAdmin\(req\)/);
+    const crud = readFileSync(join(process.cwd(), "src/lib/growth/adminCrud.ts"), "utf8");
+    assert.equal((crud.match(/await guardAdmin\(req/g) ?? []).length, 4);
     for (const file of routeFiles.filter((f) => f.includes(`${apiDir}/admin`))) {
       const src = readFileSync(file, "utf8");
-      if (!/requireAdmin\(/.test(src)) missing.push(file);
+      if (!/requireAdmin\(|guardAdmin\(req|makeAdminCrud\(/.test(src)) missing.push(file);
     }
     assert.deepEqual(missing, []);
   });
@@ -525,6 +576,165 @@ async function main() {
       const src = readFileSync(join(apiDir, rel), "utf8");
       assert.match(src, /sanitizeProfile/, `${rel} must sanitize the profile`);
     }
+  });
+
+  // ---------------------------------------------------------------------
+  // 2026-09 full-system audit — regressions for the fixed findings
+  // ---------------------------------------------------------------------
+  const routeSrc = (rel: string) => readFileSync(join(apiDir, rel), "utf8");
+  const handlerBodies = (src: string) =>
+    src.split(/(?=export (?:async )?function (?:GET|POST|PUT|PATCH|DELETE)\b)/).slice(1).map((part) => ({
+      method: /function (\w+)/.exec(part)![1],
+      body: part,
+    }));
+
+  check("every API write (POST/PUT/PATCH/DELETE) authenticates, except a reviewed public allowlist", () => {
+    const GUARD = /require(?:Admin|Session|ProfileAccess|RowAccess|FeatureSession)\(|optionalProfileAccess\(|authenticate\(|guard(?:Admin|Student|AiRequest)?\(|getRequester\(|cronAuthorized|verifyPaymeAuth|verifyClickSignature|verifyInitData|webhookSecret\(|makeAdminCrud/;
+    // Intentionally public writes — each has its own protection (rate limit,
+    // provider signature, signed Telegram data) and is reviewed in SECURITY.md.
+    const PUBLIC = new Set([
+      "auth/sign-in POST", "auth/sign-out POST", "auth/telegram/status POST", "auth/telegram/verify POST",
+      "profiles POST", "track POST", "visa/chat POST",
+    ]);
+    const unguarded: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (name === "route.ts") {
+          const rel = p.slice(apiDir.length + 1).replace(/\/route\.ts$/, "");
+          for (const h of handlerBodies(readFileSync(p, "utf8"))) {
+            if (h.method === "GET") continue;
+            if (!GUARD.test(h.body) && !PUBLIC.has(`${rel} ${h.method}`)) unguarded.push(`${rel} ${h.method}`);
+          }
+        }
+      }
+    };
+    walk(apiDir);
+    assert.deepEqual(unguarded, [], `unauthenticated writes: ${unguarded.join(", ")}`);
+  });
+
+  check("Premium features are enforced by their APIs, not only by the website's PremiumGate", () => {
+    const gated: Record<string, string> = {
+      "tasks/route.ts": "roadmap",
+      "essays/route.ts": "ai_essay",
+      "essays/reviews/route.ts": "ai_essay",
+      "essay-adapter/route.ts": "ai_essay",
+      "essay-adapter/adapt/route.ts": "ai_essay",
+      "ai/draft-sop/route.ts": "ai_essay",
+      "ai/review-sop/route.ts": "ai_essay",
+      "forum/categories/route.ts": "forum",
+      "forum/threads/route.ts": "forum",
+      "forum/threads/[id]/route.ts": "forum",
+      "forum/replies/route.ts": "forum",
+      "forum/likes/route.ts": "forum",
+      "forum/reports/route.ts": "forum",
+      "courses/[id]/route.ts": "courses",
+      "courses/progress/route.ts": "courses",
+      "quizzes/attempt/route.ts": "courses",
+      "certificates/route.ts": "courses",
+    };
+    for (const [rel, feature] of Object.entries(gated)) {
+      const src = routeSrc(rel);
+      const enforced =
+        src.includes(`premiumGate(`) && src.includes(`"${feature}"`) ||
+        src.includes(`requireFeatureSession(req, "${feature}")`) ||
+        src.includes(`feature: "${feature}"`);
+      assert.ok(enforced, `${rel} must enforce the "${feature}" feature server-side`);
+    }
+    const tasks = routeSrc("tasks/route.ts");
+    for (const h of handlerBodies(tasks)) {
+      assert.match(h.body, /premiumGate\(/, `tasks ${h.method} must check the plan`);
+    }
+    for (const h of handlerBodies(tasks).filter((x) => x.method === "PATCH" || x.method === "DELETE")) {
+      assert.match(h.body, /requireRowAccess\(/, `tasks ${h.method} must check the row owner`);
+    }
+  });
+
+  check("the website's PremiumGate asks for a specific feature and does not mount locked content", () => {
+    const gate = readFileSync(join(ROOT, "src/components/PremiumGate.tsx"), "utf8");
+    assert.match(gate, /feature: FeatureKey/);
+    assert.match(gate, /data\?\.features\?\.\[feature\]/);
+    const lockedBranch = gate.slice(gate.indexOf("if (isPremium) {"));
+    assert.equal((lockedBranch.match(/\{children\}/g) || []).length, 1, "children may only render in the unlocked branch");
+    const page = readFileSync(join(ROOT, "src/app/page.tsx"), "utf8");
+    const uses = page.match(/<PremiumGate[\s\S]*?>/g) || [];
+    assert.ok(uses.length >= 5 && uses.every((u) => /feature="[a-z_]+"/.test(u)), "every PremiumGate names its feature");
+  });
+
+  check("public / cross-account data exposure fixes stay in place", () => {
+    const gam = readFileSync(join(ROOT, "src/lib/gamification.ts"), "utf8");
+    const lb = gam.slice(gam.indexOf("export async function getLeaderboard"));
+    assert.doesNotMatch(lb.slice(0, lb.indexOf("return rows")), /studentProfiles\.email/, "leaderboard must not select e-mails");
+    assert.doesNotMatch(routeSrc("courses/[id]/route.ts"), /correctOptionIndex/, "quiz answers must not be sent before an attempt");
+    assert.match(routeSrc("quizzes/attempt/route.ts"), /correctOptionIndexes/);
+    assert.match(routeSrc("gamification/award/route.ts"), /requireAdmin\(/);
+    assert.match(routeSrc("forum/categories/route.ts"), /requireAdmin\(/);
+    assert.match(routeSrc("visa/live-token/route.ts"), /requireSession\(/);
+    assert.match(routeSrc("visa/live-token/route.ts"), /LIMITS\.visaLiveToken/);
+    for (const rel of ["consulting/route.ts", "referrals/route.ts"]) {
+      const post = handlerBodies(routeSrc(rel)).find((h) => h.method === "POST")!;
+      assert.match(post.body, /requireProfileAccess\(/, `${rel} POST must act on the caller's own profile`);
+    }
+    for (const rel of ["universities/route.ts", "universities/[id]/route.ts"]) {
+      assert.doesNotMatch(routeSrc(rel), /mock/i, `${rel} must not serve sample data on a DB error`);
+    }
+    const upload = routeSrc("admin/branding/upload/route.ts");
+    assert.ok(upload.indexOf("requireAdmin(") < upload.indexOf("formData()"), "authorize before reading the upload");
+    assert.match(upload, /matchesImageSignature\(/);
+  });
+
+  check("CSRF: cross-site API writes are refused, same-site / non-browser writes pass", () => {
+    const base: { host: string | null; forwardedHost: string | null; env: Record<string, string> } = { host: "app.example.org", forwardedHost: null, env: {} };
+    const t = (method: string, pathname: string, origin: string | null, extra: Partial<typeof base> = {}) =>
+      sec.isCrossSiteApiWrite({ method, pathname, origin, ...base, ...extra });
+    assert.equal(t("POST", "/api/tasks", "https://evil.example"), true);
+    assert.equal(t("DELETE", "/api/tasks", "null"), true);
+    assert.equal(t("POST", "/api/tasks", "https://app.example.org"), false);
+    assert.equal(t("POST", "/api/tasks", null), false, "no Origin = not a browser cross-site request");
+    assert.equal(t("GET", "/api/tasks", "https://evil.example"), false, "reads are not writes");
+    assert.equal(t("POST", "/api/payments/payme/webhook", "https://evil.example"), false, "provider webhooks are exempt");
+    assert.equal(t("POST", "/api/tasks", "https://public.example", { host: "10.0.0.5:3000", forwardedHost: "public.example" }), false);
+    assert.equal(t("POST", "/api/tasks", "https://www.example.org", { host: "internal:3000", env: { APP_URL: "https://www.example.org" } }), false);
+    assert.equal(t("POST", "/api/tasks", "https://app.example.org.evil.example"), true, "suffix tricks do not match");
+    const mw = readFileSync(join(ROOT, "src/middleware.ts"), "utf8");
+    assert.match(mw, /isCrossSiteApiWrite\(/);
+    assert.match(mw, /"\/api\/:path\*"/);
+  });
+
+  const branding = await import("../src/lib/branding");
+  check("upload signatures (bytes)", () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50]);
+    const html = new TextEncoder().encode("<html><script>alert(1)</script>");
+    assert.equal(branding.matchesImageSignature("png", png), true);
+    assert.equal(branding.matchesImageSignature("webp", webp), true);
+    assert.equal(branding.matchesImageSignature("png", html), false);
+    assert.equal(branding.matchesImageSignature("jpg", png), false);
+    assert.equal(branding.matchesImageSignature("svg", html), false);
+  });
+
+  const quota = await import("../src/lib/ai/quota");
+  check("AI quota: limit parsing and decision", () => {
+    assert.equal(quota.parseQuotaLimit("7", "5"), 7);
+    assert.equal(quota.parseQuotaLimit("0", "5"), 0, "0 = no AI on this plan");
+    assert.equal(quota.parseQuotaLimit("", "5"), 5);
+    assert.equal(quota.parseQuotaLimit("abc", "5"), 5);
+    assert.equal(quota.parseQuotaLimit("-3", "5"), 5);
+    assert.equal(quota.parseQuotaLimit("2.5", "5"), 5);
+    assert.deepEqual(quota.quotaDecision({ requests: 4, tokens: 10 }, { requests: 5, tokens: 100 }), { ok: true });
+    assert.deepEqual(quota.quotaDecision({ requests: 5, tokens: 10 }, { requests: 5, tokens: 100 }), { ok: false, reason: "requests" });
+    assert.deepEqual(quota.quotaDecision({ requests: 1, tokens: 100 }, { requests: 5, tokens: 100 }), { ok: false, reason: "tokens" });
+    assert.deepEqual(quota.quotaDecision({ requests: 0, tokens: 0 }, { requests: 0, tokens: 100 }), { ok: false, reason: "requests" });
+  });
+
+  check("AI usage is charged to the caller on every guarded route", () => {
+    for (const rel of ["ai/admissions-advisor", "ai/chat", "ai/draft-sop", "ai/evaluate-profile", "ai/review-sop", "essay-adapter/adapt"]) {
+      assert.match(routeSrc(`${rel}/route.ts`), /profileId: guarded\.usageProfileId/, `${rel} must log usage against the caller`);
+    }
+    const guard = readFileSync(join(ROOT, "src/lib/ai/guard.ts"), "utf8");
+    assert.match(guard, /checkAiQuota\(/);
+    assert.match(guard, /authenticate\(req\)/, "the caller is resolved even without a profileId");
   });
 }
 

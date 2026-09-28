@@ -65,7 +65,7 @@ Make the tone encouraging, professional, precise, and practical.`;
 
     const systemInstruction = "You are ScholarBridge's senior AI Admissions Strategist. Provide structured, practical markdown evaluation with clear actionable insights.";
 
-    let evaluationResult = await callAI(prompt, systemInstruction, { taskType: "admissions", profileId });
+    let evaluationResult = await callAI(prompt, systemInstruction, { taskType: "admissions", profileId: guarded.usageProfileId });
     // aiUsed=true only when the AI provider actually returned an evaluation.
     // When AI is unavailable the route returns a built-in estimate flagged
     // as fallback so the UI never presents fixed info as "AI analysis".

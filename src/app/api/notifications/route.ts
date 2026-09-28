@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { notifications, notificationPreferences } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, notLike } from "drizzle-orm";
+
+/** Hidden idempotency markers (`muted:<type>`, see lib/notificationSweep). */
+const visible = notLike(notifications.type, "muted:%");
 
 /** GET: list notifications for a profile (spec §20 — in-app channel). */
 export async function GET(req: Request) {
@@ -26,13 +29,13 @@ export async function GET(req: Request) {
       ? await db
           .select()
           .from(notifications)
-          .where(and(eq(notifications.profileId, profileId), eq(notifications.isRead, false)))
+          .where(and(eq(notifications.profileId, profileId), eq(notifications.isRead, false), visible))
           .orderBy(desc(notifications.createdAt))
           .limit(limit)
       : await db
           .select()
           .from(notifications)
-          .where(eq(notifications.profileId, profileId))
+          .where(and(eq(notifications.profileId, profileId), visible))
           .orderBy(desc(notifications.createdAt))
           .limit(limit);
 
@@ -63,7 +66,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: true });
     }
     if (notificationId) {
-      await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, Number(notificationId)));
+      // Row-level check: only the caller's own notification (ids are guessable).
+      const ownerId = access.targetId ?? access.session.profile.id;
+      await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(and(eq(notifications.id, Number(notificationId)), eq(notifications.profileId, ownerId)));
       return NextResponse.json({ success: true });
     }
     return NextResponse.json({ error: "notificationId or profileId+all required" }, { status: 400 });
@@ -77,10 +85,20 @@ export async function PATCH(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const profileId = Number(body.profileId);
-    if (!profileId) {
-      return NextResponse.json({ error: "profileId is required" }, { status: 400 });
+    // Previously unauthenticated: anyone could rewrite anyone's preferences.
+    const access = await requireProfileAccess(req, body.profileId);
+    if (!access.ok || !access.targetId) {
+      return NextResponse.json(
+        { error: access.ok ? "profileId is required" : access.error, code: access.ok ? "bad_request" : access.code },
+        { status: access.ok ? 400 : access.status }
+      );
     }
+    const profileId = access.targetId;
+    const bool = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+    body.inApp = bool(body.inApp);
+    body.email = bool(body.email);
+    body.push = bool(body.push);
+    body.types = Array.isArray(body.types) ? body.types.filter((t: unknown) => typeof t === "string").slice(0, 50) : undefined;
     const [existing] = await db
       .select()
       .from(notificationPreferences)

@@ -1,6 +1,6 @@
 # ScholarBridgeAi — Project Definition
 
-**Repository:** `jamijomi344as-jpg/ScholarBridgeAi`
+**Repository:** this repository (see `git remote -v`)
 **Latest commit on `main`:** `aca39e3` (admin panel wired into the UI)
 
 ---
@@ -160,9 +160,10 @@ PostgreSQL (student_profiles, universities, courses, payments, ...)
   `"canceled"`).
 
 ### 5.5 Admin panel
-- **Entry:** a profile with `is_admin = true` (auto-promoted: `seedDatabase()`
-  promotes the first profile if no admin exists). Selecting that profile in
-  the navbar dropdown reveals the **Admin Panel** tab (dark pill, crown icon)
+- **Entry:** a profile with `is_admin = true`. The first admin comes from
+  `ADMIN_EMAIL` (seed, only while no platform owner exists — no profile is
+  ever auto-promoted); further admins are granted by the platform owner in
+  **Admin → Ownership**. Signing in as an admin reveals the **Admin Panel** tab (dark pill, crown icon)
   → `{activeTab === "admin" && <AdminPanel .../>}` renders the panel.
 - **Tabs & managers:**
   - *Universities* (indigo) — `UniversitiesManager`: add/edit/delete

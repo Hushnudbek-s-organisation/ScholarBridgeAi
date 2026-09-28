@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, locales } from "@/i18n/config";
+import { frameAncestors, isCrossSiteApiWrite, isMiniAppPath, miniAppFrameAncestors, strictTransportSecurity, xFrameOptions } from "@/lib/security";
 
 /**
  * Cryptographically random nonce using the Web Crypto API (the middleware runs
@@ -33,7 +34,7 @@ const LOCALE_COOKIE = "scholarbridge_locale";
  * Set CSP_REPORT_ONLY=1 to ship the same policy in report-only mode while
  * watching for breakage in the browser console.
  */
-export function contentSecurityPolicy(nonce: string): string {
+export function contentSecurityPolicy(nonce: string, opts: { miniApp?: boolean } = {}): string {
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     // 'strict-dynamic' lets the app's own (nonced) bundles load what they need
@@ -59,7 +60,11 @@ export function contentSecurityPolicy(nonce: string): string {
     // No plugins, no embedding this site in a frame (clickjacking), no
     // relative-base-tag hijacking.
     "object-src": ["'none'"],
-    "frame-ancestors": ["'none'"],
+    // Production: nobody may embed the app. Development: only the known
+    // preview hosts, so the app can be shown inside the IDE preview.
+    // The Telegram Mini App page (/tg) may additionally be framed by
+    // Telegram Web — and nothing else.
+    "frame-ancestors": opts.miniApp ? miniAppFrameAncestors() : frameAncestors(),
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
     "frame-src": ["'self'"],
@@ -72,33 +77,54 @@ export function contentSecurityPolicy(nonce: string): string {
 }
 
 /** Static hardening headers applied to every response. */
-function applySecurityHeaders(response: NextResponse, csp: string): NextResponse {
+function applySecurityHeaders(response: NextResponse, csp: string, miniApp = false): NextResponse {
   const headers = response.headers;
   const headerName = process.env.CSP_REPORT_ONLY === "1"
     ? "Content-Security-Policy-Report-Only"
     : "Content-Security-Policy";
   headers.set(headerName, csp);
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
+  // DENY everywhere except under `next dev` (see src/lib/security.ts).
+  // X-Frame-Options cannot allow a specific host, so the Mini App page relies
+  // on the CSP frame-ancestors allowlist instead.
+  const frameOptions = miniApp ? null : xFrameOptions();
+  if (frameOptions) headers.set("X-Frame-Options", frameOptions);
+  else headers.delete("X-Frame-Options");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   headers.set("X-DNS-Prefetch-Control", "off");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   // Only meaningful over HTTPS; browsers ignore it otherwise.
-  if (process.env.NODE_ENV === "production") {
-    headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
-    );
-  }
+  const hsts = strictTransportSecurity();
+  if (hsts) headers.set("Strict-Transport-Security", hsts);
   return response;
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // API: only the CSRF check runs here — routes set their own responses.
+  if (pathname.startsWith("/api/")) {
+    const crossSite = isCrossSiteApiWrite({
+      method: request.method,
+      pathname,
+      origin: request.headers.get("origin"),
+      host: request.headers.get("host"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
+    });
+    if (crossSite) {
+      return NextResponse.json(
+        { error: "Cross-site request refused.", code: "cross_site_request" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.next();
+  }
+
   const nonce = randomNonce();
-  const csp = contentSecurityPolicy(nonce);
+  const miniApp = isMiniAppPath(pathname);
+  const csp = contentSecurityPolicy(nonce, { miniApp });
 
   // Hand the policy to Next.js: the App Router reads the nonce out of the
   // *request* Content-Security-Policy header (see
@@ -132,7 +158,7 @@ export function middleware(request: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });
-    return applySecurityHeaders(response, csp);
+    return applySecurityHeaders(response, csp, miniApp);
   }
 
   // For unprefixed requests, seed the default locale cookie if it is missing.
@@ -146,9 +172,10 @@ export function middleware(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
     });
   }
-  return applySecurityHeaders(response, csp);
+  return applySecurityHeaders(response, csp, miniApp);
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|.*\\..*).*)"],
+  // Pages (locale + security headers) and API writes (CSRF check only).
+  matcher: ["/((?!api|_next|.*\\..*).*)", "/api/:path*"],
 };

@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, doublePrecision, boolean, timestamp, date, numeric, index, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
@@ -542,7 +543,11 @@ export const aiUsage = pgTable("ai_usage", {
   costEstimate: doublePrecision("cost_estimate").notNull().default(0),
   status: text("status").notNull().default("success"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  // The daily AI quota counts one profile's requests in the last 24 hours on
+  // every AI call — without this index that is a full scan of ai_usage.
+  index("idx_ai_usage_profile_created").on(table.profileId, table.createdAt),
+]);
 
 // ---------------------------------------------------------------------------
 // 8. APPLICATION DOCUMENTS (spec §24)
@@ -1031,5 +1036,282 @@ export const essayReviews = pgTable(
   (table) => [
     index("idx_essay_reviews_version").on(table.essayVersionId),
     index("idx_essay_reviews_reviewer").on(table.reviewerProfileId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
+// Growth features (supabase/add_growth_features.sql). Ideas taken from
+// AdmitYogi/AdmitSee (success stories), ScholarshipOwl (scholarship autopilot,
+// reusable answers), Crimson (goal planner) and ApplyBoard (departure
+// checklist) — adapted, not copied. Every catalogue here is admin-managed.
+// The same DDL runs lazily from `src/lib/growth/db.ts` so a deploy never
+// needs a manual migration first.
+// ---------------------------------------------------------------------------
+
+/** Admitted-student stories: user-submitted, admin-moderated. */
+export const successStories = pgTable(
+  "success_stories",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    displayName: text("display_name").notNull().default("Anonymous"),
+    homeCountry: text("home_country"),
+    admittedUniversity: text("admitted_university").notNull(),
+    admittedCountry: text("admitted_country"),
+    otherAdmits: text("other_admits").notNull().default("[]"), // JSON list of names
+    degreeLevel: text("degree_level"),
+    major: text("major"),
+    intakeYear: integer("intake_year"),
+    gpa: doublePrecision("gpa"),
+    gpaScale: doublePrecision("gpa_scale"),
+    ielts: doublePrecision("ielts"),
+    toefl: integer("toefl"),
+    sat: integer("sat"),
+    activities: text("activities").notNull().default("[]"), // JSON list
+    awards: text("awards").notNull().default("[]"), // JSON list
+    essayTitle: text("essay_title"),
+    essayExcerpt: text("essay_excerpt"),
+    advice: text("advice"),
+    scholarshipName: text("scholarship_name"),
+    scholarshipAmountUsd: integer("scholarship_amount_usd"),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected
+    isVerified: boolean("is_verified").notNull().default(false),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    adminNote: text("admin_note"),
+    views: integer("views").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_success_stories_status").on(table.status),
+    index("idx_success_stories_profile").on(table.profileId),
+  ]
+);
+
+/** Admin library of goals students can adopt (Academic / Activities / Skills / Career). */
+export const goalTemplates = pgTable("goal_templates", {
+  id: serial("id").primaryKey(),
+  pillar: text("pillar").notNull().default("academic"), // academic | activities | skills | career
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  steps: text("steps").notNull().default("[]"), // JSON list of step strings
+  level: text("level").notNull().default("any"), // any | high_school | undergrad | grad
+  estWeeks: integer("est_weeks"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** A student's adopted (or custom) goal with its own step progress. */
+export const studentGoals = pgTable(
+  "student_goals",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    templateId: integer("template_id").references(() => goalTemplates.id, { onDelete: "set null" }),
+    pillar: text("pillar").notNull().default("academic"),
+    title: text("title").notNull(),
+    steps: text("steps").notNull().default("[]"), // JSON [{ text, done }]
+    status: text("status").notNull().default("active"), // active | done
+    targetDate: date("target_date"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_student_goals_profile").on(table.profileId)]
+);
+
+/** Admin-managed common application questions ("write once, reuse everywhere"). */
+export const answerPrompts = pgTable("answer_prompts", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull().default("general"), // general | motivation | career | leadership | challenge | community
+  question: text("question").notNull(),
+  hint: text("hint").notNull().default(""),
+  wordLimit: integer("word_limit"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** The student's saved answer to one prompt. */
+export const answerVault = pgTable(
+  "answer_vault",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    promptId: integer("prompt_id").references(() => answerPrompts.id, { onDelete: "cascade" }).notNull(),
+    answer: text("answer").notNull().default(""),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_answer_vault_profile_prompt").on(table.profileId, table.promptId)]
+);
+
+/** Scholarship autopilot decisions: hidden ("not for me") or applied. */
+export const scholarshipDecisions = pgTable(
+  "scholarship_decisions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    scholarshipId: integer("scholarship_id").references(() => scholarships.id, { onDelete: "cascade" }).notNull(),
+    status: text("status").notNull(), // hidden | applied
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_scholarship_decisions_profile_sch").on(table.profileId, table.scholarshipId)]
+);
+
+/** Admin-managed "after the offer" checklist items, grouped by phase. */
+export const checklistItems = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  phase: text("phase").notNull().default("offer"), // offer | visa | money | housing | travel | arrival
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  linkTab: text("link_tab"), // optional in-app section id
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Which checklist items a student has ticked. */
+export const studentChecklist = pgTable(
+  "student_checklist",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    itemId: integer("item_id").references(() => checklistItems.id, { onDelete: "cascade" }).notNull(),
+    doneAt: timestamp("done_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_student_checklist_profile_item").on(table.profileId, table.itemId)]
+);
+
+// ---------------------------------------------------------------------------
+// TELEGRAM BOT — sign-in codes + notification delivery
+// (supabase/add_telegram.sql; created lazily by src/lib/telegram/db.ts)
+// ---------------------------------------------------------------------------
+
+/** One Telegram chat linked to one ScholarBridge account. */
+export const telegramLinks = pgTable("telegram_links", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull().unique(),
+  // Telegram ids can exceed 32 bits — stored as text.
+  telegramUserId: text("telegram_user_id").notNull().unique(),
+  chatId: text("chat_id").notNull(),
+  username: text("username"),
+  firstName: text("first_name"),
+  languageCode: text("language_code"),
+  notifyEnabled: boolean("notify_enabled").notNull().default(true),
+  mutedTypes: text("muted_types").notNull().default("[]"), // JSON array of notification types
+  blocked: boolean("blocked").notNull().default(false), // user blocked the bot
+  linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  lastLoginAt: timestamp("last_login_at"),
+  lastMessageAt: timestamp("last_message_at"),
+  // Bot paging: the last search the user ran ({ kind, q, page }) so compact
+  // callback buttons (`pg:u:2`) never have to carry the query text.
+  lastQuery: text("last_query"),
+  // JSON array of reminder offsets in days (null → DEFAULT_REMINDER_DAYS).
+  reminderDays: text("reminder_days"),
+});
+
+/**
+ * A sign-in (or "connect Telegram") attempt. The browser keeps a secret
+ * nonce; Telegram only ever sees the public start token. The 6-digit code the
+ * bot sends is valid only together with that nonce, so codes cannot be
+ * guessed across other people's attempts.
+ */
+export const telegramLoginRequests = pgTable("telegram_login_requests", {
+  id: serial("id").primaryKey(),
+  startToken: text("start_token").notNull().unique(),
+  nonceHash: text("nonce_hash").notNull(),
+  purpose: text("purpose").notNull().default("login"), // login | link
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }), // link: who asked
+  status: text("status").notNull().default("pending"), // pending | code_sent | used | failed | locked
+  failReason: text("fail_reason"),
+  telegramUserId: text("telegram_user_id"),
+  chatId: text("chat_id"),
+  username: text("username"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  languageCode: text("language_code"),
+  codeHash: text("code_hash"),
+  codeExpiresAt: timestamp("code_expires_at"),
+  codesSent: integer("codes_sent").notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+  ip: text("ip"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+/** Delivery log for the admin panel (codes are never stored). */
+export const telegramMessages = pgTable(
+  "telegram_messages",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    chatId: text("chat_id"),
+    kind: text("kind").notNull(), // code | notification | broadcast | test | login_alert | reply
+    type: text("type"),
+    preview: text("preview"),
+    status: text("status").notNull(), // sent | failed
+    error: text("error"),
+    // Failed notification deliveries keep what is needed to retry them.
+    retryPayload: text("retry_payload"),
+    attempts: integer("attempts").notNull().default(1),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_telegram_messages_created").on(table.createdAt)]
+);
+
+/**
+ * Processed webhook update ids — Telegram re-delivers an update when a
+ * response is slow, so the id is claimed with INSERT … ON CONFLICT before any
+ * work happens (works across server instances and restarts). Pruned by the
+ * reminder sweep after 7 days.
+ */
+export const telegramUpdates = pgTable(
+  "telegram_updates",
+  {
+    updateId: bigint("update_id", { mode: "number" }).primaryKey(),
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_telegram_updates_received").on(table.receivedAt)]
+);
+
+/**
+ * Platform ownership (singleton, id = 1) — who owns this ScholarBridge
+ * instance inside the app. Separate from infrastructure/third-party accounts
+ * (hosting, Supabase, BotFather, AI providers), which the app cannot move.
+ * Mirrors src/lib/ownership/ddl.ts (applied lazily) and
+ * supabase/add_ownership.sql.
+ */
+export const platformOwnership = pgTable(
+  "platform_ownership",
+  {
+    id: integer("id").primaryKey().default(1),
+    ownerProfileId: integer("owner_profile_id").references(() => studentProfiles.id, { onDelete: "restrict" }).notNull(),
+    source: text("source").notNull().default("bootstrap"), // bootstrap | transfer
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [check("platform_ownership_id_check", sql`${table.id} = 1`)]
+);
+
+/** Ownership transfer requests + history (see src/lib/ownership/state.ts). */
+export const ownershipTransfers = pgTable(
+  "ownership_transfers",
+  {
+    id: serial("id").primaryKey(),
+    fromProfileId: integer("from_profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    toProfileId: integer("to_profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    status: text("status").notNull().default("pending"), // pending | accepted | completed | rejected | expired | cancelled
+    retainPreviousAdmin: boolean("retain_previous_admin").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    decidedAt: timestamp("decided_at"),
+    decidedBy: integer("decided_by").references(() => studentProfiles.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    uniqueIndex("ownership_transfers_one_open").on(sql`(true)`).where(sql`status IN ('pending', 'accepted')`),
+    index("ownership_transfers_to_idx").on(table.toProfileId, table.status),
+    check("ownership_transfers_status_check", sql`${table.status} IN ('pending', 'accepted', 'completed', 'rejected', 'expired', 'cancelled')`),
+    check("ownership_transfers_check", sql`${table.fromProfileId} <> ${table.toProfileId}`),
   ]
 );

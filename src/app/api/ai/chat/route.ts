@@ -68,7 +68,11 @@ ${profileContext}`;
 
     const fullPrompt = `${historyText ? "CONVERSATION HISTORY:\n" + historyText + "\n\n" : ""}User Question: ${message}`;
 
-    let reply = await callAI(fullPrompt, systemInstruction, { taskType: "general", profileId: profileId ?? null });
+    let reply = await callAI(fullPrompt, systemInstruction, { taskType: "general", profileId: guarded.usageProfileId });
+    // `offline` tells the client this is canned guidance, not a live model
+    // answer, so it can be labelled honestly (the product promise is "no
+    // invented facts" — an unlabelled template would quietly break that).
+    const offline = !reply;
 
     if (!reply) {
       // Intelligent fallback responses based on query topic.
@@ -117,7 +121,7 @@ Need a draft? Use the **AI SOP Assistant** in the main menu.`;
       } else {
         fallback = `### ScholarBridgeAI Guidance
 
-Thank you for your question regarding **"${message}"**.
+Our AI mentor is offline right now, so here is general guidance instead of a personalised answer.
 
 Action items to keep in mind:
 
@@ -130,7 +134,7 @@ You can compare tuition and acceptance rates in the **University Explorer**, or 
       reply = normalizeAiReply(fallback);
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, offline });
   } catch (error) {
     console.error("POST /api/ai/chat error:", error);
     return NextResponse.json({ error: "Failed to process chat message" }, { status: 500 });

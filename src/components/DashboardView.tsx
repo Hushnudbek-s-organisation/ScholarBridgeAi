@@ -154,7 +154,8 @@ export function DashboardView({
             </h1>
             
             <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
-              {t("heroBody", {
+              {t.rich("heroBody", {
+                b: (chunks) => <strong className="font-bold text-white">{chunks}</strong>,
                 gpa: profile.gpa,
                 scale: profile.gpaScale,
                 test: profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : t("testPrepActive"),

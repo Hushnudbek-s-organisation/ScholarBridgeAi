@@ -5,7 +5,11 @@ import { eq, sql } from "drizzle-orm";
 import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
-import { clampString, readJsonBody } from "@/lib/request";
+import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
+import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { currentOwnerId } from "@/lib/ownership/service";
+import { writeAudit } from "@/lib/audit";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -49,8 +53,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 function numField(value: unknown): number | null | undefined {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/** Round an optional number for integer columns, preserving null/undefined. */
+function roundOpt(value: number | null | undefined): number | null | undefined {
+  return typeof value === "number" ? Math.round(value) : value;
 }
 
 function boolField(value: unknown): boolean | null | undefined {
@@ -103,9 +113,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     const body = parsed.body;
 
-    let countriesStr = body.preferredCountries;
+    // Stored as a JSON array string. Anything that is not an array or a
+    // string (e.g. an object) is ignored rather than crashing the insert.
+    let countriesStr: string | undefined;
     if (Array.isArray(body.preferredCountries)) {
-      countriesStr = JSON.stringify(body.preferredCountries);
+      countriesStr = JSON.stringify(
+        body.preferredCountries
+          .filter((c: unknown) => typeof c === "string")
+          .map((c: string) => clampString(c, 80))
+          .filter(Boolean)
+          .slice(0, 40)
+      );
+    } else if (typeof body.preferredCountries === "string" && body.preferredCountries.trim()) {
+      countriesStr = clampString(body.preferredCountries, 4000);
     }
 
     // Email change: it must not collide with another account's email
@@ -122,6 +142,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       body.email.trim() &&
       body.email.trim().toLowerCase() !== current.email.trim().toLowerCase()
     ) {
+      // Reserved for bot-created accounts (see /api/profiles POST).
+      if (isTelegramPlaceholderEmail(body.email.trim())) {
+        return NextResponse.json(
+          { error: "Please provide a valid email address", code: "invalid_email" },
+          { status: 400 }
+        );
+      }
       const [taken] = await db
         .select({ id: studentProfiles.id })
         .from(studentProfiles)
@@ -150,37 +177,48 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const [updatedProfile] = await db.update(studentProfiles)
       .set({
         name: body.name !== undefined ? clampString(body.name, 120) : undefined,
-        email: body.email !== undefined ? clampString(body.email, 320) : undefined,
+        // An empty email would break sign-in — leave the stored one untouched.
+        email: body.email !== undefined ? clampString(body.email, 320) || undefined : undefined,
         passwordHash: newPasswordHash,
-        degreeLevel: body.degreeLevel !== undefined ? body.degreeLevel : undefined,
-        targetMajor: body.targetMajor !== undefined ? body.targetMajor : undefined,
-        gpa: body.gpa !== undefined ? Number(body.gpa) : undefined,
-        gpaScale: body.gpaScale !== undefined ? Number(body.gpaScale) : undefined,
+        // NOT NULL text columns: an empty/garbage value leaves them untouched.
+        degreeLevel: clampString(body.degreeLevel, 60) || undefined,
+        targetMajor: clampString(body.targetMajor, 160) || undefined,
+        // Numbers go through optionalNumber: `Number("abc")` is NaN and
+        // Postgres would store NaN in a double column. NOT NULL columns
+        // treat "cleared" (null) as "unchanged" instead of failing with 500.
+        gpa: optionalNumber(body.gpa, { min: 0, max: 100 }) ?? undefined,
+        gpaScale: optionalNumber(body.gpaScale, { min: 1, max: 100 }) ?? undefined,
         // Test scores: null/0/negative -> NULL (a 0 is not a real score).
-        ieltsScore: body.ieltsScore !== undefined ? (body.ieltsScore === null || Number(body.ieltsScore) <= 0 ? null : Number(body.ieltsScore)) : undefined,
-        toeflScore: body.toeflScore !== undefined ? (body.toeflScore === null || Number(body.toeflScore) <= 0 ? null : Number(body.toeflScore)) : undefined,
-        satScore: body.satScore !== undefined ? (body.satScore === null || Number(body.satScore) <= 0 ? null : Number(body.satScore)) : undefined,
-        greScore: body.greScore !== undefined ? (body.greScore === null || Number(body.greScore) <= 0 ? null : Number(body.greScore)) : undefined,
-        budgetAnnualUsd: body.budgetAnnualUsd !== undefined ? Number(body.budgetAnnualUsd) : undefined,
+        // Integer columns are rounded — "95.5" would otherwise be a 500.
+        ieltsScore: optionalScore(body.ieltsScore, 9),
+        toeflScore: roundOpt(optionalScore(body.toeflScore, 120)),
+        satScore: roundOpt(optionalScore(body.satScore, 1600)),
+        greScore: roundOpt(optionalScore(body.greScore, 340)),
+        budgetAnnualUsd:
+          optionalNumber(body.budgetAnnualUsd, { min: 0, max: 10_000_000, integer: true }) ?? undefined,
         preferredCountries: countriesStr,
-        needScholarship: body.needScholarship !== undefined ? body.needScholarship : undefined,
-        extracurriculars: body.extracurriculars !== undefined ? body.extracurriculars : undefined,
-        workExperienceYears: body.workExperienceYears !== undefined ? Number(body.workExperienceYears) : undefined,
-        researchPublications: body.researchPublications !== undefined ? Number(body.researchPublications) : undefined,
-        preferredLocale: body.preferredLocale !== undefined ? body.preferredLocale : undefined,
+        needScholarship:
+          typeof body.needScholarship === "boolean" ? body.needScholarship : undefined,
+        extracurriculars: textField(body.extracurriculars, 4000),
+        workExperienceYears: optionalNumber(body.workExperienceYears, { min: 0, max: 80, integer: true }),
+        researchPublications: optionalNumber(body.researchPublications, { min: 0, max: 1000, integer: true }),
+        preferredLocale:
+          body.preferredLocale === "en" || body.preferredLocale === "ru" || body.preferredLocale === "uz"
+            ? body.preferredLocale
+            : undefined,
         // --- Complete profile (Academic / Personal / Financial / Activities /
         //     Achievements / Goals). Never invent values: absent fields stay
         //     untouched, empty ones become NULL (spec §19).
-        actScore: numField(body.actScore),
-        duolingoScore: numField(body.duolingoScore),
+        actScore: roundOpt(numField(body.actScore)),
+        duolingoScore: roundOpt(numField(body.duolingoScore)),
         apCourses: jsonListField(body.apCourses),
         ibCourses: jsonListField(body.ibCourses),
         aLevelSubjects: jsonListField(body.aLevelSubjects),
         courseworkNotes: textField(body.courseworkNotes, 2000),
         country: textField(body.country, 80),
-        age: numField(body.age),
-        graduationYear: numField(body.graduationYear),
-        familyIncomeUsd: numField(body.familyIncomeUsd),
+        age: roundOpt(numField(body.age)),
+        graduationYear: roundOpt(numField(body.graduationYear)),
+        familyIncomeUsd: roundOpt(numField(body.familyIncomeUsd)),
         needsFinancialAid: boolField(body.needsFinancialAid),
         requiresFullScholarship: boolField(body.requiresFullScholarship),
         leadership: jsonListField(body.leadership),
@@ -201,7 +239,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         dataShareConsentAt:
           body.dataShareConsent === true && !body.dataShareConsentAt ? new Date() : undefined,
         // Onboarding wizard persistence (resume support)
-        onboardingStep: body.onboardingStep !== undefined ? Number(body.onboardingStep) : undefined,
+        onboardingStep:
+          optionalNumber(body.onboardingStep, { min: 0, max: 50, integer: true }) ?? undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
         updatedAt: new Date(),
       })
@@ -245,7 +284,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   } catch (error) {
     console.error("PUT /api/profiles/[id] error:", error);
     // Race on the unique email index.
-    if ((error as { code?: string })?.code === "23505") {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: "This email is already used by another account" },
         { status: 409 }
@@ -266,7 +305,27 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
+    if (!Number.isInteger(profileId) || profileId <= 0) {
+      return NextResponse.json({ error: "Invalid profile id" }, { status: 400 });
+    }
+    // The platform owner cannot be deleted — transfer ownership first.
+    if ((await currentOwnerId()) === profileId) {
+      return NextResponse.json(
+        { error: "This account owns the platform. Transfer ownership before deleting it.", code: "owner_protected" },
+        { status: 409 }
+      );
+    }
+
     await db.delete(studentProfiles).where(eq(studentProfiles.id, profileId));
+    await writeAudit({
+      entityType: "admin_role",
+      entityId: profileId,
+      fieldChanged: "profile_deleted",
+      oldValue: null,
+      newValue: true,
+      source: `admin:${access.session.profile.id}`,
+      actor: "ADMIN",
+    }).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/profiles/[id] error:", error);

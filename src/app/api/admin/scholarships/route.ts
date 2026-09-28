@@ -4,6 +4,7 @@ import { scholarships } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { auditRowChanges, writeAudit } from "@/lib/audit";
+import { notifyScholarshipDeadlineChanged, notifyScholarshipOpened } from "@/lib/notificationSweep";
 
 function toBool(value: any): boolean {
   return value === true || value === "true";
@@ -114,6 +115,15 @@ export async function PATCH(req: Request) {
       .where(eq(scholarships.id, id))
       .returning();
     await auditRowChanges("scholarship", id, existing, { ...existing, ...values }, { actor: "ADMIN" });
+    // Tell everyone who saved it (bell + Telegram). Never fails the save.
+    try {
+      await notifyScholarshipDeadlineChanged(scholarship, existing.deadlineDate, scholarship.deadlineDate);
+      if (existing.applicationStatus !== "open" && scholarship.applicationStatus === "open") {
+        await notifyScholarshipOpened(scholarship);
+      }
+    } catch (err) {
+      console.warn("scholarship change notifications failed:", err);
+    }
     return NextResponse.json({ scholarship });
   } catch (error) {
     console.error("PATCH /api/admin/scholarships error:", error);

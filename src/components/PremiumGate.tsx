@@ -2,9 +2,12 @@
 
 import React, { useEffect, useState, ReactNode } from "react";
 import { Lock, Crown } from "lucide-react";
+import type { FeatureKey } from "@/lib/entitlements";
 
 interface PremiumGateProps {
   profileId: number | null;
+  /** The entitlement this section needs — the same key its APIs check with premiumGate. */
+  feature: FeatureKey;
   title?: string;
   description?: string;
   onUpgrade: () => void;
@@ -12,11 +15,13 @@ interface PremiumGateProps {
 }
 
 /**
- * Wraps a premium-only section. If the profile is not an active subscriber,
- * it shows a lock overlay prompting the user to buy Premium, with a button
- * that navigates to the payments section.
+ * Wraps a premium-only section. Access comes from /api/premium/status, which
+ * answers per feature with the same rule the APIs enforce server-side (plan,
+ * admin role and the admin's feature_<name> overrides). When locked, the
+ * section is NOT mounted: its APIs would refuse a free account anyway, and a
+ * blurred copy of the real section only invites a DevTools "unlock".
  */
-export function PremiumGate({ profileId, title, description, onUpgrade, children }: PremiumGateProps) {
+export function PremiumGate({ profileId, feature, title, description, onUpgrade, children }: PremiumGateProps) {
   const [isPremium, setIsPremium] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -28,7 +33,9 @@ export function PremiumGate({ profileId, title, description, onUpgrade, children
     fetch(`/api/premium/status?profileId=${profileId}`)
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled) setIsPremium(!!data.isPremium);
+        if (cancelled) return;
+        const allowed = data?.features?.[feature];
+        setIsPremium(typeof allowed === "boolean" ? allowed : !!data?.isPremium);
       })
       .catch(() => {
         if (!cancelled) setIsPremium(false);
@@ -36,7 +43,7 @@ export function PremiumGate({ profileId, title, description, onUpgrade, children
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+  }, [profileId, feature]);
 
   if (isPremium === null) {
     return (
@@ -52,8 +59,15 @@ export function PremiumGate({ profileId, title, description, onUpgrade, children
 
   return (
     <div className="relative">
-      <div className="pointer-events-none opacity-30 select-none blur-[1px] max-h-[420px] overflow-hidden">
-        {children}
+      <div aria-hidden="true" className="pointer-events-none select-none min-h-[420px] rounded-2xl border border-slate-200 bg-white p-6 space-y-4 opacity-40">
+        <div className="h-6 w-1/3 rounded-lg bg-slate-200" />
+        <div className="h-4 w-2/3 rounded-lg bg-slate-100" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="h-28 rounded-xl bg-slate-100" />
+          <div className="h-28 rounded-xl bg-slate-100" />
+        </div>
+        <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
+        <div className="h-4 w-3/5 rounded-lg bg-slate-100" />
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="bg-white/95 backdrop-blur rounded-3xl border border-amber-300 shadow-2xl p-8 max-w-md w-full text-center space-y-4">

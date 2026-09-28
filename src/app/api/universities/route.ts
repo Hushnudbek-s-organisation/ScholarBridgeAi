@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authenticate } from "@/lib/auth";
 import { db } from "@/db";
 import {
   universities,
@@ -10,7 +11,6 @@ import {
 import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
-import { mockUniversityListPayload } from "@/lib/mock-universities";
 import { paginatedPayload } from "@/lib/pagination";
 
 /**
@@ -94,8 +94,14 @@ export async function GET(req: Request) {
     let profileData = null;
     if (profileIdStr) {
       const pId = parseInt(profileIdStr, 10);
-      const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-      if (p) profileData = p;
+      // Personalised matching reads private profile data (GPA, scores,
+      // degree), so only the owner — or an admin — gets it. Anyone else
+      // silently receives the public, unpersonalised list.
+      const auth = await authenticate(req);
+      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
+        if (p) profileData = p;
+      }
     }
 
     // ---------- Filtering (NULL values excluded from numeric filters) ----------
@@ -294,11 +300,13 @@ export async function GET(req: Request) {
     );
   } catch (error) {
     console.error("GET /api/universities error:", error);
-    // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
-    const payload = mockUniversityListPayload();
-    const { searchParams } = new URL(req.url);
+    // Never substitute sample universities: during a database outage students
+    // would be shown made-up data as if it were real. Clients show the error
+    // (the website's explorer / detail views, and the Telegram bot's
+    // "temporarily unavailable" message for 503).
     return NextResponse.json(
-      paginatedPayload("universities", payload.universities, searchParams),
+      { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
+      { status: 503 },
     );
   }
 }

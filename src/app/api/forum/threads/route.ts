@@ -3,15 +3,20 @@ import { db } from "@/db";
 import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategories } from "@/db/schema";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
-import { notifyAdmins } from "@/lib/notifications";
+import { notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
+import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { clampString } from "@/lib/request";
+import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 
 const PAGE_SIZE = 10;
 
 export async function GET(req: Request) {
   try {
+    // Reading the forum is part of the Premium `forum` feature (not only the UI).
+    const member = await requireFeatureSession(req, "forum");
+    if (!member.ok) return member.response;
     const { searchParams } = new URL(req.url);
     const categoryIdStr = searchParams.get("categoryId");
     const authorIdStr = searchParams.get("authorId");
@@ -125,6 +130,8 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "forum");
+    if (locked) return locked;
     const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
     if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 
@@ -157,11 +164,10 @@ export async function POST(req: Request) {
         .select({ name: studentProfiles.name })
         .from(studentProfiles)
         .where(eq(studentProfiles.id, thread.authorId));
-      await notifyAdmins({
+      await notifyAdminsLocalized({
         type: "forum_thread",
-        title: "💬 New community thread",
-        body: `${author?.name || "A student"} posted: ${String(title).slice(0, 100)}`,
         link: `/forum`,
+        text: (lang) => NOTIFY_TEXTS.adminForumThread(lang, { name: author?.name || someoneName(lang), title: String(title) }),
       });
     } catch (err) {
       console.error("Failed to notify admins about new thread:", err);

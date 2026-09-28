@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { db } from "@/db";
 import { lessonProgress, lessons, courseModules, courses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "courses");
+    if (locked) return locked;
 
     if (!profileId || !lessonId || typeof watchedSeconds !== "number") {
       return NextResponse.json({ error: "profileId, lessonId and watchedSeconds are required" }, { status: 400 });

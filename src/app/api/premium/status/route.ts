@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
 import { optionalProfileAccess } from "@/lib/auth";
-import { db } from "@/db";
-import { studentProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { findActiveSubscription, subscriptionIsActive } from "@/lib/payments";
-import { referralPremiumActive } from "@/lib/referrals";
-import { profilePlan } from "@/lib/entitlements";
+import { featureAccess, getPremiumStatus } from "@/lib/premium";
+import { DEFAULT_FEATURE_PLAN, type FeatureKey } from "@/lib/entitlements";
+
+const FEATURES = Object.keys(DEFAULT_FEATURE_PLAN) as FeatureKey[];
 
 /**
- * Premium status is "active" when EITHER:
- *  - a paid subscription is active (Payme/Click, subscriptions table), or
- *  - premium was granted through the referral system
- *    (student_profiles.is_premium + premium_until, stackable 30-day grants).
- *
- * Also returns the computed plan (free/premium/admin) for the centralized
- * entitlement system (spec §17).
+ * Premium status for the signed-in profile (see lib/premium for the rules:
+ * active subscription OR referral grant). Also returns the computed plan
+ * (free/premium/admin) and, per gated feature, whether this profile may use
+ * it — the same answer the APIs enforce with `premiumGate`, so the website
+ * never locks what the server allows (or shows what it refuses).
  */
 export async function GET(req: Request) {
   try {
@@ -30,26 +26,14 @@ export async function GET(req: Request) {
     }
 
     if (!profileId) {
-      return NextResponse.json({ isPremium: false, plan: "free" });
+      return NextResponse.json({ isPremium: false, plan: "free", features: {} });
     }
 
-    const sub = await findActiveSubscription(profileId);
-    const subscriptionActive = subscriptionIsActive(sub);
-
-    const [profile] = await db
-      .select()
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, profileId));
-
-    const referralActive = profile ? referralPremiumActive(profile) : false;
-    const isPremium = subscriptionActive || referralActive;
-
-    return NextResponse.json({
-      isPremium,
-      source: subscriptionActive ? "subscription" : referralActive ? "referral" : "none",
-      premiumUntil: referralActive ? profile?.premiumUntil : subscriptionActive ? sub?.currentPeriodEnd : null,
-      plan: profile ? profilePlan({ isAdmin: profile.isAdmin, isPremium, premiumUntil: profile.premiumUntil }) : "free",
-    });
+    const [status, features] = await Promise.all([
+      getPremiumStatus(profileId),
+      featureAccess(profileId, FEATURES),
+    ]);
+    return NextResponse.json({ ...status, features });
   } catch (error) {
     console.error("GET /api/premium/status error:", error);
     return NextResponse.json({ error: "Failed to check premium status" }, { status: 500 });

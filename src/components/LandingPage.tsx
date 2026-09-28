@@ -2,6 +2,21 @@
 
 import { BrandingImage } from "./BrandingImage";
 import React from "react";
+import { motion } from "framer-motion";
+import { Reveal, RevealGroup, RevealItem } from "./motion";
+import { staggerParent } from "./motion/variants";
+import { ThemeSwitch } from "./ThemeToggle";
+
+/** Hero children: each one rises a beat after the previous. */
+const heroGroup = staggerParent(0.1, 0.08);
+const heroItem = {
+  hidden: { opacity: 0, y: 22 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
+  },
+};
 import { useTranslations } from "next-intl";
 import {
   ArrowRight, Award, Bot, CheckCircle2, ClipboardCheck, Crown, FileText, GraduationCap,
@@ -77,15 +92,15 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] font-sans text-[#101828]">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* ===== Header ===== */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-[72px] w-[min(1160px,92%)] items-center justify-between">
-          <a href="#top" className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            <span className="grid h-[34px] w-[34px] place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="mx-auto flex h-[72px] w-[min(1160px,92%)] items-center justify-between gap-2">
+          <a href="#top" className="flex min-w-0 items-center gap-2 text-base font-extrabold tracking-tight sm:gap-2.5 sm:text-lg" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <span className="grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
               <BrandingImage alt={t("logoAlt")} className="h-[34px] w-[34px] object-cover" />
             </span>
-            {tm("appName")}
+            <span className="truncate">{tm("appName")}</span>
           </a>
           <nav className="hidden items-center gap-7 text-sm text-slate-600 md:flex">
             <button onClick={() => scrollToId("how")} className="hover:text-slate-900">{t("navHow")}</button>
@@ -93,18 +108,19 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             <button onClick={() => scrollToId("chancing")} className="hover:text-slate-900">{t("navChancing")}</button>
             <button onClick={() => scrollToId("roadmap")} className="hover:text-slate-900">{t("navPlanning")}</button>
           </nav>
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <ThemeSwitch />
             {onSignIn && (
               <button
                 onClick={onSignIn}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold hover:-translate-y-px hover:border-slate-300 transition"
+                className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold hover:-translate-y-px hover:border-slate-300 transition sm:px-4 sm:py-2.5"
               >
                 {t("signIn")}
               </button>
             )}
             <button
               onClick={onStart}
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition"
+              className="whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition sm:px-4 sm:py-2.5"
             >
               {t("getStarted")}
             </button>
@@ -117,19 +133,19 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
         <section className="relative overflow-hidden py-[72px] sm:py-20">
           <div className="pointer-events-none absolute -right-56 -top-56 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle,rgba(124,92,255,0.16),transparent_68%)]" />
           <div className="relative mx-auto grid w-[min(1160px,92%)] items-center gap-12 lg:grid-cols-[1.02fr_0.98fr]">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700">
+            <motion.div initial="hidden" animate="visible" variants={heroGroup}>
+              <motion.span variants={heroItem} className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700">
                 <span className="h-[7px] w-[7px] rounded-full bg-indigo-600" />
                 {t("heroBadge")}
-              </span>
-              <h1 className="mt-5 max-w-[700px] text-[clamp(40px,5.5vw,64px)] font-extrabold leading-[1.03] tracking-[-0.03em]">
+              </motion.span>
+              <motion.h1 variants={heroItem} className="mt-5 max-w-[700px] text-[clamp(40px,5.5vw,64px)] font-extrabold leading-[1.03] tracking-[-0.03em]">
                 {t("heroTitle")}{" "}
                 <span className="bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">
                   {t("heroTitleAccent")}
                 </span>
-              </h1>
-              <p className="mt-6 max-w-[620px] text-base text-slate-500 sm:text-lg">{t("heroBody")}</p>
-              <div className="mt-7 flex flex-wrap items-center gap-3">
+              </motion.h1>
+              <motion.p variants={heroItem} className="mt-6 max-w-[620px] text-base text-slate-500 sm:text-lg">{t("heroBody")}</motion.p>
+              <motion.div variants={heroItem} className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   onClick={onStart}
                   className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition"
@@ -142,21 +158,26 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 >
                   {t("ctaHow")}
                 </button>
-              </div>
-              <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-400">
+              </motion.div>
+              <motion.div variants={heroItem} className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-400">
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust1")}</span>
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust2")}</span>
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust3")}</span>
-              </div>
+              </motion.div>
               {onEnterApp && (
-                <button onClick={onEnterApp} className="mt-5 text-xs font-semibold text-slate-400 underline-offset-4 hover:text-slate-600 hover:underline">
+                <motion.button variants={heroItem} onClick={onEnterApp} className="mt-5 text-xs font-semibold text-slate-400 underline-offset-4 hover:text-slate-600 hover:underline">
                   {t("enterApp")}
-                </button>
+                </motion.button>
               )}
-            </div>
+            </motion.div>
 
             {/* Dashboard preview (mirrors the real in-app dashboard) */}
-            <div className="relative mx-auto w-full max-w-[680px]">
+            <motion.div
+              className="relative mx-auto w-full max-w-[680px]"
+              initial={{ opacity: 0, y: 34, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.75, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
               <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 lg:rotate-[1.2deg]">
                 <div className="flex h-[36px] items-center gap-1.5 border-b border-slate-200 px-4">
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
@@ -244,7 +265,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
@@ -256,42 +277,42 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               <h2 className="mt-2.5 text-3xl font-extrabold leading-tight tracking-[-0.02em] sm:text-[42px]">{t("howTitle")}</h2>
               <p className="mt-3 text-base text-slate-500">{t("howText")}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <RevealGroup className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {steps.map((s) => (
-                <div key={s.num} className="rounded-2xl border border-slate-200 bg-white p-6">
+                <RevealItem key={s.num} className="rounded-2xl border border-slate-200 bg-white p-6">
                   <div className="text-xs font-black text-indigo-600">{s.num} — {s.label}</div>
                   <h3 className="mb-1.5 mt-3 text-base font-extrabold">{s.title}</h3>
                   <p className="text-[13px] text-slate-500">{s.text}</p>
-                </div>
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           </div>
         </section>
 
         {/* ===== Features (dark) ===== */}
-        <section id="features" className="bg-[#0b1020] py-20 text-white sm:py-24">
+        <section id="features" className="bg-slate-900 py-20 text-white sm:py-24">
           <div className="mx-auto w-[min(1160px,92%)]">
             <div className="mx-auto mb-11 max-w-[700px] text-center">
               <div className="text-[11px] font-black uppercase tracking-[1.5px] text-indigo-400">{t("featEyebrow")}</div>
               <h2 className="mt-2.5 text-3xl font-extrabold leading-tight tracking-[-0.02em] sm:text-[42px]">{t("featTitle")}</h2>
               <p className="mt-3 text-base text-slate-400">{t("featText")}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <RevealGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((f) => (
-                <div key={f.title} className="min-h-[205px] rounded-2xl border border-[#252d42] bg-[#11182b] p-6">
-                  <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-[#20264c] text-sm font-black text-indigo-300">{f.icon}</div>
+                <RevealItem key={f.title} className="min-h-[205px] rounded-2xl border border-white/10 bg-slate-800 p-6">
+                  <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-sm font-black text-indigo-300">{f.icon}</div>
                   <h3 className="text-base font-extrabold">{f.title}</h3>
                   <p className="mt-1.5 text-sm text-slate-400">{f.text}</p>
-                </div>
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           </div>
         </section>
 
         {/* ===== Chancing (honest) ===== */}
         <section id="chancing" className="py-20 sm:py-24">
           <div className="mx-auto grid w-[min(1160px,92%)] items-center gap-10 lg:grid-cols-2">
-            <div>
+            <Reveal>
               <div className="text-[11px] font-black uppercase tracking-[1.5px] text-indigo-600">{t("chanceEyebrow")}</div>
               <h2 className="mt-2.5 text-3xl font-extrabold leading-tight tracking-[-0.02em] sm:text-[42px]">{t("chanceTitle")}</h2>
               <p className="mt-4 text-base text-slate-500 sm:text-lg">{t("chanceText")}</p>
@@ -300,8 +321,8 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <li>{t("chanceLi2")}</li>
                 <li>{t("chanceLi3")}</li>
               </ul>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-7">
+            </Reveal>
+            <Reveal delay={0.12} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-7">
               <div className="flex items-center justify-between gap-3">
                 <strong className="text-sm font-extrabold">{t("chanceCardLabel")}</strong>
                 <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">{t("chanceHybrid")}</span>
@@ -319,7 +340,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <strong className="text-base font-black">{t("chanceBuilding")}</strong>
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{t("chanceNote")}</p>
-            </div>
+            </Reveal>
           </div>
         </section>
 
@@ -331,32 +352,35 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               <h2 className="mt-2.5 text-3xl font-extrabold leading-tight tracking-[-0.02em] sm:text-[42px]">{t("roadTitle")}</h2>
               <p className="mt-3 text-base text-slate-500">{t("roadText")}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <RevealGroup className="grid gap-4 sm:grid-cols-3">
               {roadItems.map((r) => (
-                <div key={r.num} className="rounded-2xl border border-slate-200 bg-white p-6">
+                <RevealItem key={r.num} className="rounded-2xl border border-slate-200 bg-white p-6">
                   <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-base font-black text-indigo-600">{r.num}</div>
                   <h3 className="mb-1.5 mt-4 text-base font-extrabold">{r.title}</h3>
                   <p className="text-sm text-slate-500">{r.text}</p>
-                </div>
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           </div>
         </section>
 
         {/* ===== Testimonial ===== */}
         <section className="pb-20 sm:pb-24">
           <div className="mx-auto w-[min(1160px,92%)]">
+            <Reveal>
             <div className="mx-auto max-w-[900px] rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-9 text-center sm:p-10">
               <div className="flex justify-center"><Sparkles className="h-5 w-5 text-indigo-500" /></div>
               <p className="mt-4 text-xl font-bold leading-relaxed tracking-[-0.01em] sm:text-2xl">“{t("quote")}”</p>
               <p className="mt-4 text-[13px] text-slate-500">{t("quoteBy")}</p>
             </div>
+            </Reveal>
           </div>
         </section>
 
         {/* ===== CTA ===== */}
         <section className="pb-22">
           <div className="mx-auto w-[min(1160px,92%)]">
+            <Reveal>
             <div className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#161b38] to-[#29235b] px-6 py-14 text-center text-white sm:px-16 sm:py-16">
               <div className="pointer-events-none absolute -right-24 -top-40 h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle,rgba(148,92,255,0.35),transparent_70%)]" />
               <div className="relative">
@@ -373,6 +397,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 </button>
               </div>
             </div>
+            </Reveal>
           </div>
         </section>
       </main>

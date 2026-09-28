@@ -14,8 +14,11 @@ import {
   type AIProviderId,
   type PublicCredential,
   decryptApiKey,
+  decryptWithRotation,
   encryptApiKey,
   maskApiKey,
+  providerBaseUrl,
+  providerCapabilities,
   resolveCredential,
 } from "./settings";
 
@@ -82,9 +85,35 @@ export async function removeCredential(provider: AIProviderId): Promise<void> {
   await db.delete(aiProviderCredentials).where(eq(aiProviderCredentials.provider, provider));
 }
 
-/** Decrypt a stored payload using the runtime secret. */
+/** Decrypt a stored payload (current secret, then AI_KEYS_ENCRYPTION_SECRET_PREVIOUS). */
 export function decryptStoredKey(payload: string | null | undefined): string | null {
-  return decryptApiKey(payload);
+  return decryptWithRotation(payload).key ?? decryptApiKey(payload);
+}
+
+/**
+ * Re-encrypt every stored key that only decrypts with a PREVIOUS secret
+ * (after rotating AI_KEYS_ENCRYPTION_SECRET or moving hosts). Keys that
+ * cannot be decrypted at all are reported, never guessed or dropped.
+ */
+export async function reencryptStoredKeys(): Promise<{ reencrypted: AIProviderId[]; undecryptable: AIProviderId[] }> {
+  const rows = await getAllCredentials();
+  const reencrypted: AIProviderId[] = [];
+  const undecryptable: AIProviderId[] = [];
+  for (const row of rows) {
+    if (!row.apiKeyEnc) continue;
+    const { key, rotated } = decryptWithRotation(row.apiKeyEnc);
+    if (!key) {
+      undecryptable.push(row.provider as AIProviderId);
+      continue;
+    }
+    if (!rotated) continue;
+    await db
+      .update(aiProviderCredentials)
+      .set({ apiKeyEnc: encryptApiKey(key), updatedAt: new Date() })
+      .where(eq(aiProviderCredentials.id, row.id));
+    reencrypted.push(row.provider as AIProviderId);
+  }
+  return { reencrypted, undecryptable };
 }
 
 /**
@@ -97,52 +126,74 @@ export async function resolveProviderCredential(
   return resolveCredential(provider, stored, process.env);
 }
 
+/** Resolve every provider's key+model with a single DB read. */
+export async function resolveAllProviderCredentials(): Promise<
+  Record<AIProviderId, { apiKey: string | undefined; apiKeySource: "db" | "env" | "none"; model: string }>
+> {
+  const stored = await getAllCredentials();
+  const out = {} as Record<AIProviderId, { apiKey: string | undefined; apiKeySource: "db" | "env" | "none"; model: string }>;
+  for (const id of AI_PROVIDER_IDS) {
+    out[id] = resolveCredential(id, stored.find((s) => s.provider === id) ?? null, process.env);
+  }
+  return out;
+}
+
 /**
  * Public (safe) view of all providers for the admin panel — raw keys never
  * leave the server.
  */
-export async function getPublicCredentials(): Promise<PublicCredential[]> {
+export async function getPublicCredentials(disabled: AIProviderId[] = []): Promise<PublicCredential[]> {
   const stored = await getAllCredentials();
-  return AI_PROVIDER_IDS.map((id) => {
+  return AI_PROVIDER_IDS.map((id): PublicCredential => {
     const meta = AI_PROVIDERS[id];
     const row = stored.find((s) => s.provider === id);
+    const common = {
+      provider: id,
+      label: meta.label,
+      capabilities: providerCapabilities(id),
+      protocol: meta.protocol,
+      enabled: !disabled.includes(id),
+      ...(meta.baseUrlEnvVar ? { baseUrlConfigured: Boolean(providerBaseUrl(id)) } : {}),
+    };
 
+    let undecryptable = false;
     if (row?.apiKeyEnc) {
-      const decrypted = decryptStoredKey(row.apiKeyEnc);
-      if (decrypted) {
+      const { key, rotated } = decryptWithRotation(row.apiKeyEnc);
+      if (key) {
         return {
-          provider: id,
-          label: meta.label,
+          ...common,
           model: row.model?.trim() || process.env[meta.modelEnvVar] || meta.defaultModel,
           hasKey: true,
           keySource: "db",
-          keyHint: maskApiKey(decrypted),
+          keyHint: maskApiKey(key),
           updatedAt: row.updatedAt.toISOString(),
+          needsReencrypt: rotated,
         };
       }
+      undecryptable = true;
     }
 
     const envKey = process.env[meta.keyEnvVar];
     if (envKey) {
       return {
-        provider: id,
-        label: meta.label,
-        model: process.env[meta.modelEnvVar] || meta.defaultModel,
+        ...common,
+        model: row?.model?.trim() || process.env[meta.modelEnvVar] || meta.defaultModel,
         hasKey: true,
         keySource: "env",
         keyHint: maskApiKey(envKey),
         updatedAt: null,
+        undecryptable,
       };
     }
 
     return {
-      provider: id,
-      label: meta.label,
-      model: process.env[meta.modelEnvVar] || meta.defaultModel,
+      ...common,
+      model: row?.model?.trim() || process.env[meta.modelEnvVar] || meta.defaultModel,
       hasKey: false,
       keySource: "none",
       keyHint: "",
       updatedAt: null,
+      undecryptable,
     };
   });
 }

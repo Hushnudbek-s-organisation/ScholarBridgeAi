@@ -128,6 +128,9 @@ request is made.
 ```bash
 npm run test:security   # 50 assertions over auth, rate limits, SSRF, payments, CSP
 npm run test:ai-settings
+npm run test:ownership     # ownership state machine, races, authz (embedded Postgres)
+npm run test:portability   # APP_URL, config allowlist/export/import, RLS script
+npm run test:integration   # API routes against Postgres: IDOR, Premium on the API, AI quota
 npm run typecheck
 npm run build
 npm audit --audit-level=high
@@ -150,3 +153,85 @@ esbuild-kit dependency.
 Please do **not** open a public issue. Email the maintainers with a description,
 reproduction steps and the affected endpoint. We aim to acknowledge reports
 within 3 working days.
+
+
+## 9. 2026-09 audit — findings and fixes
+
+A hands-on audit ran the app against a real Postgres (`npm run db:dev`) and
+attacked it over HTTP. What held up, and what was fixed:
+
+**Verified working (no change needed)**
+
+- Session cookies are HttpOnly/SameSite=Lax, HMAC-signed; forged or tampered
+  tokens → 401. Client-asserted ids (`adminProfileId`, `profileId`) are ignored.
+- Non-admin → `/api/admin/*` → 403; user A reading/editing user B's data → 403.
+- Profile updates use a strict field whitelist (no mass assignment of
+  `isAdmin`, `isPremium`, `referralPoints`).
+- SQL is parameterised by Drizzle (no string-built queries with user input).
+- SSRF guard blocks loopback, private, link-local/metadata, decimal/hex/IPv6
+  encodings and non-http(s) schemes.
+- 256 KB JSON body cap → 413; payment webhooks and cron fail closed without
+  their secrets; `npm audit --omit=dev` reports 0 vulnerabilities.
+
+**Fixed**
+
+| Severity | Issue | Fix |
+| --- | --- | --- |
+| High | Per-IP rate limits keyed on the **leftmost** `X-Forwarded-For` entry, which the client controls. Sending a random fake IP per request bypassed sign-up, sign-in (per-IP) and anonymous AI limits (10/10 requests passed a 6/min limit). | `clientIp()` now uses the proxy-appended rightmost entry (`TRUSTED_PROXY_HOPS`, optional `CLIENT_IP_HEADER`). Regression tests added. |
+| Medium | `PUT /api/profiles/[id]` stored `NaN` in `gpa` for non-numeric input, and returned 500 for decimals sent to integer columns (TOEFL, SAT, age…) or an object for `preferredCountries`. | `optionalNumber` / `optionalScore` in `lib/request.ts`: finite-only, clamped, integer columns rounded, NOT NULL columns never nulled; text fields length-capped; locale whitelisted. |
+| Low | The AI chat served canned text indistinguishable from a real model answer when no provider was configured, and echoed the raw user message into rendered markdown. | Response carries `offline: true` and the UI labels it; the echo was removed. |
+| Low | Failed chat requests (401/429) left the UI silently waiting. | The chat now shows a clear error message. |
+
+**Framing policy.** `frame-ancestors 'none'` + `X-Frame-Options: DENY` in every
+environment except `next dev` (`NODE_ENV=development`), where the known
+preview hosts may embed the app. This is fail-closed: production, test and an
+unset `NODE_ENV` all get the strict policy (see `src/lib/security.ts`, covered
+by `npm run test:security`).
+
+**Still recommended (operational)**
+
+- Set `SESSION_SECRET` (>= 32 chars) in Render. Without it the signing key is
+  derived from `DATABASE_URL`.
+- The rate limiter is in-process memory: correct for one instance, but limits
+  are per-instance if you scale horizontally (move to Redis/Postgres then).
+- Next 16 renamed `middleware.ts` → `proxy.ts`; the old name still works but
+  is deprecated (`npx @next/codemod@canary middleware-to-proxy .`).
+
+## 11. 2026-09 portability, ownership and AI audit
+
+| Severity | Issue | Fix |
+| --- | --- | --- |
+| High | Supabase's default grants let the public `anon`/`authenticated` roles read every `public` table (password hashes, Telegram chat ids) with the anon key. | `supabase/enable_rls.sql`: RLS on every app-owned table, public roles revoked, read-only catalogue policy for `universities`/`scholarships`. The app is table owner and unaffected. Run once per Supabase project (`DEPLOYMENT.md` §2). Tested against a Supabase-like role setup (`npm run test:portability`). |
+| High | Any admin could delete any profile, including the only owner; the seed promoted the **first profile** to admin when no admin existed, and force-promoted `ADMIN_EMAIL` on every restart. | Platform ownership with a server-side state machine (`src/lib/ownership/*`, Admin → Ownership): owner-only admin grants/revokes, password re-entry, one-open-transfer unique index, row locks on confirm, expiry, audit + notifications. Owner profile delete → 409. Seed no longer promotes anyone once an owner exists and never promotes a random profile. `npm run test:ownership`. |
+| Medium | `PUT /api/admin/config` wrote **any** key unvalidated — including the encrypted Telegram token and internal sweep state — and accepted invalid AI providers. | One allowlist + per-key validation (`src/lib/configPortability.ts`) for PUT, export and import; changes are audited and rate-limited. |
+| Medium | Rotating `AI_KEYS_ENCRYPTION_SECRET` made the panel-stored Telegram token unreadable (bot stops). | Rotation-aware decryption with automatic re-encryption. |
+| Medium | Security notices (ownership) were dropped for users with default notification preferences. | `security` notifications are always recorded in-app. |
+| Low | Research agent hardwired to OpenRouter; env AI provider choices masked by DB defaults; AI errors could echo keys. | Universal provider layer (`src/lib/ai`): admin-selected provider/model per task, explicit fallback only, disabled list, key redaction in logs/errors. |
+| Low | Deploy domain / Supabase project / personal admin email hardcoded in docs and a UI placeholder. | `APP_URL` layer (`src/lib/appUrl.ts`); links built from configuration; checked by `npm run test:portability`. |
+
+## 12. 2026-09 full-system access audit
+
+Every API route was inventoried (method, authentication, ownership, Premium,
+rate limit) and the risky ones were attacked live with two accounts. Full
+report: `docs/AUDIT_2026-09.md`.
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| Critical | `PATCH`/`DELETE /api/tasks` had no authentication: anyone (even anonymous) could edit or delete any student's tasks by id. | Row-owner check (`requireRowAccess`), validation, body cap. |
+| Critical | Premium was enforced only by the website's `PremiumGate`: essays, AI SOP, tasks, forum and course APIs answered free accounts directly; the gate even mounted the locked section underneath the overlay. | `premiumGate` / `requireFeatureSession` (`src/lib/premium.ts`, reusing `hasFeature`) on every Premium API → `403 premium_required`. `/api/premium/status` returns per-feature access, `PremiumGate` takes a `feature` and never mounts locked content. |
+| Critical | `GET /api/gamification/leaderboard` (public) returned the top students' e-mail addresses. | Name + major only. |
+| Critical | `POST /api/forum/categories` had no authentication. | Admin only, validated, duplicate slug → 409. |
+| High | `POST /api/gamification/award` let a student award themselves any number of points. | Admin only, 1–10 000 points. |
+| High | `POST /api/referrals` and `POST /api/consulting` accepted any `profileId` without a session (referral farming → free Premium; spoofed requests). | Caller's own profile only (`requireProfileAccess`), rate-limited. |
+| High | `POST /api/visa/live-token` minted paid Gemini Live sessions for anonymous callers, unthrottled. | Session required, `LIMITS.visaLiveToken` (10/h), 16 KB body cap. |
+| High | The admin-configured daily AI limits (`ai_*_requests_per_day`, `ai_*_tokens_per_day`) were never enforced; a signed-in user could also drop `profileId` to be treated as anonymous. | `src/lib/ai/quota.ts` in `guardAiRequest`: rolling 24 h, per account from `ai_usage` (anonymous: per IP), admins exempt, `429 ai_quota_exceeded`. The caller is always resolved; usage is logged against the caller. Index `idx_ai_usage_profile_created` (`supabase/add_ai_usage_quota_index.sql`). Visa interview chat keeps its own per-IP limit (a single interview is many turns). |
+| Medium | No server-side CSRF check (only `SameSite=Lax`). | Middleware refuses API writes whose `Origin` is not this site (Host / X-Forwarded-Host / `APP_URL`); provider webhooks exempt; requests without `Origin` pass to route auth. |
+| Medium | Course payloads contained each quiz's correct answer before the attempt. | Answers are revealed only in the attempt response. |
+| Medium | On a database error the universities APIs served sample (fake) universities as if real. | `503 data_unavailable`; sample data removed. |
+| Medium | `test:integration` always exited 0 (embedded-postgres' exit hook overrode `process.exitCode`), so failures could not fail CI; it was not in CI either. | Explicit exit; added to `ci/security-ci.yml`. |
+| Low | Branding upload parsed the multipart body before the admin check and trusted the browser MIME type. | Auth first, size pre-check, magic-byte check. |
+| Low | FAQ JSON-LD was inlined without escaping `<`. | Escaped. |
+
+Regression guard: `npm run test:security` fails if any API write lacks an
+authentication call (outside a reviewed public allowlist) or a Premium API
+stops enforcing its feature.

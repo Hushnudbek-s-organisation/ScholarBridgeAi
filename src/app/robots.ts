@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
+import { siteUrlForRequest } from "@/lib/requestAppUrl";
 
-export default function robots(): MetadataRoute.Robots {
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const SITE_URL = await siteUrlForRequest();
   return {
     rules: {
       userAgent: "*",

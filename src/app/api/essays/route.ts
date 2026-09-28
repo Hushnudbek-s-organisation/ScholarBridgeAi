@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { essayVersions } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
+import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 
@@ -33,6 +34,8 @@ export async function GET(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
 
     const type = searchParams.get("essayType");
     const rows = await db
@@ -69,6 +72,8 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
 
     const content = clampString(body.content, MAX_CHARS);
     if (!content || !content.trim()) {
@@ -132,6 +137,14 @@ export async function POST(req: Request) {
 /** Score a draft without saving it (the "check my essay" button). */
 export async function PUT(req: Request) {
   try {
+    // Preview scoring (nothing is saved) is still part of the Premium essay
+    // studio, so it needs an account with the feature like every other method.
+    const access = await requireProfileAccess(req, undefined);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
     const parsed = await readJsonBody<Record<string, any>>(req, 256 * 1024);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
@@ -172,6 +185,8 @@ export async function DELETE(req: Request) {
         { status: rowAccess.status }
       );
     }
+    const locked = await premiumGate(rowAccess.session.profile.id, "ai_essay");
+    if (locked) return locked;
 
     await db.delete(essayVersions).where(eq(essayVersions.id, id));
     return NextResponse.json({ success: true });
@@ -196,6 +211,8 @@ export async function PATCH(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    if (locked) return locked;
     const me = access.session.profile.id;
     const parsed = await readJsonBody<Record<string, unknown>>(req);
     if (!parsed.ok) {

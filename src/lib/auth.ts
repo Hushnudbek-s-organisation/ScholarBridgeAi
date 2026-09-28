@@ -24,9 +24,9 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles } from "@/db/schema";
+import { studentProfiles, telegramLinks } from "@/db/schema";
 import { sanitizeProfile } from "@/lib/password";
 
 export const SESSION_COOKIE = "sb_session";
@@ -47,11 +47,20 @@ export interface SessionPayload {
   sid: string;
 }
 
+/**
+ * Where the request came from. "telegram" sessions (Mini App / bot adapter)
+ * are the same account with the same entitlements, but never admin powers.
+ */
+export type SessionChannel = "web" | "telegram";
+
 export interface Session {
   payload: SessionPayload;
   /** The authenticated profile row (password hash already stripped). */
   profile: Omit<typeof studentProfiles.$inferSelect, "passwordHash">;
   isAdmin: boolean;
+  channel?: SessionChannel;
+  /** Numeric Telegram user id (as a string — ids exceed 2^31) for telegram sessions. */
+  telegramUserId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +231,136 @@ export function readSessionToken(source: Request | Headers | string | null): str
 // Request-scoped authentication
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Telegram channel tokens (Mini App + bot adapter)
+// ---------------------------------------------------------------------------
+//
+// The Mini App runs inside Telegram's iframe/webview where the site's
+// SameSite cookie is not sent, so after the server verified Telegram's signed
+// initData it hands out a short-lived bearer token instead. The bot uses the
+// same token type (a few seconds of life) to call the existing API routes on
+// behalf of the linked profile — one auth system, one set of rules.
+//
+//   format:  tg1.<base64url(payload)>.<base64url(hmac)>
+//   key:     HMAC(SESSION_SECRET, "telegram-channel-v1")  (domain-separated,
+//            so a tg1 token can never be replayed as a cookie session)
+//   checks:  signature, expiry, and on EVERY request that the Telegram user is
+//            still linked to that profile — unlinking revokes access at once.
+
+export interface TelegramChannelPayload {
+  pid: number;
+  /** Telegram numeric user id, as a decimal string. */
+  tgu: string;
+  ch: "miniapp" | "bot";
+  iat: number;
+  exp: number;
+  sid: string;
+}
+
+/** Mini App session lifetime (1 hour; the page re-authenticates silently). */
+export const TELEGRAM_CHANNEL_TTL_SECONDS = 60 * 60;
+
+function channelKey(secret: string): Buffer {
+  return createHmac("sha256", secret).update("telegram-channel-v1").digest();
+}
+
+export function signTelegramChannelToken(
+  input: { profileId: number; telegramUserId: string; channel: "miniapp" | "bot" },
+  opts: { ttlSeconds?: number; now?: number; secret?: string } = {}
+): string {
+  const now = Math.floor((opts.now ?? Date.now()) / 1000);
+  const payload: TelegramChannelPayload = {
+    pid: input.profileId,
+    tgu: input.telegramUserId,
+    ch: input.channel,
+    iat: now,
+    exp: now + (opts.ttlSeconds ?? TELEGRAM_CHANNEL_TTL_SECONDS),
+    sid: randomBytes(8).toString("base64url"),
+  };
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const sig = createHmac("sha256", channelKey(opts.secret ?? sessionSecret())).update(body).digest("base64url");
+  return `tg1.${body}.${sig}`;
+}
+
+export function verifyTelegramChannelToken(
+  token: string | null | undefined,
+  opts: { now?: number; secret?: string } = {}
+): TelegramChannelPayload | null {
+  if (!token || typeof token !== "string" || token.length > 1024) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "tg1") return null;
+  const [, body, sig] = parts;
+  const expected = createHmac("sha256", channelKey(opts.secret ?? sessionSecret())).update(body).digest();
+  let provided: Buffer;
+  try {
+    provided = Buffer.from(sig, "base64url");
+  } catch {
+    return null;
+  }
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
+  let payload: TelegramChannelPayload;
+  try {
+    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload.pid !== "number" || !Number.isInteger(payload.pid) || payload.pid <= 0) return null;
+  if (typeof payload.tgu !== "string" || !/^\d{1,20}$/.test(payload.tgu)) return null;
+  if (payload.ch !== "miniapp" && payload.ch !== "bot") return null;
+  const now = Math.floor((opts.now ?? Date.now()) / 1000);
+  if (typeof payload.exp !== "number" || payload.exp <= now) return null;
+  return payload;
+}
+
+/** `Authorization: Bearer tg1.…` → the token; any other scheme → null. */
+export function readTelegramBearer(req: Request): string | null {
+  const header = req.headers?.get("authorization");
+  if (!header) return null;
+  const m = /^Bearer\s+(tg1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(header.trim());
+  return m ? m[1] : null;
+}
+
+async function authenticateTelegramChannel(token: string): Promise<AuthResult> {
+  const payload = verifyTelegramChannelToken(token);
+  if (!payload) {
+    return { ok: false, status: 401, code: "unauthorized", error: "Your Telegram session expired. Please reopen the app." };
+  }
+  let row: typeof studentProfiles.$inferSelect | undefined;
+  try {
+    const rows = await db
+      .select({ profile: studentProfiles, linkId: telegramLinks.id })
+      .from(telegramLinks)
+      .innerJoin(studentProfiles, eq(studentProfiles.id, telegramLinks.profileId))
+      .where(and(eq(telegramLinks.profileId, payload.pid), eq(telegramLinks.telegramUserId, payload.tgu)))
+      .limit(1);
+    row = rows[0]?.profile;
+  } catch (err) {
+    console.error("[auth] telegram session lookup failed:", err instanceof Error ? err.message : err);
+    return { ok: false, status: 503, code: "unavailable", error: "Authentication is temporarily unavailable." };
+  }
+  if (!row) {
+    return {
+      ok: false,
+      status: 401,
+      code: "telegram_unlinked",
+      error: "This Telegram account is no longer connected to ScholarBridge.",
+    };
+  }
+  const { passwordHash: _secret, ...safeProfile } = row;
+  return {
+    ok: true,
+    session: {
+      payload: { pid: payload.pid, iat: payload.iat, exp: payload.exp, fp: "telegram", sid: payload.sid },
+      profile: safeProfile,
+      // Least privilege: admin powers are only ever granted to a website
+      // session (password/code sign-in), never through Telegram.
+      isAdmin: false,
+      channel: "telegram",
+      telegramUserId: payload.tgu,
+    },
+  };
+}
+
 export type AuthResult =
   | { ok: true; session: Session }
   | { ok: false; status: number; error: string; code: string };
@@ -236,6 +375,10 @@ export function authFailureBody(result: { error: string; code: string }) {
  * database (profile still exists, password unchanged, live admin flag).
  */
 export async function authenticate(req: Request): Promise<AuthResult> {
+  // An explicit Telegram bearer token wins over any cookie on the request.
+  const bearer = readTelegramBearer(req);
+  if (bearer) return authenticateTelegramChannel(bearer);
+
   const payload = verifySessionToken(readSessionToken(req));
   if (!payload) {
     return {
@@ -288,6 +431,7 @@ export async function authenticate(req: Request): Promise<AuthResult> {
       payload,
       profile: safeProfile,
       isAdmin: Boolean(row.isAdmin),
+      channel: "web",
     },
   };
 }
@@ -301,6 +445,14 @@ export async function requireSession(req: Request): Promise<AuthResult> {
 export async function requireAdmin(req: Request): Promise<AuthResult> {
   const auth = await authenticate(req);
   if (!auth.ok) return auth;
+  if (auth.session.channel === "telegram") {
+    return {
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      error: "Admin tools are only available on the website.",
+    };
+  }
   if (!auth.session.isAdmin) {
     return {
       ok: false,

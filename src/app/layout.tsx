@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
 import { getBranding } from "@/lib/branding";
+import { siteUrlForRequest } from "@/lib/requestAppUrl";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { MotionProvider } from "@/components/motion";
+import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 
 // The middleware sends a per-request nonce-based CSP. Next.js can only stamp
 // that nonce on its <script> tags when the page is rendered per request —
@@ -10,19 +15,18 @@ import { getBranding } from "@/lib/branding";
 // script, React never hydrates and no button (Sign in / Get started) works.
 export const dynamic = "force-dynamic";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://scholarbridgeai-1.onrender.com";
-
 export async function generateMetadata(): Promise<Metadata> {
   const { logo, favicon } = await getBranding();
+  const SITE_URL = await siteUrlForRequest();
+  // Search Console ownership token belongs to whoever owns the domain, so it
+  // is configuration (GOOGLE_SITE_VERIFICATION), not code.
+  const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
   return {
   metadataBase: new URL(SITE_URL),
   manifest: "/manifest.json",
   // Google Search Console ownership verification (renders the
   // <meta name="google-site-verification" .../> tag in <head>).
-  verification: {
-    google: "EZ2ipQrYUQxTQEBlEGYcqAOfVHm6pc0oIm1BYkN2VTs",
-  },
+  ...(googleVerification ? { verification: { google: googleVerification } } : {}),
   title: {
     default: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
     template: "%s | ScholarBridgeAI",
@@ -92,13 +96,31 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // The middleware generates a fresh CSP nonce per request and forwards it on
+  // `x-nonce`. The pre-hydration theme script is inline, so it must carry that
+  // nonce or the browser will refuse to run it (and the theme would flash).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
+  // Server-side hint so the first render matches what the inline script
+  // painted, avoiding a hydration mismatch on the theme toggle.
+  const stored = (await cookies()).get(THEME_COOKIE)?.value;
+  const initialTheme = isThemeChoice(stored) ? stored : "system";
+
   return (
-    <html lang="uz">
+    <html lang="uz" suppressHydrationWarning>
+      <head>
+        {/* Applies the saved theme before first paint — no light/dark flash. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+      </head>
       <body className="bg-slate-100 text-slate-900 antialiased">
-        {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
-        <SiteTracker />
-        {children}
+        <ThemeProvider defaultTheme={initialTheme}>
+          <MotionProvider>
+            {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
+            <SiteTracker />
+            {children}
+          </MotionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

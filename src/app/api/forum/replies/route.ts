@@ -3,12 +3,17 @@ import { db } from "@/db";
 import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/schema";
 import { eq, and, count, asc, desc } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
-import { notifyAdmins } from "@/lib/notifications";
+import { createLocalizedNotification, notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
+import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 
 export async function GET(req: Request) {
   try {
+    // Reading the forum is part of the Premium `forum` feature (not only the UI).
+    const member = await requireFeatureSession(req, "forum");
+    if (!member.ok) return member.response;
     const { searchParams } = new URL(req.url);
     const threadIdStr = searchParams.get("threadId");
     if (!threadIdStr) {
@@ -67,6 +72,8 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const locked = await premiumGate(access.session.profile.id, "forum");
+    if (locked) return locked;
     const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
     if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);
 
@@ -96,13 +103,26 @@ export async function POST(req: Request) {
       console.error("Failed to award reply points:", err);
     }
 
-    // Notify admins about the new reply (site activity).
+    // Tell the thread author that someone answered (bell + Telegram) …
+    const snippet = String(replyBody);
+    const threadTitle = String(thread?.title || "");
+    if (thread && thread.authorId && thread.authorId !== Number(authorId)) {
+      try {
+        await createLocalizedNotification(thread.authorId, {
+          type: "forum_reply",
+          link: `/forum?thread=${thread.id}&reply=${reply.id}`,
+          text: (lang) => NOTIFY_TEXTS.forumReplyToAuthor(lang, { name: author?.name || someoneName(lang), thread: threadTitle, snippet }),
+        });
+      } catch (err) {
+        console.error("Failed to notify the thread author:", err);
+      }
+    }
+    // … and the admins (site activity).
     try {
-      await notifyAdmins({
+      await notifyAdminsLocalized({
         type: "forum_reply",
-        title: "💬 New forum reply",
-        body: `${author?.name || "A student"} replied in "${String(thread?.title || "").slice(0, 80)}": ${String(replyBody).slice(0, 100)}`,
         link: `/forum`,
+        text: (lang) => NOTIFY_TEXTS.adminForumReply(lang, { name: author?.name || someoneName(lang), thread: threadTitle, snippet }),
       });
     } catch (err) {
       console.error("Failed to notify admins about new reply:", err);

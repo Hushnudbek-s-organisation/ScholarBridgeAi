@@ -7,9 +7,11 @@ import { localeNames, locales, type Locale } from "@/i18n/config";
 
 interface LanguageSwitcherProps {
   onLocaleChange?: (locale: Locale) => void;
+  /** Small pill showing the 2-letter code — for tight headers. */
+  compact?: boolean;
 }
 
-export function LanguageSwitcher({ onLocaleChange }: LanguageSwitcherProps) {
+export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSwitcherProps) {
   const { locale, setLocale } = useLocaleContext();
 
   const handleChange = (next: string) => {
@@ -17,6 +19,26 @@ export function LanguageSwitcher({ onLocaleChange }: LanguageSwitcherProps) {
     setLocale(value);
     onLocaleChange?.(value);
   };
+
+  if (compact) {
+    return (
+      <div className="relative flex items-center rounded-lg border border-slate-200 bg-slate-100 pl-1.5">
+        <Globe className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+        <select
+          value={locale}
+          onChange={(e) => handleChange(e.target.value)}
+          className="cursor-pointer bg-transparent py-1.5 pl-1 pr-1 text-[11px] font-bold uppercase text-slate-800 focus:outline-none"
+          aria-label="Language"
+        >
+          {locales.map((l) => (
+            <option key={l} value={l}>
+              {l.toUpperCase()}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">

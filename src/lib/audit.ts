@@ -2,8 +2,25 @@ import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { desc, eq, and } from "drizzle-orm";
 
-export type AuditActor = "ADMIN" | "AUTOMATED_SYSTEM" | "AI" | "EXTERNAL_SOURCE";
-export type AuditEntityType = "university" | "scholarship" | "opportunity";
+export type AuditActor = "ADMIN" | "AUTOMATED_SYSTEM" | "AI" | "EXTERNAL_SOURCE" | "USER";
+export type AuditEntityType =
+  | "university"
+  | "scholarship"
+  | "opportunity"
+  // Growth features (Admin → Growth tools)
+  | "success_story"
+  | "goal_template"
+  | "answer_prompt"
+  | "checklist_item"
+  | "config"
+  // Account ↔ Telegram connections (entityId = profile id).
+  | "telegram_link"
+  // Global AI provider configuration (entityId = 0). Never contains keys.
+  | "ai_provider"
+  // Platform ownership + transfers (entityId = transfer id, 0 = singleton).
+  | "ownership"
+  // Admin role grants/revocations by the owner (entityId = profile id).
+  | "admin_role";
 
 interface AuditEntry {
   entityType: AuditEntityType;

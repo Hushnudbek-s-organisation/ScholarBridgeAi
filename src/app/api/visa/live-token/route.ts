@@ -17,6 +17,9 @@ import {
   type VisaOfficerGender,
 } from "@/lib/visa-interview";
 import { redactGeminiSecrets } from "@/lib/gemini";
+import { requireSession } from "@/lib/auth";
+import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request";
 
 export const runtime = "nodejs";
 
@@ -53,7 +56,19 @@ function errorMessage(err: unknown): string {
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
+    // Each token opens a paid Gemini Live session on the server's key, so
+    // only signed-in accounts may mint one, at a bounded rate.
+    const access = await requireSession(req);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    }
+    const limit = checkRateLimit(`visa:live:${access.session.profile.id}`, LIMITS.visaLiveToken);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
+    const parsed = await readJsonBody<Record<string, any>>(req, 16 * 1024);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const body = parsed.body;
     const country = getVisaCountry(body?.countryCode);
     if (!country) {
       return NextResponse.json(

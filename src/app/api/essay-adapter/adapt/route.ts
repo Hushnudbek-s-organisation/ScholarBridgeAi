@@ -26,7 +26,7 @@ import {
  */
 export async function POST(req: Request) {
   try {
-    const guarded = await guardAiRequest(req, { bodyLimit: 256 * 1024 });
+    const guarded = await guardAiRequest(req, { bodyLimit: 256 * 1024, feature: "ai_essay" });
     if (!guarded.ok) return guarded.response;
 
     const profileId = guarded.profileId;
@@ -103,7 +103,7 @@ ${essay.text.slice(0, 12_000)}
 
 Rewrite the essay: same language, same length ±15%, first person. Output the adapted essay as plain text only — no headings, no commentary, no markdown.`;
 
-    const adapted = await callAI(prompt, "You are an elite admissions essay editor.", { taskType: "essay" });
+    const adapted = await callAI(prompt, "You are an elite admissions essay editor.", { taskType: "essay", profileId: guarded.usageProfileId });
     if (!adapted) {
       // Honest fallback: the deterministic plan is still returned.
       return NextResponse.json({ fit, plan, adapted: null, source: "fallback" });

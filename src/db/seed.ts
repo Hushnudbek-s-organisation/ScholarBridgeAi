@@ -17,7 +17,7 @@ import {
   badges,
 } from "./schema";
 import { eq, sql } from "drizzle-orm";
-import { hashPassword } from "@/lib/password";
+import { MIN_PASSWORD_LENGTH, hashPassword } from "@/lib/password";
 
 /** Local 8-char referral code generator (avoids importing gamification here). */
 function makeReferralCode(): string {
@@ -29,90 +29,105 @@ function makeReferralCode(): string {
   return code;
 }
 
+/**
+ * Owner recorded by the ownership feature (null when the table or row does
+ * not exist yet — fresh installs, or before the first admin request).
+ */
+async function currentPlatformOwnerId(): Promise<number | null> {
+  try {
+    const reg = (await db.execute(sql`SELECT to_regclass('public.platform_ownership') AS t`)).rows as { t: string | null }[];
+    if (!reg[0]?.t) return null;
+    const rows = (await db.execute(sql`SELECT owner_profile_id FROM platform_ownership WHERE id = 1`)).rows as { owner_profile_id: number }[];
+    return rows[0] ? Number(rows[0].owner_profile_id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function seedDatabase() {
   try {
-    // Ensure the owner's admin account exists ("Hushnudbek") so the sign-in
-    // form always has a target. Credentials are configurable via env vars:
-    //   ADMIN_NAME  (default "Hushnudbek")
-    //   ADMIN_EMAIL (default "hushnudbek@gmail.com")
-    //   ADMIN_PASSWORD (optional, min 6 chars) — bootstrap password for the
-    //     standard email+password sign-in. When set AND the admin account has
-    //     no password yet, the seed applies it (stored as a scrypt hash). Once
-    //     the owner changes it from Edit Profile, the seed never overwrites it.
-    const adminName = process.env.ADMIN_NAME || "Hushnudbek";
-    const adminEmail = (process.env.ADMIN_EMAIL || "hushnudbek@gmail.com").toLowerCase();
+    // Bootstrap admin account — configured ONLY through env (no personal
+    // defaults in code, so a new owner/host never inherits someone's email):
+    //   ADMIN_EMAIL    — the bootstrap admin (required to create one)
+    //   ADMIN_NAME     — display name; when unset an existing name is kept
+    //   ADMIN_PASSWORD — (>= MIN_PASSWORD_LENGTH) applied only while the
+    //                    account has no password; never overwrites a password
+    //                    the owner set later in Edit Profile.
+    // After a platform ownership transfer (platform_ownership row owned by
+    // someone else) the seed never re-promotes ADMIN_EMAIL — otherwise every
+    // restart would silently undo the transfer.
+    const adminEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+    const adminNameEnv = (process.env.ADMIN_NAME || "").trim();
     const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
-    const adminHasPassword = adminPassword.length >= 6;
-    try {
-      const [adminProfile] = await db
-        .select()
-        .from(studentProfiles)
-        .where(sql`lower(${studentProfiles.email}) = ${adminEmail}`)
-        .limit(1);
-      if (adminProfile) {
-        // Set the env password only while the account has none — a password
-        // the owner set later (Edit Profile) is never clobbered on reload.
-        const needsPassword = adminHasPassword && !adminProfile.passwordHash;
-        if (!adminProfile.isAdmin || adminProfile.name !== adminName || needsPassword) {
-          await db
-            .update(studentProfiles)
-            .set({
-              name: adminName,
+    const adminHasPassword = adminPassword.length >= MIN_PASSWORD_LENGTH;
+    if (adminPassword && !adminHasPassword) {
+      console.warn(`ADMIN_PASSWORD ignored: it must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    if (adminEmail) {
+      try {
+        const [adminProfile] = await db
+          .select()
+          .from(studentProfiles)
+          .where(sql`lower(${studentProfiles.email}) = ${adminEmail}`)
+          .limit(1);
+        const ownerId = await currentPlatformOwnerId();
+        const transferredAway = ownerId !== null && (!adminProfile || ownerId !== adminProfile.id);
+        if (adminProfile) {
+          const needsPassword = adminHasPassword && !adminProfile.passwordHash;
+          const needsPromotion = !adminProfile.isAdmin && !transferredAway;
+          const needsRename = Boolean(adminNameEnv) && adminProfile.name !== adminNameEnv;
+          if (needsPromotion || needsRename || needsPassword) {
+            await db
+              .update(studentProfiles)
+              .set({
+                ...(needsRename ? { name: adminNameEnv } : {}),
+                ...(needsPromotion ? { isAdmin: true, onboardingCompleted: true, onboardingStep: 8 } : {}),
+                ...(needsPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
+              })
+              .where(eq(studentProfiles.id, adminProfile.id));
+            console.log(
+              `Ensured bootstrap admin (profile ${adminProfile.id})` +
+                (needsPassword ? " — password set from ADMIN_PASSWORD." : ".")
+            );
+          } else if (!adminProfile.isAdmin && transferredAway) {
+            console.log("ADMIN_EMAIL is no longer the platform owner — not re-promoting it.");
+          }
+        } else if (!transferredAway) {
+          const [created] = await db
+            .insert(studentProfiles)
+            .values({
+              name: adminNameEnv || "Admin",
+              email: adminEmail,
+              degreeLevel: "Master",
+              targetMajor: "Computer Science",
+              gpa: 3.5,
+              gpaScale: 4.0,
+              budgetAnnualUsd: 25000,
+              preferredCountries: JSON.stringify(["United States", "United Kingdom", "Canada", "Germany"]),
+              needScholarship: true,
               isAdmin: true,
               onboardingCompleted: true,
               onboardingStep: 8,
-              ...(needsPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
+              ...(adminHasPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
             })
-            .where(eq(studentProfiles.id, adminProfile.id));
-          console.log(
-            `Ensured admin account "${adminName}" (profile ${adminProfile.id})` +
-              (needsPassword ? " — password set from ADMIN_PASSWORD." : ".")
-          );
+            .returning();
+          console.log(`Created bootstrap admin account (profile ${created.id}).`);
         }
-      } else {
-        const [created] = await db
-          .insert(studentProfiles)
-          .values({
-            name: adminName,
-            email: adminEmail,
-            degreeLevel: "Master",
-            targetMajor: "Computer Science",
-            gpa: 3.5,
-            gpaScale: 4.0,
-            budgetAnnualUsd: 25000,
-            preferredCountries: JSON.stringify(["United States", "United Kingdom", "Canada", "Germany"]),
-            needScholarship: true,
-            isAdmin: true,
-            onboardingCompleted: true,
-            onboardingStep: 8,
-            ...(adminHasPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
-          })
-          .returning();
-        console.log(`Created admin account "${adminName}" (${adminEmail}, profile ${created.id}).`);
+      } catch (err) {
+        console.error("Failed to ensure admin account:", (err as Error)?.message);
       }
-    } catch (err) {
-      console.error("Failed to ensure admin account:", err);
     }
 
-    // Safety fallback: if for any reason no admin exists at all, promote the first profile.
+    // No admin at all → say so. (The old "promote the first profile" fallback
+    // was removed: on a public deployment it let whoever registered first
+    // become an administrator.)
     const [existingAdmin] = await db
       .select({ id: studentProfiles.id })
       .from(studentProfiles)
       .where(eq(studentProfiles.isAdmin, true))
       .limit(1);
     if (!existingAdmin) {
-      const [firstProfile] = await db
-        .select({ id: studentProfiles.id })
-        .from(studentProfiles)
-        .orderBy(studentProfiles.id)
-        .limit(1);
-      if (firstProfile) {
-        await db
-          .update(studentProfiles)
-          .set({ isAdmin: true })
-          .where(eq(studentProfiles.id, firstProfile.id));
-        console.log("Promoted profile", firstProfile.id, "to admin (no admin existed).");
-      }
+      console.warn("No administrator exists. Set ADMIN_EMAIL and ADMIN_PASSWORD and restart to create one.");
     }
 
     // Referral & onboarding backfill (idempotent, runs on every load):

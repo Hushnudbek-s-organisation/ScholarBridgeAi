@@ -1,11 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  describeGroqError,
-  getGroqModelName,
-  groqChatComplete,
-  isGroqConfigured,
-  withGroqRetry,
-} from "@/lib/groq";
+import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
 import {
   buildAnalysisPrompt,
   getVisaCountry,
@@ -88,7 +82,7 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!isGroqConfigured()) {
+    if (!(await isAiConfigured("visa"))) {
       // No model available — the rubric is still a complete, honest answer.
       return NextResponse.json({
         aiAvailable: false,
@@ -103,21 +97,36 @@ export async function POST(req: Request) {
         ? body.uiLanguage.trim().slice(0, 40)
         : "English";
 
-    // The analysis prompt asks for "JSON ONLY" (Groq's json_object mode
-    // requires the word "JSON" in the messages). gpt-oss reasoning tokens
+    // The analysis prompt asks for "JSON ONLY" (json_object mode requires the
+    // word "JSON" in the messages; providers without JSON mode still get the
+    // instruction and parseAnalysisJson tolerates fences). Reasoning tokens
     // share max_tokens, so the budget is 2048 with low effort.
-    const result = await withGroqRetry(() =>
-      groqChatComplete({
-        model: getGroqModelName(),
-        messages: [{ role: "user", content: buildAnalysisPrompt(country, history, uiLanguage) }],
+    const result = await aiChat(
+      {
+        taskType: "visa",
+        prompt: buildAnalysisPrompt(country, history, uiLanguage),
         temperature: 0.3,
         maxTokens: 2048,
         jsonMode: true,
         reasoningEffort: "low",
-      }),
+      },
+      { maxAttempts: 3 },
     );
+    if (!result.ok) {
+      // The deterministic rubric is still a real answer — return it with the reason.
+      // 200 on purpose: the client renders the rubric (same shape as "no provider").
+      console.warn("Visa analyze AI unavailable:", result.error.category, aiErrorStatus(result.error));
+      return NextResponse.json({
+        aiAvailable: false,
+        aiError: describeAiError(result.error),
+        rubric,
+        estimated_visa_chance: null,
+        chanceDisclaimer: visaChanceDisclaimer(null),
+        recommendations: "",
+      });
+    }
 
-    const analysis = parseAnalysisJson(result.text);
+    const analysis = parseAnalysisJson(result.response.text);
     if (!analysis) {
       return NextResponse.json(
         { error: "Could not parse the AI analysis. Please try again." },
@@ -133,9 +142,9 @@ export async function POST(req: Request) {
       chanceDisclaimer: visaChanceDisclaimer(analysis.estimated_visa_chance),
     });
   } catch (err) {
-    console.error("Visa analyze error:", err);
+    console.error("Visa analyze error:", (err as Error)?.message);
     return NextResponse.json(
-      { error: describeGroqError(err, getGroqModelName()) },
+      { error: "The interview analysis is temporarily unavailable. Please try again." },
       { status: 500 },
     );
   }

@@ -474,16 +474,23 @@ async function main() {
     assert.equal(calls, 4);
   });
 
-  // Structural sanity: visa routes actually wrap groqChatComplete.
-  // (Not counted — the assertions above are the contract.)
+  // Structural sanity: visa routes go through the shared AI layer (admin
+  // "visa" mapping, default Groq) with same-provider retries. Task 7 moved
+  // them off direct groqChatComplete; withGroqRetry above stays the contract
+  // for lib/groq itself. (Not counted — the assertions above are the contract.)
   const ROOT = join(import.meta.dirname, "..");
   const chat = readFileSync(join(ROOT, "src/app/api/visa/chat/route.ts"), "utf8");
   const analyze = readFileSync(join(ROOT, "src/app/api/visa/analyze/route.ts"), "utf8");
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
-  if (!chat.includes("withGroqRetry") || !analyze.includes("withGroqRetry")) {
-    throw new Error("visa routes must wrap groqChatComplete in withGroqRetry");
+  for (const [name, src] of [["chat", chat], ["analyze", analyze]] as const) {
+    if (!src.includes("aiChat(") || !src.includes('taskType: "visa"') || !/maxAttempts:\s*3/.test(src)) {
+      throw new Error(`visa ${name} route must call aiChat({ taskType: "visa" }, { maxAttempts: 3 })`);
+    }
+    if (src.includes("groqChatComplete")) {
+      throw new Error(`visa ${name} route must not call Groq directly (provider is admin-selected)`);
+    }
   }
   if (!chat.includes('reasoningEffort: "low"') || !analyze.includes('reasoningEffort: "low"')) {
     throw new Error('visa routes must pass reasoningEffort: "low"');

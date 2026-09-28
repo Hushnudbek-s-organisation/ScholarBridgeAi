@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { sanitizeProfile, verifyPassword } from "@/lib/password";
 import { sessionCookieHeader } from "@/lib/auth";
+import { sendLoginAlert } from "@/lib/telegram/service";
 import {
   LIMITS,
   checkRateLimit,
@@ -74,6 +75,10 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    // Security alert to the owner's Telegram (if connected) — sent after the
+    // response so a slow Telegram API never delays or fails the sign-in.
+    after(() => sendLoginAlert(profile.id));
 
     const response = NextResponse.json({
       profile: sanitizeProfile(profile),

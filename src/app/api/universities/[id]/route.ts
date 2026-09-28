@@ -9,7 +9,6 @@ import {
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
-import { mockUniversityDetailPayload } from "@/lib/mock-universities";
 
 /**
  * GENERIC structured parser for `other_requirements` free-text.
@@ -401,9 +400,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   } catch (error) {
     console.error("GET /api/universities/[id] error:", error);
-    // Preview / sandbox: serve MIT / Oxford / TUM when the database is unavailable.
-    const { id } = await params;
-    const uniId = parseInt(id, 10);
-    return NextResponse.json(mockUniversityDetailPayload(Number.isFinite(uniId) ? uniId : 1));
+    // Never substitute sample universities: during a database outage students
+    // would be shown made-up data as if it were real. Clients show the error
+    // (the website's explorer / detail views, and the Telegram bot's
+    // "temporarily unavailable" message for 503).
+    return NextResponse.json(
+      { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
+      { status: 503 },
+    );
   }
 }
