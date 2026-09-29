@@ -12,7 +12,7 @@ import { readJsonBody } from "@/lib/request";
 
 export async function GET(req: Request) {
   try {
-    // Reading the forum is part of the Premium `forum` feature (not only the UI).
+    // Reading the forum is free; writing is gated by forum_write (Pro).
     const member = await requireFeatureSession(req, "forum");
     if (!member.ok) return member.response;
     const { searchParams } = new URL(req.url);
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
-    const locked = await premiumGate(access.session.profile.id, "forum");
+    const locked = await premiumGate(access.session.profile.id, "forum_write");
     if (locked) return locked;
     const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
     if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);

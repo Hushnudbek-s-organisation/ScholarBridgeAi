@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, requireProfileAccess, type AuthResult, type Session } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request";
+import { ensureGrowthTables, GROWTH_UNAVAILABLE } from "@/lib/growth/db";
 import { ensureJourneyTables, JOURNEY_UNAVAILABLE } from "./db";
 
 export type Guard<T> = { ok: true; value: T } | { ok: false; response: NextResponse };
@@ -17,10 +18,19 @@ export function jsonError(status: number, error: string, code = "error") {
   return NextResponse.json({ error, code }, { status });
 }
 
-/** Tables ready? (lazy DDL on first use). */
+/**
+ * Tables ready? (lazy DDL on first use).
+ *
+ * The dashboard (and several journey routes) also read growth tables
+ * (`checklist_items`, `student_checklist`). If only journey DDL ran, those
+ * queries 500 with "relation does not exist" and the UI shows
+ * "We could not load your dashboard". Bootstrap BOTH sets here.
+ */
 export async function guardTables(): Promise<NextResponse | null> {
-  const ok = await ensureJourneyTables();
-  return ok ? null : NextResponse.json(JOURNEY_UNAVAILABLE, { status: 503 });
+  const [journeyOk, growthOk] = await Promise.all([ensureJourneyTables(), ensureGrowthTables()]);
+  if (!journeyOk) return NextResponse.json(JOURNEY_UNAVAILABLE, { status: 503 });
+  if (!growthOk) return NextResponse.json(GROWTH_UNAVAILABLE, { status: 503 });
+  return null;
 }
 
 /**

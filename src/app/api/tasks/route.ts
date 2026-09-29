@@ -3,13 +3,12 @@ import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { applicationTasks, universities } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { premiumGate } from "@/lib/premium";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 
 /**
- * Application tasks — the "Tasks & Roadmap" section, a Premium feature
- * (`roadmap`). Every method checks ownership AND the plan server-side: the
- * website's PremiumGate only decides what to render.
+ * Application tasks — basic roadmap is FREE (the "start from zero" promise).
+ * Every method still checks ownership server-side. Premium adds SOP AI,
+ * unlimited workspaces and deeper tooling — not the core task list.
  */
 
 const BODY_LIMIT = 16 * 1024;
@@ -36,8 +35,6 @@ export async function GET(req: Request) {
 
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) return authError(access);
-    const locked = await premiumGate(access.session.profile.id, "roadmap");
-    if (locked) return locked;
 
     const tasks = await db
       .select({
@@ -75,8 +72,6 @@ export async function POST(req: Request) {
     }
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) return authError(access);
-    const locked = await premiumGate(access.session.profile.id, "roadmap");
-    if (locked) return locked;
 
     const title = clampString(body.title, 300).trim();
     if (!title) {
@@ -129,8 +124,6 @@ export async function PATCH(req: Request) {
     // visitor edit or delete another student's roadmap.
     const access = await requireRowAccess(req, await findTaskOwner(id));
     if (!access.ok) return authError(access);
-    const locked = await premiumGate(access.session.profile.id, "roadmap");
-    if (locked) return locked;
 
     const patch: Partial<typeof applicationTasks.$inferInsert> = {};
     if (body.isCompleted !== undefined) {
@@ -178,8 +171,6 @@ export async function DELETE(req: Request) {
 
     const access = await requireRowAccess(req, await findTaskOwner(id));
     if (!access.ok) return authError(access);
-    const locked = await premiumGate(access.session.profile.id, "roadmap");
-    if (locked) return locked;
 
     await db.delete(applicationTasks).where(eq(applicationTasks.id, id));
 

@@ -7,6 +7,7 @@ import {
   userDocuments,
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
+import { premiumGate } from "@/lib/premium";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,12 @@ export async function POST(req: Request) {
   const g = await guardStudent(req, b.value.profileId, { write: true });
   if (!g.ok) return g.response;
   const { profileId } = g.value;
+  // Checklist metadata is free; uploading a real file is Pro (documents_upload).
+  const hasFile = Boolean(text(b.value.fileUrl, 600) || text(b.value.fileName, 240));
+  if (hasFile) {
+    const locked = await premiumGate(profileId, "documents_upload");
+    if (locked) return locked;
+  }
   const title = text(b.value.title, 160);
   const docType = oneOf(b.value.docType, DOC_TYPES, "other");
   if (!title) return jsonError(400, "title is required", "bad_request");

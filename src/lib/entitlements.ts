@@ -12,15 +12,33 @@ export type FeatureKey =
   | "ai_advanced"
   | "roadmap"
   | "forum"
+  | "forum_write"
   | "courses"
+  | "courses_full"
   | "deadline_center"
   | "documents"
-  | "notifications_advanced";
+  | "documents_upload"
+  | "notifications_advanced"
+  | "parent_dashboard"
+  | "visa_unlimited"
+  | "workspace_unlimited"
+  | "saves_unlimited";
 
 /**
- * Centralized entitlements (spec §17). Feature → minimum plan mapping is
- * configurable via app_config keys (`feature_<name> = free|premium|admin`),
- * so the admin controls which plan owns which feature without code changes.
+ * Centralized entitlements (spec §17 + Free/Pro product matrix).
+ *
+ * FREE keeps the "start from zero" promise:
+ *   search + match, save (limited), study plan / basic roadmap, basic deadlines,
+ *   test planner + document checklist, AI chat (daily quota), forum READ,
+ *   course intro lessons, 1 application workspace.
+ *
+ * PRO unlocks quality / unlimited:
+ *   SOP AI, deep profile audit, unlimited saves & workspaces, extended reminders,
+ *   unlimited visa practice, forum WRITE, full courses, file vault upload,
+ *   parent dashboard, recommendation vault extras.
+ *
+ * Feature → minimum plan is configurable via app_config
+ * (`feature_<name> = free|premium|admin`) so admins can override without code.
  */
 
 const DEFAULT_FEATURE_PLAN: Record<FeatureKey, Plan> = {
@@ -31,13 +49,34 @@ const DEFAULT_FEATURE_PLAN: Record<FeatureKey, Plan> = {
   ai_general: "free",
   ai_essay: "premium",
   ai_advanced: "premium",
-  roadmap: "premium",
-  forum: "premium",
-  courses: "premium",
-  deadline_center: "premium",
-  documents: "premium",
+  // Basic roadmap + study plan stay free (the 0→1 promise). Premium adds depth.
+  roadmap: "free",
+  // Reading the forum is free; writing needs Pro.
+  forum: "free",
+  forum_write: "premium",
+  // Catalog + intro lessons free; full course content needs Pro.
+  courses: "free",
+  courses_full: "premium",
+  // Basic deadline list + Telegram reminders free; extended offsets need Pro.
+  deadline_center: "free",
+  // Checklist free; file vault upload is Pro.
+  documents: "free",
+  documents_upload: "premium",
   notifications_advanced: "premium",
+  parent_dashboard: "premium",
+  visa_unlimited: "premium",
+  workspace_unlimited: "premium",
+  saves_unlimited: "premium",
 };
+
+/** Free-tier quantitative caps (Pro = unlimited). Overridable via app_config. */
+export const FREE_CAPS = {
+  saved_universities: 10,
+  saved_scholarships: 10,
+  application_workspaces: 1,
+  /** Free visa practice sessions per day (rubric + AI). */
+  visa_practice_per_day: 2,
+} as const;
 
 const PLAN_LEVEL: Record<Plan, number> = { free: 0, premium: 1, admin: 2 };
 

@@ -329,7 +329,8 @@ export async function GET(req: Request) {
         id: profileId,
         name: profile?.name ?? "",
         plan: profilePlan({ isAdmin: !!profile?.isAdmin, isPremium: !!profile?.isPremium, premiumUntil: profile?.premiumUntil ?? null }),
-        completeness: Math.round(profileCompleteness(profile ?? null) * 100),
+        // profileCompleteness already returns 0–100 (percentage points).
+        completeness: Math.round(profileCompleteness(profile ?? null)),
       },
       journey,
       nextSteps,

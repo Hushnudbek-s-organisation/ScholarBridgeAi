@@ -20,6 +20,44 @@ export async function getPremiumPeriodDays(): Promise<number> {
   return getConfigNumber("payment_premium_days", PREMIUM_PERIOD_DAYS);
 }
 
+/** Supported checkout packages — monthly default, plus seasonal/yearly deals. */
+export type PremiumPackageId = "monthly" | "season" | "yearly";
+
+export async function resolvePremiumPackage(
+  packageId: string | null | undefined
+): Promise<{ id: PremiumPackageId; priceUzs: number; days: number; purpose: string }> {
+  const id = (packageId === "season" || packageId === "yearly" ? packageId : "monthly") as PremiumPackageId;
+  if (id === "season") {
+    return {
+      id,
+      priceUzs: await getConfigNumber("payment_premium_season_price_uzs", 149000),
+      days: await getConfigNumber("payment_premium_season_days", 90),
+      purpose: "premium_season",
+    };
+  }
+  if (id === "yearly") {
+    return {
+      id,
+      priceUzs: await getConfigNumber("payment_premium_yearly_price_uzs", 499000),
+      days: await getConfigNumber("payment_premium_yearly_days", 365),
+      purpose: "premium_yearly",
+    };
+  }
+  return {
+    id: "monthly",
+    priceUzs: await getPremiumPriceUzs(),
+    days: await getPremiumPeriodDays(),
+    purpose: "premium",
+  };
+}
+
+/** Days granted for a paid payment purpose (gift routes pass days explicitly). */
+export async function periodDaysForPurpose(purpose: string | null | undefined): Promise<number> {
+  if (purpose === "premium_season") return getConfigNumber("payment_premium_season_days", 90);
+  if (purpose === "premium_yearly") return getConfigNumber("payment_premium_yearly_days", 365);
+  return getPremiumPeriodDays();
+}
+
 // ---------------------------------------------------------------------------
 // Config helpers
 // ---------------------------------------------------------------------------
@@ -122,7 +160,8 @@ export async function activateSubscription(paymentId: number, profileId: number 
   }
 
   const now = new Date();
-  const periodDays = await getPremiumPeriodDays();
+  // Package length comes from the payment purpose (monthly / season / yearly).
+  const periodDays = await periodDaysForPurpose(payment.purpose);
   const periodEnd = new Date(now.getTime() + periodDays * 86400000);
 
   await db

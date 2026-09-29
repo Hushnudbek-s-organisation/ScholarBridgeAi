@@ -87,9 +87,11 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
             onClick={onUpgrade}
             className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold rounded-xl shadow-md transition-all"
           >
-            Buy Premium
+            Pro ga o&apos;tish
           </button>
-          <p className="text-[11px] text-slate-400">Unlock AI SOP Studio, Tasks, Community Forum &amp; Courses</p>
+          <p className="text-[11px] text-slate-400">
+            SOP AI, cheksiz saqlash, viza mashqi, ota-ona paneli, to&apos;liq kurslar
+          </p>
         </div>
       </div>
     </div>

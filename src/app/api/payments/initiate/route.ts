@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import {
-  getPremiumPriceUzs,
   PREMIUM_CURRENCY,
   paymeConfig,
   clickConfig,
+  resolvePremiumPackage,
 } from "@/lib/payments";
 import { requireProfileAccess } from "@/lib/auth";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
@@ -13,7 +13,7 @@ import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { profileId, provider } = body;
+    const { profileId, provider, package: packageId } = body;
 
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
@@ -33,8 +33,9 @@ export async function POST(req: Request) {
     const limit = checkRateLimit(`payments:${access.session.profile.id}`, LIMITS.payment);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
-    // Price from app_config (spec §3, §18 — no hardcoded amounts).
-    const priceUzs = await getPremiumPriceUzs();
+    // Package + price from app_config (monthly / season / yearly).
+    const pack = await resolvePremiumPackage(packageId);
+    const priceUzs = pack.priceUzs;
 
     const [payment] = await db
       .insert(payments)
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
         amount: priceUzs,
         currency: PREMIUM_CURRENCY,
         status: "pending",
-        purpose: "premium",
+        purpose: pack.purpose,
       })
       .returning();
 
@@ -78,7 +79,9 @@ export async function POST(req: Request) {
       params,
       amount: priceUzs,
       currency: PREMIUM_CURRENCY,
-      purpose: "premium",
+      purpose: pack.purpose,
+      package: pack.id,
+      days: pack.days,
     });
   } catch (error) {
     console.error("POST /api/payments/initiate error:", error);

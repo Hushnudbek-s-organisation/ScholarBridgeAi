@@ -616,7 +616,6 @@ async function main() {
 
   check("Premium features are enforced by their APIs, not only by the website's PremiumGate", () => {
     const gated: Record<string, string> = {
-      "tasks/route.ts": "roadmap",
       "essays/route.ts": "ai_essay",
       "essays/reviews/route.ts": "ai_essay",
       "essay-adapter/route.ts": "ai_essay",
@@ -624,31 +623,35 @@ async function main() {
       "ai/draft-sop/route.ts": "ai_essay",
       "ai/review-sop/route.ts": "ai_essay",
       "forum/categories/route.ts": "forum",
-      "forum/threads/route.ts": "forum",
+      "forum/threads/route.ts": "forum_write",
       "forum/threads/[id]/route.ts": "forum",
-      "forum/replies/route.ts": "forum",
-      "forum/likes/route.ts": "forum",
-      "forum/reports/route.ts": "forum",
-      "courses/[id]/route.ts": "courses",
-      "courses/progress/route.ts": "courses",
-      "quizzes/attempt/route.ts": "courses",
-      "certificates/route.ts": "courses",
+      "forum/replies/route.ts": "forum_write",
+      "forum/likes/route.ts": "forum_write",
+      "forum/reports/route.ts": "forum_write",
+      "courses/[id]/route.ts": "courses_full",
+      "courses/progress/route.ts": "courses_full",
+      "quizzes/attempt/route.ts": "courses_full",
+      "certificates/route.ts": "courses_full",
     };
     for (const [rel, feature] of Object.entries(gated)) {
       const src = routeSrc(rel);
       const enforced =
-        src.includes(`premiumGate(`) && src.includes(`"${feature}"`) ||
+        (src.includes(`premiumGate(`) && src.includes(`"${feature}"`)) ||
         src.includes(`requireFeatureSession(req, "${feature}")`) ||
+        src.includes(`hasFeature(`) && src.includes(`"${feature}"`) ||
         src.includes(`feature: "${feature}"`);
       assert.ok(enforced, `${rel} must enforce the "${feature}" feature server-side`);
     }
+    // Basic roadmap (tasks) is FREE — ownership still required on every write.
     const tasks = routeSrc("tasks/route.ts");
-    for (const h of handlerBodies(tasks)) {
-      assert.match(h.body, /premiumGate\(/, `tasks ${h.method} must check the plan`);
-    }
+    assert.doesNotMatch(tasks, /premiumGate\(/, "basic roadmap must stay free (no premiumGate on tasks)");
     for (const h of handlerBodies(tasks).filter((x) => x.method === "PATCH" || x.method === "DELETE")) {
       assert.match(h.body, /requireRowAccess\(/, `tasks ${h.method} must check the row owner`);
     }
+    // Free quantitative caps are enforced server-side on write paths.
+    assert.match(routeSrc("saved-universities/route.ts"), /enforceFreeCap\(/);
+    assert.match(routeSrc("saved-scholarships/route.ts"), /enforceFreeCap\(/);
+    assert.match(routeSrc("applications/route.ts"), /enforceFreeCap\(/);
   });
 
   check("the website's PremiumGate asks for a specific feature and does not mount locked content", () => {
@@ -659,7 +662,8 @@ async function main() {
     assert.equal((lockedBranch.match(/\{children\}/g) || []).length, 1, "children may only render in the unlocked branch");
     const page = readFileSync(join(ROOT, "src/app/page.tsx"), "utf8");
     const uses = page.match(/<PremiumGate[\s\S]*?>/g) || [];
-    assert.ok(uses.length >= 5 && uses.every((u) => /feature="[a-z_]+"/.test(u)), "every PremiumGate names its feature");
+    // SOP + parent (and any future Pro-only sections) — free sections no longer wrap PremiumGate.
+    assert.ok(uses.length >= 2 && uses.every((u) => /feature="[a-z_]+"/.test(u)), "every PremiumGate names its feature");
   });
 
   check("public / cross-account data exposure fixes stay in place", () => {

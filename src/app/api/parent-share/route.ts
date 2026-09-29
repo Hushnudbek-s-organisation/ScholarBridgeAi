@@ -7,6 +7,7 @@ import { requireProfileAccess } from "@/lib/auth";
 import { readJsonBody, clampString } from "@/lib/request";
 import { buildParentSummary, parentShareLink, type ParentSource } from "@/lib/parentSummary";
 import { computeProfileCompleteness } from "@/lib/gamification";
+import { premiumGate } from "@/lib/premium";
 
 /**
  * Parent Dashboard access (Phase 4).
@@ -33,6 +34,9 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    // Parent dashboard is a Pro feature (families pay).
+    const locked = await premiumGate(access.session.profile.id, "parent_dashboard");
+    if (locked) return locked;
 
     const enabled = body.enabled === true;
     if (!enabled) {

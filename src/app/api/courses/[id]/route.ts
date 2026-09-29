@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
-import { premiumGate } from "@/lib/premium";
+import { hasFeature } from "@/lib/premium";
 import { db } from "@/db";
 import {
   courses,
@@ -21,8 +21,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;
-    // Lessons (video URLs, content) and quizzes are the Premium course
-    // material — an account with the `courses` feature is required.
+    // Catalog browsing is free. Full lesson content needs `courses_full` (Pro).
+    // Free accounts still get the first lesson of each module as an intro preview.
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
       return NextResponse.json(
@@ -30,8 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         { status: access.status }
       );
     }
-    const locked = await premiumGate(access.session.profile.id, "courses");
-    if (locked) return locked;
+    const fullAccess = await hasFeature(access.session.profile.id, "courses_full");
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     if (!course) {
@@ -113,6 +112,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       modules.push({ ...mod, lessons: lessonData });
     }
 
+    // Free plan: first lesson of each module is the intro preview; the rest
+    // are locked placeholders (title only, no video/quiz). Pro gets everything.
+    const visibleModules = fullAccess
+      ? modules
+      : modules.map((mod: any) => {
+          const lessons = (mod.lessons as any[]) || [];
+          return {
+            ...mod,
+            lessons: lessons.map((lesson: any, idx: number) => {
+              if (idx === 0) return { ...lesson, isIntro: true, locked: false };
+              return {
+                id: lesson.id,
+                title: lesson.title,
+                sortOrder: lesson.sortOrder,
+                durationMinutes: lesson.durationMinutes ?? null,
+                isIntro: false,
+                locked: true,
+                progress: null,
+                quiz: null,
+                lastAttempt: null,
+                content: null,
+                videoUrl: null,
+              };
+            }),
+          };
+        });
+
     let certificate = null;
     let totalCompleted = 0;
     if (profileId && allLessonIds.length > 0) {
@@ -134,11 +160,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     return NextResponse.json({
       course,
-      modules,
+      modules: visibleModules,
       totalLessons,
       completedLessons: totalCompleted,
       progressPct: totalLessons ? Math.round((totalCompleted / totalLessons) * 100) : 0,
       certificate,
+      fullAccess,
+      freePreview: !fullAccess,
     });
   } catch (error) {
     console.error("GET /api/courses/[id] error:", error);

@@ -49,15 +49,15 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-base font-extrabold text-slate-900">2. Free vs Premium Tiers</h2>
+              <h2 className="text-base font-extrabold text-slate-900">2. Free vs Pro Tiers</h2>
               <p className="mt-2">
-                <strong>Free tier:</strong> Creating a profile, browsing universities and scholarships, viewing match scores, and saving shortlists are free. No credit card is required to start.
+                <strong>Free tier:</strong> Profile, university/scholarship search and match scores, saving up to 10 universities and 10 scholarships, study plan and basic roadmap, basic deadline reminders (Telegram), test planner and document checklist, AI helper (daily quota), forum reading, course intro lessons, and 1 application workspace. No credit card is required to start.
               </p>
               <p className="mt-2">
-                <strong>Premium tier:</strong> AI SOP Studio (drafting, evaluation, review), Tasks & Roadmap generation, Deadline Center, Community Forum, Video Courses with certificates, and priority support are Premium-only features. Premium is offered as a subscription and may also be granted temporarily via referral rewards (e.g., 30 days for every 5 friends who join and complete their profile).
+                <strong>Pro tier:</strong> SOP/essay AI (draft, review, versions), deep profile audit, unlimited saves and workspaces, extended deadline reminders (3/7/14 days), unlimited visa practice, unlimited AI helper, recommendation vault, document file uploads, parent dashboard, forum writing, and full courses with certificates. Pro is offered as monthly, application-season (≈3 months), or yearly packages, and may also be granted temporarily via referral rewards.
               </p>
               <p className="mt-2">
-                We may introduce additional Premium benefits over time. Prices and entitlements are shown at checkout and in the app&apos;s Premium section.
+                Prices and entitlements are shown at checkout and in the app&apos;s Payments section. We may adjust packages over time; the in-app list is the source of truth.
               </p>
             </section>
 
