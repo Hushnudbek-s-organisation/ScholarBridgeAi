@@ -61,6 +61,12 @@ interface UniversityExplorerProps {
   savedUniIds: Set<number>;
   onSaveUniversity: (uniId: number) => Promise<void>;
   onUnsaveUniversity: (uniId: number) => Promise<void>;
+  /**
+   * Spec §34 — the global search (Ctrl+K) can ask the explorer to open one
+   * specific university. It broadcasts a window event rather than threading a
+   * prop through the page, so the palette and the explorer stay decoupled.
+   */
+  autoOpenUniversityId?: number | null;
 }
 
 export function UniversityExplorer({
@@ -68,6 +74,7 @@ export function UniversityExplorer({
   savedUniIds,
   onSaveUniversity,
   onUnsaveUniversity,
+  autoOpenUniversityId,
 }: UniversityExplorerProps) {
   const [universities, setUniversities] = useState<University[]>([]);
   const [fetchError, setFetchError] = useState("");
@@ -85,6 +92,16 @@ export function UniversityExplorer({
 
   // Detail view + sorting
   const [selectedUniId, setSelectedUniId] = useState<number | null>(null);
+
+  // Global search → deep-open this university. The prop changes, so the
+  // selection is adjusted during render (React's documented "derive state from
+  // a prop" pattern) rather than in an effect, which would cost an extra
+  // render pass for every keystroke of the command palette.
+  const [lastAutoOpenId, setLastAutoOpenId] = useState<number | null>(null);
+  if (autoOpenUniversityId != null && autoOpenUniversityId !== lastAutoOpenId) {
+    setLastAutoOpenId(autoOpenUniversityId);
+    setSelectedUniId(autoOpenUniversityId);
+  }
   const [sortBy, setSortBy] = useState("rank");
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is

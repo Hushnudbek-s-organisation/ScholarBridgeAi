@@ -4,10 +4,28 @@
  * WHY THIS EXISTS
  * ---------------
  * `Navbar` renders the sidebar from i18n labels + icons, while the
- * Admin → Navigation manager needs the SAME section ids with plain labels and
- * a default visibility list. Keeping both here means the two sides can never
- * drift apart, and the default hidden list lives in exactly one place
+ * Admin → Navigation manager needs the SAME section ids with plain labels
+ * and a default visibility list. Keeping both here means the two sides can
+ * never drift apart, and the default hidden list lives in exactly one place
  * (reused by `app_config.nav_hidden_items` defaults).
+ *
+ * THE EIGHT GROUPS (2026-09-29 reorganization)
+ * -------------------------------------------
+ * The sidebar used to be a flat list of independent features, which made a
+ * student who had just decided to study abroad unable to guess where to
+ * start. It is now grouped by the journey they are actually on:
+ *
+ *   🏠 HOME            → the control center
+ *   🔎 DISCOVER        → what exists out there
+ *   🧭 MY JOURNEY      → what fits ME, and my plan
+ *   📋 PREPARE         → the raw materials
+ *   📝 APPLY           → the applications
+ *   🎓 AFTER ADMISSION → offer → funding → visa → departure
+ *   🤝 HELP            → people and answers
+ *   👤 ACCOUNT         → settings, premium, sharing
+ *
+ * Groups are collapsible on mobile (the drawer can be 40 rows tall otherwise)
+ * and always show the group that contains the active page.
  */
 
 export interface NavSectionMeta {
@@ -21,45 +39,126 @@ export interface NavSectionMeta {
   group: NavGroupId;
   /** Added in the growth release — shown with a "New" badge for a while. */
   isNew?: boolean;
+  /** The journey stage this section belongs to (see src/lib/journey/stages). */
+  stage?: string;
 }
 
-/**
- * Sidebar groups, in display order. Grouping follows the student's journey
- * (find → plan → apply → get help) so a newcomer can guess where things are.
- */
-export const NAV_GROUPS = ["start", "explore", "plan", "apply", "help", "account"] as const;
-export type NavGroupId = (typeof NAV_GROUPS)[number];
+export type NavGroupId =
+  | "home"
+  | "discover"
+  | "journey"
+  | "prepare"
+  | "apply"
+  | "after"
+  | "help"
+  | "account";
+
+/** Sidebar groups, in display order. */
+export const NAV_GROUPS = [
+  "home",
+  "discover",
+  "journey",
+  "prepare",
+  "apply",
+  "after",
+  "help",
+  "account",
+] as const;
+
+export const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
+  home: "Home",
+  discover: "Discover",
+  journey: "My Journey",
+  prepare: "Prepare",
+  apply: "Apply",
+  after: "After Admission",
+  help: "Help",
+  account: "Account",
+};
+
+export const NAV_GROUP_ICONS: Record<NavGroupId, string> = {
+  home: "🏠",
+  discover: "🔎",
+  journey: "🧭",
+  prepare: "📋",
+  apply: "📝",
+  after: "🎓",
+  help: "🤝",
+  account: "👤",
+};
 
 /** Every sidebar section an admin can toggle from Admin → Navigation. */
 export const NAV_SECTIONS: NavSectionMeta[] = [
-  { id: "dashboard", group: "start", label: "Dashboard", description: "Home overview, 'Your path' guide, next actions and quick links. Must stay visible.", locked: true },
-  { id: "universities", group: "explore", label: "University Explorer", description: "Search and save universities and programmes." },
-  { id: "scholarships", group: "explore", label: "Scholarship Hub", description: "Scholarship discovery and saved scholarships." },
-  { id: "autopilot", group: "explore", label: "Scholarship Autopilot", description: "NEW — one queue of matched scholarships: save, mark applied or hide. Similar suggestions after applying.", isNew: true },
-  { id: "opportunities", group: "explore", label: "Opportunities", description: "Personalized opportunities feed." },
-  { id: "compare", group: "explore", label: "Country Compare", description: "Country-to-country comparison on published data." },
-  { id: "profile", group: "plan", label: "My Profile", description: "Full-page profile editor. Hidden by default — all of its fields now live in Edit Profile." },
-  { id: "chancing", group: "plan", label: "My Chances", description: "Fit score and admission-chance estimates." },
-  { id: "strength", group: "plan", label: "Profile Strength", description: "Profile completeness and extracurricular analysis." },
-  { id: "goals", group: "plan", label: "Goal Planner", description: "NEW — up to 6 focused goals (academic, activities, skills, career) with step-by-step progress.", isNew: true },
-  { id: "stories", group: "plan", label: "Admission Stories", description: "NEW — moderated stories of admitted students, with a 'find my twin' match.", isNew: true },
-  { id: "similar", group: "plan", label: "Students Like Me", description: "Accepted students with a similar profile." },
-  { id: "planning", group: "plan", label: "Planning", description: "Cost calculator, scholarship portfolio and CV tools." },
-  { id: "advisor", group: "plan", label: "AI Advisor", description: "AI admissions advisor." },
-  { id: "mentors", group: "plan", label: "Mentors", description: "Mentor marketplace." },
-  { id: "parent", group: "plan", label: "Parents", description: "Parent dashboard and shared progress view." },
-  { id: "applications", group: "apply", label: "Applications", description: "Universal application tracker." },
+  { id: "dashboard", group: "home", label: "Dashboard", description: "Home overview, 'Your path' guide, next actions and quick links. Must stay visible.", locked: true, stage: "discover" },
+
+  // ---- DISCOVER ----------------------------------------------------------
+  { id: "universities", group: "discover", label: "University Explorer", description: "Search and save universities and programmes.", stage: "discover" },
+  { id: "scholarships", group: "discover", label: "Scholarship Hub", description: "Scholarship discovery and saved scholarships.", stage: "discover" },
+  { id: "autopilot", group: "discover", label: "Scholarship Autopilot", description: "NEW — one queue of matched scholarships: save, mark applied or hide. Similar suggestions after applying.", isNew: true, stage: "discover" },
+  { id: "opportunities", group: "discover", label: "Opportunities", description: "Personalized opportunities feed." },
+  { id: "compare", group: "discover", label: "Country Compare", description: "Country-to-country comparison on published data." },
+  { id: "career", group: "discover", label: "Career & Major Explorer", description: "Career → major → countries → universities → scholarships.", isNew: true, stage: "discover" },
+
+  // ---- MY JOURNEY --------------------------------------------------------
+  { id: "study-plan", group: "journey", label: "My Study Plan", description: "Your goal split into ten phases, updated automatically from your real data.", isNew: true },
+  { id: "chancing", group: "journey", label: "My Chances", description: "Fit score and admission-chance estimates.", stage: "match" },
+  { id: "strength", group: "journey", label: "Profile Strength", description: "Profile readiness by category and what to improve.", stage: "prepare" },
+  { id: "goals", group: "journey", label: "Goals", description: "NEW — up to 6 focused goals (academic, activities, skills, career) with step-by-step progress.", isNew: true },
+  { id: "activities", group: "journey", label: "My Activities", description: "Volunteering, leadership, projects, competitions — with evidence.", isNew: true, stage: "prepare" },
+  { id: "stories", group: "journey", label: "Admission Stories", description: "NEW — moderated stories of admitted students, with a 'find my twin' match.", isNew: true },
+  { id: "similar", group: "journey", label: "Students Like Me", description: "Accepted students with a similar profile." },
+  { id: "profile", group: "journey", label: "My Profile", description: "Full-page profile editor. Hidden by default — all of its fields now live in Edit Profile." },
+
+  // ---- PREPARE -----------------------------------------------------------
+  { id: "documents", group: "prepare", label: "Documents", description: "One vault of documents, reused across every application.", isNew: true, stage: "prepare" },
+  { id: "tests", group: "prepare", label: "Test Planner", description: "IELTS / TOEFL / SAT targets, dates and practice tasks.", isNew: true, stage: "prepare" },
+  { id: "requirements", group: "prepare", label: "Application Requirements", description: "What a university asks for, with source and last-verified date.", isNew: true, stage: "prepare" },
+  { id: "funding", group: "prepare", label: "Financial Plan", description: "Full yearly cost, funding, family budget and the remaining gap.", isNew: true, stage: "fund" },
+  { id: "planning", group: "prepare", label: "Cost Calculator", description: "Cost calculator, scholarship portfolio and CV tools." },
+
+  // ---- APPLY -------------------------------------------------------------
+  { id: "applications", group: "apply", label: "Applications", description: "Universal application tracker.", stage: "apply" },
+  { id: "workspace", group: "apply", label: "Application Workspace", description: "One workspace per university with tabs and a live progress bar.", isNew: true, stage: "apply" },
   { id: "vault", group: "apply", label: "Answer Vault", description: "NEW — answer common application questions once and reuse them everywhere.", isNew: true },
   { id: "sop", group: "apply", label: "AI SOP & Essays", description: "Premium — AI statement of purpose and essay studio." },
+  { id: "recommendations", group: "apply", label: "Recommendation Manager", description: "Track every letter from 'not requested' to 'submitted'.", isNew: true, stage: "apply" },
   { id: "tasks", group: "apply", label: "Tasks & Roadmap", description: "Premium — application roadmap and task tracking." },
-  { id: "visa", group: "apply", label: "Visa Speaking", description: "Visa interview practice assistant." },
-  { id: "departure", group: "apply", label: "Departure Checklist", description: "NEW — after the offer: visa, money, housing, travel and arrival steps.", isNew: true },
+
+  // ---- AFTER ADMISSION ---------------------------------------------------
+  { id: "offers", group: "after", label: "Offers & Decisions", description: "Pending, accepted, rejected, waitlisted — and the post-admission plan.", isNew: true, stage: "accepted" },
+  { id: "post-admission-funding", group: "after", label: "Funding & Deposits", description: "What you must pay, when, and to whom.", isNew: true, stage: "fund" },
+  { id: "visa", group: "after", label: "Visa Center", description: "Visa case, documents, appointments, fees and interview practice.", stage: "visa" },
+  { id: "interviews", group: "after", label: "Interview Center", description: "University and visa interview simulation with feedback.", isNew: true },
+  { id: "departure", group: "after", label: "Departure Planner", description: "After the visa: flight, housing, insurance, packing, arrival.", isNew: true, stage: "depart" },
+
+  // ---- HELP --------------------------------------------------------------
+  { id: "advisor", group: "help", label: "AI Advisor", description: "AI admissions advisor." },
   { id: "chat", group: "help", label: "AI Mentor", description: "AI mentor chat." },
-  { id: "forum", group: "help", label: "Community Forum", description: "Premium — community discussions." },
-  { id: "notifications", group: "account", label: "Telegram & Notifications", description: "NEW — connect the Telegram bot (sign-in codes + alerts), pause it or choose which alerts to receive.", isNew: true },
+  { id: "mentors", group: "help", label: "Mentors", description: "Mentor marketplace." },
+  { id: "forum", group: "help", label: "Community", description: "Premium — community discussions." },
+  { id: "courses", group: "help", label: "Courses", description: "Premium — video courses with certificates." },
+  { id: "consulting", group: "help", label: "Consulting", description: "Book a consultant." },
+
+  // ---- ACCOUNT -----------------------------------------------------------
+  { id: "parent", group: "account", label: "Parents", description: "Parent dashboard and shared progress view." },
+  { id: "notifications", group: "account", label: "Telegram & Alerts", description: "NEW — connect the Telegram bot (sign-in codes + alerts), pause it or choose which alerts to receive.", isNew: true },
   { id: "payments", group: "account", label: "Premium", description: "Premium subscription and payment history." },
   { id: "rewards", group: "account", label: "Rewards & Referrals", description: "Referral program, points and rewards." },
 ];
+
+/**
+ * When the "NEW" badge stops being shown.
+ *
+ * The badge is deliberately temporary — a sidebar where every row says NEW is
+ * noise, and a student cannot tell what actually changed recently. Admins do
+ * not configure this: it is a release date, not a feature flag.
+ */
+export const NEW_BADGE_UNTIL = "2026-12-31";
+
+/** True while the release that added these sections is still recent. */
+export function isNewBadgeActive(now: Date = new Date()): boolean {
+  return now.toISOString().slice(0, 10) <= NEW_BADGE_UNTIL;
+}
 
 /**
  * Sections hidden from the sidebar by default. The admin can change this any
@@ -68,6 +167,10 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
  * - profile     → removed from the sidebar; everything it contained is now in
  *                 Edit Profile.
  * - advisor / mentors / opportunities / compare / parent → removed for now.
+ *
+ * NOTE the new sections are deliberately NOT hidden: the whole point of the
+ * reorganization is that a new student can see the journey. They can be hidden
+ * from Admin → Navigation at any time.
  */
 export const DEFAULT_HIDDEN_NAV_ITEMS = [
   "profile",
@@ -103,4 +206,10 @@ export const NAV_LABEL_KEYS: Record<string, string> = {
 
 export function navLabelKey(id: string): string {
   return NAV_LABEL_KEYS[id] ?? id;
+}
+
+/** Every group that has at least one section (the sidebar only shows those). */
+export function groupsWithSections(visibleIds: string[]): NavGroupId[] {
+  const set = new Set(visibleIds);
+  return NAV_GROUPS.filter((g) => NAV_SECTIONS.some((s) => s.group === g && set.has(s.id)));
 }

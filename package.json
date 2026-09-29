@@ -15,6 +15,7 @@
     "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
     "test:security": "tsx scripts/check-security.ts",
+    "test:api-security": "tsx scripts/check-api-anonymous.ts",
     "test:chancing": "tsx scripts/check-chancing.ts",
     "test:roadmap": "tsx scripts/check-roadmap.ts",
     "test:documents": "tsx scripts/check-documents.ts",
@@ -37,7 +38,8 @@
     "test:telegram": "tsx scripts/check-telegram.ts",
     "test:telegram-integration": "tsx scripts/check-telegram-integration.ts",
     "test:ownership": "tsx scripts/check-ownership.ts",
-    "test:portability": "tsx scripts/check-portability.ts"
+    "test:portability": "tsx scripts/check-portability.ts",
+    "test:journey": "tsx scripts/check-journey.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

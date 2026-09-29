@@ -3,12 +3,21 @@ import { db } from "@/db";
 import { opportunities } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { auditRowChanges, writeAudit } from "@/lib/audit";
+import { readJsonBody } from "@/lib/request";
 import { eq } from "drizzle-orm";
 
 /**
  * #26/#27/#28 — Admin CRUD for the curated opportunities catalog.
  * The platform never scrapes third-party lists: admins add real, verifiable
  * programs one by one, and every change is audit-logged.
+ *
+ * SECURITY NOTE (fixed 2026-09-29): this file used to guard with
+ * `const admin = await requireAdmin(req); if (!admin) {…}`. `requireAdmin`
+ * resolves to a *result object*, which is truthy even when the caller is
+ * anonymous — so every handler in this file was effectively public, and an
+ * unauthenticated POST could insert a row. The guard is now the same
+ * `.ok` check every other admin route uses, and bodies go through the
+ * size-capped reader.
  */
 
 const TYPES = ["competition", "research", "internship", "summer_school"];
@@ -31,8 +40,8 @@ function toValues(o: any) {
 
 export async function GET(req: Request) {
   try {
-    const admin = await requireAdmin(req);
-    if (!admin) return NextResponse.json({ error: "Admin required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     const rows = await db.select().from(opportunities).orderBy(opportunities.type, opportunities.title);
     return NextResponse.json({
       items: rows.map((r) => ({ ...r, deadlineDate: r.deadlineDate || null })),
@@ -44,10 +53,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const admin = await requireAdmin(req);
-    if (!admin) return NextResponse.json({ error: "Admin required" }, { status: 403 });
-    const body = await req.json().catch(() => ({}));
-    const values = toValues(body);
+    const access = await requireAdmin(req);
+    if (!access.ok) return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    const parsed = await readJsonBody<Record<string, unknown>>(req, 64 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const values = toValues(parsed.body ?? {});
     const [row] = await db.insert(opportunities).values(values).returning();
     await writeAudit({
       entityType: "opportunity",
@@ -65,9 +75,11 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const admin = await requireAdmin(req);
-    if (!admin) return NextResponse.json({ error: "Admin required" }, { status: 403 });
-    const body = await req.json().catch(() => ({}));
+    const access = await requireAdmin(req);
+    if (!access.ok) return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+    const parsed = await readJsonBody<Record<string, unknown>>(req, 64 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body ?? {};
     const id = Number(body.id);
     if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -87,8 +99,8 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const admin = await requireAdmin(req);
-    if (!admin) return NextResponse.json({ error: "Admin required" }, { status: 403 });
+    const access = await requireAdmin(req);
+    if (!access.ok) return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     const url = new URL(req.url);
     const id = Number(url.searchParams.get("id"));
     if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "id is required" }, { status: 400 });

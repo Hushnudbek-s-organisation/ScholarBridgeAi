@@ -404,3 +404,185 @@ html.theme-transition *::after {
 .wave-bar {
   animation: visa-eq 0.6s ease-in-out infinite;
 }
+
+/* ===========================================================================
+   JOURNEY POLISH (2026-09-29)
+   ---------------------------------------------------------------------------
+   A small, shared motion + surface vocabulary for the student-facing journey
+   screens, so the dashboard, the workspace and the panels feel like one
+   product instead of a set of pages. Everything here is:
+
+     • transform/opacity only (compositor-friendly, no layout thrash),
+     • disabled by the global `prefers-reduced-motion` rule above,
+     • theme-aware — no hardcoded light-only colours.
+   =========================================================================== */
+
+/*  Skeleton shimmer — loading placeholders that look intentional ------------ */
+@keyframes sb-shimmer {
+  0% { background-position: -160% 0; }
+  100% { background-position: 260% 0; }
+}
+
+.sb-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: rgb(148 163 184 / 0.18);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.55) 50%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: sb-shimmer 1.5s ease-in-out infinite;
+}
+
+.dark .sb-skeleton {
+  background-color: rgb(148 163 184 / 0.12);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.09) 50%,
+    transparent 80%
+  );
+}
+
+/*  Card entrance + hover lift --------------------------------------------- */
+@keyframes sb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sb-rise {
+  animation: sb-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Subtle, GPU-cheap lift for interactive cards. `will-change` is deliberately
+   NOT used: there are dozens of cards per screen and promoting them all costs
+   more than the animation saves. */
+.sb-card-hover {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@media (hover: hover) {
+  .sb-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 10px 24px -12px rgb(15 23 42 / 0.28),
+      0 2px 6px -2px rgb(15 23 42 / 0.12);
+  }
+}
+
+.sb-card-hover:active {
+  transform: translateY(0);
+}
+
+/*  Progress fill: a soft travelling highlight while something is in flight -- */
+@keyframes sb-progress-sheen {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.sb-progress-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.sb-progress-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.45),
+    transparent
+  );
+  animation: sb-progress-sheen 1.8s ease-in-out infinite;
+}
+
+/*  Gradient headline + aurora backdrop ------------------------------------ */
+.sb-gradient-text {
+  background-image: linear-gradient(100deg, #4f46e5 0%, #7c3aed 45%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .sb-gradient-text {
+  background-image: linear-gradient(100deg, #a5b4fc 0%, #c4b5fd 45%, #7dd3fc 100%);
+}
+
+/* Slow-drifting aurora used behind hero cards. Two blurred radial blobs, no
+   images, no external requests. */
+@keyframes sb-aurora {
+  0% { transform: translate3d(-4%, -2%, 0) scale(1); }
+  50% { transform: translate3d(4%, 3%, 0) scale(1.08); }
+  100% { transform: translate3d(-4%, -2%, 0) scale(1); }
+}
+
+.sb-aurora {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 45% at 20% 25%, rgb(99 102 241 / 0.35), transparent 70%),
+    radial-gradient(34% 40% at 78% 30%, rgb(168 85 247 / 0.28), transparent 70%),
+    radial-gradient(40% 45% at 55% 85%, rgb(56 189 248 / 0.25), transparent 72%);
+  filter: blur(6px);
+  animation: sb-aurora 16s ease-in-out infinite;
+}
+
+/*  Animated underline for the active tab in a segmented control ------------ */
+.sb-tab-underline {
+  position: absolute;
+  inset-inline: 0.5rem;
+  bottom: 0.15rem;
+  height: 2px;
+  border-radius: 9999px;
+  background-image: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: 0.7;
+}
+
+/*  Count-up "pop" for numbers that change after a save --------------------- */
+@keyframes sb-pop {
+  0% { transform: scale(0.9); opacity: 0.4; }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.sb-pop {
+  animation: sb-pop 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/*  Focus ring that stays visible on both themes --------------------------- */
+.sb-focus:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 2px;
+}
+
+/*  Scroll-reveal without JavaScript: a graceful degradation path for the
+    panels that are rendered on the server. */
+@keyframes sb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sb-fade-in {
+  animation: sb-fade-in 0.4s ease-out both;
+}

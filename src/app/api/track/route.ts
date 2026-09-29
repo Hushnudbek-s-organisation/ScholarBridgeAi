@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordVisit, visitorCookieHeader, VISITOR_COOKIE, readCookie, type VisitEventType } from "@/lib/visits";
 import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request";
 
 /**
  * POST /api/track — anonymous traffic beacon.
@@ -24,7 +25,8 @@ export async function POST(req: Request) {
 
     let body: Record<string, unknown> = {};
     try {
-      body = (await req.json()) as Record<string, unknown>;
+      const parsed = await readJsonBody<Record<string, unknown>>(req, 4 * 1024);
+      body = parsed.ok ? parsed.body : {};
     } catch {
       body = {};
     }
