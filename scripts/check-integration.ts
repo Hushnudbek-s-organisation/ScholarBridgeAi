@@ -214,6 +214,75 @@ async function main() {
         );
 
   // -----------------------------------------------------------------------
+  // 0. Core-schema drift — production never runs `drizzle-kit push`, so a
+  //    database created before an additive schema change keeps the old shape
+  //    (this is what made the live dashboard answer 500/503: the session
+  //    lookup selects the whole profile row, and `student_profiles.is_admin`
+  //    existed only in schema.ts). Simulate exactly that on the freshly
+  //    pushed database and prove the app repairs it and still answers.
+  section("0. core-schema drift — the dashboard repairs an old database");
+
+  const { CORE_TABLES, coreRepairStatements } = await import("../src/lib/core/ddl");
+  const repairStatements = coreRepairStatements();
+  check(
+    "repair statements are additive only",
+    repairStatements.length > 0 &&
+      repairStatements.every((s) =>
+        /^CREATE (TABLE|INDEX) IF NOT EXISTS |^ALTER TABLE .+ ADD COLUMN IF NOT EXISTS /.test(s)
+      )
+  );
+  check(
+    "no destructive SQL in the repair list",
+    !repairStatements.some((s) => /\b(DROP|TRUNCATE|RENAME|ALTER COLUMN)\b/i.test(s))
+  );
+
+  await pool.query(`ALTER TABLE student_profiles DROP COLUMN IF EXISTS is_admin`);
+  await pool.query(`ALTER TABLE universities DROP COLUMN IF EXISTS official_website_url`);
+  await pool.query(`DROP TABLE IF EXISTS programs CASCADE`);
+  await pool.query(`DROP TABLE IF EXISTS ai_evaluations CASCADE`);
+  await pool.query(`DROP TABLE IF EXISTS opportunities CASCADE`);
+
+  const { GET: dashboardGet } = await import("../src/app/api/dashboard/route");
+  const dash = await call(dashboardGet as any, `/api/dashboard?profileId=${profile.id}`);
+  check(
+    "the dashboard answers 200 on the drifted database",
+    dash.status === 200,
+    `got ${dash.status} ${JSON.stringify(dash.body)?.slice(0, 200)}`
+  );
+  check("the journey summary is present", typeof dash.body?.journey?.current === "string");
+  check("the profile summary names the real student", dash.body?.profile?.name === "Aziza Karimova");
+
+  const liveColumns = await pool.query(
+    `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = current_schema()`
+  );
+  const haveColumns = new Set(liveColumns.rows.map((r: { table_name: string; column_name: string }) => `${r.table_name}.${r.column_name}`));
+  const { getTableName, getTableColumns } = await import("drizzle-orm");
+  const stillMissing: string[] = [];
+  for (const table of CORE_TABLES) {
+    const name = getTableName(table as never);
+    for (const col of Object.values(getTableColumns(table as never))) {
+      const column = (col as { name: string }).name;
+      if (!haveColumns.has(`${name}.${column}`)) stillMissing.push(`${name}.${column}`);
+    }
+  }
+  check(
+    "the repair restored every core table column",
+    stillMissing.length === 0,
+    stillMissing.slice(0, 5).join(", ")
+  );
+
+  const [repairedProfile] = await db.select().from(schema.studentProfiles).where(eq(schema.studentProfiles.id, profile.id));
+  check("is_admin is back and defaults to false (old rows stay non-admin)", repairedProfile?.isAdmin === false);
+
+  for (const table of ["programs", "ai_evaluations", "opportunities"]) {
+    const { rows } = await pool.query(`SELECT to_regclass($1) AS t`, [`public.${table}`]);
+    check(`the dropped table ${table} was recreated`, rows[0]?.t !== null && rows[0]?.t !== undefined);
+  }
+
+  const dash2 = await call(dashboardGet as any, `/api/dashboard?profileId=${profile.id}`);
+  check("a second request is unaffected (the repair is idempotent)", dash2.status === 200, `got ${dash2.status}`);
+
+  // -----------------------------------------------------------------------
   section("1. /api/planning — costs, portfolio, CV and comparison from real rows");
 
   const { GET: planningGet } = await import("../src/app/api/planning/route");
@@ -270,6 +339,12 @@ async function main() {
 
   section("4. /api/parent-share — token issue, read and revocation");
 
+  // The parent dashboard is a Premium feature and the route enforces that
+  // server-side (PR #39). Grant Premium for this section only, then revoke it
+  // again so the FREE-plan assertions further down still mean what they say.
+  const premiumForParentShare = { isPremium: true, premiumUntil: new Date(Date.now() + 86400000) };
+  await db.update(schema.studentProfiles).set(premiumForParentShare).where(eq(schema.studentProfiles.id, profile.id));
+
   const { POST: parentPost, GET: parentGet } = await import("../src/app/api/parent-share/route");
 
   const on = await call(parentPost as any, "/api/parent-share", {
@@ -321,6 +396,11 @@ async function main() {
     return { status: res.status };
   })();
   check("the old link stops working after revocation", afterRevoke.status === 404, `got ${afterRevoke.status}`);
+
+  await db
+    .update(schema.studentProfiles)
+    .set({ isPremium: false, premiumUntil: null })
+    .where(eq(schema.studentProfiles.id, profile.id));
 
   // -----------------------------------------------------------------------
   // 5. IDOR — row ids are guessable, so every mutating route has to prove

@@ -160,7 +160,11 @@ CREATE INDEX IF NOT EXISTS idx_activity_evidence_activity ON activity_evidence(a
 CREATE TABLE IF NOT EXISTS requirement_templates (
   id SERIAL PRIMARY KEY,
   university_id INTEGER REFERENCES universities(id) ON DELETE CASCADE,
-  program_id INTEGER REFERENCES programs(id) ON DELETE CASCADE,
+  -- Soft link (no FK): programs is a BASE table owned by the database, not by
+  -- this bootstrap. Some deployments have it renamed (to university_programs
+  -- by fix_align_schema.sql) or absent, and a hard FK here aborted the whole
+  -- journey bootstrap — every dashboard request then answered 503.
+  program_id INTEGER,
   section TEXT NOT NULL,
   item_key TEXT NOT NULL,
   title TEXT NOT NULL,

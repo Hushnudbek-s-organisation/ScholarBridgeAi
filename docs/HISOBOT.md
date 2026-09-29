@@ -466,8 +466,9 @@ Loyiha qoidasiga ko'ra `drizzle-kit push` **hech qachon** avtomatik ishga tushir
 | `supabase/add_documents_essays.sql` | 43 | documents ustunlari + `essay_versions` |
 | `supabase/add_mentors_parent.sql` | 66 | `mentors`, `mentor_requests`, 4 ta `parent_share_*` |
 | `supabase/add_opportunities_essay_reviews.sql` | 100 | `essay_versions.open_for_review`, `essay_reviews`, `opportunities` + 11 ta haqiqiy starter dastur + **`saved_programs`** + `notification_preferences` default'lari kengaytmasi |
+| `supabase/add_core_repair.sql` | 409 | **Ixtiyoriy** — `src/db/schema.ts` bilan baza orasidagi additiv farq (`student_profiles.is_admin`, `programs` va h.k.). Ilova buni birinchi so'rovda o'zi bajaradi (`ensureCoreSchema`), shuning uchun qo'lda ishga tushirish shart emas — faqat SQL'ni o'zingiz nazorat qilmoqchi bo'lsangiz. Regeneratsiya: `npm run db:core-repair-sql` |
 
-Uchalasi ham faqat `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` — mavjud ma'lumot o'chmaydi.
+Hammasi faqat `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` — mavjud ma'lumot o'chmaydi.
 
 ---
 

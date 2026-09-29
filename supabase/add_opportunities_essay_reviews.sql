@@ -52,7 +52,10 @@ CREATE INDEX IF NOT EXISTS idx_opportunities_deadline ON opportunities(deadline_
 -- Starter dataset: faqat rasmiy, barqaror, xalqaro tan olingan dasturlar.
 -- Ma'lumotlar ommaviy faktlar; admin panel orqali boshqariladi.
 INSERT INTO opportunities (type, title, provider, country, fields, level, deadline_date, url, description, is_verified)
-SELECT v.type, v.title, v.provider, v.country, v.fields, v.level, v.deadline_date, v.url, v.description, v.is_verified
+SELECT v.type, v.title, v.provider, v.country, v.fields, v.level,
+       -- NULL::date cast: the VALUES column is untyped and would otherwise be
+       -- inferred as text, aborting the whole migration (date = text).
+       v.deadline_date::date, v.url, v.description, v.is_verified
 FROM (VALUES
   ('competition', 'International Mathematical Olympiad', 'IMO Foundation', NULL, '["Mathematics"]', 'high_school', NULL,
    'https://www.imo-official.org', 'Yillik xalqaro matematika olimpiadasi — 18 yoshgacha bo''lgan maktab o''quvchilari uchun.', true),
@@ -87,7 +90,9 @@ WHERE NOT EXISTS (
 CREATE TABLE IF NOT EXISTS saved_programs (
   id SERIAL PRIMARY KEY,
   profile_id INTEGER NOT NULL REFERENCES student_profiles(id) ON DELETE CASCADE,
-  program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  -- Soft link (no FK): `programs` is a base table that may be renamed/absent
+  -- (`fix_align_schema.sql`). A hard FK aborted this migration on such DBs.
+  program_id INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (profile_id, program_id)
 );

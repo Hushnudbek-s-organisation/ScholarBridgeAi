@@ -4,6 +4,7 @@ import { studentProfiles } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { sanitizeProfile, verifyPassword } from "@/lib/password";
 import { sessionCookieHeader } from "@/lib/auth";
+import { ensureCoreSchema } from "@/lib/core/db";
 import { sendLoginAlert } from "@/lib/telegram/service";
 import {
   LIMITS,
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
     // hammer a single account.
     const accountLimit = checkRateLimit(`signin:email:${email}`, LIMITS.signIn);
     if (!accountLimit.ok) return rateLimitedResponse(accountLimit.retryAfterSec);
+
+    // The lookup below selects the whole profile row; repair additive core-schema
+    // drift first (no-op once the database matches the schema).
+    await ensureCoreSchema();
 
     const [profile] = await db
       .select()

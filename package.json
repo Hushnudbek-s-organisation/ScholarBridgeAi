@@ -14,6 +14,7 @@
     "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
+    "db:core-repair-sql": "tsx scripts/gen-core-repair-sql.ts",
     "test:security": "tsx scripts/check-security.ts",
     "test:api-security": "tsx scripts/check-api-anonymous.ts",
     "test:chancing": "tsx scripts/check-chancing.ts",
