@@ -9,14 +9,28 @@ interface CheckoutModalProps {
   onClose: () => void;
   profileId: number;
   onPaid: () => void;
+  /** monthly | season | yearly — sent to /api/payments/initiate */
+  packageId?: "monthly" | "season" | "yearly";
+  packageMeta?: { label?: string; labelUz?: string; priceUzs?: number; days?: number } | null;
 }
 
-export function CheckoutModal({ isOpen, onClose, profileId, onPaid }: CheckoutModalProps) {
+export function CheckoutModal({
+  isOpen,
+  onClose,
+  profileId,
+  onPaid,
+  packageId = "monthly",
+  packageMeta,
+}: CheckoutModalProps) {
   const t = useTranslations("payments");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const price = packageMeta?.priceUzs ?? 59000;
+  const days = packageMeta?.days ?? 30;
+  const label = packageMeta?.labelUz || packageMeta?.label || t("planPremium");
 
   const startCheckout = async (provider: "payme" | "click") => {
     setLoading(true);
@@ -25,9 +39,14 @@ export function CheckoutModal({ isOpen, onClose, profileId, onPaid }: CheckoutMo
       const res = await fetch("/api/payments/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, provider }),
+        body: JSON.stringify({ profileId, provider, package: packageId }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Checkout failed. Please try again.");
+        setLoading(false);
+        return;
+      }
       if (data.checkoutUrl) {
         window.open(data.checkoutUrl, "_blank", "noopener,noreferrer");
       }
@@ -43,11 +62,6 @@ export function CheckoutModal({ isOpen, onClose, profileId, onPaid }: CheckoutMo
     }
   };
 
-  const providers: { id: "payme" | "click"; name: string; color: string; note: string }[] = [
-    { id: "payme", name: "Payme", color: "from-blue-500 to-blue-600", note: t("payme") },
-    { id: "click", name: "Click", color: "from-violet-500 to-purple-600", note: t("click") },
-  ];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
@@ -60,28 +74,38 @@ export function CheckoutModal({ isOpen, onClose, profileId, onPaid }: CheckoutMo
 
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-indigo-700">{t("planLabel")}: {t("planPremium")}</span>
-            <span className="text-lg font-extrabold text-indigo-900">59,000 UZS</span>
+            <span className="text-xs font-semibold text-indigo-700">
+              {t("planLabel")}: {label}
+            </span>
+            <span className="text-lg font-extrabold text-indigo-900">
+              {price.toLocaleString("uz-UZ")} UZS
+            </span>
           </div>
-          <p className="text-[11px] text-indigo-600 mt-1">/ 30 days</p>
+          <p className="text-[11px] text-indigo-600 mt-1">/ {days} days</p>
         </div>
 
         <p className="text-xs font-semibold text-slate-600">{t("chooseProvider")}</p>
 
         <div className="space-y-2">
-          {providers.map((provider) => (
+          {(["payme", "click"] as const).map((provider) => (
             <button
-              key={provider.id}
-              onClick={() => startCheckout(provider.id)}
+              key={provider}
+              onClick={() => startCheckout(provider)}
               disabled={loading}
               className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gradient-to-r text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-              style={{ backgroundImage: `linear-gradient(to right, ${provider.id === "payme" ? "#2563eb, #1d4ed8" : "#7c3aed, #9333ea"})` }}
+              style={{
+                backgroundImage: `linear-gradient(to right, ${
+                  provider === "payme" ? "#2563eb, #1d4ed8" : "#7c3aed, #9333ea"
+                })`,
+              }}
             >
               <span className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
-                {provider.name}
+                {provider === "payme" ? "Payme" : "Click"}
               </span>
-              <span className="text-xs opacity-80">{t("payWith")} {provider.name}</span>
+              <span className="text-xs opacity-80">
+                {t("payWith")} {provider === "payme" ? "Payme" : "Click"}
+              </span>
             </button>
           ))}
         </div>

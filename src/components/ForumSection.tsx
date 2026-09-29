@@ -44,6 +44,9 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   const [reports, setReports] = useState<ForumReportItem[]>([]);
   const [showModeration, setShowModeration] = useState(false);
   const [showNewThread, setShowNewThread] = useState(false);
+  /** Free can read; Pro (forum_write) can post/like/reply. */
+  const [canWrite, setCanWrite] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   // New thread form
   const [newTitle, setNewTitle] = useState("");
@@ -110,6 +113,26 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   }, [loadThreads]);
 
   useEffect(() => {
+    if (!userId) {
+      setCanWrite(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/premium/status?profileId=${userId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setCanWrite(!!data?.features?.forum_write || !!data?.isPremium);
+      })
+      .catch(() => {
+        if (!cancelled) setCanWrite(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
     if (showModeration) loadReports();
   }, [showModeration, loadReports]);
 
@@ -126,12 +149,22 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !newTitle || !newBody || !newCategory) return;
+    if (!canWrite) {
+      setWriteError("Forumda yozish — Pro imkoniyati. O'qish bepul.");
+      return;
+    }
+    setWriteError(null);
     try {
-      await fetch("/api/forum/threads", {
+      const res = await fetch("/api/forum/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId: newCategory, authorId: userId, title: newTitle, body: newBody }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setWriteError(data.error || "Could not post. Upgrade to Pro to write in the forum.");
+        return;
+      }
       setShowNewThread(false);
       setNewTitle("");
       setNewBody("");
@@ -309,6 +342,16 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
         </div>
       </div>
 
+      {!canWrite && userId && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          Forumni o&apos;qish bepul. Yozish, javob va like — <strong>Pro</strong> imkoniyati.
+          {writeError ? <span className="ml-1 font-semibold"> {writeError}</span> : null}
+        </div>
+      )}
+      {writeError && canWrite && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{writeError}</div>
+      )}
+
       {showModeration && isModerator && (
         <ForumModerationPanel
           reports={reports}
@@ -350,7 +393,14 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
               totalPages={totalPages}
               onPageChange={setPage}
               onOpenThread={openThreadById}
-              onStartThread={() => setShowNewThread(true)}
+              onStartThread={() => {
+                if (!canWrite) {
+                  setWriteError("Forumda yozish — Pro imkoniyati. O'qish bepul.");
+                  return;
+                }
+                setWriteError(null);
+                setShowNewThread(true);
+              }}
             />
           </div>
         </div>

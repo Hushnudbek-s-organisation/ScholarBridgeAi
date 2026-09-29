@@ -19,7 +19,7 @@ const faqItems: FaqItem[] = [
   {
     question: "ScholarBridge qanday ishlaydi va bepulmi?",
     answer:
-      "ScholarBridge'da profilingizni (GPA, IELTS, byudjet, yo'nalish) kiritasiz va tizim avtomatik ravishda sizga mos keladigan xorijiy universitetlar hamda grantlarni taklif qiladi. Universitet va grant qidirish, moslik bahosi kabi asosiy funksiyalar bepul. AI SOP yordamchisi, video kurslar va jamoat forumi kabi qo'shimcha imkoniyatlar Premium obuna orqali ochiladi.",
+      "Profilingizni (GPA, IELTS, byudjet, yo'nalish) kiritasiz — tizim mos universitet va grantlarni ko'rsatadi. Bepul: qidiruv + moslik, 10 ta universitet/stipendiya saqlash, o'qish rejasi, asosiy deadline eslatmalari, test/hujjat checklist, kuniga 3–5 AI savol, forum o'qish, kurs kirish darsi va 1 ta ariza ish maydoni. Pro: SOP AI, cheksiz saqlash/workspace, chuqur profil auditi, kengaytirilgan eslatmalar, cheksiz viza mashqi, fayl ombori, ota-ona paneli, forum yozish va to'liq kurslar.",
   },
   {
     question: "IELTS 6.5 bilan qaysi davlatlarda grant olsa bo'ladi?",

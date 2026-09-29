@@ -803,15 +803,7 @@ export default function Home() {
           )}
 
           {activeTab === "tasks" && (
-            <PremiumGate
-              profileId={activeProfile?.id ?? null}
-              feature="roadmap"
-              title="Tasks & Roadmap is Premium"
-              description="Build and track your study-abroad application roadmap — an exclusive Premium feature."
-              onUpgrade={() => setActiveTab("payments")}
-            >
-              <TaskRoadmap activeProfile={activeProfile} />
-            </PremiumGate>
+            <TaskRoadmap activeProfile={activeProfile} />
           )}
 
           {/* Complete Student Profile (#1) */}
@@ -835,9 +827,8 @@ export default function Home() {
           {/* #10 Accepted students with a similar profile */}
           {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
 
-          {/* Phase 4 — mentor marketplace + parent dashboard */}
+          {/* Phase 4 — mentor marketplace (parent dashboard is gated below) */}
           {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
-          {activeTab === "parent" && <ParentDashboard activeProfile={activeProfile} />}
 
           {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
           {activeTab === "opportunities" && <OpportunitiesPanel />}
@@ -852,15 +843,7 @@ export default function Home() {
           {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
 
           {activeTab === "deadlines" && (
-            <PremiumGate
-              profileId={activeProfile?.id ?? null}
-              feature="deadline_center"
-              title="Deadline Center is Premium"
-              description="Track every scholarship, university and milestone deadline in one timeline — an exclusive Premium feature."
-              onUpgrade={() => setActiveTab("payments")}
-            >
-              <DeadlineCenter profileId={activeProfile?.id ?? null} />
-            </PremiumGate>
+            <DeadlineCenter profileId={activeProfile?.id ?? null} />
           )}
 
           {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
@@ -873,26 +856,22 @@ export default function Home() {
           )}
 
           {activeTab === "forum" && (
-            <PremiumGate
-              profileId={activeProfile?.id ?? null}
-              feature="forum"
-              title="Community Forum is Premium"
-              description="Read community topics, join discussions and post your own threads — an exclusive Premium feature."
-              onUpgrade={() => setActiveTab("payments")}
-            >
-              <ForumSection activeProfile={activeProfile} isModerator={activeProfile?.isAdmin ?? false} />
-            </PremiumGate>
+            <ForumSection activeProfile={activeProfile} isModerator={activeProfile?.isAdmin ?? false} />
           )}
 
           {activeTab === "courses" && (
+            <CoursesSection activeProfile={activeProfile} />
+          )}
+
+          {activeTab === "parent" && (
             <PremiumGate
               profileId={activeProfile?.id ?? null}
-              feature="courses"
-              title="Video Courses are Premium"
-              description="Watch video courses, take quizzes and earn certificates — an exclusive Premium feature."
+              feature="parent_dashboard"
+              title="Parent dashboard is Pro"
+              description="Share a read-only progress page with your family — a Pro feature families pay for."
               onUpgrade={() => setActiveTab("payments")}
             >
-              <CoursesSection activeProfile={activeProfile} />
+              <ParentDashboard activeProfile={activeProfile} />
             </PremiumGate>
           )}
 

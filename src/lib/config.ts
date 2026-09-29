@@ -15,14 +15,19 @@ export interface ConfigDefaults {
 
 export const CONFIG_DEFAULTS: ConfigDefaults = {
   // Payment (spec §18 — no hardcoded amounts)
+  // Monthly default; season (3 mo) and yearly are discounted packages.
   payment_premium_price_uzs: "59000",
   payment_premium_days: "30",
+  payment_premium_season_price_uzs: "149000",
+  payment_premium_season_days: "90",
+  payment_premium_yearly_price_uzs: "499000",
+  payment_premium_yearly_days: "365",
   payment_currency: "UZS",
-  // AI limits (spec §16)
+  // AI limits (spec §16) — free keeps 3–5/day so the helper is useful, not endless
   ai_free_requests_per_day: "5",
-  ai_premium_requests_per_day: "50",
+  ai_premium_requests_per_day: "200",
   ai_free_tokens_per_day: "20000",
-  ai_premium_tokens_per_day: "200000",
+  ai_premium_tokens_per_day: "500000",
   ai_default_provider: "openrouter",
   ai_provider_admissions: "openrouter",
   ai_provider_essay: "openrouter",
@@ -30,6 +35,11 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   ai_provider_search: "openrouter",
   ai_provider_document: "openrouter",
   ai_provider_visa: "groq",
+  // Free quantitative caps (Pro = unlimited via feature flags)
+  free_saved_universities: "10",
+  free_saved_scholarships: "10",
+  free_application_workspaces: "1",
+  free_visa_practice_per_day: "2",
   // Data refresh (spec §9)
   refresh_interval_hours: "24",
   refresh_default_scope: "all",
@@ -43,6 +53,23 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   // hidden section ids. Default comes from navSections.ts so the client and
   // the server always agree.
   nav_hidden_items: JSON.stringify(DEFAULT_HIDDEN_NAV_ITEMS),
+  // Explicit Free/Pro feature map defaults (same as entitlements.ts) so
+  // admins see them in Settings and export/import stays consistent.
+  feature_roadmap: "free",
+  feature_deadline_center: "free",
+  feature_documents: "free",
+  feature_forum: "free",
+  feature_forum_write: "premium",
+  feature_courses: "free",
+  feature_courses_full: "premium",
+  feature_documents_upload: "premium",
+  feature_parent_dashboard: "premium",
+  feature_visa_unlimited: "premium",
+  feature_workspace_unlimited: "premium",
+  feature_saves_unlimited: "premium",
+  feature_ai_essay: "premium",
+  feature_ai_advanced: "premium",
+  feature_notifications_advanced: "premium",
 };
 
 const cache = new Map<string, string | null>();

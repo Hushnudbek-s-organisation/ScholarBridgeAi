@@ -12,6 +12,7 @@ import { readJsonBody } from "@/lib/request";
 import { db } from "@/db";
 import { aiEvaluations } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
+import { enforceFreeCap } from "@/lib/planLimits";
 
 /**
  * POST /api/visa/analyze
@@ -54,10 +55,13 @@ export async function POST(req: Request) {
 
     // Practice history (spec §13): when a signed-in profile is passed, persist
     // the rubric so the student can watch scores rise across sessions.
+    // Free plan: limited practice sessions/day; Pro is unlimited.
     const profileId = Number(body?.profileId) || null;
     if (profileId) {
       const access = await requireProfileAccess(req, profileId);
       if (access.ok) {
+        const capped = await enforceFreeCap(profileId, "visa_practice");
+        if (capped) return capped;
         try {
           await db.insert(aiEvaluations).values({
             profileId,

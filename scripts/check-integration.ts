@@ -1035,7 +1035,7 @@ async function main() {
       .values({ profileId: profile.id, title: "Private task", dueDate: "2027-01-10" })
       .returning();
     const freeList = await call(tasks.GET as any, `/api/tasks?profileId=${profile.id}`);
-    check("tasks: a FREE owner is refused by the API (403 premium_required)", freeList.status === 403 && freeList.body?.code === "premium_required", `got ${freeList.status}`);
+    check("tasks: a FREE owner can use the basic roadmap", freeList.status === 200, `got ${freeList.status} ${JSON.stringify(freeList.body)?.slice(0,120)}`);
     await setPremium([profile.id, other.id], true);
     const ownList = await call(tasks.GET as any, `/api/tasks?profileId=${profile.id}`);
     check("tasks: a Premium owner lists their tasks", ownList.status === 200 && ownList.body?.tasks?.some((t: any) => t.id === task.id));
@@ -1059,7 +1059,7 @@ async function main() {
     const anonThreads = await call(threads.GET as any, "/api/forum/threads", { headers: anon });
     check("forum: anonymous reads are refused (401)", anonThreads.status === 401, `got ${anonThreads.status}`);
     const freeThreads = await call(threads.GET as any, "/api/forum/threads");
-    check("forum: a FREE account cannot read threads (403 premium_required)", freeThreads.status === 403 && freeThreads.body?.code === "premium_required", `got ${freeThreads.status}`);
+    check("forum: a FREE account CAN read threads (read is free)", freeThreads.status === 200, `got ${freeThreads.status} ${JSON.stringify(freeThreads.body)?.slice(0,120)}`);
     const catAnon = await call(cats.POST as any, "/api/forum/categories", { method: "POST", headers: { ...anon, ...json }, body: JSON.stringify({ name: "Spam", slug: "spam" }) });
     const catStudent = await call(cats.POST as any, "/api/forum/categories", { method: "POST", headers: json, body: JSON.stringify({ name: "Spam", slug: "spam" }) });
     check("forum: categories cannot be created anonymously (401) or by a student (403)", catAnon.status === 401 && catStudent.status === 403, `got ${catAnon.status}/${catStudent.status}`);

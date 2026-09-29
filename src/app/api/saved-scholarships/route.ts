@@ -3,6 +3,7 @@ import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { savedScholarships, scholarships } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { enforceFreeCap } from "@/lib/planLimits";
 
 export async function GET(req: Request) {
   try {
@@ -72,6 +73,10 @@ export async function POST(req: Request) {
     if (existing.length > 0) {
       return NextResponse.json({ saved: existing[0], message: "Already saved" });
     }
+
+    // Free plan: max N saved scholarships (Pro = unlimited).
+    const capped = await enforceFreeCap(profileId, "saved_scholarships");
+    if (capped) return capped;
 
     const [newSaved] = await db.insert(savedScholarships).values({
       profileId,

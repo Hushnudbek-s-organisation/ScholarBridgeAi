@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { telegramLinks } from "@/db/schema";
-import { hasFeature, getPremiumStatus } from "@/lib/premium";
+import { getPremiumStatus } from "@/lib/premium";
 import { fmtDate } from "@/lib/notificationTexts";
 import { tgSendChatAction, type InlineButton, type Keyboard } from "./api";
 import * as app from "./appAdapter";
@@ -286,12 +286,9 @@ async function applications(ctx: BotCtx) {
 }
 
 async function deadlines(ctx: BotCtx) {
+  // Basic deadlines are FREE (the 0→1 promise). Extended reminder offsets
+  // (notifications_advanced) stay a Pro setting — the list itself is not locked.
   const t = T(ctx);
-  // Same Premium rule the website's Deadline Center uses — enforced here on
-  // the server, whatever the client shows.
-  if (!(await hasFeature(ctx.link!.profileId, "deadline_center"))) {
-    return void (await send(ctx, t.premiumLocked, siteButton(publicSiteUrl(ctx.settings), ctx.lang, "/payments", t.btnUpgrade)));
-  }
   const res = await app.listDeadlines(who(ctx));
   const fail = failure(ctx, res);
   if (fail) return void (await send(ctx, fail));

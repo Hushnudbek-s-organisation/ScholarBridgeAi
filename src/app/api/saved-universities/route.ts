@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { savedUniversities, universities, studentProfiles } from "@/db/schema";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, and } from "drizzle-orm";
+import { enforceFreeCap } from "@/lib/planLimits";
 
 export async function GET(req: Request) {
   try {
@@ -76,6 +77,10 @@ export async function POST(req: Request) {
     if (existing.length > 0) {
       return NextResponse.json({ saved: existing[0], message: "Already saved" });
     }
+
+    // Free plan: max N saved universities (Pro = unlimited).
+    const capped = await enforceFreeCap(profileId, "saved_universities");
+    if (capped) return capped;
 
     // Get profile & university for match score calculation
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { applications, applicationOutcomes, universities } from "@/db/schema";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
+import { enforceFreeCap } from "@/lib/planLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
     const profileId = access.targetId!;
+
+    // Free plan: 1 application workspace. Pro unlocks unlimited.
+    const capped = await enforceFreeCap(profileId, "application_workspaces");
+    if (capped) return capped;
 
     const universityId = positiveInt(body.universityId);
     let universityName = clampString(body.universityName, 200);

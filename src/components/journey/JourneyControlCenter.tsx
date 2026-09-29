@@ -124,8 +124,14 @@ export function JourneyControlCenter({
   }, [profileId]);
 
   useEffect(() => {
-    if (!profileId) return;
+    if (!profileId) {
+      setLoading(false);
+      setData(null);
+      setError(null);
+      return;
+    }
     let live = true;
+    setLoading(true);
     (async () => {
       try {
         const res = await load();
@@ -135,6 +141,7 @@ export function JourneyControlCenter({
       } catch (err) {
         if (!live) return;
         setError(err instanceof Error ? err.message : "Could not load your dashboard");
+        setData(null);
       } finally {
         if (live) setLoading(false);
       }
@@ -146,17 +153,27 @@ export function JourneyControlCenter({
 
   /** Explicit "try again" — the only place the spinner is turned on by hand. */
   const refresh = useCallback(async () => {
+    if (!profileId) return;
     setLoading(true);
     try {
       setData(await load());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load your dashboard");
+      setData(null);
     } finally {
       setLoading(false);
     }
-  }, [load]);
+  }, [load, profileId]);
 
+  if (!profileId) {
+    return (
+      <Empty
+        title="Select a profile"
+        hint="Sign in and pick a student profile to build your study-abroad journey."
+      />
+    );
+  }
   if (loading) return <Loading label="Building your journey…" cards={2} />;
   if (error) {
     return (
