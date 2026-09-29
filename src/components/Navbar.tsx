@@ -61,7 +61,6 @@ import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
   NAV_GROUP_ICONS,
-  NAV_GROUP_LABELS,
   NAV_GROUPS,
   NAV_SECTIONS,
   isNewBadgeActive,
@@ -236,10 +235,12 @@ export function Navbar({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchKey, setSearchKey] = useState(0);
-  // Spec §2/§33: the sidebar is ~40 rows, which is unusable on a phone. On
-  // small screens each GROUP collapses; the group holding the active page is
-  // always open so the student never has to hunt for where they are.
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  // Keep the sidebar focused on the current task: groups start collapsed on
+  // every screen, and the group containing the active page is always expanded.
+  // Students can open another group without losing their current location.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(NAV_GROUPS.map((group) => [group, true]))
+  );
 
   useEffect(() => {
     let alive = true;
@@ -421,9 +422,20 @@ export function Navbar({
     [th]
   );
 
-  // Group captions come from the shared registry so the sidebar, the admin
-  // Navigation manager and the command palette can never disagree.
-  const groupLabel = (g: NavGroupId) => NAV_GROUP_LABELS[g] ?? g;
+  // Keep group headings localized just like the section labels.
+  const groupLabel = (g: NavGroupId) => {
+    const keys: Record<NavGroupId, string> = {
+      home: "groupHome",
+      discover: "groupDiscover",
+      journey: "groupJourney",
+      prepare: "groupPrepare",
+      apply: "groupApply",
+      after: "groupAfter",
+      help: "groupHelp",
+      account: "groupAccount",
+    };
+    return t(keys[g]);
+  };
 
   // Every section: registry order from navSections + a few legacy tabs whose
   // code is kept but whose UI is hidden until ready (no dead navigation).
@@ -560,21 +572,18 @@ export function Navbar({
     );
   };
 
-  /**
-   * One group: a header (tappable on phones) plus its rows. On the wide
-   * desktop rail every group is open — there is room, and hiding sections
-   * behind a click there would only slow the student down.
-   */
+  /** A compact, collapsible group works the same way in the sidebar and drawer. */
   const renderGroup = (g: NavGroupId, items: NavItem[], layoutId: string) => {
     const active = activeTab === "admin" ? "account" : items.find((i) => i.id === activeTab)?.group;
-    const collapsible = layoutId === "nav-active-drawer";
-    const open = !collapsible || !collapsedGroups[g] || active === g;
+    const open = !collapsedGroups[g] || active === g;
     const heading = (
       <>
         <span aria-hidden>{NAV_GROUP_ICONS[g]}</span>
         {groupLabel(g)}
-        {items.length > 0 && (
-          <span className="ml-auto text-[10px] font-semibold text-slate-400">{items.length}</span>
+        {!open && items.length > 0 && (
+          <span className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-500 dark:bg-slate-800">
+            {items.length}
+          </span>
         )}
       </>
     );
@@ -589,24 +598,18 @@ export function Navbar({
 
     return (
       <div key={g}>
-        {collapsible ? (
-          <button
-            type="button"
-            onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
-            aria-expanded={open}
-            className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-          >
-            {heading}
-            <ChevronDown
-              className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-              aria-hidden
-            />
-          </button>
-        ) : (
-          <p className="mb-1 flex items-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {heading}
-          </p>
-        )}
+        <button
+          type="button"
+          onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
+          aria-expanded={open}
+          className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+        >
+          {heading}
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
         {open && <div className="space-y-0.5">{items.map((item) => renderItem(item, layoutId))}</div>}
       </div>
     );
