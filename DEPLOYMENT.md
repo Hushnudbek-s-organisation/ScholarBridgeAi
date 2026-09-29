@@ -31,6 +31,16 @@ Telegram, ownership, growth features) are created on first use with
 `CREATE TABLE IF NOT EXISTS`; if your database user may not create tables,
 run the matching `supabase/add_*.sql` file once instead.
 
+The app also repairs *additive drift* of the core tables it owns on first use
+(`ensureCoreSchema`, `src/lib/core/db.ts`): a column or table that exists in
+`src/db/schema.ts` but not yet in the database — for example
+`student_profiles.is_admin` — is added with `ADD COLUMN IF NOT EXISTS` /
+`CREATE TABLE IF NOT EXISTS` before it is queried. Nothing runs when the
+database is already up to date, and nothing is ever dropped or renamed. An old
+database that cannot be repaired automatically keeps answering as before. The
+same statements are mirrored in `supabase/add_core_repair.sql` (regenerate with
+`npm run db:core-repair-sql`) for owners who prefer to run the SQL by hand.
+
 ### Any other Node host (Railway, Fly.io, a VPS, Docker, …)
 
 | Setting | Value |

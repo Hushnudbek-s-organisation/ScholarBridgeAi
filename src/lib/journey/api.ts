@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, requireProfileAccess, type AuthResult, type Session } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request";
+import { ensureCoreSchema } from "@/lib/core/db";
 import { ensureGrowthTables, GROWTH_UNAVAILABLE } from "@/lib/growth/db";
 import { ensureJourneyTables, JOURNEY_UNAVAILABLE } from "./db";
 
@@ -27,6 +28,11 @@ export function jsonError(status: number, error: string, code = "error") {
  * "We could not load your dashboard". Bootstrap BOTH sets here.
  */
 export async function guardTables(): Promise<NextResponse | null> {
+  // Core tables first: the journey DDL declares foreign keys to `applications`
+  // (and reads `student_profiles`/`universities`/`scholarships`), so a database
+  // that predates them must be repaired before the feature tables are created.
+  // `ensureCoreSchema` is cached and runs no DDL once the DB is up to date.
+  await ensureCoreSchema();
   const [journeyOk, growthOk] = await Promise.all([ensureJourneyTables(), ensureGrowthTables()]);
   if (!journeyOk) return NextResponse.json(JOURNEY_UNAVAILABLE, { status: 503 });
   if (!growthOk) return NextResponse.json(GROWTH_UNAVAILABLE, { status: 503 });

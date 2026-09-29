@@ -28,6 +28,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles, telegramLinks } from "@/db/schema";
 import { sanitizeProfile } from "@/lib/password";
+import { ensureCoreSchema } from "@/lib/core/db";
 
 export const SESSION_COOKIE = "sb_session";
 
@@ -375,6 +376,11 @@ export function authFailureBody(result: { error: string; code: string }) {
  * database (profile still exists, password unchanged, live admin flag).
  */
 export async function authenticate(req: Request): Promise<AuthResult> {
+  // The session lookup below selects the whole profile row, so a database that
+  // predates a column (e.g. `is_admin`) would fail every authenticated request.
+  // Repair the additive core-schema drift first; it is a no-op once up to date.
+  await ensureCoreSchema();
+
   // An explicit Telegram bearer token wins over any cookie on the request.
   const bearer = readTelegramBearer(req);
   if (bearer) return authenticateTelegramChannel(bearer);
