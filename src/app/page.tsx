@@ -50,6 +50,22 @@ import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
 import { TelegramSettings } from "@/components/telegram/TelegramSettings";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { SuccessStories } from "@/components/growth/SuccessStories";
+import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
+import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
+import {
+  ActivityPortfolioPanel,
+  DocumentVaultPanel,
+  StudyPlanPanel,
+  TestPlannerPanel,
+} from "@/components/journey/PreparePanels";
+import {
+  FinancialPlanPanel,
+  LearningProvidersPanel,
+  OffersPanel,
+  RecommendationManagerPanel,
+} from "@/components/journey/AfterAdmissionPanels";
+import { CareerExplorerPanel, InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
+import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
 
 /** Tabs that may appear in the URL hash (#scholarships …) for deep links. */
 const LINKABLE_TABS = new Set<string>([
@@ -115,6 +131,10 @@ export default function Home() {
   const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
   const [savedProgramCount, setSavedProgramCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
+  // Which application the Application Workspace is showing (null = the list).
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  // Which university the Explorer should open (set by the global search, §34).
+  const [focusUniversityId, setFocusUniversityId] = useState<number | null>(null);
 
   // Referral system: capture ?ref=CODE from the URL and keep it for up to
   // 48h so a visitor who browses first and registers later is still credited.
@@ -302,6 +322,25 @@ export default function Home() {
     else window.history.replaceState(null, "", url);
     hashSynced.current = true;
   }, [activeTab, view]);
+
+  // Global search (spec §34) asks the page to focus a record it found.
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind: string; id?: string | number }>).detail;
+      if (!detail) return;
+      if (detail.kind === "university") {
+        setFocusUniversityId(Number(detail.id) || null);
+        setActiveTab("universities");
+      } else if (detail.kind === "application") {
+        setWorkspaceId(Number(detail.id) || null);
+        setActiveTab("workspace");
+      } else {
+        setActiveTab((detail.kind as string) === "task" ? "tasks" : detail.kind);
+      }
+    };
+    window.addEventListener("scholarbridge:focus-record", onFocus);
+    return () => window.removeEventListener("scholarbridge:focus-record", onFocus);
+  }, []);
 
   useEffect(() => {
     const onNav = () => {
@@ -700,22 +739,17 @@ export default function Home() {
             />
           ) : activeTab === "dashboard" && (
             <div className="space-y-4">
-              {/* "Your path" — the 8-step journey; one highlighted next step */}
-              <JourneyGuide profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
               {/* "Connect Telegram" nudge — only while not connected; dismissible */}
               <TelegramNudge profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
-              {/* #4 Personalized Roadmap — the centrepiece: three actions */}
-              <NextActionsPanel activeProfile={activeProfile} onNavigate={handleNavigateTab} />
-              <DashboardView
-                profile={activeProfile}
+              {/* Spec §3 — the control center. Journey bar, next steps,
+                  deadlines, application progress, readiness, recommendations
+                  and the ten study-plan phases, in that order. */}
+              <JourneyControlCenter
+                profileId={activeProfile?.id ?? null}
                 onNavigateTab={handleNavigateTab}
-                savedUniCount={savedUniversities.length}
-                savedScholarshipCount={savedScholarships.length}
-                savedProgramCount={savedProgramCount}
-                taskCount={taskCount}
-                onEditProfile={() => {
-                  setIsNewProfile(false);
-                  setIsProfileModalOpen(true);
+                onOpenWorkspace={(applicationId) => {
+                  setWorkspaceId(applicationId);
+                  handleNavigateTab("workspace");
                 }}
               />
             </div>
@@ -727,6 +761,7 @@ export default function Home() {
               savedUniIds={savedUniIds}
               onSaveUniversity={handleSaveUniversity}
               onUnsaveUniversity={handleUnsaveUniversity}
+              autoOpenUniversityId={focusUniversityId}
             />
           )}
 
@@ -830,7 +865,12 @@ export default function Home() {
 
           {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
 
-          {activeTab === "visa" && <VisaSpeakingAssistant activeProfile={activeProfile} />}
+          {activeTab === "visa" && activeProfile && (
+            <div className="space-y-4">
+              <VisaCenterPanel profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+              <VisaSpeakingAssistant activeProfile={activeProfile} />
+            </div>
+          )}
 
           {activeTab === "forum" && (
             <PremiumGate
@@ -855,6 +895,64 @@ export default function Home() {
               <CoursesSection activeProfile={activeProfile} />
             </PremiumGate>
           )}
+
+          {/* ---- Journey reorganization (spec §2 sidebar groups) ---------- */}
+
+          {/* DISCOVER */}
+          {activeTab === "career" && <CareerExplorerPanel onNavigateTab={handleNavigateTab} />}
+
+          {/* MY JOURNEY */}
+          {activeTab === "study-plan" && activeProfile && (
+            <StudyPlanPanel key={`plan-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+          )}
+          {activeTab === "activities" && activeProfile && (
+            <ActivityPortfolioPanel key={`act-${activeProfile.id}`} profileId={activeProfile.id} />
+          )}
+
+          {/* PREPARE */}
+          {activeTab === "documents" && activeProfile && (
+            <DocumentVaultPanel key={`docs-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+          )}
+          {activeTab === "tests" && activeProfile && (
+            <TestPlannerPanel key={`tests-${activeProfile.id}`} profileId={activeProfile.id} />
+          )}
+          {activeTab === "requirements" && activeProfile && (
+            <RequirementsBrowser
+              key={`req-${activeProfile.id}`}
+              profileId={activeProfile.id}
+              onOpenWorkspace={(id) => {
+                setWorkspaceId(id);
+                handleNavigateTab("workspace");
+              }}
+            />
+          )}
+          {activeTab === "funding" && activeProfile && (
+            <FinancialPlanPanel key={`fund-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+          )}
+
+          {/* APPLY */}
+          {activeTab === "workspace" && activeProfile && (
+            <ApplicationWorkspacePanel
+              key={`ws-${activeProfile.id}-${workspaceId ?? "list"}`}
+              profileId={activeProfile.id}
+              applicationId={workspaceId}
+              onSelect={(id) => setWorkspaceId(id || null)}
+              onNavigateTab={handleNavigateTab}
+            />
+          )}
+          {activeTab === "recommendations" && activeProfile && (
+            <RecommendationManagerPanel key={`rec-${activeProfile.id}`} profileId={activeProfile.id} />
+          )}
+
+          {/* AFTER ADMISSION */}
+          {activeTab === "offers" && activeProfile && (
+            <OffersPanel key={`off-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+          )}
+          {activeTab === "post-admission-funding" && activeProfile && (
+            <FinancialPlanPanel key={`paf-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
+          )}
+          {activeTab === "interviews" && <InterviewCenterPanel onNavigateTab={handleNavigateTab} />}
+          {activeTab === "learning" && activeProfile && <LearningProvidersPanel key={`lp-${activeProfile.id}`} profileId={activeProfile.id} />}
 
           {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
 

@@ -3,7 +3,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { CornerDownLeft, Search, X } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  CheckSquare,
+  CornerDownLeft,
+  Dumbbell,
+  FileText,
+  GraduationCap,
+  ListChecks,
+  PenLine,
+  Search,
+  Sparkles,
+  Video,
+  X,
+} from "lucide-react";
 
 export interface PaletteItem {
   id: string;
@@ -13,6 +27,18 @@ export interface PaletteItem {
   icon: React.ComponentType<{ className?: string }>;
   isNew?: boolean;
   premium?: boolean;
+  /**
+   * A real record (university, application, document…) rather than a section.
+   * Spec §34: searching "Harvard" should find the university, my application
+   * for it, and the requirements — not just a sidebar label.
+   */
+  entity?: {
+    kind: string;
+    /** The tab to open, e.g. "universities". */
+    tab: string;
+    /** A row inside that tab to focus, when there is one. */
+    id?: string | number;
+  };
 }
 
 interface CommandPaletteProps {
@@ -31,33 +57,98 @@ function fold(s: string) {
     .replace(/[''`ʻʼ]/g, "");
 }
 
+const ENTITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  feature: Sparkles,
+  university: GraduationCap,
+  scholarship: Award,
+  application: CheckSquare,
+  document: FileText,
+  story: BookOpen,
+  course: Video,
+  task: ListChecks,
+  activity: Dumbbell,
+  essay: PenLine,
+};
+
 /**
- * "Where is…?" — a quick section finder (Ctrl/⌘+K or the search button).
- * Newcomers type what they want in their own words ("grant", "viza",
- * "insho") and jump straight there; every result shows a one-line hint.
+ * Global command search (spec §34).
+ *
+ * Newcomers type what they want in their own words ("grant", "viza", "insho")
+ * and jump straight there; every result shows a one-line hint. Passing
+ * `profileId` turns the same box into a real search over the student's OWN
+ * universities, scholarships, applications, documents, stories and courses —
+ * records first, sections second.
  */
-export function CommandPalette({ open, onClose, items, onSelect }: CommandPaletteProps) {
+export function CommandPalette({
+  open,
+  onClose,
+  items,
+  onSelect,
+  profileId,
+}: CommandPaletteProps & { profileId?: number | null }) {
   const t = useTranslations("nav");
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
+  const [entities, setEntities] = useState<PaletteItem[]>([]);
+  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const results = useMemo(() => {
     const q = fold(query.trim());
+    const all = entities.length > 0 ? [...entities, ...items] : items;
     if (!q) return items;
     const words = q.split(/\s+/);
-    return items
+    return all
       .map((it) => {
-        const hay = fold(`${it.label} ${it.hint ?? ""} ${it.id}`);
+        const hay = fold(`${it.label} ${it.hint ?? ""} ${it.id} ${it.group ?? ""}`);
         if (!words.every((w) => hay.includes(w))) return null;
-        const score = fold(it.label).startsWith(q) ? 0 : fold(it.label).includes(q) ? 1 : 2;
+        const score = it.entity ? -1 : fold(it.label).startsWith(q) ? 0 : fold(it.label).includes(q) ? 1 : 2;
         return { it, score };
       })
       .filter((x): x is { it: PaletteItem; score: number } => !!x)
       .sort((a, b) => a.score - b.score)
       .map((x) => x.it);
-  }, [items, query]);
+  }, [items, entities, query]);
+
+  // Debounced live search against the student's OWN records.
+  // Every state write happens inside the timer callback — a synchronous
+  // setState in an effect body is exactly what the React compiler rejects.
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || q.length < 2 || !profileId) {
+      const clear = window.setTimeout(() => {
+        setEntities([]);
+        setSearching(false);
+      }, 0);
+      return () => window.clearTimeout(clear);
+    }
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/search?profileId=${profileId}&q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        const list: PaletteItem[] = Array.isArray(json.results)
+          ? json.results
+              .filter((r: { kind: string }) => r.kind !== "feature")
+              .map((r: any) => ({
+                id: `${r.kind}-${r.id}`,
+                label: r.title,
+                hint: r.subtitle,
+                group: r.group,
+                icon: ENTITY_ICONS[r.kind] ?? Search,
+                entity: { kind: r.kind, tab: r.tab, id: r.id },
+              }))
+          : [];
+        setEntities(list);
+      } catch {
+        setEntities([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [query, open, profileId]);
 
   // Focus the input when opened. The parent remounts this component on every
   // open (key), so the query/cursor state always starts fresh.
@@ -76,6 +167,17 @@ export function CommandPalette({ open, onClose, items, onSelect }: CommandPalett
     onClose();
   };
 
+  // Selecting a record navigates to its section, then focuses the row.
+  const chooseItem = (it: PaletteItem) => {
+    if (it.entity) {
+      window.dispatchEvent(
+        new CustomEvent("scholarbridge:focus-record", { detail: { kind: it.entity.kind, id: it.entity.id } })
+      );
+    }
+    onSelect(it.entity?.tab ?? it.id);
+    onClose();
+  };
+
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -88,7 +190,7 @@ export function CommandPalette({ open, onClose, items, onSelect }: CommandPalett
       setCursor((c) => Math.max(0, c - 1));
     } else if (e.key === "Enter" && results[cursor]) {
       e.preventDefault();
-      choose(results[cursor].id);
+      chooseItem(results[cursor]);
     }
   };
 
@@ -138,7 +240,9 @@ export function CommandPalette({ open, onClose, items, onSelect }: CommandPalett
             </div>
             <ul ref={listRef} className="max-h-[55vh] overflow-y-auto p-2" role="listbox">
               {results.length === 0 && (
-                <li className="px-3 py-8 text-center text-sm text-slate-500">{t("searchEmpty")}</li>
+                <li className="px-3 py-8 text-center text-sm text-slate-500">
+                  {searching ? "Searching…" : t("searchEmpty")}
+                </li>
               )}
               {results.map((it, idx) => {
                 const Icon = it.icon;
@@ -146,7 +250,7 @@ export function CommandPalette({ open, onClose, items, onSelect }: CommandPalett
                 return (
                   <li key={it.id} data-idx={idx} role="option" aria-selected={active}>
                     <button
-                      onClick={() => choose(it.id)}
+                      onClick={() => chooseItem(it)}
                       onMouseMove={() => setCursor(idx)}
                       className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                         active ? "bg-indigo-50" : "hover:bg-slate-50"
@@ -172,6 +276,11 @@ export function CommandPalette({ open, onClose, items, onSelect }: CommandPalett
                           )}
                         </span>
                         {it.hint && <span className="mt-0.5 block text-xs leading-snug text-slate-500">{it.hint}</span>}
+                        {it.group && (
+                          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            {it.group}
+                          </span>
+                        )}
                       </span>
                       {active && <CornerDownLeft className="mt-2 h-3.5 w-3.5 shrink-0 text-indigo-400" />}
                     </button>

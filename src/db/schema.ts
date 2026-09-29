@@ -1315,3 +1315,430 @@ export const ownershipTransfers = pgTable(
     check("ownership_transfers_check", sql`${table.fromProfileId} <> ${table.toProfileId}`),
   ]
 );
+
+// ===========================================================================
+// JOURNEY CORE (reorganization, 2026-09-29)
+// ---------------------------------------------------------------------------
+// Adds the missing pieces of the end-to-end journey — study plan, document
+// vault, test planner, activity portfolio, requirements engine, offers &
+// funding, the central deadline table and the generic external-learning
+// provider contract.
+//
+// EVERYTHING IS ADDITIVE. No existing table above is altered or dropped, and
+// none of the tables here duplicate `student_profiles`, `universities`,
+// `scholarships`, `applications` or `notifications` — they extend them.
+// The lazy DDL that creates them lives in `src/lib/journey/ddl.ts`
+// (mirrored in `supabase/add_journey_core.sql`).
+// ===========================================================================
+
+/** My Study Plan (spec §12) — a dated, phase-based plan for one goal. */
+export const studyPlans = pgTable(
+  "study_plans",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull(),
+    targetMajor: text("target_major"),
+    targetCountry: text("target_country"),
+    degreeLevel: text("degree_level"),
+    intakeTerm: text("intake_term"),
+    goalYear: integer("goal_year"),
+    fundingGoal: text("funding_goal"),
+    status: text("status").notNull().default("active"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_study_plans_profile").on(table.profileId)]
+);
+
+/** The ten phases of a study plan (spec §12). */
+export const studyPlanPhases = pgTable(
+  "study_plan_phases",
+  {
+    id: serial("id").primaryKey(),
+    planId: integer("plan_id").references(() => studyPlans.id, { onDelete: "cascade" }).notNull(),
+    phaseKey: text("phase_key").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_study_plan_phases_plan").on(table.planId),
+    uniqueIndex("uq_study_plan_phases_key").on(table.planId, table.phaseKey),
+  ]
+);
+
+/**
+ * Document Vault (spec §7) — one upload, reused by every application.
+ * `application_document_links` attaches these rows to `applications`, and the
+ * pre-existing per-application `application_documents` checklist is untouched.
+ */
+export const userDocuments = pgTable(
+  "user_documents",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    docType: text("doc_type").notNull(), // passport | transcript | ielts | toefl | sat | cv | award | certificate | recommendation | financial | other
+    title: text("title").notNull(),
+    fileName: text("file_name"),
+    fileUrl: text("file_url"),
+    fileSizeBytes: integer("file_size_bytes"),
+    mimeType: text("mime_type"),
+    issuedAt: date("issued_at"),
+    expiresAt: date("expires_at"),
+    status: text("status").notNull().default("uploaded"), // uploaded | verified | needs_update | expired | rejected
+    verificationNote: text("verification_note"),
+    verifiedAt: timestamp("verified_at"),
+    uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_user_documents_profile").on(table.profileId),
+    index("idx_user_documents_expiry").on(table.profileId, table.expiresAt),
+  ]
+);
+
+/** Which applications use which vault document (spec §7). */
+export const applicationDocumentLinks = pgTable(
+  "application_document_links",
+  {
+    id: serial("id").primaryKey(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+    documentId: integer("document_id").references(() => userDocuments.id, { onDelete: "cascade" }).notNull(),
+    usage: text("usage").notNull().default("required"), // required | optional | submitted
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_app_doc_link").on(table.applicationId, table.documentId)]
+);
+
+/** Test Planner (spec §8) — current / target score and dates per test. */
+export const testPlans = pgTable(
+  "test_plans",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    testType: text("test_type").notNull(), // ielts | toefl | duolingo | sat | act | ap | other
+    currentScore: doublePrecision("current_score"),
+    targetScore: doublePrecision("target_score"),
+    targetDate: date("target_date"),
+    nextTestDate: date("next_test_date"),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_test_plans_profile").on(table.profileId)]
+);
+
+/** Previous attempts of a test (spec §8). */
+export const testAttempts = pgTable(
+  "test_attempts",
+  {
+    id: serial("id").primaryKey(),
+    testPlanId: integer("test_plan_id").references(() => testPlans.id, { onDelete: "cascade" }).notNull(),
+    testDate: date("test_date").notNull(),
+    score: doublePrecision("score"),
+    resultLabel: text("result_label"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_test_attempts_plan").on(table.testPlanId)]
+);
+
+/** Generated practice tasks for a test plan (spec §8). */
+export const testTasks = pgTable(
+  "test_tasks",
+  {
+    id: serial("id").primaryKey(),
+    testPlanId: integer("test_plan_id").references(() => testPlans.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull(),
+    skill: text("skill").notNull().default("general"),
+    dueDate: date("due_date"),
+    isCompleted: boolean("is_completed").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_test_tasks_plan").on(table.testPlanId)]
+);
+
+/**
+ * Activity Portfolio (spec §14). Student-entered only — the app must never
+ * invent an activity, an achievement or a date (spec §14, §18).
+ */
+export const studentActivities = pgTable(
+  "student_activities",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    category: text("category").notNull(), // volunteering | leadership | competition | project | club | research | work | community | sport | creative
+    title: text("title").notNull(),
+    role: text("role"),
+    organization: text("organization"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    hours: integer("hours"),
+    description: text("description"),
+    achievements: text("achievements"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_student_activities_profile").on(table.profileId)]
+);
+
+/** Evidence attached to an activity (certificate / photo / URL / document). */
+export const activityEvidence = pgTable(
+  "activity_evidence",
+  {
+    id: serial("id").primaryKey(),
+    activityId: integer("activity_id").references(() => studentActivities.id, { onDelete: "cascade" }).notNull(),
+    evidenceType: text("evidence_type").notNull(), // certificate | photo | url | document
+    label: text("label").notNull(),
+    url: text("url"),
+    documentId: integer("document_id").references(() => userDocuments.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_activity_evidence_activity").on(table.activityId)]
+);
+
+/**
+ * Requirement templates (spec §5) — university / program level catalogue.
+ * ADMIN-PUBLISHED ONLY. `verification_status` + `source_*` ride on every row
+ * so the UI can print "Source · Last verified" next to the requirement, and an
+ * unverified row renders as "Not specified" instead of as a fact.
+ */
+export const requirementTemplates = pgTable(
+  "requirement_templates",
+  {
+    id: serial("id").primaryKey(),
+    universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }),
+    programId: integer("program_id").references(() => universityPrograms.id, { onDelete: "cascade" }),
+    section: text("section").notNull(), // academic | english | testing | documents | essays | finance | application
+    itemKey: text("item_key").notNull(),
+    title: text("title").notNull(),
+    instructions: text("instructions"),
+    isRequired: boolean("is_required").notNull().default(true),
+    sourceUrl: text("source_url"),
+    sourceName: text("source_name"),
+    sourceType: text("source_type"),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    verificationStatus: text("verification_status").notNull().default("unverified"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_requirement_templates_uni").on(table.universityId),
+    index("idx_requirement_templates_program").on(table.programId),
+  ]
+);
+
+/**
+ * Application requirements (spec §5/§6) — the live, per-application
+ * checklist. Seeded from `requirement_templates` and editable by the student;
+ * every row keeps its own source + last-verified date.
+ */
+export const applicationRequirements = pgTable(
+  "application_requirements",
+  {
+    id: serial("id").primaryKey(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    section: text("section").notNull(),
+    itemKey: text("item_key").notNull(),
+    title: text("title").notNull(),
+    instructions: text("instructions"),
+    isRequired: boolean("is_required").notNull().default(true),
+    status: text("status").notNull().default("todo"), // todo | in_progress | done | blocked | not_required
+    dueDate: date("due_date"),
+    sourceUrl: text("source_url"),
+    sourceName: text("source_name"),
+    sourceType: text("source_type"),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    verificationStatus: text("verification_status").notNull().default("unverified"),
+    /** What completes this row: document | essay | recommendation | test | payment | manual */
+    linkedType: text("linked_type"),
+    linkedId: integer("linked_id"),
+    completedAt: timestamp("completed_at"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_app_requirements_application").on(table.applicationId),
+    uniqueIndex("uq_app_requirements_key").on(table.applicationId, table.itemKey),
+  ]
+);
+
+/** Recommendation manager (spec §19). */
+export const recommendationRequests = pgTable(
+  "recommendation_requests",
+  {
+    id: serial("id").primaryKey(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    recommenderName: text("recommender_name").notNull(),
+    recommenderEmail: text("recommender_email"),
+    relationship: text("relationship"),
+    status: text("status").notNull().default("not_requested"), // not_requested | requested | opened | submitted
+    requestedAt: timestamp("requested_at"),
+    submittedAt: timestamp("submitted_at"),
+    dueDate: date("due_date"),
+    instructions: text("instructions"),
+    isPrivate: boolean("is_private").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_rec_requests_application").on(table.applicationId)]
+);
+
+/** Offers & Decisions (spec §23) — the post-acceptance record. */
+export const admissionOffers = pgTable(
+  "admission_offers",
+  {
+    id: serial("id").primaryKey(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    status: text("status").notNull().default("pending"), // pending | accepted | rejected | waitlisted | deferred
+    decidedAt: date("decided_at"),
+    responseDeadline: date("response_deadline"),
+    offerLetterUrl: text("offer_letter_url"),
+    offerLetterName: text("offer_letter_name"),
+    conditions: text("conditions"),
+    depositAmount: integer("deposit_amount"),
+    depositDueDate: date("deposit_due_date"),
+    tuitionCommitment: integer("tuition_commitment"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_admission_offer_application").on(table.applicationId)]
+);
+
+/** My Funding Plan (spec §9/§24) — scholarship, aid, family budget, loans. */
+export const fundingItems = pgTable(
+  "funding_items",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    applicationId: integer("application_id").references(() => applications.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // scholarship | aid | family | savings | loan | other
+    name: text("name").notNull(),
+    amountUsd: integer("amount_usd").notNull().default(0),
+    covers: text("covers").notNull().default("[]"),
+    status: text("status").notNull().default("planned"), // planned | applied | awarded | declined | confirmed
+    confirmedAt: date("confirmed_at"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_funding_items_profile").on(table.profileId)]
+);
+
+/** Central deadline engine (spec §21) — one timeline for every deadline. */
+export const journeyDeadlines = pgTable(
+  "journey_deadlines",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    kind: text("kind").notNull(), // university | scholarship | test | document | visa | other
+    title: text("title").notNull(),
+    dueDate: date("due_date").notNull(),
+    entityType: text("entity_type"),
+    entityId: integer("entity_id"),
+    isAutoGenerated: boolean("is_auto_generated").notNull().default(false),
+    isCompleted: boolean("is_completed").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_journey_deadlines_profile").on(table.profileId, table.dueDate)]
+);
+
+/**
+ * External Learning Provider (spec §32) — a GENERIC registry.
+ *
+ * No provider is hardcoded, no partner is named, and the table ships EMPTY.
+ * ScholarBridge behaves identically when there are zero rows. A future partner
+ * is added by an admin here, not by a code change.
+ */
+export const learningProviders = pgTable(
+  "learning_providers",
+  {
+    id: serial("id").primaryKey(),
+    providerKey: text("provider_key").notNull().unique(),
+    name: text("name").notNull(),
+    kind: text("kind").notNull().default("test_prep"),
+    status: text("status").notNull().default("disabled"), // disabled | sandbox | live
+    config: text("config").notNull().default("{}"),
+    isEnabled: boolean("is_enabled").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  }
+);
+
+/** A student's (optional) link to one external learning provider. */
+export const learningProviderLinks = pgTable(
+  "learning_provider_links",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    providerId: integer("provider_id").references(() => learningProviders.id, { onDelete: "cascade" }).notNull(),
+    externalUserRef: text("external_user_ref"),
+    status: text("status").notNull().default("not_connected"),
+    consentAt: timestamp("consent_at"),
+    lastSyncedAt: timestamp("last_synced_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_learning_link").on(table.profileId, table.providerId)]
+);
+
+/**
+ * Metrics an external provider MAY share. Metric keys are a fixed vocabulary so
+ * no partner can invent an arbitrary field: current_score, target_score,
+ * practice_progress, mock_score, course_completion, study_task_completed.
+ */
+export const learningProviderScores = pgTable(
+  "learning_provider_scores",
+  {
+    id: serial("id").primaryKey(),
+    linkId: integer("link_id").references(() => learningProviderLinks.id, { onDelete: "cascade" }).notNull(),
+    metric: text("metric").notNull(),
+    value: doublePrecision("value"),
+    measuredAt: date("measured_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_learning_scores_link").on(table.linkId)]
+);
+
+/**
+ * Visa requirements (spec §25) — country × visa type, admin-published.
+ * Never written by AI: a visa requirement without a source is shown as
+ * "Not specified", and the AI is explicitly forbidden from inventing one.
+ */
+export const visaRequirements = pgTable(
+  "visa_requirements",
+  {
+    id: serial("id").primaryKey(),
+    country: text("country").notNull(),
+    visaType: text("visa_type").notNull(),
+    title: text("title").notNull(),
+    instructions: text("instructions"),
+    isRequired: boolean("is_required").notNull().default(true),
+    sourceUrl: text("source_url"),
+    sourceName: text("source_name"),
+    sourceType: text("source_type"),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    verificationStatus: text("verification_status").notNull().default("unverified"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_visa_requirements_country").on(table.country, table.visaType)]
+);

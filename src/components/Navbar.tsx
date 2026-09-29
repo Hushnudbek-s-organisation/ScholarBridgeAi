@@ -41,13 +41,32 @@ import {
   Archive,
   ArrowLeftRight,
   Send,
+  Briefcase,
+  Route,
+  Dumbbell,
+  FolderOpen,
+  ClipboardCheck,
+  PiggyBank,
+  PanelsTopLeft,
+  Mail,
+  HandCoins,
+  Plug,
+  ChevronDown,
 } from "lucide-react";
 import { BrandingImage } from "./BrandingImage";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeSwitch, ThemeToggle } from "./ThemeToggle";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
-import { DEFAULT_HIDDEN_NAV_ITEMS, NAV_GROUPS, NAV_SECTIONS, type NavGroupId } from "@/lib/navSections";
+import {
+  DEFAULT_HIDDEN_NAV_ITEMS,
+  NAV_GROUP_ICONS,
+  NAV_GROUP_LABELS,
+  NAV_GROUPS,
+  NAV_SECTIONS,
+  isNewBadgeActive,
+  type NavGroupId,
+} from "@/lib/navSections";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 export interface StudentProfile {
@@ -166,9 +185,29 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   courses: Video,
   consulting: Headset,
   admin: ShieldCheck,
+  // journey reorganization (2026-09-29)
+  career: Briefcase,
+  "study-plan": Route,
+  activities: Dumbbell,
+  documents: FolderOpen,
+  tests: ClipboardCheck,
+  requirements: ListChecks,
+  funding: PiggyBank,
+  workspace: PanelsTopLeft,
+  recommendations: Mail,
+  offers: GraduationCap,
+  "post-admission-funding": HandCoins,
+  interviews: MessagesSquare,
+  learning: Plug,
 };
 
-const PREMIUM = new Set(["sop", "tasks", "forum", "deadlines", "courses"]);
+/**
+ * Premium sections keep their existing PRO badge. Spec §36: essential
+ * information (universities, scholarships, documents, requirements, basic
+ * applications, basic planning) stays free — locking those would be the
+ * opposite of helping a student who has just decided to study abroad.
+ */
+const PREMIUM = new Set(["sop", "tasks", "forum", "deadlines", "courses", "interviews", "funding"]);
 /** Order of preference for the phone/tablet bottom bar (first 4 visible win). */
 const BOTTOM_BAR_PREFERENCE = ["dashboard", "universities", "scholarships", "applications", "autopilot", "chat"];
 
@@ -197,6 +236,10 @@ export function Navbar({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchKey, setSearchKey] = useState(0);
+  // Spec §2/§33: the sidebar is ~40 rows, which is unusable on a phone. On
+  // small screens each GROUP collapses; the group holding the active page is
+  // always open so the student never has to hunt for where they are.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
@@ -291,6 +334,19 @@ export function Navbar({
         payments: t("payments"),
         rewards: t("rewards"),
         notifications: t("notifications"),
+        career: "Career & Major Explorer",
+        "study-plan": "My Study Plan",
+        activities: "My Activities",
+        documents: "Documents",
+        tests: "Test Planner",
+        requirements: "Application Requirements",
+        funding: "Financial Plan",
+        workspace: "Application Workspace",
+        recommendations: "Recommendation Manager",
+        offers: "Offers & Decisions",
+        "post-admission-funding": "Funding & Deposits",
+        interviews: "Interview Center",
+        learning: "External Learning Provider",
         tracker: t("tracker"),
         deadlines: t("deadlines"),
         courses: t("courses"),
@@ -345,6 +401,19 @@ export function Navbar({
         payments: th("payments"),
         rewards: th("rewards"),
         notifications: th("notifications"),
+        career: "Start from the job you want, then the major, the countries and the universities.",
+        "study-plan": "Your goal split into ten phases, updated automatically from your real data.",
+        activities: "Volunteering, leadership, projects, competitions — with evidence.",
+        documents: "One vault of documents, reused across every application.",
+        tests: "IELTS / TOEFL / SAT targets, dates, attempts and practice tasks.",
+        requirements: "What a university asks for, with the source and the date we last verified it.",
+        funding: "Full yearly cost, funding, family budget and the remaining gap.",
+        workspace: "One workspace per university: requirements, essays, tests, finance and submission.",
+        recommendations: "Track every letter from “not requested” to “submitted”.",
+        offers: "Pending, accepted, rejected, waitlisted — and the post-admission plan.",
+        "post-admission-funding": "What you must pay, when, and to whom.",
+        interviews: "University and visa interview practice with honest feedback.",
+        learning: "Optional connection to an external preparation platform.",
         admin: th("admin"),
       };
       return map[id];
@@ -352,11 +421,16 @@ export function Navbar({
     [th]
   );
 
-  const groupLabel = (g: NavGroupId) =>
-    g === "start" ? t("groupStart") : g === "explore" ? t("groupExplore") : g === "plan" ? t("groupPlan") : g === "apply" ? t("groupApply") : g === "help" ? t("groupHelp") : t("groupAccount");
+  // Group captions come from the shared registry so the sidebar, the admin
+  // Navigation manager and the command palette can never disagree.
+  const groupLabel = (g: NavGroupId) => NAV_GROUP_LABELS[g] ?? g;
 
   // Every section: registry order from navSections + a few legacy tabs whose
   // code is kept but whose UI is hidden until ready (no dead navigation).
+  // Read once per mount — the badge retires on its release date, not on a
+  // feature flag an admin has to remember to switch off.
+  const newBadgesActive = useMemo(() => isNewBadgeActive(), []);
+
   const navItems: NavItem[] = useMemo(() => {
     const fromRegistry: NavItem[] = NAV_SECTIONS.map((s) => ({
       id: s.id,
@@ -364,7 +438,7 @@ export function Navbar({
       icon: ICONS[s.id] ?? Sparkles,
       group: s.group,
       premium: PREMIUM.has(s.id),
-      isNew: s.isNew,
+      isNew: s.isNew && newBadgesActive,
     }));
     const legacy: NavItem[] = [
       { id: "tracker", label: labelFor("tracker"), icon: ICONS.tracker, group: "apply", hidden: true },
@@ -373,7 +447,7 @@ export function Navbar({
       { id: "consulting", label: labelFor("consulting"), icon: ICONS.consulting, group: "help", hidden: true },
     ];
     return [...fromRegistry, ...legacy];
-  }, [labelFor]);
+  }, [labelFor, newBadgesActive]);
 
   const displayItems = useMemo((): NavItem[] => {
     const visible = navItems.filter((item) => !item.hidden && !hiddenItems.includes(item.id));
@@ -464,7 +538,12 @@ export function Navbar({
         {item.isNew && !isActive && (
           <>
             {/* Narrow desktop sidebar (lg): a dot, so long labels stay readable */}
-            {!inDrawer && <span className="relative h-2 w-2 shrink-0 rounded-full bg-emerald-500 xl:hidden" title={t("new")} aria-label={t("new")} />}
+            {!inDrawer && (
+              <span className="relative h-2 w-2 shrink-0 xl:hidden" title={t("new")} aria-label={t("new")}>
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                <span className="relative block h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+            )}
             <span
               className={`relative shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 ${inDrawer ? "" : "hidden xl:inline"}`}
             >
@@ -481,16 +560,61 @@ export function Navbar({
     );
   };
 
-  const renderGroups = (layoutId: string) => (
-    <div className="space-y-4">
-      {grouped.map(({ g, items }) => (
+  /**
+   * One group: a header (tappable on phones) plus its rows. On the wide
+   * desktop rail every group is open — there is room, and hiding sections
+   * behind a click there would only slow the student down.
+   */
+  const renderGroup = (g: NavGroupId, items: NavItem[], layoutId: string) => {
+    const active = activeTab === "admin" ? "account" : items.find((i) => i.id === activeTab)?.group;
+    const collapsible = layoutId === "nav-active-drawer";
+    const open = !collapsible || !collapsedGroups[g] || active === g;
+    const heading = (
+      <>
+        <span aria-hidden>{NAV_GROUP_ICONS[g]}</span>
+        {groupLabel(g)}
+        {items.length > 0 && (
+          <span className="ml-auto text-[10px] font-semibold text-slate-400">{items.length}</span>
+        )}
+      </>
+    );
+
+    if (g === "home") {
+      return (
         <div key={g}>
-          {g !== "start" && (
-            <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">{groupLabel(g)}</p>
-          )}
           <div className="space-y-0.5">{items.map((item) => renderItem(item, layoutId))}</div>
         </div>
-      ))}
+      );
+    }
+
+    return (
+      <div key={g}>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
+            aria-expanded={open}
+            className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+          >
+            {heading}
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+        ) : (
+          <p className="mb-1 flex items-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {heading}
+          </p>
+        )}
+        {open && <div className="space-y-0.5">{items.map((item) => renderItem(item, layoutId))}</div>}
+      </div>
+    );
+  };
+
+  const renderGroups = (layoutId: string) => (
+    <div className="space-y-3">
+      {grouped.map(({ g, items }) => renderGroup(g, items, layoutId))}
     </div>
   );
 
@@ -719,7 +843,14 @@ export function Navbar({
         )}
       </AnimatePresence>
 
-      <CommandPalette key={searchKey} open={searchOpen} onClose={() => setSearchOpen(false)} items={paletteItems} onSelect={go} />
+      <CommandPalette
+        key={searchKey}
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        items={paletteItems}
+        onSelect={go}
+        profileId={activeProfileId}
+      />
     </>
   );
 }
