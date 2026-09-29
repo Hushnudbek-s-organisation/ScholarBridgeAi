@@ -6,6 +6,7 @@ import { awardPoints } from "@/lib/gamification";
 import { requireProfileAccess } from "@/lib/auth";
 import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request";
 
 export async function GET(req: Request) {
   try {
@@ -53,7 +54,11 @@ export async function GET(req: Request) {
 /** Toggle a like. One like per user per target enforced via unique index. */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Size-capped parse: even an authenticated community write must never
+    // hand an unbounded body to the JSON parser.
+    const parsed = await readJsonBody<Record<string, any>>(req, 16 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
     const { userId, targetType, targetId } = body;
 
     if (!userId || !targetType || !targetId) {

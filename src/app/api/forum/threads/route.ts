@@ -7,7 +7,7 @@ import { notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
 import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
-import { clampString } from "@/lib/request";
+import { clampString, readJsonBody } from "@/lib/request";
 import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 
 const PAGE_SIZE = 10;
@@ -114,7 +114,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Size-capped parse: even an authenticated community write must never
+    // hand an unbounded body to the JSON parser.
+    const parsed = await readJsonBody<Record<string, any>>(req, 32 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
     const { categoryId, authorId, title, body: threadBody } = body;
 
     if (!categoryId || !authorId || !title || !threadBody) {

@@ -137,3 +137,42 @@ export function isCrossSiteApiWrite(req: {
   for (const name of APP_URL_ENV_VARS) add(normalizeAppUrl(env[name]));
   return !allowed.has(originHost);
 }
+
+/**
+ * Largest JSON body any API route may hand to a parser, in bytes.
+ *
+ * Every route that reads its body through `readJsonBody`/`readBody` already
+ * enforces its own (smaller) cap — the biggest legitimate payload in the app is
+ * the admin config import at 512 KB. This global ceiling exists for the routes
+ * that still call `await request.json()` directly: it is enforced in the
+ * middleware, BEFORE the route runs, so an attacker cannot make the server
+ * buffer an arbitrarily large JSON document.
+ *
+ * `multipart/form-data` (the branding logo upload) is exempt — that path has
+ * its own file-type and size validation.
+ */
+export const MAX_API_JSON_BODY_BYTES = 1024 * 1024;
+
+/**
+ * Should this API request be refused for carrying an oversized JSON body?
+ *
+ * Only a *declared* Content-Length can be checked in the middleware (the Edge
+ * runtime does not read the body here). That is enough to stop the ordinary
+ * attack: a client that streams an unbounded body while declaring nothing is
+ * still caught by `readJsonBody`'s streaming cap on the routes that use it.
+ */
+export function isOversizedApiJsonBody(req: {
+  method: string;
+  pathname: string;
+  contentType: string | null;
+  contentLength: string | null;
+  limit?: number;
+}): boolean {
+  if (!req.pathname.startsWith("/api/")) return false;
+  if (!WRITE_METHODS.has(req.method.toUpperCase())) return false;
+  const type = String(req.contentType ?? "").toLowerCase();
+  if (!type.includes("application/json")) return false;
+  const declared = Number(req.contentLength ?? "0");
+  const limit = req.limit ?? MAX_API_JSON_BODY_BYTES;
+  return Number.isFinite(declared) && declared > limit;
+}

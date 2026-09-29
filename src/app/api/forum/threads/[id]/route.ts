@@ -4,6 +4,7 @@ import { forumThreads, studentProfiles, forumCategories, forumLikes } from "@/db
 import { eq, and, count, sql } from "drizzle-orm";
 import { authenticate } from "@/lib/auth";
 import { requireFeatureSession } from "@/lib/premium";
+import { readJsonBody } from "@/lib/request";
 
 /**
  * Resolve the requester from the signed session cookie. The old
@@ -70,7 +71,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const threadId = parseInt(id, 10);
-    const body = await req.json();
+    // Size-capped parse: even an authenticated community write must never
+    // hand an unbounded body to the JSON parser.
+    const parsed = await readJsonBody<Record<string, any>>(req, 32 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
     const { title, body: threadBody, isPinned, isLocked } = body;
 
     // Pin/lock/title/body changes are moderator actions — admin only.

@@ -736,6 +736,164 @@ async function main() {
     assert.match(guard, /checkAiQuota\(/);
     assert.match(guard, /authenticate\(req\)/, "the caller is resolved even without a profileId");
   });
+
+  // ---------------------------------------------------------------------
+  // 2026-09-29 full-surface audit — the findings of the anonymous probe
+  // ---------------------------------------------------------------------
+  check("no route treats a guard RESULT OBJECT as a boolean", () => {
+    // The bug this catches: `const access = await requireAdmin(req);
+    // if (!access) {…}`. requireAdmin resolves to an object, which is truthy
+    // even for an anonymous caller — so the 403 branch was dead code and
+    // /api/admin/opportunities was open to the internet. Only `.ok` may be
+    // negated.
+    const GUARD_FNS = [
+      "requireAdmin",
+      "requireSession",
+      "requireProfileAccess",
+      "optionalProfileAccess",
+      "requireRowAccess",
+      "authenticate",
+    ];
+    const offenders: string[] = [];
+    const scan = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) {
+          scan(full);
+          continue;
+        }
+        if (!name.endsWith(".ts")) continue;
+        // Strip comments first: this test's own explanation of the bug would
+        // otherwise match itself.
+        const lines = readFileSync(full, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/(^|[^:])\/\/.*$/gm, "$1")
+          .split("\n");
+        const assigned = new Map<string, string>();
+        lines.forEach((line) => {
+          const m = /(?:const|let)\s+(\w+)\s*=\s*await\s+(\w+)\s*\(/.exec(line);
+          if (m && GUARD_FNS.includes(m[2])) assigned.set(m[1], m[2]);
+        });
+        for (const [varName, fn] of assigned) {
+          const re = new RegExp(`if\\s*\\(\\s*!\\s*${varName}\\s*\\)`);
+          lines.forEach((line, i) => {
+            if (re.test(line)) offenders.push(`${full.slice(ROOT.length + 1)}:${i + 1} ${fn} → ${line.trim()}`);
+          });
+        }
+      }
+    };
+    scan(join(ROOT, "src/app"));
+    scan(join(ROOT, "src/lib"));
+    assert.deepEqual(offenders, [], `guard result used as a boolean: ${offenders.join(" | ")}`);
+  });
+
+  check("every API read is either session-guarded or a reviewed public read", () => {
+    const GUARD =
+      /require(?:Admin|Session|ProfileAccess|RowAccess|FeatureSession)\(|optionalProfileAccess\(|authenticate\(|guard(?:Admin|Student|AiRequest)?\(|getRequester\(|cronAuthorized|verifyPaymeAuth|verifyClickSignature|verifyInitData|webhookSecret\(|makeAdminCrud/;
+    // Public reads: shared catalogues and configuration only. None of these may
+    // ever return another student's data — each is reviewed in SECURITY.md.
+    const PUBLIC_READS = new Set([
+      "config/branding GET",
+      "config/guide GET",
+      "config/nav GET",
+      "config/telegram GET",
+      "countries/compare GET",
+      "courses GET",
+      "gamification/leaderboard GET",
+      "health GET",
+      "opportunities GET",
+      "scholarships GET",
+      "stories GET",
+      "universities GET",
+      "universities/[id] GET",
+      "certificates/verify GET",
+      // Token-authenticated read-only parent summary: 20+ char unguessable
+      // token compared in constant time, sharing is opt-in and revocable.
+      "parent-share GET",
+      "visa/requirements GET",
+      "cron/refresh GET",
+      "cron/notifications GET",
+    ]);
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) {
+          walk(p);
+          continue;
+        }
+        if (name !== "route.ts") continue;
+        const rel = p.slice(apiDir.length + 1).replace(/\/route\.ts$/, "");
+        for (const h of handlerBodies(readFileSync(p, "utf8"))) {
+          if (h.method !== "GET") continue;
+          if (!GUARD.test(h.body) && !PUBLIC_READS.has(`${rel} ${h.method}`)) offenders.push(`${rel} ${h.method}`);
+        }
+      }
+    };
+    walk(apiDir);
+    assert.deepEqual(offenders, [], `unguarded reads: ${offenders.join(", ")}`);
+  });
+
+
+  check("sign-up requires a real email and cannot claim a shared default address", () => {
+    const src = routeSrc("profiles/route.ts");
+    // A blank email used to fall back to one shared default address, which made
+    // the first anonymous caller its owner and every later sign-up a 500.
+    assert.doesNotMatch(src, /student@scholarbridge\.edu/, "no shared default sign-up address");
+    assert.match(src, /invalid_email/, "a missing/invalid email is a 400");
+    assert.match(src, /isUniqueViolation\(err\)/, "a racing duplicate resolves to 409, not 500");
+    assert.match(src, /passwordPolicyError\(plainPassword\)/, "the password policy is enforced server-side");
+  });
+
+  check("community and beacon writes parse a size-capped body", () => {
+    for (const rel of [
+      "track",
+      "forum/likes",
+      "forum/replies",
+      "forum/reports",
+      "forum/threads",
+      "forum/threads/[id]",
+      "forum/reports/[id]",
+    ]) {
+      const src = routeSrc(`${rel}/route.ts`);
+      assert.doesNotMatch(src, /await req\.json\(\)/, `${rel} must not parse an unbounded body`);
+      assert.match(src, /readJsonBody</, `${rel} must use the capped reader`);
+    }
+  });
+
+  check("the middleware caps API JSON bodies before any route runs", () => {
+    const base = { method: "POST", pathname: "/api/track", contentType: "application/json", contentLength: "2048" };
+    assert.equal(sec.isOversizedApiJsonBody(base), false);
+    assert.equal(sec.isOversizedApiJsonBody({ ...base, contentLength: String(sec.MAX_API_JSON_BODY_BYTES + 1) }), true);
+    assert.equal(
+      sec.isOversizedApiJsonBody({ ...base, contentLength: "9999999", limit: 64 * 1024 }),
+      true,
+      "the limit is injectable for per-route comparison"
+    );
+    assert.equal(
+      sec.isOversizedApiJsonBody({ ...base, contentType: "multipart/form-data; boundary=x", contentLength: "9999999" }),
+      false,
+      "file uploads are exempt — they validate their own size and type"
+    );
+    assert.equal(sec.isOversizedApiJsonBody({ ...base, pathname: "/dashboard" }), false, "pages are not API routes");
+    assert.equal(sec.isOversizedApiJsonBody({ ...base, method: "GET" }), false, "a GET has no body to buffer");
+
+    const req = new NextRequest("https://app.example.org/api/track", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": String(sec.MAX_API_JSON_BODY_BYTES + 1) },
+      body: "{}",
+    });
+    const res = middleware(req);
+    assert.equal(res.status, 413);
+  });
+
+  check("API responses are marked no-store (student data is never cached)", () => {
+    const req = new NextRequest("https://app.example.org/api/workspace?profileId=3");
+    const res = middleware(req);
+    assert.match(String(res.headers.get("cache-control")), /no-store/);
+    const health = middleware(new NextRequest("https://app.example.org/api/health"));
+    assert.match(String(health.headers.get("cache-control")), /no-store/);
+  });
 }
 
 main()

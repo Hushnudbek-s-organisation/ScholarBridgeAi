@@ -3,12 +3,17 @@ import { db } from "@/db";
 import { forumReports } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
+import { readJsonBody } from "@/lib/request";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const reportId = parseInt(id, 10);
-    const body = await req.json();
+    // Size-capped parse: even an authenticated community write must never
+    // hand an unbounded body to the JSON parser.
+    const parsed = await readJsonBody<Record<string, any>>(req, 16 * 1024);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    const body = parsed.body;
     const { status, adminProfileId } = body; // 'resolved' | 'dismissed'
 
     // Only admins may resolve/dismiss reports.

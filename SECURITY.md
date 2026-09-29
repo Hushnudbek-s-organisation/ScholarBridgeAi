@@ -235,3 +235,37 @@ report: `docs/AUDIT_2026-09.md`.
 Regression guard: `npm run test:security` fails if any API write lacks an
 authentication call (outside a reviewed public allowlist) or a Premium API
 stops enforcing its feature.
+
+## 13. 2026-09-29 anonymous surface audit (all 128 routes)
+
+The whole API surface was attacked live with **no session cookie, no bearer
+token and no admin flag** — every method of every route file, 232 handlers.
+Tool: `npm run test:api-security` (`scripts/check-api-anonymous.ts`), which walks
+`src/app/api/**/route.ts`, calls each exported handler anonymously, and fails on
+any non-public route that answers 2xx. Run it against a running server
+(`npm run dev`, or a production `next build && next start` on another port with
+`API_BASE_URL=`).
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| **Critical** | `POST/PUT/DELETE/GET /api/admin/opportunities` were **open to the internet**. The file guarded with `const admin = await requireAdmin(req); if (!admin) …` — `requireAdmin` resolves to a *result object*, which is truthy for an anonymous caller, so the 403 branch never ran. A live anonymous `POST` created a row. | Guards use `.ok` (`access.status/error/code`), bodies go through `readJsonBody(64 KB)`. Reproduced, fixed, then re-verified with the same probe. |
+| Medium | ~30 routes (community forum, analytics beacon, payments, admin CRUD) parsed `await request.json()` with no size cap, so an unbounded body reached the JSON parser. | All public/community writes now use the capped reader; the middleware additionally refuses any `/api` JSON write declaring more than `MAX_API_JSON_BODY_BYTES` (1 MB) with `413` **before** the route runs (multipart uploads exempt — they validate size and magic bytes themselves). |
+| Medium | `DELETE /api/visa/requirements` parsed its body before the admin check, leaking the payload shape through validation errors. | Authorize first, then parse (matches the other handlers in that file). |
+| Medium | `POST /api/profiles` (sign-up) silently fell back to ONE shared default e-mail address when none was supplied: the first anonymous caller owned it and every later e-mail-less sign-up died with a 500 **and logged the whole insert**. | The e-mail is required and validated (400), a racing duplicate maps to 409 via the unique index, and the shared default is gone. The two sign-up UIs already required it. |
+| Low | API responses carried no cache directives: a shared cache or proxy could in principle store one student's journey/essay/document JSON. | The middleware now marks every `/api` response `Cache-Control: no-store, private` (verified live), on top of the existing `has: cookie → no-store` rule in `next.config.ts`. |
+
+Regression guards added to `npm run test:security`:
+
+- **no route treats a guard RESULT OBJECT as a boolean** — the exact bug class
+  above, scanned across `src/app` and `src/lib` (comments stripped, so the
+  warning comment in the fixed file does not match itself);
+- **every API read is session-guarded or a reviewed public read** — the public
+  read allowlist is explicit in the test;
+- **community and beacon writes parse a size-capped body**;
+- **the middleware caps API JSON bodies** (unit + middleware-level `413`);
+- **API responses are marked `no-store`**.
+
+Result after the fixes: `OK — every non-public route refused an anonymous
+caller (401/403)` across 232 handlers, and 48 protected routes still answer a
+validation error before their auth check (not a data leak — they authorize the
+claimed id against the session — but listed by the probe for review).

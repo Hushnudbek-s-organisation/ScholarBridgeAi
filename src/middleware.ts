@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, locales } from "@/i18n/config";
-import { frameAncestors, isCrossSiteApiWrite, isMiniAppPath, miniAppFrameAncestors, strictTransportSecurity, xFrameOptions } from "@/lib/security";
+import {
+  frameAncestors,
+  isCrossSiteApiWrite,
+  isMiniAppPath,
+  isOversizedApiJsonBody,
+  miniAppFrameAncestors,
+  strictTransportSecurity,
+  xFrameOptions,
+} from "@/lib/security";
 
 /**
  * Cryptographically random nonce using the Web Crypto API (the middleware runs
@@ -104,7 +112,8 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // API: only the CSRF check runs here — routes set their own responses.
+  // API: the CSRF and body-size gates run here, before any route code — routes
+  // set their own responses otherwise.
   if (pathname.startsWith("/api/")) {
     const crossSite = isCrossSiteApiWrite({
       method: request.method,
@@ -119,7 +128,29 @@ export function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
-    return NextResponse.next();
+
+    // Refuse an oversized JSON body before the route parses it. Routes that use
+    // readJsonBody() also enforce their own, smaller cap.
+    if (
+      isOversizedApiJsonBody({
+        method: request.method,
+        pathname,
+        contentType: request.headers.get("content-type"),
+        contentLength: request.headers.get("content-length"),
+      })
+    ) {
+      return NextResponse.json(
+        { error: "Payload too large.", code: "payload_too_large" },
+        { status: 413 }
+      );
+    }
+
+    const apiResponse = NextResponse.next();
+    // Privacy: an API response can contain one student's data (journey plans,
+    // documents, essays) and is frequently authorized by a cookie or a Telegram
+    // bearer token. Never let a shared cache or an intermediary store it.
+    apiResponse.headers.set("Cache-Control", "no-store, private");
+    return apiResponse;
   }
 
   const nonce = randomNonce();

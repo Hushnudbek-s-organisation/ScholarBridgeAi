@@ -82,7 +82,11 @@ export async function POST(req: Request) {
     // has an account, the visitor must sign in instead of creating a second
     // profile — otherwise email+password sign-in would be ambiguous.
     const emailInput = clampString(body.email, 320).toLowerCase();
-    if (emailInput && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailInput)) {
+    // The email is the sign-in identity: it is required, and it is the ONLY
+    // thing that makes the account reachable from another device. A blank
+    // value must never fall back to a shared default address — that made the
+    // first anonymous caller the owner of it and every later sign-up a 500.
+    if (!emailInput || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailInput)) {
       return NextResponse.json(
         { error: "Please provide a valid email address", code: "invalid_email" },
         { status: 400 }
@@ -149,27 +153,44 @@ export async function POST(req: Request) {
       }
     }
 
-    const [newProfile] = await db.insert(studentProfiles).values({
-      name: clampString(body.name, 120) || "New Student Profile",
-      email: emailInput || "student@scholarbridge.edu",
-      degreeLevel: body.degreeLevel || "Master",
-      targetMajor: body.targetMajor || "Computer Science",
-      gpa: numOrNull(body.gpa) ?? 3.5, // schema default; real GPA entered later
-      gpaScale: numOrNull(body.gpaScale) ?? 4.0,
-      ieltsScore: scoreOrNull(body.ieltsScore),
-      toeflScore: scoreOrNull(body.toeflScore),
-      satScore: scoreOrNull(body.satScore),
-      greScore: scoreOrNull(body.greScore),
-      budgetAnnualUsd: numOrNull(body.budgetAnnualUsd) ?? 25000,
-      preferredCountries: countriesStr,
-      needScholarship: body.needScholarship ?? true,
-      extracurriculars: body.extracurriculars || "",
-      workExperienceYears: numOrNull(body.workExperienceYears) ?? 0,
-      researchPublications: numOrNull(body.researchPublications) ?? 0,
-      preferredLocale: body.preferredLocale || "en",
+    let newProfile: typeof studentProfiles.$inferSelect;
+    try {
+      [newProfile] = await db.insert(studentProfiles).values({
+        name: clampString(body.name, 120) || "New Student Profile",
+        email: emailInput,
+        degreeLevel: body.degreeLevel || "Master",
+        targetMajor: body.targetMajor || "Computer Science",
+        gpa: numOrNull(body.gpa) ?? 3.5, // schema default; real GPA entered later
+        gpaScale: numOrNull(body.gpaScale) ?? 4.0,
+        ieltsScore: scoreOrNull(body.ieltsScore),
+        toeflScore: scoreOrNull(body.toeflScore),
+        satScore: scoreOrNull(body.satScore),
+        greScore: scoreOrNull(body.greScore),
+        budgetAnnualUsd: numOrNull(body.budgetAnnualUsd) ?? 25000,
+        preferredCountries: countriesStr,
+        needScholarship: body.needScholarship ?? true,
+        extracurriculars: body.extracurriculars || "",
+        workExperienceYears: numOrNull(body.workExperienceYears) ?? 0,
+        researchPublications: numOrNull(body.researchPublications) ?? 0,
+        preferredLocale: body.preferredLocale || "en",
       // Sign-up password: stored ONLY as a scrypt hash (never plain text).
-      passwordHash: plainPassword ? hashPassword(plainPassword) : null,
-    }).returning();
+        passwordHash: plainPassword ? hashPassword(plainPassword) : null,
+      }).returning();
+    } catch (err) {
+      // Two sign-ups for the same address at the same moment: the earlier
+      // existence check cannot cover this, so the unique index does.
+      if (isUniqueViolation(err)) {
+        return NextResponse.json(
+          {
+            error:
+              "An account with this email already exists. Close this window and use Sign in instead.",
+            code: "email_taken",
+          },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     // Analytics: attribute the signup to the anonymous visitor cookie so the
     // admin dashboard can show the visitor → signup funnel. Never throws.
