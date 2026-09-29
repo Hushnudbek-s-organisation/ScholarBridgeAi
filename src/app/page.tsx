@@ -85,10 +85,14 @@ function tabFromHash(): string | null {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  // "landing" = first-time visitor (English welcome page),
-  // "wizard"  = step-by-step onboarding for a brand-new user,
-  // "app"     = the main app (sidebar navigation).
-  const [view, setView] = useState<"landing" | "wizard" | "app">("landing");
+  // "restoring" = checking the HttpOnly session before choosing a screen,
+  // "landing"   = visitor with no active session,
+  // "wizard"    = step-by-step onboarding for a brand-new user,
+  // "app"       = the main app (sidebar navigation).
+  // Start in restoring so returning students do not briefly land on the public
+  // welcome page while their valid session is being checked.
+  const [view, setView] = useState<"restoring" | "restore-error" | "landing" | "wizard" | "app">("restoring");
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   // Profile management — the app works with ONE signed-in profile per browser.
   // `profiles` is used by the picker to show this device's saved accounts.
@@ -162,7 +166,7 @@ export default function Home() {
   // every visible section is reported as its own "screen view". The call is
   // fire-and-forget, de-duplicated in `@/lib/tracker` and never throws.
   useEffect(() => {
-    const screen = view === "app" ? activeTab : view === "wizard" ? "onboarding" : "landing";
+    const screen = view === "app" ? activeTab : view === "wizard" ? "onboarding" : view === "landing" ? "landing" : "session-restore";
     trackScreen(screen, activeProfile?.id ?? null);
   }, [view, activeTab, activeProfile?.id]);
 
@@ -292,8 +296,19 @@ export default function Home() {
         } catch {
           // ignore
         }
+        setRestoreError(null);
         return;
       }
+
+      // A 401 means there is no valid session. Other failures (for example a
+      // temporary database outage) must not silently send a returning student
+      // back to the public landing page as if they had been signed out.
+      if (!res.ok && res.status !== 401) {
+        setRestoreError(data.error || "Your session could not be checked. Please try again.");
+        setView("restore-error");
+        return;
+      }
+
       // No (or an expired) session — drop the stale local hint so the next
       // load does not pretend an account is active.
       try {
@@ -301,8 +316,12 @@ export default function Home() {
       } catch {
         // ignore
       }
+      setRestoreError(null);
     } catch (err) {
       console.error("Error restoring session:", err);
+      setRestoreError("We could not reach ScholarBridgeAI. Check your connection and try again.");
+      setView("restore-error");
+      return;
     }
     setView("landing");
   }, [hydrateProfileData, rememberProfile]);
@@ -668,6 +687,58 @@ export default function Home() {
       notice={pickerMessage}
     />
   );
+
+  // ---- Restore a returning student's session before showing the landing page ----
+  if (view === "restoring") {
+    return (
+      <LocaleProvider>
+        <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center">
+          <div role="status" aria-live="polite" className="space-y-4">
+            <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+            <div>
+              <p className="font-semibold text-slate-800">Opening ScholarBridgeAI…</p>
+              <p className="mt-1 text-sm text-slate-500">Checking your secure session.</p>
+            </div>
+          </div>
+        </main>
+      </LocaleProvider>
+    );
+  }
+
+  if (view === "restore-error") {
+    return (
+      <LocaleProvider>
+        <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center">
+          <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <h1 className="text-xl font-bold text-slate-900">Dashboard unavailable</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              {restoreError || "We could not restore your secure session."}
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setRestoreError(null);
+                  setView("restoring");
+                  void loadStoredProfile();
+                }}
+                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("landing")}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Go to sign in
+              </button>
+            </div>
+          </section>
+        </main>
+      </LocaleProvider>
+    );
+  }
 
   // ---- First visit: English landing page ----
   if (view === "landing") {
