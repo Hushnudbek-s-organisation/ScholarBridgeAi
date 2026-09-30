@@ -45,7 +45,11 @@ export function JourneyCard({
   const reduceMotion = useReducedMotion();
   const tones: Record<string, string> = {
     plain: "",
-    hero: "relative overflow-hidden border-indigo-200/70 bg-gradient-to-br from-indigo-50 via-white to-sky-50 dark:border-indigo-500/30 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950",
+    // The hero gets its own colour identity in both themes (see `.sb-journey-hero`
+    // in globals.css) instead of borrowing the card palette: a pale indigo wash
+    // on light, a deep indigo→violet on dark. It must stay the ONE hero per
+    // screen, so panels keep `plain` / `accent`.
+    hero: "sb-journey-hero relative overflow-hidden",
     accent: "border-indigo-100 bg-indigo-50/40 dark:border-indigo-500/20 dark:bg-indigo-950/20",
   };
   return (

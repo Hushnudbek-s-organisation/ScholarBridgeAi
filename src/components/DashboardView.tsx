@@ -199,7 +199,7 @@ export function DashboardView({
             <button
               onClick={runAiAudit}
               disabled={isEvaluating}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-900 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-900 sb-ink-on-warm font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
             >
               <Bot className="h-4 w-4" />
               {isEvaluating ? t("analyzing") : t("runAudit")}

@@ -164,7 +164,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
             <li key={i}>
               <button onClick={() => toggleStep(g, i)} className="flex w-full items-start gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-slate-50">
                 <span
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${s.done ? "bg-emerald-500 text-white" : "border-2 border-slate-300"}`}
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${s.done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-300"}`}
                 >
                   {s.done && <Check className="h-3 w-3" />}
                 </span>
@@ -261,7 +261,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                 title={t("emptyActive")}
                 body={t("emptyActiveBody")}
                 action={
-                  <button onClick={() => setView("library")} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600">
+                  <button onClick={() => setView("library")} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600">
                     {t("browseLibrary")}
                   </button>
                 }
@@ -323,7 +323,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end">
-                      <button disabled={busy || active.length >= maxActive} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50">
+                      <button disabled={busy || active.length >= maxActive} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600 disabled:opacity-50">
                         {t("addGoal")}
                       </button>
                     </div>
@@ -376,7 +376,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                           disabled={busy || adopted || active.length >= maxActive}
                           onClick={() => void add({ templateId: tp.id })}
                           className={`w-full rounded-xl px-3 py-2 text-xs font-bold ${
-                            adopted ? "bg-emerald-50 text-emerald-700" : "bg-amber-500 text-white hover:bg-amber-600"
+                            adopted ? "bg-emerald-50 text-emerald-700" : "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600"
                           } disabled:cursor-not-allowed disabled:opacity-70`}
                         >
                           {adopted ? t("onList") : active.length >= maxActive ? t("limitReached") : t("addGoal")}

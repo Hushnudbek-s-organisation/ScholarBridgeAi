@@ -95,15 +95,15 @@ export function RewardsSection({ activeProfile }: RewardsSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-3xl p-6 shadow-xl">
+      <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 sb-ink-on-bright rounded-3xl p-6 shadow-xl">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <Gift className="h-6 w-6 text-white" />
+              <Gift className="h-6 w-6 text-white sb-ink-on-bright" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-extrabold">{t("title")}</h1>
-              <p className="text-xs text-white/80 mt-0.5">{t("subtitle")}</p>
+              <p className="text-xs text-slate-700 sb-ink-on-bright mt-0.5">{t("subtitle")}</p>
             </div>
           </div>
           <PointsBadge points={gamification.totalPoints} levelName={gamification.level.name} levelIcon={gamification.level.iconUrl} />

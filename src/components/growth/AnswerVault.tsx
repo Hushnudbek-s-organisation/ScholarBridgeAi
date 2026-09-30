@@ -147,7 +147,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                     aria-expanded={isOpen}
                   >
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white" : "border-2 border-slate-200"}`}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-200"}`}
                     >
                       {done && <Check className="h-3.5 w-3.5" />}
                     </span>

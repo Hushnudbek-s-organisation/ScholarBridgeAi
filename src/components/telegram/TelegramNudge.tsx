@@ -54,7 +54,7 @@ export function TelegramNudge({ profileId, onNavigate }: { profileId: number | n
           className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 sm:flex-row sm:items-center"
         >
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white sb-ink-on-bright">
               <Send className="h-4 w-4" />
             </span>
             <div className="min-w-0">
@@ -63,7 +63,7 @@ export function TelegramNudge({ profileId, onNavigate }: { profileId: number | n
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-            <button onClick={() => onNavigate("notifications")} className="rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-sky-600">
+            <button onClick={() => onNavigate("notifications")} className="rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600">
               {t("nudgeCta")}
             </button>
             <button onClick={dismiss} aria-label={t("dismiss")} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600">

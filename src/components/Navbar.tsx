@@ -530,7 +530,7 @@ export function Navbar({
       : "bg-indigo-600";
     const stateCls = isActive
       ? item.premium
-        ? "text-slate-900 font-bold"
+        ? "text-slate-900 font-bold sb-ink-on-warm"
         : "text-white font-semibold"
       : item.premium
       ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800"

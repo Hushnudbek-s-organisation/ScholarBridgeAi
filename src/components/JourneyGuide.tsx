@@ -152,7 +152,7 @@ export function JourneyGuide({ profileId, onNavigate }: { profileId: number | nu
                     <span className="flex w-full items-center justify-between">
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                          s.done ? "bg-emerald-500 text-white" : s.current ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                          s.done ? "bg-emerald-500 text-white sb-ink-on-bright" : s.current ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
                         }`}
                       >
                         {s.done ? <Check className="h-3.5 w-3.5" /> : i + 1}
@@ -187,7 +187,7 @@ export function JourneyGuide({ profileId, onNavigate }: { profileId: number | nu
                     >
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                          s.done ? "bg-emerald-500 text-white" : s.current ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                          s.done ? "bg-emerald-500 text-white sb-ink-on-bright" : s.current ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
                         }`}
                       >
                         {s.done ? <Check className="h-3.5 w-3.5" /> : i + 1}

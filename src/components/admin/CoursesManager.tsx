@@ -921,7 +921,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                             <button
                               type="button"
                               onClick={() => addQuestion(mi, li)}
-                              className="ml-auto flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-amber-600"
+                              className="ml-auto flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-[11px] font-bold text-white sb-ink-on-warm hover:bg-amber-600"
                             >
                               <Plus className="h-3 w-3" /> Add Question
                             </button>

@@ -165,7 +165,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
                           aria-checked={i.done}
                           aria-label={tr(i.title)}
                           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors ${
-                            i.done ? "bg-emerald-500 text-white" : "border-2 border-slate-300 hover:border-emerald-400"
+                            i.done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-300 hover:border-emerald-400"
                           }`}
                         >
                           {i.done && <Check className="h-3.5 w-3.5" />}

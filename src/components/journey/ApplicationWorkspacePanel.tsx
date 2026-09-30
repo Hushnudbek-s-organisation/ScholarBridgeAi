@@ -423,7 +423,7 @@ export function ApplicationWorkspacePanel({
                         aria-label={r.status === "done" ? `Mark ${r.title} as not done` : `Mark ${r.title} as done`}
                         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                           r.status === "done"
-                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            ? "border-emerald-500 bg-emerald-500 text-white sb-ink-on-bright"
                             : r.status === "not_required"
                               ? "border-slate-300 bg-slate-100 dark:bg-slate-700"
                               : "border-slate-300 dark:border-slate-600"
@@ -530,7 +530,7 @@ export function ApplicationWorkspacePanel({
               <li key={c.key} className="flex items-center gap-2 text-sm">
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    c.ok ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
+                    c.ok ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                   }`}
                 >
                   {c.ok ? "✓" : ""}

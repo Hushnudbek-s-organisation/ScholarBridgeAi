@@ -25,10 +25,23 @@
         deliberately dark panel", `bg-white` is "this is a card". Those are
         pinned back to dark surfaces with explicit `.dark .bg-*` rules below.
 
+   The inversion is per-COLOUR, not per-role, so anything structural has to be
+   pinned too, or a "surface" turns into ink and the copy on it vanishes:
+
+     • backgrounds/borders/strokes at `slate-600…950`  → dark surfaces,
+     • gradient stops that are pale surfaces (`from-indigo-50 to-white`, …)   → dark,
+     • fills that are *meant* to stay bright (amber CTAs, green ticks, sky
+       buttons) keep their fill and take `.sb-ink-on-bright` / `.sb-ink-on-warm`
+       for their copy — white on those fills is 2.0–2.7:1 in BOTH themes.
+
    Because these rules sit outside `@layer utilities` they win over the plain
    utility classes. Do NOT hand-write `dark:` variants on an element that also
    uses a remapped class — the remap will take precedence. Use the semantic
    helpers at the bottom of this file instead.
+
+   `npm run test:dark` (scripts/dark-audit.mjs) resolves every fill/ink pair in
+   the markup against these rules and fails when one is too low-contrast to
+   read. Run it after touching a theme rule or a component's colours.
    =========================================================================== */
 
 /* Class-based dark mode (a `dark` class on <html>), not OS media query. */
@@ -57,6 +70,13 @@
 .dark .bg-slate-800 { background-color: #16213a; }
 .dark .bg-slate-900 { background-color: #0d1424; }
 .dark .bg-slate-950 { background-color: #060b16; }
+/* `bg-slate-600/700` is never used as a *light-theme* fill in this app — it
+   only ever appears as `dark:bg-slate-700`, meaning "a subtle raised surface":
+   a progress track, a selected chip, a thin divider. Left to the inverted ramp
+   it becomes a near-white block (`slate-700` → #dde5ef) and the copy sitting on
+   it disappears. Pin both to the dark equivalent of the light-theme value. */
+.dark .bg-slate-700 { background-color: #33425f; }
+.dark .bg-slate-600 { background-color: #3d4d6d; }
 /* A dark *control* (primary button, selected tab, the sliding nav pill) sits
    on a dark card in dark mode; lift it so the selected state still reads. */
 .dark button.bg-slate-900,
@@ -68,9 +88,22 @@
 .dark .hover\:bg-slate-700:hover { background-color: #24334f; }
 .dark .hover\:bg-slate-800:hover { background-color: #1d2b47; }
 .dark .hover\:bg-slate-900:hover { background-color: #16213a; }
+/* …and the pale hovers need the mirror-image treatment: inverted, `hover:bg-slate-50`
+   would resolve to the page colour, so a row would *darken* on hover instead
+   of lifting. Map them to the same subtle raised tone as `hover:bg-slate-700`. */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover { background-color: #1b2740; }
 .dark .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #22304d; }
 .dark .border-slate-800,
 .dark .border-slate-900 { border-color: #22304d; }
+/* Structural hairlines follow the same rule as `bg-slate-600/700` above: the
+   inverted ramp turns these into near-white, which reads as a glowing outline
+   rather than a divider (input borders, the progress-ring track). */
+.dark .border-slate-700 { border-color: #33425f; }
+.dark .border-slate-600 { border-color: #3d4d6d; }
+.dark .stroke-slate-700 { stroke: #33425f; }
+.dark .stroke-slate-600 { stroke: #3d4d6d; }
+.dark .ring-slate-700 { --tw-ring-color: #33425f; }
 
 /*  Dark gradient stops -------------------------------------------------------
     `from-slate-900` / `to-slate-900` build the deliberately dark hero banners.
@@ -82,6 +115,30 @@
 .dark .from-slate-900\/80 { --tw-gradient-from: rgb(13 20 36 / 0.8); }
 .dark .to-slate-900\/85 { --tw-gradient-to: rgb(13 20 36 / 0.85); }
 .dark .via-slate-900\/20 { --tw-gradient-via: rgb(13 20 36 / 0.2); }
+
+/*  Soft "tinted surface" gradients -------------------------------------------
+    `from-indigo-50 to-white`, `from-amber-50 to-orange-50` and friends are
+    surface gradients, not decoration: the card itself. The inverted ramp does
+    not touch `--tw-gradient-*` stops, so they used to stay pale in dark mode
+    while the copy inside them flipped to a light slate value — white text on a
+    white gradient. They resolve to the dark equivalents of the same tints. */
+.dark .from-white { --tw-gradient-from: #131c31; }
+.dark .via-white { --tw-gradient-via: #131c31; }
+.dark .to-white { --tw-gradient-to: #131c31; }
+.dark .from-indigo-50 { --tw-gradient-from: #1b2547; }
+.dark .via-indigo-50 { --tw-gradient-via: #1b2547; }
+.dark .to-indigo-50 { --tw-gradient-to: #1b2547; }
+.dark .from-sky-50 { --tw-gradient-from: #14203a; }
+.dark .via-sky-50 { --tw-gradient-via: #14203a; }
+.dark .to-sky-50 { --tw-gradient-to: #14203a; }
+.dark .from-amber-50 { --tw-gradient-from: #2a2114; }
+.dark .via-amber-50 { --tw-gradient-via: #2a2114; }
+.dark .to-amber-50 { --tw-gradient-to: #2a2114; }
+.dark .to-orange-50 { --tw-gradient-to: #2a1b14; }
+.dark .from-orange-50 { --tw-gradient-from: #2a1b14; }
+/* The rank-2 leaderboard badge is a silver gradient; keep it metallic, not
+   paper-white, by darkening the light-mode start. */
+.dark .from-slate-300 { --tw-gradient-from: #3d4d6d; }
 
 /*  Light text on dark panels ------------------------------------------------
     `text-slate-100/200/300` is used almost exclusively as light copy on the
@@ -280,6 +337,47 @@
   .dark .text-rose-700,
   .dark .text-rose-800,
   .dark .text-rose-900 { color: #fda4af; }
+
+/*  Ink for deliberately BRIGHT fills -----------------------------------------
+    Amber CTAs, the "Apply now" button, the green tick badges, the sky-coloured
+    Telegram buttons: these fills stay bright in dark mode (they are the accent,
+    not a surface), and white copy on them lands at 2.0–2.7:1 in *both* themes.
+    A `dark:` variant cannot fix this — the remap above outranks it — so the
+    bright-fill ink is a class of its own, applied in both themes.
+
+    Use it on the element that carries the copy (label, number, icon), never on
+    the fill itself.                                                         */
+.sb-ink-on-bright { color: #1a1405; }
+.dark .sb-ink-on-bright { color: #0b1220; }
+/* Same idea for a bright fill that needs a warmer ink (amber/yellow/orange). */
+.sb-ink-on-warm { color: #241704; }
+.dark .sb-ink-on-warm { color: #0b1220; }
+
+/*  The journey hero — its own colour identity --------------------------------
+    "Your Study Abroad Journey" is the one block on the dashboard that should
+    not look like every other card. In light mode it is a pale indigo wash; in
+    dark mode the generic `slate-900` gradient would flatten it into a black
+    band, so it gets a deep indigo→violet of its own that sits *with* the dark
+    palette instead of shouting over it. The eyebrow label gets a dedicated
+    indigo as well, deeper than the washed `text-indigo-500` remap.           */
+.sb-journey-hero {
+  background-image: linear-gradient(135deg, #eef2ff 0%, #ffffff 45%, #f0f9ff 100%);
+  border-color: rgb(199 210 254 / 0.7);
+}
+.dark .sb-journey-hero {
+  background-image: linear-gradient(135deg, #131d3d 0%, #191741 55%, #1d1847 100%);
+  border-color: rgb(129 140 248 / 0.28);
+  box-shadow:
+    inset 0 1px 0 rgb(165 180 252 / 0.1),
+    0 12px 32px -18px rgb(49 46 129 / 0.9);
+}
+/* The aurora behind the hero is tuned for a light card; in dark mode it has to
+   be far dimmer or it turns the block into a glowing blob. */
+.dark .sb-aurora {
+  opacity: 0.4;
+}
+.sb-journey-eyebrow { color: #4338ca; }
+.dark .sb-journey-eyebrow { color: #93a0f5; }
 
 /*  Native controls, scrollbars and selection -------------------------------
     `color-scheme` (set above) already darkens form controls and scrollbars;

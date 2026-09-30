@@ -152,7 +152,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
           {link ? (
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500 text-white">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500 text-white sb-ink-on-bright">
                   <Send className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -178,7 +178,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                   href={`https://t.me/${data.bot.botUsername}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-white hover:bg-sky-600"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
                 >
                   <Send className="h-3.5 w-3.5" /> {t("openChat")}
                 </a>
@@ -290,7 +290,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                   disabled={!link || !link.notifyEnabled || !data.bot.notificationsEnabled}
                   onClick={() => !active && void save({ reminderDays: [...preset.days] })}
                   className={`rounded-xl border px-3 py-2 text-left text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    active ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    active ? "border-sky-500 bg-sky-500 text-white sb-ink-on-bright" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {t(`preset.${preset.id}`)}

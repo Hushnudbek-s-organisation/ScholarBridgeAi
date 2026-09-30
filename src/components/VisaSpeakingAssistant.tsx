@@ -398,7 +398,7 @@ function Steps({ current }: { current: 0 | 1 | 2 }) {
                 i === current
                   ? "bg-white text-blue-700"
                   : i < current
-                    ? "bg-emerald-400 text-slate-950"
+                    ? "bg-emerald-400 text-slate-950 sb-ink-on-bright"
                     : "bg-white/15 text-white/60"
               }`}
             >
@@ -476,7 +476,7 @@ function ReactorCore({
           style={{ inset: `${34 - level * 16}px` }}
         />
         <div
-          className={`relative flex h-40 w-40 flex-col items-center justify-center rounded-full bg-gradient-to-br ${palette} text-slate-950 shadow-[0_0_60px_rgba(34,211,238,0.35)] ring-4 ring-white/10 transition-transform duration-100 sm:h-52 sm:w-52`}
+          className={`relative flex h-40 w-40 flex-col items-center justify-center rounded-full bg-gradient-to-br ${palette} text-white shadow-[0_0_60px_rgba(34,211,238,0.35)] ring-4 ring-white/10 transition-transform duration-100 sm:h-52 sm:w-52`}
           style={{ transform: `scale(${scale})` }}
         >
           <div className="absolute inset-4 rounded-full bg-white/25 blur-md" />
@@ -2026,12 +2026,12 @@ export function VisaSpeakingAssistant({
                     engineMode === "gemini-live"
                       ? liveConnected
                         ? "cursor-not-allowed bg-white/10 text-white/45"
-                        : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                        : "bg-emerald-500 text-slate-950 sb-ink-on-bright hover:bg-emerald-400"
                       : listening
                         ? "bg-red-600 text-white hover:bg-red-700"
                         : officerState !== "idle"
                           ? "cursor-not-allowed bg-white/10 text-white/45"
-                          : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                          : "bg-emerald-500 text-slate-950 sb-ink-on-bright hover:bg-emerald-400"
                   }`}
                 >
                   {engineMode === "fallback" && listening ? (
@@ -2093,7 +2093,7 @@ export function VisaSpeakingAssistant({
                       }}
                       placeholder={t("typePlaceholder")}
                       disabled={officerState !== "idle"}
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300 disabled:bg-slate-800"
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-300 focus:border-cyan-300 disabled:bg-slate-800"
                     />
                     <button
                       type="button"

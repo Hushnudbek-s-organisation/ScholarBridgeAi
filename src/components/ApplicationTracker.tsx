@@ -120,7 +120,7 @@ export function ApplicationTracker({
             onClick={() => setActiveTab("scholarships")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeSubTab === "scholarships"
-                ? "bg-amber-500 text-slate-900 shadow-xs"
+                ? "bg-amber-500 text-slate-900 sb-ink-on-warm shadow-xs"
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
@@ -325,7 +325,7 @@ export function ApplicationTracker({
                                 await onUpdateSavedScholarshipStatus(item.id, item.status, tempNotes);
                                 setEditingNotesId(null);
                               }}
-                              className="px-3 py-1 bg-amber-500 text-slate-900 rounded-lg text-xs font-bold flex items-center gap-1"
+                              className="px-3 py-1 bg-amber-500 text-slate-900 sb-ink-on-warm rounded-lg text-xs font-bold flex items-center gap-1"
                             >
                               <Save className="h-3 w-3" /> Save Notes
                             </button>

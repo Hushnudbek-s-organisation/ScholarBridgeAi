@@ -52,7 +52,7 @@ export function Leaderboard({ entries, highlightProfileId }: LeaderboardProps) {
               <div
                 className={`h-10 w-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
                   medal
-                    ? `bg-gradient-to-br ${rankColors[entry.rank - 1]} text-white shadow-sm`
+                    ? `bg-gradient-to-br ${rankColors[entry.rank - 1]} text-white sb-ink-on-bright shadow-sm`
                     : "bg-slate-100 text-slate-500"
                 }`}
               >
