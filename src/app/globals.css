@@ -157,6 +157,56 @@
 .dark .bg-white\/85 { background-color: rgb(19 28 49 / 0.85); }
 .dark .hover\:bg-white:hover { background-color: #22304d; }
 
+/*  Neutral text safety net --------------------------------------------------
+    Gray/neutral/zinc are independent Tailwind 4 tokens, not aliases for
+    slate. Without an explicit dark rule their default dark ink disappears
+    on dark surfaces. Keep those utilities readable, including dark variants. */
+.dark :is(
+  [class~="text-black"], [class~="text-gray-950"], [class~="text-gray-900"],
+  [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"],
+  [class~="text-gray-500"], [class~="text-gray-400"], [class~="text-gray-300"],
+  [class~="text-gray-200"], [class~="text-gray-100"], [class~="text-gray-50"],
+  [class~="text-neutral-950"], [class~="text-neutral-900"], [class~="text-neutral-800"],
+  [class~="text-neutral-700"], [class~="text-neutral-600"], [class~="text-neutral-500"],
+  [class~="text-neutral-400"], [class~="text-neutral-300"], [class~="text-neutral-200"],
+  [class~="text-neutral-100"], [class~="text-neutral-50"],
+  [class~="text-zinc-950"], [class~="text-zinc-900"], [class~="text-zinc-800"],
+  [class~="text-zinc-700"], [class~="text-zinc-600"], [class~="text-zinc-500"],
+  [class~="text-zinc-400"], [class~="text-zinc-300"], [class~="text-zinc-200"],
+  [class~="text-zinc-100"], [class~="text-zinc-50"],
+  [class~="dark:text-black"], [class~="dark:text-gray-950"], [class~="dark:text-gray-900"],
+  [class~="dark:text-gray-800"], [class~="dark:text-gray-700"], [class~="dark:text-gray-600"],
+  [class~="dark:text-gray-500"], [class~="dark:text-gray-400"], [class~="dark:text-gray-300"],
+  [class~="dark:text-gray-200"], [class~="dark:text-gray-100"], [class~="dark:text-gray-50"],
+  [class~="dark:text-neutral-950"], [class~="dark:text-neutral-900"], [class~="dark:text-neutral-800"],
+  [class~="dark:text-neutral-700"], [class~="dark:text-neutral-600"], [class~="dark:text-neutral-500"],
+  [class~="dark:text-neutral-400"], [class~="dark:text-neutral-300"], [class~="dark:text-neutral-200"],
+  [class~="dark:text-neutral-100"], [class~="dark:text-neutral-50"],
+  [class~="dark:text-zinc-950"], [class~="dark:text-zinc-900"], [class~="dark:text-zinc-800"],
+  [class~="dark:text-zinc-700"], [class~="dark:text-zinc-600"], [class~="dark:text-zinc-500"],
+  [class~="dark:text-zinc-400"], [class~="dark:text-zinc-300"], [class~="dark:text-zinc-200"],
+  [class~="dark:text-zinc-100"], [class~="dark:text-zinc-50"],
+  [class*="text-black/"], [class*="text-gray-"], [class*="text-neutral-"], [class*="text-zinc-"]
+) { color: #f5f8fc; }
+
+.dark :is(
+  [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"],
+  [class~="bg-neutral-50"], [class~="bg-neutral-100"], [class~="bg-neutral-200"],
+  [class~="bg-zinc-50"], [class~="bg-zinc-100"], [class~="bg-zinc-200"]
+) { background-color: #111a2e; }
+
+.dark :is(input, textarea, select)::placeholder { color: #a3b1c9; opacity: 1; }
+.dark :is(input, textarea, select) { color: #f5f8fc; }
+
+/* The slate aliases are explicit as well, protecting against a component's
+   dark variant winning the cascade with a low-contrast value. */
+.dark .text-slate-400 { color: #c3cede; }
+.dark .text-slate-500 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #d6deea; }
+.dark .text-slate-700 { color: #e1e8f2; }
+.dark .text-slate-800 { color: #edf2f8; }
+.dark .text-slate-900 { color: #f8fafc; }
+
 /*  Accent hover tints -------------------------------------------------------
     `hover:bg-{accent}-50/100` is a pale wash on light cards; in dark mode it
     would flash a near-white block, so map it to a translucent accent tint. */
