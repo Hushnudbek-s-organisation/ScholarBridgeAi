@@ -1,0 +1,120 @@
+{
+  "_howToUse": [
+    "Bu shabl — bitta universitet uchun barcha maydonlar.",
+    "Har bir qiymatning yoniga _source_url va _evidence (sahifadan aniq kiritilgan jumlа) qo'ying.",
+    "Topilmagan maydon null qoldiring — 0, 3.0, 6.5 kabi qiymat QOYMANG.",
+    "Bu faylni toldirib menga bering (yoki .env.local orqali import qilamiz)."
+  ],
+
+  "university": {
+    "name": null,
+    "country": null,
+    "city": null,
+    "flag_emoji": null,
+    "world_ranking": null,
+    "degree_level": null,
+    "program_major": null,
+    "description": null,
+    "highlights": [],
+
+    "founded_year": null,
+    "university_type": null,
+    "address": null,
+
+    "min_gpa": null,
+    "min_ielts": null,
+    "min_sat": null,
+    "acceptance_rate": null,
+    "post_study_work_visa_years": null,
+
+    "annual_tuition": null,
+    "tuition_currency": null,
+    "tuition_period": null,
+    "annual_living_est": null,
+    "living_cost_currency": null,
+    "living_cost_period": null,
+    "accommodation_cost": null,
+    "accommodation_cost_currency": null,
+    "accommodation_cost_period": null,
+    "application_fee": null,
+    "application_fee_currency": null,
+
+    "international_students_count": null,
+    "international_students_percentage": null,
+
+    "website_url": null,
+    "official_website_url": null,
+    "admissions_url": null,
+    "international_admissions_url": null,
+    "undergraduate_admissions_url": null,
+    "application_url": null,
+    "image_url": null,
+
+    "_source_url": null,
+    "_last_verified_at": null
+  },
+
+  "programs": [
+    {
+      "name": null,
+      "field": null,
+      "degree_level": null,
+      "duration": null,
+      "duration_unit": "years",
+      "study_mode": null,
+      "language": null,
+      "annual_tuition": null,
+      "tuition_currency": null,
+      "tuition_period": null,
+      "description": null,
+      "official_url": null,
+      "application_url": null,
+      "_source_url": null,
+
+      "requirements": {
+        "min_ielts": null,
+        "min_toefl": null,
+        "min_det": null,
+        "min_sat": null,
+        "min_act": null,
+        "min_gpa": null,
+        "ib_requirement": null,
+        "a_level_requirement": null,
+        "ap_requirement": null,
+        "subject_requirements": null,
+        "other_requirements": null,
+        "portfolio_required": null,
+        "interview_required": null,
+        "recommendation_required": null,
+        "personal_statement_required": null,
+        "_source_url": null
+      }
+    }
+  ],
+
+  "application_cycles": [
+    {
+      "academic_year": null,
+      "intake": null,
+      "application_type": null,
+      "opening_date": null,
+      "deadline": null,
+      "deadline_timezone": null,
+      "application_fee": null,
+      "application_fee_currency": null,
+      "application_url": null,
+      "_source_url": null
+    }
+  ],
+
+  "sources": [
+    {
+      "url": null,
+      "title": null,
+      "domain": null,
+      "source_type": "official_website",
+      "is_official": true,
+      "accessed_at": null
+    }
+  ]
+}
