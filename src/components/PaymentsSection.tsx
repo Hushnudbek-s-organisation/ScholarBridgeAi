@@ -100,15 +100,15 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-white rounded-3xl p-6 shadow-xl">
+      <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 sb-ink-on-warm rounded-3xl p-6 shadow-xl">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <Crown className="h-6 w-6 text-white" />
+              <Crown className="h-6 w-6 text-white sb-ink-on-warm" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">{t("title")}</h1>
-              <p className="text-xs text-slate-800 mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 sb-ink-on-warm">{t("title")}</h1>
+              <p className="text-xs text-slate-800 sb-ink-on-warm mt-0.5">
                 Bepul — ishni boshlash uchun. Pro — vaqt tejash, sifat va cheksizlik.
               </p>
             </div>
@@ -140,7 +140,7 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             <h2 className="flex items-center gap-1.5 text-base font-extrabold text-slate-900">
               <Crown className="h-4 w-4 text-amber-500" /> Pro
             </h2>
-            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-white">Tavsiya</span>
+            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-white sb-ink-on-warm">Tavsiya</span>
           </div>
           <p className="mt-1 text-xs text-slate-600">Deadline yaqin, insho yozilayotganda, viza oldidan — shu paytda kerak.</p>
           <ul className="mt-4 space-y-2.5">
@@ -185,7 +185,7 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
                   }`}
                 >
                   {pack.badge && (
-                    <span className="absolute -top-2 right-3 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="absolute -top-2 right-3 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white sb-ink-on-warm">
                       {pack.badge}
                     </span>
                   )}
@@ -211,7 +211,7 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             </div>
             <button
               onClick={() => setShowCheckout(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl text-xs shadow-md transition-colors"
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white sb-ink-on-warm font-bold rounded-xl text-xs shadow-md transition-colors"
             >
               {t("upgrade")}
             </button>

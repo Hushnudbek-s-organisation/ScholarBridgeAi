@@ -307,7 +307,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
                         >
                           <span
                             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[9px] ${
-                              t.isCompleted ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-slate-600"
+                              t.isCompleted ? "border-emerald-500 bg-emerald-500 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
                             }`}
                           >
                             {t.isCompleted && <Check className="h-2.5 w-2.5" />}
@@ -543,7 +543,7 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
                   onClick={() => void togglePhase(p.key, p.status !== "done")}
                   aria-label={p.status === "done" ? `Reopen ${p.title}` : `Complete ${p.title}`}
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                    p.status === "done" ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
+                    p.status === "done" ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                   }`}
                 >
                   {p.status === "done" ? <Check className="h-3 w-3" /> : i + 1}

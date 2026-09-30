@@ -83,7 +83,7 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
               <div className="mt-auto pt-3">
                 <button
                   className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    inProgress ? "bg-amber-500 text-white hover:bg-amber-600" : done ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    inProgress ? "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600" : done ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-indigo-600 text-white hover:bg-indigo-700"
                   }`}
                 >
                   <PlayCircle className="h-4 w-4" />

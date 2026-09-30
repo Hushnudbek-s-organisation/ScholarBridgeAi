@@ -49,7 +49,7 @@ function OldHero() {
             </a>
             <a
               href={DEMO.applicationUrl}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 px-4 py-2 text-xs font-bold"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 sb-ink-on-warm px-4 py-2 text-xs font-bold"
             >
               <ExternalLink className="h-3.5 w-3.5" /> Apply Now
             </a>
@@ -103,7 +103,7 @@ function NewHero({ showImage }: { showImage: boolean }) {
             </a>
             <a
               href={DEMO.applicationUrl}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 sb-ink-on-warm px-5 py-2.5 text-xs font-bold shadow-lg"
             >
               <ExternalLink className="h-3.5 w-3.5" /> Apply Now
             </a>

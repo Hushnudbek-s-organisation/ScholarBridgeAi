@@ -217,7 +217,7 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
         <button
           type="submit"
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600 disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />}
           Gift Premium
@@ -244,7 +244,7 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
                 <div
                   className={`h-9 w-9 rounded-xl flex items-center justify-center text-sm font-extrabold ${
                     p.isPremium
-                      ? "bg-amber-100 text-amber-600"
+                      ? "bg-amber-100 text-amber-800"
                       : "bg-slate-100 text-slate-500"
                   }`}
                 >

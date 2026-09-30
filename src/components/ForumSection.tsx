@@ -333,7 +333,7 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
             <button
               onClick={() => setShowModeration((v) => !v)}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-                showModeration ? "bg-amber-400 text-slate-900" : "bg-white/10 border border-white/20 hover:bg-white/20"
+                showModeration ? "bg-amber-400 text-slate-900 sb-ink-on-warm" : "bg-white/10 border border-white/20 hover:bg-white/20"
               }`}
             >
               {showModeration ? "✕" : `🛡️ ${t("moderation")}`}

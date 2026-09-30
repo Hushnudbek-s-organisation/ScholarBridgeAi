@@ -40,7 +40,8 @@
     "test:telegram-integration": "tsx scripts/check-telegram-integration.ts",
     "test:ownership": "tsx scripts/check-ownership.ts",
     "test:portability": "tsx scripts/check-portability.ts",
-    "test:journey": "tsx scripts/check-journey.ts"
+    "test:journey": "tsx scripts/check-journey.ts",
+    "test:dark": "node scripts/dark-audit.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

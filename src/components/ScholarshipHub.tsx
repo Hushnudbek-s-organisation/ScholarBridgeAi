@@ -373,7 +373,7 @@ export function ScholarshipHub({
                   ) : (
                     <button
                       onClick={() => onSaveScholarship(s.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-xl text-xs shadow-xs transition-colors"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 sb-ink-on-warm font-bold rounded-xl text-xs shadow-xs transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Track Scholarship

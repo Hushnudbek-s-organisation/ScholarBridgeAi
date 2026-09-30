@@ -234,7 +234,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                           <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
                         </div>
                         <div className="text-[7px] font-semibold">Needs Strengthening</div>
-                        <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900">
+                        <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900 sb-ink-on-warm">
                           <Bot className="h-2.5 w-2.5" /> Run AI Audit
                         </div>
                       </div>

@@ -171,7 +171,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     aria-selected={active === id}
                     onClick={() => setMethod(id)}
                     className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
-                      active === id ? (id === "telegram" ? "bg-sky-500 text-white" : "bg-indigo-600 text-white") : "text-slate-500 hover:bg-slate-100"
+                      active === id ? (id === "telegram" ? "bg-sky-500 text-white sb-ink-on-bright" : "bg-indigo-600 text-white") : "text-slate-500 hover:bg-slate-100"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" /> {label}

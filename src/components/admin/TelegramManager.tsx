@@ -299,7 +299,7 @@ export function TelegramManager() {
             <button
               onClick={saveToken}
               disabled={!token.trim() || busy === "token"}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-600 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 disabled:opacity-50"
             >
               {busy === "token" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} {t("saveToken")}
             </button>
@@ -428,7 +428,7 @@ export function TelegramManager() {
           <button onClick={() => setDraft(data.settings)} disabled={!dirty} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
             {t("reset")}
           </button>
-          <button onClick={saveSettings} disabled={!dirty || busy === "settings"} className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-600 disabled:opacity-40">
+          <button onClick={saveSettings} disabled={!dirty || busy === "settings"} className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 disabled:opacity-40">
             {busy === "settings" && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {t("save")}
           </button>
         </div>
@@ -602,7 +602,7 @@ function Card({
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="mb-3 flex items-center gap-2.5">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${done ? "bg-emerald-500 text-white" : "bg-sky-50 text-sky-600"}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${done ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-sky-50 text-sky-600"}`}>
           {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
         </span>
         <h3 className="text-sm font-extrabold text-slate-900">

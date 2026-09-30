@@ -198,7 +198,9 @@ export function JourneyControlCenter({
       <JourneyCard tone="hero">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-500">Your Study Abroad Journey</p>
+            {/* The label carries the journey's own accent in both themes — the
+                generic `text-indigo-500` remap washes out on the dark hero. */}
+            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">Your Study Abroad Journey</p>
             {/* The stage icon gets a soft halo so the hero reads at a glance. */}
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
               <motion.span

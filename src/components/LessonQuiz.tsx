@@ -80,8 +80,8 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
       {result && (
         <div className={`p-4 rounded-xl ${result.passed ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-200"}`}>
           <div className="flex items-center gap-3">
-            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${result.passed ? "bg-emerald-600" : "bg-amber-500"}`}>
-              <span className="text-white font-extrabold text-sm">{result.score}%</span>
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${result.passed ? "bg-emerald-600" : "bg-amber-500 sb-ink-on-bright"}`}>
+              <span className="text-white sb-ink-on-bright font-extrabold text-sm">{result.score}%</span>
             </div>
             <div>
               <p className={`font-bold text-sm ${result.passed ? "text-emerald-800" : "text-amber-800"}`}>

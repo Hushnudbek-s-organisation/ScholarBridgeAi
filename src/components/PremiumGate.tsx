@@ -72,7 +72,7 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="bg-white/95 backdrop-blur rounded-3xl border border-amber-300 shadow-2xl p-8 max-w-md w-full text-center space-y-4">
           <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg">
-            <Lock className="h-8 w-8 text-white" />
+            <Lock className="h-8 w-8 text-white sb-ink-on-warm" />
           </div>
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
@@ -85,7 +85,7 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold rounded-xl shadow-md transition-all"
+            className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white sb-ink-on-warm font-bold rounded-xl shadow-md transition-all"
           >
             Pro ga o&apos;tish
           </button>

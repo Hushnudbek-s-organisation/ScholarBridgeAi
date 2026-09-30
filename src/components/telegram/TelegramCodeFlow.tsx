@@ -263,7 +263,7 @@ export function TelegramCodeFlow({
           type="button"
           onClick={start}
           disabled={starting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-sky-600 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white sb-ink-on-bright shadow-sm transition-colors hover:bg-sky-600 disabled:opacity-60"
         >
           {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {starting ? t("starting") : purpose === "login" ? t("loginButton") : t("connectButton")}
@@ -318,7 +318,7 @@ export function TelegramCodeFlow({
             href={attempt.deepLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-white hover:bg-sky-600"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
           >
             <ExternalLink className="h-3.5 w-3.5" /> {t("openBot", { bot: `@${bot}` })}
           </a>
@@ -392,7 +392,7 @@ export function TelegramCodeFlow({
             <button
               type="submit"
               disabled={verifying || code.length !== 6}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-600 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 disabled:opacity-50"
             >
               {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
               {verifying ? t("verifying") : t("verify")}
