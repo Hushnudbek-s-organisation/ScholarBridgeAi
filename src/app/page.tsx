@@ -37,7 +37,8 @@ import { FaqSection } from "@/components/FaqSection";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
-import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
+import type { Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
 import { PageTransition } from "@/components/motion";
 import { NAV_SECTIONS } from "@/lib/navSections";
@@ -81,6 +82,45 @@ function tabFromHash(): string | null {
   if (typeof window === "undefined") return null;
   const id = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
   return LINKABLE_TABS.has(id) ? id : null;
+}
+
+const sessionCopy: Record<Locale, { opening: string; checking: string; unavailable: string; retry: string; signIn: string; details: string }> = {
+  en: { opening: "Opening ScholarBridge…", checking: "Checking your secure session.", unavailable: "Dashboard temporarily unavailable", retry: "Try again", signIn: "Go to sign in", details: "More information" },
+  uz: { opening: "ScholarBridge ochilmoqda…", checking: "Xavfsiz seansingiz tekshirilmoqda.", unavailable: "Boshqaruv paneli vaqtincha ishlamayapti", retry: "Qayta urinish", signIn: "Kirish sahifasiga o‘tish", details: "Qo‘shimcha ma’lumot" },
+  ru: { opening: "Открываем ScholarBridge…", checking: "Проверяем защищённую сессию.", unavailable: "Панель временно недоступна", retry: "Повторить", signIn: "Перейти ко входу", details: "Подробнее" },
+};
+
+function SessionRestoreLoader() {
+  const { locale } = useLocaleContext();
+  const text = sessionCopy[locale];
+  return (
+    <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center dark:bg-slate-950">
+      <div role="status" aria-live="polite" className="space-y-4">
+        <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+        <div>
+          <p className="font-semibold text-slate-900 dark:text-white">{text.opening}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{text.checking}</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function SessionRestoreError({ error, onRetry, onSignIn }: { error: string | null; onRetry: () => void; onSignIn: () => void }) {
+  const { locale } = useLocaleContext();
+  const text = sessionCopy[locale];
+  return (
+    <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center dark:bg-slate-950">
+      <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white">{text.unavailable}</h1>
+        {error && <details className="mt-3 text-left text-sm text-slate-600 dark:text-slate-300"><summary className="cursor-pointer font-medium">{text.details}</summary><p className="mt-2 break-words">{error}</p></details>}
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={onRetry} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700">{text.retry}</button>
+          <button type="button" onClick={onSignIn} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">{text.signIn}</button>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 export default function Home() {
@@ -690,52 +730,21 @@ export default function Home() {
 
   // ---- Restore a returning student's session before showing the landing page ----
   if (view === "restoring") {
-    return (
-      <LocaleProvider>
-        <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center">
-          <div role="status" aria-live="polite" className="space-y-4">
-            <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-            <div>
-              <p className="font-semibold text-slate-800">Opening ScholarBridgeAI…</p>
-              <p className="mt-1 text-sm text-slate-500">Checking your secure session.</p>
-            </div>
-          </div>
-        </main>
-      </LocaleProvider>
-    );
+    return <LocaleProvider><SessionRestoreLoader /></LocaleProvider>;
   }
 
   if (view === "restore-error") {
     return (
       <LocaleProvider>
-        <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center">
-          <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h1 className="text-xl font-bold text-slate-900">Dashboard unavailable</h1>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              {restoreError || "We could not restore your secure session."}
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setRestoreError(null);
-                  setView("restoring");
-                  void loadStoredProfile();
-                }}
-                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-              >
-                Try again
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("landing")}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Go to sign in
-              </button>
-            </div>
-          </section>
-        </main>
+        <SessionRestoreError
+          error={restoreError}
+          onRetry={() => {
+            setRestoreError(null);
+            setView("restoring");
+            void loadStoredProfile();
+          }}
+          onSignIn={() => setView("landing")}
+        />
       </LocaleProvider>
     );
   }
@@ -789,6 +798,7 @@ export default function Home() {
 
       <div className="flex-1 min-w-0 flex flex-col">
       <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="mx-auto w-full max-w-7xl">
         {/* Sections swap with a short cross-fade + lift. Keyed on what is
             actually on screen so the wizard and every tab participate. */}
         <PageTransition
@@ -1033,6 +1043,7 @@ export default function Home() {
           {activeTab !== "admin" && <FaqSection />}
 
         </PageTransition>
+        </div>
       </main>
 
       {/* Footer */}

@@ -27,6 +27,10 @@ export interface Scholarship {
   country: string;
   coverageType: string;
   amountUsdValue: number | null;
+  awardAmount?: number | null;
+  awardCurrency?: string | null;
+  awardPeriod?: string | null;
+  awardBasis?: string | null;
   deadline: string;
   degreeLevels: string;
   eligibleMajors: string;
@@ -49,6 +53,18 @@ export interface Scholarship {
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   sourceLastVerifiedAt?: string | null;
+}
+
+function awardLabel(s: Scholarship): string {
+  if (s.awardBasis === "need_based") return "Need-based; varies by applicant";
+  if (s.awardBasis === "full_tuition") return "Full tuition coverage";
+  if (s.awardBasis === "variable") return "Variable award; see details";
+  if (s.awardAmount != null) {
+    const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
+    return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
+  }
+  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+  return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : "Not specified";
 }
 
 interface ScholarshipHubProps {
@@ -303,7 +319,7 @@ export function ScholarshipHub({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
                     <span className="text-slate-400 block font-medium">Award Value:</span>
-                    <strong className="text-emerald-700 font-extrabold">{formatMoney(s.amountUsdValue, "USD", { suffix: " / yr" })}</strong>
+                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s)}</strong>
                   </div>
 
                   <div>

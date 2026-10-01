@@ -764,6 +764,21 @@ const fullCounts = {
   departureReady: true,
 };
 
+check("profile completeness and open required items prevent false completion", () => {
+  const profileAt55 = buildPhaseProgress({ ...fullCounts, profileCompletenessPct: 55 });
+  assert.equal(profileAt55.find((p) => p.key === "profile")!.pct, 55);
+  assert.equal(profileAt55.find((p) => p.key === "profile")!.status, "in_progress");
+
+  const submittedWithOpenItems = buildPhaseProgress({ ...fullCounts, openApplicationRequirements: 2 });
+  const applicationPhase = submittedWithOpenItems.find((p) => p.key === "applications")!;
+  assert.equal(applicationPhase.pct, 80);
+  assert.equal(applicationPhase.status, "in_progress");
+  assert.deepEqual(applicationPhase.missing, ["2 required item(s) still missing"]);
+
+  const submittedComplete = buildPhaseProgress({ ...fullCounts, openApplicationRequirements: 0 });
+  assert.equal(submittedComplete.find((p) => p.key === "applications")!.pct, 100);
+});
+
 check("progress only grows as the student actually does things", () => {
   for (const p of buildPhaseProgress(fullCounts)) {
     assert.equal(p.pct, 100, `${p.key} should be complete`);
@@ -1131,11 +1146,15 @@ check("no journey component writes state synchronously inside an effect", () => 
 });
 
 check("the control center and workspace load state-free then write after the await", () => {
-  for (const p of ["src/components/journey/JourneyControlCenter.tsx", "src/components/journey/ApplicationWorkspacePanel.tsx"]) {
-    const src = readFileSync(p, "utf8");
-    assert.ok(/let live = true/.test(src), `${p} has no live guard`);
-    assert.ok(/if \(!live\) return/.test(src), `${p} has no unmount guard`);
-  }
+  const controlCenter = readFileSync("src/components/journey/JourneyControlCenter.tsx", "utf8");
+  assert.ok(/useResource/.test(controlCenter), "the control center should use the shared live-guarded resource hook");
+  const resourceHook = readFileSync("src/components/journey/useResource.ts", "utf8");
+  assert.ok(/let live = true/.test(resourceHook), "the shared resource hook has no live guard");
+  assert.ok(/if \(!live\) return/.test(resourceHook), "the shared resource hook has no unmount guard");
+
+  const workspace = readFileSync("src/components/journey/ApplicationWorkspacePanel.tsx", "utf8");
+  assert.ok(/let live = true/.test(workspace), "the workspace has no live guard");
+  assert.ok(/if \(!live\) return/.test(workspace), "the workspace has no unmount guard");
 });
 
 check("the database migration is additive — it only creates journey tables", () => {

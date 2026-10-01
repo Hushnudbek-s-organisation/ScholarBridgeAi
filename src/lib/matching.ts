@@ -21,11 +21,11 @@ export interface UniversityData {
   id: number;
   name: string;
   country: string;
-  city: string;
+  city: string | null;
   flagEmoji: string;
-  worldRanking: number;
+  worldRanking: number | null;
   degreeLevel: string;
-  programMajor: string;
+  programMajor: string | null;
   annualTuitionUsd?: number | null;
   annualLivingEstUsd?: number | null;
   minGpa?: number | null;
@@ -45,8 +45,8 @@ export interface ScholarshipData {
   provider: string;
   country: string;
   coverageType: string;
-  amountUsdValue: number;
-  deadline: string;
+  amountUsdValue: number | null;
+  deadline: string | null;
   degreeLevels: string;
   eligibleMajors: string;
   minGpa?: number | null;

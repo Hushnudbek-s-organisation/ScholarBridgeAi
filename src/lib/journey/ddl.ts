@@ -161,8 +161,8 @@ CREATE TABLE IF NOT EXISTS requirement_templates (
   id SERIAL PRIMARY KEY,
   university_id INTEGER REFERENCES universities(id) ON DELETE CASCADE,
   -- Soft link (no FK): programs is a BASE table owned by the database, not by
-  -- this bootstrap. Some deployments have it renamed (to university_programs
-  -- by fix_align_schema.sql) or absent, and a hard FK here aborted the whole
+  -- this bootstrap. Some deployments have a legacy university_programs table or no programs table,
+  -- and a hard FK here aborted the whole
   -- journey bootstrap — every dashboard request then answered 503.
   program_id INTEGER,
   section TEXT NOT NULL,
