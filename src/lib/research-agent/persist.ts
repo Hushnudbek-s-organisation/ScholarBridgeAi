@@ -400,19 +400,24 @@ export async function upsertRequirements(
 export async function upsertCycle(
   universityId: number,
   c: ExtractedCycle,
-  sourceUrl: string
+  sourceUrl: string,
+  programId: number | null = null
 ): Promise<{ inserted: boolean; duplicate: boolean }> {
   try {
     const deadline = toIsoDate(c.deadline);
     const existing = (await db.select().from(applicationCycles).where(eq(applicationCycles.universityId, universityId))).find(
       (x) =>
+        (x.programId ?? null) === programId &&
         (x.academicYear ?? "") === (c.academicYear ?? "") &&
         (x.applicationType ?? "") === (c.applicationType ?? "") &&
         (x.deadline ? (toIsoDate(x.deadline) ?? "") : "") === (deadline ?? "")
     );
     if (existing) return { inserted: false, duplicate: true };
+    const cycleSourceUrl = normalizeUrl(c.sourceUrl ?? sourceUrl);
+    const [cycleSource] = await db.select().from(sources).where(eq(sources.url, cycleSourceUrl));
     await db.insert(applicationCycles).values({
       universityId,
+      programId,
       academicYear: c.academicYear ?? null,
       intake: c.intake ?? null,
       applicationType: c.applicationType ?? null,
@@ -423,6 +428,7 @@ export async function upsertCycle(
       applicationFeeCurrency: c.applicationFeeCurrency ?? "USD",
       applicationUrl: c.applicationUrl ?? null,
       sourceUrl: c.sourceUrl ?? sourceUrl,
+      sourceId: cycleSource?.id ?? null,
       verificationStatus: "unverified",
     });
     return { inserted: true, duplicate: false };
@@ -432,29 +438,42 @@ export async function upsertCycle(
   }
 }
 
-/** Upsert a scholarship (dedupe by normalized title; DB has no university link). */
+/** Upsert a scholarship by title/provider/university identity and attach known source evidence. */
 export async function upsertScholarship(
   s: ExtractedScholarship,
-  sourceUrl: string
+  sourceUrl: string,
+  universityId: number | null = null
 ): Promise<{ inserted: boolean; duplicate: boolean }> {
   try {
-    const key = normalizeNameKey(s.title);
-    const existing = (await db.select().from(scholarships)).find((x) => normalizeNameKey(x.title) === key);
+    const titleKey = normalizeNameKey(s.title);
+    const providerKey = normalizeNameKey(s.provider ?? "");
+    const existing = (await db.select().from(scholarships)).find((x) =>
+      normalizeNameKey(x.title) === titleKey &&
+      normalizeNameKey(x.provider) === providerKey &&
+      (x.universityId ?? null) === universityId
+    );
     if (existing) return { inserted: false, duplicate: true };
-    // Currency rule (spec §12): amount_usd_value ONLY when source is USD.
-    await db.insert(scholarships).values({
+    // Preserve only a source-denominated USD value in the legacy USD field.
+    const scholarshipSourceUrl = normalizeUrl(s.websiteUrl ?? sourceUrl);
+    const [scholarshipSource] = await db.select().from(sources).where(eq(sources.url, scholarshipSourceUrl));
+    const [insertedScholarship] = await db.insert(scholarships).values({
       title: s.title,
-      provider: s.provider ?? "",
-      country: s.country ?? "Global",
-      coverageType: s.coverageType ?? "Full Tuition + Stipend",
-      amountUsdValue: s.amountUsd ?? 0,
-      deadline: s.deadline ?? "",
-      degreeLevels: JSON.stringify(s.degreeLevels ?? ["Master", "PhD"]),
-      eligibleMajors: JSON.stringify(s.eligibleMajors ?? ["All"]),
+      provider: s.provider ?? "Unspecified",
+      country: s.country ?? "Unspecified",
+      coverageType: s.coverageType ?? "Unspecified",
+      amountUsdValue: s.amountUsd ?? null,
+      awardAmount: s.amountOriginal ?? s.amountUsd ?? null,
+      awardCurrency: s.currency ?? (s.amountUsd != null ? "USD" : null),
+      awardPeriod: null,
+      awardBasis: s.financialNeedBased ? "need_based" : null,
+      deadline: s.deadline ?? null,
+      universityId,
+      degreeLevels: JSON.stringify(s.degreeLevels ?? []),
+      eligibleMajors: JSON.stringify(s.eligibleMajors ?? []),
       minGpa: s.minGpa ?? null,
       minIelts: s.minIelts ?? null,
-      financialNeedBased: s.financialNeedBased ?? false,
-      meritBased: s.meritBased ?? true,
+      financialNeedBased: s.financialNeedBased ?? null,
+      meritBased: s.meritBased ?? null,
       description: s.description ?? "",
       requirements: s.requirements ?? "",
       websiteUrl: s.websiteUrl ?? sourceUrl,
@@ -474,13 +493,16 @@ export async function upsertScholarship(
       expectedOpeningPeriod: s.expectedOpeningPeriod ?? null,
       expectedDeadlinePeriod: s.expectedDeadlinePeriod ?? null,
       verificationStatus: "unverified",
-      sourceUrl: sourceUrl,
-      lastVerifiedAt: new Date(),
-      // Non-USD amounts preserved in description (spec §12).
-      ...(s.currency && s.currency !== "USD" && s.amountOriginal != null
-        ? { description: `${s.description ?? ""}\n\nAmount: ${s.amountOriginal} ${s.currency} (source currency — not converted).`.trim() }
-        : {}),
-    });
+      sourceUrl: scholarshipSourceUrl,
+      lastUpdatedAt: new Date(),
+    }).returning();
+    if (insertedScholarship && scholarshipSource) {
+      await db.insert(scholarshipSources).values({
+        scholarshipId: insertedScholarship.id,
+        sourceId: scholarshipSource.id,
+        sourceType: "scholarship_evidence",
+      });
+    }
     return { inserted: true, duplicate: false };
   } catch (err) {
     console.error("[research-agent] upsertScholarship failed:", err);

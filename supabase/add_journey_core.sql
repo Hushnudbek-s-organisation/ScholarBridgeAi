@@ -160,9 +160,10 @@ CREATE TABLE IF NOT EXISTS requirement_templates (
   id SERIAL PRIMARY KEY,
   university_id INTEGER REFERENCES universities(id) ON DELETE CASCADE,
   -- Soft link (no FK): `programs` is a BASE table owned by the database, not by
-  -- this migration. Some deployments have it renamed (`university_programs`
-  -- after `fix_align_schema.sql`) or absent, and a hard FK here aborted the
-  -- journey bootstrap. Keep in sync with `src/lib/journey/ddl.ts`.
+  -- this migration. Some legacy deployments may have `university_programs`
+  -- instead or may not yet have the canonical table. Never rename that table
+  -- without auditing its rows and referencing FKs. Keep in sync with
+  -- `src/lib/journey/ddl.ts`.
   program_id INTEGER,
   section TEXT NOT NULL,
   item_key TEXT NOT NULL,

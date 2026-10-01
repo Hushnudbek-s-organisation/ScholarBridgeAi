@@ -15,23 +15,57 @@ function toJsonField(value: any, fallback: string): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
+function validateScholarshipInput(s: any): string | null {
+  if (typeof s.title !== "string" || !s.title.trim()) return "Scholarship title is required";
+  if (typeof s.provider !== "string" || !s.provider.trim()) return "Provider is required";
+  if (typeof s.country !== "string" || !s.country.trim()) return "Provider/host country is required (use Global only when accurate)";
+  const sourceUrl = s.websiteUrl || s.sourceUrl;
+  try {
+    const parsed = new URL(sourceUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) return "A valid HTTP(S) source URL is required";
+  } catch {
+    return "A valid HTTP(S) source URL is required";
+  }
+  if (s.awardAmount != null && s.awardAmount !== "") {
+    if (!Number.isFinite(Number(s.awardAmount)) || Number(s.awardAmount) < 0) return "Award amount must be a non-negative number";
+    if (!/^[A-Za-z]{3}$/.test(String(s.awardCurrency || ""))) return "Use a three-letter currency code for the award amount";
+  }
+  const validPeriods = ["total", "year", "month", "one_time", "variable"];
+  if (s.awardPeriod && !validPeriods.includes(s.awardPeriod)) return "Award period is not supported";
+  const validBases = ["fixed", "range", "full_tuition", "need_based", "variable"];
+  if (s.awardBasis && !validBases.includes(s.awardBasis)) return "Award basis is not supported";
+  if (s.universityId != null && s.universityId !== "" && (!Number.isInteger(Number(s.universityId)) || Number(s.universityId) <= 0)) {
+    return "University id must be a positive integer or null for a global award";
+  }
+  return null;
+}
+
 function buildScholarshipValues(s: any) {
   return {
-    title: s.title || "Untitled Scholarship",
-    provider: s.provider || "Unknown",
-    country: s.country || "Global",
-    coverageType: s.coverageType || "Full Tuition + Stipend",
-    amountUsdValue: Number(s.amountUsdValue) || 0,
-    deadline: s.deadline || "",
-    degreeLevels: toJsonField(s.degreeLevels, '["Master","PhD"]'),
-    eligibleMajors: toJsonField(s.eligibleMajors, '["All"]'),
+    title: s.title.trim(),
+    provider: s.provider.trim(),
+    country: s.country.trim(),
+    coverageType: s.coverageType || "Unspecified",
+    amountUsdValue: s.amountUsdValue === "" || s.amountUsdValue == null || !Number.isFinite(Number(s.amountUsdValue))
+      ? null
+      : Number(s.amountUsdValue),
+    awardAmount: s.awardAmount === "" || s.awardAmount == null || !Number.isFinite(Number(s.awardAmount))
+      ? null
+      : Number(s.awardAmount),
+    awardCurrency: s.awardCurrency ? String(s.awardCurrency).toUpperCase() : null,
+    awardPeriod: s.awardPeriod || null,
+    awardBasis: s.awardBasis || null,
+    deadline: s.deadline || null,
+    universityId: s.universityId == null || s.universityId === "" ? null : Number(s.universityId),
+    degreeLevels: toJsonField(s.degreeLevels, "[]"),
+    eligibleMajors: toJsonField(s.eligibleMajors, "[]"),
     minGpa: s.minGpa === "" || s.minGpa == null ? null : Number(s.minGpa),
     minIelts: s.minIelts === "" || s.minIelts == null ? null : Number(s.minIelts),
-    financialNeedBased: toBool(s.financialNeedBased),
-    meritBased: s.meritBased == null ? true : toBool(s.meritBased),
+    financialNeedBased: s.financialNeedBased == null ? null : toBool(s.financialNeedBased),
+    meritBased: s.meritBased == null ? null : toBool(s.meritBased),
     description: s.description || "",
     requirements: s.requirements || "",
-    websiteUrl: s.websiteUrl || "",
+    websiteUrl: s.websiteUrl || s.sourceUrl || "",
     // --- Dynamic lifecycle (spec §4) ---
     eligibleCountries: toJsonField(s.eligibleCountries, "[]"),
     fundingType: s.fundingType || "",
@@ -71,9 +105,12 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const input = body.scholarship || {};
+    const validationError = validateScholarshipInput(input);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
     const [scholarship] = await db
       .insert(scholarships)
-      .values(buildScholarshipValues(body.scholarship || {}))
+      .values(buildScholarshipValues(input))
       .returning();
     await writeAudit({
       entityType: "scholarship",
@@ -108,7 +145,10 @@ export async function PATCH(req: Request) {
     if (!existing) {
       return NextResponse.json({ error: "Scholarship not found" }, { status: 404 });
     }
-    const values = buildScholarshipValues(body.scholarship || {});
+    const input = { ...existing, ...(body.scholarship || {}) };
+    const validationError = validateScholarshipInput(input);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+    const values = buildScholarshipValues(input);
     const [scholarship] = await db
       .update(scholarships)
       .set(values)

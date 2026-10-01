@@ -90,9 +90,9 @@ WHERE NOT EXISTS (
 CREATE TABLE IF NOT EXISTS saved_programs (
   id SERIAL PRIMARY KEY,
   profile_id INTEGER NOT NULL REFERENCES student_profiles(id) ON DELETE CASCADE,
-  -- Soft link (no FK): `programs` is a base table that may be renamed/absent
-  -- (`fix_align_schema.sql`). A hard FK aborted this migration on such DBs.
-  program_id INTEGER NOT NULL,
+  -- Canonical program FK: create this table only after programs exists.
+  -- Legacy university_programs data must be audited, never silently renamed.
+  program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (profile_id, program_id)
 );

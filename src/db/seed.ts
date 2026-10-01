@@ -559,8 +559,8 @@ export async function seedDatabase() {
     try {
       const seededScholarships = await db.select().from(scholarships);
       for (const sc of seededScholarships) {
-        const parsed = Date.parse(sc.deadline);
-        if (!isNaN(parsed) && !sc.deadlineDate) {
+        const parsed = sc.deadline ? Date.parse(sc.deadline) : Number.NaN;
+        if (sc.deadline && !isNaN(parsed) && !sc.deadlineDate) {
           await db
             .update(scholarships)
             .set({

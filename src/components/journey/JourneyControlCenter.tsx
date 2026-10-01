@@ -11,8 +11,10 @@
  *   5. Where am I weak?    → profile readiness, weakest first
  *   6. What should I look at? → recommendations based on the real profile
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
+import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { formatMoney } from "@/lib/format";
 import { ArrowRight, CalendarClock, Compass, RefreshCw, Sparkles } from "lucide-react";
 import { AnimatedNumber as CountUp, RevealGroup, RevealItem, SectionTransition } from "@/components/motion";
 import {
@@ -59,17 +61,18 @@ export interface JourneyDashboard {
   };
   phases: { key: string; title: string; icon: string; tab: string; status: string; pct: number; missing: string[] }[];
   testGaps: { testType: string; state: string; current: number | null; required: number; message: string }[];
-  funding: { annualCost: number; isCovered: boolean; fundingGap: number; securedGap: number; items: number };
+  funding: { annualCost: number; isCovered: boolean; fundingGap: number; securedGap: number; items: number; calculated: boolean; estimated: boolean };
   expiringDocuments: { id: number; title: string; docType: string; expiresAt: string | null; daysRemaining: number | null }[];
   recommended: {
     universities: {
       id: number;
       name: string;
       country: string;
-      city: string;
+      city: string | null;
       flagEmoji: string;
-      worldRanking: number;
-      programMajor: string;
+      worldRanking: number | null;
+      programMajor: string | null;
+      sourceUrl: string | null;
       minGpa: number | null;
       minIelts: number | null;
       annualTuition: string | number | null;
@@ -84,17 +87,53 @@ export interface JourneyDashboard {
       title: string;
       provider: string;
       country: string;
-      amountUsdValue: number;
+      amountUsdValue: number | null;
+      awardAmount: number | null;
+      awardCurrency: string | null;
+      awardPeriod: string | null;
+      awardBasis: string | null;
       deadlineDate: string | null;
       minGpa: number | null;
       eligibleCountries: string | null;
       verificationStatus: string;
       tuitionCoverage: string;
+      sourceUrl: string | null;
+      lastVerifiedAt: string | null;
       gpaOk: boolean;
+      gpaProvided: boolean;
     }[];
     opportunities: { id: number; title: string; provider: string; country: string | null; type: string; deadlineDate: string | null; url: string }[];
   };
   learning: { connected: boolean; providers: { providerKey: string; name: string; kind: string; linked: boolean }[] };
+}
+
+function scholarshipAwardLabel(s: JourneyDashboard["recommended"]["scholarships"][number]): string {
+  if (s.awardBasis === "need_based") return "Need-based; varies by applicant";
+  if (s.awardBasis === "full_tuition") return "Full tuition coverage";
+  if (s.awardBasis === "range") return "Award varies within a range — see official details";
+  if (s.awardBasis === "variable") return "Variable award — see official details";
+  if (s.awardAmount != null) {
+    const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
+    return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
+  }
+  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+  return s.tuitionCoverage || "Award amount not published";
+}
+
+function actionLabelForStep(id: string, tab: string): string {
+  if (id === "requirements-open") return "Open workspace";
+  if (id.startsWith("test-")) return "Open test planner";
+  if (id.startsWith("readiness-")) return "Improve profile";
+  if (id === "documents-expiring" || id === "documents-missing") return "Review documents";
+  if (id === "funding-gap") return "Find scholarships";
+  if (id === "recommendations") return "Manage letters";
+  if (id === "profile") return "Complete profile";
+  if (tab === "universities") return "Save universities";
+  if (tab === "chancing") return "Check fit";
+  if (tab === "activities") return "Add activities";
+  if (tab === "workspace") return "Open workspace";
+  if (tab === "study-plan") return "Open study plan";
+  return `Open ${tab.replaceAll("-", " ")}`;
 }
 
 export function JourneyControlCenter({
@@ -107,64 +146,20 @@ export function JourneyControlCenter({
   onOpenWorkspace: (applicationId: number) => void;
 }) {
   const reduceMotion = useReducedMotion();
-  const [data, setData] = useState<JourneyDashboard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  /**
-   * Data loader kept OUTSIDE the effect and free of state writes, so the mount
-   * effect can call it without a synchronous setState (the React compiler
-   * rejects that), and `reload` can reuse it for an explicit refresh.
-   */
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.error || "Could not load your dashboard");
     return json as JourneyDashboard;
   }, [profileId]);
-
-  useEffect(() => {
-    if (!profileId) {
-      setLoading(false);
-      setData(null);
-      setError(null);
-      return;
-    }
-    let live = true;
-    setLoading(true);
-    (async () => {
-      try {
-        const res = await load();
-        if (!live) return;
-        setData(res);
-        setError(null);
-      } catch (err) {
-        if (!live) return;
-        setError(err instanceof Error ? err.message : "Could not load your dashboard");
-        setData(null);
-      } finally {
-        if (live) setLoading(false);
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [load, profileId]);
-
-  /** Explicit "try again" — the only place the spinner is turned on by hand. */
-  const refresh = useCallback(async () => {
-    if (!profileId) return;
-    setLoading(true);
-    try {
-      setData(await load());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your dashboard");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [load, profileId]);
+  const resource = useResource<JourneyDashboard | null>(
+    () => profileId ? load() : Promise.resolve(null),
+    [profileId],
+    { initial: null, errorFallback: "Could not load your dashboard" }
+  );
+  const { error, reload: refresh } = resource;
+  const data = resource.data;
+  const loading = resource.loading || (!error && !!profileId && data?.profile.id !== profileId);
 
   if (!profileId) {
     return (
@@ -191,6 +186,9 @@ export function JourneyControlCenter({
   if (!data) return null;
 
   const { journey, nextSteps, deadlines, applications, readiness, recommended } = data;
+  const completedBeforeOpen = journey.stages.some((stage, index) =>
+    stage.done && journey.stages.slice(0, index).some((earlier) => !earlier.done)
+  );
 
   return (
     <div className="space-y-4">
@@ -268,6 +266,14 @@ export function JourneyControlCenter({
             </motion.li>
           ))}
         </ol>
+        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          This journey has 8 stages. The study plan expands the same route into 10 detailed work phases.
+        </p>
+        {completedBeforeOpen && (
+          <p className="mt-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+            Stages can overlap. Your submitted application is recorded, while earlier preparation can still be in progress.
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={() => onNavigateTab(journey.continueTab)}>
@@ -298,32 +304,33 @@ export function JourneyControlCenter({
             label="Profile readiness"
             value={readiness.overall}
             suffix="%"
-            hint={readiness.weakest[0] ? `Weakest: ${readiness.weakest[0].label}` : "Every area looks ready"}
+            hint="Profile readiness across 7 areas — not an admission chance"
             icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
             state={readiness.overall >= 75 ? "good" : readiness.overall >= 45 ? "warn" : "bad"}
           />
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Funding gap"
-            value={Math.max(0, Math.round(data.funding.fundingGap))}
-            prefix="$"
-            hint={data.funding.isCovered ? "Your yearly cost is covered" : "Still to find for one year"}
+            label="Financial gap"
+            value={data.funding.calculated ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
+            prefix={data.funding.calculated ? "$" : ""}
+            hint={data.funding.calculated ? `${data.funding.isCovered ? "Your yearly cost is covered" : "Still to find for one year"}${data.funding.estimated ? " · includes estimates" : ""}` : "Not calculated — add a university and budget"}
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
-            state={data.funding.isCovered ? "good" : "warn"}
+            state={!data.funding.calculated ? "neutral" : data.funding.isCovered ? "good" : "warn"}
+            onClick={!data.funding.calculated ? () => onNavigateTab("funding") : undefined}
           />
         </RevealItem>
         <RevealItem>
           <StatTile
             label="Next deadline"
-            value={deadlines[0]?.daysRemaining ?? 0}
-            suffix={deadlines.length ? " days" : ""}
-            hint={deadlines[0]?.title ?? "No dated deadlines yet"}
+            value={deadlines.length && deadlines[0].daysRemaining != null ? deadlines[0].daysRemaining < 0 ? "Overdue" : deadlines[0].daysRemaining : "—"}
+            suffix={deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0 ? " days" : ""}
+            hint={deadlines[0] ? `${deadlines[0].title} · due ${deadlines[0].dueDate}` : "Unscheduled"}
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
             state={
-              !deadlines.length
+              !deadlines.length || deadlines[0].daysRemaining == null
                 ? "neutral"
-                : (deadlines[0].daysRemaining ?? 99) < 0
+                : deadlines[0].daysRemaining < 0
                   ? "bad"
                   : (deadlines[0].daysRemaining ?? 99) <= 14
                     ? "warn"
@@ -365,7 +372,7 @@ export function JourneyControlCenter({
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => onNavigateTab(s.tab)}>
-                  Continue
+                  {actionLabelForStep(s.id, s.tab)}
                 </Button>
               </motion.li>
             ))}
@@ -490,17 +497,6 @@ export function JourneyControlCenter({
             </motion.button>
           ))}
         </div>
-        {readiness.weakest.length > 0 && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-            <strong>Weakest areas:</strong>{" "}
-            {readiness.weakest.map((w, i) => (
-              <span key={w.key}>
-                {i > 0 && ", "}
-                {w.label} ({w.pct}%) — {w.gaps[0] ?? "keep improving"}
-              </span>
-            ))}
-          </p>
-        )}
       </JourneyCard>
 
       {/* ---- Test gaps (spec §8) ------------------------------------------ */}
@@ -543,13 +539,13 @@ export function JourneyControlCenter({
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {u.flagEmoji} {u.name}
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {u.city}, {u.country} · #{u.worldRanking}
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : "Ranking unavailable"}
                     </p>
-                    <p className="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">{u.reason}</p>
+                    <p className="mt-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">{u.reason}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2">
                       <SourceTag
-                        url={u.verificationStatus === "verified" ? null : null}
+                        url={u.sourceUrl}
                         verificationStatus={u.verificationStatus}
                         lastVerified={u.lastVerifiedAt}
                       />
@@ -563,23 +559,33 @@ export function JourneyControlCenter({
             )}
           </div>
 
-          {recommended.scholarships.length > 0 && (
+          {recommended.scholarships.length > 0 ? (
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Scholarships</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Scholarships</h3>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {recommended.scholarships.slice(0, 6).map((s) => (
                   <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{s.provider}</p>
-                    <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      ${s.amountUsdValue.toLocaleString()}
+                    <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
+                    <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      {scholarshipAwardLabel(s)}
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Tuition: {s.tuitionCoverage || "Not specified"}
+                    {s.deadlineDate && (
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        Deadline: {new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString()}
+                      </p>
+                    )}
+                    <p className={`text-xs ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
+                      {s.minGpa == null ? "GPA eligibility not specified" : !s.gpaProvided ? `Minimum GPA ${s.minGpa} — add your GPA to check` : `Minimum GPA ${s.minGpa}${s.gpaOk ? " — meets listed minimum" : " — below listed minimum"}`}
                     </p>
+                    <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              No upcoming scholarship matches verified eligibility and current-cycle deadlines yet. Check your citizenship and degree level in your profile, then confirm awards on their official pages.
             </div>
           )}
 
@@ -599,7 +605,7 @@ export function JourneyControlCenter({
                         href={o.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                        className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
                       >
                         Open
                       </a>
@@ -609,6 +615,9 @@ export function JourneyControlCenter({
               </ul>
             </div>
           )}
+          <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            Recommendations are planning aids, not admission or funding decisions. Confirm current eligibility, costs and deadlines with each official provider.
+          </p>
         </div>
       </JourneyCard>
 
@@ -634,21 +643,26 @@ export function JourneyControlCenter({
         <JourneyCard title="Funding" subtitle="What your plan covers and what is still missing.">
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Annual cost</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated annual cost" : "Annual cost"}</p>
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                ${data.funding.annualCost.toLocaleString()}
+                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : "Not calculated"}
               </p>
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Remaining gap</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated remaining gap" : "Remaining gap"}</p>
               <p
                 className={`text-xl font-extrabold ${
-                  data.funding.fundingGap > 0 ? "text-rose-600" : "text-emerald-600"
+                  !data.funding.calculated ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
                 }`}
               >
-                ${data.funding.fundingGap.toLocaleString()}
+                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : "Unavailable"}
               </p>
             </div>
+            {!data.funding.calculated ? (
+              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Add annual study costs to calculate the gap; zero is not treated as a verified cost.</p>
+            ) : data.funding.estimated ? (
+              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Some cost lines are estimated. Review the assumptions and official university costs before relying on this figure.</p>
+            ) : null}
             <Button variant="outline" onClick={() => onNavigateTab("funding")}>
               Open financial plan
             </Button>

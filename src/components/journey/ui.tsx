@@ -238,7 +238,11 @@ export function SourceTag({
       title={name ?? "Official source"}
     >
       {name ?? "Source"}
-      {when && <span className="text-slate-400">· verified {when}</span>}
+      {when && (
+        <span className="text-slate-500 dark:text-slate-400">
+          · {verificationStatus === "verified" ? "verified" : verificationStatus === "outdated" ? "outdated" : "last checked"} {when}
+        </span>
+      )}
     </a>
   );
 }
@@ -338,9 +342,10 @@ export function StatTile({
   icon,
   state = "neutral",
   className = "",
+  onClick,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   decimals?: number;
   suffix?: string;
   prefix?: string;
@@ -348,6 +353,7 @@ export function StatTile({
   icon?: React.ReactNode;
   state?: "neutral" | "good" | "warn" | "bad" | "brand";
   className?: string;
+  onClick?: () => void;
 }) {
   const states: Record<string, string> = {
     neutral: "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
@@ -363,17 +369,27 @@ export function StatTile({
     warn: "text-amber-700 dark:text-amber-200",
     bad: "text-rose-700 dark:text-rose-200",
   };
-  return (
-    <div className={`rounded-xl border px-3.5 py-3 ${states[state]} ${className}`}>
-      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+  const tile = (
+    <>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
         {icon}
         <span className="truncate">{label}</span>
       </div>
       <p className={`mt-1 text-2xl font-extrabold tabular-nums ${valueTones[state]}`}>
-        <AnimatedNumber value={value} decimals={decimals} prefix={prefix} suffix={suffix} />
+        {typeof value === "number" ? (
+          <AnimatedNumber value={value} decimals={decimals} prefix={prefix} suffix={suffix} />
+        ) : value}
       </p>
-      {hint && <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{hint}</p>}
-    </div>
+      {hint && <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{hint}</p>}
+    </>
+  );
+  const tileClassName = `rounded-xl border px-3.5 py-3 text-left ${states[state]} ${className}`;
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${tileClassName} w-full transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500`}>
+      {tile}
+    </button>
+  ) : (
+    <div className={tileClassName}>{tile}</div>
   );
 }
 

@@ -108,9 +108,8 @@ export async function GET(req: Request) {
     if (search) {
       allUnis = allUnis.filter(u =>
         u.name.toLowerCase().includes(search) ||
-
-        u.programMajor.toLowerCase().includes(search) ||
-        u.city.toLowerCase().includes(search) ||
+        (u.programMajor ?? "").toLowerCase().includes(search) ||
+        (u.city ?? "").toLowerCase().includes(search) ||
         u.country.toLowerCase().includes(search)
       );
     }
@@ -138,8 +137,8 @@ export async function GET(req: Request) {
       allUnis = allUnis.filter(u => u.minIelts != null && u.minIelts <= minI);
     }
 
-    if (minRank) allUnis = allUnis.filter(u => u.worldRanking >= minRank);
-    if (maxRank) allUnis = allUnis.filter(u => u.worldRanking <= maxRank);
+    if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
+    if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
     // Scholarship availability: universities that have at least one scholarship
     // in the app scholarships table (matched by name similarity is not reliable —
@@ -290,7 +289,12 @@ export async function GET(req: Request) {
         return b.matchScore - a.matchScore;
       });
     } else {
-      results.sort((a, b) => a.worldRanking - b.worldRanking);
+      results.sort((a, b) => {
+        if (a.worldRanking == null && b.worldRanking == null) return a.name.localeCompare(b.name);
+        if (a.worldRanking == null) return 1;
+        if (b.worldRanking == null) return -1;
+        return a.worldRanking - b.worldRanking;
+      });
     }
 
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).

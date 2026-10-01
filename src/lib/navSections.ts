@@ -94,41 +94,41 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
   // ---- DISCOVER ----------------------------------------------------------
   { id: "universities", group: "discover", label: "University Explorer", description: "Search and save universities and programmes.", stage: "discover" },
   { id: "scholarships", group: "discover", label: "Scholarship Hub", description: "Scholarship discovery and saved scholarships.", stage: "discover" },
-  { id: "autopilot", group: "discover", label: "Scholarship Autopilot", description: "NEW — one queue of matched scholarships: save, mark applied or hide. Similar suggestions after applying.", isNew: true, stage: "discover" },
+  { id: "autopilot", group: "discover", label: "Scholarship Autopilot", description: "One queue of matched scholarships: save, mark applied or hide. Similar suggestions after applying.", isNew: true, stage: "discover" },
   { id: "opportunities", group: "discover", label: "Opportunities", description: "Personalized opportunities feed." },
   { id: "compare", group: "discover", label: "Country Compare", description: "Country-to-country comparison on published data." },
   { id: "career", group: "discover", label: "Career & Major Explorer", description: "Career → major → countries → universities → scholarships.", isNew: true, stage: "discover" },
 
   // ---- MY JOURNEY --------------------------------------------------------
-  { id: "study-plan", group: "journey", label: "My Study Plan", description: "Your goal split into ten phases, updated automatically from your real data.", isNew: true },
+  { id: "study-plan", group: "journey", label: "My Study Plan", description: "Your goal split into ten phases, updated automatically from your real data." },
   { id: "chancing", group: "journey", label: "My Chances", description: "Fit score and admission-chance estimates.", stage: "match" },
   { id: "strength", group: "journey", label: "Profile Strength", description: "Profile readiness by category and what to improve.", stage: "prepare" },
-  { id: "goals", group: "journey", label: "Goals", description: "NEW — up to 6 focused goals (academic, activities, skills, career) with step-by-step progress.", isNew: true },
-  { id: "activities", group: "journey", label: "My Activities", description: "Volunteering, leadership, projects, competitions — with evidence.", isNew: true, stage: "prepare" },
-  { id: "stories", group: "journey", label: "Admission Stories", description: "NEW — moderated stories of admitted students, with a 'find my twin' match.", isNew: true },
+  { id: "goals", group: "journey", label: "Goals", description: "Up to 6 focused goals (academic, activities, skills, career) with step-by-step progress.", isNew: true },
+  { id: "activities", group: "journey", label: "My Activities", description: "Volunteering, leadership, projects, competitions — with evidence.", stage: "prepare" },
+  { id: "stories", group: "journey", label: "Admission Stories", description: "Moderated stories of admitted students, with a 'find my twin' match.", isNew: true },
   { id: "similar", group: "journey", label: "Students Like Me", description: "Accepted students with a similar profile." },
   { id: "profile", group: "journey", label: "My Profile", description: "Full-page profile editor. Hidden by default — all of its fields now live in Edit Profile." },
 
   // ---- PREPARE -----------------------------------------------------------
-  { id: "documents", group: "prepare", label: "Documents", description: "One vault of documents, reused across every application.", isNew: true, stage: "prepare" },
-  { id: "tests", group: "prepare", label: "Test Planner", description: "IELTS / TOEFL / SAT targets, dates and practice tasks.", isNew: true, stage: "prepare" },
-  { id: "requirements", group: "prepare", label: "Application Requirements", description: "What a university asks for, with source and last-verified date.", isNew: true, stage: "prepare" },
-  { id: "funding", group: "prepare", label: "Financial Plan", description: "Full yearly cost, funding, family budget and the remaining gap.", isNew: true, stage: "fund" },
+  { id: "documents", group: "prepare", label: "Documents", description: "One vault of documents, reused across every application.", stage: "prepare" },
+  { id: "tests", group: "prepare", label: "Test Planner", description: "IELTS / TOEFL / SAT targets, dates and practice tasks.", stage: "prepare" },
+  { id: "requirements", group: "prepare", label: "Application Requirements", description: "What a university asks for, with source and last-verified date.", stage: "prepare" },
+  { id: "funding", group: "prepare", label: "Financial Plan", description: "Full yearly cost, funding, family budget and the remaining gap.", stage: "fund" },
   { id: "planning", group: "prepare", label: "Cost Calculator", description: "Cost calculator, scholarship portfolio and CV tools." },
 
   // ---- APPLY -------------------------------------------------------------
   { id: "applications", group: "apply", label: "Applications", description: "Universal application tracker.", stage: "apply" },
-  { id: "workspace", group: "apply", label: "Application Workspace", description: "One workspace per university with tabs and a live progress bar.", isNew: true, stage: "apply" },
-  { id: "vault", group: "apply", label: "Answer Vault", description: "NEW — answer common application questions once and reuse them everywhere.", isNew: true },
+  { id: "workspace", group: "apply", label: "Application Workspace", description: "One workspace per university with tabs and a live progress bar.", stage: "apply" },
+  { id: "vault", group: "apply", label: "Answer Vault", description: "Answer common application questions once and reuse them everywhere.", isNew: true },
   { id: "sop", group: "apply", label: "AI SOP & Essays", description: "Premium — AI statement of purpose and essay studio." },
-  { id: "recommendations", group: "apply", label: "Recommendation Manager", description: "Track every letter from 'not requested' to 'submitted'.", isNew: true, stage: "apply" },
+  { id: "recommendations", group: "apply", label: "Recommendation Manager", description: "Track every letter from 'not requested' to 'submitted'.", stage: "apply" },
   { id: "tasks", group: "apply", label: "Tasks & Roadmap", description: "Premium — application roadmap and task tracking." },
 
   // ---- AFTER ADMISSION ---------------------------------------------------
   { id: "offers", group: "after", label: "Offers & Decisions", description: "Pending, accepted, rejected, waitlisted — and the post-admission plan.", isNew: true, stage: "accepted" },
-  { id: "post-admission-funding", group: "after", label: "Funding & Deposits", description: "What you must pay, when, and to whom.", isNew: true, stage: "fund" },
+  { id: "post-admission-funding", group: "after", label: "Funding & Deposits", description: "What you must pay, when, and to whom.", stage: "fund" },
   { id: "visa", group: "after", label: "Visa Center", description: "Visa case, documents, appointments, fees and interview practice.", stage: "visa" },
-  { id: "interviews", group: "after", label: "Interview Center", description: "University and visa interview simulation with feedback.", isNew: true },
+  { id: "interviews", group: "after", label: "Interview Center", description: "University and visa interview simulation with feedback." },
   { id: "departure", group: "after", label: "Departure Planner", description: "After the visa: flight, housing, insurance, packing, arrival.", isNew: true, stage: "depart" },
 
   // ---- HELP --------------------------------------------------------------
@@ -141,7 +141,7 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
 
   // ---- ACCOUNT -----------------------------------------------------------
   { id: "parent", group: "account", label: "Parents", description: "Parent dashboard and shared progress view." },
-  { id: "notifications", group: "account", label: "Telegram & Alerts", description: "NEW — connect the Telegram bot (sign-in codes + alerts), pause it or choose which alerts to receive.", isNew: true },
+  { id: "notifications", group: "account", label: "Telegram & Alerts", description: "Connect the Telegram bot (sign-in codes + alerts), pause it or choose which alerts to receive.", isNew: true },
   { id: "payments", group: "account", label: "Premium", description: "Premium subscription and payment history." },
   { id: "rewards", group: "account", label: "Rewards & Referrals", description: "Referral program, points and rewards." },
 ];
@@ -149,11 +149,11 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
 /**
  * When the "NEW" badge stops being shown.
  *
- * The badge is deliberately temporary — a sidebar where every row says NEW is
- * noise, and a student cannot tell what actually changed recently. Admins do
+ * The badge is temporary and reserved for a small set of recent feature launches;
+ * marking every reorganized section as new would turn the sidebar into noise. Admins do
  * not configure this: it is a release date, not a feature flag.
  */
-export const NEW_BADGE_UNTIL = "2026-12-31";
+export const NEW_BADGE_UNTIL = "2026-10-31";
 
 /** True while the release that added these sections is still recent. */
 export function isNewBadgeActive(now: Date = new Date()): boolean {

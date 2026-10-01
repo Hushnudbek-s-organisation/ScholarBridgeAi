@@ -22,15 +22,20 @@ interface ScholarshipRow {
   title: string;
   provider: string;
   country: string;
+  universityId?: number | null;
   coverageType: string;
   amountUsdValue: number | null;
-  deadline: string;
+  awardAmount?: number | null;
+  awardCurrency?: string | null;
+  awardPeriod?: string | null;
+  awardBasis?: string | null;
+  deadline: string | null;
   degreeLevels: string;
   eligibleMajors: string;
   minGpa: number | null;
   minIelts: number | null;
-  financialNeedBased: boolean;
-  meritBased: boolean;
+  financialNeedBased: boolean | null;
+  meritBased: boolean | null;
   description: string;
   requirements: string;
   websiteUrl: string;
@@ -47,19 +52,26 @@ interface ScholarshipRow {
   requiredDocuments?: string;
 }
 
+type TriState = "unknown" | "yes" | "no";
+
 interface ScholarshipForm {
   title: string;
   provider: string;
   country: string;
+  universityId: string;
   coverageType: string;
   amountUsdValue: string;
+  awardAmount: string;
+  awardCurrency: string;
+  awardPeriod: string;
+  awardBasis: string;
   deadline: string;
   degreeLevels: string;
   eligibleMajors: string;
   minGpa: string;
   minIelts: string;
-  financialNeedBased: boolean;
-  meritBased: boolean;
+  financialNeedBased: TriState;
+  meritBased: TriState;
   description: string;
   requirements: string;
   websiteUrl: string;
@@ -80,15 +92,20 @@ const emptyForm: ScholarshipForm = {
   title: "",
   provider: "",
   country: "",
-  coverageType: "Full Tuition + Stipend",
+  universityId: "",
+  coverageType: "Unspecified",
   amountUsdValue: "",
+  awardAmount: "",
+  awardCurrency: "",
+  awardPeriod: "",
+  awardBasis: "",
   deadline: "",
-  degreeLevels: '["Master","PhD"]',
-  eligibleMajors: '["All"]',
+  degreeLevels: "[]",
+  eligibleMajors: "[]",
   minGpa: "",
   minIelts: "",
-  financialNeedBased: false,
-  meritBased: true,
+  financialNeedBased: "unknown",
+  meritBased: "unknown",
   description: "",
   requirements: "",
   websiteUrl: "",
@@ -143,15 +160,20 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
       title: s.title,
       provider: s.provider,
       country: s.country,
+      universityId: s.universityId == null ? "" : String(s.universityId),
       coverageType: s.coverageType,
       amountUsdValue: s.amountUsdValue == null ? "" : String(s.amountUsdValue),
-      deadline: s.deadline,
+      awardAmount: s.awardAmount == null ? "" : String(s.awardAmount),
+      awardCurrency: s.awardCurrency || "",
+      awardPeriod: s.awardPeriod || "",
+      awardBasis: s.awardBasis || "",
+      deadline: s.deadline ?? "",
       degreeLevels: s.degreeLevels,
       eligibleMajors: s.eligibleMajors,
       minGpa: s.minGpa == null ? "" : String(s.minGpa),
       minIelts: s.minIelts == null ? "" : String(s.minIelts),
-      financialNeedBased: s.financialNeedBased,
-      meritBased: s.meritBased,
+      financialNeedBased: s.financialNeedBased == null ? "unknown" : s.financialNeedBased ? "yes" : "no",
+      meritBased: s.meritBased == null ? "unknown" : s.meritBased ? "yes" : "no",
       description: s.description,
       requirements: s.requirements,
       websiteUrl: s.websiteUrl,
@@ -183,7 +205,14 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
     setError("");
     setSuccess("");
     try {
-      const payload = { adminProfileId, scholarship: form };
+      const payload = {
+        adminProfileId,
+        scholarship: {
+          ...form,
+          financialNeedBased: form.financialNeedBased === "unknown" ? null : form.financialNeedBased === "yes",
+          meritBased: form.meritBased === "unknown" ? null : form.meritBased === "yes",
+        },
+      };
       const res = editingId
         ? await fetch("/api/admin/scholarships", {
             method: "PATCH",
@@ -227,12 +256,17 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
   const textFields: { key: keyof ScholarshipForm; label: string; type?: string; full?: boolean; placeholder?: string }[] = [
     { key: "title", label: "Scholarship Title", full: true },
     { key: "provider", label: "Provider" },
-    { key: "country", label: "Country" },
-    { key: "coverageType", label: "Coverage Type", placeholder: "Full Tuition + Stipend" },
-    { key: "amountUsdValue", label: "Amount (USD / year)", type: "number" },
-    { key: "deadline", label: "Deadline", placeholder: "e.g. 2026-12-01" },
-    { key: "degreeLevels", label: "Degree Levels (JSON array)", placeholder: '["Master","PhD"]' },
-    { key: "eligibleMajors", label: "Eligible Majors (JSON array)", placeholder: '["All"]' },
+    { key: "country", label: "Provider / Host Country" },
+    { key: "universityId", label: "University ID (blank = global award)", type: "number" },
+    { key: "coverageType", label: "Coverage Type", placeholder: "e.g. tuition waiver, stipend, or one-time award" },
+    { key: "amountUsdValue", label: "Legacy amount (USD, exact only)", type: "number" },
+    { key: "awardAmount", label: "Award amount (source currency)", type: "number" },
+    { key: "awardCurrency", label: "Award currency (ISO code)", placeholder: "USD, GBP, EUR" },
+    { key: "awardPeriod", label: "Award period", placeholder: "year | month | one_time | total | variable" },
+    { key: "awardBasis", label: "Award basis", placeholder: "fixed | range | full_tuition | need_based | variable" },
+    { key: "deadline", label: "Deadline", placeholder: "e.g. 2026-12-01; blank if unpublished" },
+    { key: "degreeLevels", label: "Degree Levels (JSON array)", placeholder: '["Bachelor"] — enter only when confirmed' },
+    { key: "eligibleMajors", label: "Eligible Majors (JSON array)", placeholder: "[] — leave empty if not specified" },
     { key: "minGpa", label: "Min GPA (optional)", type: "number" },
     { key: "minIelts", label: "Min IELTS (optional)", type: "number" },
     { key: "websiteUrl", label: "Website URL", full: true },
@@ -305,6 +339,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
               </label>
               <input
                 type={f.type || "text"}
+                step={f.type === "number" ? "any" : undefined}
                 value={String(form[f.key] ?? "")}
                 placeholder={f.placeholder}
                 onChange={(e) => setField(f.key, e.target.value as any)}
@@ -336,23 +371,29 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
             />
           </div>
 
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-            <input
-              type="checkbox"
-              checked={form.financialNeedBased}
-              onChange={(e) => setField("financialNeedBased", e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            />
+          <label className="text-xs font-semibold text-slate-700">
             Financial need based
+            <select
+              value={form.financialNeedBased}
+              onChange={(e) => setField("financialNeedBased", e.target.value as TriState)}
+              className={`${inputCls} mt-1`}
+            >
+              <option value="unknown">Not specified</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
           </label>
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-            <input
-              type="checkbox"
-              checked={form.meritBased}
-              onChange={(e) => setField("meritBased", e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            />
+          <label className="text-xs font-semibold text-slate-700">
             Merit based
+            <select
+              value={form.meritBased}
+              onChange={(e) => setField("meritBased", e.target.value as TriState)}
+              className={`${inputCls} mt-1`}
+            >
+              <option value="unknown">Not specified</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
           </label>
         </div>
 
@@ -395,7 +436,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
                   <th className="px-4 py-3 font-bold">Scholarship</th>
                   <th className="px-4 py-3 font-bold">Provider</th>
                   <th className="px-4 py-3 font-bold">Country</th>
-                  <th className="px-4 py-3 font-bold">Amount (USD)</th>
+                  <th className="px-4 py-3 font-bold">Award</th>
                   <th className="px-4 py-3 font-bold">Deadline</th>
                   <th className="px-4 py-3 font-bold text-right">Actions</th>
                 </tr>
@@ -410,11 +451,17 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
                     <td className="px-4 py-3 text-slate-600">{s.provider}</td>
                     <td className="px-4 py-3 text-slate-600">{s.country}</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {formatMoney(s.amountUsdValue, "USD")}
+                      {s.awardAmount != null
+                        ? formatMoney(s.awardAmount, s.awardCurrency, { suffix: s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "" })
+                        : s.awardBasis === "need_based"
+                          ? "Need-based; varies"
+                          : s.awardBasis === "full_tuition"
+                            ? "Full tuition"
+                            : formatMoney(s.amountUsdValue, "USD")}
                       {s.financialNeedBased && <span className="ml-1 text-[10px] text-emerald-600 font-bold">NEED</span>}
                       {s.meritBased && <span className="ml-1 text-[10px] text-indigo-600 font-bold">MERIT</span>}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{s.deadline}</td>
+                    <td className="px-4 py-3 text-slate-600">{s.deadline || "Not published"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1.5">
                         <button

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
@@ -87,11 +87,17 @@ export const universities = pgTable("universities", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   country: text("country").notNull(),
-  city: text("city").notNull(),
+  city: text("city"),
   flagEmoji: text("flag_emoji").notNull().default("🌐"),
-  worldRanking: integer("world_ranking").notNull(),
-  degreeLevel: text("degree_level").notNull().default("All"),
-  programMajor: text("program_major").notNull(),
+  // Legacy summary field. Detailed rankings live in university_rankings.
+  worldRanking: integer("world_ranking"),
+  degreeLevel: text("degree_level").notNull().default("All"), // legacy summary; prefer programs.degree_level
+  programMajor: text("program_major"), // legacy summary; detailed subjects live in programs
+  canonicalName: text("canonical_name"),
+  shortName: text("short_name"),
+  countryCode: text("country_code"),
+  qsRankYear: integer("qs_rank_year"),
+  dataSource: text("data_source"),
   // --- Financial (NULL = not verified, spec §14) ---
   // Legacy USD columns (kept — DO NOT drop)
   annualTuitionUsd: integer("annual_tuition_usd"),
@@ -137,25 +143,36 @@ export const universities = pgTable("universities", {
   verificationStatus: text("verification_status").notNull().default("unverified"),
   sourceReliability: integer("source_reliability").notNull().default(7),
   isActive: boolean("is_active").notNull().default(true),
-});
+}, (table) => [
+  uniqueIndex("uq_universities_canonical_name_ci")
+    .on(sql`lower(btrim(${table.canonicalName}))`)
+    .where(sql`${table.canonicalName} is not null and btrim(${table.canonicalName}) <> ''`),
+]);
 
 export const scholarships = pgTable("scholarships", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   provider: text("provider").notNull(),
   country: text("country").notNull(),
-  coverageType: text("coverage_type").notNull().default("Full Tuition + Stipend"),
-  amountUsdValue: integer("amount_usd_value").notNull(),
-  deadline: text("deadline").notNull(),
-  degreeLevels: text("degree_levels").notNull().default("[\"Master\", \"PhD\"]"),
-  eligibleMajors: text("eligible_majors").notNull().default("[\"All\"]"),
-  minGpa: doublePrecision("min_gpa").default(3.2),
-  minIelts: doublePrecision("min_ielts").default(6.5),
+  coverageType: text("coverage_type").notNull().default("Unspecified"),
+  // Legacy USD-only value; NULL means no fixed USD amount is published.
+  amountUsdValue: integer("amount_usd_value"),
+  awardAmount: numeric("award_amount").$type<number>(),
+  awardCurrency: text("award_currency"),
+  awardPeriod: text("award_period"), // total | year | month | one_time | variable
+  awardBasis: text("award_basis"), // fixed | range | full_tuition | need_based | variable
+  deadline: text("deadline"),
+  degreeLevels: text("degree_levels").notNull().default("[]"), // empty means eligibility is not specified
+  eligibleMajors: text("eligible_majors").notNull().default("[]"), // empty means eligibility is not specified
+  minGpa: doublePrecision("min_gpa"),
+  minIelts: doublePrecision("min_ielts"),
   financialNeedBased: boolean("financial_need_based").default(false),
   meritBased: boolean("merit_based").default(true),
   description: text("description").notNull(),
   requirements: text("requirements").notNull(),
   websiteUrl: text("website_url").notNull(),
+  // NULL means a global award not tied to one university.
+  universityId: integer("university_id").references(() => universities.id, { onDelete: "set null" }),
   // --- Dynamic lifecycle (spec §4) ---
   eligibleCountries: text("eligible_countries").default("[]"),
   fundingType: text("funding_type").default(""),
@@ -186,7 +203,7 @@ export const scholarships = pgTable("scholarships", {
   sourceUrl: text("source_url"),
   notes: text("notes"),
   isActive: boolean("is_active").notNull().default(true),
-});
+}, (table) => [index("idx_scholarships_university").on(table.universityId)]);
 
 export const savedUniversities = pgTable("saved_universities", {
   id: serial("id").primaryKey(),
@@ -197,14 +214,14 @@ export const savedUniversities = pgTable("saved_universities", {
   status: text("status").notNull().default("Shortlisted"),
   notes: text("notes").default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [uniqueIndex("uq_saved_universities_profile_university").on(table.profileId, table.universityId)]);
 
 export const savedPrograms = pgTable("saved_programs", {
   id: serial("id").primaryKey(),
   profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
   programId: integer("program_id").references(() => universityPrograms.id, { onDelete: "cascade" }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [uniqueIndex("uq_saved_programs_profile_program").on(table.profileId, table.programId)]);
 
 export const savedScholarships = pgTable("saved_scholarships", {
   id: serial("id").primaryKey(),
@@ -213,7 +230,7 @@ export const savedScholarships = pgTable("saved_scholarships", {
   status: text("status").notNull().default("Saved"),
   notes: text("notes").default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [uniqueIndex("uq_saved_scholarships_profile_scholarship").on(table.profileId, table.scholarshipId)]);
 
 export const applicationTasks = pgTable("application_tasks", {
   id: serial("id").primaryKey(),
@@ -694,8 +711,18 @@ export const universityPrograms = pgTable("programs", {
   isVerified: boolean("is_verified").notNull().default(false),
   sourceUrl: text("source_url"),
   lastVerifiedAt: timestamp("last_verified_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  verificationStatus: text("verification_status").notNull().default("unverified"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_programs_university").on(table.universityId),
+  uniqueIndex("uq_programs_university_name_degree").on(
+    table.universityId,
+    sql`lower(btrim(${table.name}))`,
+    sql`lower(btrim(coalesce(${table.degree}, '')))`
+  ),
+  uniqueIndex("uq_programs_id_university").on(table.id, table.universityId),
+]);
 
 /** Program-level academic requirements. */
 /**
@@ -722,10 +749,16 @@ export const programRequirements = pgTable("program_requirements", {
   recommendationRequired: boolean("recommendation_required").notNull().default(false),
   personalStatementRequired: boolean("personal_statement_required").notNull().default(false),
   otherRequirements: text("other_requirements"),
+  academicYear: text("academic_year"),
   sourceUrl: text("source_url"),
   lastVerifiedAt: timestamp("last_verified_at"),
   verificationStatus: text("verification_status").notNull().default("unverified"),
-});
+}, (table) => [
+  index("idx_program_requirements_program").on(table.programId),
+  uniqueIndex("uq_program_requirements_program_year")
+    .on(table.programId, table.academicYear)
+    .where(sql`${table.academicYear} is not null`),
+]);
 
 /** Application cycles / deadlines (multiple rounds, exact or estimated). */
 /**
@@ -736,6 +769,7 @@ export const programRequirements = pgTable("program_requirements", {
 export const applicationCycles = pgTable("application_cycles", {
   id: serial("id").primaryKey(),
   universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }).notNull(),
+  programId: integer("program_id"),
   academicYear: text("academic_year"), // e.g. "2027-2028"
   intake: text("intake"), // Fall | Spring | Summer | Winter
   applicationType: text("application_type"), // Early Action | Early Decision | Regular Decision | International Undergraduate | Transfer | Direct Application
@@ -746,9 +780,18 @@ export const applicationCycles = pgTable("application_cycles", {
   applicationFeeCurrency: text("application_fee_currency").notNull().default("USD"),
   applicationUrl: text("application_url"),
   sourceUrl: text("source_url"),
+  sourceId: integer("source_id").references((): AnyPgColumn => sources.id, { onDelete: "set null" }),
   lastVerifiedAt: timestamp("last_verified_at"),
   verificationStatus: text("verification_status").notNull().default("unverified"),
-});
+}, (table) => [
+  index("idx_application_cycles_university_year").on(table.universityId, table.academicYear),
+  index("idx_application_cycles_program").on(table.programId),
+  foreignKey({
+    name: "application_cycles_program_university_fkey",
+    columns: [table.programId, table.universityId],
+    foreignColumns: [universityPrograms.id, universityPrograms.universityId],
+  }).onDelete("cascade"),
+]);
 
 /** Verified sources for a university (spec §13). */
 /** University→source links — mapped to existing DB layout (id, university_id, source_id, source_type). */
@@ -756,7 +799,7 @@ export const universitySources = pgTable("university_sources", {
   id: serial("id").primaryKey(),
   universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }).notNull(),
   sourceId: integer("source_id").references((): AnyPgColumn => sources.id, { onDelete: "set null" }),
-  sourceType: text("source_type").notNull().default("official_website"),
+  sourceType: text("source_type").notNull().default("university_evidence"),
 });
 
 // ---------------------------------------------------------------------------
@@ -769,19 +812,39 @@ export const sources = pgTable("sources", {
   url: text("url").notNull(),
   title: text("title").notNull(),
   domain: text("domain"),
-  sourceType: text("source_type").notNull().default("official_website"),
+  sourceType: text("source_type").notNull().default("unclassified"),
   accessedAt: timestamp("accessed_at"),
   isOfficial: boolean("is_official").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [uniqueIndex("uq_sources_url").on(table.url)]);
+
+/** One row per institution, ranking publisher, ranking edition, and year. */
+export const universityRankings = pgTable("university_rankings", {
+  id: serial("id").primaryKey(),
+  universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }).notNull(),
+  rankingProvider: text("ranking_provider").notNull(), // QS | THE | ARWU | U.S. News
+  rankingName: text("ranking_name").notNull(),
+  rankingYear: integer("ranking_year").notNull(),
+  rank: integer("rank"), // NULL for unranked; never encode as zero
+  rankLabel: text("rank_label"), // e.g. "=101" or "201-250" where source uses bands
+  score: numeric("score").$type<number>(),
+  sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
+  verifiedAt: timestamp("verified_at"),
+  verificationStatus: text("verification_status").notNull().default("unverified"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_university_ranking_edition")
+    .on(table.universityId, table.rankingProvider, table.rankingName, table.rankingYear),
+  index("idx_university_rankings_year_rank").on(table.rankingYear, table.rank),
+]);
 
 /** Program → source links. */
 export const programSources = pgTable("program_sources", {
   id: serial("id").primaryKey(),
   programId: integer("program_id").references(() => universityPrograms.id, { onDelete: "cascade" }).notNull(),
   sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
-  sourceType: text("source_type").notNull().default("official_program"), // official_program | admission_requirement | tuition | application
+  sourceType: text("source_type").notNull().default("program_evidence"), // program | admission_requirement | tuition | application evidence
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -790,7 +853,7 @@ export const scholarshipSources = pgTable("scholarship_sources", {
   id: serial("id").primaryKey(),
   scholarshipId: integer("scholarship_id").references(() => scholarships.id, { onDelete: "cascade" }).notNull(),
   sourceId: integer("source_id").references(() => sources.id, { onDelete: "set null" }),
-  sourceType: text("source_type").notNull().default("official_scholarship"),
+  sourceType: text("source_type").notNull().default("scholarship_evidence"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

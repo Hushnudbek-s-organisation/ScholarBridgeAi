@@ -85,6 +85,8 @@ export async function GET(req: Request) {
       .limit(1);
 
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
+    const profileCompletionPct = profileCompleteness(profile ?? null);
+    const profileIsComplete = profileCompletionPct >= 100;
 
     // ---- Applications for the progress summary + the next deadline ---------
     const appRows = await db
@@ -122,7 +124,9 @@ export async function GET(req: Request) {
       Number(row?.departureTotal ?? 0) > 0 && Number(row?.departureDone ?? 0) >= Number(row?.departureTotal ?? 0);
 
     const phases = buildPhaseProgress({
-      profileComplete: !!row?.profileComplete,
+      profileComplete: profileIsComplete,
+      profileCompletenessPct: profileCompletionPct,
+      openApplicationRequirements: Number(row?.openRequirements ?? 0),
       ieltsScore: profile?.ieltsScore ?? null,
       testPlanCount: Number(row?.testPlanCount ?? 0),
       savedUniversities: Number(row?.savedUniversities ?? 0),
@@ -151,6 +155,7 @@ export async function GET(req: Request) {
 
     let fundingGapClosed = false;
     let annualCost = 0;
+    let fundingEstimated = false;
     let fundingSummary: ReturnType<typeof buildFundingPlan> | null = null;
     if (acceptedApp?.universityId) {
       const [uni] = await db.select().from(universities).where(eq(universities.id, acceptedApp.universityId)).limit(1);
@@ -177,6 +182,7 @@ export async function GET(req: Request) {
             })),
         });
         annualCost = costs.annualTotalUsd;
+        fundingEstimated = costs.lines.some((line) => line.estimated);
         fundingSummary = buildFundingPlan({ annualCost, items: normalizeFunding(fundingRows) });
         fundingGapClosed = fundingSummary.fundingGap === 0;
       }
@@ -184,7 +190,7 @@ export async function GET(req: Request) {
 
     const journeyCounts: JourneyCounts = {
       ...EMPTY_JOURNEY_COUNTS,
-      profileComplete: !!row?.profileComplete,
+      profileComplete: profileIsComplete,
       savedUniversities: Number(row?.savedUniversities ?? 0),
       shortlistMatches: Number(row?.shortlistMatches ?? 0),
       applications: appRows.length,
@@ -308,13 +314,21 @@ export async function GET(req: Request) {
         belowTarget: gaps.some((x) => x.state === "below"),
       },
       funding: fundingSummary ? { gap: fundingSummary.fundingGap, covered: fundingSummary.isCovered } : null,
-      profileComplete: !!row?.profileComplete,
+      profileComplete: profileIsComplete,
       savedUniversities: Number(row?.savedUniversities ?? 0),
       visaStage: journeyCounts.visaCaseStarted,
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
-    const recommended = await recommendedFor(profileId, profile?.preferredCountries ?? "[]", profile?.targetMajor ?? "", profile?.gpa ?? 0, todayIso);
+    const recommended = await recommendedFor(
+      profileId,
+      profile?.preferredCountries ?? "[]",
+      profile?.targetMajor ?? "",
+      profile?.gpa ?? null,
+      todayIso,
+      profile?.degreeLevel ?? null,
+      profile?.country ?? null
+    );
 
     // ---- External learning providers (spec §32) ---------------------------
     const providerRows = await db.select().from(learningProviders).where(eq(learningProviders.isEnabled, true));
@@ -339,9 +353,9 @@ export async function GET(req: Request) {
       readiness,
       phases,
       testGaps: gaps,
-      funding: fundingSummary
-        ? { ...fundingSummary, items: fundingRows.length }
-        : { annualCost: 0, isCovered: false, fundingGap: 0, securedGap: 0, items: 0 },
+      funding: fundingSummary && annualCost > 0
+        ? { ...fundingSummary, items: fundingRows.length, calculated: true, estimated: fundingEstimated }
+        : { annualCost: 0, isCovered: false, fundingGap: 0, securedGap: 0, items: fundingRows.length, calculated: false, estimated: false },
       expiringDocuments: expiring.map((e) => ({
         ...e,
         expiresAt: e.expiresAt ? String(e.expiresAt).slice(0, 10) : null,
@@ -460,7 +474,15 @@ async function highestTestTarget(profileId: number, testType: string): Promise<n
  * opportunities the profile actually points at. Filtered server-side by the
  * student's own country/major/GPA preferences; no client-side guesswork.
  */
-async function recommendedFor(profileId: number, countriesJson: string, major: string, gpa: number, todayIso: string) {
+async function recommendedFor(
+  profileId: number,
+  countriesJson: string,
+  major: string,
+  gpa: number | null,
+  todayIso: string,
+  degreeLevel: string | null,
+  applicantCountry: string | null
+) {
   const countries = parseList(countriesJson);
   const countryFilter = countries.length ? inArray(universities.country, countries) : undefined;
 
@@ -479,6 +501,7 @@ async function recommendedFor(profileId: number, countriesJson: string, major: s
       annualTuitionUsd: universities.annualTuitionUsd,
       verificationStatus: universities.verificationStatus,
       lastVerifiedAt: universities.lastVerifiedAt,
+      sourceUrl: universities.sourceUrl,
     })
     .from(universities)
     .where(and(eq(universities.isActive, true), countryFilter))
@@ -492,10 +515,10 @@ async function recommendedFor(profileId: number, countriesJson: string, major: s
 
   const scoredUnis = uniRows
     .map((u) => {
-      const gpaOk = u.minGpa == null || gpa >= u.minGpa;
+      const gpaOk = u.minGpa == null || gpa == null || gpa >= u.minGpa;
       const majorOk = !major || !u.programMajor || similar(u.programMajor, major);
       const saved = savedIds.has(u.id);
-      return { ...u, saved, reason: reasonFor(gpaOk, majorOk, saved) };
+      return { ...u, saved, reason: reasonFor(gpaOk, majorOk, saved, gpa == null) };
     })
     .sort((a, b) => Number(b.saved) - Number(a.saved));
 
@@ -506,16 +529,27 @@ async function recommendedFor(profileId: number, countriesJson: string, major: s
       provider: scholarships.provider,
       country: scholarships.country,
       amountUsdValue: scholarships.amountUsdValue,
+      awardAmount: scholarships.awardAmount,
+      awardCurrency: scholarships.awardCurrency,
+      awardPeriod: scholarships.awardPeriod,
+      awardBasis: scholarships.awardBasis,
+      degreeLevels: scholarships.degreeLevels,
       deadlineDate: scholarships.deadlineDate,
       minGpa: scholarships.minGpa,
       eligibleCountries: scholarships.eligibleCountries,
       verificationStatus: scholarships.verificationStatus,
       tuitionCoverage: scholarships.tuitionCoverage,
+      sourceUrl: scholarships.sourceUrl,
+      lastVerifiedAt: scholarships.lastVerifiedAt,
     })
     .from(scholarships)
     .where(and(eq(scholarships.isActive, true), gte(scholarships.deadlineDate, todayIso)))
-    .orderBy(desc(scholarships.amountUsdValue))
-    .limit(6);
+    .orderBy(
+      desc(sql`CASE WHEN ${scholarships.verificationStatus} = 'verified' THEN 1 ELSE 0 END`),
+      desc(scholarships.lastVerifiedAt),
+      scholarships.deadlineDate
+    )
+    .limit(100);
 
   const oppRows = await db
     .select({
@@ -532,15 +566,31 @@ async function recommendedFor(profileId: number, countriesJson: string, major: s
     .orderBy(desc(opportunities.deadlineDate))
     .limit(4);
 
+  const seenScholarships = new Set<string>();
+  const relevantScholarships = schRows.filter((s) => {
+    if (!degreeLevel || !degreeMatches(s.degreeLevels, degreeLevel)) return false;
+    if (!applicantCountry || !countryMatches(s.eligibleCountries, applicantCountry)) return false;
+    const title = normalizeScholarshipTitle(s.title);
+    const key = `${normalizeScholarshipTitle(s.provider)}:${title}`;
+    if (!title || seenScholarships.has(key)) return false;
+    seenScholarships.add(key);
+    return true;
+  }).slice(0, 6);
+
   return {
     universities: scoredUnis,
-    scholarships: schRows.map((s) => ({ ...s, gpaOk: s.minGpa == null || gpa >= s.minGpa })),
+    scholarships: relevantScholarships.map((s) => ({
+      ...s,
+      gpaOk: s.minGpa == null || gpa == null || gpa >= s.minGpa,
+      gpaProvided: gpa != null,
+    })),
     opportunities: oppRows,
   };
 }
 
-function reasonFor(gpaOk: boolean, majorOk: boolean, saved: boolean): string {
+function reasonFor(gpaOk: boolean, majorOk: boolean, saved: boolean, gpaUnknown: boolean): string {
   if (saved) return "Already on your list";
+  if (gpaUnknown) return "In your preferred country; GPA fit not assessed";
   if (gpaOk && majorOk) return "Matches your major and GPA";
   if (gpaOk) return "Matches your GPA";
   return "In your preferred country";
@@ -551,6 +601,39 @@ function similar(a: string, b: string): boolean {
   const A = norm(a);
   const B = norm(b);
   return A.includes(B) || B.includes(A);
+}
+
+function degreeMatches(raw: string | null | undefined, target: string): boolean {
+  const eligible = parseList(raw).map((v) => v.toLowerCase().replace(/[^a-z]/g, ""));
+  if (eligible.includes("all")) return true;
+  if (!eligible.length) return false;
+  const level = target.toLowerCase().replace(/[^a-z]/g, "");
+  const undergraduate = /bachelor|undergraduate|undergrad/.test(level);
+  const graduate = /master|graduate/.test(level);
+  const doctoral = /phd|doctor/.test(level);
+  return eligible.some((value) => {
+    if (undergraduate) return /bachelor|undergraduate|undergrad/.test(value);
+    if (doctoral) return /phd|doctor/.test(value);
+    if (graduate) return /master|graduate/.test(value);
+    return value === level;
+  });
+}
+
+function countryMatches(raw: string | null | undefined, country: string): boolean {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z]/g, "");
+  const applicant = normalize(country);
+  const eligible = parseList(raw).map(normalize);
+  if (!eligible.length) return false;
+  if (eligible.some((value) => /^(all|allcountries|international|worldwide|anycountry)$/.test(value))) return true;
+  return eligible.some((value) => value === applicant || value.includes(applicant) || applicant.includes(value));
+}
+
+function normalizeScholarshipTitle(value: string): string {
+  return value.toLowerCase()
+    .replace(/\b(program|scholarship)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseList(raw: string | null | undefined): string[] {

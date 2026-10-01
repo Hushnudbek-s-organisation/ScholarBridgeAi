@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { studentProfiles, studyPlanPhases, studyPlans } from "@/db/schema";
 import { guardStudent, idParam, jsonError, readBody, serverError, text } from "@/lib/journey/api";
 import { buildPhaseProgress, PLAN_PHASES } from "@/lib/journey/planning";
+import { profileCompleteness } from "@/lib/growth/logic";
 
 export const dynamic = "force-dynamic";
 
@@ -169,7 +170,6 @@ export async function DELETE(req: Request) {
 export async function phaseProgress(profileId: number) {
   const [row] = await db
     .select({
-      profileComplete: sql<boolean>`(COALESCE(${studentProfiles.name},'') <> '' AND ${studentProfiles.gpa} > 0)`,
       ielts: sql<number | null>`${studentProfiles.ieltsScore}`,
       testPlans: sql<number>`(SELECT COUNT(*)::int FROM test_plans tp WHERE tp.profile_id = ${profileId})`,
       savedUniversities: sql<number>`(SELECT COUNT(*)::int FROM saved_universities su WHERE su.profile_id = ${profileId})`,
@@ -178,6 +178,7 @@ export async function phaseProgress(profileId: number) {
       documentsReady: sql<number>`(SELECT COUNT(*)::int FROM user_documents ud WHERE ud.profile_id = ${profileId} AND ud.status IN ('uploaded','verified') AND (ud.expires_at IS NULL OR ud.expires_at >= CURRENT_DATE))`,
       applications: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId})`,
       submitted: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId} AND a.submitted_at IS NOT NULL)`,
+      openApplicationRequirements: sql<number>`(SELECT COUNT(*)::int FROM application_requirements r WHERE r.profile_id = ${profileId} AND r.is_required AND r.status NOT IN ('done','not_required'))`,
       interviews: sql<number>`(SELECT COUNT(*)::int FROM ai_evaluations ae WHERE ae.profile_id = ${profileId} AND ae.evaluation_type = 'Visa Practice')`,
       offers: sql<number>`(SELECT COUNT(*)::int FROM admission_offers ao WHERE ao.profile_id = ${profileId})`,
     })
@@ -185,8 +186,13 @@ export async function phaseProgress(profileId: number) {
     .where(eq(studentProfiles.id, profileId))
     .limit(1);
 
+  const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
+  const completenessPct = profileCompleteness(profile ?? null);
+
   return buildPhaseProgress({
-    profileComplete: !!row?.profileComplete,
+    profileComplete: completenessPct >= 100,
+    profileCompletenessPct: completenessPct,
+    openApplicationRequirements: row?.openApplicationRequirements ?? 0,
     ieltsScore: row?.ielts ?? null,
     testPlanCount: row?.testPlans ?? 0,
     savedUniversities: row?.savedUniversities ?? 0,

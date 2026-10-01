@@ -67,6 +67,10 @@ export interface PhaseProgress {
  */
 export function buildPhaseProgress(counts: {
   profileComplete: boolean;
+  /** Real completeness percentage; overrides the legacy boolean when provided. */
+  profileCompletenessPct?: number;
+  /** Required application checklist items still open. */
+  openApplicationRequirements?: number;
   ieltsScore?: number | null;
   testPlanCount: number;
   savedUniversities: number;
@@ -86,8 +90,14 @@ export function buildPhaseProgress(counts: {
 
   const raw: Record<PlanPhaseKey, { p: number; missing: string[] }> = {
     profile: {
-      p: counts.profileComplete ? 100 : 30,
-      missing: counts.profileComplete ? [] : ["Complete your profile"],
+      p: counts.profileCompletenessPct == null
+        ? (counts.profileComplete ? 100 : 30)
+        : Math.max(0, Math.min(100, Math.round(counts.profileCompletenessPct))),
+      missing: (counts.profileCompletenessPct == null
+        ? (counts.profileComplete ? 100 : 30)
+        : Math.max(0, Math.min(100, Math.round(counts.profileCompletenessPct)))) >= 100
+        ? []
+        : ["Complete the remaining profile fields and activity details"],
     },
     tests: {
       p: counts.ieltsScore != null ? (counts.testPlanCount > 0 ? 100 : 70) : counts.testPlanCount > 0 ? 40 : 0,
@@ -111,9 +121,14 @@ export function buildPhaseProgress(counts: {
       missing: docPct >= 100 ? [] : counts.documentsTotal > 0 ? ["Finish your document checklist"] : ["Upload your passport and transcript"],
     },
     applications: {
-      p: counts.submittedApplications > 0 ? 100 : counts.applications > 0 ? 50 : 0,
-      missing:
-        counts.submittedApplications > 0 ? [] : counts.applications > 0 ? ["Submit your application"] : ["Start an application"],
+      p: counts.submittedApplications > 0
+        ? (counts.openApplicationRequirements ?? 0) === 0 ? 100 : 80
+        : counts.applications > 0 ? 50 : 0,
+      missing: counts.submittedApplications > 0
+        ? (counts.openApplicationRequirements ?? 0) > 0
+          ? [`${counts.openApplicationRequirements} required item(s) still missing`]
+          : []
+        : counts.applications > 0 ? ["Submit your application"] : ["Start an application"],
     },
     interviews: {
       p: counts.interviewSessions > 0 ? 100 : 0,

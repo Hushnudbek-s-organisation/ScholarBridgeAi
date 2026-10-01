@@ -110,7 +110,7 @@ export async function GET(req: Request) {
         tuitionCoverage: s.tuitionCoverage || "Not specified",
         deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
       }))
-      .filter((s) => s.amountUsdValue > 0)
+      .filter((s): s is typeof s & { amountUsdValue: number } => s.amountUsdValue != null && s.amountUsdValue > 0)
       .sort((a, b) => b.amountUsdValue - a.amountUsdValue)
       .slice(0, 8);
 
