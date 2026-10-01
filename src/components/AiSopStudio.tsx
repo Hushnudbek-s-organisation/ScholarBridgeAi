@@ -240,7 +240,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
                   <Sparkles className="h-10 w-10 text-indigo-300" />
                   <p className="text-xs font-semibold text-slate-600">
-                    Fill out the target university details on the left and click "Generate SOP Draft" to build a customized statement.
+                    {`Fill out the target university details on the left and click "Generate SOP Draft" to build a customized statement.`}
                   </p>
                 </div>
               )}
@@ -308,7 +308,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
               <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
                 <Bot className="h-10 w-10 text-purple-300" />
                 <p className="text-xs font-semibold text-slate-600">
-                  Paste your essay draft on the left and click "Evaluate" to receive detailed scoring and line-by-line sentence improvements.
+                  {`Paste your essay draft on the left and click "Evaluate" to receive detailed scoring and line-by-line sentence improvements.`}
                 </p>
               </div>
             )}

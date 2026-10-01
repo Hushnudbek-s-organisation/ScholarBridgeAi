@@ -21,7 +21,8 @@ function randomNonce(): string {
 }
 
 /**
- * Middleware: locale routing + security response headers.
+ * Proxy (formerly middleware — Next 16 renamed the file convention):
+ * locale routing + security response headers.
  *
  * Two jobs:
  *  1. Locale routing — /uz, /ru, /en paths are rewritten to the locale-agnostic
@@ -109,7 +110,7 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
   return response;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // API: the CSRF and body-size gates run here, before any route code — routes

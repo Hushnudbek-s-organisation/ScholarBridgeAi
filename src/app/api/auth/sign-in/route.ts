@@ -3,15 +3,11 @@ import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { sanitizeProfile, verifyPassword } from "@/lib/password";
-import { sessionCookieHeader } from "@/lib/auth";
+import { checkSessionRecord, sessionCookieFromToken, signSessionToken } from "@/lib/auth";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { sendLoginAlert } from "@/lib/telegram/service";
-import {
-  LIMITS,
-  checkRateLimit,
-  clientIp,
-  rateLimitedResponse,
-} from "@/lib/rate-limit";
+import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampString, readJsonBody } from "@/lib/request";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +28,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const ip = clientIp(req);
-    const ipLimit = checkRateLimit(`signin:ip:${ip}`, LIMITS.signIn);
+    const ipLimit = await checkSharedRateLimit(`signin:ip:${ip}`, LIMITS.signIn);
     if (!ipLimit.ok) return rateLimitedResponse(ipLimit.retryAfterSec);
 
     const parsed = await readJsonBody<{ email?: unknown; password?: unknown }>(req);
@@ -52,7 +48,7 @@ export async function POST(req: Request) {
 
     // Second, per-account bucket: an attacker rotating IPs still cannot
     // hammer a single account.
-    const accountLimit = checkRateLimit(`signin:email:${email}`, LIMITS.signIn);
+    const accountLimit = await checkSharedRateLimit(`signin:email:${email}`, LIMITS.signIn);
     if (!accountLimit.ok) return rateLimitedResponse(accountLimit.retryAfterSec);
 
     // The lookup below selects the whole profile row; repair additive core-schema
@@ -85,12 +81,22 @@ export async function POST(req: Request) {
     // response so a slow Telegram API never delays or fails the sign-in.
     after(() => sendLoginAlert(profile.id));
 
+    // Sign the token explicitly so the server-side session record (audit
+    // A23) can be created for exactly this token.
+    const token = signSessionToken(profile);
     const response = NextResponse.json({
       profile: sanitizeProfile(profile),
       session: { profileId: profile.id, isAdmin: Boolean(profile.isAdmin) },
     });
-    response.headers.set("Set-Cookie", sessionCookieHeader(profile, req));
+    response.headers.set("Set-Cookie", sessionCookieFromToken(token, req));
     response.headers.set("Cache-Control", "no-store");
+    // Fire-and-forget: if this insert races the first authenticated request,
+    // the lazy adoption inside checkSessionRecord creates the same row.
+    void checkSessionRecord(token, profile.id, {
+      scope: "web",
+      userAgent: req.headers.get("user-agent"),
+      ip: clientIp(req),
+    });
     return response;
   } catch (error) {
     console.error("POST /api/auth/sign-in error:", error);

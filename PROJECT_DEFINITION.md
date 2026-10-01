@@ -1,3 +1,10 @@
+> **⚠️ ARXIV (2026-10).** Bu hujjat 2026-08 holatidagi an'anaviy reja.
+> Joyi: [`docs/JOURNEY_CORE.md`](./docs/JOURNEY_CORE.md) (mahsulot
+> yadrosi), [`SECURITY.md`](./SECURITY.md) (xavfsizlik modeli),
+> [`DEPLOYMENT.md`](./DEPLOYMENT.md) (deploy) va [`docs/AUDIT_2026-09.md`](./docs/AUDIT_2026-09.md)
+> (audit + re-audit). Quyidagi matn o'zgarishlar uchun tarixiy yozuv sifatida
+> saqlangan.
+
 # ScholarBridgeAi — Project Definition
 
 **Repository:** this repository (see `git remote -v`)

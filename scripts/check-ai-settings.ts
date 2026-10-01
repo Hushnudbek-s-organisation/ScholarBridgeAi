@@ -744,7 +744,9 @@ await checkAsync("aiGenerate stays backward compatible (null on failure)", async
 check("admin AI route: audit, rate limit, gemini rejected for chat tasks, no key in audit", () => {
   const route = readFileSync(join(ROOT, "src/app/api/admin/ai-settings/route.ts"), "utf8");
   assert.match(route, /entityType: "ai_provider"/);
-  assert.match(route, /checkRateLimit\(/);
+  // Either limiter satisfies "rate limited": checkRateLimit is the in-process
+  // one, checkSharedRateLimit the Postgres-backed one (audit A20, stronger).
+  assert.match(route, /checkRateLimit\(|checkSharedRateLimit\(/);
   assert.match(route, /isChatProvider\(value\)/);
   assert.match(route, /reencryptStoredKeys/);
   assert.doesNotMatch(route, /audit\([^)]*apiKey[,)]/, "raw key must never be passed to audit");

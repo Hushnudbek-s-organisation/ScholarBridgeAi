@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/auth";
 import { getAllConfig, getStoredConfig, setConfig } from "@/lib/config";
 import { validateConfigValue } from "@/lib/configPortability";
 import { writeAudit } from "@/lib/audit";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 
 /**
@@ -31,7 +32,7 @@ export async function PUT(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const limit = checkRateLimit(`admin-config:${access.session.profile.id}`, LIMITS.adminWrite);
+    const limit = await checkSharedRateLimit(`admin-config:${access.session.profile.id}`, LIMITS.adminWrite);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
     const parsed = await readJsonBody<Record<string, unknown>>(req, 64 * 1024);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });

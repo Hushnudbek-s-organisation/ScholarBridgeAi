@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { signTelegramChannelToken, TELEGRAM_CHANNEL_TTL_SECONDS } from "@/lib/auth";
 import { sanitizeProfile } from "@/lib/password";
-import { checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import { verifyInitData, MAX_INIT_DATA_LENGTH } from "@/lib/telegram/initData";
 import { getLinkByTelegramUser, getProfileRow, publicSiteUrl } from "@/lib/telegram/messaging";
@@ -24,7 +25,7 @@ const MINIAPP_AUTH = { limit: 30, windowMs: 5 * 60_000 };
  *                        No account is ever created here.
  */
 export async function POST(req: Request) {
-  const rl = checkRateLimit(`tg:miniapp:${clientIp(req)}`, MINIAPP_AUTH);
+  const rl = await checkSharedRateLimit(`tg:miniapp:${clientIp(req)}`, MINIAPP_AUTH);
   if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
   const unavailable = await tgTablesOr503();
   if (unavailable) return unavailable;

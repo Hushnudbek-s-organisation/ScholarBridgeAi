@@ -379,15 +379,20 @@ async function main() {
     await service.handleUpdate(msg(1001, "/next"));
     check("/next answers from the next-actions service", since(m).some((c) => c.method === "sendMessage"));
 
-    // Premium: Deadline Center is premium on the website → locked in the bot.
+    // Policy (A15, docs/PRODUCT_POLICIES.md §1): deadline VISIBILITY is free
+    // on every channel — the bot lists deadlines for a free account exactly
+    // like the website. Only reminder automation stays a Premium setting.
     m = mark();
     await service.handleUpdate(msg(1001, "/deadlines"));
-    const locked = since(m).find((c) => c.method === "sendMessage");
-    check("/deadlines is premium-locked for a free account (server-side)", buttonsOf(locked).some((b) => /#payments$/.test(String(b.url ?? ""))) && !/DAAD/.test(locked?.body.text ?? ""));
+    const freeList = since(m).find((c) => c.method === "sendMessage");
+    check(
+      "/deadlines is FREE for a free account (policy: visibility is not locked)",
+      /DAAD/.test(freeList?.body.text ?? "") && !buttonsOf(freeList).some((b) => /#payments$/.test(String(b.url ?? "")))
+    );
     await db.update(schema.studentProfiles).set({ isPremium: true, premiumUntil: new Date(Date.now() + 7 * 86_400_000) } as any).where(eq(schema.studentProfiles.id, aziza.id));
     m = mark();
     await service.handleUpdate(msg(1001, "/deadlines"));
-    check("/deadlines works once the account is Premium", /DAAD/.test(since(m).find((c) => c.method === "sendMessage")?.body.text ?? ""));
+    check("/deadlines gives the same list to Premium accounts (consistency)", /DAAD/.test(since(m).find((c) => c.method === "sendMessage")?.body.text ?? ""));
     await db.update(schema.studentProfiles).set({ isPremium: false, premiumUntil: null } as any).where(eq(schema.studentProfiles.id, aziza.id));
 
     m = mark();

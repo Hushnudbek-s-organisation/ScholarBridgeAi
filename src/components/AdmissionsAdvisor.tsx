@@ -20,15 +20,15 @@ import { StudentProfile } from "./Navbar";
  * the model writes prose around them and is rejected if it quotes a
  * percentage that is not in its brief. That guarantee is stated in the UI so
  * the student knows which numbers are computed and which are prose.
+ *
+ * PROBABILITY POLICY (2026-10): only fit scores are shown. The admission
+ * probability dimension is labelled "unavailable" — it is never computed or
+ * displayed because no validated methodology + outcome data exists yet.
  */
 
 interface ChanceRow {
   universityName: string;
   fitScore: number | null;
-  low: number;
-  high: number;
-  band: string;
-  label: string;
 }
 
 interface Advice {
@@ -101,7 +101,8 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
           AI Admissions Advisor
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Ask anything about your applications. The advisor reads your real profile and estimates.
+          Ask anything about your applications. The advisor reads your real profile and shows fit
+          scores — not admission probabilities.
         </p>
 
         <div className="mt-3 flex gap-2">
@@ -180,13 +181,13 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
                       <span className="rounded-md bg-white px-2 py-0.5 text-slate-600">
                         fit {c.fitScore ?? "—"}%
                       </span>
-                      <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-indigo-700">
-                        admit {c.low}–{c.high}%
-                      </span>
-                      <span className="rounded-md bg-white px-2 py-0.5 text-slate-600">{c.label}</span>
                     </span>
                   </div>
                 ))}
+                <p className="text-[11px] text-slate-400">
+                  Fit = how well your profile meets each university&apos;s published requirements.
+                  We do not show an admission probability — a fit score is not a chance of getting in.
+                </p>
               </div>
             )}
 
@@ -242,8 +243,10 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
           </div>
 
           <p className="text-[11px] text-slate-400">
-            Estimates are model output based on published university data and ScholarBridge
-            outcomes — not a guarantee of admission.
+            The fit scores are computed from your profile and each university&apos;s published
+            requirements. Admission probabilities are not shown — we do not present them until a
+            validated methodology and enough outcome data exist. Nothing here is a guarantee of
+            admission.
           </p>
         </>
       )}

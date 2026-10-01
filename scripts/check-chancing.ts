@@ -276,5 +276,60 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// 6. Student-facing probability policy (2026-10)
+// ---------------------------------------------------------------------------
+// An admission probability may only be shown to students once the project
+// has a validated methodology AND sufficient outcome data. That does not
+// exist yet, so the student-facing surface must expose the dimension as
+// "unavailable" and never the numeric range. Static source checks (no server
+// required) pin that the routes/lib do not leak the engine's range.
+// ---------------------------------------------------------------------------
+
+section("6. Student-facing probability policy (2026-10)");
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+
+const chancingRoute = src("src/app/api/chancing/route.ts");
+check(
+  "GET /api/chancing returns the availability object",
+  chancingRoute.includes("probability: ADMISSION_PROBABILITY")
+);
+check(
+  "GET /api/chancing does not spread the engine result (no range leak)",
+  !chancingRoute.includes("...estimate")
+);
+check(
+  "GET /api/chancing never exposes estimate.admission",
+  !/\badmission:\s*estimate\.admission\b/.test(chancingRoute)
+);
+
+const planningRoute = src("src/app/api/planning/route.ts");
+check("planning comparison has no admission-estimate row", !planningRoute.includes("admissionEstimate"));
+check("planning response carries the availability object", planningRoute.includes("probability: ADMISSION_PROBABILITY"));
+
+const advisor = src("src/lib/advisor.ts");
+check("AI brief states admission probability is unavailable", advisor.includes("Admission probability: UNAVAILABLE"));
+check(
+  "AI brief no longer injects the numeric range",
+  !advisor.includes("admission estimate ${c.admission.low}")
+);
+check(
+  "reply guard rejects probability-framed percentages",
+  /framed a percentage as an admission probability/.test(advisor)
+);
+const promptMatch = advisor.match(/ADVISOR_SYSTEM_PROMPT = `([\s\S]*?)`;/);
+check(
+  "system prompt forbids stating/implying an admission probability",
+  Boolean(promptMatch && /never state or imply a\s+probability of admission/i.test(promptMatch[1]))
+);
+check("rules advice uses fit tiers, not reach/target/safety bands", !/admission\.band/.test(advisor));
+
+const advisorRoute = src("src/app/api/ai/admissions-advisor/route.ts");
+check("advisor response has no low/high/band fields", !/low:\s*c\.admission\.low/.test(advisorRoute));
+check("advisor response carries the availability object", advisorRoute.includes("probability: ADMISSION_PROBABILITY"));
+
+// ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;

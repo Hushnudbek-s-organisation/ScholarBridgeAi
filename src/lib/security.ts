@@ -1,7 +1,7 @@
 /**
  * Shared security-header policy.
  *
- * Imported by both `next.config.ts` (Node) and `src/middleware.ts` (Edge), so
+ * Imported by both `next.config.ts` (Node) and `src/proxy.ts` (Edge), so
  * it must stay free of Node-only APIs.
  *
  * The one environment-dependent decision is framing:

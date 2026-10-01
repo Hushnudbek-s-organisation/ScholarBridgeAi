@@ -23,9 +23,10 @@
 
 CREATE TABLE IF NOT EXISTS "student_profiles" ("id" serial PRIMARY KEY NOT NULL, "name" text NOT NULL, "email" text UNIQUE NOT NULL, "password_hash" text, "degree_level" text NOT NULL DEFAULT 'Master', "target_major" text NOT NULL DEFAULT 'Computer Science', "gpa" double precision NOT NULL DEFAULT 3.5, "gpa_scale" double precision NOT NULL DEFAULT 4, "ielts_score" double precision DEFAULT 7, "toefl_score" integer DEFAULT 95, "sat_score" integer DEFAULT 1350, "gre_score" integer DEFAULT 315, "budget_annual_usd" integer NOT NULL DEFAULT 25000, "preferred_countries" text NOT NULL DEFAULT '["United States", "United Kingdom", "Canada", "Germany"]', "need_scholarship" boolean NOT NULL DEFAULT TRUE, "extracurriculars" text DEFAULT 'Hackathon winner, Peer Tutor, Student Council Vice President', "work_experience_years" integer DEFAULT 1, "research_publications" integer DEFAULT 0, "preferred_locale" text NOT NULL DEFAULT 'en', "is_admin" boolean NOT NULL DEFAULT FALSE, "referral_code" text UNIQUE, "referred_by" integer, "referral_points" integer NOT NULL DEFAULT 0, "referral_rewarded" boolean NOT NULL DEFAULT FALSE, "is_premium" boolean NOT NULL DEFAULT FALSE, "premium_until" timestamp, "parent_share_enabled" boolean NOT NULL DEFAULT FALSE, "parent_share_email" text, "parent_share_token" text, "parent_share_created_at" timestamp, "act_score" integer, "duolingo_score" integer, "ap_courses" text, "ib_courses" text, "a_level_subjects" text, "coursework_notes" text, "country" text, "age" integer, "graduation_year" integer, "family_income_usd" integer, "needs_financial_aid" boolean, "requires_full_scholarship" boolean, "leadership" text, "volunteering" text, "sports" text, "clubs" text, "research_experience" text, "projects" text, "olympiads" text, "awards" text, "competitions" text, "certificates" text, "target_universities" text, "career_goal" text, "data_share_consent" boolean NOT NULL DEFAULT FALSE, "data_share_consent_at" timestamp, "onboarding_step" integer NOT NULL DEFAULT 0, "onboarding_completed" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now(), "updated_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "universities" ("id" serial PRIMARY KEY NOT NULL, "name" text NOT NULL, "country" text NOT NULL, "city" text NOT NULL, "flag_emoji" text NOT NULL DEFAULT '🌐', "world_ranking" integer NOT NULL, "degree_level" text NOT NULL DEFAULT 'All', "program_major" text NOT NULL, "annual_tuition_usd" integer, "annual_living_est_usd" integer, "accommodation_cost_usd" integer, "annual_tuition" numeric, "tuition_currency" text NOT NULL DEFAULT 'USD', "tuition_period" text NOT NULL DEFAULT 'year', "annual_living_est" numeric, "living_cost_currency" text NOT NULL DEFAULT 'USD', "living_cost_period" text NOT NULL DEFAULT 'year', "accommodation_cost" numeric, "accommodation_cost_currency" text NOT NULL DEFAULT 'USD', "accommodation_cost_period" text NOT NULL DEFAULT 'year', "application_fee" integer, "application_fee_currency" text NOT NULL DEFAULT 'USD', "min_gpa" double precision, "min_ielts" double precision, "min_sat" integer, "acceptance_rate" double precision, "post_study_work_visa_years" double precision, "founded_year" integer, "university_type" text, "address" text, "international_students_count" integer, "international_students_percentage" double precision, "official_website_url" text, "admissions_url" text, "international_admissions_url" text, "undergraduate_admissions_url" text, "application_url" text, "description" text NOT NULL, "highlights" text NOT NULL DEFAULT '[]', "website_url" text NOT NULL, "image_url" text, "source_url" text, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified', "source_reliability" integer NOT NULL DEFAULT 7, "is_active" boolean NOT NULL DEFAULT TRUE);
+CREATE TABLE IF NOT EXISTS "universities" ("id" serial PRIMARY KEY NOT NULL, "name" text NOT NULL, "country" text NOT NULL, "city" text, "flag_emoji" text NOT NULL DEFAULT '🌐', "world_ranking" integer, "degree_level" text NOT NULL DEFAULT 'All', "program_major" text, "canonical_name" text, "short_name" text, "country_code" text, "qs_rank_year" integer, "data_source" text, "annual_tuition_usd" integer, "annual_living_est_usd" integer, "accommodation_cost_usd" integer, "annual_tuition" numeric, "tuition_currency" text NOT NULL DEFAULT 'USD', "tuition_period" text NOT NULL DEFAULT 'year', "annual_living_est" numeric, "living_cost_currency" text NOT NULL DEFAULT 'USD', "living_cost_period" text NOT NULL DEFAULT 'year', "accommodation_cost" numeric, "accommodation_cost_currency" text NOT NULL DEFAULT 'USD', "accommodation_cost_period" text NOT NULL DEFAULT 'year', "application_fee" integer, "application_fee_currency" text NOT NULL DEFAULT 'USD', "min_gpa" double precision, "min_ielts" double precision, "min_sat" integer, "acceptance_rate" double precision, "post_study_work_visa_years" double precision, "founded_year" integer, "university_type" text, "address" text, "international_students_count" integer, "international_students_percentage" double precision, "official_website_url" text, "admissions_url" text, "international_admissions_url" text, "undergraduate_admissions_url" text, "application_url" text, "description" text NOT NULL, "highlights" text NOT NULL DEFAULT '[]', "website_url" text NOT NULL, "image_url" text, "source_url" text, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified', "source_reliability" integer NOT NULL DEFAULT 7, "is_active" boolean NOT NULL DEFAULT TRUE);
 
-CREATE TABLE IF NOT EXISTS "scholarships" ("id" serial PRIMARY KEY NOT NULL, "title" text NOT NULL, "provider" text NOT NULL, "country" text NOT NULL, "coverage_type" text NOT NULL DEFAULT 'Full Tuition + Stipend', "amount_usd_value" integer NOT NULL, "deadline" text NOT NULL, "degree_levels" text NOT NULL DEFAULT '["Master", "PhD"]', "eligible_majors" text NOT NULL DEFAULT '["All"]', "min_gpa" double precision DEFAULT 3.2, "min_ielts" double precision DEFAULT 6.5, "financial_need_based" boolean DEFAULT FALSE, "merit_based" boolean DEFAULT TRUE, "description" text NOT NULL, "requirements" text NOT NULL, "website_url" text NOT NULL, "eligible_countries" text DEFAULT '[]', "funding_type" text DEFAULT '', "tuition_coverage" text DEFAULT '', "living_allowance" integer, "travel_allowance" integer, "accommodation" text DEFAULT '', "application_fee" integer, "english_requirements" text DEFAULT '', "required_documents" text DEFAULT '[]', "application_url" text, "opening_date" date, "deadline_date" date, "deadline_type" text NOT NULL DEFAULT 'unknown', "deadline_range_start" date, "deadline_range_end" date, "rounds" text DEFAULT '[]', "recurrence" text NOT NULL DEFAULT 'none', "expected_opening_period" text, "expected_deadline_period" text, "application_status" text NOT NULL DEFAULT 'unknown', "last_verified_at" timestamp, "last_updated_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified', "source_reliability" integer NOT NULL DEFAULT 7, "source_url" text, "notes" text, "is_active" boolean NOT NULL DEFAULT TRUE);
+CREATE TABLE IF NOT EXISTS "scholarships" ("id" serial PRIMARY KEY NOT NULL, "title" text NOT NULL, "provider" text NOT NULL, "country" text NOT NULL, "coverage_type" text NOT NULL DEFAULT 'Unspecified', "amount_usd_value" integer, "award_amount" numeric, "award_currency" text, "award_period" text, "award_basis" text, "deadline" text, "degree_levels" text NOT NULL DEFAULT '[]', "eligible_majors" text NOT NULL DEFAULT '[]', "min_gpa" double precision, "min_ielts" double precision, "financial_need_based" boolean DEFAULT FALSE, "merit_based" boolean DEFAULT TRUE, "description" text NOT NULL, "requirements" text NOT NULL, "website_url" text NOT NULL, "university_id" integer, "eligible_countries" text DEFAULT '[]', "funding_type" text DEFAULT '', "tuition_coverage" text DEFAULT '', "living_allowance" integer, "travel_allowance" integer, "accommodation" text DEFAULT '', "application_fee" integer, "english_requirements" text DEFAULT '', "required_documents" text DEFAULT '[]', "application_url" text, "opening_date" date, "deadline_date" date, "deadline_type" text NOT NULL DEFAULT 'unknown', "deadline_range_start" date, "deadline_range_end" date, "rounds" text DEFAULT '[]', "recurrence" text NOT NULL DEFAULT 'none', "expected_opening_period" text, "expected_deadline_period" text, "application_status" text NOT NULL DEFAULT 'unknown', "last_verified_at" timestamp, "last_updated_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified', "source_reliability" integer NOT NULL DEFAULT 7, "source_url" text, "notes" text, "is_active" boolean NOT NULL DEFAULT TRUE);
+CREATE INDEX IF NOT EXISTS "idx_scholarships_university" ON "scholarships" ("university_id");
 
 CREATE TABLE IF NOT EXISTS "applications" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "university_id" integer, "university_name" text NOT NULL DEFAULT '', "program_name" text, "application_round" text, "intake_term" text, "deadline" date, "status" text NOT NULL DEFAULT 'not_started', "submitted_at" timestamp, "application_fee_paid" boolean NOT NULL DEFAULT FALSE, "fee_amount" integer, "portal_url" text, "notes" text, "created_at" timestamp NOT NULL DEFAULT now(), "updated_at" timestamp NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS "idx_applications_profile" ON "applications" ("profile_id");
@@ -48,19 +49,23 @@ CREATE INDEX IF NOT EXISTS "idx_opportunities_deadline" ON "opportunities" ("dea
 
 CREATE TABLE IF NOT EXISTS "notifications" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "type" text NOT NULL, "title" text NOT NULL, "body" text NOT NULL, "link" text, "is_read" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "programs" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "name" text NOT NULL, "field" text, "degree_level" text, "duration" numeric, "duration_unit" text NOT NULL DEFAULT 'years', "study_mode" text, "language" text, "annual_tuition" numeric, "tuition_currency" text NOT NULL DEFAULT 'USD', "tuition_period" text NOT NULL DEFAULT 'year', "description" text, "official_url" text, "application_url" text, "is_verified" boolean NOT NULL DEFAULT FALSE, "source_url" text, "last_verified_at" timestamp, "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "programs" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "name" text NOT NULL, "field" text, "degree_level" text, "duration" numeric, "duration_unit" text NOT NULL DEFAULT 'years', "study_mode" text, "language" text, "annual_tuition" numeric, "tuition_currency" text NOT NULL DEFAULT 'USD', "tuition_period" text NOT NULL DEFAULT 'year', "description" text, "official_url" text, "application_url" text, "is_verified" boolean NOT NULL DEFAULT FALSE, "source_url" text, "last_verified_at" timestamp, "is_active" boolean NOT NULL DEFAULT TRUE, "verification_status" text NOT NULL DEFAULT 'unverified', "created_at" timestamp NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS "idx_programs_university" ON "programs" ("university_id");
 
-CREATE TABLE IF NOT EXISTS "sources" ("id" serial PRIMARY KEY NOT NULL, "url" text NOT NULL, "title" text NOT NULL, "domain" text, "source_type" text NOT NULL DEFAULT 'official_website', "accessed_at" timestamp, "is_official" boolean NOT NULL DEFAULT FALSE, "is_verified" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "sources" ("id" serial PRIMARY KEY NOT NULL, "url" text NOT NULL, "title" text NOT NULL, "domain" text, "source_type" text NOT NULL DEFAULT 'unclassified', "accessed_at" timestamp, "is_official" boolean NOT NULL DEFAULT FALSE, "is_verified" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "program_sources" ("id" serial PRIMARY KEY NOT NULL, "program_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'official_program', "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "program_sources" ("id" serial PRIMARY KEY NOT NULL, "program_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'program_evidence', "created_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "scholarship_sources" ("id" serial PRIMARY KEY NOT NULL, "scholarship_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'official_scholarship', "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "scholarship_sources" ("id" serial PRIMARY KEY NOT NULL, "scholarship_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'scholarship_evidence', "created_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "university_sources" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'official_website');
+CREATE TABLE IF NOT EXISTS "university_sources" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "source_id" integer, "source_type" text NOT NULL DEFAULT 'university_evidence');
 
-CREATE TABLE IF NOT EXISTS "application_cycles" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "academic_year" text, "intake" text, "application_type" text, "opening_date" date, "deadline" date, "deadline_timezone" text, "application_fee" numeric, "application_fee_currency" text NOT NULL DEFAULT 'USD', "application_url" text, "source_url" text, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified');
+CREATE TABLE IF NOT EXISTS "application_cycles" ("id" serial PRIMARY KEY NOT NULL, "university_id" integer NOT NULL, "program_id" integer, "academic_year" text, "intake" text, "application_type" text, "opening_date" date, "deadline" date, "deadline_timezone" text, "application_fee" numeric, "application_fee_currency" text NOT NULL DEFAULT 'USD', "application_url" text, "source_url" text, "source_id" integer, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified');
+CREATE INDEX IF NOT EXISTS "idx_application_cycles_university_year" ON "application_cycles" ("university_id", "academic_year");
+CREATE INDEX IF NOT EXISTS "idx_application_cycles_program" ON "application_cycles" ("program_id");
 
-CREATE TABLE IF NOT EXISTS "program_requirements" ("id" serial PRIMARY KEY NOT NULL, "program_id" integer NOT NULL, "min_ielts" double precision, "min_toefl" double precision, "min_det" double precision, "min_sat" integer, "min_act" integer, "min_gpa" double precision, "ib_requirement" text, "a_level_requirement" text, "ap_requirement" text, "subject_requirements" text, "portfolio_required" boolean NOT NULL DEFAULT FALSE, "interview_required" boolean NOT NULL DEFAULT FALSE, "recommendation_required" boolean NOT NULL DEFAULT FALSE, "personal_statement_required" boolean NOT NULL DEFAULT FALSE, "other_requirements" text, "source_url" text, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified');
+CREATE TABLE IF NOT EXISTS "program_requirements" ("id" serial PRIMARY KEY NOT NULL, "program_id" integer NOT NULL, "min_ielts" double precision, "min_toefl" double precision, "min_det" double precision, "min_sat" integer, "min_act" integer, "min_gpa" double precision, "ib_requirement" text, "a_level_requirement" text, "ap_requirement" text, "subject_requirements" text, "portfolio_required" boolean NOT NULL DEFAULT FALSE, "interview_required" boolean NOT NULL DEFAULT FALSE, "recommendation_required" boolean NOT NULL DEFAULT FALSE, "personal_statement_required" boolean NOT NULL DEFAULT FALSE, "other_requirements" text, "academic_year" text, "source_url" text, "last_verified_at" timestamp, "verification_status" text NOT NULL DEFAULT 'unverified');
+CREATE INDEX IF NOT EXISTS "idx_program_requirements_program" ON "program_requirements" ("program_id");
 
 CREATE TABLE IF NOT EXISTS "ai_provider_credentials" ("id" serial PRIMARY KEY NOT NULL, "provider" text UNIQUE NOT NULL, "api_key_enc" text, "model" text, "updated_at" timestamp NOT NULL DEFAULT now());
 
@@ -138,6 +143,11 @@ ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "flag_emoji" text DEFAULT '�
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "world_ranking" integer;
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "degree_level" text DEFAULT 'All';
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "program_major" text;
+ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "canonical_name" text;
+ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "short_name" text;
+ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "country_code" text;
+ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "qs_rank_year" integer;
+ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "data_source" text;
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "annual_tuition_usd" integer;
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "annual_living_est_usd" integer;
 ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "accommodation_cost_usd" integer;
@@ -181,18 +191,23 @@ ALTER TABLE "universities" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT 
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "title" text;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "provider" text;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "country" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "coverage_type" text DEFAULT 'Full Tuition + Stipend';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "coverage_type" text DEFAULT 'Unspecified';
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "amount_usd_value" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_amount" numeric;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_currency" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_period" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_basis" text;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "degree_levels" text DEFAULT '["Master", "PhD"]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_majors" text DEFAULT '["All"]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_gpa" double precision DEFAULT 3.2;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_ielts" double precision DEFAULT 6.5;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "degree_levels" text DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_majors" text DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_gpa" double precision;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_ielts" double precision;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "financial_need_based" boolean DEFAULT FALSE;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "merit_based" boolean DEFAULT TRUE;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "description" text;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "requirements" text;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "website_url" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_countries" text DEFAULT '[]';
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "funding_type" text DEFAULT '';
 ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "tuition_coverage" text DEFAULT '';
@@ -319,13 +334,15 @@ ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "application_url" text;
 ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "is_verified" boolean DEFAULT FALSE;
 ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "source_url" text;
 ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
+ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT TRUE;
+ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "verification_status" text DEFAULT 'unverified';
 ALTER TABLE "programs" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT now();
 
 -- ---------- sources ----------
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "url" text;
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "title" text;
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "domain" text;
-ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'official_website';
+ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'unclassified';
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "accessed_at" timestamp;
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "is_official" boolean DEFAULT FALSE;
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "is_verified" boolean DEFAULT FALSE;
@@ -334,22 +351,23 @@ ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT no
 -- ---------- program_sources ----------
 ALTER TABLE "program_sources" ADD COLUMN IF NOT EXISTS "program_id" integer;
 ALTER TABLE "program_sources" ADD COLUMN IF NOT EXISTS "source_id" integer;
-ALTER TABLE "program_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'official_program';
+ALTER TABLE "program_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'program_evidence';
 ALTER TABLE "program_sources" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT now();
 
 -- ---------- scholarship_sources ----------
 ALTER TABLE "scholarship_sources" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
 ALTER TABLE "scholarship_sources" ADD COLUMN IF NOT EXISTS "source_id" integer;
-ALTER TABLE "scholarship_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'official_scholarship';
+ALTER TABLE "scholarship_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'scholarship_evidence';
 ALTER TABLE "scholarship_sources" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT now();
 
 -- ---------- university_sources ----------
 ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "source_id" integer;
-ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'official_website';
+ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "source_type" text DEFAULT 'university_evidence';
 
 -- ---------- application_cycles ----------
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "university_id" integer;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "program_id" integer;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "academic_year" text;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "intake" text;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "application_type" text;
@@ -360,6 +378,7 @@ ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "application_fee" nume
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "application_fee_currency" text DEFAULT 'USD';
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "application_url" text;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_url" text;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_id" integer;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "verification_status" text DEFAULT 'unverified';
 
@@ -380,6 +399,7 @@ ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "interview_required"
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "recommendation_required" boolean DEFAULT FALSE;
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "personal_statement_required" boolean DEFAULT FALSE;
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "other_requirements" text;
+ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "academic_year" text;
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "source_url" text;
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
 ALTER TABLE "program_requirements" ADD COLUMN IF NOT EXISTS "verification_status" text DEFAULT 'unverified';

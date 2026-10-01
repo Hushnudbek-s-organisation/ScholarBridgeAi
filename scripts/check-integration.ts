@@ -618,13 +618,14 @@ async function main() {
   check("documents: a ghost id is also refused", ghostDoc.status === 404, `got ${ghostDoc.status}`);
 
   // -----------------------------------------------------------------------
-  // 6. /api/chancing — the flagship route, and the one carrying the standing
-  // requirement that Fit and Admission stay SEPARATE numbers. That has been
-  // asserted in unit tests against synthetic inputs. Here it is asserted
-  // against rows fetched from the database, plus the two claims about data
-  // that only a real corpus can settle: that consented outcomes change the
-  // basis, and that non-consented ones do not.
-  section("6. /api/chancing — Fit and Admission stay separate");
+  // 6. /api/chancing — the flagship route. PROBABILITY POLICY (2026-10): the
+  // admission probability dimension is NEVER returned as a number — the
+  // response carries `probability: { available: false }` instead, and a fit
+  // score must never be read as a probability. That is asserted here against
+  // rows fetched from the database, plus the two claims about data that only
+  // a real corpus can settle: that consented outcomes change the basis
+  // (dataBasis/sampleSize), and that non-consented ones do not.
+  section("6. /api/chancing — probability unavailable, fit stays its own number");
 
   const { GET: chancingGet } = await import("../src/app/api/chancing/route");
   const ch = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
@@ -639,26 +640,27 @@ async function main() {
   const first = ch.body?.results?.[0] ?? {};
 
   // --- the standing requirement -----------------------------------------
-  check("Match % is present as its own number", typeof first.fitScore === "number", JSON.stringify(first.fitScore));
+  check("Fit score is present as its own number", typeof first.fitScore === "number", JSON.stringify(first.fitScore));
   check(
-    "Admission % is present as its own number",
-    typeof first.admission?.mid === "number",
-    JSON.stringify(first.admission)
+    "admission probability is NEVER exposed as a number (policy)",
+    first.probability?.available === false && first.admission === undefined,
+    JSON.stringify({ probability: first.probability, admission: first.admission })
   );
   check(
-    "Fit and Admission are NOT the same number",
-    first.fitScore !== first.admission?.mid,
-    `fit=${first.fitScore} admission=${first.admission?.mid}`
+    "no admission range object (mid/low/high/label) exists in the response",
+    first.admission === undefined,
+    JSON.stringify(first).slice(0, 200)
   );
   check(
-    "Admission carries an honest range, not just a point",
-    typeof first.admission?.low === "number" &&
-      typeof first.admission?.high === "number" &&
-      first.admission.low <= first.admission.mid &&
-      first.admission.mid <= first.admission.high,
-    JSON.stringify(first.admission)
+    "Fit and the probability dimension stay separate (fit numeric, probability unavailable)",
+    typeof first.fitScore === "number" && first.probability?.available === false,
+    `fit=${first.fitScore} probability=${JSON.stringify(first.probability)}`
   );
-  check("Admission is labelled with a band", typeof first.admission?.label === "string" && first.admission.label.length > 0);
+  check(
+    "probability dimension is labelled unavailable with a reason",
+    first.probability?.available === false && typeof first.probability?.reason === "string" && first.probability.reason.length > 0,
+    JSON.stringify(first.probability)
+  );
 
   const SUBS = [
     "academicFit",
@@ -692,9 +694,9 @@ async function main() {
     `got ${first.dataBasis}`
   );
   check(
-    "the disclaimer says it is not a guarantee",
-    /not a guarantee/i.test(first.disclaimer ?? ""),
-    first.disclaimer
+    "probability policy is stated in the response (no validated methodology)",
+    first.probability?.reason === "no-validated-methodology",
+    JSON.stringify(first.probability)
   );
   check("the dataset readiness gate is reported", ch.body?.dataset?.stage != null, JSON.stringify(ch.body?.dataset?.stage));
   check(
@@ -755,14 +757,16 @@ async function main() {
     `got ${tumRow?.sampleSize}, expected ${EXPECTED_SAMPLE}`
   );
   check(
-    "the disclaimer now cites the blended sample",
-    new RegExp(`Blended with ${EXPECTED_SAMPLE} ScholarBridge`).test(tumRow?.disclaimer ?? ""),
-    tumRow?.disclaimer
+    "blending is still reported via dataBasis + sampleSize — and still no numeric probability",
+    (tumRow?.dataBasis === "hybrid" || tumRow?.dataBasis === "scholarbridge-data") &&
+      typeof tumRow?.sampleSize === "number" &&
+      tumRow?.probability?.available === false,
+    `basis=${tumRow?.dataBasis} sample=${tumRow?.sampleSize} prob=${JSON.stringify(tumRow?.probability)}`
   );
   check(
     "Fit stays its own number even after blending",
-    typeof tumRow?.fitScore === "number" && tumRow.fitScore !== tumRow?.admission?.mid,
-    `fit=${tumRow?.fitScore} admission=${tumRow?.admission?.mid}`
+    typeof tumRow?.fitScore === "number" && tumRow?.probability?.available === false,
+    `fit=${tumRow?.fitScore} probability=${JSON.stringify(tumRow?.probability)}`
   );
 
   // --- non-consented outcomes must NOT be used ---------------------------
@@ -1432,6 +1436,203 @@ async function main() {
   });
   check("sweep: a second run creates nothing new", sw2.body?.created === 0, `created=${sw2.body?.created}`);
 
+  // -----------------------------------------------------------------------
+  // 12. Re-audit 2026-10 — courses performance (A19), shared rate limits
+  //     (A20), visa AI usage (A21), session revocation (A23), the deadlines
+  //     plan policy (A15) and the instructors endpoint (A26).
+  section("12. Re-audit 2026-10 — A19/A20/A21/A23/A15/A26");
+
+  const { setConfig, deleteConfig } = await import("../src/lib/config");
+  const { desc, sql } = await import("drizzle-orm");
+  const jsonHdr = { "Content-Type": "application/json" };
+  const anonHdr = { cookie: "" };
+
+  // ---- A19: course listing — no N+1 re-seeding, no writes on read ---------
+  const coursesRoute = await import("../src/app/api/courses/route");
+  const countRows = async (table: any) => {
+    const [r] = await db.select({ n: sql`count(*)::int` }).from(table);
+    return Number(r.n);
+  };
+  const c1 = await call(coursesRoute.GET as any, "/api/courses", { headers: anonHdr });
+  check(
+    "courses: the anonymous catalogue lists published courses with count/progress fields",
+    c1.status === 200 && Array.isArray(c1.body?.courses) && c1.body.courses.length >= 1 &&
+      c1.body.courses.every((c: any) => typeof c.id === "number" && typeof c.lessonCount === "number" && typeof c.progressPct === "number"),
+    JSON.stringify(c1.body?.courses?.[0])?.slice(0, 140)
+  );
+  const modsBefore = await countRows(schema.courseModules);
+  const lessonsBefore = await countRows(schema.lessons);
+  const c2 = await call(coursesRoute.GET as any, `/api/courses?profileId=${profile.id}`);
+  check(
+    "courses: a signed-in listing carries the caller's completed-lesson progress",
+    c2.status === 200 && c2.body?.courses?.every((c: any) => typeof c.completedLessons === "number"),
+    JSON.stringify(c2.body?.courses?.[0])?.slice(0, 140)
+  );
+  const modsAfter = await countRows(schema.courseModules);
+  const lessonsAfter = await countRows(schema.lessons);
+  check(
+    "courses: repeated GETs perform NO writes (the old per-GET seed is gone)",
+    modsBefore === modsAfter && lessonsBefore === lessonsAfter,
+    `modules ${modsBefore}->${modsAfter}, lessons ${lessonsBefore}->${lessonsAfter}`
+  );
+  const seedRoute = await import("../src/app/api/admin/courses/seed/route");
+  const seedAnon = await call(seedRoute.POST as any, "/api/admin/courses/seed", { method: "POST", headers: anonHdr, body: "{}" });
+  check("courses seed: the explicit (re)seed endpoint is admin-only (401)", seedAnon.status === 401, `got ${seedAnon.status}`);
+
+  // ---- A20: rate limits shared across instances ---------------------------
+  const { checkSharedRateLimit } = await import("../src/lib/rate-limit-shared");
+  const { resetRateLimits } = await import("../src/lib/rate-limit");
+  const sharedKey = `it-shared:${Date.now()}`;
+  const sr1 = await checkSharedRateLimit(sharedKey, { limit: 2, windowMs: 60_000 });
+  const sr2 = await checkSharedRateLimit(sharedKey, { limit: 2, windowMs: 60_000 });
+  const sr3 = await checkSharedRateLimit(sharedKey, { limit: 2, windowMs: 60_000 });
+  check(
+    "shared limiter: the budget is enforced (limit hits pass, the next is 429-shaped)",
+    sr1.ok && sr2.ok && !sr3.ok && sr3.retryAfterSec >= 1 && sr3.remaining === 0,
+    JSON.stringify(sr3)
+  );
+  resetRateLimits(); // simulate a brand-new app instance with empty memory
+  const sr4 = await checkSharedRateLimit(sharedKey, { limit: 2, windowMs: 60_000 });
+  check(
+    "shared limiter: a NEW process does NOT get a fresh budget (counters live in Postgres)",
+    !sr4.ok,
+    JSON.stringify(sr4)
+  );
+
+  // ---- A21: visa AI usage is recorded; quota exclusion is deliberate ------
+  const http = await import("http");
+  let mockCalls = 0;
+  const mockServer = http.createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c: string) => (raw += c));
+    req.on("end", () => {
+      mockCalls++;
+      const body = JSON.parse(raw || "{}");
+      const text = JSON.stringify(body.messages ?? []);
+      // The analyze prompt asks for "JSON ONLY"; the chat prompt is a normal
+      // conversation. Content-based detection is robust to capability flags.
+      const wantsJson = body.response_format?.type === "json_object" || /JSON ONLY/i.test(text);
+      const content = wantsJson
+        ? JSON.stringify({ confidence: 7, persuasiveness: 6, language_level: 7, estimated_visa_chance: 65, recommendations: "Answer more specifically about funding and home ties." })
+        : "Good morning. May I see your offer letter?";
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        id: "mock", object: "chat.completion", model: "mock-model",
+        choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 111, completion_tokens: 22, total_tokens: 133 },
+      }));
+    });
+  });
+  await new Promise<void>((resolve) => mockServer.listen(55455, "127.0.0.1", resolve));
+  process.env.AI_CUSTOM_API_KEY = "test-custom-key";
+  process.env.AI_CUSTOM_BASE_URL = "http://127.0.0.1:55455/v1";
+  process.env.AI_CUSTOM_MODEL = "mock-model";
+  await setConfig("ai_provider_visa", "custom");
+  await db.delete(schema.aiUsage).where(eq(schema.aiUsage.taskType, "visa"));
+
+  const visaChatRoute = await import("../src/app/api/visa/chat/route");
+  const visaAnalyzeRoute = await import("../src/app/api/visa/analyze/route");
+  const vchat = await call(visaChatRoute.POST as any, "/api/visa/chat", {
+    method: "POST", headers: jsonHdr, body: JSON.stringify({ countryCode: "US" }),
+  });
+  check("visa chat: a signed-in interview turn is answered", vchat.status === 200 && typeof vchat.body?.reply === "string" && vchat.body.reply.length > 0, JSON.stringify(vchat.body)?.slice(0, 120));
+  const [visaUsage] = await db
+    .select()
+    .from(schema.aiUsage)
+    .where(eq(schema.aiUsage.taskType, "visa"))
+    .orderBy(desc(schema.aiUsage.createdAt));
+  check(
+    "visa chat: usage lands in ai_usage against the CALLER (admin stats complete, A21)",
+    visaUsage?.profileId === profile.id && visaUsage?.promptTokens === 111 && visaUsage?.completionTokens === 22,
+    JSON.stringify(visaUsage)
+  );
+  const vchatAnon = await call(visaChatRoute.POST as any, "/api/visa/chat", {
+    method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify({ countryCode: "US" }),
+  });
+  const anonUsageRows = await db
+    .select()
+    .from(schema.aiUsage)
+    .where(and(eq(schema.aiUsage.taskType, "visa"), sql`${schema.aiUsage.profileId} IS NULL`));
+  check("visa chat: anonymous practice still works and is logged with a null profile", vchatAnon.status === 200 && anonUsageRows.length >= 1, `status ${vchatAnon.status}, rows ${anonUsageRows.length}`);
+  const vanalyze = await call(visaAnalyzeRoute.POST as any, "/api/visa/analyze", {
+    method: "POST", headers: jsonHdr,
+    body: JSON.stringify({ countryCode: "US", messages: [{ role: "user", text: "I will study computer science and fund it myself." }, { role: "assistant", text: "Why that university?" }] }),
+  });
+  check("visa analyze: the model answer keeps its disclaimer and rubric", vanalyze.status === 200 && vanalyze.body?.aiAvailable === true && typeof vanalyze.body?.chanceDisclaimer === "string" && vanalyze.body?.rubric != null, JSON.stringify(vanalyze.body)?.slice(0, 120));
+  // Deliberate, documented policy (audit A21): one interview is a multi-step
+  // conversation, so the DAILY AI quota must not cut it off mid-interview.
+  await setConfig("ai_free_requests_per_day", "0");
+  const vchatZero = await call(visaChatRoute.POST as any, "/api/visa/chat", {
+    method: "POST", headers: jsonHdr, body: JSON.stringify({ countryCode: "US" }),
+  });
+  check("visa chat: the daily AI quota is intentionally NOT applied (multi-step policy)", vchatZero.status === 200, `got ${vchatZero.status}`);
+  await setConfig("ai_free_requests_per_day", "5");
+  await deleteConfig("ai_provider_visa");
+  mockServer.close();
+
+  // ---- A23: server-side session revocation --------------------------------
+  const { checkSessionRecord } = await import("../src/lib/auth");
+  const makeDevice = async (label: string) => {
+    const tok = signSessionToken({ id: profile.id, passwordHash: profile.passwordHash });
+    await checkSessionRecord(tok, profile.id, { scope: "web", userAgent: label, ip: "127.0.0.1" });
+    return tok;
+  };
+  const tokX = await makeDevice("Mozilla/5.0 Device X");
+  const tokY = await makeDevice("Mozilla/5.0 Device Y");
+  const sessionsRoute = await import("../src/app/api/sessions/route");
+  const listX = await call(sessionsRoute.GET as any, "/api/sessions", { headers: { cookie: `sb_session=${tokX}` } });
+  const seen = listX.body?.sessions ?? [];
+  check(
+    "sessions: the owner sees every device, exactly one marked current",
+    listX.status === 200 && seen.length >= 2 && seen.filter((s: any) => s.current).length === 1 &&
+      seen.every((s: any) => !("tokenHash" in s) && !("passwordHash" in s)),
+    JSON.stringify(seen.map((s: any) => ({ id: s.id, current: s.current })))
+  );
+  // Target Device Y explicitly (the list also contains sessions created by
+  // earlier sections — revoking "the first non-current" would hit one of those).
+  const yRow = seen.find((s: any) => s.userAgent === "Mozilla/5.0 Device Y");
+  const xRow = seen.find((s: any) => s.current);
+  check("sessions: test setup found both dedicated devices", Boolean(yRow) && Boolean(xRow), JSON.stringify(seen.map((s: any) => ({ id: s.id, ua: s.userAgent }))));
+  const revokeY = await call(sessionsRoute.POST as any, "/api/sessions", {
+    method: "POST", headers: { ...jsonHdr, cookie: `sb_session=${tokX}` }, body: JSON.stringify({ sessionId: yRow.id }),
+  });
+  check("sessions: the owner can revoke another device", revokeY.status === 200 && revokeY.body?.revoked === 1, JSON.stringify(revokeY.body));
+  const tasksRoute2 = await import("../src/app/api/tasks/route");
+  const yAfter = await call(tasksRoute2.GET as any, `/api/tasks?profileId=${profile.id}`, { headers: { cookie: `sb_session=${tokY}` } });
+  check("sessions: the revoked token dies with session_revoked (401)", yAfter.status === 401 && yAfter.body?.code === "session_revoked", `got ${yAfter.status} ${yAfter.body?.code}`);
+  const xStill = await call(tasksRoute2.GET as any, `/api/tasks?profileId=${profile.id}`, { headers: { cookie: `sb_session=${tokX}` } });
+  check("sessions: the owner's own device keeps working", xStill.status === 200, `got ${xStill.status}`);
+  const selfRevoke = await call(sessionsRoute.POST as any, "/api/sessions", {
+    method: "POST", headers: { ...jsonHdr, cookie: `sb_session=${tokX}` }, body: JSON.stringify({ sessionId: xRow.id }),
+  });
+  check("sessions: the current session cannot be revoked (sign out instead)", selfRevoke.status === 400 && selfRevoke.body?.code === "current_session", `got ${selfRevoke.status}`);
+  const otherTok2 = signSessionToken({ id: other.id, passwordHash: other.passwordHash });
+  await checkSessionRecord(otherTok2, other.id, { scope: "web", userAgent: "other", ip: "127.0.0.1" });
+  const crossRevoke = await call(sessionsRoute.POST as any, "/api/sessions", {
+    method: "POST", headers: { ...jsonHdr, cookie: `sb_session=${otherTok2}` }, body: JSON.stringify({ sessionId: xRow.id }),
+  });
+  check("sessions: another student cannot revoke your sessions (404, no existence leak)", crossRevoke.status === 404, `got ${crossRevoke.status}`);
+
+  // ---- A15: the deadlines plan policy — free visibility, both channels ----
+  const deadlinesRoute = await import("../src/app/api/deadlines/route");
+  const freeDeadlines = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
+  check("deadlines: a FREE account gets the full deadline list from the web API", freeDeadlines.status === 200 && Array.isArray(freeDeadlines.body?.items), `got ${freeDeadlines.status}`);
+  const { readFileSync: readFile2 } = await import("node:fs");
+  const deadlinesSrc = readFile2("src/app/api/deadlines/route.ts", "utf8");
+  check("deadlines: the web API has no premium gate (policy: visibility is free)", !/premiumGate|requireFeatureSession/.test(deadlinesSrc));
+  const botSrc = readFile2("src/lib/telegram/bot.ts", "utf8");
+  const botDeadlinesFn = botSrc.slice(botSrc.indexOf("async function deadlines"), botSrc.indexOf("async function next"));
+  check("deadlines: the Telegram /deadlines list is FREE (policy: same data, every channel)", botDeadlinesFn.length > 0 && !/hasFeature|premium/.test(botDeadlinesFn));
+
+  // ---- A26: the instructors endpoint is admin-only and validated ----------
+  const instructorsRoute = await import("../src/app/api/admin/instructors/route");
+  const otherHdr2 = { cookie: `sb_session=${otherTok2}` };
+  const instAnon = await call(instructorsRoute.GET as any, "/api/admin/instructors", { headers: anonHdr });
+  const instStudent = await call(instructorsRoute.GET as any, "/api/admin/instructors", { headers: otherHdr2 });
+  const instAnonPost = await call(instructorsRoute.POST as any, "/api/admin/instructors", { method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify({ type: "instructor", name: "x" }) });
+  check("instructors: the admin endpoint refuses anonymous (401) and student (403) access", instAnon.status === 401 && instStudent.status === 403 && instAnonPost.status === 401, `got ${instAnon.status}/${instStudent.status}/${instAnonPost.status}`);
+
+  // -----------------------------------------------------------------------
   // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which

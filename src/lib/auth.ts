@@ -24,9 +24,10 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles, telegramLinks } from "@/db/schema";
+import { studentProfiles, telegramLinks, userSessions } from "@/db/schema";
+import { clientIp } from "@/lib/rate-limit";
 import { sanitizeProfile } from "@/lib/password";
 import { ensureCoreSchema } from "@/lib/core/db";
 
@@ -179,6 +180,89 @@ export function verifySessionToken(
 }
 
 // ---------------------------------------------------------------------------
+// Server-side session records (audit A23)
+// ---------------------------------------------------------------------------
+//
+// The token itself stays stateless (HMAC), but every sign-in also creates a
+// row in `user_sessions`, keyed by the SHA-256 of the full token. That makes
+// individual sessions revocable: a stolen token can be killed server-side
+// without logging out the owner's other devices, and password rotation keeps
+// working exactly as before (the fingerprint check runs first).
+
+/** SHA-256 hex of the full session token — what `user_sessions` stores. */
+export function sessionTokenHash(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+/** last_seen_at is refreshed at most this often per active session. */
+const LAST_SEEN_THROTTLE_MS = 60_000;
+
+/**
+ * Check (and keep fresh) the server-side record for a valid token.
+ *
+ *  - `"ok"`      — the record exists and is not revoked; or the token has no
+ *                  record yet (issued before the sessions table shipped) and
+ *                  was just lazily adopted — a deploy must never log everyone
+ *                  out;
+ *  - `"revoked"` — a record exists and has been revoked;
+ *  - `"error"`   — the lookup failed; the caller should answer 503 exactly
+ *                  like any other database lookup failure.
+ */
+export async function checkSessionRecord(
+  token: string,
+  profileId: number,
+  meta: { scope: string; userAgent?: string | null; ip?: string | null }
+): Promise<"ok" | "revoked" | "error"> {
+  const hash = sessionTokenHash(token);
+  try {
+    const [row] = await db
+      .select({ revokedAt: userSessions.revokedAt, lastSeenAt: userSessions.lastSeenAt })
+      .from(userSessions)
+      .where(eq(userSessions.tokenHash, hash))
+      .limit(1);
+    if (row) {
+      if (row.revokedAt) return "revoked";
+      const seen = row.lastSeenAt ? new Date(row.lastSeenAt).getTime() : 0;
+      if (Date.now() - seen > LAST_SEEN_THROTTLE_MS) {
+        await db
+          .update(userSessions)
+          .set({ lastSeenAt: new Date() })
+          .where(eq(userSessions.tokenHash, hash));
+      }
+      return "ok";
+    }
+    // Lazy adoption of a pre-table token (valid signature + fingerprint).
+    await db
+      .insert(userSessions)
+      .values({
+        profileId,
+        tokenHash: hash,
+        scope: meta.scope,
+        userAgent: meta.userAgent?.slice(0, 300) ?? null,
+        ip: meta.ip ?? null,
+      })
+      .onConflictDoNothing({ target: userSessions.tokenHash });
+    return "ok";
+  } catch (err) {
+    console.error("[auth] session record check failed:", err);
+    return "error";
+  }
+}
+
+/** Revoke one token server-side (sign-out, "revoke this device"). Best-effort. */
+export async function revokeSessionToken(token: string | null): Promise<void> {
+  if (!token) return;
+  try {
+    await db
+      .update(userSessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(userSessions.tokenHash, sessionTokenHash(token)), isNull(userSessions.revokedAt)));
+  } catch (err) {
+    console.error("[auth] session revocation failed:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Cookie plumbing
 // ---------------------------------------------------------------------------
 
@@ -204,6 +288,11 @@ export function sessionCookieHeader(
   const token = signSessionToken(profile, opts);
   const ttl = opts.ttlSeconds ?? SESSION_TTL_SECONDS;
   return `${SESSION_COOKIE}=${token}; ${cookieAttrs(req)}; Max-Age=${ttl}`;
+}
+
+/** `Set-Cookie` header value for a token that was signed separately. */
+export function sessionCookieFromToken(token: string, req?: Request, ttlSeconds = SESSION_TTL_SECONDS): string {
+  return `${SESSION_COOKIE}=${token}; ${cookieAttrs(req)}; Max-Age=${ttlSeconds}`;
 }
 
 /** `Set-Cookie` header value that clears the session (logout). */
@@ -347,6 +436,24 @@ async function authenticateTelegramChannel(token: string): Promise<AuthResult> {
       error: "This Telegram account is no longer connected to ScholarBridge.",
     };
   }
+  // Same revocation story as web sessions (audit A23).
+  const record = await checkSessionRecord(token, row.id, { scope: "telegram" });
+  if (record === "revoked") {
+    return {
+      ok: false,
+      status: 401,
+      code: "session_revoked",
+      error: "This session was revoked. Please connect Telegram again.",
+    };
+  }
+  if (record === "error") {
+    return {
+      ok: false,
+      status: 503,
+      code: "unavailable",
+      error: "Authentication is temporarily unavailable.",
+    };
+  }
   const { passwordHash: _secret, ...safeProfile } = row;
   return {
     ok: true,
@@ -427,6 +534,31 @@ export async function authenticate(req: Request): Promise<AuthResult> {
       status: 401,
       code: "session_expired",
       error: "Your password changed — please sign in again.",
+    };
+  }
+
+  // Individual session revocation (audit A23): a valid signature and password
+  // fingerprint are not enough when this session was revoked server-side.
+  const token = readSessionToken(req);
+  const record = await checkSessionRecord(token ?? "", row.id, {
+    scope: "web",
+    userAgent: req.headers.get("user-agent"),
+    ip: clientIp(req),
+  });
+  if (record === "revoked") {
+    return {
+      ok: false,
+      status: 401,
+      code: "session_revoked",
+      error: "This session was revoked. Please sign in again.",
+    };
+  }
+  if (record === "error") {
+    return {
+      ok: false,
+      status: 503,
+      code: "unavailable",
+      error: "Authentication is temporarily unavailable.",
     };
   }
 

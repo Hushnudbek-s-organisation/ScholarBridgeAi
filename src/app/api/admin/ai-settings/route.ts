@@ -20,7 +20,8 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { deleteConfig, getStoredConfig, setConfig } from "@/lib/config";
 import { writeAudit } from "@/lib/audit";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import {
   AI_PROVIDERS,
@@ -127,7 +128,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
     const actorId = access.session.profile.id;
-    const limit = checkRateLimit(`admin-ai:${actorId}`, LIMITS.adminWrite);
+    const limit = await checkSharedRateLimit(`admin-ai:${actorId}`, LIMITS.adminWrite);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
     const parsed = await readJsonBody<Record<string, unknown>>(req, 16 * 1024);
     if (!parsed.ok) return bad(parsed.error, parsed.code, parsed.status);
@@ -240,7 +241,7 @@ export async function POST(req: Request) {
     const body = parsed.body;
 
     if (body.action === "reencrypt") {
-      const limit = checkRateLimit(`admin-ai:${actorId}`, LIMITS.adminWrite);
+      const limit = await checkSharedRateLimit(`admin-ai:${actorId}`, LIMITS.adminWrite);
       if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
       const result = await reencryptStoredKeys();
       await audit("ai_keys_reencrypted", null, result, actorId);
@@ -248,7 +249,7 @@ export async function POST(req: Request) {
     }
 
     // Health checks call the provider (and deep checks spend tokens).
-    const limit = checkRateLimit(`admin-ai-test:${actorId}`, { limit: 20, windowMs: 10 * 60_000 });
+    const limit = await checkSharedRateLimit(`admin-ai-test:${actorId}`, { limit: 20, windowMs: 10 * 60_000 });
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     const provider = String(body.provider ?? "");

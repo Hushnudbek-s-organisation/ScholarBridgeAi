@@ -9,9 +9,11 @@
  * group of the sidebar.
  */
 import React, { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { CalendarPlus, Check, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
 
 // ===========================================================================
 // DOCUMENT VAULT (spec §7)
@@ -34,10 +36,12 @@ interface VaultData {
 }
 
 export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+  const t = useTranslations("journey");
+  const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<VaultData>(
-    useCallback(() => getJson<VaultData>(`/api/vault/documents?profileId=${profileId}`, "Could not load documents"), [profileId]),
+    useCallback(() => getJson<VaultData>(`/api/vault/documents?profileId=${profileId}`, t("dvLoadError")), [profileId, t]),
     [profileId],
-    { initial: { docTypes: [], documents: [], summary: { total: 0, verified: 0, expiring: 0, expired: 0 } }, errorFallback: "Could not load documents" }
+    { initial: { docTypes: [], documents: [], summary: { total: 0, verified: 0, expiring: 0, expired: 0 } }, errorFallback: t("dvLoadError") }
   );
   const [form, setForm] = useState({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
   const [busy, setBusy] = useState(false);
@@ -46,18 +50,18 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
     if (!form.title.trim()) return;
     setBusy(true);
     try {
-      await sendJson("/api/vault/documents", { method: "POST", body: JSON.stringify({ profileId, ...form }) }, "Could not add the document");
+      await sendJson("/api/vault/documents", { method: "POST", body: JSON.stringify({ profileId, ...form }) }, t("dvAddError"));
       setForm({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not add the document");
+      alert(e instanceof Error ? e.message : t("dvAddError"));
     } finally {
       setBusy(false);
     }
   };
 
   const patchDoc = async (body: Record<string, unknown>) => {
-    await sendJson("/api/vault/documents", { method: "PATCH", body: JSON.stringify(body) }, "Could not update");
+    await sendJson("/api/vault/documents", { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
     await reload();
   };
 
@@ -66,56 +70,56 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
     await reload();
   };
 
-  if (loading && data.documents.length === 0) return <Loading label="Opening your document vault…" />;
+  if (loading && data.documents.length === 0) return <Loading label={t("dvLoading")} />;
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="Document vault"
-        subtitle="Upload once, reuse across every application. Passports and test certificates expire — we warn you before they do."
+        title={t("dvTitle")}
+        subtitle={t("dvSubtitle")}
         action={
           <div className="flex flex-wrap gap-2 text-[11px] font-bold">
-            <Pill tone="slate">{data.summary.total} documents</Pill>
-            {data.summary.expiring > 0 && <Pill tone="warn">{data.summary.expiring} expiring</Pill>}
-            {data.summary.expired > 0 && <Pill tone="bad">{data.summary.expired} expired</Pill>}
+            <Pill tone="slate">{t("dvDocumentsPill", { n: data.summary.total })}</Pill>
+            {data.summary.expiring > 0 && <Pill tone="warn">{t("dvExpiringPill", { n: data.summary.expiring })}</Pill>}
+            {data.summary.expired > 0 && <Pill tone="bad">{t("dvExpiredPill", { n: data.summary.expired })}</Pill>}
           </div>
         }
       >
         {error && <ErrorNote message={error} />}
 
         <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Type">
+          <Field label={t("dvFieldType")}>
             <select className={inputClass} value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
-              {data.docTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace(/_/g, " ")}
+              {data.docTypes.map((dt) => (
+                <option key={dt} value={dt}>
+                  {t(`doc${dt[0].toUpperCase()}${dt.slice(1)}`)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Title">
-            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Passport — Aziz Karimov" />
+          <Field label={t("dvFieldTitle")}>
+            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("dvTitlePlaceholder")} />
           </Field>
-          <Field label="Issued">
+          <Field label={t("dvFieldIssued")}>
             <input type="date" className={inputClass} value={form.issuedAt} onChange={(e) => setForm({ ...form, issuedAt: e.target.value })} />
           </Field>
-          <Field label="Expires" hint="Leave empty if it never expires">
+          <Field label={t("dvFieldExpires")} hint={t("dvExpiresHint")}>
             <input type="date" className={inputClass} value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
           </Field>
         </div>
         <Button onClick={add} disabled={busy || !form.title.trim()}>
-          <Plus className="h-3.5 w-3.5" /> Add document
+          <Plus className="h-3.5 w-3.5" /> {t("dvAdd")}
         </Button>
       </JourneyCard>
 
       {data.documents.length === 0 ? (
-        <Empty title="Your vault is empty" hint="Start with your passport and your transcript — almost every application asks for both." />
+        <Empty title={t("dvEmptyTitle")} hint={t("dvEmptyHint")} />
       ) : (
         <JourneyCard
-          title="Your documents"
+          title={t("dvYourDocs")}
           action={
             <Button size="sm" variant="outline" onClick={() => onNavigateTab("requirements")}>
-              See what each application needs
+              {t("dvSeeNeeds")}
             </Button>
           }
         >
@@ -127,13 +131,13 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{d.title}</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {d.docType.replace(/_/g, " ")}
-                      {d.expiresAt && ` · expires ${d.expiresAt}`}
-                      {d.usedBy.length > 0 && ` · used by ${d.usedBy.length} application(s)`}
+                      {t(`doc${d.docType[0].toUpperCase()}${d.docType.slice(1)}`)}
+                      {d.expiresAt && t("dvExpires", { date: d.expiresAt })}
+                      {d.usedBy.length > 0 && t("dvUsedBy", { n: d.usedBy.length })}
                     </p>
                     {d.daysToExpiry != null && d.daysToExpiry < 180 && (
                       <p className="mt-1">
-                        <Pill tone={toneForDays(d.daysToExpiry)}>{daysLabel(d.daysToExpiry)}</Pill>
+                        <Pill tone={toneForDays(d.daysToExpiry)}>{daysLabel(d.daysToExpiry, locale)}</Pill>
                       </p>
                     )}
                     {d.usedBy.length > 0 && (
@@ -143,14 +147,14 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
                   <div className="flex shrink-0 flex-wrap gap-1">
                     {d.status !== "verified" ? (
                       <Button size="sm" variant="outline" onClick={() => void patchDoc({ profileId, id: d.id, status: "verified" })}>
-                        <Check className="h-3 w-3" /> Verify
+                        <Check className="h-3 w-3" /> {t("dvVerify")}
                       </Button>
                     ) : (
                       <Button size="sm" variant="ghost" onClick={() => void patchDoc({ profileId, id: d.id, status: "needs_update" })}>
-                        Needs update
+                        {t("dvNeedsUpdate")}
                       </Button>
                     )}
-                    <Button size="sm" variant="danger" onClick={() => void remove(d.id)} aria-label={`Delete ${d.title}`}>
+                    <Button size="sm" variant="danger" onClick={() => void remove(d.id)} aria-label={t("dvDeleteAria", { title: d.title })}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
@@ -158,7 +162,7 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <input
                     className={inputClass}
-                    placeholder="Paste a file link (Drive, Dropbox, your own upload)"
+                    placeholder={t("dvFilePlaceholder")}
                     defaultValue={d.fileUrl ?? ""}
                     onBlur={(e) => {
                       if (e.target.value === (d.fileUrl ?? "")) return;
@@ -176,7 +180,7 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
             ))}
           </ul>
           <p className="mt-3 text-[11px] text-slate-400">
-            Only you can see your documents. They are never shared with a parent, a mentor or an employer.
+            {t("dvPrivacyNote")}
           </p>
         </JourneyCard>
       )}

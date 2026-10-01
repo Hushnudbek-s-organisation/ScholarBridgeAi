@@ -6,6 +6,7 @@ import { GraduationCap } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { CourseCatalog, CourseItem } from "./CourseCatalog";
 import { CoursePlayer } from "./CoursePlayer";
+import { MyCertificatesPanel } from "./MyCertificatesPanel";
 
 interface CoursesSectionProps {
   activeProfile: StudentProfile | null;
@@ -47,6 +48,8 @@ export function CoursesSection({ activeProfile }: CoursesSectionProps) {
           </div>
         </div>
       </div>
+
+      <MyCertificatesPanel activeProfile={activeProfile} />
 
       {openCourseId && activeProfile ? (
         <CoursePlayer

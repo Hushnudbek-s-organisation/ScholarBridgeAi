@@ -9,9 +9,12 @@
  * (the app uses CSS variables via `ThemeProvider`).
  */
 import React from "react";
+import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Circle, CircleDashed, Info, TriangleAlert, XCircle } from "lucide-react";
 import { AnimatedNumber, AnimatedRing } from "@/components/motion";
+import { dictionaries } from "@/i18n/messages";
+import { isLocale } from "@/i18n/config";
 
 /**
  * A titled surface — the workhorse of every Journey screen.
@@ -102,6 +105,7 @@ export function ProgressBar({
   };
   const heights: Record<string, string> = { sm: "h-1.5", md: "h-2.5", lg: "h-3.5" };
   const reduceMotion = useReducedMotion();
+  const t = useTranslations("journey");
   return (
     <div>
       <div
@@ -110,7 +114,7 @@ export function ProgressBar({
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={label ?? "Progress"}
+        aria-label={label ?? t("uiProgressAria")}
       >
         <div className={`h-full rounded-full transition-all ${tones[tone]}`} style={{ width: `${value}%` }} />
       </div>
@@ -210,11 +214,12 @@ export function SourceTag({
   lastVerified?: string | Date | null;
   verificationStatus?: string | null;
 }) {
+  const t = useTranslations("journey");
   // SPEC §4: an unsourced requirement must never read as an official fact.
   if (!url) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
-        <Info className="h-3 w-3" aria-hidden /> Not specified
+        <Info className="h-3 w-3" aria-hidden /> {t("uiNotSpecified")}
       </span>
     );
   }
@@ -235,12 +240,13 @@ export function SourceTag({
       target="_blank"
       rel="noopener noreferrer nofollow"
       className={`inline-flex items-center gap-1 text-[10px] font-medium underline-offset-2 hover:underline ${tone}`}
-      title={name ?? "Official source"}
+      title={name ?? t("uiOfficialSource")}
     >
-      {name ?? "Source"}
+      {name ?? t("uiSourceFallback")}
       {when && (
         <span className="text-slate-500 dark:text-slate-400">
-          · {verificationStatus === "verified" ? "verified" : verificationStatus === "outdated" ? "outdated" : "last checked"} {when}
+          · {verificationStatus === "verified" ? t("uiVerified") : verificationStatus === "outdated" ? t("uiOutdated") : t("uiLastChecked")}{" "}
+          {when}
         </span>
       )}
     </a>
@@ -286,7 +292,7 @@ export function SkeletonCard({ lines = 3, className = "" }: { lines?: number; cl
  * message) plus skeleton cards shaped like the content that is arriving.
  */
 export function Loading({
-  label = "Loading…",
+  label,
   rows = 3,
   cards = 0,
 }: {
@@ -296,18 +302,20 @@ export function Loading({
   /** > 0 renders full skeleton CARDS instead — for whole-page panels only. */
   cards?: number;
 }) {
+  const t = useTranslations("journey");
+  const shown = label ?? t("uiLoadingDefault");
   const widths = ["w-2/5", "w-full", "w-4/5", "w-3/5", "w-5/6"];
   return (
     <div className="space-y-4" aria-busy="true">
       <p className="sr-only" role="status" aria-live="polite">
-        {label}
+        {shown}
       </p>
       <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-70" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500" />
         </span>
-        {label}
+        {shown}
       </div>
       {cards > 0 ? (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -472,13 +480,14 @@ export const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:focus:ring-indigo-900";
 
 /** "in 4 days" / "today" / "3 days ago" — the format the spec asks for. */
-export function daysLabel(days: number | null): string {
-  if (days == null) return "No date";
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days === -1) return "Yesterday";
-  if (days > 0) return `${days} days left`;
-  return `${Math.abs(days)} days ago`;
+export function daysLabel(days: number | null, locale: string = "en"): string {
+  const m = isLocale(locale) ? dictionaries[locale].journey : dictionaries.en.journey;
+  if (days == null) return m.daysNoDate;
+  if (days === 0) return m.daysToday;
+  if (days === 1) return m.daysTomorrow;
+  if (days === -1) return m.daysYesterday;
+  if (days > 0) return m.daysLeft.replace("{n}", String(days));
+  return m.daysAgo.replace("{n}", String(Math.abs(days)));
 }
 
 export function toneForDays(days: number | null): "good" | "warn" | "bad" | "slate" {

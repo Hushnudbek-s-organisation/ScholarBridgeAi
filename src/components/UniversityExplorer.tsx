@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { 
   Search, 
@@ -76,6 +78,9 @@ export function UniversityExplorer({
   onUnsaveUniversity,
   autoOpenUniversityId,
 }: UniversityExplorerProps) {
+  const t = useTranslations("university");
+  const { locale } = useLocaleContext();
+
   const [universities, setUniversities] = useState<University[]>([]);
   const [fetchError, setFetchError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -157,9 +162,9 @@ export function UniversityExplorer({
       if (!res.ok) {
         // Show the real server error instead of a misleading empty message.
         if (data?.error?.includes("does not exist") || data?.error?.includes("column") || data?.error?.includes("out of date")) {
-          setFetchError("Database schema is out of date. Please run `supabase/add_data_integrity.sql` in Supabase SQL Editor (or redeploy on Render) to add the new columns.");
+          setFetchError(t("exSchemaError"));
         } else {
-          setFetchError(data?.error || "Failed to load universities.");
+          setFetchError(data?.error || t("exLoadError"));
         }
         setUniversities([]);
         return;
@@ -180,7 +185,7 @@ export function UniversityExplorer({
       }
     } catch (err: any) {
       console.error("Error fetching universities:", err);
-      setFetchError(err?.message || "Failed to load universities.");
+      setFetchError(err?.message || t("exLoadError"));
     } finally {
       setLoading(false);
     }
@@ -200,7 +205,7 @@ export function UniversityExplorer({
         return prev.filter((item) => item !== id);
       } else {
         if (prev.length >= 3) {
-          alert("You can compare up to 3 universities at once.");
+          alert(t("exCompareLimit"));
           return prev;
         }
         return [...prev, id];
@@ -235,6 +240,17 @@ export function UniversityExplorer({
     compareIds.includes(u.id),
   );
 
+  // Degree level shown next to the results count (locked to the profile for
+  // active students, free for guests) — translated per locale.
+  const levelKeyMap: Record<string, string> = {
+    Bachelor: t("exLevelBachelor"),
+    Master: t("exLevelMaster"),
+    PhD: t("exLevelPhD"),
+    Diploma: t("exLevelDiploma"),
+  };
+  const activeLevel = activeProfile?.degreeLevel || (selectedLevel !== "All" ? selectedLevel : null);
+  const levelLabel = activeLevel ? levelKeyMap[activeLevel] ?? activeLevel : null;
+
   if (selectedUniId != null) {
     return (
       <UniversityDetail
@@ -253,10 +269,10 @@ export function UniversityExplorer({
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Search className="h-5 w-5 text-indigo-600" />
-              Global University & Program Explorer
+              {t("exTitle")}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Filtered by match criteria against {activeProfile?.name || "active student profile"}.
+              {t("exFilteredBy", { profile: activeProfile?.name || t("exProfileFallback") })}
             </p>
           </div>
 
@@ -266,7 +282,7 @@ export function UniversityExplorer({
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-xl text-xs shadow-md hover:shadow-indigo-200 transition-all"
             >
               <Columns className="h-4 w-4" />
-              Compare Selected ({compareIds.length})
+              {t("exCompareSelected", { count: compareIds.length })}
             </button>
           )}
         </div>
@@ -278,7 +294,7 @@ export function UniversityExplorer({
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search university, major, or city..."
+              placeholder={t("exSearchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -292,16 +308,16 @@ export function UniversityExplorer({
               onChange={(e) => setSelectedCountry(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
             >
-              <option value="All">🌐 All Destinations</option>
-              <option value="United States">🇺🇸 United States</option>
-              <option value="United Kingdom">🇬🇧 United Kingdom</option>
-              <option value="Canada">🇨🇦 Canada</option>
-              <option value="Germany">🇩🇪 Germany</option>
-              <option value="Singapore">🇸🇬 Singapore</option>
-              <option value="Australia">🇦🇺 Australia</option>
-              <option value="Switzerland">🇨🇭 Switzerland</option>
-              <option value="Netherlands">🇳🇱 Netherlands</option>
-              <option value="Japan">🇯🇵 Japan</option>
+              <option value="All">{t("exCountryAll")}</option>
+              <option value="United States">{t("exCountryUS")}</option>
+              <option value="United Kingdom">{t("exCountryGB")}</option>
+              <option value="Canada">{t("exCountryCA")}</option>
+              <option value="Germany">{t("exCountryDE")}</option>
+              <option value="Singapore">{t("exCountrySG")}</option>
+              <option value="Australia">{t("exCountryAU")}</option>
+              <option value="Switzerland">{t("exCountryCH")}</option>
+              <option value="Netherlands">{t("exCountryNL")}</option>
+              <option value="Japan">{t("exCountryJP")}</option>
             </select>
           </div>
 
@@ -311,14 +327,14 @@ export function UniversityExplorer({
               value={activeProfile?.degreeLevel || selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
               disabled={Boolean(activeProfile?.degreeLevel)}
-              aria-label="Target degree level"
+              aria-label={t("exLevelAria")}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
             >
-              {!activeProfile?.degreeLevel && <option value="All">🎓 All Degree Levels</option>}
-              <option value="Bachelor">🎓 Bachelor programs</option>
-              <option value="Master">🎓 Master programs</option>
-              <option value="PhD">🎓 PhD / Doctorate programs</option>
-              {activeProfile?.degreeLevel === "Diploma" && <option value="Diploma">🎓 Diploma / Post-grad programs</option>}
+              {!activeProfile?.degreeLevel && <option value="All">{t("exLevelAll")}</option>}
+              <option value="Bachelor">{t("exLevelBachelor")}</option>
+              <option value="Master">{t("exLevelMaster")}</option>
+              <option value="PhD">{t("exLevelPhD")}</option>
+              {activeProfile?.degreeLevel === "Diploma" && <option value="Diploma">{t("exLevelDiploma")}</option>}
             </select>
           </div>
 
@@ -329,17 +345,17 @@ export function UniversityExplorer({
               onChange={(e) => setSortBy(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
             >
-              <option value="rank">🏆 Sort: QS Ranking</option>
-              <option value="tuition_asc">💰 Tuition: Low → High</option>
-              <option value="tuition_desc">💰 Tuition: High → Low</option>
-              <option value="name_asc">🔤 Name: A → Z</option>
+              <option value="rank">{t("exSortRank")}</option>
+              <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
+              <option value="tuition_desc">{t("exSortTuitionDesc")}</option>
+              <option value="name_asc">{t("exSortNameAsc")}</option>
             </select>
           </div>
 
           {/* Max Tuition Slider */}
           <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col justify-center">
             <div className="flex justify-between items-center text-[11px] font-semibold text-slate-700">
-              <span>Max Tuition:</span>
+              <span>{t("exMaxTuition")}</span>
               <span className="text-indigo-600 font-bold">${formatNumber(maxTuition, { placeholder: "0", suffix: "/yr" })}</span>
             </div>
             <input
@@ -358,32 +374,35 @@ export function UniversityExplorer({
       {/* Results Count & Active Info */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
-          Showing {totalCount === 0 ? 0 : (page - 1) * perPage + 1}-
-          {(page - 1) * perPage + filteredUniversities.length} of {totalCount}{" "}
-          {activeProfile?.degreeLevel || selectedLevel !== "All" ? `${activeProfile?.degreeLevel || selectedLevel} ` : ""}matched university programs
+          {levelLabel ? <b>{levelLabel} — </b> : null}
+          {t("exResultsCount", {
+            from: totalCount === 0 ? 0 : (page - 1) * perPage + 1,
+            to: (page - 1) * perPage + filteredUniversities.length,
+            total: totalCount,
+          })}
         </span>
-        <span className="shrink-0">Page {page} of {totalPages}</span>
+        <span className="shrink-0">{t("exPageOf", { page, totalPages })}</span>
       </div>
 
       {/* University Cards Grid */}
       {loading ? (
         <div className="p-12 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
-          Loading universities & evaluating profile matches...
+          {t("exLoading")}
         </div>
       ) : fetchError ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-red-200">
-          <p className="text-xs font-bold text-red-700 mb-2">Failed to load universities</p>
+          <p className="text-xs font-bold text-red-700 mb-2">{t("exLoadFailed")}</p>
           <p className="text-[11px] text-slate-600 break-all">{fetchError}</p>
           <button
             onClick={fetchUniversities}
             className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
           >
-            Try again
+            {t("exTryAgain")}
           </button>
         </div>
       ) : filteredUniversities.length === 0 ? (
         <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
-          No universities match your filter criteria. Try adjusting max tuition or target country.
+          {t("exEmpty")}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -431,14 +450,14 @@ export function UniversityExplorer({
                   {/* Match Score Badge */}
                   <div className="absolute top-3 left-3 flex items-center gap-1.5">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
-                      {uni.matchScore != null ? `${uni.matchScore}% Match` : "Match data unavailable"} • {uni.matchCategory ?? "—"}
+                      {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")} • {uni.matchCategory ?? "—"}
                     </span>
                   </div>
 
                   {/* World Rank Badge */}
                   <div className="absolute top-3 right-3 bg-slate-900/80 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-1">
                     <Star className="h-3 w-3 fill-amber-300" />
-                    World #{formatNumber(uni.worldRanking, { placeholder: "—" })}
+                    {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
                   </div>
 
                   {/* Title & Country Overlay */}
@@ -466,19 +485,19 @@ export function UniversityExplorer({
                     {/* Key Requirements Grid — NULL = Not specified (spec §19) */}
                     <div className="grid grid-cols-2 gap-2 my-3 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <div>
-                        <span className="text-slate-400 block">Annual Tuition:</span>
+                        <span className="text-slate-400 block">{t("exAnnualTuition")}</span>
                         <strong className="text-slate-900">{formatMoney(uni.annualTuitionUsd, "USD")}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">Living Est.:</span>
+                        <span className="text-slate-400 block">{t("exLivingEst")}</span>
                         <strong className="text-slate-900">{formatMoney(uni.annualLivingEstUsd, "USD", { suffix: "/yr" })}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">Min GPA:</span>
+                        <span className="text-slate-400 block">{t("exMinGpa")}</span>
                         <strong className="text-slate-900">{formatNumber(uni.minGpa, { decimals: 2, suffix: " / 4.0" })}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">Min IELTS:</span>
+                        <span className="text-slate-400 block">{t("exMinIelts")}</span>
                         <strong className="text-slate-900">{formatNumber(uni.minIelts, { decimals: 1 })}</strong>
                       </div>
                     </div>
@@ -500,13 +519,13 @@ export function UniversityExplorer({
                         {uni.matchReasons?.map((r, i) => (
                           <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
                             <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>Why:</b> {r}</span>
+                            <span><b>{t("exWhyMatch")}</b> {r}</span>
                           </p>
                         ))}
                         {uni.matchIssues?.map((r, i) => (
                           <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
                             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>Why lower:</b> {r}</span>
+                            <span><b>{t("exWhyLower")}</b> {r}</span>
                           </p>
                         ))}
                       </div>
@@ -517,7 +536,7 @@ export function UniversityExplorer({
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-600">
                     <span className="flex items-center gap-1 font-medium">
                       <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
-                      Post-Study Work Visa:
+                      {t("exPsWorkVisa")}
                     </span>
                     <strong className="text-slate-900 font-bold">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
                   </div>
@@ -531,17 +550,17 @@ export function UniversityExplorer({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
                       >
-                        <ExternalLink className="h-3 w-3" /> Source
+                        <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
                       </a>
                     ) : (
-                      <span className="text-slate-400">Source: pending verification</span>
+                      <span className="text-slate-400">{t("exSourcePending")}</span>
                     )}
                     {uni.sourceLastVerifiedAt ? (
                       <span className="text-slate-400">
-                        Last verified: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString()}
+                        {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
                       </span>
                     ) : uni.sourceUrl ? (
-                      <span className="text-slate-400">Last verified: —</span>
+                      <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
                     ) : null}
                   </div>
 
@@ -554,7 +573,7 @@ export function UniversityExplorer({
                         onChange={() => toggleCompare(uni.id)}
                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>Compare</span>
+                      <span>{t("exCompare")}</span>
                     </label>
 
                     <div className="flex items-center gap-2">
@@ -563,7 +582,7 @@ export function UniversityExplorer({
                         target="_blank"
                         rel="noreferrer"
                         className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl transition-colors"
-                        title="Visit Official Portal"
+                        title={t("exVisitPortal")}
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
@@ -573,7 +592,7 @@ export function UniversityExplorer({
                         className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        View University
+                        {t("exViewUniversity")}
                       </button>
 
                       {isSaved ? (
@@ -582,7 +601,7 @@ export function UniversityExplorer({
                           className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
                         >
                           <Check className="h-3.5 w-3.5" />
-                          Saved
+                          {t("exSaved")}
                         </button>
                       ) : (
                         <button
@@ -590,7 +609,7 @@ export function UniversityExplorer({
                           className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors"
                         >
                           <Plus className="h-3.5 w-3.5" />
-                          Shortlist
+                          {t("exShortlist")}
                         </button>
                       )}
                     </div>
@@ -619,7 +638,7 @@ export function UniversityExplorer({
             <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Columns className="h-5 w-5" />
-                Side-by-Side University Comparison
+                {t("exCompareTitle")}
               </h3>
               <button
                 onClick={() => setShowCompareModal(false)}
@@ -632,13 +651,13 @@ export function UniversityExplorer({
             <div className="p-6 overflow-x-auto">
               {compareLoading ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-500">
-                  Loading selected universities...
+                  {t("exCompareLoading")}
                 </p>
               ) : (
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold text-slate-500 w-1/4">Metric</th>
+                    <th className="py-3 px-4 font-bold text-slate-500 w-1/4">{t("exMetric")}</th>
                     {comparedUniversities.map((u) => (
                       <th key={u.id} className="py-3 px-4 font-bold text-slate-900 text-sm w-1/4">
                         <div className="flex items-center gap-1">
@@ -651,49 +670,49 @@ export function UniversityExplorer({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">World Ranking</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMWorldRanking")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Match Score</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-emerald-600">{u.matchScore != null ? `${u.matchScore}%` : "—"} ({u.matchCategory ?? "—"})</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Annual Tuition</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAnnualTuition")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900 font-bold">{formatMoney(u.annualTuitionUsd, "USD")}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Living Expenses</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMLivingExpenses")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatMoney(u.annualLivingEstUsd, "USD", { suffix: "/yr" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Post-Study Work Visa</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMPsWorkVisa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-amber-700">{formatNumber(u.postStudyWorkVisaYears, { placeholder: "—", suffix: " Years" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Min GPA Cutoff</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinGpa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minGpa, { decimals: 2, suffix: " / 4.0" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Min IELTS Cutoff</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinIelts")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minIelts, { decimals: 1 })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">Acceptance Rate</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAcceptanceRate")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatPercent(u.acceptanceRate, { placeholder: "—" })}</td>
                     ))}

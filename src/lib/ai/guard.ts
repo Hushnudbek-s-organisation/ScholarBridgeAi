@@ -28,6 +28,7 @@ import {
   clientIp,
   rateLimitedResponse,
 } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampPrompt, readJsonBody } from "@/lib/request";
 
 export type AiGuardResult =
@@ -87,8 +88,8 @@ export async function guardAiRequest(
   // Authenticated callers are limited per account; anonymous ones per IP and
   // far more tightly — an unauthenticated AI proxy is how bills get burned.
   const limit = session
-    ? checkRateLimit(`ai:${session.profile.id}`, LIMITS.ai)
-    : checkRateLimit(`ai:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
+    ? await checkSharedRateLimit(`ai:${session.profile.id}`, LIMITS.ai)
+    : await checkSharedRateLimit(`ai:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
   if (!limit.ok) {
     return { ok: false, response: rateLimitedResponse(limit.retryAfterSec) };
   }

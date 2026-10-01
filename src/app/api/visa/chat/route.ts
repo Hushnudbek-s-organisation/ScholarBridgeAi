@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
+import { authenticate } from "@/lib/auth";
+import { logAIUsage } from "@/lib/ai/usage";
 import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
@@ -16,12 +18,26 @@ import { readJsonBody } from "@/lib/request";
  * Body: { countryCode, gender?, messages: [{role, text}], profile? }
  * Returns: { reply } — the AI visa officer's next line (first question when
  * `messages` is empty).
+ *
+ * Metering (audit A21): every signed-in caller's usage is recorded in
+ * `ai_usage` (admin statistics are complete) and throttled per account;
+ * anonymous callers keep the per-IP throttle. The daily AI request quota is
+ * INTENTIONALLY not applied here: one practice interview is a multi-step
+ * conversation (10+ messages) and would exhaust a free 5-request/day budget
+ * mid-interview — the per-minute limits below are the abuse control instead.
+ * This exclusion is deliberate, documented and test-covered.
  */
 export async function POST(req: Request) {
   try {
-    // This endpoint calls a paid model and is reachable anonymously — throttle
-    // it per IP so it cannot be used as a free AI proxy.
-    const limit = checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
+    // Who is calling? A signed-in account gets a per-account budget and its
+    // usage is logged against it; an anonymous caller is throttled per IP so
+    // the endpoint cannot be used as a free AI proxy.
+    const auth = await authenticate(req);
+    const session = auth.ok ? auth.session : null;
+
+    const limit = session
+      ? checkRateLimit(`visa:chat:${session.profile.id}`, LIMITS.ai)
+      : checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     // Provider = admin's "visa" mapping (default Groq); see lib/ai/settings.
@@ -82,6 +98,25 @@ export async function POST(req: Request) {
         { error: "The AI officer returned an empty reply. Please try again." },
         { status: 502 },
       );
+    }
+
+    // Usage goes to the caller (or null for anonymous) so admin statistics
+    // and future per-task reporting are complete (audit A21). Awaited (not
+    // fire-and-forget) so the row exists before the response is sent; a
+    // storage blip must never fail an otherwise successful interview turn.
+    try {
+      await logAIUsage({
+        profileId: session?.profile.id ?? null,
+        taskType: "visa",
+        provider: result.response.provider,
+        model: result.response.model,
+        promptTokens: result.response.promptTokens,
+        completionTokens: result.response.completionTokens,
+        costEstimate: result.response.costEstimate,
+        status: "success",
+      });
+    } catch (err) {
+      console.error("Visa chat usage log failed:", err);
     }
 
     return NextResponse.json({ reply });

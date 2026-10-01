@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
+import { logAIUsage } from "@/lib/ai/usage";
 import {
   buildAnalysisPrompt,
   getVisaCountry,
@@ -11,7 +12,7 @@ import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rat
 import { readJsonBody } from "@/lib/request";
 import { db } from "@/db";
 import { aiEvaluations } from "@/db/schema";
-import { requireProfileAccess } from "@/lib/auth";
+import { authenticate, requireProfileAccess } from "@/lib/auth";
 import { enforceFreeCap } from "@/lib/planLimits";
 
 /**
@@ -28,11 +29,24 @@ import { enforceFreeCap } from "@/lib/planLimits";
  *   - `estimated_visa_chance` is the model's opinion and is shipped with a
  *     disclaimer, because a consular decision depends on the officer, the post
  *     and documents this endpoint never sees.
+ *
+ * Metering (audit A21): a successful model analysis is recorded in
+ * `ai_usage` against the signed-in caller (null for anonymous) so admin
+ * statistics are complete. The daily AI request quota is intentionally NOT
+ * applied (multi-step practice; see /api/visa/chat) — the per-minute limits
+ * and the free practice-session cap remain the abuse controls.
  */
 export async function POST(req: Request) {
   try {
-    // Paid model, anonymous endpoint — throttle per IP (see lib/rate-limit).
-    const limit = checkRateLimit(`visa:analyze:${clientIp(req)}`, LIMITS.aiAnonymous);
+    // Paid model, reachable anonymously — signed-in callers get a per-account
+    // budget (and their usage is logged against them), anonymous callers a
+    // per-IP one, so the endpoint cannot be used as a free AI proxy.
+    const auth = await authenticate(req);
+    const session = auth.ok ? auth.session : null;
+
+    const limit = session
+      ? checkRateLimit(`visa:analyze:${session.profile.id}`, LIMITS.ai)
+      : checkRateLimit(`visa:analyze:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     const parsed = await readJsonBody<Record<string, any>>(req, 256 * 1024);
@@ -136,6 +150,24 @@ export async function POST(req: Request) {
         { error: "Could not parse the AI analysis. Please try again." },
         { status: 502 },
       );
+    }
+
+    // Record the model spend against the caller (audit A21). Awaited so the
+    // row exists before the response is sent; a storage blip never fails the
+    // analysis (the deterministic rubric already shipped with it).
+    try {
+      await logAIUsage({
+        profileId: session?.profile.id ?? null,
+        taskType: "visa",
+        provider: result.response.provider,
+        model: result.response.model,
+        promptTokens: result.response.promptTokens,
+        completionTokens: result.response.completionTokens,
+        costEstimate: result.response.costEstimate,
+        status: "success",
+      });
+    } catch (err) {
+      console.error("Visa analyze usage log failed:", err);
     }
 
     return NextResponse.json({

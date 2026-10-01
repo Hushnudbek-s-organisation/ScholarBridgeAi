@@ -6,6 +6,7 @@ import {
   programRequirements,
   applicationCycles,
   universitySources,
+  programSources,
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
@@ -134,6 +135,73 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(universityPrograms.universityId, uniId))
       .orderBy(asc(universityPrograms.name));
 
+    // ---------- Program → source links (provenance, spec §19) ----------
+    // Batch-loaded for every program of this university; resilient like the
+    // university sources block (a missing table must not 500 the page).
+    const programSourcesMap = new Map<
+      number,
+      {
+        url: string;
+        title: string;
+        sourceType: string;
+        domain: string | null;
+        accessedAt: string | null;
+        isOfficial: boolean;
+        isVerified: boolean;
+      }[]
+    >();
+    try {
+      const progIds = programs.map((p) => p.id);
+      if (progIds.length) {
+        const linkRows = await db
+          .select({
+            programId: programSources.programId,
+            sourceId: programSources.sourceId,
+            sourceType: programSources.sourceType,
+          })
+          .from(programSources)
+          .where(inArray(programSources.programId, progIds));
+        const srcIds = [...new Set(linkRows.map((r) => r.sourceId).filter((x): x is number => x != null))];
+        const srcMap = new Map<
+          number,
+          { url: string; title: string; domain: string | null; accessedAt: Date | null; isOfficial: boolean; isVerified: boolean }
+        >();
+        if (srcIds.length) {
+          const srows = await db
+            .select({
+              id: sources.id,
+              url: sources.url,
+              title: sources.title,
+              domain: sources.domain,
+              accessedAt: sources.accessedAt,
+              isOfficial: sources.isOfficial,
+              isVerified: sources.isVerified,
+            })
+            .from(sources)
+            .where(inArray(sources.id, srcIds));
+          srows.forEach((r) => srcMap.set(r.id, r));
+        }
+        for (const link of linkRows) {
+          if (link.sourceId == null) continue;
+          const s = srcMap.get(link.sourceId);
+          if (!s) continue;
+          const arr = programSourcesMap.get(link.programId) ?? [];
+          arr.push({
+            url: s.url,
+            title: s.title,
+            sourceType: link.sourceType,
+            domain: s.domain,
+            accessedAt: s.accessedAt ? new Date(s.accessedAt).toISOString() : null,
+            isOfficial: s.isOfficial,
+            isVerified: s.isVerified,
+          });
+          programSourcesMap.set(link.programId, arr);
+        }
+      }
+    } catch {
+      // program_sources / sources unavailable — program sources simply not shown.
+    }
+
     // ---------- Program requirements (wide columns → normalized) ----------
     const programsWithReqs = [];
     for (const p of programs) {
@@ -142,7 +210,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .from(programRequirements)
         .where(eq(programRequirements.programId, p.id));
 
-      const reqs: { requirementType: string; minimumValue: number | null; valueText: string | null }[] = [];
+      const reqs: {
+        requirementType: string;
+        minimumValue: number | null;
+        valueText: string | null;
+        // Provenance (spec §19): each requirement keeps its own source +
+        // verification state straight from program_requirements. NULL stays
+        // NULL — never shown as a value, and an unverified requirement is
+        // never presented as verified.
+        sourceUrl: string | null;
+        lastVerifiedAt: string | null;
+        verificationStatus: string;
+      }[] = [];
+      const reqProvenance = (r: (typeof reqRows)[number]) => ({
+        sourceUrl: r.sourceUrl ?? null,
+        lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toISOString() : null,
+        verificationStatus: r.verificationStatus,
+      });
       let programMinIelts: number | null = null;
       let programMinSat: number | null = null;
       let programMinToefl: number | null = null;
@@ -150,35 +234,36 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       let programMinGpa: number | null = null;
       let programMinAct: number | null = null;
       for (const r of reqRows) {
+        const prov = reqProvenance(r);
         if (r.minIelts != null) {
-          reqs.push({ requirementType: "ielts", minimumValue: r.minIelts, valueText: null });
+          reqs.push({ requirementType: "ielts", minimumValue: r.minIelts, valueText: null, ...prov });
           if (programMinIelts == null) programMinIelts = r.minIelts;
         }
         if (r.minToefl != null) {
-          reqs.push({ requirementType: "toefl", minimumValue: r.minToefl, valueText: null });
+          reqs.push({ requirementType: "toefl", minimumValue: r.minToefl, valueText: null, ...prov });
           if (programMinToefl == null) programMinToefl = r.minToefl;
         }
         if (r.minDet != null) {
-          reqs.push({ requirementType: "duolingo", minimumValue: r.minDet, valueText: null });
+          reqs.push({ requirementType: "duolingo", minimumValue: r.minDet, valueText: null, ...prov });
           if (programMinDet == null) programMinDet = r.minDet;
         }
         if (r.minSat != null) {
-          reqs.push({ requirementType: "sat", minimumValue: r.minSat, valueText: null });
+          reqs.push({ requirementType: "sat", minimumValue: r.minSat, valueText: null, ...prov });
           if (programMinSat == null) programMinSat = r.minSat;
         }
         if (r.minAct != null) {
-          reqs.push({ requirementType: "act", minimumValue: r.minAct, valueText: null });
+          reqs.push({ requirementType: "act", minimumValue: r.minAct, valueText: null, ...prov });
           if (programMinAct == null) programMinAct = r.minAct;
         }
         if (r.minGpa != null) {
-          reqs.push({ requirementType: "gpa", minimumValue: r.minGpa, valueText: null });
+          reqs.push({ requirementType: "gpa", minimumValue: r.minGpa, valueText: null, ...prov });
           if (programMinGpa == null) programMinGpa = r.minGpa;
         }
-        if (r.ibRequirement) reqs.push({ requirementType: "ib", minimumValue: null, valueText: r.ibRequirement });
-        if (r.aLevelRequirement) reqs.push({ requirementType: "alevel", minimumValue: null, valueText: r.aLevelRequirement });
-        if (r.apRequirement) reqs.push({ requirementType: "ap", minimumValue: null, valueText: r.apRequirement });
-        if (r.subjectRequirements) reqs.push({ requirementType: "subject", minimumValue: null, valueText: r.subjectRequirements });
-        if (r.otherRequirements) reqs.push({ requirementType: "other", minimumValue: null, valueText: r.otherRequirements });
+        if (r.ibRequirement) reqs.push({ requirementType: "ib", minimumValue: null, valueText: r.ibRequirement, ...prov });
+        if (r.aLevelRequirement) reqs.push({ requirementType: "alevel", minimumValue: null, valueText: r.aLevelRequirement, ...prov });
+        if (r.apRequirement) reqs.push({ requirementType: "ap", minimumValue: null, valueText: r.apRequirement, ...prov });
+        if (r.subjectRequirements) reqs.push({ requirementType: "subject", minimumValue: null, valueText: r.subjectRequirements, ...prov });
+        if (r.otherRequirements) reqs.push({ requirementType: "other", minimumValue: null, valueText: r.otherRequirements, ...prov });
       }
 
       const flags = reqRows[0] ?? null;
@@ -209,6 +294,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         programUrl: p.programUrl,
         applicationUrl: p.applicationUrl,
         isVerified: p.isVerified,
+        // Provenance straight from the programs row (spec §19): the UI shows
+        // these as "verified" / "unverified" / "not checked yet" — never
+        // invents a source, never treats unknown as verified.
+        sourceUrl: p.sourceUrl ?? null,
+        lastVerifiedAt: p.lastVerifiedAt ? new Date(p.lastVerifiedAt).toISOString() : null,
+        verificationStatus: p.verificationStatus,
+        sources: programSourcesMap.get(p.id) ?? [],
         requirements: reqs,
       });
     }
@@ -301,7 +393,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         applicationFeeCurrency: c.applicationFeeCurrency,
         applicationUrl: c.applicationUrl,
         isVerified: c.verificationStatus === "verified",
-        isEstimated: false,
+        // A deadline only counts as "confirmed" when the DB row is verified.
+        // Anything else is surfaced as "estimated / not confirmed" so a
+        // student never mistakes an unverified date for an official one.
+        isEstimated: c.verificationStatus !== "verified",
+        sourceUrl: c.sourceUrl ?? null,
+        lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
       };
     });
 
@@ -311,7 +408,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       universityId: number;
       sourceId: number | null;
       sourceType: string;
-      source: { url: string; title: string; isOfficial: boolean; isVerified: boolean } | null;
+      source: {
+        url: string;
+        title: string;
+        domain: string | null;
+        accessedAt: string | null;
+        isOfficial: boolean;
+        isVerified: boolean;
+      } | null;
     }[] = [];
     try {
       const linkRows = await db
@@ -325,7 +429,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .where(eq(universitySources.universityId, uniId));
 
       const srcIds = [...new Set(linkRows.map((r) => r.sourceId).filter((x): x is number => x != null))];
-      const srcMap = new Map<number, { url: string; title: string; isOfficial: boolean; isVerified: boolean }>();
+      const srcMap = new Map<
+        number,
+        {
+          url: string;
+          title: string;
+          domain: string | null;
+          accessedAt: string | null;
+          isOfficial: boolean;
+          isVerified: boolean;
+        }
+      >();
       if (srcIds.length) {
         try {
           const rows = await db
@@ -333,13 +447,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               id: sources.id,
               url: sources.url,
               title: sources.title,
+              domain: sources.domain,
+              accessedAt: sources.accessedAt,
               isOfficial: sources.isOfficial,
               isVerified: sources.isVerified,
             })
             .from(sources)
             .where(inArray(sources.id, srcIds));
           rows.forEach((r) =>
-            srcMap.set(r.id, { url: r.url, title: r.title, isOfficial: r.isOfficial, isVerified: r.isVerified })
+            srcMap.set(r.id, {
+              url: r.url,
+              title: r.title,
+              domain: r.domain,
+              accessedAt: r.accessedAt ? new Date(r.accessedAt).toISOString() : null,
+              isOfficial: r.isOfficial,
+              isVerified: r.isVerified,
+            })
           );
         } catch {
           // sources table shape differs — sources are simply not shown.

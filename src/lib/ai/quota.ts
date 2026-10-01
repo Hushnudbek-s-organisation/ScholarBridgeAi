@@ -17,7 +17,8 @@ import { NextResponse } from "next/server";
 import type { Session } from "@/lib/auth";
 import { CONFIG_DEFAULTS, getConfig } from "@/lib/config";
 import { getPremiumStatus } from "@/lib/premium";
-import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { aiUsageSince } from "@/lib/ai/usage";
 
 export const AI_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -82,7 +83,7 @@ export async function checkAiQuota(
   if (!session) {
     const { requests } = await quotaLimits("free");
     if (requests === 0) return { ok: false, response: exceeded("free", 0, AI_QUOTA_WINDOW_MS / 1000, "requests") };
-    const r = checkRateLimit(`ai:quota:ip:${clientIp(req)}`, { limit: requests, windowMs: AI_QUOTA_WINDOW_MS });
+    const r = await checkSharedRateLimit(`ai:quota:ip:${clientIp(req)}`, { limit: requests, windowMs: AI_QUOTA_WINDOW_MS });
     return r.ok ? { ok: true } : { ok: false, response: exceeded("free", requests, r.retryAfterSec, "requests") };
   }
 

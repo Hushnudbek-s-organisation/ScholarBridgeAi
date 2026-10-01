@@ -7,6 +7,7 @@ import {
   Gauge,
   Info,
   Loader2,
+  Lock,
   Minus,
   Plus,
   RefreshCw,
@@ -15,15 +16,17 @@ import {
 import { StudentProfile } from "./Navbar";
 
 /**
- * Chancing panel — the two numbers, kept apart on purpose.
+ * Chancing panel — the FIT score, clearly separated from admission odds.
  *
- *   FIT SCORE        how well the profile matches the programme requirements
- *   ADMISSION EST.   the estimated probability of actually being admitted
- *
- * A 78% fit with an 18–27% admit estimate is the normal case at selective
- * universities, and showing them as one number would mislead students. Every
- * estimate ships with sub-scores, an explicit "Why?" list and a statement of
- * what evidence it is based on.
+ * PROBABILITY POLICY (2026-10 task constraint): an admission probability may
+ * only be shown once the project has a VALIDATED METHODOLOGY AND sufficient
+ * outcome data. That does not exist yet, so this panel:
+ *   • shows the FIT score (requirements/affordability match) — explicitly
+ *     NOT a probability, with the "Why?" sub-scores and reasons;
+ *   • labels the admission-probability dimension "unavailable" and explains
+ *     what would make it available;
+ *   • never renders a percentage range, a Safety/Target/Reach band, or a
+ *     confidence figure for admission odds.
  */
 
 export interface ChancingResult {
@@ -33,7 +36,6 @@ export interface ChancingResult {
   fitCategory?: string;
   fitReasons?: string[];
   fitIssues?: string[];
-  admission: { low: number; high: number; mid: number; band: string; label: string };
   subScores: {
     academicFit: number;
     testFit: number;
@@ -44,18 +46,11 @@ export interface ChancingResult {
   };
   positives: string[];
   negatives: string[];
-  confidence: number;
   dataBasis: "public-estimate" | "hybrid" | "scholarbridge-data";
   sampleSize: number;
-  disclaimer: string;
+  /** Single source of truth from /api/chancing — never hardcode the state. */
+  probability: { available: boolean; reason: string };
 }
-
-const BAND_STYLE: Record<string, { chip: string; bar: string }> = {
-  safety: { chip: "bg-emerald-100 text-emerald-800", bar: "bg-emerald-500" },
-  target: { chip: "bg-sky-100 text-sky-800", bar: "bg-sky-500" },
-  reach: { chip: "bg-amber-100 text-amber-800", bar: "bg-amber-500" },
-  "long-reach": { chip: "bg-rose-100 text-rose-800", bar: "bg-rose-500" },
-};
 
 const SUBSCORE_LABELS: { key: keyof ChancingResult["subScores"]; label: string }[] = [
   { key: "academicFit", label: "Academic fit" },
@@ -68,12 +63,12 @@ const SUBSCORE_LABELS: { key: keyof ChancingResult["subScores"]; label: string }
 
 function basisLabel(basis: ChancingResult["dataBasis"], sampleSize: number) {
   if (basis === "scholarbridge-data") {
-    return `Based on ${sampleSize} ScholarBridge application outcomes`;
+    return `Signals based on ${sampleSize} ScholarBridge application outcomes`;
   }
   if (basis === "hybrid") {
-    return `Public data + ${sampleSize} ScholarBridge outcomes`;
+    return `Signals based on public data + ${sampleSize} ScholarBridge outcomes`;
   }
-  return "Based on published university data";
+  return "Signals based on published university data";
 }
 
 interface ChancingPanelProps {
@@ -99,10 +94,10 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
       else params.set("all", "1");
       const res = await fetch(`/api/chancing?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to estimate");
+      if (!res.ok) throw new Error(data.error || "Failed to assess");
       setResults(data.results ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to estimate admission chances");
+      setError(err instanceof Error ? err.message : "Failed to assess your shortlist");
     } finally {
       setLoading(false);
     }
@@ -115,7 +110,7 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to see admission estimates.
+        Sign in to see your profile fit assessments.
       </div>
     );
   }
@@ -126,10 +121,11 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
             <Target className="h-5 w-5 text-indigo-600" />
-            Admission chances
+            Profile fit
           </h2>
           <p className="text-xs text-slate-500">
-            Fit score and admission probability are two different things — both are shown.
+            Fit measures how well your profile meets each university&apos;s published requirements —
+            it is not a probability of admission.
           </p>
         </div>
         <button
@@ -141,6 +137,16 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
         </button>
       </div>
 
+      {/* Admission probability — labelled unavailable (2026-10 policy). */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div className="text-xs text-amber-800">
+          <span className="font-bold">Admission probability: unavailable.</span> We do not estimate
+          the chance of admission until a validated methodology and enough real outcome data exist.
+          A high fit score is not a guarantee of admission.
+        </div>
+      </div>
+
       {error && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {error}
@@ -149,68 +155,36 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
       {loading && !results.length && (
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Estimating…
+          <Loader2 className="h-4 w-4 animate-spin" /> Assessing…
         </div>
       )}
 
       {!loading && !results.length && !error && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          Save universities or add applications first — estimates are calculated for your shortlist.
+          Save universities or add applications first — fit is assessed for your shortlist.
         </div>
       )}
 
       <div className="grid gap-3">
         {results.map((r) => {
-          const style = BAND_STYLE[r.admission.band] ?? BAND_STYLE.target;
           const open = expanded === r.universityId;
           return (
             <div key={r.universityId} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate font-bold text-slate-900">{r.universityName}</h3>
-                  <span
-                    className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${style.chip}`}
-                  >
-                    {r.admission.label}
+                  <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                    Requirements fit — not an admission probability
                   </span>
                 </div>
 
-                {/* The two numbers, side by side, never merged */}
-                <div className="flex gap-4 text-center">
-                  <div className="rounded-xl bg-slate-50 px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                      Fit score
-                    </div>
-                    <div className="text-xl font-extrabold text-slate-900">
-                      {r.fitScore == null ? "—" : `${r.fitScore}%`}
-                    </div>
+                <div className="rounded-xl bg-indigo-50 px-3 py-2 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                    Fit score
                   </div>
-                  <div className="rounded-xl bg-indigo-50 px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                      Admission est.
-                    </div>
-                    <div className="text-xl font-extrabold text-indigo-700">
-                      {r.admission.low}–{r.admission.high}%
-                    </div>
+                  <div className="text-xl font-extrabold text-indigo-700">
+                    {r.fitScore == null ? "—" : `${r.fitScore}%`}
                   </div>
-                </div>
-              </div>
-
-              {/* Range bar */}
-              <div className="mt-3">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className={`h-full ${style.bar}`}
-                    style={{
-                      marginLeft: `${Math.max(0, r.admission.low)}%`,
-                      width: `${Math.max(2, r.admission.high - r.admission.low)}%`,
-                    }}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-                  <span>0%</span>
-                  <span>confidence {r.confidence}%</span>
-                  <span>100%</span>
                 </div>
               </div>
 
@@ -264,9 +238,7 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
                   <p className="flex items-start gap-1.5 text-[11px] text-slate-500">
                     <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      {basisLabel(r.dataBasis, r.sampleSize)} · {r.disclaimer}
-                    </span>
+                    <span>{basisLabel(r.dataBasis, r.sampleSize)}.</span>
                   </p>
                 </div>
               )}
@@ -277,8 +249,9 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
       <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
         <Gauge className="h-3.5 w-3.5" />
-        Estimates improve as ScholarBridge collects real outcomes (accepted and rejected) from
-        students who opt in.
+        Fit signals get sharper as ScholarBridge collects real outcomes (accepted and rejected)
+        from students who opt in. An admission probability will appear here only once a validated
+        methodology exists.
       </p>
     </div>
   );

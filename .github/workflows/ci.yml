@@ -1,0 +1,79 @@
+# GitHub Actions workflow — full verification gate.
+#
+# Mirrors ci/security-ci.yml (keep the two in sync). Runs on every push to
+# main and every pull request: dependency audit, typecheck, security +
+# integration + journey + Telegram + ownership + portability suites (embedded
+# Postgres), i18n parity and a production build.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Dependency audit (high+)
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Security regression tests
+        run: npm run test:security
+
+      - name: AI settings tests
+        run: npm run test:ai-settings
+
+      - name: AI format tests
+        run: npm run test:ai-format
+
+      - name: Ownership tests (embedded Postgres)
+        run: npm run test:ownership
+
+      - name: Portability, config and RLS tests (embedded Postgres)
+        run: npm run test:portability
+
+      - name: Telegram integration tests (embedded Postgres)
+        run: npm run test:telegram-integration
+
+      - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
+        run: npm run test:integration
+
+      - name: E2E journey tests (embedded Postgres)
+        run: npm run test:journey
+
+      - name: Chancing + probability-policy tests (embedded Postgres)
+        run: npm run test:chancing
+
+      - name: Recommender tests — engine + API (embedded Postgres)
+        run: npm run test:recommend
+
+      - name: Opportunities feed tests (embedded Postgres)
+        run: npm run test:opportunities
+
+      - name: i18n message parity
+        run: npm run check:i18n
+
+      - name: Lint (baseline gate — fails on new or worsened problems)
+        run: npm run lint:baseline
+
+      - name: Dark-mode contrast audit
+        run: npm run test:dark
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
