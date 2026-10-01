@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { instructors, courseCategories } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { clampString, readJsonBody } from "@/lib/request";
 import { eq, asc } from "drizzle-orm";
 
 /** GET: list instructors and categories (admin). */
@@ -24,10 +25,16 @@ export async function GET(req: Request) {
   }
 }
 
+const BODY_LIMIT = 16 * 1024;
+
 /** POST: create instructor or category (based on `type`). */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const parsed = await readJsonBody<Record<string, unknown>>(req, BODY_LIMIT);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const body = parsed.body;
     const access = await requireAdmin(req);
     if (!access.ok) {
       return NextResponse.json(
@@ -40,13 +47,13 @@ export async function POST(req: Request) {
       const [row] = await db
         .insert(instructors)
         .values({
-          name: body.name || "New Instructor",
-          bio: body.bio || "",
-          photoUrl: body.photoUrl || null,
-          university: body.university || null,
-          program: body.program || null,
-          country: body.country || null,
-          scholarshipName: body.scholarshipName || null,
+          name: clampString(body.name, 200) || "New Instructor",
+          bio: clampString(body.bio, 2000),
+          photoUrl: clampString(body.photoUrl, 500) || null,
+          university: clampString(body.university, 200) || null,
+          program: clampString(body.program, 200) || null,
+          country: clampString(body.country, 100) || null,
+          scholarshipName: clampString(body.scholarshipName, 200) || null,
           isVerifiedStudent: !!body.isVerifiedStudent,
         })
         .returning();
@@ -54,13 +61,14 @@ export async function POST(req: Request) {
     }
 
     if (body.type === "category") {
-      const slug = (body.slug || (body.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")).replace(/^-|-$/g, "");
+      const name = clampString(body.name, 100);
+      const slug = (clampString(body.slug, 60) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).replace(/^-|-$/g, "");
       const [row] = await db
         .insert(courseCategories)
         .values({
-          name: body.name || "New Category",
+          name: name || "New Category",
           slug: slug || `cat-${Date.now()}`,
-          description: body.description || "",
+          description: clampString(body.description, 500),
         })
         .returning();
       return NextResponse.json({ category: row });

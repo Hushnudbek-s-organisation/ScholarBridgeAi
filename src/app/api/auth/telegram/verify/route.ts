@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { sessionCookieHeader } from "@/lib/auth";
 import { sanitizeProfile } from "@/lib/password";
-import { checkRateLimit, clientIp, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { clientIp, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import { normalizeCodeInput } from "@/lib/telegram/core";
 import { verifyRequest } from "@/lib/telegram/service";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  const rl = checkRateLimit(`tg:verify:${ip}`, LIMITS.telegramVerify);
+  const rl = await checkSharedRateLimit(`tg:verify:${ip}`, LIMITS.telegramVerify);
   if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
   const unavailable = await tgTablesOr503();
   if (unavailable) return unavailable;

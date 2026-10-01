@@ -98,6 +98,15 @@ async function main() {
   const ownershipRoute = await import("../src/app/api/admin/ownership/route");
   const profileRoute = await import("../src/app/api/profiles/[id]/route");
   const { resetRateLimits } = await import("../src/lib/rate-limit");
+  const { resetSharedRateLimits } = await import("../src/lib/rate-limit-shared");
+  // The ownership route counts against the SHARED (Postgres) limiter (audit
+  // A20), so concurrency sections must clear BOTH budgets or the previous
+  // password-gated calls exhaust the shared budget and the parallel requests
+  // see 429 instead of the 200/409/403 race they are asserting.
+  const resetAllRateLimits = async () => {
+    resetRateLimits();
+    await resetSharedRateLimits();
+  };
 
   // -------------------------------------------------------------------------
   section("Schema: runtime DDL == drizzle == supabase/add_ownership.sql");
@@ -162,7 +171,7 @@ async function main() {
     return signSessionToken({ id: p.id, passwordHash: p.passwordHash });
   };
   async function api(asId: number, body?: Record<string, unknown>) {
-    resetRateLimits();
+    await resetAllRateLimits();
     const cookie = `sb_session=${await tokenFor(asId)}`;
     const req = body
       ? new Request("http://localhost/api/admin/ownership", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) })
@@ -238,7 +247,7 @@ async function main() {
     check("owner now sees canConfirm", (await api(owner.id)).json.openTransfer?.canConfirm === true);
 
     // Two confirmations at the same time: exactly one wins.
-    resetRateLimits();
+    await resetAllRateLimits();
     const cookie = `sb_session=${await tokenFor(owner.id)}`;
     const mk = () =>
       ownershipRoute.POST(new Request("http://localhost/api/admin/ownership", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ action: "confirm", transferId: t1, password: PW.owner }) }));
@@ -261,7 +270,7 @@ async function main() {
   section("Concurrent starts: the partial unique index allows one");
   // -------------------------------------------------------------------------
   {
-    resetRateLimits();
+    await resetAllRateLimits();
     const cookie = `sb_session=${await tokenFor(bob.id)}`;
     const mk = (email: string) =>
       ownershipRoute.POST(new Request("http://localhost/api/admin/ownership", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ action: "start", targetEmail: email, confirm: "TRANSFER", password: PW.bob }) }));
@@ -321,7 +330,7 @@ async function main() {
     check("previous owner is no longer admin", (await isAdmin(bob.id)) === false);
     check("previous owner loses admin API access at once (403)", (await api(bob.id)).status === 403);
 
-    resetRateLimits();
+    await resetAllRateLimits();
     const del = (asId: number, target: number) =>
       tokenFor(asId).then((tok) =>
         profileRoute.DELETE(new Request(`http://localhost/api/profiles/${target}`, { method: "DELETE", headers: { cookie: `sb_session=${tok}` } }), { params: Promise.resolve({ id: String(target) }) })

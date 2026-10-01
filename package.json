@@ -13,7 +13,11 @@
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
     "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:groq": "tsx scripts/check-groq.ts",
-    "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
+    "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
+    "test:schema": "tsx scripts/check-supabase-schema.ts",
+    "db:verify": "tsx scripts/check-supabase-schema.ts --live",
+    "db:gen:full-schema": "tsx scripts/gen-full-schema-sql.ts",
+    "db:apply-full-schema": "tsx scripts/apply-full-schema.ts",
     "db:core-repair-sql": "tsx scripts/gen-core-repair-sql.ts",
     "test:security": "tsx scripts/check-security.ts",
     "test:api-security": "tsx scripts/check-api-anonymous.ts",
@@ -41,7 +45,11 @@
     "test:ownership": "tsx scripts/check-ownership.ts",
     "test:portability": "tsx scripts/check-portability.ts",
     "test:journey": "tsx scripts/check-journey.ts",
-    "test:dark": "node scripts/dark-audit.mjs"
+    "test:dark": "node scripts/dark-audit.mjs",
+    "lint:baseline": "tsx scripts/check-lint-baseline.ts",
+    "test:schema-repair": "tsx scripts/check-schema-repair.ts",
+    "test:provenance": "tsx scripts/check-provenance.ts",
+    "test:recommend": "tsx scripts/check-recommend.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -70,21 +70,30 @@ Hosting assumptions (all portable):
 1. Create the database and copy its connection string into `DATABASE_URL`
    (Supabase: *Project settings → Database*; add `?sslmode=require` if the
    host requires SSL).
-2. First start: visiting `/api/universities` runs the seed (demo catalogue
+2. **Run the canonical schema once** — one file covers everything the app
+   reads or writes (93 tables, every column, indexes, FKs, RLS lockdown):
+   paste [`supabase/full_schema.sql`](./supabase/full_schema.sql) into the
+   Supabase SQL Editor and Run. It is **additive and idempotent** — safe on a
+   fresh database and safe to re-run on an existing one (it only creates
+   missing tables/columns/indexes/constraints and never drops or renames).
+   Terminal alternative: `npm run db:apply-full-schema`.
+   Then verify that the app's expectations match the live database:
+   `npm run db:verify` (exits non-zero and lists every gap if something is
+   off). Full table/column reference: [`docs/SUPABASE_SCHEMA.md`](./docs/SUPABASE_SCHEMA.md).
+   The older `supabase/add_*.sql` patches remain safe (all `IF NOT EXISTS`),
+   but the one file above replaces running them one by one.
+3. First start: visiting `/api/universities` runs the seed (demo catalogue
    and the bootstrap admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
-3. **Supabase only — lock down the public API roles (important).** Supabase
-   exposes every `public` table to its `anon`/`authenticated` roles by
-   default, so anyone with the anon key could read e.g. password hashes.
-   Run [`supabase/enable_rls.sql`](./supabase/enable_rls.sql) in the SQL
-   Editor as the same role the app uses. It enables RLS on every table that
-   role owns, revokes the public roles, and keeps read-only access to the
-   `universities` / `scholarships` catalogue. The app is the table owner, so
-   it is unaffected. Re-run it after adding tables. Verified by
-   `npm run test:portability`.
-4. Run [`supabase/add_ai_usage_quota_index.sql`](./supabase/add_ai_usage_quota_index.sql)
-   (or `npm run db:push`): the daily AI limits (Admin → Settings,
-   `ai_*_requests_per_day` / `ai_*_tokens_per_day`) count each account's
-   recent AI requests on every AI call, and this index keeps that fast.
+4. **Supabase only — public API roles are locked down.**
+   [`supabase/full_schema.sql`](./supabase/full_schema.sql) already enables RLS
+   on every table and revokes `anon`/`authenticated` (keeping read-only access
+   to the `universities` / `scholarships` catalogue). If you skip step 2 and
+   create tables another way, run
+   [`supabase/enable_rls.sql`](./supabase/enable_rls.sql) instead, as the same
+   role the app uses. Verified by `npm run test:portability`.
+5. The daily AI limits index (`ai_usage(profile_id, created_at)`) is part of
+   the canonical schema; standalone it is
+   [`supabase/add_ai_usage_quota_index.sql`](./supabase/add_ai_usage_quota_index.sql).
 
 ## 3. Domain and canonical URL
 
@@ -214,3 +223,95 @@ The admin panel opens on **Analytics** (visitors, views, signups, premium,
 revenue, engagement; 7/30/90 days; CSV export). Traffic is counted in
 `site_visits` (anonymous `sb_vid` cookie, no IP stored), created on first use
 or via `supabase/add_analytics.sql`.
+
+## 8. Releases: CI gate + production checklist
+
+### CI gate (before any deploy)
+
+The workflow in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) (kept
+in sync with [`ci/security-ci.yml`](./ci/security-ci.yml)) runs on every push
+to `main` and every pull request:
+
+- `npm audit --audit-level=high` — no known high/critical dependency issues;
+- `npm run typecheck` — 0 TypeScript errors;
+- `npm run test:security`, `test:api-security`, `test:ai-settings`,
+  `test:ai-format` — security and AI-configuration regressions;
+- `npm run test:ownership`, `test:portability`, `test:telegram-integration`,
+  `test:integration`, `test:journey` — full API/E2E suites against embedded
+  Postgres (the integration suite contains the 2026-10 re-audit checks:
+  rate limiting, visa usage, sessions, deadlines policy, instructors guard);
+- `npm run check:i18n` — every user-facing string exists in all 3 languages;
+- `npm run lint:baseline` — lint gate (see [docs/LINT.md](./docs/LINT.md)):
+  fails on any NEW file with lint problems or any WORSENED rule count; the
+  50 pre-existing issues are pinned in `lint-baseline.json` and shrink as
+  debt is fixed (never hidden);
+- `npm run test:dark` — dark-mode contrast audit (0 unreadable pairs);
+- `npm run build` — the production bundle compiles.
+
+> `npm run test:api-security` (anonymous-caller probe of every route) is a
+> **local** check that needs a running server + seeded dev DB, so it is not a
+> CI step. Run it in a PR review when auth/routing changes.
+
+**Enforcement (the part this repository cannot do for you).** The workflow
+only *runs*; making it a *gate* is configured in the live service, and these
+settings are **not** stored in the repo, so they cannot be verified from
+here. The exact operator steps:
+
+1. **GitHub branch protection (this is the actual gate).**
+   Repo → *Settings* → *Branches* → *Add branch protection rule* →
+   branch name `main`. Tick:
+   - **Require status checks to pass before merging**, then select the
+     `verify` job of the **CI** workflow (the single job above). With only
+     this job selected, a merge is blocked until every step is green.
+   - Recommended: also tick **Require pull request reviews before merging**
+     and **Include administrators** (otherwise admins can bypass it).
+2. **Render auto-deploy.** `render.yaml` already sets `autoDeploy: true` on
+   the web service, so Render deploys `main` automatically right after a
+   merge. No extra Render setting is needed — the safety comes entirely from
+   step 1 (nothing reaches `main` without passing CI). **If you ever flip
+   `autoDeploy` off or add manual deploys, re-add a required check or manual
+   gate accordingly.**
+
+> ⚠️ Because `autoDeploy: true`, a *direct* push to `main` that skips the PR /
+> required-check (e.g. by an admin) would deploy immediately. Step 1, with
+> **Include administrators** on, is what closes that hole.
+
+The workflow cannot be verified from inside a sandbox, so after wiring the
+repository to GitHub the first run must be watched to completion by an
+operator before it is treated as the gate.
+
+### Production operator checklist (each release)
+
+The application code is stateless; the database is the source of truth. A
+release therefore touches the live database at most once:
+
+1. Watch the CI on `main` go fully green (gate above).
+2. **Apply the canonical schema to the production database** —
+   [`supabase/full_schema.sql`](./supabase/full_schema.sql) in the Supabase
+   SQL Editor (or `npm run db:apply-full-schema` with the production
+   `DATABASE_URL`). It is additive and idempotent: it creates only what is
+   missing — new tables, columns, indexes, FKs and UNIQUE constraints — and
+   never drops, renames or backfills data. Existing rows that violate a new
+   uniqueness rule produce a NOTICE, not an error (the app keeps working).
+3. **Verify** the live database matches the app's expectations:
+   `npm run db:verify` (exits non-zero and lists every gap).
+4. Deploy the new build (Render: automatic on `main`; other hosts: your
+   normal deploy step). The app reads schema on every request, so step 2
+   before step 4 means there is no incompatible window.
+5. Smoke test against production (read-only checks, no writes):
+   - `GET /api/health` → 200
+   - homepage → 200
+   - one signed-in call you control (e.g. `GET /api/sessions`) → 200
+   - `GET /api/certificates/verify?code=BOGUS` → 404 (public endpoint up)
+6. Watch logs for 10–15 minutes for `[auth]`, `[ai]` and 5xx spikes.
+
+**Never** run the integration/E2E test suites against the production
+database — they create throwaway accounts and mutate state. They only ever
+run against embedded/dev databases (CI and `npm run db:dev`).
+
+### Rollback
+
+Because schema changes are additive, a code rollback (redeploy the previous
+tag) is always safe against a newer schema: older code simply does not read
+the new tables/columns. The only irreversible case is a data backfill you
+run manually — do not do those inside this workflow.

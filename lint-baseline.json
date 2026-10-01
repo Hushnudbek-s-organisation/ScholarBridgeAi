@@ -1,0 +1,119 @@
+{
+  "_comment": "Committed lint baseline — pre-existing debt only. CI (npm run lint:baseline) FAILS on any NEW or WORSENED issue. After fixing debt, re-run `npm run lint:baseline -- --update` to shrink this file. See docs/LINT.md.",
+  "total": 50,
+  "errors": 45,
+  "warnings": 5,
+  "files": {
+    "src/components/AiChatMentor.tsx": {
+      "react-hooks/purity": 1
+    },
+    "src/components/ApplicationCenter.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/ChancingPanel.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/CoursePlayer.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/CoursesSection.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/DeadlineCenter.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/DocumentChecklist.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/EssayRubricStudio.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 2
+    },
+    "src/components/ForumSection.tsx": {
+      "react-hooks/set-state-in-effect": 4
+    },
+    "src/components/MentorMarketplace.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/NextActionsPanel.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/NotificationBell.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/ParentDashboard.tsx": {
+      "react-hooks/preserve-manual-memoization": 1
+    },
+    "src/components/PaymentsSection.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/PlanningStudio.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/PremiumGate.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/ProfileModal.tsx": {
+      "react-hooks/set-state-in-effect": 2
+    },
+    "src/components/ProfileStrengthPanel.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/RecLetterPanel.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/RewardsSection.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/SimilarProfiles.tsx": {
+      "react-hooks/preserve-manual-memoization": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/TaskRoadmap.tsx": {
+      "react-hooks/exhaustive-deps": 1,
+      "react-hooks/immutability": 1,
+      "react-hooks/purity": 1
+    },
+    "src/components/UniversityExplorer.tsx": {
+      "@next/next/no-img-element": 1
+    },
+    "src/components/admin/AuditLogViewer.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/ConfigManager.tsx": {
+      "@next/next/no-img-element": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/ConsultingManager.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/CoursesManager.tsx": {
+      "react-hooks/exhaustive-deps": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/PremiumManager.tsx": {
+      "react-hooks/exhaustive-deps": 1,
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/RefreshCenter.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/ScholarshipsManager.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/UniversitiesManager.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/components/admin/VerificationManager.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    },
+    "src/i18n/LocaleProvider.tsx": {
+      "react-hooks/set-state-in-effect": 1
+    }
+  }
+}

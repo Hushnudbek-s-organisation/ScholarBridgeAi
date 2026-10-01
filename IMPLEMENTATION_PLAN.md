@@ -1,3 +1,9 @@
+> **⚠️ ARXIV (2026-10).** Bu reja 2026-08 holatiga mansub; uning ko'p qismi
+> allaqachon amalga oshgan. Joriy holat uchun: [`docs/JOURNEY_CORE.md`](./docs/JOURNEY_CORE.md),
+> [`docs/AUDIT_2026-09.md`](./docs/AUDIT_2026-09.md) (barcha topilmalar + 2026-10
+> re-audit) va [`DEPLOYMENT.md`](./DEPLOYMENT.md). Matn o'zgarishlar uchun
+> tarixiy yozuv sifatida saqlangan.
+
 # ScholarBridge — Tahlil va Implementatsiya Rejasi
 
 Sana: 2026-08-15

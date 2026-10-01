@@ -12,7 +12,8 @@ import { writeAudit } from "@/lib/audit";
 import { setConfig } from "@/lib/config";
 import { planConfigImport } from "@/lib/configPortability";
 import { upsertCredential } from "@/lib/ai/credentials";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import type { AIProviderId } from "@/lib/ai/settings";
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   const access = await requireAdmin(req);
   if (!access.ok) return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
   const actorId = access.session.profile.id;
-  const limit = checkRateLimit(`admin-config:${actorId}`, LIMITS.adminWrite);
+  const limit = await checkSharedRateLimit(`admin-config:${actorId}`, LIMITS.adminWrite);
   if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
   const parsed = await readJsonBody<Record<string, unknown>>(req, 512 * 1024);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });

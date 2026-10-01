@@ -7,21 +7,38 @@
  * programme?" → the **Fit score** (e.g. 78%). That is a requirements/affordability
  * match, and a great fit can still be a 12% admit.
  *
- * This module answers a different question: "what is the estimated probability
- * of being ADMITTED?" → the **Admission estimate**, shown as a range
- * (e.g. 18–27%) with sub-scores and an explicit "Why?".
+ * This module historically answered "what is the estimated probability of
+ * being ADMITTED?" → the **Admission estimate** (e.g. an 18–27% range) with
+ * sub-scores and an explicit "Why?".
  *
- * Two data sources, clearly labelled in the UI via `dataBasis`:
- *  - `public-estimate` — rules over the university's own published numbers
- *    (acceptance rate, ranking, published minimums). Honest label: it is a
- *    model estimate, not a promise.
- *  - `hybrid` / `scholarbridge-data` — once ScholarBridge has its own
- *    outcomes (see `application_outcomes`, including rejections), the
- *    empirical admit rate is blended in and the estimate gets sharper.
+ * STUDENT-FACING PROBABILITY POLICY (2026-10 task constraint):
+ * an admission probability may only be computed/displayed for students once
+ * the project has a VALIDATED METHODOLOGY AND sufficient outcome data. That
+ * does not exist yet — the consented outcomes corpus is far below any
+ * validation threshold and no model has been validated. Therefore:
+ *   • student-facing APIs (GET /api/chancing, /api/planning,
+ *     /api/ai/admissions-advisor) return `probability: ADMISSION_PROBABILITY`
+ *     and must NOT expose the numeric `admission` range;
+ *   • the UI labels the admission-probability dimension "unavailable" and
+ *     shows only the fit score and the requirement signals;
+ *   • `estimateAdmissionChance` remains a PURE, unit-tested internal engine
+ *     (its sub-scores/positives/negatives power the signals shown to students,
+ *     and a future validated methodology will build on it) — it must not be
+ *     surfaced to students as a percentage.
  *
  * Everything here is pure and deterministic so it can be unit-tested without a
  * database (see scripts/check-chancing.ts).
  */
+
+/**
+ * The single source of truth for student-facing probability availability.
+ * Any route/UI that mentions admission probability must read this — never
+ * hardcode the state.
+ */
+export const ADMISSION_PROBABILITY = {
+  available: false,
+  reason: "no-validated-methodology",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Inputs

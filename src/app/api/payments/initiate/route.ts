@@ -8,7 +8,8 @@ import {
   resolvePremiumPackage,
 } from "@/lib/payments";
 import { requireProfileAccess } from "@/lib/auth";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
-    const limit = checkRateLimit(`payments:${access.session.profile.id}`, LIMITS.payment);
+    const limit = await checkSharedRateLimit(`payments:${access.session.profile.id}`, LIMITS.payment);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     // Package + price from app_config (monthly / season / yearly).

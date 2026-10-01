@@ -270,8 +270,12 @@ check("webhook: secret header checked in constant time before parsing the body",
 });
 
 check("public endpoints are rate-limited and size-limited", () => {
-  assert.ok(routes.start.includes("checkRateLimit("));
-  assert.ok(routes.verify.includes("checkRateLimit("));
+  // start/verify use the DB-SHARED limiter (checkSharedRateLimit) — it
+  // survives across replicas and cold starts, unlike the in-process
+  // checkRateLimit. The shared limiter is the stronger control, so we
+  // assert on it explicitly.
+  assert.ok(routes.start.includes("checkSharedRateLimit("));
+  assert.ok(routes.verify.includes("checkSharedRateLimit("));
   for (const [name, src] of Object.entries(routes)) {
     if (name === "config") continue;
     assert.ok(src.includes("readJsonBody"), `${name} uses readJsonBody (size-limited)`);

@@ -5,7 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { callAI } from "@/lib/ai";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { ADVISOR_SYSTEM_PROMPT, buildAdvisorBrief, isTrustworthyReply, rulesAdvice, type AdvisorInput } from "@/lib/advisor";
-import { estimateAdmissionChance, profileCompletenessRatio, type ChancingProfile, type ChancingResult } from "@/lib/chancing";
+import { ADMISSION_PROBABILITY, estimateAdmissionChance, profileCompletenessRatio, type ChancingProfile, type ChancingResult } from "@/lib/chancing";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
 import { calculateUniversityMatch, type StudentProfileData } from "@/lib/matching";
 
@@ -168,14 +168,13 @@ export async function POST(req: Request) {
       aiRejectedFor: aiRejectedFor || null,
       headline: roadmap.headline,
       nextActions: roadmap.actions,
+      // Probability policy (2026-10): fit scores only — no admission
+      // probability numbers (no validated methodology + outcome data yet).
       chances: chances.map((c) => ({
         universityName: c.universityName,
         fitScore: c.fitScore,
-        low: c.admission.low,
-        high: c.admission.high,
-        band: c.admission.band,
-        label: c.admission.label,
       })),
+      probability: ADMISSION_PROBABILITY,
     });
   } catch (error) {
     console.error("POST /api/ai/admissions-advisor error:", error);

@@ -9,8 +9,10 @@ import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ChancingPanel } from "@/components/ChancingPanel";
+import { RecommendationStudio } from "@/components/RecommendationStudio";
 import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
 import { CompleteProfileForm } from "@/components/CompleteProfileForm";
+import { SessionsPanel } from "@/components/SessionsPanel";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { NextActionsPanel } from "@/components/NextActionsPanel";
 import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
@@ -250,15 +252,19 @@ export default function Home() {
   }, []);
 
   const fetchTaskCount = useCallback(async (profileId: number) => {
+    // The badge is decorative: a failed lookup (e.g. a profile this session
+    // may not read) must not log console errors or show a fake number
+    // (audit A24). Unknown stays "unknown" — we simply keep the previous 0.
     try {
       const res = await fetch(`/api/tasks?profileId=${profileId}`);
+      if (!res.ok) return;
       const data = await res.json();
-      if (data.tasks) {
+      if (Array.isArray(data.tasks)) {
         const pending = data.tasks.filter((t: { isCompleted: boolean }) => !t.isCompleted);
         setTaskCount(pending.length);
       }
-    } catch (err) {
-      console.error("Error fetching task count:", err);
+    } catch {
+      /* non-fatal — the badge just keeps its previous value */
     }
   }, []);
 
@@ -887,17 +893,23 @@ export default function Home() {
             <TaskRoadmap activeProfile={activeProfile} />
           )}
 
-          {/* Complete Student Profile (#1) */}
+          {/* Complete Student Profile (#1) + my sessions (server-side revocation) */}
           {activeTab === "profile" && activeProfile && (
-            <CompleteProfileForm
-              key={`profile-${activeProfile.id}`}
-              activeProfile={activeProfile}
-              onSaved={handleProfileUpdated}
-            />
+            <div className="space-y-6">
+              <CompleteProfileForm
+                key={`profile-${activeProfile.id}`}
+                activeProfile={activeProfile}
+                onSaved={handleProfileUpdated}
+              />
+              <SessionsPanel />
+            </div>
           )}
 
           {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
           {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
+
+          {/* Program recommender — four separate dimensions, probability unavailable */}
+          {activeTab === "recommend" && <RecommendationStudio activeProfile={activeProfile} />}
 
           {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
           {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}

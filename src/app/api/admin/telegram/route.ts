@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
-import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import { tgCall } from "@/lib/telegram/api";
 import {
@@ -37,7 +38,7 @@ async function guard(req: Request, write = false) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return { ok: false as const, response: tgJsonError(auth.status, auth.error, auth.code) };
   if (write) {
-    const rl = checkRateLimit(`admin:${auth.session.profile.id}`, LIMITS.adminWrite);
+    const rl = await checkSharedRateLimit(`admin:${auth.session.profile.id}`, LIMITS.adminWrite);
     if (!rl.ok) return { ok: false as const, response: rateLimitedResponse(rl.retryAfterSec) };
   }
   return { ok: true as const, session: auth.session };
@@ -233,7 +234,7 @@ export async function POST(req: Request) {
     }
 
     if (action === "sweep") {
-      const rl = checkRateLimit(`admin:tg-sweep:${g.session.profile.id}`, { limit: 6, windowMs: 60 * 60_000 });
+      const rl = await checkSharedRateLimit(`admin:tg-sweep:${g.session.profile.id}`, { limit: 6, windowMs: 60 * 60_000 });
       if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
       const summary = await runScheduledTelegramJobs();
       await recordSweep(summary, "admin");
@@ -244,7 +245,7 @@ export async function POST(req: Request) {
       const text = typeof parsed.body.text === "string" ? parsed.body.text.trim() : "";
       if (!text) return tgJsonError(400, "Write a message first.", "validation");
       if (text.length > MAX_BROADCAST_CHARS) return tgJsonError(400, `Keep it under ${MAX_BROADCAST_CHARS} characters.`, "validation");
-      const rl = checkRateLimit(`admin:tg-broadcast:${g.session.profile.id}`, { limit: 3, windowMs: 60 * 60_000 });
+      const rl = await checkSharedRateLimit(`admin:tg-broadcast:${g.session.profile.id}`, { limit: 3, windowMs: 60 * 60_000 });
       if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
       const result = await broadcast(text, { includeMuted: parsed.body.includeMuted === true });
       await writeAudit({ entityType: "config", entityId: 0, fieldChanged: "telegram_broadcast", newValue: { text: text.slice(0, 200), ...result } });

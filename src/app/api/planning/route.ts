@@ -8,7 +8,7 @@ import { buildCv, renderCvText } from "@/lib/cv";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
 import { gpaTo4 } from "@/lib/similarProfiles";
 import { calculateUniversityMatch } from "@/lib/matching";
-import { estimateAdmissionChance } from "@/lib/chancing";
+import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 
 /**
  * Planning studio (Phase 3): cost calculator, scholarship portfolio, CV
@@ -165,12 +165,11 @@ export async function GET(req: Request) {
     };
 
     const chanced = compareList.map((u) => {
-      // The full university row satisfies both matchers (fit + chancing);
-      // the raw profile row satisfies StudentProfileData / ChancingProfile.
+      // The full university row satisfies the matchers; the raw profile row
+      // satisfies StudentProfileData / ChancingProfile.
       const uni = uniRows.find((r) => r.id === u.id)!;
       const match = calculateUniversityMatch(profile, uni).matchScore;
-      const adm = estimateAdmissionChance(profile, uni);
-      return { id: u.id, match, low: adm.admission.low, high: adm.admission.high, mid: adm.admission.mid };
+      return { id: u.id, match };
     });
 
     const matchRow: CompareRow = {
@@ -179,14 +178,6 @@ export async function GET(req: Request) {
       values: Object.fromEntries(chanced.map((c) => [c.id, `${Math.round(c.match)}%`])),
       winner: pickWinner(chanced.map((c) => ({ id: c.id, score: c.match }))),
       winnerReason: "Highest fit with your profile.",
-      allUnknown: chanced.length === 0,
-    };
-    const admissionRow: CompareRow = {
-      key: "admissionEstimate",
-      label: "Admission estimate",
-      values: Object.fromEntries(chanced.map((c) => [c.id, `${c.low}–${c.high}%`])),
-      winner: pickWinner(chanced.map((c) => ({ id: c.id, score: c.mid }))),
-      winnerReason: "Highest estimated chance of admission.",
       allUnknown: chanced.length === 0,
     };
 
@@ -198,7 +189,7 @@ export async function GET(req: Request) {
         sat: profile.satScore,
         budgetAnnualUsd: profile.budgetAnnualUsd,
       },
-      [matchRow, admissionRow]
+      [matchRow]
     );
 
     return NextResponse.json({
@@ -209,6 +200,10 @@ export async function GET(req: Request) {
       cv,
       cvText: renderCvText(cv),
       comparison,
+      // Probability policy (2026-10): the admission-probability dimension is
+      // surfaced as "unavailable" — the planning comparison no longer shows a
+      // numeric admission estimate (no validated methodology yet).
+      probability: ADMISSION_PROBABILITY,
     });
   } catch (error) {
     console.error("GET /api/planning error:", error);

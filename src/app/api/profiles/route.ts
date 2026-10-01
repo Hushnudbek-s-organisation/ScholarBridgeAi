@@ -8,7 +8,8 @@ import { awardPoints } from "@/lib/gamification";
 import { ensureReferralCode, applyReferralCodeToProfile } from "@/lib/referrals";
 import { recordVisit } from "@/lib/visits";
 import { authenticate, sessionCookieHeader } from "@/lib/auth";
-import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampString, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { isUniqueViolation } from "@/lib/db-errors";
@@ -69,7 +70,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const ip = clientIp(req);
-    const limit = checkRateLimit(`signup:ip:${ip}`, LIMITS.signUp);
+    const limit = await checkSharedRateLimit(`signup:ip:${ip}`, LIMITS.signUp);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     const parsed = await readJsonBody<Record<string, any>>(req, 64 * 1024);

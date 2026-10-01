@@ -102,6 +102,7 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
   // ---- MY JOURNEY --------------------------------------------------------
   { id: "study-plan", group: "journey", label: "My Study Plan", description: "Your goal split into ten phases, updated automatically from your real data." },
   { id: "chancing", group: "journey", label: "My Chances", description: "Fit score and admission-chance estimates.", stage: "match" },
+  { id: "recommend", group: "journey", label: "Program Recommender", description: "Catalog programs matched to your interests across four separate dimensions: subject fit, published requirements, affordability, funding — plus provenance and plain-language ranking factors. Admission probability is never shown (no validated methodology).", isNew: true, stage: "match" },
   { id: "strength", group: "journey", label: "Profile Strength", description: "Profile readiness by category and what to improve.", stage: "prepare" },
   { id: "goals", group: "journey", label: "Goals", description: "Up to 6 focused goals (academic, activities, skills, career) with step-by-step progress.", isNew: true },
   { id: "activities", group: "journey", label: "My Activities", description: "Volunteering, leadership, projects, competitions — with evidence.", stage: "prepare" },

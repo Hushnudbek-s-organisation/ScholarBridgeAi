@@ -77,18 +77,18 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
     { label: nav("universities"), icon: Search },
     { label: nav("scholarships"), icon: Award },
     { label: nav("myApplications"), icon: GraduationCap },
-    { label: "AI SOP & Essays", icon: FileText, pro: true },
-    { label: "Tasks & Roadmap", icon: ClipboardCheck, pro: true },
-    { label: "AI Mentor", icon: Bot },
-    { label: "Visa Speaking", icon: Mic },
-    { label: "Premium", icon: Crown },
+    { label: t("mockSidebarAiSop"), icon: FileText, pro: true },
+    { label: t("mockSidebarTasks"), icon: ClipboardCheck, pro: true },
+    { label: t("mockSidebarMentor"), icon: Bot },
+    { label: t("mockSidebarVisa"), icon: Mic },
+    { label: t("mockSidebarPremium"), icon: Crown },
   ];
 
   const mockStats = [
-    { label: "Shortlisted Programs", value: "12", sub: "Universities in tracker", icon: GraduationCap, tone: "bg-indigo-50 text-indigo-600" },
-    { label: "Scholarships Tracked", value: "5", sub: "Saved aid programs", icon: Award, tone: "bg-emerald-50 text-emerald-600" },
-    { label: "Pending Milestones", value: "7", sub: "Tasks pending", icon: CheckCircle2, tone: "bg-amber-50 text-amber-600" },
-    { label: "AI SOP Studio", value: "Ready", sub: "Draft or evaluate", icon: FileText, tone: "bg-violet-50 text-violet-600" },
+    { label: t("mockStatShortlisted"), value: "12", sub: t("mockStatShortlistedSub"), icon: GraduationCap, tone: "bg-indigo-50 text-indigo-600" },
+    { label: t("mockStatScholarships"), value: "5", sub: t("mockStatScholarshipsSub"), icon: Award, tone: "bg-emerald-50 text-emerald-600" },
+    { label: t("mockStatMilestones"), value: "7", sub: t("mockStatMilestonesSub"), icon: CheckCircle2, tone: "bg-amber-50 text-amber-600" },
+    { label: t("mockStatAiSop"), value: t("mockReady"), sub: t("mockStatAiSopSub"), icon: FileText, tone: "bg-violet-50 text-violet-600" },
   ];
 
   return (
@@ -126,6 +126,22 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             </button>
           </div>
         </div>
+        {/* Mobile anchor nav (md:hidden) — same sections as the desktop nav,
+            scrollable pills, keyboard-focusable, 40px+ touch targets. */}
+        <nav aria-label={t("navAria")} className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
+          <button onClick={() => scrollToId("how")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            {t("navHow")}
+          </button>
+          <button onClick={() => scrollToId("features")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            {t("navFeatures")}
+          </button>
+          <button onClick={() => scrollToId("chancing")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            {t("navChancing")}
+          </button>
+          <button onClick={() => scrollToId("roadmap")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            {t("navPlanning")}
+          </button>
+        </nav>
       </header>
 
       <main id="top">
@@ -183,6 +199,11 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
                   <span className="h-2 w-2 rounded-full bg-slate-300" />
+                  {/* Label the mock as demo — it mirrors the real dashboard but
+                      everything inside it is sample data, not a live product. */}
+                  <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[8px] font-bold text-amber-700">
+                    {t("demoBadge")}
+                  </span>
                 </div>
                 <div className="grid min-h-[420px] grid-cols-1 sm:grid-cols-[150px_1fr]">
                   <aside className="hidden border-r border-slate-200 bg-white p-2.5 sm:block">
@@ -214,28 +235,28 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                     <div className="flex gap-3 rounded-2xl bg-gradient-to-br from-[#12143a] via-[#1b1f5e] to-[#2a3ba8] p-4 text-white">
                       <div className="min-w-0 flex-1">
                         <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[8px] font-semibold">
-                          <Sparkles className="h-2.5 w-2.5 text-amber-300" /> Active Applicant
+                          <Sparkles className="h-2.5 w-2.5 text-amber-300" /> {t("mockActiveApplicant")}
                         </span>
                         <div className="mt-2 text-[13px] font-extrabold leading-tight sm:text-[15px]">
-                          Global Admissions &amp; Scholarship Discovery Hub
+                          {t("mockHubTitle")}
                         </div>
                         <p className="mt-1.5 text-[8px] leading-snug text-slate-300">
-                          Matching your academic credentials (GPA 4.7/5) for Bachelor in Computer Science across top universities.
+                          {t("mockHubSub")}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1 text-[7px] font-semibold">
-                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><GraduationCap className="h-2.5 w-2.5" /> Bachelor</span>
+                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><GraduationCap className="h-2.5 w-2.5" /> {t("mockChipBachelor")}</span>
                           <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><Wallet className="h-2.5 w-2.5" /> <span className="text-emerald-300">$25 000/yr</span></span>
-                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><Trophy className="h-2.5 w-2.5" /> <span className="text-amber-300">0 Pubs</span></span>
+                          <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5"><Trophy className="h-2.5 w-2.5" /> <span className="text-amber-300">{t("mockChipPubs")}</span></span>
                         </div>
                       </div>
                       <div className="hidden w-[110px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/5 p-2 sm:flex">
-                        <div className="text-[7px] font-bold tracking-wider text-slate-300">ADMISSIONS INDEX</div>
+                        <div className="text-[7px] font-bold tracking-wider text-slate-300">{t("mockAdmissionsIndex")}</div>
                         <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/60">
                           <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
                         </div>
-                        <div className="text-[7px] font-semibold">Needs Strengthening</div>
+                        <div className="text-[7px] font-semibold">{t("mockNeedsStrengthening")}</div>
                         <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900 sb-ink-on-warm">
-                          <Bot className="h-2.5 w-2.5" /> Run AI Audit
+                          <Bot className="h-2.5 w-2.5" /> {t("mockRunAiAudit")}
                         </div>
                       </div>
                     </div>
@@ -253,13 +274,13 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                     </div>
                     <div className="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
                       <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-700">
-                        <Bot className="h-3 w-3" /> ScholarBridgeAI Strategic Evaluation
+                        <Bot className="h-3 w-3" /> {t("mockStrategicEval")}
                       </div>
-                      <div className="mt-2 text-[9px] font-bold">Overall Profile Score &amp; Readiness</div>
+                      <div className="mt-2 text-[9px] font-bold">{t("mockOverallScore")}</div>
                       <ul className="mt-1 list-disc space-y-0.5 pl-3.5 text-[8px] text-slate-600">
-                        <li>Score: 78 / 100</li>
-                        <li>Percentile: ≈ 85th among international CS applicants</li>
-                        <li>Key strength: GPA 4.7/5 — consistent academic performance</li>
+                        <li>{t("mockScoreLine")}</li>
+                        <li>{t("mockPercentileLine")}</li>
+                        <li>{t("mockStrengthLine")}</li>
                       </ul>
                     </div>
                   </div>

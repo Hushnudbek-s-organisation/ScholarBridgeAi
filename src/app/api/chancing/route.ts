@@ -11,6 +11,7 @@ import {
 import { requireProfileAccess } from "@/lib/auth";
 import { calculateUniversityMatch, type StudentProfileData } from "@/lib/matching";
 import {
+  ADMISSION_PROBABILITY,
   estimateAdmissionChance,
   type ChancingProfile,
   type ChancingUniversity,
@@ -218,8 +219,13 @@ async function outcomeSamples(universityIds: number[]): Promise<Map<number, Outc
  * GET /api/chancing?profileId=N&universityId=M     → one university
  * GET /api/chancing?profileId=N&all=1              → saved + tracked universities
  *
- * Returns the FIT score and the ADMISSION ESTIMATE as two separate numbers —
- * they answer different questions and must never be blended in the UI.
+ * Returns the FIT score (requirements/affordability match) plus the
+ * requirement SIGNALS (sub-scores, positives, negatives).
+ *
+ * PROBABILITY POLICY (2026-10): the admission probability dimension is
+ * returned as `probability: ADMISSION_PROBABILITY` ({ available: false }) —
+ * the numeric range is NOT exposed because no validated methodology +
+ * outcome data exists yet. A fit score must never be read as a probability.
  */
 export async function GET(req: Request) {
   try {
@@ -286,10 +292,21 @@ export async function GET(req: Request) {
         outcomes: samples.get(uni.id) ?? null,
       });
       return {
-        ...estimate,
+        universityId: estimate.universityId,
+        universityName: estimate.universityName,
+        fitScore: estimate.fitScore,
         fitCategory: fit.matchCategory,
         fitReasons: fit.reasons,
         fitIssues: fit.potentialIssues,
+        subScores: estimate.subScores,
+        positives: estimate.positives,
+        negatives: estimate.negatives,
+        dataBasis: estimate.dataBasis,
+        sampleSize: estimate.sampleSize,
+        // The numeric admission range is intentionally NOT returned (see
+        // policy header). Students see the probability dimension labelled
+        // unavailable, never a percentage we cannot stand behind.
+        probability: ADMISSION_PROBABILITY,
       };
     });
 

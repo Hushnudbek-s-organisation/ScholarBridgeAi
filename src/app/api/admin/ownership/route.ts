@@ -21,7 +21,8 @@ import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import {
   OwnershipError,
@@ -43,7 +44,7 @@ function fail(error: string, code: string, status: number) {
 
 /** Re-authenticate the acting admin (rate limited like sign-in). */
 async function checkPassword(profileId: number, password: unknown): Promise<NextResponse | null> {
-  const limit = checkRateLimit(`owner-pw:${profileId}`, LIMITS.signIn);
+  const limit = await checkSharedRateLimit(`owner-pw:${profileId}`, LIMITS.signIn);
   if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec, "Too many password attempts. Try again later.");
   if (typeof password !== "string" || !password) return fail("Enter your account password to confirm.", "password_required", 400);
   const [row] = await db
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   if (!access.ok) return fail(access.error, access.code, access.status);
   const actorId = access.session.profile.id;
 
-  const limit = checkRateLimit(`owner:${actorId}`, LIMITS.adminWrite);
+  const limit = await checkSharedRateLimit(`owner:${actorId}`, LIMITS.adminWrite);
   if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
   const parsed = await readJsonBody<Record<string, unknown>>(req, 8 * 1024);

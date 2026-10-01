@@ -8,7 +8,7 @@
  *   src/lib/ssrf.ts        outbound-fetch guard
  *   src/lib/request.ts     body-size cap
  *   src/lib/payments.ts    Payme / Click callback authentication
- *   src/middleware.ts      Content-Security-Policy
+ *   src/proxy.ts         Content-Security-Policy (proxy = the renamed middleware)
  * plus structural checks that no API route trusts a client-supplied id again.
  *
  * Run:  npm run test:security
@@ -49,7 +49,7 @@ async function main() {
   const ssrf = await import("../src/lib/ssrf");
   const request = await import("../src/lib/request");
   const payments = await import("../src/lib/payments");
-  const { contentSecurityPolicy, middleware } = await import("../src/middleware");
+  const { contentSecurityPolicy, proxy: middleware } = await import("../src/proxy");
   const { NextRequest } = await import("next/server");
   // The exact function the App Router uses to pull the nonce out of the request
   // CSP header — used below to prove our policy format is compatible.
@@ -446,7 +446,7 @@ async function main() {
   });
 
   check("middleware forwards the CSP on the request headers Next reads", () => {
-    const src = readFileSync(join(ROOT, "src/middleware.ts"), "utf8");
+    const src = readFileSync(join(ROOT, "src/proxy.ts"), "utf8");
     assert.match(
       src,
       /requestHeaders\.set\([\s\S]{0,120}"Content-Security-Policy(-Report-Only)?"/
@@ -526,8 +526,13 @@ async function main() {
 
   check("sign-in issues a session cookie and is rate limited", () => {
     const route = readFileSync(join(apiDir, "auth/sign-in/route.ts"), "utf8");
-    assert.match(route, /sessionCookieHeader/);
-    assert.match(route, /checkRateLimit/);
+    // sessionCookieHeader = direct helper; sessionCookieFromToken = A23, where
+    // the token is signed explicitly so a server-side session row can record
+    // exactly this token. Both satisfy "a real session cookie is set".
+    assert.match(route, /sessionCookieHeader|sessionCookieFromToken/);
+    // checkRateLimit = in-process limiter; checkSharedRateLimit = A20, the
+    // Postgres-backed limiter that survives process restarts (stronger).
+    assert.match(route, /checkRateLimit|checkSharedRateLimit/);
     assert.match(route, /Incorrect email or password/); // no account enumeration
   });
 
@@ -701,7 +706,7 @@ async function main() {
     assert.equal(t("POST", "/api/tasks", "https://public.example", { host: "10.0.0.5:3000", forwardedHost: "public.example" }), false);
     assert.equal(t("POST", "/api/tasks", "https://www.example.org", { host: "internal:3000", env: { APP_URL: "https://www.example.org" } }), false);
     assert.equal(t("POST", "/api/tasks", "https://app.example.org.evil.example"), true, "suffix tricks do not match");
-    const mw = readFileSync(join(ROOT, "src/middleware.ts"), "utf8");
+    const mw = readFileSync(join(ROOT, "src/proxy.ts"), "utf8");
     assert.match(mw, /isCrossSiteApiWrite\(/);
     assert.match(mw, /"\/api\/:path\*"/);
   });

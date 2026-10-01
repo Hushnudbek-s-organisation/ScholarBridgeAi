@@ -18,7 +18,8 @@ import {
 } from "@/lib/visa-interview";
 import { redactGeminiSecrets } from "@/lib/gemini";
 import { requireSession } from "@/lib/auth";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 
 export const runtime = "nodejs";
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const limit = checkRateLimit(`visa:live:${access.session.profile.id}`, LIMITS.visaLiveToken);
+    const limit = await checkSharedRateLimit(`visa:live:${access.session.profile.id}`, LIMITS.visaLiveToken);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
     const parsed = await readJsonBody<Record<string, any>>(req, 16 * 1024);
     if (!parsed.ok) {

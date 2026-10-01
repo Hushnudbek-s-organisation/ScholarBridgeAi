@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, unique, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
@@ -721,7 +721,13 @@ export const universityPrograms = pgTable("programs", {
     sql`lower(btrim(${table.name}))`,
     sql`lower(btrim(coalesce(${table.degree}, '')))`
   ),
-  uniqueIndex("uq_programs_id_university").on(table.id, table.universityId),
+  // A UNIQUE CONSTRAINT, not a unique index: the composite FK
+  // application_cycles(program_id, university_id) → programs(id, university_id)
+  // must be creatable by `drizzle-kit push` on a FRESH database, and drizzle
+  // adds that FK before it creates standalone indexes. A constraint declared
+  // in the table definition is created atomically with `programs`, so the FK
+  // always has its matching key. (full_schema.sql uses the same constraint.)
+  unique("uq_programs_id_university").on(table.id, table.universityId),
 ]);
 
 /** Program-level academic requirements. */
@@ -1785,6 +1791,58 @@ export const learningProviderScores = pgTable(
  * Never written by AI: a visa requirement without a source is shown as
  * "Not specified", and the AI is explicitly forbidden from inventing one.
  */
+/**
+ * Shared rate-limit hits (audit A20).
+ *
+ * The in-memory limiter in lib/rate-limit.ts is correct for ONE process, but a
+ * deployment with several instances (or a redeploy mid-window) would hand out
+ * one fresh budget per instance. Sensitive budgets — sign-in, sign-up, AI
+ * spend, payments, Telegram login, admin writes — are instead counted here:
+ * one row per hit, counted per key over the sliding window.
+ *
+ * Rows are pruned opportunistically by lib/rate-limit-shared.ts; the table
+ * stays small (a day of traffic, at most a few hundred thousand rows).
+ */
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    key: text("key").notNull(),
+    hitAt: timestamp("hit_at").notNull().defaultNow(),
+  },
+  (table) => [index("idx_rate_limit_hits_key_at").on(table.key, table.hitAt)]
+);
+
+/**
+ * Server-side web sessions (audit A23).
+ *
+ * The `sb_session` token is stateless (HMAC), which makes individual session
+ * revocation impossible: a stolen token stays valid for its full 7-day life.
+ * Each sign-in (and each Telegram channel token) now creates a row here,
+ * keyed by the SHA-256 of the token. `authenticate` rejects tokens whose row
+ * is missing or revoked; existing tokens from before this table shipped are
+ * adopted lazily on first use so a deploy does not log everyone out.
+ */
+export const userSessions = pgTable(
+  "user_sessions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => studentProfiles.id, { onDelete: "cascade" }),
+    // SHA-256 hex of the session token — the token itself never touches the DB.
+    // Column-level UNIQUE (a real constraint, so ON CONFLICT (token_hash)
+    // works — a plain unique index would not satisfy it).
+    tokenHash: text("token_hash").notNull().unique(),
+    scope: text("scope").notNull().default("web"),
+    userAgent: text("user_agent"),
+    ip: text("ip"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (table) => [index("idx_user_sessions_profile").on(table.profileId)]
+);
+
 export const visaRequirements = pgTable(
   "visa_requirements",
   {

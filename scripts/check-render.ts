@@ -22,6 +22,8 @@ import { PlanningStudio } from "../src/components/PlanningStudio";
 import { MentorMarketplace } from "../src/components/MentorMarketplace";
 import { ParentDashboard } from "../src/components/ParentDashboard";
 import { LandingPage } from "../src/components/LandingPage";
+import { UniversityExplorer } from "../src/components/UniversityExplorer";
+import { UniversityDetail } from "../src/components/UniversityDetail";
 
 let passed = 0;
 let failed = 0;
@@ -124,6 +126,10 @@ const loadMessages = (locale: string) =>
   JSON.parse(readFileSync(new URL(`../src/i18n/messages/${locale}.json`, import.meta.url), "utf8"));
 const renderLanding = (locale: string) =>
   render(
+    // react-intl types NextIntlClientProvider as IntlConfig & { children: ReactNode },
+    // i.e. `children` is a REQUIRED PROP for this component (not a rest argument),
+    // so the 2-arg form with children-in-props is the only form that type-checks.
+    // eslint-disable-next-line react/no-children-prop
     React.createElement(NextIntlClientProvider, {
       locale,
       messages: loadMessages(locale),
@@ -131,10 +137,23 @@ const renderLanding = (locale: string) =>
     })
   );
 
+const demoBadge: Record<string, string> = {
+  en: "Demo · sample data",
+  uz: "Demo · namunaviy ma'lumot",
+  ru: "Демо · данные-пример",
+};
+
 for (const locale of ["en", "uz", "ru"]) {
   const { html, error } = renderLanding(locale);
   check(`LandingPage renders in ${locale}`, error === null, error ?? "");
   check(`LandingPage produces substantial markup in ${locale}`, html.length > 3000, `only ${html.length} chars`);
+  // React escapes ' as &#x27; in static markup; normalize before comparing.
+  const normalized = html.replace(/&#x27;/g, "'");
+  check(
+    `landing dashboard mock is labeled as demo (${locale})`,
+    normalized.includes(demoBadge[locale]),
+    demoBadge[locale]
+  );
 }
 
 const landingHtml = renderLanding("en").html;
@@ -146,6 +165,78 @@ check(
   /Admission estimate/.test(landingHtml) && /intentionally does not invent a probability/i.test(landingHtml)
 );
 check("landing footer links to privacy and terms", /\/privacy/.test(landingHtml) && /\/terms/.test(landingHtml));
+
+// ---------------------------------------------------------------------------
+section("7. UniversityExplorer & UniversityDetail render in every locale");
+
+// Both components fetch in useEffect, so SSR shows the initial paint: the
+// explorer's filter shell and the detail's loading state. That initial paint
+// is where useTranslations + useLocaleContext must resolve correctly in
+// en/uz/ru, so we assert a locale-specific string lands in the markup.
+const renderExplorer = (locale: string, p: any) =>
+  render(
+    // eslint-disable-next-line react/no-children-prop
+    React.createElement(NextIntlClientProvider, {
+      locale,
+      messages: loadMessages(locale),
+      children: React.createElement(UniversityExplorer, {
+        activeProfile: p,
+        savedUniIds: new Set<number>(),
+        onSaveUniversity: () => Promise.resolve(),
+        onUnsaveUniversity: () => Promise.resolve(),
+      }),
+    })
+  );
+const renderDetail = (locale: string) =>
+  render(
+    // eslint-disable-next-line react/no-children-prop
+    React.createElement(NextIntlClientProvider, {
+      locale,
+      messages: loadMessages(locale),
+      children: React.createElement(UniversityDetail, {
+        universityId: 1,
+        activeProfile: null,
+        onBack: () => {},
+      }),
+    })
+  );
+
+const explorerTitle: Record<string, string> = {
+  en: "Global University &amp; Program Explorer",
+  uz: "Global universitet va dasturlar eksploryeri",
+  ru: "Глобальный поиск университетов и программ",
+};
+const detailLoading: Record<string, string> = {
+  en: "Loading university",
+  uz: "Universitet yuklanmoqda",
+  ru: "Загрузка университета",
+};
+
+for (const locale of ["en", "uz", "ru"]) {
+  const ex = renderExplorer(locale, null);
+  check(`UniversityExplorer renders in ${locale}`, ex.error === null, ex.error ?? "");
+  check(
+    `UniversityExplorer title is localized (${locale})`,
+    ex.html.includes(explorerTitle[locale]),
+    explorerTitle[locale]
+  );
+
+  const exProfile = renderExplorer(locale, profile);
+  check(
+    `UniversityExplorer renders with a profile in ${locale}`,
+    exProfile.error === null,
+    exProfile.error ?? ""
+  );
+
+  const det = renderDetail(locale);
+  check(`UniversityDetail renders in ${locale}`, det.error === null, det.error ?? "");
+  check(
+    `UniversityDetail loading state is localized (${locale})`,
+    det.html.includes(detailLoading[locale]),
+    detailLoading[locale]
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

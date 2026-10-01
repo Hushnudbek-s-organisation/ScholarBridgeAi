@@ -55,8 +55,26 @@ jobs:
       - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
         run: npm run test:integration
 
+      - name: E2E journey tests (embedded Postgres)
+        run: npm run test:journey
+
+      - name: Chancing + probability-policy tests (embedded Postgres)
+        run: npm run test:chancing
+
+      - name: Recommender tests — engine + API (embedded Postgres)
+        run: npm run test:recommend
+
+      - name: Opportunities feed tests (embedded Postgres)
+        run: npm run test:opportunities
+
       - name: i18n message parity
         run: npm run check:i18n
+
+      - name: Lint (baseline gate — fails on new or worsened problems)
+        run: npm run lint:baseline
+
+      - name: Dark-mode contrast audit
+        run: npm run test:dark
 
       - name: Build
         run: npm run build
