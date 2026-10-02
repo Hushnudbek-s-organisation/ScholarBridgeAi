@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { formatDegreeLevel } from "@/lib/degreeLevels";
 import { AiFormattedText } from "./AiFormattedText";
 import { 
   Sparkles, 
@@ -41,6 +43,7 @@ export function DashboardView({
   onEditProfile,
 }: DashboardViewProps) {
   const t = useTranslations("dashboard");
+  const tDegrees = useTranslations("degrees");
   const [aiEvaluation, setAiEvaluation] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   // Real scholarship match count (fetched, never a hardcoded claim).
@@ -159,7 +162,7 @@ export function DashboardView({
                 gpa: profile.gpa,
                 scale: profile.gpaScale,
                 test: profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : t("testPrepActive"),
-                degree: profile.degreeLevel,
+                degree: formatDegreeLevel(profile.degreeLevel, tDegrees),
                 major: profile.targetMajor,
                 countries: preferredCountriesList.slice(0, 3).join(", "),
               })}
@@ -168,7 +171,7 @@ export function DashboardView({
             {/* Quick Metrics Badges */}
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium border border-white/10">
-                🎓 {t("levelBadge")}: <strong className="text-white">{profile.degreeLevel}</strong>
+                🎓 {t("levelBadge")}: <strong className="text-white"><DegreeLevelLabel value={profile.degreeLevel} /></strong>
               </span>
               <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-medium border border-white/10">
                 💰 {t("budgetBadge")}: <strong className="text-emerald-300">${profile.budgetAnnualUsd?.toLocaleString()}{t("perYear")}</strong>

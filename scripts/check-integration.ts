@@ -283,6 +283,157 @@ async function main() {
   check("a second request is unaffected (the repair is idempotent)", dash2.status === 200, `got ${dash2.status}`);
 
   // -----------------------------------------------------------------------
+  section("0b. /api/universities — unspecified levels, aliases and explicit conflicts");
+
+  const { GET: universitiesGet } = await import("../src/app/api/universities/route");
+  type DiscoveryUniversity = {
+    id: number;
+    degreeLevel: string | null;
+    annualTuitionUsd: number | null;
+    worldRanking: number | null;
+    matchScore: number | null;
+  };
+  const catalogue = async (query = "", init: RequestInit = {}) => {
+    const result = await call(universitiesGet, `/api/universities${query ? `?${query}` : ""}`, init);
+    const rows: DiscoveryUniversity[] = Array.isArray(result.body?.universities) ? result.body.universities : [];
+    return { ...result, rows };
+  };
+  const includesUniversity = (result: Awaited<ReturnType<typeof catalogue>>, id: number) =>
+    result.status === 200 && result.rows.some((row) => row.id === id);
+  const bachelorQuery = `profileId=${profile.id}&degreeLevel=Bachelor`;
+
+  // Simulate live-schema drift ONLY in this suite's throwaway embedded DB.
+  // Reuse the existing university fixtures; never add a fake catalogue or
+  // coerce NULL to "All". Restore both rows and the constraint in finally.
+  await pool.query("ALTER TABLE universities ALTER COLUMN degree_level DROP NOT NULL");
+  try {
+    await db.update(schema.universities).set({ degreeLevel: "Master's" }).where(eq(schema.universities.id, uniB.id));
+    for (const unspecified of [null, "", "   ", "Unknown", "Not specified", "N/A", "Uncatalogued level", "constructor"]) {
+      await pool.query("UPDATE universities SET degree_level = $1 WHERE id = $2", [unspecified, uniA.id]);
+      const list = await catalogue(bachelorQuery);
+      check(
+        `universities: the owner sees degree_level ${JSON.stringify(unspecified)} for Bachelor`,
+        includesUniversity(list, uniA.id) && list.rows.find((row) => row.id === uniA.id)?.degreeLevel === unspecified,
+        `status ${list.status}, ids ${list.rows.map((row) => row.id)}`
+      );
+      check(
+        `universities: an explicit Master's-only row is absent alongside ${JSON.stringify(unspecified)}`,
+        list.status === 200 && !list.rows.some((row) => row.id === uniB.id)
+      );
+    }
+
+    await db.update(schema.universities).set({ degreeLevel: " aLL " }).where(eq(schema.universities.id, uniB.id));
+    const allLevels = await catalogue(bachelorQuery);
+    check("universities: All remains visible (case-insensitive, trimmed)", includesUniversity(allLevels, uniB.id));
+
+    // Full labels, not substring guesses: undergraduate must not be mistaken
+    // for graduate, and a postgraduate diploma must not be a Master's-only row.
+    const degreeCases: [offered: string, requested: string, conflicting: string][] = [
+      ["Bachelor", "Bachelor", "Master"],
+      ["Bachelor’s degree", "Bachelor", "Master"],
+      ["Undergraduate", "Bachelor", "Master"],
+      ["  UNDERGRADUATE DEGREE  ", "Bachelor", "PhD"],
+      ["Undergrad", "Bachelor", "Master"],
+      ["B.Sc.", "Bachelor", "Master"],
+      ["Bachelor (undergraduate)", "Bachelor", "Master"],
+      ["Master’s-only", "Master", "Bachelor"],
+      ["Graduate", "Master", "Bachelor"],
+      ["Graduate degree", "Master", "Bachelor"],
+      ["Postgraduate", "Master", "Bachelor"],
+      ["Master (graduate)", "Master", "PhD"],
+      ["Master (MS / MA)", "Master", "Bachelor"],
+      ["M.Sc.", "Master", "Bachelor"],
+      ["Ph.D.", "PhD", "Master"],
+      ["Doctorate", "PhD", "Bachelor"],
+      ["Doctoral degree", "PhD", "Master"],
+      ["Doctor of Philosophy", "PhD", "Master"],
+      ["PhD (doctoral)", "PhD", "Master"],
+      ["DPhil", "PhD", "Master"],
+      ["Diploma", "Diploma", "Master"],
+      ["Postgraduate diploma", "Diploma", "Master"],
+    ];
+    for (const [offered, requested, conflicting] of degreeCases) {
+      await db.update(schema.studentProfiles).set({ degreeLevel: requested }).where(eq(schema.studentProfiles.id, profile.id));
+      await db.update(schema.universities).set({ degreeLevel: offered }).where(eq(schema.universities.id, uniA.id));
+      await db.update(schema.universities).set({ degreeLevel: conflicting }).where(eq(schema.universities.id, uniB.id));
+      const list = await catalogue(`profileId=${profile.id}&degreeLevel=${requested}`);
+      check(
+        `universities: ${offered} matches ${requested}, not ${conflicting} (raw value preserved)`,
+        includesUniversity(list, uniA.id) && !list.rows.some((row) => row.id === uniB.id) &&
+          list.rows.find((row) => row.id === uniA.id)?.degreeLevel === offered,
+        `status ${list.status}, ids ${list.rows.map((row) => row.id)}`
+      );
+    }
+
+    for (const [profileLevel, offered, conflicting] of [
+      ["Undergraduate degree", "Bachelor", "Master"],
+      ["Graduate degree", "Master", "Bachelor"],
+      ["Doctoral degree", "PhD", "Master"],
+    ]) {
+      await db.update(schema.studentProfiles).set({ degreeLevel: profileLevel }).where(eq(schema.studentProfiles.id, profile.id));
+      await db.update(schema.universities).set({ degreeLevel: offered }).where(eq(schema.universities.id, uniA.id));
+      await db.update(schema.universities).set({ degreeLevel: conflicting }).where(eq(schema.universities.id, uniB.id));
+      const list = await catalogue(`profileId=${profile.id}&degreeLevel=${conflicting}`);
+      check(
+        `universities: profile alias ${profileLevel} wins over the conflicting query`,
+        includesUniversity(list, uniA.id) && !list.rows.some((row) => row.id === uniB.id)
+      );
+    }
+
+    await db.update(schema.studentProfiles).set({ degreeLevel: "Bachelor" }).where(eq(schema.studentProfiles.id, profile.id));
+    await db.update(schema.universities).set({ degreeLevel: "Bachelor / Master" }).where(eq(schema.universities.id, uniA.id));
+    await db.update(schema.universities).set({ degreeLevel: "Master / PhD" }).where(eq(schema.universities.id, uniB.id));
+    const multipleLevels = await catalogue(bachelorQuery);
+    check(
+      "universities: explicit multi-level records match any offered level, not a conflicting list",
+      includesUniversity(multipleLevels, uniA.id) && !multipleLevels.rows.some((row) => row.id === uniB.id)
+    );
+    const cannotUnlock = await catalogue(`profileId=${profile.id}&degreeLevel=All`);
+    check("universities: degreeLevel=All cannot bypass the owner's profile level", includesUniversity(cannotUnlock, uniA.id) && !cannotUnlock.rows.some((row) => row.id === uniB.id));
+
+    // Ownership stays unchanged: another student's profileId (or an anonymous
+    // caller) gets the public list, never personalised scores/private data.
+    const otherUniversityCookie = `sb_session=${signSessionToken({ id: other.id, passwordHash: other.passwordHash })}`;
+    for (const callerCookie of [otherUniversityCookie, ""]) {
+      const publicList = await catalogue(`profileId=${profile.id}&degreeLevel=Graduate`, { headers: { cookie: callerCookie } });
+      check(
+        `universities: ${callerCookie ? "non-owner" : "anonymous"} cannot personalise against a foreign profile`,
+        includesUniversity(publicList, uniB.id) && publicList.rows.every((row) => row.matchScore === null)
+      );
+    }
+
+    // Missing numeric data must remain missing: adding degree visibility must
+    // not turn NULL tuition/ranking into zero or change filter/sort semantics.
+    await pool.query("UPDATE universities SET degree_level = NULL, annual_tuition_usd = NULL, world_ranking = NULL WHERE id = $1", [uniA.id]);
+    await db.update(schema.universities).set({ degreeLevel: "All" }).where(eq(schema.universities.id, uniB.id));
+    const unspecifiedNumbers = await catalogue(bachelorQuery);
+    const unspecifiedRow = unspecifiedNumbers.rows.find((row) => row.id === uniA.id);
+    check("universities: a NULL-level row with no numeric filters is visible, with NULLs intact", includesUniversity(unspecifiedNumbers, uniA.id) && unspecifiedRow?.degreeLevel === null && unspecifiedRow.annualTuitionUsd === null && unspecifiedRow.worldRanking === null);
+    const unfiltered = await catalogue();
+    check("universities: the unfiltered admin/public list still contains both rows", includesUniversity(unfiltered, uniA.id) && includesUniversity(unfiltered, uniB.id));
+
+    for (const numericFilter of ["maxTuition=2000", "minRank=1", "maxRank=100"]) {
+      const list = await catalogue(`${bachelorQuery}&${numericFilter}`);
+      check(`universities: ${numericFilter} still excludes NULL, not the verified row`, includesUniversity(list, uniB.id) && !list.rows.some((row) => row.id === uniA.id));
+    }
+    const zeroTuition = await catalogue(`${bachelorQuery}&maxTuition=0`);
+    check("universities: NULL tuition is never treated as free", zeroTuition.status === 200 && zeroTuition.rows.length === 0);
+    for (const sort of ["tuition_asc", "tuition_desc"]) {
+      const list = await catalogue(`${bachelorQuery}&sort=${sort}`);
+      check(`universities: ${sort} still puts NULL tuition last`, list.status === 200 && list.rows[0]?.id === uniB.id && list.rows.at(-1)?.id === uniA.id);
+    }
+    const firstPage = await catalogue("degreeLevel=Bachelor&page=1&perPage=1");
+    const lastPage = await catalogue("degreeLevel=Bachelor&page=2&perPage=1");
+    check("universities: public rank sorting keeps NULL rank on the final page, not missing", firstPage.status === 200 && firstPage.rows[0]?.id === uniB.id && firstPage.body?.total === 2 && includesUniversity(lastPage, uniA.id) && lastPage.body?.page === 2);
+  } finally {
+    for (const uni of [uniA, uniB]) {
+      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking }).where(eq(schema.universities.id, uni.id));
+    }
+    await db.update(schema.studentProfiles).set({ degreeLevel: profile.degreeLevel }).where(eq(schema.studentProfiles.id, profile.id));
+    await pool.query("ALTER TABLE universities ALTER COLUMN degree_level SET NOT NULL");
+  }
+
+  // -----------------------------------------------------------------------
   section("1. /api/planning — costs, portfolio, CV and comparison from real rows");
 
   const { GET: planningGet } = await import("../src/app/api/planning/route");

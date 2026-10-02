@@ -24,6 +24,13 @@ import { ParentDashboard } from "../src/components/ParentDashboard";
 import { LandingPage } from "../src/components/LandingPage";
 import { UniversityExplorer } from "../src/components/UniversityExplorer";
 import { UniversityDetail } from "../src/components/UniversityDetail";
+import { DegreeLevelLabel } from "../src/components/DegreeLevelLabel";
+import { ProfileModal } from "../src/components/ProfileModal";
+import { OnboardingWizard } from "../src/components/OnboardingWizard";
+import { DashboardView } from "../src/components/DashboardView";
+import { RecommendationStudio } from "../src/components/RecommendationStudio";
+import { CompleteProfileForm } from "../src/components/CompleteProfileForm";
+import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
 
 let passed = 0;
 let failed = 0;
@@ -237,6 +244,81 @@ for (const locale of ["en", "uz", "ru"]) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+section("8. Degree aliases, paired labels and honest unspecified states (SSR only)");
+
+const renderLocalized = (locale: string, node: React.ReactElement) => {
+  const props = { locale, messages: loadMessages(locale), timeZone: "UTC", children: node };
+  return render(React.createElement(NextIntlClientProvider, props));
+};
+const text = (html: string) => html.replace(/&#x27;/g, "'");
+const degreeLabels: Record<string, { Bachelor: string; Master: string; PhD: string; all: string; unspecified: string }> = {
+  en: { Bachelor: "Bachelor (undergraduate)", Master: "Master (graduate)", PhD: "PhD (doctoral)", all: "All degree levels", unspecified: "Level: not specified" },
+  uz: { Bachelor: "Bakalavr (bakalavriat)", Master: "Magistr (magistratura)", PhD: "PhD (doktorantura)", all: "Barcha darajalar", unspecified: "Daraja: ko'rsatilmagan" },
+  ru: { Bachelor: "Бакалавр (бакалавриат)", Master: "Магистр (магистратура)", PhD: "PhD (докторантура)", all: "Все уровни обучения", unspecified: "Уровень: не указан" },
+};
+const aliases: [string, "Bachelor" | "Master" | "PhD"][] = [
+  ["Undergraduate degree", "Bachelor"],
+  ["Graduate degree", "Master"],
+  ["Doctoral degree", "PhD"],
+];
+
+for (const locale of ["en", "uz", "ru"]) {
+  const expected = degreeLabels[locale];
+  for (const [alias, canonical] of aliases) {
+    const label = renderLocalized(locale, React.createElement(DegreeLevelLabel, { value: alias }));
+    check(`degree alias ${alias} has its paired label (${locale})`, label.error === null && text(label.html) === expected[canonical], label.error ?? label.html);
+
+    const explorer = renderExplorer(locale, { ...profile, degreeLevel: alias });
+    const selected = new RegExp(`<option(?=[^>]*value="${canonical}")(?=[^>]*selected)[^>]*>`);
+    check(`Explorer's locked ${alias} control selects ${canonical} (${locale})`, explorer.error === null && selected.test(explorer.html) && explorer.html.includes(expected[canonical]) && /<select[^>]*disabled/.test(explorer.html), explorer.error ?? "canonical option not selected");
+  }
+
+  for (const value of [null, "", "   ", "Unknown"]) {
+    const badge = renderLocalized(locale, React.createElement(DegreeLevelLabel, { value, showPrefix: true }));
+    check(`card degree ${JSON.stringify(value)} is explicitly unspecified (${locale})`, badge.error === null && text(badge.html) === expected.unspecified, badge.error ?? badge.html);
+  }
+  const all = renderLocalized(locale, React.createElement(DegreeLevelLabel, { value: " aLL " }));
+  check(`All stays distinct from unspecified (${locale})`, all.error === null && text(all.html) === expected.all);
+  const multiple = renderLocalized(locale, React.createElement(DegreeLevelLabel, { value: "Bachelor / Master" }));
+  check(`multi-level labels are not invented as All (${locale})`, multiple.error === null && text(multiple.html) === `${expected.Bachelor} / ${expected.Master}`);
+  const unknownExplorer = renderExplorer(locale, { ...profile, degreeLevel: "Uncatalogued level" });
+  check(`an unrecognised profile level remains selected and labelled (${locale})`, unknownExplorer.error === null && /<option(?=[^>]*value="Uncatalogued level")(?=[^>]*selected)[^>]*>/.test(unknownExplorer.html));
+  const allExplorer = renderExplorer(locale, { ...profile, degreeLevel: "All" });
+  check(`an All profile has an actual selected All option (${locale})`, allExplorer.error === null && /<option(?=[^>]*value="All")(?=[^>]*selected)[^>]*>/.test(allExplorer.html));
+
+  const modal = renderLocalized(locale, React.createElement(ProfileModal, { isOpen: true, isNew: true, profile: null, onClose: () => {}, onSave: async () => {} }));
+  check(`profile degree choices have paired names, not changed option values (${locale})`, modal.error === null && ["Bachelor", "Master", "PhD"].every((level) => modal.html.includes(`<option value="${level}"`)) && [expected.Bachelor, expected.Master, expected.PhD].every((label) => text(modal.html).includes(label)), modal.error ?? "missing degree choice");
+  const onboarding = renderLocalized(locale, React.createElement(OnboardingWizard, { profile: { ...profile, onboardingStep: 1, degreeLevel: "Undergraduate degree" }, onComplete: () => {} }));
+  check(`onboarding degree choices use paired names and recognise an existing alias (${locale})`, onboarding.error === null && [expected.Bachelor, expected.Master, expected.PhD].every((label) => text(onboarding.html).includes(label)) && onboarding.html.includes("border-indigo-600 bg-indigo-50"), onboarding.error ?? "missing paired choice or selected alias");
+
+  // Initial paints of the other consumers. Effects and browser interactions
+  // are deliberately not claimed here; this sandbox has no browser.
+  const dashboard = renderLocalized(locale, React.createElement(DashboardView, {
+    profile: { ...profile, name: "", email: "", degreeLevel: "Undergraduate degree", targetMajor: "", gpa: 0, gpaScale: 4, budgetAnnualUsd: 0, preferredCountries: "[]", needScholarship: false },
+    onNavigateTab: () => {}, savedUniCount: 0, savedScholarshipCount: 0, savedProgramCount: 0, taskCount: 0, onEditProfile: () => {},
+  }));
+  check(`dashboard displays the paired degree name (${locale})`, dashboard.error === null && text(dashboard.html).includes(expected.Bachelor), dashboard.error ?? "missing paired badge");
+  const recommend = renderLocalized(locale, React.createElement(RecommendationStudio, { activeProfile: null }));
+  check(`recommendation studio still renders (${locale})`, recommend.error === null && recommend.html.length > 50, recommend.error ?? "");
+  const complete = renderLocalized(locale, React.createElement(CompleteProfileForm, { activeProfile: profile, onSaved: () => {} }));
+  check(`complete-profile form still renders (${locale})`, complete.error === null && complete.html.length > 50, complete.error ?? "");
+}
+
+for (const [name, condition] of [
+  ["unknown university level is visible, not assumed to offer All", supportsDegreeLevel(null, "Bachelor") && normalizeDegreeLevel(null) === null],
+  ["unknown requested level does not fabricate a conflict", supportsDegreeLevel("Master", "Unknown")],
+  ["an explicit graduate-only row conflicts with undergraduate", !supportsDegreeLevel("Graduate degree", "Undergraduate degree")],
+  ["a doctoral-only row conflicts with Master", !supportsDegreeLevel("Ph.D.", "Master’s")],
+  ["All is preserved for every requested alias", aliases.every(([alias]) => supportsDegreeLevel("All", alias))],
+  ["a partially unknown list remains unspecified", supportsDegreeLevel("Master / unclassified", "Bachelor") && normalizeDegreeLevel("Master / unclassified") === null],
+  ["a postgraduate diploma is not inferred to be a Master", normalizeDegreeLevel("Postgraduate diploma") === "Diploma" && !supportsDegreeLevel("Postgraduate diploma", "Master")],
+  ["local-language aliases are recognised", normalizeDegreeLevel("Бакалавриат") === "Bachelor" && normalizeDegreeLevel("Magistratura") === "Master"],
+  ["paired names canonicalise without conflating explicit multiple levels", normalizeDegreeLevel("Bachelor (undergraduate)") === "Bachelor" && !supportsDegreeLevel("Master / PhD", "Bachelor")],
+] as [string, boolean][]) {
+  check(name, condition);
+}
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

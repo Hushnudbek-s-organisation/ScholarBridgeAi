@@ -40,6 +40,8 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 
 // ---------------------------------------------------------------------------
@@ -646,13 +648,18 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
               <label htmlFor="rec-degree" className={labelCls}>
                 {t("degreeLevel")}
               </label>
-              <select id="rec-degree" value={form.degreeLevel} onChange={(e) => setField("degreeLevel", e.target.value)} className={inputCls}>
+              <select id="rec-degree" value={normalizeDegreeLevel(form.degreeLevel) ?? form.degreeLevel} onChange={(e) => setField("degreeLevel", e.target.value)} className={inputCls}>
                 <option value="">{t("dontKnow")}</option>
                 {DEGREE_LEVELS.map((d) => (
                   <option key={d} value={d}>
-                    {d}
+                    {normalizeDegreeLevel(d) ? <DegreeLevelLabel value={d} /> : d}
                   </option>
                 ))}
+                {form.degreeLevel && !DEGREE_LEVELS.includes(normalizeDegreeLevel(form.degreeLevel) ?? form.degreeLevel) && (
+                  <option value={normalizeDegreeLevel(form.degreeLevel) ?? form.degreeLevel}>
+                    <DegreeLevelLabel value={form.degreeLevel} />
+                  </option>
+                )}
               </select>
               <p className={hintCls}>{t("degreeLevelWhy")}</p>
             </div>
@@ -855,7 +862,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
                             <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                               <GraduationCap className="h-4 w-4 shrink-0 text-indigo-500" />
                               <span className="truncate">{r.program.name}</span>
-                              {r.program.degreeLevel ? <Badge tone="slate">{r.program.degreeLevel}</Badge> : null}
+                              {r.program.degreeLevel ? <Badge tone="slate">{normalizeDegreeLevel(r.program.degreeLevel) ? <DegreeLevelLabel value={r.program.degreeLevel} /> : r.program.degreeLevel}</Badge> : null}
                               {r.program.language ? (
                                 <Badge tone="slate">
                                   <Languages className="h-3 w-3" /> {r.program.language}

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
@@ -36,7 +38,7 @@ export interface University {
   city: string;
   flagEmoji: string;
   worldRanking: number | null;
-  degreeLevel: string;
+  degreeLevel: string | null;
   programMajor: string;
   annualTuitionUsd: number | null;
   annualLivingEstUsd: number | null;
@@ -126,7 +128,7 @@ export function UniversityExplorer({
   // (filters, search, sort, profile, or page size). Adjusted during render
   // (the React-endorsed alternative to a reset effect), so the debounced
   // fetch below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, selectedCountry, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
+  const resultKey = [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -195,7 +197,7 @@ export function UniversityExplorer({
     const t = setTimeout(() => fetchUniversities(), 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedLevel, maxTuition, search, sortBy, page, perPage]);
+  }, [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedLevel, maxTuition, search, sortBy, page, perPage]);
 
   const filteredUniversities = universities;
 
@@ -240,16 +242,10 @@ export function UniversityExplorer({
     compareIds.includes(u.id),
   );
 
-  // Degree level shown next to the results count (locked to the profile for
-  // active students, free for guests) — translated per locale.
-  const levelKeyMap: Record<string, string> = {
-    Bachelor: t("exLevelBachelor"),
-    Master: t("exLevelMaster"),
-    PhD: t("exLevelPhD"),
-    Diploma: t("exLevelDiploma"),
-  };
+  // Canonicalise aliases only for the control's selected value; requests and
+  // API records keep their original labels. Unknown is never changed to All.
+  const lockedLevel = normalizeDegreeLevel(activeProfile?.degreeLevel) ?? activeProfile?.degreeLevel;
   const activeLevel = activeProfile?.degreeLevel || (selectedLevel !== "All" ? selectedLevel : null);
-  const levelLabel = activeLevel ? levelKeyMap[activeLevel] ?? activeLevel : null;
 
   if (selectedUniId != null) {
     return (
@@ -324,17 +320,20 @@ export function UniversityExplorer({
           {/* Level Filter */}
           <div>
             <select
-              value={activeProfile?.degreeLevel || selectedLevel}
+              value={lockedLevel || selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              disabled={Boolean(activeProfile?.degreeLevel)}
+              disabled={Boolean(lockedLevel)}
               aria-label={t("exLevelAria")}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
             >
-              {!activeProfile?.degreeLevel && <option value="All">{t("exLevelAll")}</option>}
-              <option value="Bachelor">{t("exLevelBachelor")}</option>
-              <option value="Master">{t("exLevelMaster")}</option>
-              <option value="PhD">{t("exLevelPhD")}</option>
-              {activeProfile?.degreeLevel === "Diploma" && <option value="Diploma">{t("exLevelDiploma")}</option>}
+              {(!lockedLevel || lockedLevel === "All") && <option value="All">{t("exLevelAll")}</option>}
+              <option value="Bachelor">🎓 <DegreeLevelLabel value="Bachelor" /></option>
+              <option value="Master">🎓 <DegreeLevelLabel value="Master" /></option>
+              <option value="PhD">🎓 <DegreeLevelLabel value="PhD" /></option>
+              {lockedLevel === "Diploma" && <option value="Diploma">🎓 <DegreeLevelLabel value="Diploma" /></option>}
+              {lockedLevel && !normalizeDegreeLevel(lockedLevel) && (
+                <option value={lockedLevel}><DegreeLevelLabel value={lockedLevel} /></option>
+              )}
             </select>
           </div>
 
@@ -374,7 +373,7 @@ export function UniversityExplorer({
       {/* Results Count & Active Info */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
-          {levelLabel ? <b>{levelLabel} — </b> : null}
+          {activeLevel ? <b><DegreeLevelLabel value={activeLevel} /> — </b> : null}
           {t("exResultsCount", {
             from: totalCount === 0 ? 0 : (page - 1) * perPage + 1,
             to: (page - 1) * perPage + filteredUniversities.length,
@@ -477,6 +476,10 @@ export function UniversityExplorer({
                     <div className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 mb-2 inline-block">
                       {uni.programMajor}
                     </div>
+
+                    <p className="text-[11px] text-slate-500 mb-2">
+                      <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
+                    </p>
 
                     <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
                       {uni.description}
