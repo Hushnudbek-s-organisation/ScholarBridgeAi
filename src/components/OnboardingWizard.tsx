@@ -17,6 +17,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { STUDY_FIELD_CATEGORIES } from "@/lib/studyFields";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
@@ -400,12 +402,12 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 type="button"
                 onClick={() => set("degreeLevel", d)}
                 className={`rounded-2xl border-2 px-4 py-5 text-sm font-bold transition-all ${
-                  form.degreeLevel === d
+                  normalizeDegreeLevel(form.degreeLevel) === d
                     ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm"
                     : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
                 }`}
               >
-                {d}
+                <DegreeLevelLabel value={d} />
               </button>
             ))}
           </div>

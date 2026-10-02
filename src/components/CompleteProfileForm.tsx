@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { Loader2, Save, Sparkles } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 
 /**
  * Complete Student Profile (#1).
@@ -219,12 +221,17 @@ export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileF
                     ) : field.type === "select" ? (
                       <select
                         className={`${inputClass} mt-1`}
-                        value={form[field.key] ?? ""}
+                        value={field.key === "degreeLevel" ? normalizeDegreeLevel(form[field.key]) ?? form[field.key] ?? "" : form[field.key] ?? ""}
                         onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
                       >
+                        {field.key === "degreeLevel" && !(field.options ?? []).includes(normalizeDegreeLevel(form[field.key]) ?? form[field.key] ?? "") && (
+                          <option value={normalizeDegreeLevel(form[field.key]) ?? form[field.key] ?? ""}>
+                            <DegreeLevelLabel value={form[field.key]} />
+                          </option>
+                        )}
                         {(field.options ?? []).map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {field.key === "degreeLevel" ? <DegreeLevelLabel value={option} /> : option}
                           </option>
                         ))}
                       </select>

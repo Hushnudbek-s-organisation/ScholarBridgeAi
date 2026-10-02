@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import {
   ArrowLeft,
   ExternalLink,
@@ -753,7 +755,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       <div className="min-w-0">
                         <p className="text-sm font-extrabold text-slate-800">{p.name}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          {tVal(fmtValue(p.degree))} · {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || t("yearsUnit", { years: p.durationYears })}` : t("durationNotSpecified")} · {tVal(fmtValue(p.studyMode))}
+                          {normalizeDegreeLevel(p.degree) ? <DegreeLevelLabel value={p.degree} /> : tVal(fmtValue(p.degree))} · {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || t("yearsUnit", { years: p.durationYears })}` : t("durationNotSpecified")} · {tVal(fmtValue(p.studyMode))}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">

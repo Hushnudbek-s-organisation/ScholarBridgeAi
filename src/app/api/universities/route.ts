@@ -12,28 +12,13 @@ import { calculateUniversityMatch } from "@/lib/matching";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
+import { supportsDegreeLevel } from "@/lib/degreeLevels";
 
 /**
  * Resilient university select: tries the full schema first. If the database
  * is missing an unexpected column (the DB is the source of truth and may
  * differ), falls back to a core subset so the list still works.
  */
-/** Normalize label variants such as "Bachelor's" and "Master’s". */
-function normalizeDegreeLevel(value: string | null | undefined): string {
-  return (value || "")
-    .toLowerCase()
-    .replace(/[’']/g, "")
-    .replace(/s\b/g, "")
-    .trim();
-}
-
-function supportsDegreeLevel(universityLevel: string | null | undefined, requestedLevel: string): boolean {
-  const offered = normalizeDegreeLevel(universityLevel);
-  const requested = normalizeDegreeLevel(requestedLevel);
-  // "All" means the university record confirms availability at every level.
-  return offered === "all" || offered === requested;
-}
-
 async function selectUniversities() {
   try {
     return await db.select().from(universities);
@@ -118,8 +103,10 @@ export async function GET(req: Request) {
       allUnis = allUnis.filter(u => u.country === country);
     }
 
-    // A signed-in student's target degree is mandatory: a Bachelor applicant
-    // must never be shown Master/PhD-only institutions (and vice versa).
+    // Keep the owner's target degree authoritative and recognise equivalent
+    // labels (e.g. Undergraduate/Bachelor, Graduate/Master, Doctoral/PhD).
+    // Only explicit conflicting levels are excluded; unspecified levels stay
+    // visible without claiming verified compatibility or rewriting NULL.
     // The request filter is retained for visitors with no profile.
     const requestedDegree = profileData?.degreeLevel || degreeLevel;
     if (requestedDegree && requestedDegree !== "All") {

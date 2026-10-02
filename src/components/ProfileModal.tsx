@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { StudentProfile } from "./Navbar";
+import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Target } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 import { STUDY_FIELD_CATEGORIES, STUDY_FIELDS } from "@/lib/studyFields";
@@ -242,6 +244,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   if (!isOpen) return null;
 
+  const degreeControlValue = normalizeDegreeLevel(formData.degreeLevel) ?? formData.degreeLevel;
+
   const countryOptions = [
     "United States",
     "United Kingdom",
@@ -469,14 +473,17 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Target Degree</label>
                 <select
-                  value={formData.degreeLevel}
+                  value={degreeControlValue}
                   onChange={(e) => setFormData({ ...formData, degreeLevel: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value="Bachelor">Bachelor (Undergrad)</option>
-                  <option value="Master">Master (MS / MA)</option>
-                  <option value="PhD">Doctorate (PhD)</option>
-                  <option value="Diploma">Diploma / Post-grad</option>
+                  <option value="Bachelor"><DegreeLevelLabel value="Bachelor" /></option>
+                  <option value="Master"><DegreeLevelLabel value="Master" /></option>
+                  <option value="PhD"><DegreeLevelLabel value="PhD" /></option>
+                  <option value="Diploma"><DegreeLevelLabel value="Diploma" /></option>
+                  {!["Bachelor", "Master", "PhD", "Diploma"].includes(degreeControlValue) && (
+                    <option value={degreeControlValue}><DegreeLevelLabel value={formData.degreeLevel} /></option>
+                  )}
                 </select>
               </div>
 

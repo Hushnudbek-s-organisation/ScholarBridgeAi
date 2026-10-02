@@ -86,6 +86,15 @@
     "uz": "O'zbekcha",
     "ru": "Русский"
   },
+  "degrees": {
+    "bachelor": "Bachelor (undergraduate)",
+    "master": "Master (graduate)",
+    "phd": "PhD (doctoral)",
+    "diploma": "Diploma",
+    "all": "All degree levels",
+    "unspecified": "not specified",
+    "level": "Level: {level}"
+  },
   "common": {
     "loading": "Loading...",
     "save": "Save",
