@@ -8,6 +8,7 @@ import { siteUrlForRequest } from "@/lib/requestAppUrl";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/motion";
 import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
+import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 
 // The middleware sends a per-request nonce-based CSP. Next.js can only stamp
 // that nonce on its <script> tags when the page is rendered per request —
@@ -107,8 +108,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const stored = (await cookies()).get(THEME_COOKIE)?.value;
   const initialTheme = isThemeChoice(stored) ? stored : "system";
 
+  // Language of the document itself. Screen readers use it to pick a
+  // pronunciation dictionary, so it must match the locale the app renders —
+  // it is read from the same cookie the LocaleProvider uses, and the provider
+  // keeps it in sync when the language is switched without a reload.
+  const storedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const lang = storedLocale && isLocale(storedLocale) ? storedLocale : defaultLocale;
+
   return (
-    <html lang="uz" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <head>
         {/* Applies the saved theme before first paint — no light/dark flash. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />

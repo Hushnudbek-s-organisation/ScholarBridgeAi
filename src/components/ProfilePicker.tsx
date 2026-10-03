@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ShieldCheck, X, LogIn, Loader2, Plus, Mail, Send } from "lucide-react";
 import { StudentProfile } from "./Navbar";
@@ -39,6 +39,59 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
   const [signInBusy, setSignInBusy] = useState(false);
   const [tg, setTg] = useState<TelegramPublicConfig | null>(null);
   const [method, setMethod] = useState<"telegram" | "email" | null>(null);
+
+  /**
+   * Modal behaviour, the same as the navigation drawer: Escape closes it, the
+   * page behind cannot scroll, focus moves INTO the dialog and Tab stays there,
+   * and focus returns to the control that opened it. Without this a keyboard or
+   * screen-reader user could tab into the page behind the overlay.
+   */
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const close = useCallback(() => {
+    setSignInError("");
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const node = dialogRef.current;
+    const focusables = () =>
+      [
+        ...(node?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []),
+      ].filter((el) => el.offsetParent !== null);
+    window.setTimeout(() => focusables()[0]?.focus(), 20);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+      triggerRef.current?.focus?.();
+    };
+  }, [open, close]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,14 +140,20 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-xs sm:p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="picker-title" className="my-6 w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="picker-title"
+        className="my-6 w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      >
         {/* Header */}
         <div className="flex items-center justify-between bg-gradient-to-r from-indigo-700 via-violet-700 to-indigo-800 px-5 py-4 text-white sm:px-6 sm:py-5">
           <div>
             <h2 id="picker-title" className="text-lg font-extrabold">{t("title")}</h2>
             <p className="mt-0.5 text-xs text-indigo-100">{t("subtitle")}</p>
           </div>
-          <button onClick={onClose} aria-label={t("close")} className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 hover:text-white">
+          <button onClick={close} aria-label={t("close")} className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>

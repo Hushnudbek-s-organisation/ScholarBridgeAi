@@ -3,39 +3,12 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar, StudentProfile } from "@/components/Navbar";
 import { ProfileModal } from "@/components/ProfileModal";
-import { DashboardView } from "@/components/DashboardView";
-import { UniversityExplorer } from "@/components/UniversityExplorer";
-import { ScholarshipHub } from "@/components/ScholarshipHub";
 import { ApplicationTracker, SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
-import { DeadlineCenter } from "@/components/DeadlineCenter";
-import { ChancingPanel } from "@/components/ChancingPanel";
-import { RecommendationStudio } from "@/components/RecommendationStudio";
-import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
-import { CompleteProfileForm } from "@/components/CompleteProfileForm";
-import { SessionsPanel } from "@/components/SessionsPanel";
-import { ApplicationCenter } from "@/components/ApplicationCenter";
-import { NextActionsPanel } from "@/components/NextActionsPanel";
-import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
-import { EssayRubricStudio } from "@/components/EssayRubricStudio";
-import { CountryComparePanel } from "@/components/CountryComparePanel";
-import { OpportunitiesPanel } from "@/components/OpportunitiesPanel";
-import { SimilarProfiles } from "@/components/SimilarProfiles";
-import { PlanningStudio } from "@/components/PlanningStudio";
-import { MentorMarketplace } from "@/components/MentorMarketplace";
-import { ParentDashboard } from "@/components/ParentDashboard";
-import { DocumentChecklist } from "@/components/DocumentChecklist";
-import { ConsultingSection } from "@/components/ConsultingSection";
-import { AiSopStudio } from "@/components/AiSopStudio";
-import { TaskRoadmap } from "@/components/TaskRoadmap";
-import { AiChatMentor } from "@/components/AiChatMentor";
-import { VisaSpeakingAssistant } from "@/components/VisaSpeakingAssistant";
-import { ForumSection } from "@/components/ForumSection";
-import { CoursesSection } from "@/components/CoursesSection";
 import { PaymentsSection } from "@/components/PaymentsSection";
 import { RewardsSection } from "@/components/RewardsSection";
+import { ParentDashboard } from "@/components/ParentDashboard";
 import { AdminPanel } from "@/components/AdminPanel";
 import { PremiumGate } from "@/components/PremiumGate";
-import { FaqSection } from "@/components/FaqSection";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
@@ -43,47 +16,43 @@ import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import type { Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
 import { PageTransition } from "@/components/motion";
-import { NAV_SECTIONS } from "@/lib/navSections";
-import { JourneyGuide } from "@/components/JourneyGuide";
+import {
+  DEFAULT_HIDDEN_NAV_ITEMS,
+  parseHiddenNav,
+  resolveNavTarget,
+} from "@/lib/navSections";
 import { SectionIntro } from "@/components/SectionIntro";
-import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
-import { AnswerVault } from "@/components/growth/AnswerVault";
-import { GoalPlanner } from "@/components/growth/GoalPlanner";
-import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
 import { TelegramSettings } from "@/components/telegram/TelegramSettings";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
-import { SuccessStories } from "@/components/growth/SuccessStories";
 import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
-import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
 import {
-  ActivityPortfolioPanel,
-  DocumentVaultPanel,
-  StudyPlanPanel,
-  TestPlannerPanel,
-} from "@/components/journey/PreparePanels";
-import {
-  FinancialPlanPanel,
-  LearningProvidersPanel,
-  OffersPanel,
-  RecommendationManagerPanel,
-} from "@/components/journey/AfterAdmissionPanels";
-import { CareerExplorerPanel, InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
-import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
+  CommunityHub,
+  FundingHub,
+  GuidanceHub,
+  MaterialsHub,
+  OffersHub,
+  PostAdmissionFundingHub,
+  ProfileHub,
+  ScholarshipsHub,
+  StudyPlanHub,
+  TasksHub,
+  UniversitiesHub,
+  VisaHub,
+  ApplicationsHub,
+} from "@/components/hubs";
 
-/** Tabs that may appear in the URL hash (#scholarships …) for deep links. */
-const LINKABLE_TABS = new Set<string>([
-  ...NAV_SECTIONS.map((s) => s.id).filter((id) => id !== "profile"),
-  "admin",
-  "tracker",
-  "deadlines",
-  "courses",
-  "consulting",
-]);
-
-function tabFromHash(): string | null {
+/**
+ * Any destination, pane, legacy section id or utility screen may appear in the
+ * URL hash (`#universities`, `#universities/outlook`, `#vault`, `#payments`).
+ * Old links keep working because `resolveNavTarget` maps every previous id.
+ */
+function targetFromHash(): { section: string; pane: string | null } | null {
   if (typeof window === "undefined") return null;
-  const id = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
-  return LINKABLE_TABS.has(id) ? id : null;
+  const raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+  if (!raw) return null;
+  const target = resolveNavTarget(raw);
+  if (!target) return null;
+  return { section: target.section, pane: target.utility ? null : target.pane };
 }
 
 const sessionCopy: Record<Locale, { opening: string; checking: string; unavailable: string; retry: string; signIn: string; details: string }> = {
@@ -126,7 +95,14 @@ function SessionRestoreError({ error, onRetry, onSignIn }: { error: string | nul
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // The open destination (one of the fourteen) and, inside a multi-tab
+  // destination, the open tab. Both live in the URL hash so Back/Forward,
+  // bookmarks and Telegram deep links keep working.
+  const [activeTab, setActiveTabState] = useState("dashboard");
+  const [activePane, setActivePane] = useState<string | null>(null);
+  // Ids an admin has turned off (Admin → Navigation). Hubs honour them too, so
+  // a hidden tab is never reachable in the middle of a page.
+  const [hiddenNav, setHiddenNav] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
   // "restoring" = checking the HttpOnly session before choosing a screen,
   // "landing"   = visitor with no active session,
   // "wizard"    = step-by-step onboarding for a brand-new user,
@@ -177,6 +153,56 @@ export default function Home() {
   const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
   const [savedProgramCount, setSavedProgramCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
+  /**
+   * The one navigation entry point. It accepts anything the product has ever
+   * used as a destination: a section id (`materials`), a pane deep link
+   * (`materials/essays`), a bare pane id (`outlook`) or a legacy section id
+   * (`vault`, `chancing`, `workspace`, `profile`). Unknown ids are ignored
+   * instead of silently dumping the student on the dashboard.
+   */
+  const handleNavigateTab = useCallback((id: string) => {
+    const target = resolveNavTarget(id);
+    if (!target) return;
+    setActiveTabState(target.section);
+    setActivePane(target.utility ? null : target.pane);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const openPane = useCallback(
+    (pane: string) => {
+      setActivePane(pane);
+      const hash = `#${activeTab}/${pane}`;
+      if (typeof window !== "undefined" && window.location.hash !== hash) {
+        window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+      }
+    },
+    [activeTab]
+  );
+
+  // Admin → Navigation can hide a destination or a single tab. The sidebar
+  // announces changes; the shell applies them to the page body as well.
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/config/nav", { cache: "no-store" });
+        const data = await res.json();
+        if (alive) setHiddenNav(parseHiddenNav(JSON.stringify(data.hidden ?? [])));
+      } catch {
+        // keep the defaults — the shell still works offline
+      }
+    };
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener("scholarbridge:nav-updated", onUpdate);
+    return () => {
+      alive = false;
+      window.removeEventListener("scholarbridge:nav-updated", onUpdate);
+    };
+  }, []);
+
+  const setActiveTab = handleNavigateTab;
+
   // Which application the Application Workspace is showing (null = the list).
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   // Which university the Explorer should open (set by the global search, §34).
@@ -319,9 +345,13 @@ export default function Home() {
         }
         hydrateProfileData(storedId);
         setView("app");
-        // Deep link (#autopilot, #stories …) wins over the default tab.
-        const linked = tabFromHash();
-        if (linked && (linked !== "admin" || data.profile.isAdmin)) setActiveTab(linked);
+        // Deep link (#universities/outlook, #vault, #payments …) wins over the
+        // default destination. Unknown/foreign ids fall back to the dashboard.
+        const linked = targetFromHash();
+        if (linked && (linked.section !== "admin" || data.profile.isAdmin)) {
+          setActiveTabState(linked.section);
+          setActivePane(linked.pane);
+        }
         // Fire-and-forget: check for approaching deadlines → notifications.
         try {
           fetch("/api/notifications/sweep", {
@@ -377,7 +407,7 @@ export default function Home() {
   const hashSynced = useRef(false);
   useEffect(() => {
     if (view !== "app") return;
-    const want = `#${activeTab}`;
+    const want = activePane ? `#${activeTab}/${activePane}` : `#${activeTab}`;
     if (window.location.hash === want) {
       hashSynced.current = true;
       return;
@@ -386,7 +416,7 @@ export default function Home() {
     if (hashSynced.current) window.history.pushState(null, "", url);
     else window.history.replaceState(null, "", url);
     hashSynced.current = true;
-  }, [activeTab, view]);
+  }, [activeTab, activePane, view]);
 
   // Global search (spec §34) asks the page to focus a record it found.
   useEffect(() => {
@@ -395,22 +425,24 @@ export default function Home() {
       if (!detail) return;
       if (detail.kind === "university") {
         setFocusUniversityId(Number(detail.id) || null);
-        setActiveTab("universities");
+        handleNavigateTab("universities/search");
       } else if (detail.kind === "application") {
         setWorkspaceId(Number(detail.id) || null);
-        setActiveTab("workspace");
+        handleNavigateTab("applications/workspace");
       } else {
-        setActiveTab((detail.kind as string) === "task" ? "tasks" : detail.kind);
+        handleNavigateTab((detail.kind as string) === "task" ? "tasks" : detail.kind);
       }
     };
     window.addEventListener("scholarbridge:focus-record", onFocus);
     return () => window.removeEventListener("scholarbridge:focus-record", onFocus);
-  }, []);
+  }, [handleNavigateTab]);
 
   useEffect(() => {
     const onNav = () => {
-      const linked = tabFromHash();
-      if (linked) setActiveTab(linked);
+      const linked = targetFromHash();
+      if (!linked) return;
+      setActiveTabState(linked.section);
+      setActivePane(linked.pane);
     };
     window.addEventListener("popstate", onNav);
     window.addEventListener("hashchange", onNav);
@@ -673,15 +705,6 @@ export default function Home() {
    * now (the My Profile sidebar entry was removed). All other targets navigate
    * as before.
    */
-  const handleNavigateTab = (tab: string) => {
-    if (tab === "profile") {
-      setIsNewProfile(false);
-      setIsProfileModalOpen(true);
-      return;
-    }
-    setActiveTab(tab);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   // ---- Landing / onboarding flow ----
   const handleWizardCreated = (created: StudentProfile) => {
@@ -842,118 +865,182 @@ export default function Home() {
             </div>
           )}
 
+          {/* ---- EXPLORE ------------------------------------------------ */}
           {activeTab === "universities" && (
-            <UniversityExplorer
-              activeProfile={activeProfile}
+            <UniversitiesHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
               savedUniIds={savedUniIds}
               onSaveUniversity={handleSaveUniversity}
               onUnsaveUniversity={handleUnsaveUniversity}
               autoOpenUniversityId={focusUniversityId}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
             />
           )}
 
           {activeTab === "scholarships" && (
-            <ScholarshipHub
-              activeProfile={activeProfile}
+            <ScholarshipsHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
               savedScholarshipIds={savedScholarshipIds}
               onSaveScholarship={handleSaveScholarship}
               onUnsaveScholarship={handleUnsaveScholarship}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
             />
           )}
 
-          {activeTab === "tracker" && (
-            <ApplicationTracker
-              activeProfile={activeProfile}
-              savedUniversities={savedUniversities}
-              savedScholarships={savedScholarships}
-              onUpdateSavedUniStatus={handleUpdateSavedUniStatus}
-              onRemoveSavedUni={handleRemoveSavedUni}
-              onUpdateSavedScholarshipStatus={handleUpdateSavedScholarshipStatus}
-              onRemoveSavedScholarship={handleRemoveSavedScholarship}
+          {/* ---- MY PLAN ------------------------------------------------ */}
+          {activeTab === "study-plan" && (
+            <StudyPlanHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
             />
-          )}
-
-          {activeTab === "sop" && (
-            <PremiumGate
-              profileId={activeProfile?.id ?? null}
-              feature="ai_essay"
-              title="AI SOP & Essays is Premium"
-              description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
-              onUpgrade={() => setActiveTab("payments")}
-            >
-              <div className="space-y-4">
-                <AiSopStudio activeProfile={activeProfile} />
-                {/* #8 Advanced Essay AI — deterministic rubric + version history */}
-                <EssayRubricStudio activeProfile={activeProfile} />
-              </div>
-            </PremiumGate>
           )}
 
           {activeTab === "tasks" && (
-            <TaskRoadmap activeProfile={activeProfile} />
+            <TasksHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
           )}
 
-          {/* Complete Student Profile (#1) + my sessions (server-side revocation) */}
-          {activeTab === "profile" && activeProfile && (
-            <div className="space-y-6">
-              <CompleteProfileForm
-                key={`profile-${activeProfile.id}`}
-                activeProfile={activeProfile}
-                onSaved={handleProfileUpdated}
-              />
-              <SessionsPanel />
-            </div>
+          {activeTab === "profile" && (
+            <ProfileHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              onProfileSaved={handleProfileUpdated}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
           )}
 
-          {/* Chancing engine (#2) — Fit score and Admission estimate shown separately */}
-          {activeTab === "chancing" && <ChancingPanel activeProfile={activeProfile} />}
-
-          {/* Program recommender — four separate dimensions, probability unavailable */}
-          {activeTab === "recommend" && <RecommendationStudio activeProfile={activeProfile} />}
-
-          {/* #21 + #22 — profile strength dashboard + extracurricular analysis */}
-          {activeTab === "strength" && <ProfileStrengthPanel activeProfile={activeProfile} />}
-
-          {/* #3 AI Admissions Advisor */}
-          {activeTab === "advisor" && <AdmissionsAdvisor activeProfile={activeProfile} />}
-
-          {/* #10 Accepted students with a similar profile */}
-          {activeTab === "similar" && <SimilarProfiles activeProfile={activeProfile} />}
-
-          {/* Phase 4 — mentor marketplace (parent dashboard is gated below) */}
-          {activeTab === "mentors" && <MentorMarketplace activeProfile={activeProfile} />}
-
-          {/* #26/#27/#28 — personalized opportunities feed (curated catalog) */}
-          {activeTab === "opportunities" && <OpportunitiesPanel />}
-
-          {/* #29 — country comparison on published data only */}
-          {activeTab === "compare" && <CountryComparePanel />}
-
-          {/* Phase 3 — cost calculator, scholarship portfolio, CV, comparison */}
-          {activeTab === "planning" && <PlanningStudio activeProfile={activeProfile} />}
-
-          {/* Universal application tracker + outcomes flywheel (#12) */}
-          {activeTab === "applications" && <ApplicationCenter activeProfile={activeProfile} />}
-
-          {activeTab === "deadlines" && (
-            <DeadlineCenter profileId={activeProfile?.id ?? null} />
+          {activeTab === "funding" && (
+            <FundingHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
           )}
 
-          {activeTab === "chat" && <AiChatMentor activeProfile={activeProfile} />}
-
-          {activeTab === "visa" && activeProfile && (
-            <div className="space-y-4">
-              <VisaCenterPanel profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-              <VisaSpeakingAssistant activeProfile={activeProfile} />
-            </div>
+          {/* ---- APPLICATIONS ------------------------------------------- */}
+          {activeTab === "applications" && (
+            <ApplicationsHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
           )}
 
-          {activeTab === "forum" && (
-            <ForumSection activeProfile={activeProfile} isModerator={activeProfile?.isAdmin ?? false} />
+          {activeTab === "materials" && (
+            <MaterialsHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
           )}
 
-          {activeTab === "courses" && (
-            <CoursesSection activeProfile={activeProfile} />
+          {/* ---- AFTER ADMISSION ---------------------------------------- */}
+          {activeTab === "offers" && (
+            <OffersHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
+          )}
+
+          {activeTab === "post-admission-funding" && (
+            <PostAdmissionFundingHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
+          )}
+
+          {activeTab === "visa" && (
+            <VisaHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
+          )}
+
+          {/* ---- HELP & LEARNING ---------------------------------------- */}
+          {activeTab === "guidance" && (
+            <GuidanceHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
+          )}
+
+          {activeTab === "community" && (
+            <CommunityHub
+              profile={activeProfile}
+              pane={activePane}
+              setPane={openPane}
+              navigate={handleNavigateTab}
+              hidden={hiddenNav}
+              workspaceId={workspaceId}
+              setWorkspaceId={setWorkspaceId}
+            />
+          )}
+
+          {/* ---- ACCOUNT / UTILITY (not a journey group) ---------------- */}
+          {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
+
+          {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+
+          {activeTab === "notifications" && (
+            <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />
           )}
 
           {activeTab === "parent" && (
@@ -962,97 +1049,13 @@ export default function Home() {
               feature="parent_dashboard"
               title="Parent dashboard is Pro"
               description="Share a read-only progress page with your family — a Pro feature families pay for."
-              onUpgrade={() => setActiveTab("payments")}
+              onUpgrade={() => handleNavigateTab("payments")}
             >
               <ParentDashboard activeProfile={activeProfile} />
             </PremiumGate>
           )}
 
-          {/* ---- Journey reorganization (spec §2 sidebar groups) ---------- */}
-
-          {/* DISCOVER */}
-          {activeTab === "career" && <CareerExplorerPanel onNavigateTab={handleNavigateTab} />}
-
-          {/* MY JOURNEY */}
-          {activeTab === "study-plan" && activeProfile && (
-            <StudyPlanPanel key={`plan-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-          )}
-          {activeTab === "activities" && activeProfile && (
-            <ActivityPortfolioPanel key={`act-${activeProfile.id}`} profileId={activeProfile.id} />
-          )}
-
-          {/* PREPARE */}
-          {activeTab === "documents" && activeProfile && (
-            <DocumentVaultPanel key={`docs-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-          )}
-          {activeTab === "tests" && activeProfile && (
-            <TestPlannerPanel key={`tests-${activeProfile.id}`} profileId={activeProfile.id} />
-          )}
-          {activeTab === "requirements" && activeProfile && (
-            <RequirementsBrowser
-              key={`req-${activeProfile.id}`}
-              profileId={activeProfile.id}
-              onOpenWorkspace={(id) => {
-                setWorkspaceId(id);
-                handleNavigateTab("workspace");
-              }}
-            />
-          )}
-          {activeTab === "funding" && activeProfile && (
-            <FinancialPlanPanel key={`fund-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-          )}
-
-          {/* APPLY */}
-          {activeTab === "workspace" && activeProfile && (
-            <ApplicationWorkspacePanel
-              key={`ws-${activeProfile.id}-${workspaceId ?? "list"}`}
-              profileId={activeProfile.id}
-              applicationId={workspaceId}
-              onSelect={(id) => setWorkspaceId(id || null)}
-              onNavigateTab={handleNavigateTab}
-            />
-          )}
-          {activeTab === "recommendations" && activeProfile && (
-            <RecommendationManagerPanel key={`rec-${activeProfile.id}`} profileId={activeProfile.id} />
-          )}
-
-          {/* AFTER ADMISSION */}
-          {activeTab === "offers" && activeProfile && (
-            <OffersPanel key={`off-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-          )}
-          {activeTab === "post-admission-funding" && activeProfile && (
-            <FinancialPlanPanel key={`paf-${activeProfile.id}`} profileId={activeProfile.id} onNavigateTab={handleNavigateTab} />
-          )}
-          {activeTab === "interviews" && <InterviewCenterPanel onNavigateTab={handleNavigateTab} />}
-          {activeTab === "learning" && activeProfile && <LearningProvidersPanel key={`lp-${activeProfile.id}`} profileId={activeProfile.id} />}
-
-          {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
-
-          {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
-
-          {activeTab === "consulting" && <ConsultingSection activeProfile={activeProfile} />}
-
           {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
-
-          {/* Growth features (CollegeVine / ApplyBoard / ScholarshipOwl /
-              Crimson / AdmitSee-inspired, adapted) */}
-          {activeTab === "autopilot" && (
-            <ScholarshipAutopilot
-              activeProfile={activeProfile}
-              onSaveScholarship={async (id) => {
-                await handleSaveScholarship(id);
-              }}
-              onNavigate={handleNavigateTab}
-            />
-          )}
-          {activeTab === "vault" && <AnswerVault activeProfile={activeProfile} />}
-          {activeTab === "goals" && <GoalPlanner activeProfile={activeProfile} />}
-          {activeTab === "departure" && <DepartureChecklist activeProfile={activeProfile} onNavigate={handleNavigateTab} />}
-          {activeTab === "stories" && <SuccessStories activeProfile={activeProfile} />}
-          {activeTab === "notifications" && <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />}
-
-          {/* SEO/AEO: FAQ har bir bo'limda sahifa pastida ko'rinadi */}
-          {activeTab !== "admin" && <FaqSection />}
 
         </PageTransition>
         </div>
@@ -1064,24 +1067,27 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>
             <div className="flex items-center gap-3">
-              <a href="/terms" className="hover:text-slate-800 underline underline-offset-4">
+              <a href="/terms" className="inline-flex min-h-6 items-center px-1 hover:text-slate-800 underline underline-offset-4">
                 Terms
               </a>
-              <a href="/privacy" className="hover:text-slate-800 underline underline-offset-4">
+              <a href="/privacy" className="inline-flex min-h-6 items-center px-1 hover:text-slate-800 underline underline-offset-4">
                 Privacy
               </a>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="hover:text-slate-800 cursor-pointer" onClick={() => setActiveTab("universities")}>
+          {/* Real buttons, not clickable spans: these are navigation, so they
+              must be reachable with Tab and announced as controls. `flex-wrap`
+              keeps the row inside the viewport at 200% zoom. */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("universities")}>
               University Matcher
-            </span>
-            <span className="hover:text-slate-800 cursor-pointer" onClick={() => setActiveTab("scholarships")}>
+            </button>
+            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("scholarships")}>
               Scholarship Discovery
-            </span>
-            <span className="hover:text-slate-800 cursor-pointer" onClick={() => setActiveTab("chat")}>
+            </button>
+            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("mentor")}>
               AI Mentor
-            </span>
+            </button>
           </div>
         </div>
       </footer>

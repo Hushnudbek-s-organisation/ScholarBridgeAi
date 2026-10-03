@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { ScrollRegion } from "@/components/hubs/ui";
 
 /**
  * Planning Studio (Phase 3) — cost calculator, scholarship portfolio, CV
@@ -455,7 +456,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   Save at least two universities to compare them.
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <ScrollRegion label="University comparison" className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
@@ -492,7 +493,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollRegion>
               )}
 
               {data.comparison.dataGaps.length > 0 && (

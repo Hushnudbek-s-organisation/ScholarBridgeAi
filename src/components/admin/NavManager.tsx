@@ -7,17 +7,18 @@ import {
   DEFAULT_HIDDEN_NAV_ITEMS,
   NAV_GROUPS,
   NAV_SECTIONS,
+  NAV_UTILITY_SECTIONS,
   navLabelKey,
   parseHiddenNav,
 } from "@/lib/navSections";
 
 const GROUP_KEY: Record<string, string> = {
-  start: "groupStart",
+  home: "groupHome",
   explore: "groupExplore",
   plan: "groupPlan",
-  apply: "groupApply",
+  applications: "groupApplications",
+  after: "groupAfter",
   help: "groupHelp",
-  account: "groupAccount",
 };
 
 interface NavManagerProps {
@@ -37,6 +38,7 @@ interface NavManagerProps {
  */
 export function NavManager({ adminProfileId }: NavManagerProps) {
   const tn = useTranslations("nav");
+  const tp = useTranslations("navPanes");
   const [hidden, setHidden] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
@@ -220,6 +222,57 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
           </div>
         )}
       </div>
+
+      {/* Tabs inside a destination and the account screens are toggleable too:
+          hiding one removes that tab (or that utility row) for everyone, which
+          is how "Country compare", "Mentors" and "Parents" are off by default. */}
+      {!loading && (
+        <details className="rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-slate-700">
+            Tabs and account screens ({NAV_SECTIONS.reduce((n, s) => n + s.panes.length, 0) + NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).length})
+          </summary>
+          <ul className="divide-y divide-slate-100 border-t border-slate-100">
+            {NAV_SECTIONS.flatMap((section) =>
+              section.panes.map((pane) => ({ id: pane.id, label: `${tn(navLabelKey(section.id))} → ${tp(pane.id as never)}`, description: pane.description }))
+            )
+              .concat(
+                NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map((u) => ({
+                  id: u.id,
+                  label: `${tn(navLabelKey(u.id))}`,
+                  description: u.description,
+                }))
+              )
+              .map((row) => {
+                const visible = !hidden.includes(row.id);
+                const saving = savingId === row.id;
+                return (
+                  <li key={row.id} className="flex items-center gap-4 px-4 py-2.5 hover:bg-slate-50/60">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700">{row.label}</span>
+                        <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{row.id}</code>
+                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-500">{row.description}</p>
+                    </div>
+                    <button
+                      onClick={() => toggle(row.id)}
+                      disabled={saving || savingId !== ""}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                        visible
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                      title={visible ? "Hide from the app" : "Show in the app"}
+                    >
+                      {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {visible ? "Visible" : "Hidden"}
+                    </button>
+                  </li>
+                );
+              })}
+          </ul>
+        </details>
+      )}
 
       {!loading && (
         <button

@@ -466,7 +466,9 @@ export function JourneyControlCenter({
         title="Profile readiness"
         subtitle="How ready each area is — and exactly what to improve. This is not an admission chance."
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* 2 columns on phones too: seven full-width tiles made a ~700px
+            stack that pushed the next actions off the first screen. */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {readiness.categories.map((c) => (
             <motion.button
               key={c.key}

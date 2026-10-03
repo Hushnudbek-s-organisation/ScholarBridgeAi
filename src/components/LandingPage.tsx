@@ -1,7 +1,8 @@
 "use client";
 
 import { BrandingImage } from "./BrandingImage";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Menu, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Reveal, RevealGroup, RevealItem } from "./motion";
 import { staggerParent } from "./motion/variants";
@@ -49,6 +50,31 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
   const t = useTranslations("landing");
   const nav = useTranslations("nav");
   const tm = useTranslations("meta");
+
+  /**
+   * Phone/tablet menu. The four section links used to live in an
+   * `overflow-x-auto` strip, so on a 320-390px screen the last one ("Planning"
+   * / "Rejalashtirish" / "Планирование") sat outside the viewport behind a
+   * visible scrollbar. A disclosure menu shows every link at once and is
+   * reachable with Tab, Escape and the keyboard like any other control.
+   */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        menuTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  const goToSection = (id: string) => {
+    setMenuOpen(false);
+    scrollToId(id);
+  };
 
   const steps = [
     { num: "01", label: t("step1Label"), title: t("step1Title"), text: t("step1Text") },
@@ -100,9 +126,12 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             <span className="grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
               <BrandingImage alt={t("logoAlt")} className="h-[34px] w-[34px] object-cover" />
             </span>
-            <span className="truncate">{tm("appName")}</span>
+            {/* `truncate` stays as a safety net, but nothing is allowed to
+                squeeze the wordmark away on a 320px phone: the header keeps
+                only the controls that fit and the rest move into the menu. */}
+            <span className="truncate text-[15px] sm:text-lg">{tm("appName")}</span>
           </a>
-          <nav className="hidden items-center gap-7 text-sm text-slate-600 md:flex">
+          <nav aria-label={t("navAria")} className="hidden items-center gap-6 text-sm text-slate-600 lg:flex xl:gap-7">
             <button onClick={() => scrollToId("how")} className="hover:text-slate-900">{t("navHow")}</button>
             <button onClick={() => scrollToId("features")} className="hover:text-slate-900">{t("navFeatures")}</button>
             <button onClick={() => scrollToId("chancing")} className="hover:text-slate-900">{t("navChancing")}</button>
@@ -113,35 +142,76 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             {onSignIn && (
               <button
                 onClick={onSignIn}
-                className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold hover:-translate-y-px hover:border-slate-300 transition sm:px-4 sm:py-2.5"
+                className="hidden whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold hover:-translate-y-px hover:border-slate-300 transition sm:block sm:px-4 sm:py-2.5"
               >
                 {t("signIn")}
               </button>
             )}
             <button
               onClick={onStart}
-              className="whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition sm:px-4 sm:py-2.5"
+              className="hidden whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition sm:block sm:px-4 sm:py-2.5"
             >
               {t("getStarted")}
             </button>
+            <button
+              ref={menuTriggerRef}
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-controls="landing-mobile-nav"
+              aria-label={t("navAria")}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 lg:hidden"
+            >
+              {menuOpen ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
+            </button>
           </div>
         </div>
-        {/* Mobile anchor nav (md:hidden) — same sections as the desktop nav,
-            scrollable pills, keyboard-focusable, 40px+ touch targets. */}
-        <nav aria-label={t("navAria")} className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
-          <button onClick={() => scrollToId("how")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            {t("navHow")}
-          </button>
-          <button onClick={() => scrollToId("features")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            {t("navFeatures")}
-          </button>
-          <button onClick={() => scrollToId("chancing")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            {t("navChancing")}
-          </button>
-          <button onClick={() => scrollToId("roadmap")} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            {t("navPlanning")}
-          </button>
-        </nav>
+        {/* Phone/tablet menu — every section in the same order as the desktop
+            nav, plus the sign-in entry point that no longer fits in the bar. */}
+        {menuOpen && (
+          <nav
+            id="landing-mobile-nav"
+            aria-label={t("navAria")}
+            className="border-t border-slate-100 bg-white px-4 pb-3 pt-2 lg:hidden"
+          >
+            <ul className="flex flex-col">
+              {[
+                { id: "how", label: t("navHow") },
+                { id: "features", label: t("navFeatures") },
+                { id: "chancing", label: t("navChancing") },
+                { id: "roadmap", label: t("navPlanning") },
+              ].map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => goToSection(item.id)}
+                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+              {/* The bar's CTA is hidden below 640px, so the menu carries it. */}
+              <li className="mt-1 border-t border-slate-100 pt-1 sm:hidden">
+                <button
+                  onClick={() => { menuTriggerRef.current?.focus(); setMenuOpen(false); onStart(); }}
+                  className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-bold text-indigo-700 hover:bg-slate-50"
+                >
+                  {t("getStarted")}
+                </button>
+              </li>
+              {onSignIn && (
+                <li className="sm:mt-1 sm:border-t sm:border-slate-100 sm:pt-1">
+                  <button
+                    onClick={() => { menuTriggerRef.current?.focus(); setMenuOpen(false); onSignIn(); }}
+                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {t("signIn")}
+                  </button>
+                </li>
+              )}
+            </ul>
+          </nav>
+        )}
       </header>
 
       <main id="top">
@@ -427,9 +497,11 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
       <footer className="border-t border-slate-200 py-9 text-xs text-slate-400">
         <div className="mx-auto flex w-[min(1160px,92%)] flex-col items-center justify-between gap-4 sm:flex-row">
           <div>© {new Date().getFullYear()} {t("footerLeft")}</div>
+          {/* min-h-6 keeps the tap targets at the 24px minimum even though the
+              type is xs; px-1 widens them without changing the visual rhythm. */}
           <div className="flex items-center gap-4">
-            <a href="/privacy" className="hover:text-slate-600">{t("footerPrivacy")}</a>
-            <a href="/terms" className="hover:text-slate-600">{t("footerTerms")}</a>
+            <a href="/privacy" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerPrivacy")}</a>
+            <a href="/terms" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerTerms")}</a>
           </div>
         </div>
       </footer>

@@ -33,7 +33,7 @@ export interface PlanPhase {
 }
 
 export const PLAN_PHASES: readonly PlanPhase[] = [
-  { key: "profile", title: "Build profile", description: "Grades, activities, awards and a complete profile.", icon: "🧱", tab: "profile" },
+  { key: "profile", title: "Build profile", description: "Grades, activities, awards and a complete profile.", icon: "🧱", tab: "profile/details" },
   { key: "tests", title: "Tests", description: "English test and any standardized test, with a target date.", icon: "📝", tab: "tests" },
   { key: "university_research", title: "University research", description: "Shortlist, compare programmes, check requirements.", icon: "🔎", tab: "universities" },
   { key: "scholarship_research", title: "Scholarship research", description: "Find funding that matches your profile and budget.", icon: "💰", tab: "scholarships" },

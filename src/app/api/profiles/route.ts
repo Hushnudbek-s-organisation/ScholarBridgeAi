@@ -174,6 +174,12 @@ export async function POST(req: Request) {
         workExperienceYears: numOrNull(body.workExperienceYears) ?? 0,
         researchPublications: numOrNull(body.researchPublications) ?? 0,
         preferredLocale: body.preferredLocale || "en",
+        // The onboarding wizard saves the step it will resume from on EVERY
+        // save — including the very first one, which creates the account. Without
+        // this a student who reloads (or comes back on another device) after
+        // step 1 was sent back to step 1 with the form empty, even though the
+        // account already existed. Clamped to the wizard's 8 steps.
+        onboardingStep: Math.min(Math.max(Number(body.onboardingStep) || 0, 0), 7),
       // Sign-up password: stored ONLY as a scrypt hash (never plain text).
         passwordHash: plainPassword ? hashPassword(plainPassword) : null,
       }).returning();

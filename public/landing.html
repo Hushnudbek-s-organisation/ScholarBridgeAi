@@ -37,7 +37,16 @@
         }
     </script>
     <style>
+        /* Decorative blobs are clipped here so no phantom horizontal scroll
+           area is reported at any width (the CDN build sets body{overflow-x:hidden},
+           which turns the body itself into a scroll container). */
+        html { overflow-x: clip; }
         .animate-on-scroll { opacity: 0; }
+        /* The sticky notice pushes the fixed navbar down by its own height. */
+        :root { --notice-h: 0px; }
+        #protoNotice { position: sticky; }
+        main { scroll-margin-top: 96px; }
+        h1, h2, h3 { overflow-wrap: break-word; }
         .glass-card {
             background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(10px);
@@ -54,31 +63,60 @@
 </head>
 <body class="font-sans text-slate-800 bg-slate-50 antialiased overflow-x-hidden">
 
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
+
+    <!-- Prototype notice: static design mockup, sample data. Localized en/uz/ru
+         from navigator.language; the language switcher below re-renders it. -->
+    <div id="protoNotice" role="note" data-i18n="notice"
+         style="position:sticky;top:0;z-[100];background:#f59e0b;color:#1f2937;padding:8px 16px;font-size:13px;font-weight:600;text-align:center">
+        ⚠️ Prototype (static design) — sample data, not a real account.
+        <a href="/" style="color:#1f2937;font-weight:800;text-decoration:underline">Open the real app</a>
+    </div>
+
     <!-- Navbar -->
-    <nav id="navbar" class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
+    <nav id="navbar" class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all duration-300" style="top:var(--notice-h,0px)">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
-                <a href="#top" class="flex items-center gap-2 cursor-pointer transform transition hover:scale-105">
+            <div class="flex justify-between items-center h-20 gap-3">
+                <a href="#top" class="flex min-w-0 items-center gap-2 cursor-pointer transform transition hover:scale-105">
                     <!-- Logo Icon -->
-                    <div class="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center text-white font-bold text-xl">SB</div>
-                    <span class="font-bold text-xl tracking-tight">ScholarBridge</span>
+                    <div class="w-8 h-8 shrink-0 bg-slate-900 rounded-md flex items-center justify-center text-white font-bold text-xl">SB</div>
+                    <span class="font-bold text-lg sm:text-xl tracking-tight whitespace-nowrap">ScholarBridge</span>
                 </a>
 
-                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
+                <!-- Desktop nav: from lg, so 768-1023px tablets use the menu
+                     instead of wrapping "How it works" onto a second line. -->
+                <div class="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-600">
                     <a href="#how-it-works" class="hover:text-primary transition">How it works</a>
                     <a href="#features" class="hover:text-primary transition">Features</a>
                     <a href="#chancing" class="hover:text-primary transition">Chancing</a>
                     <a href="#planning" class="hover:text-primary transition">Planning</a>
                 </div>
 
-                <div class="flex items-center space-x-4">
+                <div class="flex shrink-0 items-center gap-2 sm:gap-4">
                     <a href="/" class="hidden sm:block text-sm font-medium text-slate-700 hover:text-primary transition">Sign in</a>
-                    <a href="#get-started" class="bg-primary hover:bg-primaryDark text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5">Get started</a>
+                    <a href="#get-started" class="hidden sm:inline-block bg-primary hover:bg-primaryDark text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5">Get started</a>
+                    <button id="menuBtn" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Page sections"
+                            class="lg:hidden flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Phone/tablet menu: every section, no horizontal scroll strip. -->
+            <div id="mobileMenu" class="hidden lg:hidden border-t border-slate-100 pb-2">
+                <a href="#how-it-works" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">How it works</a>
+                <a href="#features" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Features</a>
+                <a href="#chancing" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Chancing</a>
+                <a href="#planning" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Planning</a>
+                <div class="mt-1 border-t border-slate-100 pt-1 sm:hidden">
+                    <a href="/" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign in</a>
+                    <a href="#get-started" class="menu-link flex min-h-11 items-center rounded-lg px-2 text-sm font-bold text-primary hover:bg-slate-50">Get started</a>
                 </div>
             </div>
         </div>
     </nav>
 
+    <main id="main">
     <!-- Hero Section -->
     <section id="top" class="pt-32 pb-20 lg:pt-40 lg:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -87,7 +125,7 @@
                     <span class="w-2 h-2 rounded-full bg-primary"></span>
                     AI-powered admissions planning
                 </div>
-                <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1] mb-6">
+                <h1 class="text-[2rem] sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.15] sm:leading-[1.1] mb-6 break-words">
                     Your path to university, <span class="text-primary">mapped intelligently.</span>
                 </h1>
                 <p class="text-lg text-slate-600 mb-8 max-w-lg leading-relaxed">
@@ -121,7 +159,7 @@
                             <div class="w-16 h-16 bg-white rounded-2xl shadow-sm mx-auto mb-4 flex items-center justify-center">
                                 <span class="font-bold text-primary text-2xl">SB</span>
                             </div>
-                            <p class="text-slate-400 font-medium">Dashboard Interface</p>
+                            <p class="text-slate-500 font-medium">Dashboard Interface</p>
                             <span class="mt-3 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">Open dashboard →</span>
                         </div>
                     </a>
@@ -134,7 +172,7 @@
     <section id="how-it-works" class="py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h3 class="text-xs font-bold text-primary tracking-widest uppercase mb-4">One Profile. One System.</h3>
-            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6">Everything starts with understanding you.</h2>
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 mb-6">Everything starts with understanding you.</h2>
             <p class="text-slate-500 max-w-2xl mx-auto mb-16 text-lg">
                 Your academic record, tests, activities, goals, budget and preferences become the foundation for every recommendation.
             </p>
@@ -174,8 +212,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center mb-16">
                 <h3 class="text-xs font-bold text-primary tracking-widest uppercase mb-4">Built around the full journey</h3>
-                <h2 class="text-4xl md:text-5xl font-extrabold mb-6">More than a university search.</h2>
-                <p class="text-slate-400 max-w-2xl mx-auto text-lg">
+                <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6">More than a university search.</h2>
+                <p class="text-slate-500 max-w-2xl mx-auto text-lg">
                     ScholarBridge brings discovery, preparation and application management into one connected experience.
                 </p>
             </div>
@@ -187,7 +225,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">University Matcher</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Compare academic fit, tuition, living costs, requirements, location and other profile-specific factors.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Compare academic fit, tuition, living costs, requirements, location and other profile-specific factors.</p>
                 </div>
                 <!-- Feature Card -->
                 <div class="bg-darkCard border border-darkBorder p-8 rounded-2xl transition-all duration-300 hover:-translate-y-2 hover:bg-slate-800/80 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
@@ -195,7 +233,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">Admission Chancing</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Keep university fit separate from admission estimates, with transparent data-basis labels and evidence.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Keep university fit separate from admission estimates, with transparent data-basis labels and evidence.</p>
                 </div>
                 <!-- Feature Card -->
                 <div class="bg-darkCard border border-darkBorder p-8 rounded-2xl transition-all duration-300 hover:-translate-y-2 hover:bg-slate-800/80 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
@@ -203,7 +241,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">Scholarship Matcher</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Discover opportunities based on eligibility, degree, profile, award value, deadlines and requirements.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Discover opportunities based on eligibility, degree, profile, award value, deadlines and requirements.</p>
                 </div>
                 <!-- Feature Card -->
                 <div class="bg-darkCard border border-darkBorder p-8 rounded-2xl transition-all duration-300 hover:-translate-y-2 hover:bg-slate-800/80 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
@@ -211,7 +249,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">AI Admissions Advisor</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Ask questions about your application and receive grounded guidance without invented facts or guarantees.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Ask questions about your application and receive grounded guidance without invented facts or guarantees.</p>
                 </div>
                 <!-- Feature Card -->
                 <div class="bg-darkCard border border-darkBorder p-8 rounded-2xl transition-all duration-300 hover:-translate-y-2 hover:bg-slate-800/80 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
@@ -219,7 +257,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">Application Tracker</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Keep applications, tasks, deadlines and documents organized from one dashboard.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Keep applications, tasks, deadlines and documents organized from one dashboard.</p>
                 </div>
                 <!-- Feature Card -->
                 <div class="bg-darkCard border border-darkBorder p-8 rounded-2xl transition-all duration-300 hover:-translate-y-2 hover:bg-slate-800/80 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10">
@@ -227,7 +265,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                     </div>
                     <h4 class="text-lg font-bold mb-3">Personalized Roadmap</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed">Turn your profile gaps and upcoming deadlines into prioritized next actions.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Turn your profile gaps and upcoming deadlines into prioritized next actions.</p>
                 </div>
             </div>
         </div>
@@ -290,7 +328,7 @@
                             </div>
                         </div>
                     </div>
-                    <p class="text-xs text-slate-400 mt-6 pt-4 border-t border-slate-50">
+                    <p class="text-xs text-slate-500 mt-6 pt-4 border-t border-slate-50">
                         Admission probability is shown only when the available evidence supports an estimate. The platform intentionally does not invent a probability.
                     </p>
                 </div>
@@ -342,7 +380,7 @@
     </section>
 
     <!-- CTA Section -->
-    <section id="get-started" class="py-20 bg-slate-50 px-4 sm:px-6 lg:px-8 pb-32">
+    <section id="get-started" class="overflow-hidden py-20 bg-slate-50 px-4 sm:px-6 lg:px-8 pb-32">
         <div class="max-w-5xl mx-auto bg-gradient-to-br from-[#0B0F19] to-[#2B237C] rounded-[2rem] p-12 md:p-20 text-center relative overflow-hidden shadow-2xl transform transition hover:-translate-y-1">
             <!-- decorative blurs -->
             <div class="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnN2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50"></div>
@@ -353,7 +391,7 @@
                     <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     Start your plan today
                 </div>
-                <h2 class="text-4xl md:text-6xl font-extrabold text-white mb-6">Build your university plan.</h2>
+                <h2 class="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white mb-6">Build your university plan.</h2>
                 <p class="text-lg text-slate-300 max-w-2xl mx-auto mb-10">
                     Create one profile and let ScholarBridge organize the universities, scholarships, applications and next steps around you.
                 </p>
@@ -365,9 +403,11 @@
         </div>
     </section>
 
+    </main>
+
     <!-- Footer -->
     <footer class="bg-slate-50 border-t border-slate-200 py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium text-slate-500">
             <p>&copy; 2026 ScholarBridge AI — built to make admissions clearer.</p>
             <div class="flex space-x-6">
                 <a href="/privacy" class="hover:text-slate-600 transition">Privacy</a>
@@ -419,20 +459,40 @@
         };
         window.addEventListener('scroll', onScroll, { passive: true });
         onScroll();
-    </script>
-</body>
-</html>
-ll = () => {
-            if (window.scrollY > 10) {
-                navbar.classList.add('shadow-sm', 'bg-white/95');
-                navbar.classList.remove('bg-white/80');
-            } else {
-                navbar.classList.add('bg-white/80');
-                navbar.classList.remove('shadow-sm', 'bg-white/95');
-            }
+
+        // ---- Phone/tablet menu (keyboard accessible) ----------------------
+        const menuBtn = document.getElementById('menuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const setMenu = (open) => {
+            mobileMenu.classList.toggle('hidden', !open);
+            menuBtn.setAttribute('aria-expanded', String(open));
         };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
+        menuBtn.addEventListener('click', () => setMenu(mobileMenu.classList.contains('hidden')));
+        mobileMenu.querySelectorAll('.menu-link').forEach((a) => a.addEventListener('click', () => setMenu(false)));
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) {
+                setMenu(false);
+                menuBtn.focus();
+            }
+        });
+        window.addEventListener('resize', () => { if (window.innerWidth >= 1024) setMenu(false); });
+
+        // ---- Prototype notice localization (en / uz / ru) ------------------
+        const NOTICE = {
+            en: { html: '⚠️ Prototype (static design) — sample data, not a real account.', cta: 'Open the real app' },
+            uz: { html: "⚠️ Prototip (statik dizayn) — namunaviy ma'lumotlar, haqiqiy hisob emas.", cta: "Haqiqiy ilovani ochish" },
+            ru: { html: '⚠️ Прототип (статичный макет) — демонстрационные данные, не настоящий аккаунт.', cta: 'Открыть настоящее приложение' },
+        };
+        const notice = document.getElementById('protoNotice');
+        function renderNotice(lang) {
+            const copy = NOTICE[lang] || NOTICE.en;
+            notice.innerHTML = `${copy.html} <a href="/" style="color:#1f2937;font-weight:800;text-decoration:underline">${copy.cta}</a>`;
+            document.documentElement.lang = lang;
+            const h = notice.offsetHeight;
+            document.documentElement.style.setProperty('--notice-h', h + 'px');
+        }
+        renderNotice((navigator.language || 'en').slice(0, 2).toLowerCase());
+        window.addEventListener('resize', () => document.documentElement.style.setProperty('--notice-h', notice.offsetHeight + 'px'));
     </script>
 </body>
 </html>

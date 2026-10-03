@@ -39,14 +39,29 @@ export async function GET(req: Request) {
   try {
     // Features first — they are always available and are what a newcomer
     // searching in their own words ("viza", "grant", "insho") needs most.
-    const features = NAV_SECTIONS.filter((s) => s.id !== "profile").map((s) => ({
-      kind: "feature" as const,
-      id: s.id,
-      title: s.label,
-      subtitle: s.description,
-      group: s.group,
-      tab: s.id,
-    }));
+    // Each destination is listed, and so is every tab inside it, so the old
+    // feature names (Answer Vault, Test Planner, My Chances) still land on the
+    // right tab instead of the top of a hub.
+    const features = [
+      ...NAV_SECTIONS.filter((s) => s.id !== "profile").map((s) => ({
+        kind: "feature" as const,
+        id: s.id,
+        title: s.label,
+        subtitle: s.description,
+        group: s.group,
+        tab: s.id,
+      })),
+      ...NAV_SECTIONS.flatMap((s) =>
+        s.panes.map((p) => ({
+          kind: "feature" as const,
+          id: `${s.id}/${p.id}`,
+          title: `${s.label} — ${p.label}`,
+          subtitle: p.description,
+          group: s.group,
+          tab: `${s.id}/${p.id}`,
+        }))
+      ),
+    ];
 
     if (q.length < 2) {
       return NextResponse.json({ query: q, results: features.slice(0, 12), counts: { features: features.length } });

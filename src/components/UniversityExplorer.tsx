@@ -10,6 +10,7 @@ import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
+import { ScrollRegion } from "@/components/hubs/ui";
 import { 
   Search, 
   Globe, 
@@ -651,7 +652,7 @@ export function UniversityExplorer({
               </button>
             </div>
 
-            <div className="p-6 overflow-x-auto">
+            <ScrollRegion label={t("exCompare")} className="p-6 overflow-x-auto">
               {compareLoading ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-500">
                   {t("exCompareLoading")}
@@ -723,7 +724,7 @@ export function UniversityExplorer({
                 </tbody>
               </table>
               )}
-            </div>
+            </ScrollRegion>
           </div>
         </div>
       )}

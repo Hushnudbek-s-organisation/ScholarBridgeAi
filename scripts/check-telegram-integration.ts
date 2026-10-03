@@ -128,7 +128,7 @@ async function main() {
   const auth = await import("../src/lib/auth");
   const sweep = await import("../src/lib/notificationSweep");
   const { TELEGRAM_DDL, telegramStatements } = await import("../src/lib/telegram/ddl");
-  const { NAV_SECTIONS } = await import("../src/lib/navSections");
+  const { NAV_SECTIONS, resolveNavTarget } = await import("../src/lib/navSections");
   const { BOT_COMMANDS } = await import("../src/lib/telegram/bot");
 
   await settingsMod.saveTelegramSettings({ ...core.DEFAULT_TELEGRAM_SETTINGS, botUsername: "ScholarBridgeTestBot", siteUrl: SITE });
@@ -649,8 +649,16 @@ async function main() {
   section("Deep links + misc");
   // ===========================================================================
   {
-    const navIds = new Set([...NAV_SECTIONS.map((s: { id: string }) => s.id), "admin"]);
-    const missing = core.APP_TABS.filter((t) => !navIds.has(t));
+    // Bot deep links may name a destination OR a tab inside it OR a legacy id
+    // from before the reorganisation; all three must still land somewhere.
+    const navIds = new Set([
+      ...NAV_SECTIONS.map((s: { id: string }) => s.id),
+      ...NAV_SECTIONS.flatMap((s: { id: string; panes: { id: string }[] }) => s.panes.map((p) => `${s.id}/${p.id}`)),
+      "admin",
+    ]);
+    const missing = core.APP_TABS.filter(
+      (t) => !navIds.has(t) && !navIds.has(t.split("/")[0]) && resolveNavTarget(t) === null
+    );
     check("APP_TABS ⊆ app navigation (no dead deep links)", missing.length === 0, missing.join(", "));
     check("miniAppUrl only for https sites", (await import("../src/lib/telegram/messaging")).miniAppUrl({ siteUrl: "http://localhost:3000" }) === null);
   }
