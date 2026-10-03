@@ -547,7 +547,8 @@ to the corresponding message file, with `overflow=false` and zero clipped labels
 
 ## 11.9 Branch, commit and working-tree status
 
-* Branch **`arena/01a100ca-scholarbridgeai`**; HEAD before this pass `ceb5bb1`.
+* Branch **`arena/01a100ca-scholarbridgeai`**; HEAD before this pass `ceb5bb1`, HEAD now `9811ce9`
+  (this line is itself recorded by the follow-up documentation commit).
 * This pass committed the localisation closure and the three fixes above as local commit
   **`<RECORDED_IN_11_10>`** on top of `ceb5bb1`; the two earlier commits (`0416113`, `ceb5bb1`) were
   not amended or rewritten.
