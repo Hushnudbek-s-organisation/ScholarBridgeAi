@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { countryCodeFor } from "@/lib/countries";
 import { StudentProfile } from "./Navbar";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
@@ -73,15 +75,17 @@ const COUNTRIES = [
 
 const DEGREES = ["Bachelor", "Master", "PhD"];
 
+
+
 const STEPS = [
-  { id: 0, title: "Name, Email & Password", icon: User },
-  { id: 1, title: "Target Degree", icon: GraduationCap },
-  { id: 2, title: "Target Major", icon: Compass },
-  { id: 3, title: "Academic Performance", icon: BookOpen },
-  { id: 4, title: "Standard Tests", icon: FileCheck },
-  { id: 5, title: "Budget & Financial Aid", icon: Wallet },
-  { id: 6, title: "Preferred Countries", icon: Globe2 },
-  { id: 7, title: "Experience & Achievements", icon: Trophy },
+  { id: 0, titleKey: "stepTitle0", icon: User },
+  { id: 1, titleKey: "stepTitle1", icon: GraduationCap },
+  { id: 2, titleKey: "stepTitle2", icon: Compass },
+  { id: 3, titleKey: "stepTitle3", icon: BookOpen },
+  { id: 4, titleKey: "stepTitle4", icon: FileCheck },
+  { id: 5, titleKey: "stepTitle5", icon: Wallet },
+  { id: 6, titleKey: "stepTitle6", icon: Globe2 },
+  { id: 7, titleKey: "stepTitle7", icon: Trophy },
 ];
 
 const inputCls =
@@ -94,6 +98,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     ? Math.min(Math.max(profile.onboardingStep ?? 0, 0), 7)
     : 0;
 
+  const t = useTranslations("onboarding");
+  const tc = useTranslations("countries");
   const [step, setStep] = useState<number>(startStep);
   const [createdId, setCreatedId] = useState<number | null>(profile?.id ?? null);
   const [saving, setSaving] = useState(false);
@@ -190,7 +196,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         });
         const data = await res.json();
         if (!res.ok || !data.profile) {
-          throw new Error(data.error || "Could not create profile");
+          throw new Error(data.error || t("errCreate"));
         }
         created = data.profile as StudentProfile;
 
@@ -212,10 +218,10 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         body: JSON.stringify({ ...payload, requesterId: createdId }),
       });
       const data = await res.json();
-      if (!res.ok || !data.profile) throw new Error(data.error || "Could not save profile");
+      if (!res.ok || !data.profile) throw new Error(data.error || t("errSave"));
       return data.profile as StudentProfile;
     } catch (err: any) {
-      setError(err.message || "Something went wrong while saving");
+      setError(err.message || t("errGeneric"));
       return null;
     } finally {
       setSaving(false);
@@ -235,8 +241,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     if (step === 0 && step0Invalid) {
       setError(
         isNewAccount
-          ? "Full name, email and a password (at least 8 characters) are required — you'll sign in with this email + password"
-          : "Full name and email are required"
+          ? t("valNewAccount")
+          : t("valNameEmail")
       );
       return;
     }
@@ -286,17 +292,15 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           <div className="mx-auto h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-200">
             <CheckCircle2 className="h-10 w-10 text-white" />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Your profile is ready! 🎉</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900">{t("doneTitle")}</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            ScholarBridgeAI can now match you with universities and grants that fit
-            your GPA, test scores and budget. Let&apos;s go to your dashboard!
+            {t("doneBody")}
           </p>
           <button
             onClick={() => onComplete(profile ?? ({} as StudentProfile))}
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-xl shadow-md hover:from-indigo-700 hover:to-violet-700 transition-all"
           >
-            <Sparkles className="h-4 w-4" /> Go to Dashboard
-          </button>
+            <Sparkles className="h-4 w-4" />{t("goDashboard")}</button>
         </div>
       </div>
     );
@@ -314,10 +318,10 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-            {createdId == null ? "Create your account" : "Complete your profile"}
+            {createdId == null ? t("createAccount") : t("completeProfile")}
           </p>
           <p className="text-xs font-extrabold text-indigo-600">
-            Step {step + 1} / {STEPS.length}
+            {t("step")} {step + 1} / {STEPS.length}
           </p>
         </div>
         <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
@@ -330,7 +334,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
             <StepIcon className="h-4 w-4" />
           </div>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">{stepInfo.title}</h2>
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">{t(stepInfo.titleKey)}</h2>
         </div>
       </div>
 
@@ -349,8 +353,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {!error && step === 0 && step0Invalid && (
           <p className="mb-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
             {isNewAccount
-              ? "All three fields are required: name, email and a password of at least 8 characters."
-              : "Name and email are required to continue."}
+              ? t("helpNewAccount")
+              : t("helpNameEmail")}
           </p>
         )}
 
@@ -358,7 +362,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 0 && (
           <div className="space-y-4">
             <div>
-              <label className={labelCls} htmlFor="ob-name">Full Name *</label>
+              <label className={labelCls} htmlFor="ob-name">{t("fullName")}</label>
               <input
                 id="ob-name"
                 name="name"
@@ -367,13 +371,13 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 aria-required="true"
                 aria-invalid={step0Invalid && !form.name.trim() ? true : undefined}
                 className={inputCls}
-                placeholder="e.g. Aziz Aliyev"
+                placeholder={t("namePlaceholder")}
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
               />
             </div>
             <div>
-              <label className={labelCls} htmlFor="ob-email">Email Address {placeholderEmail ? "(optional)" : "*"}</label>
+              <label className={labelCls} htmlFor="ob-email">{t("emailAddress")} {placeholderEmail ? t("optional") : "*"}</label>
               <input
                 id="ob-email"
                 name="email"
@@ -384,20 +388,17 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 aria-required={!placeholderEmail}
                 aria-invalid={step0Invalid && !form.email.trim() && !placeholderEmail ? true : undefined}
                 className={inputCls}
-                placeholder="aziz@example.com"
+                placeholder={t("emailPlaceholder")}
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
               />
               {placeholderEmail && (
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  You signed in with Telegram, so an email is optional. Add one to also get
-                  email updates and to sign in with email + password later.
-                </p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("telegramEmailHint")}</p>
               )}
             </div>
             {isNewAccount && (
               <div>
-                <label className={labelCls} htmlFor="ob-password">Password *</label>
+                <label className={labelCls} htmlFor="ob-password">{t("password")}</label>
                 <input
                   id="ob-password"
                   name="new-password"
@@ -407,20 +408,18 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                   aria-invalid={step0Invalid && form.password.trim().length < MIN_PASSWORD_LENGTH ? true : undefined}
                   aria-describedby="ob-password-help"
                   className={inputCls}
-                  placeholder="At least 8 characters"
+                  placeholder={t("passwordPlaceholder")}
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
                   autoComplete="new-password"
                 />
                 <p id="ob-password-help" className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  You&apos;ll sign in later with this email + password — from any
-                  device or after logging out. It&apos;s stored encrypted (hashed),
-                  never in plain text.
+                  {t("passwordHint")}
                 </p>
               </div>
             )}
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              You can update these later anytime from &quot;Edit Profile&quot;.
+              {t("editLaterHint")}
             </p>
           </div>
         )}
@@ -449,13 +448,13 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 2 && (
           <div className="space-y-4">
             <div>
-              <label className={labelCls}>Target Major / Field</label>
+              <label className={labelCls}>{t("targetMajorLabel")}</label>
               <select
                 className={inputCls}
                 value={form.targetMajor}
                 onChange={(e) => set("targetMajor", e.target.value)}
               >
-                <option value="" disabled>Select your target program…</option>
+                <option value="" disabled>{t("majorPlaceholder")}</option>
                 {STUDY_FIELD_CATEGORIES.map((category) => (
                   <optgroup key={category.name} label={category.name}>
                     {category.fields.map((field) => (
@@ -464,9 +463,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                   </optgroup>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Select the program you plan to study. We use it to find matching universities and scholarships.
-              </p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("majorHint")}</p>
             </div>
           </div>
         )}
@@ -488,15 +485,15 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>GPA Scale</label>
+              <label className={labelCls}>{t("gpaScale")}</label>
               <select
                 className={inputCls}
                 value={form.gpaScale}
                 onChange={(e) => set("gpaScale", e.target.value)}
               >
-                <option value="4.0">4.0 scale</option>
-                <option value="5.0">5.0 scale</option>
-                <option value="10.0">10.0 scale</option>
+                <option value="4.0">{t("scale4")}</option>
+                <option value="5.0">{t("scale5")}</option>
+                <option value="10.0">{t("scale10")}</option>
               </select>
             </div>
           </div>
@@ -506,7 +503,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 4 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>IELTS Score</label>
+              <label className={labelCls}>{t("ielts")}</label>
               <input
                 type="number"
                 step="0.5"
@@ -519,7 +516,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>TOEFL iBT</label>
+              <label className={labelCls}>{t("toefl")}</label>
               <input
                 type="number"
                 min="0"
@@ -531,7 +528,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>SAT Score</label>
+              <label className={labelCls}>{t("sat")}</label>
               <input
                 type="number"
                 min="400"
@@ -543,7 +540,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>GRE General</label>
+              <label className={labelCls}>{t("gre")}</label>
               <input
                 type="number"
                 min="260"
@@ -561,7 +558,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 5 && (
           <div className="space-y-4">
             <div>
-              <label className={labelCls}>Annual Budget Limit (USD)</label>
+              <label className={labelCls}>{t("budget")}</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span>
                 <input
@@ -581,9 +578,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 onChange={(e) => set("needScholarship", e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              <span className="text-sm font-semibold text-slate-700">
-                I need a full / partial scholarship
-              </span>
+              <span className="text-sm font-semibold text-slate-700">{t("needScholarship")}</span>
             </label>
           </div>
         )}
@@ -604,7 +599,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                       : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
                   }`}
                 >
-                  {c}
+                  {tc(countryCodeFor(c) ?? "us")}
                 </button>
               );
             })}
@@ -615,23 +610,23 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 7 && (
           <div className="space-y-4">
             <div>
-              <label className={labelCls}>Work / Internship Experience</label>
+              <label className={labelCls}>{t("workExperience")}</label>
               <select
                 className={inputCls}
                 value={form.workExperienceYears}
                 onChange={(e) => set("workExperienceYears", e.target.value)}
               >
-                <option value="">Select…</option>
-                <option value="0">0 years</option>
-                <option value="1">1 year</option>
-                <option value="2">2 years</option>
-                <option value="3">3 years</option>
-                <option value="4">4 years</option>
-                <option value="5">5+ years</option>
+                <option value="">{t("selectOption")}</option>
+                <option value="0">{t("exp0")}</option>
+                <option value="1">{t("exp1")}</option>
+                <option value="2">{t("exp2")}</option>
+                <option value="3">{t("exp3")}</option>
+                <option value="4">{t("exp4")}</option>
+                <option value="5">{t("exp5")}</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>Research Papers / Publications</label>
+              <label className={labelCls}>{t("publications")}</label>
               <input
                 type="number"
                 min="0"
@@ -642,11 +637,11 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>Extracurriculars & Achievements</label>
+              <label className={labelCls}>{t("extracurriculars")}</label>
               <textarea
                 rows={3}
                 className={inputCls}
-                placeholder="Hackathon winner, olympiad medals, volunteering, club leadership…"
+                placeholder={t("extracurricularsPlaceholder")}
                 value={form.extracurriculars}
                 onChange={(e) => set("extracurriculars", e.target.value)}
               />
@@ -656,14 +651,10 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
 
         {/* Terms agreement */}
         <p className="mt-5 text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-          By continuing, you agree to our{" "}
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
-            Terms
-          </a>{" "}
+          {t("agreePrefix")}{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">{t("terms")}</a>{" "}
           and{" "}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
-            Privacy Policy
-          </a>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">{t("privacy")}</a>
           .
         </p>
 
@@ -675,8 +666,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
             disabled={step === 0}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
-          </button>
+            <ArrowLeft className="h-3.5 w-3.5" />{t("back")}</button>
 
           {step !== 0 && (
             <button
@@ -685,8 +675,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               disabled={saving}
               className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
-              <SkipForward className="h-3.5 w-3.5" /> Skip
-            </button>
+              <SkipForward className="h-3.5 w-3.5" />{t("skip")}</button>
           )}
 
           <button
@@ -695,7 +684,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
             disabled={nextDisabled}
             className="ml-auto flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {saving ? "Saving…" : isLast ? "Finish" : "Continue"}
+            {saving ? t("saving") : isLast ? t("finish") : t("continue")}
             {!saving && <ArrowRight className="h-3.5 w-3.5" />}
           </button>
         </div>

@@ -12,6 +12,7 @@
  *   6. What should I look at? → recommendations based on the real profile
  */
 import React, { useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
@@ -107,35 +108,6 @@ export interface JourneyDashboard {
   learning: { connected: boolean; providers: { providerKey: string; name: string; kind: string; linked: boolean }[] };
 }
 
-function scholarshipAwardLabel(s: JourneyDashboard["recommended"]["scholarships"][number]): string {
-  if (s.awardBasis === "need_based") return "Need-based; varies by applicant";
-  if (s.awardBasis === "full_tuition") return "Full tuition coverage";
-  if (s.awardBasis === "range") return "Award varies within a range — see official details";
-  if (s.awardBasis === "variable") return "Variable award — see official details";
-  if (s.awardAmount != null) {
-    const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
-    return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
-  }
-  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
-  return s.tuitionCoverage || "Award amount not published";
-}
-
-function actionLabelForStep(id: string, tab: string): string {
-  if (id === "requirements-open") return "Open workspace";
-  if (id.startsWith("test-")) return "Open test planner";
-  if (id.startsWith("readiness-")) return "Improve profile";
-  if (id === "documents-expiring" || id === "documents-missing") return "Review documents";
-  if (id === "funding-gap") return "Find scholarships";
-  if (id === "recommendations") return "Manage letters";
-  if (id === "profile") return "Complete profile";
-  if (tab === "universities") return "Save universities";
-  if (tab === "chancing") return "Check fit";
-  if (tab === "activities") return "Add activities";
-  if (tab === "workspace") return "Open workspace";
-  if (tab === "study-plan") return "Open study plan";
-  return `Open ${tab.replaceAll("-", " ")}`;
-}
-
 export function JourneyControlCenter({
   profileId,
   onNavigateTab,
@@ -145,17 +117,98 @@ export function JourneyControlCenter({
   onNavigateTab: (tab: string) => void;
   onOpenWorkspace: (applicationId: number) => void;
 }) {
+  const t = useTranslations("journey");
   const reduceMotion = useReducedMotion();
+
+  /** Scholarship award label — inside the component so it can use t(). */
+  const scholarshipAwardLabel = (s: JourneyDashboard["recommended"]["scholarships"][number]): string => {
+    if (s.awardBasis === "need_based") return t("jccAwardNeedBased");
+    if (s.awardBasis === "full_tuition") return t("jccAwardFullTuition");
+    if (s.awardBasis === "range") return t("jccAwardRange");
+    if (s.awardBasis === "variable") return t("jccAwardVariable");
+    if (s.awardAmount != null) {
+      const period = s.awardPeriod === "year" ? t("jccAwardPerYear") : s.awardPeriod === "month" ? t("jccAwardPerMonth") : "";
+      return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
+    }
+    if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+    return s.tuitionCoverage || t("jccAwardNotPublished");
+  };
+
+  /** Next-step button label — inside the component so it can use t(). */
+  const actionLabelForStep = (id: string, tab: string): string => {
+    if (id === "requirements-open") return t("jccActionOpenWorkspace");
+    if (id.startsWith("test-")) return t("jccActionTestPlanner");
+    if (id.startsWith("readiness-")) return t("jccActionImproveProfile");
+    if (id === "documents-expiring" || id === "documents-missing") return t("jccActionReviewDocuments");
+    if (id === "funding-gap") return t("jccActionFindScholarships");
+    if (id === "recommendations") return t("jccActionManageLetters");
+    if (id === "profile") return t("jccActionCompleteProfile");
+    if (tab === "universities") return t("jccActionSaveUniversities");
+    if (tab === "chancing") return t("jccActionCheckFit");
+    if (tab === "activities") return t("jccActionAddActivities");
+    if (tab === "workspace") return t("jccActionOpenWorkspace");
+    if (tab === "study-plan") return t("jccActionOpenStudyPlan");
+    return t("jccActionOpenGeneric", { tab: tab.replaceAll("-", " ") });
+  };
+
+  /**
+   * Journey stages and study-plan phases are served by /api/dashboard as plain
+   * English text (src/lib/journey/stages.ts and planning.ts). Their ids/keys are
+   * stable, so we render a localized label for the ids this build knows and fall
+   * back to the server text for anything else — the API contract stays untouched
+   * and no content is invented for unknown records.
+   */
+  const stageLabel = (s: { id: string; label: string }): string => {
+    const keys: Record<string, () => string> = {
+      discover: () => t("jccStageLabel_discover"),
+      match: () => t("jccStageLabel_match"),
+      prepare: () => t("jccStageLabel_prepare"),
+      apply: () => t("jccStageLabel_apply"),
+      accepted: () => t("jccStageLabel_accepted"),
+      fund: () => t("jccStageLabel_fund"),
+      visa: () => t("jccStageLabel_visa"),
+      depart: () => t("jccStageLabel_depart"),
+    };
+    return keys[s.id] ? keys[s.id]() : s.label;
+  };
+  const stageDoneWhen = (s: { id: string; doneWhen: string }): string => {
+    const keys: Record<string, () => string> = {
+      discover: () => t("jccStageDone_discover"),
+      match: () => t("jccStageDone_match"),
+      prepare: () => t("jccStageDone_prepare"),
+      apply: () => t("jccStageDone_apply"),
+      accepted: () => t("jccStageDone_accepted"),
+      fund: () => t("jccStageDone_fund"),
+      visa: () => t("jccStageDone_visa"),
+      depart: () => t("jccStageDone_depart"),
+    };
+    return keys[s.id] ? keys[s.id]() : s.doneWhen;
+  };
+  const phaseTitle = (p: { key: string; title: string }): string => {
+    const keys: Record<string, () => string> = {
+      profile: () => t("jccPhaseTitle_profile"),
+      tests: () => t("jccPhaseTitle_tests"),
+      university_research: () => t("jccPhaseTitle_university_research"),
+      scholarship_research: () => t("jccPhaseTitle_scholarship_research"),
+      documents: () => t("jccPhaseTitle_documents"),
+      applications: () => t("jccPhaseTitle_applications"),
+      interviews: () => t("jccPhaseTitle_interviews"),
+      admission: () => t("jccPhaseTitle_admission"),
+      visa: () => t("jccPhaseTitle_visa"),
+      departure: () => t("jccPhaseTitle_departure"),
+    };
+    return keys[p.key] ? keys[p.key]() : p.title;
+  };
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || "Could not load your dashboard");
+    if (!res.ok) throw new Error(json.error || t("jccLoadError"));
     return json as JourneyDashboard;
-  }, [profileId]);
+  }, [profileId, t]);
   const resource = useResource<JourneyDashboard | null>(
     () => profileId ? load() : Promise.resolve(null),
     [profileId],
-    { initial: null, errorFallback: "Could not load your dashboard" }
+    { initial: null, errorFallback: t("jccLoadError") }
   );
   const { error, reload: refresh } = resource;
   const data = resource.data;
@@ -164,21 +217,20 @@ export function JourneyControlCenter({
   if (!profileId) {
     return (
       <Empty
-        title="Select a profile"
-        hint="Sign in and pick a student profile to build your study-abroad journey."
+        title={t("jccSelectProfile")}
+        hint={t("jccSignedOutHint")}
       />
     );
   }
-  if (loading) return <Loading label="Building your journey…" cards={2} />;
+  if (loading) return <Loading label={t("jccLoading")} cards={2} />;
   if (error) {
     return (
       <Empty
-        title="We could not load your dashboard"
+        title={t("jccErrorTitle")}
         hint={error}
         action={
           <Button variant="outline" onClick={() => void refresh()}>
-            <RefreshCw className="h-3.5 w-3.5" /> Try again
-          </Button>
+            <RefreshCw className="h-3.5 w-3.5" />{t("jccTryAgain")}</Button>
         }
       />
     );
@@ -198,7 +250,7 @@ export function JourneyControlCenter({
           <div className="min-w-0 flex-1">
             {/* The label carries the journey's own accent in both themes — the
                 generic `text-indigo-500` remap washes out on the dark hero. */}
-            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">Your Study Abroad Journey</p>
+            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">{t("jccTitle")}</p>
             {/* The stage icon gets a soft halo so the hero reads at a glance. */}
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
               <motion.span
@@ -215,25 +267,24 @@ export function JourneyControlCenter({
             <p className="mt-1.5 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
               {journey.stillNeeded.length > 0
                 ? journey.stillNeeded[0].text
-                : "This stage is complete — your dashboard now points at the next one."}
+                : t("jccStageCompleteNote")}
             </p>
             {journey.next && (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">
-                Next up <ArrowRight className="h-3 w-3" aria-hidden /> {journey.next}
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">{t("jccNextUp")}<ArrowRight className="h-3 w-3" aria-hidden /> {journey.next}
               </p>
             )}
           </div>
           <ProgressRing
             pct={journey.progressPct}
             size={104}
-            label="Journey progress"
-            caption={`${journey.stages.filter((st) => st.done).length} of ${journey.stages.length} stages done`}
+            label={t("jccProgress")}
+            caption={t("jccStagesDone", { done: journey.stages.filter((st) => st.done).length, total: journey.stages.length })}
             tone={journey.progressPct >= 100 ? "good" : "brand"}
           />
         </div>
 
         {/* The seven-stage visual bar, with the current stage highlighted. */}
-        <ol className="mt-4 flex flex-wrap items-center gap-1.5" aria-label="Journey stages">
+        <ol className="mt-4 flex flex-wrap items-center gap-1.5" aria-label={t("jccStagesAria")}>
           {journey.stages.map((s, i) => (
             <motion.li
               key={s.id}
@@ -245,7 +296,7 @@ export function JourneyControlCenter({
               <motion.button
                 type="button"
                 onClick={() => onNavigateTab(s.tab)}
-                title={s.doneWhen}
+                title={stageDoneWhen(s)}
                 whileHover={reduceMotion ? undefined : { y: -1, scale: 1.03 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                 className={`group flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
@@ -257,8 +308,8 @@ export function JourneyControlCenter({
                 }`}
               >
                 <span aria-hidden>{s.icon}</span>
-                <span className="hidden sm:inline">{s.label}</span>
-                <span className="sm:hidden">{s.label.slice(0, 3)}</span>
+                <span className="hidden sm:inline">{stageLabel(s)}</span>
+                <span className="sm:hidden">{stageLabel(s).slice(0, 3)}</span>
               </motion.button>
               {i < journey.stages.length - 1 && (
                 <span aria-hidden className={`h-px w-3 ${s.done ? "bg-emerald-300" : "bg-slate-200 dark:bg-slate-700"}`} />
@@ -267,21 +318,17 @@ export function JourneyControlCenter({
           ))}
         </ol>
         <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-          This journey has 8 stages. The study plan expands the same route into 10 detailed work phases.
+          {t("jccStagesExplainer", { stages: journey.stages.length, phases: data.phases.length })}
         </p>
         {completedBeforeOpen && (
-          <p className="mt-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-            Stages can overlap. Your submitted application is recorded, while earlier preparation can still be in progress.
-          </p>
+          <p className="mt-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">{t("jccStagesOverlap")}</p>
         )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={() => onNavigateTab(journey.continueTab)}>
-            Continue {journey.currentLabel} <ArrowRight className="h-3.5 w-3.5" />
+            {t("jccContinue")} {journey.currentLabel} <ArrowRight className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" onClick={() => onNavigateTab("study-plan")}>
-            See my study plan
-          </Button>
+          <Button variant="outline" onClick={() => onNavigateTab("study-plan")}>{t("jccSeeStudyPlan")}</Button>
         </div>
       </JourneyCard>
 
@@ -292,29 +339,29 @@ export function JourneyControlCenter({
       <RevealGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4" stagger={0.06}>
         <RevealItem>
           <StatTile
-            label="Applications"
+            label={t("jccPanelApplications")}
             value={applications.total}
-            hint={applications.total === 0 ? "Add your first university" : `${applications.submitted} submitted`}
+            hint={applications.total === 0 ? t("jccAddFirstUniversity") : `${applications.submitted} submitted`}
             icon={<Compass className="h-3.5 w-3.5" aria-hidden />}
             state={applications.total === 0 ? "warn" : "brand"}
           />
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Profile readiness"
+            label={t("jccPanelReadiness")}
             value={readiness.overall}
             suffix="%"
-            hint="Profile readiness across 7 areas — not an admission chance"
+            hint={t("jccReadinessHint", { areas: data.readiness.categories.length })}
             icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
             state={readiness.overall >= 75 ? "good" : readiness.overall >= 45 ? "warn" : "bad"}
           />
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Financial gap"
+            label={t("jccPanelFinancialGap")}
             value={data.funding.calculated ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
             prefix={data.funding.calculated ? "$" : ""}
-            hint={data.funding.calculated ? `${data.funding.isCovered ? "Your yearly cost is covered" : "Still to find for one year"}${data.funding.estimated ? " · includes estimates" : ""}` : "Not calculated — add a university and budget"}
+            hint={data.funding.calculated ? `${data.funding.isCovered ? t("jccCostCovered") : t("jccStillToFind")}${data.funding.estimated ? t("jccIncludesEstimates") : ""}` : t("jccNotCalculatedShort")}
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
             state={!data.funding.calculated ? "neutral" : data.funding.isCovered ? "good" : "warn"}
             onClick={!data.funding.calculated ? () => onNavigateTab("funding") : undefined}
@@ -322,10 +369,10 @@ export function JourneyControlCenter({
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Next deadline"
+            label={t("jccPanelNextDeadline")}
             value={deadlines.length && deadlines[0].daysRemaining != null ? deadlines[0].daysRemaining < 0 ? "Overdue" : deadlines[0].daysRemaining : "—"}
             suffix={deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0 ? " days" : ""}
-            hint={deadlines[0] ? `${deadlines[0].title} · due ${deadlines[0].dueDate}` : "Unscheduled"}
+            hint={deadlines[0] ? t("jccDueOn", { date: `${deadlines[0].title} · ${deadlines[0].dueDate}` }) : t("jccUnscheduled")}
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
             state={
               !deadlines.length || deadlines[0].daysRemaining == null
@@ -342,11 +389,11 @@ export function JourneyControlCenter({
 
       {/* ---- 2. Next steps ----------------------------------------------- */}
       <JourneyCard
-        title="Next steps"
-        subtitle="The few things that actually move you forward this week."
+        title={t("jccPanelNextSteps")}
+        subtitle={t("jccNextStepsSubtitle")}
       >
         {nextSteps.length === 0 ? (
-          <Empty title="Nothing outstanding" hint="Add a university to generate your application checklist." />
+          <Empty title={t("jccNothingOutstanding")} hint={t("jccAddUniversityChecklist")} />
         ) : (
           <ul className="space-y-2">
             {nextSteps.map((s, i) => (
@@ -383,15 +430,15 @@ export function JourneyControlCenter({
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ---- 3. Deadlines ---------------------------------------------- */}
         <JourneyCard
-          title="Upcoming deadlines"
-          subtitle="Everything with a real date, nearest first."
+          title={t("jccPanelUpcomingDeadlines")}
+          subtitle={t("jccDeadlinesSubtitle")}
           action={<CalendarClock className="h-4 w-4 text-slate-400" aria-hidden />}
         >
           {deadlines.length === 0 ? (
             <Empty
-              title="No deadlines yet"
-              hint="Save a university or add a scholarship and the real dates appear here."
-              action={<Button size="sm" variant="outline" onClick={() => onNavigateTab("universities")}>Explore universities</Button>}
+              title={t("jccNoDeadlinesYet")}
+              hint={t("jccNoDeadlinesHint")}
+              action={<Button size="sm" variant="outline" onClick={() => onNavigateTab("universities")}>{t("jccExploreUniversities")}</Button>}
             />
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -409,9 +456,7 @@ export function JourneyControlCenter({
                     <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{d.title}</p>
                     <p className="text-[11px] uppercase tracking-wide text-slate-400">{d.kind}</p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => onNavigateTab(d.tab)}>
-                    Open
-                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onNavigateTab(d.tab)}>{t("jccOpen")}</Button>
                 </motion.li>
               ))}
             </ul>
@@ -420,23 +465,23 @@ export function JourneyControlCenter({
 
         {/* ---- 4. Application progress ----------------------------------- */}
         <JourneyCard
-          title="Application progress"
-          subtitle="Every application you are working on, in one number."
+          title={t("jccPanelApplicationProgress")}
+          subtitle={t("jccAppsSubtitle")}
         >
           {applications.total === 0 ? (
             <Empty
-              title="No applications yet"
-              hint="Adding a university is all it takes — we build the checklist, tasks and deadline for you."
-              action={<Button size="sm" onClick={() => onNavigateTab("applications")}>Start an application</Button>}
+              title={t("jccNoApplicationsYet")}
+              hint={t("jccAppsHint")}
+              action={<Button size="sm" onClick={() => onNavigateTab("applications")}>{t("jccStartApplication")}</Button>}
             />
           ) : (
             <>
               <div className="grid grid-cols-4 gap-2 text-center">
                 {[
-                  { label: "Total", value: applications.total, tone: "text-slate-900 dark:text-white" },
-                  { label: "Preparing", value: applications.preparing, tone: "text-amber-600 dark:text-amber-400" },
-                  { label: "Submitted", value: applications.submitted, tone: "text-sky-600 dark:text-sky-400" },
-                  { label: "Decision", value: applications.decision, tone: "text-emerald-600 dark:text-emerald-400" },
+                  { label: t("jccTotal"), value: applications.total, tone: "text-slate-900 dark:text-white" },
+                  { label: t("jccPreparing"), value: applications.preparing, tone: "text-amber-600 dark:text-amber-400" },
+                  { label: t("jccSubmitted"), value: applications.submitted, tone: "text-sky-600 dark:text-sky-400" },
+                  { label: t("jccDecision"), value: applications.decision, tone: "text-emerald-600 dark:text-emerald-400" },
                 ].map((s, i) => (
                   <motion.div
                     key={s.label}
@@ -453,9 +498,7 @@ export function JourneyControlCenter({
                   </motion.div>
                 ))}
               </div>
-              <Button className="mt-3 w-full" variant="outline" onClick={() => onNavigateTab("workspace")}>
-                Open application workspaces
-              </Button>
+              <Button className="mt-3 w-full" variant="outline" onClick={() => onNavigateTab("workspace")}>{t("jccOpenWorkspaces")}</Button>
             </>
           )}
         </JourneyCard>
@@ -463,8 +506,8 @@ export function JourneyControlCenter({
 
       {/* ---- 5. Profile readiness ----------------------------------------- */}
       <JourneyCard
-        title="Profile readiness"
-        subtitle="How ready each area is — and exactly what to improve. This is not an admission chance."
+        title={t("jccPanelReadiness")}
+        subtitle={t("jccReadinessSubtitle")}
       >
         {/* 2 columns on phones too: seven full-width tiles made a ~700px
             stack that pushed the next actions off the first screen. */}
@@ -493,7 +536,7 @@ export function JourneyControlCenter({
                   pct={c.pct}
                   size="sm"
                   tone={c.pct >= 75 ? "good" : c.pct >= 45 ? "warn" : "bad"}
-                  label={c.gaps[0] ?? "Looking good"}
+                  label={c.gaps[0] ?? t("jccLookingGood")}
                 />
               </div>
             </motion.button>
@@ -503,7 +546,7 @@ export function JourneyControlCenter({
 
       {/* ---- Test gaps (spec §8) ------------------------------------------ */}
       {data.testGaps.length > 0 && (
-        <JourneyCard title="Test requirements" subtitle="Compared against the published minimums of your own applications.">
+        <JourneyCard title={t("jccPanelTestRequirements")} subtitle={t("jccTestsSubtitle")}>
           <ul className="space-y-2">
             {data.testGaps.map((g) => (
               <li key={g.testType} className="flex flex-wrap items-center gap-2 text-sm">
@@ -511,29 +554,25 @@ export function JourneyControlCenter({
                   {g.testType.toUpperCase()}
                 </Pill>
                 <span className="min-w-0 flex-1 text-slate-700 dark:text-slate-200">{g.message}</span>
-                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("tests")}>
-                  Test planner
-                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("tests")}>{t("jccTestPlanner")}</Button>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[11px] text-slate-400">
-            We show the gap against the published minimum. We never estimate how a score change affects your admission chances.
-          </p>
+          <p className="mt-2 text-[11px] text-slate-400">{t("jccTestGapNote")}</p>
         </JourneyCard>
       )}
 
       {/* ---- 6. Recommended for you --------------------------------------- */}
       <JourneyCard
-        title="Recommended for you"
-        subtitle="Based on your profile, budget and countries — not on popularity."
+        title={t("jccPanelRecommended")}
+        subtitle={t("jccRecommendedSubtitle")}
         action={<Compass className="h-4 w-4 text-slate-400" aria-hidden />}
       >
         <div className="space-y-4">
           <div>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Universities</h3>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("jccUniversities")}</h3>
             {recommended.universities.length === 0 ? (
-              <p className="text-xs text-slate-500">No universities match your country preferences yet.</p>
+              <p className="text-xs text-slate-500">{t("jccNoUniversityMatches")}</p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {recommended.universities.slice(0, 6).map((u) => (
@@ -542,7 +581,7 @@ export function JourneyControlCenter({
                       {u.flagEmoji} {u.name}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-300">
-                      {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : "Ranking unavailable"}
+                      {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : t("jccRankingUnavailable")}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">{u.reason}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -551,9 +590,7 @@ export function JourneyControlCenter({
                         verificationStatus={u.verificationStatus}
                         lastVerified={u.lastVerifiedAt}
                       />
-                      <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>
-                        View
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>{t("jccView")}</Button>
                     </div>
                   </div>
                 ))}
@@ -563,7 +600,7 @@ export function JourneyControlCenter({
 
           {recommended.scholarships.length > 0 ? (
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Scholarships</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("jccScholarshipsHeading")}</h3>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {recommended.scholarships.slice(0, 6).map((s) => (
                   <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
@@ -574,11 +611,15 @@ export function JourneyControlCenter({
                     </p>
                     {s.deadlineDate && (
                       <p className="text-xs text-slate-600 dark:text-slate-300">
-                        Deadline: {new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString()}
+                        {t("jccDeadlineLabel")} {new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString()}
                       </p>
                     )}
                     <p className={`text-xs ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
-                      {s.minGpa == null ? "GPA eligibility not specified" : !s.gpaProvided ? `Minimum GPA ${s.minGpa} — add your GPA to check` : `Minimum GPA ${s.minGpa}${s.gpaOk ? " — meets listed minimum" : " — below listed minimum"}`}
+                      {s.minGpa == null
+                        ? t("jccGpaNotSpecified")
+                        : !s.gpaProvided
+                          ? t("jccMinGpaAddYoursValue", { gpa: s.minGpa })
+                          : `${t("jccMinGpaValue", { gpa: s.minGpa })}${s.gpaOk ? ` ${t("jccMeetsMin")}` : ` ${t("jccBelowMin")}`}`}
                     </p>
                     <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
                   </div>
@@ -587,13 +628,13 @@ export function JourneyControlCenter({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-              No upcoming scholarship matches verified eligibility and current-cycle deadlines yet. Check your citizenship and degree level in your profile, then confirm awards on their official pages.
+              {t("jccNoScholarshipMatches")}
             </div>
           )}
 
           {recommended.opportunities.length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Opportunities</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("jccOpportunities")}</h3>
               <ul className="space-y-1.5">
                 {recommended.opportunities.map((o) => (
                   <li key={o.id} className="flex items-center gap-2 text-sm">
@@ -609,7 +650,7 @@ export function JourneyControlCenter({
                         rel="noopener noreferrer"
                         className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
                       >
-                        Open
+                        {t("jccOpen")}
                       </a>
                     )}
                   </li>
@@ -617,23 +658,19 @@ export function JourneyControlCenter({
               </ul>
             </div>
           )}
-          <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
-            Recommendations are planning aids, not admission or funding decisions. Confirm current eligibility, costs and deadlines with each official provider.
-          </p>
+          <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">{t("jccDisclaimer")}</p>
         </div>
       </JourneyCard>
 
       {/* ---- Documents about to expire (spec §7) -------------------------- */}
       {data.expiringDocuments.length > 0 && (
-        <JourneyCard title="Documents expiring" subtitle="A passport or certificate that expires can fail a whole application.">
+        <JourneyCard title={t("jccDocumentsExpiring")} subtitle={t("jccDocumentsSubtitle")}>
           <ul className="space-y-1.5">
             {data.expiringDocuments.map((d) => (
               <li key={d.id} className="flex items-center gap-2 text-sm">
                 <Pill tone={toneForDays(d.daysRemaining)}>{daysLabel(d.daysRemaining)}</Pill>
                 <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">{d.title}</span>
-                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("documents")}>
-                  Open vault
-                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("documents")}>{t("jccOpenVault")}</Button>
               </li>
             ))}
           </ul>
@@ -642,38 +679,36 @@ export function JourneyControlCenter({
 
       {/* ---- Funding summary (spec §9) ------------------------------------ */}
       {data.funding.items > 0 && (
-        <JourneyCard title="Funding" subtitle="What your plan covers and what is still missing.">
+        <JourneyCard title={t("jccFunding")} subtitle={t("jccFundingSubtitle")}>
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated annual cost" : "Annual cost"}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("jccEstimatedAnnualCost") : t("jccAnnualCost")}</p>
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : "Not calculated"}
+                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : t("jccNotCalculated")}
               </p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated remaining gap" : "Remaining gap"}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("jccEstimatedRemainingGap") : t("jccRemainingGap")}</p>
               <p
                 className={`text-xl font-extrabold ${
                   !data.funding.calculated ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
                 }`}
               >
-                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : "Unavailable"}
+                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : t("jccUnavailable")}
               </p>
             </div>
             {!data.funding.calculated ? (
-              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Add annual study costs to calculate the gap; zero is not treated as a verified cost.</p>
+              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">{t("jccFundingGapHint")}</p>
             ) : data.funding.estimated ? (
-              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Some cost lines are estimated. Review the assumptions and official university costs before relying on this figure.</p>
+              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">{t("jccFundingEstimatesHint")}</p>
             ) : null}
-            <Button variant="outline" onClick={() => onNavigateTab("funding")}>
-              Open financial plan
-            </Button>
+            <Button variant="outline" onClick={() => onNavigateTab("funding")}>{t("jccOpenFinancialPlan")}</Button>
           </div>
         </JourneyCard>
       )}
 
       {/* ---- The ten study-plan phases (spec §12) ------------------------- */}
-      <JourneyCard title="My study plan" subtitle="Ten phases from today to departure. They update themselves.">
+      <JourneyCard title={t("jccPanelStudyPlan")} subtitle={t("jccStudyPlanSubtitle", { phases: data.phases.length })}>
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {data.phases.map((p) => (
             <li key={p.key}>
@@ -691,12 +726,12 @@ export function JourneyControlCenter({
                 <p className="text-base" aria-hidden>
                   {p.icon}
                 </p>
-                <p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-100">{p.title}</p>
+                <p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-100">{phaseTitle(p)}</p>
                 <div className="mt-1.5">
                   <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                  {p.status === "done" ? "Done" : (p.missing[0] ?? `${p.pct}%`)}
+                  {p.status === "done" ? t("jccDone") : (p.missing[0] ?? `${p.pct}%`)}
                 </p>
               </button>
             </li>

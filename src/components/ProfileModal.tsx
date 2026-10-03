@@ -8,6 +8,8 @@ import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Ta
 import { formatNumber } from "@/lib/format";
 import { STUDY_FIELD_CATEGORIES, STUDY_FIELDS } from "@/lib/studyFields";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { countryCodeFor } from "@/lib/countries";
+import { useTranslations } from "next-intl";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 
 interface ProfileModalProps {
@@ -43,6 +45,8 @@ const toList = (raw?: string | null): string => {
 };
 
 export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: ProfileModalProps) {
+  const t = useTranslations("profile");
+  const tc = useTranslations("countries");
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
@@ -285,11 +289,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     setErrorMsg("");
     const password = formData.password.trim();
     if (isNew && password.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`Parol kiriting (kamida ${MIN_PASSWORD_LENGTH} belgi) — keyin shu email + parol bilan kirish qilasiz.`);
+      setErrorMsg(t("errPasswordNew", { min: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (!isNew && password.length > 0 && password.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`Yangi parol kamida ${MIN_PASSWORD_LENGTH} belgi bo'lishi kerak (o'zgartirmaslik uchun bo'sh qoldiring).`);
+      setErrorMsg(t("errPasswordChange", { min: MIN_PASSWORD_LENGTH }));
       return;
     }
     setIsSubmitting(true);
@@ -317,7 +321,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
       onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err?.message || "Saqlashda xatolik yuz berdi. Qayta urinib ko'ring.");
+      setErrorMsg(err?.message || t("errSave"));
     } finally {
       setIsSubmitting(false);
     }
@@ -333,8 +337,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{isNew ? "Create Student Profile" : "Edit Academic Profile"}</h2>
-              <p className="text-xs text-indigo-100">ScholarBridgeAI matching engine calculates recommendations using these metrics.</p>
+              <h2 className="text-xl font-bold">{isNew ? t("titleCreate") : t("titleEdit")}</h2>
+              <p className="text-xs text-indigo-100">{t("subtitle")}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg">
@@ -352,40 +356,36 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Basic Info */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
-              Basic Information
-            </h3>
+              <BookOpen className="h-3.5 w-3.5 text-indigo-600" />{t("sectionBasic")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("fullName")}</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="e.g. Alex Chen"
+                  placeholder={t("namePlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("emailAddress")}</label>
                 <input
                   type="email"
                   required={!tgOnlyAccount}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="alex@university.edu"
+                  placeholder={t("emailPlaceholder")}
                 />
                 {tgOnlyAccount && (
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    You signed up with Telegram. Add an email + new password here to also sign in without Telegram.
-                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">{t("telegramHint")}</p>
                 )}
               </div>
               {isNew && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Password *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{t("password")}</label>
                   <input
                     type="password"
                     required
@@ -393,28 +393,26 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="At least 8 characters"
+                    placeholder={t("passwordPlaceholder")}
                     autoComplete="new-password"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">
-                    You&apos;ll sign in later with this email + password — from any device.
+                    {t("passwordHint")}
                   </p>
                 </div>
               )}
               {!isNew && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">New Password (optional)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{t("newPassword")}</label>
                   <input
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="Leave empty to keep the current one"
+                    placeholder={t("newPasswordPlaceholder")}
                     autoComplete="new-password"
                   />
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Enter at least 8 characters to change the sign-in password.
-                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">{t("newPasswordHint")}</p>
                 </div>
               )}
             </div>
@@ -423,22 +421,20 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Personal details */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-sky-600" />
-              Personal Details
-            </h3>
+              <User className="h-3.5 w-3.5 text-sky-600" />{t("sectionPersonal")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Country of Residence</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("countryResidence")}</label>
                 <input
                   type="text"
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="Uzbekistan"
+                  placeholder={t("countryPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Age</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("age")}</label>
                 <input
                   type="number"
                   min="14"
@@ -450,7 +446,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Graduation Year</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("graduationYear")}</label>
                 <input
                   type="number"
                   min="2020"
@@ -467,12 +463,10 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Academic Profile */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <Award className="h-3.5 w-3.5 text-indigo-600" />
-              Academic Credentials & Standardized Scores
-            </h3>
+              <Award className="h-3.5 w-3.5 text-indigo-600" />{t("sectionAcademic")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Degree</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("targetDegree")}</label>
                 <select
                   value={degreeControlValue}
                   onChange={(e) => setFormData({ ...formData, degreeLevel: e.target.value })}
@@ -489,14 +483,14 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Major / Field</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("targetMajor")}</label>
                 <select
                   required
                   value={formData.targetMajor}
                   onChange={(e) => setFormData({ ...formData, targetMajor: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value="" disabled>Select your target program…</option>
+                  <option value="" disabled>{t("majorPlaceholder")}</option>
                   {formData.targetMajor && !STUDY_FIELDS.includes(formData.targetMajor) && (
                     <option value={formData.targetMajor}>{formData.targetMajor}</option>
                   )}
@@ -508,11 +502,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     </optgroup>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-500">Choose the program you plan to study.</p>
+                <p className="mt-1 text-[10px] text-slate-500">{t("majorHint")}</p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">GPA & Scale</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("gpaScale")}</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -541,7 +535,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             {/* Test Scores */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">IELTS Score</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("ielts")}</label>
                 <input
                   type="number"
                   step="0.5"
@@ -554,7 +548,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">TOEFL iBT</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("toefl")}</label>
                 <input
                   type="number"
                   min="0"
@@ -566,7 +560,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">SAT Score</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("sat")}</label>
                 <input
                   type="number"
                   min="400"
@@ -578,7 +572,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">GRE General</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("gre")}</label>
                 <input
                   type="number"
                   min="260"
@@ -590,7 +584,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">ACT Score</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("act")}</label>
                 <input
                   type="number"
                   min="1"
@@ -602,7 +596,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Duolingo English</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("duolingo")}</label>
                 <input
                   type="number"
                   min="10"
@@ -618,33 +612,33 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             {/* Course rigor */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">AP Courses</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("apCourses")}</label>
                 <input
                   type="text"
                   value={formData.apCourses}
                   onChange={(e) => setFormData({ ...formData, apCourses: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="Calculus AB, Physics C"
+                  placeholder={t("apPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">IB Courses</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("ibCourses")}</label>
                 <input
                   type="text"
                   value={formData.ibCourses}
                   onChange={(e) => setFormData({ ...formData, ibCourses: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="Math HL, English HL"
+                  placeholder={t("ibPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">A-Level Subjects</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">{t("alevelSubjects")}</label>
                 <input
                   type="text"
                   value={formData.aLevelSubjects}
                   onChange={(e) => setFormData({ ...formData, aLevelSubjects: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="Maths, Physics"
+                  placeholder={t("alevelPlaceholder")}
                 />
               </div>
             </div>
@@ -653,14 +647,10 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Financials & Preferences */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-              Budget Constraints & Financial Aid
-            </h3>
+              <DollarSign className="h-3.5 w-3.5 text-emerald-600" />{t("sectionBudget")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Annual Budget Limit (Tuition + Living)
-                </label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("budgetLabel")}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">$</span>
                   <input
@@ -673,7 +663,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Current: {formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}
+                  {t("currentPrefix")} {formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}
                 </p>
               </div>
 
@@ -686,8 +676,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <div>
-                    <span className="text-xs font-semibold text-slate-800">Requires Full/Partial Scholarships</span>
-                    <p className="text-[11px] text-slate-500">Prioritizes universities with financial aid & grant funds</p>
+                    <span className="text-xs font-semibold text-slate-800">{t("requiresScholarship")}</span>
+                    <p className="text-[11px] text-slate-500">{t("prioritizesAid")}</p>
                   </div>
                 </label>
               </div>
@@ -695,7 +685,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Family Income (USD / year)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("familyIncome")}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">$</span>
                   <input
@@ -717,7 +707,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     onChange={(e) => setFormData({ ...formData, needsFinancialAid: e.target.checked })}
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-xs font-semibold text-slate-800">Needs financial aid?</span>
+                  <span className="text-xs font-semibold text-slate-800">{t("needsAid")}</span>
                 </label>
               </div>
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">
@@ -728,7 +718,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     onChange={(e) => setFormData({ ...formData, requiresFullScholarship: e.target.checked })}
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-xs font-semibold text-slate-800">Require a full scholarship?</span>
+                  <span className="text-xs font-semibold text-slate-800">{t("requireFullScholarship")}</span>
                 </label>
               </div>
             </div>
@@ -737,9 +727,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Preferred Countries */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-              <Globe className="h-3.5 w-3.5 text-blue-600" />
-              Preferred Study Destinations
-            </h3>
+              <Globe className="h-3.5 w-3.5 text-blue-600" />{t("sectionDestinations")}</h3>
             <div className="flex flex-wrap gap-2">
               {countryOptions.map((country) => {
                 const selected = formData.preferredCountries.includes(country);
@@ -755,7 +743,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     }`}
                   >
                     {selected ? "✓ " : "+ "}
-                    {country}
+                    {tc(countryCodeFor(country) ?? "us")}
                   </button>
                 );
               })}
@@ -764,27 +752,25 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
           {/* Research & Experience */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Research & Extracurricular Highlights
-            </h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">{t("sectionHighlights")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Work/Internship Experience</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("workExperience")}</label>
                 <select
                   value={formData.workExperienceYears}
                   onChange={(e) => setFormData({ ...formData, workExperienceYears: parseInt(e.target.value, 10) })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value={0}>0 Years (Fresh Graduate)</option>
-                  <option value={1}>1 Year</option>
-                  <option value={2}>2 Years</option>
-                  <option value={3}>3+ Years</option>
-                  <option value={5}>5+ Years Senior</option>
+                  <option value={0}>{t("exp0")}</option>
+                  <option value={1}>{t("exp1")}</option>
+                  <option value={2}>{t("exp2")}</option>
+                  <option value={3}>{t("exp3")}</option>
+                  <option value={5}>{t("exp5")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Research Papers / Publications</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("publications")}</label>
                 <input
                   type="number"
                   min="0"
@@ -796,13 +782,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Extracurriculars & Achievements</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">{t("extracurricularsTitle")}</label>
               <textarea
                 rows={2}
                 value={formData.extracurriculars}
                 onChange={(e) => setFormData({ ...formData, extracurriculars: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="e.g. Hackathon winner, Vice President of Tech Club, Peer Tutor in Data Structures..."
+                placeholder={t("extracurricularsPlaceholder")}
               />
             </div>
           </div>
@@ -810,26 +796,24 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Extracurricular detail (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-teal-600" />
-              Extracurriculars
-            </h3>
+              <User className="h-3.5 w-3.5 text-teal-600" />{t("extracurricularsLabel")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
-                ["leadership", "Leadership", "Student Council VP, Club President"],
-                ["volunteering", "Volunteering", "Red Crescent volunteer"],
-                ["sports", "Sports", "Football team captain"],
-                ["clubs", "Clubs", "Debate club, Robotics"],
-                ["researchExperience", "Research", "NLP research assistant"],
-                ["projects", "Projects", "Open-source contributor"],
-              ] as const).map(([key, label, placeholder]) => (
+                ["leadership", "chipLeadership", "chipLeadershipHint"],
+                ["volunteering", "chipVolunteering", "chipVolunteeringHint"],
+                ["sports", "chipSports", "chipSportsHint"],
+                ["clubs", "chipClubs", "chipClubsHint"],
+                ["researchExperience", "chipResearch", "chipResearchHint"],
+                ["projects", "chipProjects", "chipProjectsHint"],
+              ] as const).map(([key, labelKey, placeholderKey]) => (
                 <div key={key}>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{t(labelKey)}</label>
                   <input
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder={placeholder}
+                    placeholder={t(placeholderKey)}
                   />
                 </div>
               ))}
@@ -839,24 +823,22 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Achievements (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <Trophy className="h-3.5 w-3.5 text-amber-600" />
-              Achievements
-            </h3>
+              <Trophy className="h-3.5 w-3.5 text-amber-600" />{t("achievements")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
-                ["olympiads", "Olympiads", "National Math Olympiad — 2nd place"],
-                ["awards", "Awards", "President's scholarship"],
-                ["competitions", "Competitions", "ACM ICPC regional"],
-                ["certificates", "Certificates", "AWS Certified, Google UX"],
-              ] as const).map(([key, label, placeholder]) => (
+                ["olympiads", t("achOlympiads"), t("achOlympiadsHint")],
+                ["awards", t("achAwards"), t("achAwardsHint")],
+                ["competitions", t("achCompetitions"), t("achCompetitionsHint")],
+                ["certificates", t("achCertificates"), t("achCertificatesHint")],
+              ] as const).map(([key, labelKey, placeholderKey]) => (
                 <div key={key}>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{t(labelKey)}</label>
                   <input
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder={placeholder}
+                    placeholder={t(placeholderKey)}
                   />
                 </div>
               ))}
@@ -866,28 +848,26 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
           {/* Goals (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5 text-indigo-600" />
-              Goals
-            </h3>
+              <Target className="h-3.5 w-3.5 text-indigo-600" />{t("goals")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Universities</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("targetUniversities")}</label>
                 <input
                   type="text"
                   value={formData.targetUniversities}
                   onChange={(e) => setFormData({ ...formData, targetUniversities: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="TUM, Purdue"
+                  placeholder={t("targetUniversitiesPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Career Goal</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{t("careerGoal")}</label>
                 <textarea
                   rows={2}
                   value={formData.careerGoal}
                   onChange={(e) => setFormData({ ...formData, careerGoal: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="ML engineer working on healthcare AI"
+                  placeholder={t("careerGoalPlaceholder")}
                 />
               </div>
             </div>
@@ -899,16 +879,14 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
+            >{t("cancel")}</button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md hover:shadow-indigo-200 transition-all disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {isSubmitting ? "Saving Profile..." : isNew ? "Create Profile" : "Save Profile Changes"}
+              {isSubmitting ? t("saving") : isNew ? t("create") : t("saveChanges")}
             </button>
           </div>
         </form>
