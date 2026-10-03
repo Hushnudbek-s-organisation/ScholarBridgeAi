@@ -397,7 +397,9 @@ scratch tooling, not part of the repository. Screenshots from this pass are in
   clone and the branch checkout, `git fsck` reports no dangling commits, and the repository has **no
   upstream configured** — so any earlier statement that this work was committed as `c97896d` was
   wrong: that object does not exist in this repository. Nothing was reset or discarded; the working
-  tree is the single source of truth for the changes, and this finalization pass committed them
-  locally (see below).
+  tree is the single source of truth for the changes. This finalization pass committed them
+  **locally only**, as commit **`0416113`** ("Restructure navigation into 6 groups / 14 destinations
+  + responsive & a11y fixes") on top of `1bdfc14` — the pre-existing commit was not amended or
+  rewritten.
 * **Nothing was pushed and nothing was deployed.** No remote-write command was executed in this
   session.
