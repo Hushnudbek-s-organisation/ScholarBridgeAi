@@ -74,7 +74,14 @@ import {
   summarizeProviders,
 } from "../src/lib/journey/providers";
 import { ALL_MAJORS, CAREER_PATHS } from "../src/lib/journey/careers";
-import { NAV_GROUPS, NAV_SECTIONS } from "../src/lib/navSections";
+import {
+  DEFAULT_HIDDEN_NAV_ITEMS,
+  LEGACY_SECTION_ALIASES,
+  NAV_GROUPS,
+  NAV_SECTIONS,
+  resolveNavTarget,
+  visiblePanes,
+} from "../src/lib/navSections";
 
 let passed = 0;
 const failures: string[] = [];
@@ -165,6 +172,11 @@ const item = (over: Partial<FundingItemLike> = {}): FundingItemLike => ({
   ...over,
 });
 
+/** A section id OR a pane deep link OR a legacy id — all must resolve. */
+function isNavigable(tab: string): boolean {
+  return resolveNavTarget(tab) !== null;
+}
+
 // ---------------------------------------------------------------------------
 section("Journey stages");
 // ---------------------------------------------------------------------------
@@ -179,7 +191,7 @@ check("the journey is discover → match → prepare → apply → accepted → 
 check("every stage has a real tab a student can Continue into", () => {
   for (const s of JOURNEY_STAGES) {
     assert.ok(s.tab && s.label && s.icon && s.doneWhen, s.id);
-    assert.ok(NAV_SECTIONS.some((n) => n.id === s.tab), `${s.id} → ${s.tab} is not a navigable section`);
+    assert.ok(isNavigable(s.tab), `${s.id} → ${s.tab} is not a navigable destination`);
   }
 });
 
@@ -236,7 +248,7 @@ check("'still needed' always points at a real section", () => {
   for (const c of [EMPTY_JOURNEY_COUNTS, counts({ profileComplete: true }), counts({ profileComplete: true, savedUniversities: 4, applications: 2 })]) {
     for (const s of stageStillNeeded(currentStage(c), c)) {
       assert.ok(s.text, "a step needs a sentence");
-      assert.ok(NAV_SECTIONS.some((n) => n.id === s.tab), `unknown tab ${s.tab}`);
+      assert.ok(isNavigable(s.tab), `unknown tab ${s.tab}`);
     }
   }
 });
@@ -556,7 +568,7 @@ check("every reverse step lands strictly BEFORE the deadline", () => {
     for (const step of reversePlan("2026-12-01", kind)) {
       assert.ok(step.date < "2026-12-01", `${kind}/${step.key} = ${step.date} is not before the deadline`);
       assert.ok(step.daysBefore > 0, `${kind}/${step.key} must be a positive lead time`);
-      assert.ok(NAV_SECTIONS.some((n) => n.id === step.tab), `${kind}/${step.key} → unknown tab ${step.tab}`);
+      assert.ok(isNavigable(step.tab), `${kind}/${step.key} → unknown tab ${step.tab}`);
     }
   }
 });
@@ -717,7 +729,7 @@ check("the plan has ten phases covering the whole journey", () => {
 check("every phase opens a real section", () => {
   for (const p of PLAN_PHASES) {
     assert.ok(p.title && p.description && p.icon, p.key);
-    assert.ok(NAV_SECTIONS.some((n) => n.id === p.tab), `${p.key} → unknown tab ${p.tab}`);
+    assert.ok(isNavigable(p.tab), `${p.key} → unknown tab ${p.tab}`);
   }
 });
 
@@ -978,8 +990,30 @@ check("majors are deduplicated across careers", () => {
 section("Navigation");
 // ---------------------------------------------------------------------------
 
-check("there are exactly the eight requested groups, in order", () => {
-  assert.deepEqual([...NAV_GROUPS], ["home", "discover", "journey", "prepare", "apply", "after", "help", "account"]);
+check("there are exactly the six requested groups, in order", () => {
+  assert.deepEqual([...NAV_GROUPS], ["home", "explore", "plan", "applications", "after", "help"]);
+});
+
+check("there are exactly the fourteen requested destinations", () => {
+  assert.deepEqual(
+    NAV_SECTIONS.map((s) => s.id),
+    [
+      "dashboard",
+      "universities",
+      "scholarships",
+      "study-plan",
+      "tasks",
+      "profile",
+      "funding",
+      "applications",
+      "materials",
+      "offers",
+      "post-admission-funding",
+      "visa",
+      "guidance",
+      "community",
+    ]
+  );
 });
 
 check("every section belongs to a real group and carries a label + description", () => {
@@ -994,6 +1028,17 @@ check("section ids are unique", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+check("pane ids are unique inside their destination and deep-linkable", () => {
+  for (const s of NAV_SECTIONS) {
+    const ids = s.panes.map((p) => p.id);
+    assert.equal(new Set(ids).size, ids.length, `${s.id} has duplicate panes`);
+    for (const p of ids) {
+      const target = resolveNavTarget(`${s.id}/${p}`);
+      assert.ok(target && target.section === s.id && target.pane === p, `${s.id}/${p} does not resolve`);
+    }
+  }
+});
+
 check("the dashboard is locked visible and in HOME", () => {
   const d = NAV_SECTIONS.find((s) => s.id === "dashboard");
   assert.ok(d, "the dashboard must exist");
@@ -1001,22 +1046,58 @@ check("the dashboard is locked visible and in HOME", () => {
   assert.equal(d!.locked, true);
 });
 
-check("the whole journey is reachable from the sidebar", () => {
+check("the whole journey is reachable from the new destinations", () => {
   const ids = new Set(NAV_SECTIONS.map((s) => s.id));
   for (const id of [
-    "universities", "scholarships", "career", "study-plan", "activities", "chancing",
-    "documents", "tests", "requirements", "funding", "applications", "workspace",
-    "recommendations", "tasks", "sop", "offers", "post-admission-funding", "visa",
-    "interviews", "departure", "advisor", "chat", "mentors", "forum", "courses",
-    "parent", "notifications", "payments",
+    "universities", "scholarships", "study-plan", "tasks", "profile", "funding",
+    "applications", "materials", "offers", "post-admission-funding", "visa",
+    "guidance", "community",
   ]) {
     assert.ok(ids.has(id), `${id} is not in the sidebar`);
   }
 });
 
-check("after-admission runs offer → funding → visa → interview → departure in order", () => {
+check("every feature that used to be its own section still resolves", () => {
+  for (const oldId of Object.keys(LEGACY_SECTION_ALIASES)) {
+    const target = resolveNavTarget(oldId);
+    assert.ok(target, `${oldId} no longer resolves`);
+    assert.ok(NAV_SECTIONS.some((s) => s.id === target!.section), `${oldId} → unknown section ${target!.section}`);
+  }
+});
+
+check("no destination nests more than one level of navigation", () => {
+  for (const s of NAV_SECTIONS) {
+    // One page, a flat row of tabs — never tabs inside tabs.
+    for (const pane of s.panes) assert.ok(!pane.id.includes("/"), `${s.id}/${pane.id} nests deeper than one level`);
+  }
+});
+
+check("hidden-by-default ids are real panes, account screens or legacy ids", () => {
+  const paneIds = new Set(NAV_SECTIONS.flatMap((s) => s.panes.map((p) => p.id)));
+  const utilityIds = new Set(["payments", "notifications", "rewards", "parent", "admin"]);
+  for (const id of DEFAULT_HIDDEN_NAV_ITEMS) {
+    // A pane ("compare"), an account screen ("parent") or a pre-restructure id
+    // ("advisor", "mentors") that still resolves — all three are hideable.
+    assert.ok(
+      paneIds.has(id) || utilityIds.has(id) || resolveNavTarget(id) !== null,
+      `${id} is neither a pane, an account screen nor a legacy id`
+    );
+  }
+});
+
+check("the after-admission destinations run offer → funding → visa in order", () => {
   const after = NAV_SECTIONS.filter((s) => s.group === "after").map((s) => s.id);
-  assert.deepEqual(after, ["offers", "post-admission-funding", "visa", "interviews", "departure"]);
+  assert.deepEqual(after, ["offers", "post-admission-funding", "visa"]);
+});
+
+check("hiding a pane never removes the destination it belongs to", () => {
+  for (const s of NAV_SECTIONS) {
+    assert.ok(visiblePanes(s.id, []).length === s.panes.length, s.id);
+    if (s.panes.length > 1) {
+      const hiddenAllButOne = s.panes.slice(1).map((p) => p.id);
+      assert.ok(visiblePanes(s.id, hiddenAllButOne).length === 1, `${s.id} lost every tab`);
+    }
+  }
 });
 
 check("stage tags only name stages the journey engine actually has", () => {

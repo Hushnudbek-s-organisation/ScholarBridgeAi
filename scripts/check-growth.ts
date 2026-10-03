@@ -45,7 +45,7 @@ import {
   type AutopilotScholarship,
   type JourneyCounts,
 } from "../src/lib/growth/logic";
-import { NAV_GROUPS, NAV_SECTIONS } from "../src/lib/navSections";
+import { NAV_GROUPS, NAV_SECTIONS, resolveNavTarget } from "../src/lib/navSections";
 
 let passed = 0;
 const failures: string[] = [];
@@ -222,10 +222,16 @@ console.log("\nNavigation, seeds & i18n");
 check("every section belongs to a known group", () => {
   for (const s of NAV_SECTIONS) assert.ok((NAV_GROUPS as readonly string[]).includes(s.group), s.id);
 });
-check("new sections are registered and flagged new", () => {
+check("new features are still reachable and still carry the NEW badge", () => {
+  // These features used to be their own sections; they are tabs now, so check
+  // the destination the tab lives in. The badge stays on the feature — badges
+  // never create destinations and never disappear in a reorganisation.
   for (const id of ["autopilot", "goals", "stories", "vault", "departure"]) {
-    const s = NAV_SECTIONS.find((x) => x.id === id);
-    assert.ok(s?.isNew, id);
+    const target = resolveNavTarget(id);
+    assert.ok(target, `${id} no longer resolves`);
+    const owner = NAV_SECTIONS.find((x) => x.id === target!.section);
+    assert.ok(owner, `${id} → unknown section ${target!.section}`);
+    assert.ok(owner!.isNew || owner!.panes.some((pp) => pp.isNew), `NEW badge lost on ${id} (${owner!.id})`);
   }
 });
 const msgs = Object.fromEntries(

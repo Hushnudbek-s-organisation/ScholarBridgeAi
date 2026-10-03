@@ -42,6 +42,7 @@ import {
 import { useTranslations } from "next-intl";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
+import { ScrollRegion } from "@/components/hubs/ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 
 // ---------------------------------------------------------------------------
@@ -802,7 +803,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
               <>
                 {/* Compare tray (client-side, up to 3) */}
                 {compareRows.length > 0 && (
-                  <div className="mt-4 overflow-x-auto rounded-xl border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/40">
+                  <ScrollRegion label={t("compareTray")} className="mt-4 overflow-x-auto rounded-xl border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/40">
                     <div className="flex items-center justify-between px-3 pt-3">
                       <p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
                         {t("compareTray")} ({compareRows.length}/{MAX_COMPARE})
@@ -844,7 +845,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ScrollRegion>
                 )}
                 {compareRows.length === 0 && <p className="mt-4 text-[11px] text-slate-500 dark:text-slate-400">{t("compareHint")}</p>}
 

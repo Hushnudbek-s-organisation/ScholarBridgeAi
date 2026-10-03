@@ -191,7 +191,7 @@ export function currentStage(c: JourneyCounts): JourneyStageId {
 export function stageStillNeeded(stage: JourneyStageId, c: JourneyCounts): { text: string; tab: string }[] {
   switch (stage) {
     case "discover":
-      return c.profileComplete ? [] : [{ text: "Complete your profile so matches are personalised", tab: "profile" }];
+      return c.profileComplete ? [] : [{ text: "Complete your profile so matches are personalised", tab: "profile/details" }];
     case "match":
       return [
         ...(c.savedUniversities === 0 ? [{ text: "Save universities you are considering", tab: "universities" }] : []),

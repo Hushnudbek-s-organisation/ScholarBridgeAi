@@ -63,9 +63,15 @@ interface ApplicationRow {
 
 interface ApplicationCenterProps {
   activeProfile: StudentProfile | null;
+  /**
+   * Opens the selected application in its workspace. The tracker row stays the
+   * single source of truth for status; the workspace is a view of the same
+   * record, so the two can never disagree.
+   */
+  onOpenWorkspace?: (id: number) => void;
 }
 
-export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
+export function ApplicationCenter({ activeProfile, onOpenWorkspace }: ApplicationCenterProps) {
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -218,7 +224,9 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* 2 columns on phones: seven full-width metric tiles stacked ~560px
+          of scrolling before the first application card. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           { label: "Applied", value: rows.length },
           { label: "Submitted", value: submitted },
@@ -232,7 +240,7 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
             <div className="text-2xl font-extrabold text-slate-900">
               {stat.value === null || stat.value === undefined ? "—" : stat.value}
             </div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{stat.label}</div>
+            <div className="break-words text-[10px] font-bold uppercase leading-tight tracking-wide text-slate-400">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -340,6 +348,15 @@ export function ApplicationCenter({ activeProfile }: ApplicationCenterProps) {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
+                {onOpenWorkspace && (
+                  <button
+                    onClick={() => onOpenWorkspace(row.id)}
+                    className="flex min-h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
+                  >
+                    <Target className="h-3.5 w-3.5" /> Open workspace
+                  </button>
+                )}
+
                 <select
                   className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
                   value={row.status}

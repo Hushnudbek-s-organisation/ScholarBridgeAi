@@ -31,7 +31,7 @@ export interface JourneyStepDef {
 
 /** Built-in order. Titles/descriptions come from i18n (`journey.steps.<id>`). */
 export const JOURNEY_STEPS: JourneyStepDef[] = [
-  { id: "profile", check: "profile", tab: "profile" },
+  { id: "profile", check: "profile", tab: "profile/details" },
   { id: "explore", check: "universities", tab: "universities" },
   { id: "chances", check: "shortlist", tab: "chancing" },
   { id: "funding", check: "scholarships", tab: "autopilot" },
@@ -105,10 +105,30 @@ export function resolveJourneySteps(overrides: JourneyStepOverride[]) {
 // them off or replace the text (app_config.section_help).
 // ---------------------------------------------------------------------------
 
+/**
+ * Sections the "what is this page?" banner may appear on.
+ *
+ * The first block is the current navigation (six groups, fourteen
+ * destinations); the second keeps the ids of features that are now tabs, so an
+ * admin override written before the reorganization still applies to the page
+ * where that feature now lives.
+ */
 export const HELP_SECTIONS = [
   "dashboard",
   "universities",
   "scholarships",
+  "study-plan",
+  "tasks",
+  "profile",
+  "funding",
+  "applications",
+  "materials",
+  "offers",
+  "post-admission-funding",
+  "visa",
+  "guidance",
+  "community",
+  // legacy ids (features that became tabs)
   "chancing",
   "strength",
   "similar",

@@ -6,15 +6,12 @@
  * written to the database.
  */
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { MIN_PASSWORD_LENGTH } from "./passwordPolicy";
 
 const SCRYPT_KEYLEN = 64;
 const SALT_BYTES = 16;
 
-/**
- * Minimum password length enforced server-side (and mirrored in the UI copy).
- * Short passwords are the cheapest way into an account — 8 is the floor.
- */
-export const MIN_PASSWORD_LENGTH = 8;
+export { MIN_PASSWORD_LENGTH } from "./passwordPolicy";
 
 /** Reject the most common passwords outright. */
 const BLOCKED_PASSWORDS = new Set([

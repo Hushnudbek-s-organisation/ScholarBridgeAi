@@ -212,7 +212,7 @@ export function computeNextActions(input: NextStepsInput, limit = 5): NextStep[]
       title: "Finish your profile",
       detail: "Everything personalised — matches, requirements, funding — depends on it.",
       dueInDays: null,
-      tab: "profile",
+      tab: "profile/details",
       score: 48,
     });
   }

@@ -8,6 +8,7 @@ import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Ta
 import { formatNumber } from "@/lib/format";
 import { STUDY_FIELD_CATEGORIES, STUDY_FIELDS } from "@/lib/studyFields";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -283,12 +284,12 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     e.preventDefault();
     setErrorMsg("");
     const password = formData.password.trim();
-    if (isNew && password.length < 6) {
-      setErrorMsg("Parol kiriting (kamida 6 belgi) — keyin shu email + parol bilan kirish qilasiz.");
+    if (isNew && password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`Parol kiriting (kamida ${MIN_PASSWORD_LENGTH} belgi) — keyin shu email + parol bilan kirish qilasiz.`);
       return;
     }
-    if (!isNew && password.length > 0 && password.length < 6) {
-      setErrorMsg("Yangi parol kamida 6 belgi bo'lishi kerak (o'zgartirmaslik uchun bo'sh qoldiring).");
+    if (!isNew && password.length > 0 && password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`Yangi parol kamida ${MIN_PASSWORD_LENGTH} belgi bo'lishi kerak (o'zgartirmaslik uchun bo'sh qoldiring).`);
       return;
     }
     setIsSubmitting(true);

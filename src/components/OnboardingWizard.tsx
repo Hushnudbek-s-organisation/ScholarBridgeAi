@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { STUDY_FIELD_CATEGORIES } from "@/lib/studyFields";
@@ -226,7 +227,9 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const step0Invalid =
     !form.name.trim() ||
     (!form.email.trim() && !placeholderEmail) ||
-    (isNewAccount && form.password.trim().length < 6);
+    // Must match MIN_PASSWORD_LENGTH in src/lib/password.ts (server rejects
+    // anything shorter, so a 6-char pass here would only fail later).
+    (isNewAccount && form.password.trim().length < MIN_PASSWORD_LENGTH);
 
   const handleNext = async () => {
     if (step === 0 && step0Invalid) {
@@ -336,17 +339,33 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 animate-fadeIn"
       >
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-semibold text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200"
+          >
             {error}
           </div>
+        )}
+        {!error && step === 0 && step0Invalid && (
+          <p className="mb-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {isNewAccount
+              ? "All three fields are required: name, email and a password of at least 8 characters."
+              : "Name and email are required to continue."}
+          </p>
         )}
 
         {/* STEP 1 — Name, email & password (mandatory on new accounts) */}
         {step === 0 && (
           <div className="space-y-4">
             <div>
-              <label className={labelCls}>Full Name *</label>
+              <label className={labelCls} htmlFor="ob-name">Full Name *</label>
               <input
+                id="ob-name"
+                name="name"
+                autoComplete="name"
+                required
+                aria-required="true"
+                aria-invalid={step0Invalid && !form.name.trim() ? true : undefined}
                 className={inputCls}
                 placeholder="e.g. Aziz Aliyev"
                 value={form.name}
@@ -354,16 +373,23 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               />
             </div>
             <div>
-              <label className={labelCls}>Email Address {placeholderEmail ? "(optional)" : "*"}</label>
+              <label className={labelCls} htmlFor="ob-email">Email Address {placeholderEmail ? "(optional)" : "*"}</label>
               <input
+                id="ob-email"
+                name="email"
                 type="email"
+                autoComplete="email"
+                inputMode="email"
+                required={!placeholderEmail}
+                aria-required={!placeholderEmail}
+                aria-invalid={step0Invalid && !form.email.trim() && !placeholderEmail ? true : undefined}
                 className={inputCls}
                 placeholder="aziz@example.com"
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
               />
               {placeholderEmail && (
-                <p className="text-[11px] text-slate-400 mt-2">
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   You signed in with Telegram, so an email is optional. Add one to also get
                   email updates and to sign in with email + password later.
                 </p>
@@ -371,23 +397,29 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
             </div>
             {isNewAccount && (
               <div>
-                <label className={labelCls}>Password *</label>
+                <label className={labelCls} htmlFor="ob-password">Password *</label>
                 <input
+                  id="ob-password"
+                  name="new-password"
                   type="password"
+                  required
+                  aria-required="true"
+                  aria-invalid={step0Invalid && form.password.trim().length < MIN_PASSWORD_LENGTH ? true : undefined}
+                  aria-describedby="ob-password-help"
                   className={inputCls}
                   placeholder="At least 8 characters"
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
                   autoComplete="new-password"
                 />
-                <p className="text-[11px] text-slate-400 mt-2">
+                <p id="ob-password-help" className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   You&apos;ll sign in later with this email + password — from any
                   device or after logging out. It&apos;s stored encrypted (hashed),
                   never in plain text.
                 </p>
               </div>
             )}
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               You can update these later anytime from &quot;Edit Profile&quot;.
             </p>
           </div>
@@ -432,7 +464,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                   </optgroup>
                 ))}
               </select>
-              <p className="text-[11px] text-slate-400 mt-2">
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 Select the program you plan to study. We use it to find matching universities and scholarships.
               </p>
             </div>
@@ -623,7 +655,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         )}
 
         {/* Terms agreement */}
-        <p className="mt-5 text-[11px] text-slate-400 text-center leading-relaxed">
+        <p className="mt-5 text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
           By continuing, you agree to our{" "}
           <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
             Terms

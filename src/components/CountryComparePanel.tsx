@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Globe2, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { ScrollRegion } from "@/components/hubs/ui";
 
 interface Comparison {
   country: string;
@@ -109,7 +110,7 @@ export function CountryComparePanel() {
       {error && <p className="mt-3 text-xs font-semibold text-rose-600">{error}</p>}
 
       {data && (
-        <div className="mt-4 overflow-x-auto">
+        <ScrollRegion label={t("compare")} className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
@@ -152,7 +153,7 @@ export function CountryComparePanel() {
             </tbody>
           </table>
           <p className="mt-2 text-[10px] text-slate-400">{t("publishedNote")}</p>
-        </div>
+        </ScrollRegion>
       )}
     </div>
   );

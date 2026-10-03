@@ -61,7 +61,12 @@ export function JourneyCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px 0px -50px 0px" }}
       transition={{ duration: 0.42, delay: reduceMotion ? 0 : delay, ease: [0.16, 1, 0.3, 1] }}
-      className={`rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${tones[tone]} ${
+      // `min-w-0` matters: these cards are grid items, and a grid track
+      // defaults to `minmax(auto, 1fr)`. A long university name inside a
+      // `truncate` (nowrap) <p> then pushed the track to ~640px and gave every
+      // phone a horizontal page scroll. Allowing the track to shrink keeps the
+      // page at the viewport width (WCAG 1.4.10 Reflow).
+      className={`min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${tones[tone]} ${
         interactive ? "sb-card-hover" : ""
       } ${className}`}
     >

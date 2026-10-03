@@ -37,7 +37,7 @@
     .dropdown       { @apply pointer-events-none opacity-0 scale-95 transition-all duration-200 ease-out; }
     .dropdown.show  { @apply pointer-events-auto opacity-100 scale-100; }
     .task-check.checked                          { @apply border-brand-500 bg-brand-500 text-white; }
-    .task-check.checked ~ .task-body .task-title { @apply text-gray-400 line-through; }
+    .task-check.checked ~ .task-body .task-title { @apply text-gray-500 line-through; }
   </style>
 
   <style>
@@ -83,14 +83,18 @@
 
 <body class="bg-slate-50 font-sans text-gray-800 antialiased">
 
-  <!-- Prototype notice: this is a static design mockup, not the app. -->
-  <div role="note" style="position:sticky;top:0;z-index:100;background:#f59e0b;color:#1f2937;padding:8px 16px;font-size:13px;font-weight:600;text-align:center">
-    ⚠️ Bu prototip (statik dizayn) sahifasi — ma'lumotlar uydurma. Haqiqiy ilova:
-    <a href="/" style="color:#1f2937;font-weight:800;text-decoration:underline">ScholarBridgeAI</a>
+  <!-- Prototype notice: static design mockup, sample data. Localized en/uz/ru
+       from navigator.language so every locale sees the same warning. -->
+  <div id="protoNotice" role="note" data-i18n="notice"
+       style="position:sticky;top:0;z-index:100;background:#f59e0b;color:#1f2937;padding:8px 16px;font-size:13px;font-weight:600;text-align:center">
+    ⚠️ Prototype (static design) — sample data, not a real account.
+    <a href="/" style="color:#1f2937;font-weight:800;text-decoration:underline">Open the real app</a>
   </div>
 
   <!-- ======================= SIDEBAR ======================= -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col bg-gray-900 text-gray-300" aria-label="Main navigation">
+  <!-- At 768-1023px the sidebar becomes an 80px icon rail so it matches the
+       `md:ml-20` the content reserves; it never overlaps the page again. -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col bg-gray-900 text-gray-300 md:w-20 lg:w-[250px]" aria-label="Main navigation">
 
     <!-- Logo -->
     <div class="flex h-[68px] shrink-0 items-center gap-3 border-b border-gray-800 px-5 md:justify-center lg:justify-start">
@@ -101,7 +105,7 @@
         <p class="text-[15px] font-bold text-white">ScholarBridge <span class="text-indigo-400">AI</span></p>
         <p class="text-[9px] font-medium uppercase tracking-[0.18em] text-gray-500">Admissions copilot</p>
       </div>
-      <button id="closeSidebar" class="ml-auto rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white md:hidden" aria-label="Close menu">
+      <button id="closeSidebar" class="ml-auto rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-white md:hidden" aria-label="Close menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-5 w-5"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
@@ -118,25 +122,25 @@
 
       <a href="#" title="University Explorer"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
         <span class="text-sm font-medium md:hidden lg:inline">University Explorer</span>
       </a>
 
       <a href="#" title="Scholarships Hub"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
         <span class="text-sm font-medium md:hidden lg:inline">Scholarships Hub</span>
       </a>
 
       <a href="#" title="My Applications"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span class="text-sm font-medium md:hidden lg:inline">My Applications</span>
       </a>
 
       <a href="#" title="My Chances"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         <span class="text-sm font-medium md:hidden lg:inline">My Chances</span>
       </a>
 
@@ -147,21 +151,21 @@
         <!-- AI Tools (accordion) -->
         <button id="aiToolsBtn" type="button" title="AI Tools" aria-expanded="false"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M12 3l1.9 5.7a2 2 0 0 0 1.3 1.3L21 12l-5.7 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.7a2 2 0 0 0-1.3-1.3L3 12l5.7-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><path d="M12 3l1.9 5.7a2 2 0 0 0 1.3 1.3L21 12l-5.7 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.7a2 2 0 0 0-1.3-1.3L3 12l5.7-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
           <span class="flex-1 text-left text-sm font-medium md:hidden lg:inline">AI Tools</span>
           <svg id="aiToolsChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 text-gray-500 transition-transform duration-300 md:hidden lg:inline"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
 
-        <div id="aiToolsMenu" class="hidden space-y-0.5 pb-1">
-          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+        <div id="aiToolsMenu" class="hidden space-y-0.5 pb-1 max-md:hidden lg:block">
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-500 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
             <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
             <span class="md:hidden lg:inline">SOP Writer</span>
           </a>
-          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-500 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
             <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
             <span class="md:hidden lg:inline">CV Analyzer</span>
           </a>
-          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
+          <a href="#" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-gray-500 transition-all duration-200 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start lg:pl-11">
             <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
             <span class="md:hidden lg:inline">Scholarship Match</span>
           </a>
@@ -169,7 +173,7 @@
 
         <a href="#" title="Community Forum"
            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
           <span class="text-sm font-medium md:hidden lg:inline">Community Forum</span>
         </a>
       </div>
@@ -185,7 +189,7 @@
       </a>
       <a href="#" title="Rewards & Referrals"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-indigo-400"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
         <span class="text-sm font-medium md:hidden lg:inline">Rewards &amp; Referrals</span>
       </a>
     </div>
@@ -195,8 +199,8 @@
       <div class="flex items-center gap-3 rounded-xl p-2 transition-colors duration-300 hover:bg-gray-800 md:justify-center lg:justify-start">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-600 text-xs font-bold text-white ring-2 ring-gray-700">SU</div>
         <div class="min-w-0 flex-1 md:hidden lg:block">
-          <p class="truncate text-sm font-semibold text-white">Hakimov H.</p>
-          <p class="text-[11px] text-gray-500">Free Plan</p>
+          <p class="truncate text-sm font-semibold text-white">Demo student</p>
+          <p class="text-[11px] text-gray-500">Free plan · sample</p>
         </div>
         <button class="rounded-lg p-1.5 text-gray-500 transition-all duration-300 hover:bg-gray-700 hover:text-red-400 md:hidden lg:block" title="Log out" aria-label="Log out">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -206,7 +210,7 @@
   </aside>
 
   <!-- Mobile overlay -->
-  <div id="overlay" class="pointer-events-none fixed inset-0 z-40 bg-gray-900/60 opacity-0 backdrop-blur-sm md:hidden"></div>
+  <div id="overlay" aria-hidden="true" class="pointer-events-none fixed inset-0 z-40 bg-gray-900/60 opacity-0 backdrop-blur-sm md:hidden"></div>
 
   <!-- ======================= HEADER + MAIN ======================= -->
   <div class="md:ml-20 lg:ml-[250px]">
@@ -214,13 +218,13 @@
     <!-- Header -->
     <header class="sticky top-0 z-30 border-b border-gray-200/70 bg-slate-50/85 backdrop-blur-md">
       <div class="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-3 sm:px-6">
-        <button id="menuBtn" class="icon-btn -ml-2 md:hidden" aria-label="Open menu">
+        <button id="menuBtn" class="icon-btn -ml-2 md:hidden" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar" aria-haspopup="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-5 w-5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
         </button>
 
         <!-- Search -->
         <div class="relative min-w-0 flex-1 sm:max-w-xl">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <input type="search" placeholder="Search universities, scholarships..."
                  class="w-full rounded-full border border-transparent bg-gray-100 py-2.5 pl-10 pr-4 text-base text-gray-700 placeholder-gray-400 shadow-inner transition-all duration-300 focus:border-indigo-200 focus:bg-white focus:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500/40 sm:text-sm" />
         </div>
@@ -242,7 +246,7 @@
                 <svg viewBox="0 0 60 30" class="h-4 w-6 rounded-[3px] shadow-sm" aria-hidden="true"><defs><clipPath id="f-uk"><rect width="60" height="30" rx="3"/></clipPath></defs><g clip-path="url(#f-uk)"><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="2.5"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>
               </span>
               <span id="langLabel" class="hidden sm:inline">EN</span>
-              <svg id="langChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-gray-400 transition-transform duration-300"><polyline points="6 9 12 15 18 9"/></svg>
+              <svg id="langChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-gray-500 transition-transform duration-300"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
 
             <div id="langMenu" class="dropdown absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-gray-100 bg-white py-1.5 shadow-xl" role="listbox">
@@ -268,21 +272,26 @@
     </header>
 
     <!-- Main content -->
-    <main class="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
+    <!-- `flex-col` + order utilities: on a phone the application status and
+         "what to do next" come BEFORE the four metric cards; from lg the
+         original order returns. `pb-24` keeps the last row clear of the
+         floating help button. -->
+    <main class="mx-auto flex max-w-[1400px] flex-col gap-6 px-4 pb-24 pt-6 sm:px-6">
 
       <!-- ============ Welcome banner ============ -->
-      <section class="fade-up relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white shadow-lg shadow-brand-500/25 sm:p-8" style="--d:0s">
+      <section class="order-1 fade-up relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white shadow-lg shadow-brand-500/25 sm:p-8" style="--d:0s">
         <div class="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
         <div class="pointer-events-none absolute -bottom-28 right-32 h-64 w-64 rounded-full bg-white/5"></div>
         <div class="pointer-events-none absolute -left-10 -bottom-16 h-40 w-40 rounded-full bg-indigo-400/20 blur-2xl"></div>
 
         <div class="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div class="max-w-2xl">
-            <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Welcome back, Hushnudbek! 👋</h1>
+            <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Welcome back, Demo student! 👋</h1>
             <p class="mt-2 text-sm leading-relaxed text-indigo-100 sm:text-base">
-              You are on track for the <span class="font-semibold text-white">Fall 2024</span> admissions cycle.
+              You are on track for the <span class="font-semibold text-white" id="cycleLabel">this</span> admissions cycle.
               3 applications are in progress and 1 deadline is approaching — keep the momentum going.
             </p>
+            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/90">Sample data — static prototype</p>
           </div>
           <button class="shrink-0 rounded-xl bg-white px-6 py-3 text-sm font-bold text-brand-600 shadow-md transition-all duration-300 ease-in-out hover:scale-105 hover:bg-indigo-50 hover:shadow-xl active:scale-95">
             Resume Application
@@ -291,7 +300,7 @@
       </section>
 
       <!-- ============ Stat cards ============ -->
-      <section class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4" aria-label="Statistics">
+      <section class="order-3 grid grid-cols-1 gap-5 md:grid-cols-2 lg:order-2 lg:grid-cols-4" aria-label="Statistics">
 
         <!-- Profile Strength -->
         <article class="fade-up group rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.08s">
@@ -320,7 +329,7 @@
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Saved Universities</p>
           <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="12">0</span></p>
-          <p class="mt-1 text-xs text-gray-400">Across 3 countries</p>
+          <p class="mt-1 text-xs text-gray-500">Across 3 countries</p>
         </article>
 
         <!-- Active Applications -->
@@ -332,7 +341,7 @@
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Active Applications</p>
           <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="3">0</span></p>
-          <p class="mt-1 text-xs text-gray-400">2 in drafting, 1 submitted</p>
+          <p class="mt-1 text-xs text-gray-500">2 in drafting, 1 submitted</p>
         </article>
 
         <!-- Upcoming Deadlines -->
@@ -345,12 +354,12 @@
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Upcoming Deadlines</p>
           <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="1">0</span></p>
-          <p class="mt-1 text-xs font-medium text-red-400">MEXT Scholarship in 5 days</p>
+          <p class="mt-1 text-xs font-medium text-red-400">MEXT Scholarship · <span data-sample-due="5">due soon</span></p>
         </article>
       </section>
 
       <!-- ============ Bottom section ============ -->
-      <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section class="order-2 grid grid-cols-1 gap-6 lg:order-3 lg:grid-cols-3">
 
         <!-- Application Status (2/3) -->
         <article class="fade-up rounded-2xl border border-gray-100 bg-white shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover lg:col-span-2" style="--d:.32s">
@@ -362,10 +371,11 @@
             </a>
           </div>
 
-          <div class="mt-4 overflow-x-auto pb-2">
+          <p class="px-5 pt-3 text-xs font-medium text-gray-500 sm:hidden">Swipe the table sideways for the status columns.</p>
+          <div class="mt-2 overflow-x-auto overscroll-x-contain pb-2" role="region" aria-label="Application status table (scrolls sideways)" tabindex="0">
             <table class="w-full min-w-[560px] text-left text-sm">
               <thead>
-                <tr class="border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-400">
+                <tr class="border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-500">
                   <th scope="col" class="px-5 py-3 font-semibold sm:px-6">University / Program</th>
                   <th scope="col" class="px-4 py-3 font-semibold">Progress</th>
                   <th scope="col" class="px-4 py-3 font-semibold">Status</th>
@@ -393,7 +403,7 @@
                   </td>
                   <td class="px-4 py-4"><span class="badge bg-blue-50 text-blue-600">Drafting</span></td>
                   <td class="px-5 py-4 text-right sm:px-6">
-                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-400 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
+                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                     </button>
                   </td>
@@ -418,7 +428,7 @@
                   </td>
                   <td class="px-4 py-4"><span class="badge bg-gray-100 text-gray-600">Gathering Docs</span></td>
                   <td class="px-5 py-4 text-right sm:px-6">
-                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-400 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
+                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                     </button>
                   </td>
@@ -446,7 +456,7 @@
                   <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Prepare MEXT Japanese Gov Scholarship</p>
                   <span class="badge bg-red-100 text-red-600">Overdue</span>
                 </div>
-                <p class="mt-1 text-xs leading-relaxed text-gray-500">Due in 5 days. You have missing info.</p>
+                <p class="mt-1 text-xs leading-relaxed text-gray-500"><span data-sample-due="5">Due soon</span>. You have missing info.</p>
               </div>
             </div>
 
@@ -473,7 +483,7 @@
         </article>
       </section>
 
-      <p class="pb-4 text-center text-xs text-gray-400">ScholarBridge AI · Your bridge to global education</p>
+      <p class="order-4 pb-4 text-center text-xs text-gray-500">ScholarBridge AI · Your bridge to global education · static prototype</p>
     </main>
   </div>
 
@@ -508,16 +518,39 @@
       var sidebar = document.getElementById('sidebar');
       var overlay = document.getElementById('overlay');
 
+      var menuBtn = document.getElementById('menuBtn');
+      var lastFocus = null;
       function openSidebar() {
+        lastFocus = document.activeElement;
         sidebar.classList.add('open');
         overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+        menuBtn.setAttribute('aria-expanded', 'true');
         document.body.style.overflow = 'hidden';
+        var first = sidebar.querySelector('a, button');
+        if (first) first.focus();
+        document.addEventListener('keydown', trapTab);
       }
       function closeSidebar() {
+        if (!sidebar.classList.contains('open')) return;
         sidebar.classList.remove('open');
         overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+        menuBtn.setAttribute('aria-expanded', 'false');
         document.body.style.overflow = '';
+        document.removeEventListener('keydown', trapTab);
+        (lastFocus || menuBtn).focus();
       }
+      /* Tab stays inside the open drawer (it is modal on phones). */
+      function trapTab(e) {
+        if (e.key !== 'Tab' || !sidebar.classList.contains('open')) return;
+        var items = sidebar.querySelectorAll('a[href], button:not([disabled])');
+        if (!items.length) return;
+        var first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+      window.addEventListener('resize', function () { if (window.innerWidth >= 768) closeSidebar(); });
       document.getElementById('menuBtn').addEventListener('click', openSidebar);
       document.getElementById('closeSidebar').addEventListener('click', closeSidebar);
       overlay.addEventListener('click', closeSidebar);
@@ -608,6 +641,9 @@
             o.setAttribute('aria-selected', String(active));
             o.querySelector('.opt-check').classList.toggle('hidden', !active);
           });
+          // Re-render the prototype warning in the chosen language: without
+          // this the notice stayed English in uz/ru after switching.
+          renderNotice((opt.dataset.lang || 'en').toLowerCase());
           closeAllDropdowns();
         });
       });
@@ -623,6 +659,38 @@
           closeAllDropdowns();
         }
       });
+
+      /* ---------- Prototype notice + sample dates (en/uz/ru) ---------- */
+      var NOTICE = {
+        en: { html: '⚠️ Prototype (static design) — sample data, not a real account.', cta: 'Open the real app' },
+        uz: { html: "⚠️ Prototip (statik dizayn) — namunaviy ma'lumotlar, haqiqiy hisob emas.", cta: 'Haqiqiy ilovani ochish' },
+        ru: { html: '⚠️ Прототип (статичный макет) — демонстрационные данные, не настоящий аккаунт.', cta: 'Открыть настоящее приложение' },
+      };
+      var notice = document.getElementById('protoNotice');
+      function renderNotice(lang) {
+        var copy = NOTICE[lang] || NOTICE.en;
+        notice.innerHTML = copy.html + ' <a href="/" style="color:#1f2937;font-weight:800;text-decoration:underline">' + copy.cta + '</a>';
+        document.documentElement.lang = lang;
+      }
+      renderNotice((navigator.language || 'en').slice(0, 2).toLowerCase());
+
+      /* Dates are computed from the real "today", so the prototype never shows
+         a fixed year or a stale countdown again. */
+      (function () {
+        var now = new Date();
+        var cycleStart = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+        var label = document.getElementById('cycleLabel');
+        if (label) label.textContent = 'Fall ' + cycleStart;
+        // ISO-style date: readable and identical in en/uz/ru (ICU month
+        // abbreviations in uz rendered as "2026 M10 8").
+        var fmt = function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+        document.querySelectorAll('[data-sample-due]').forEach(function (el) {
+          var days = parseInt(el.dataset.sampleDue, 10) || 0;
+          var due = new Date(now.getTime() + days * 86400000);
+          var text = fmt(due) + ' (in ' + days + ' days)';
+          el.textContent = el.textContent.indexOf('Due soon') === 0 ? 'Due ' + text : text;
+        });
+      })();
 
       /* Escape -> close everything */
       document.addEventListener('keydown', function (e) {
