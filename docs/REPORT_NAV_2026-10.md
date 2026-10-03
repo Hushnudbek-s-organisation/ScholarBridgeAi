@@ -403,3 +403,152 @@ scratch tooling, not part of the repository. Screenshots from this pass are in
   rewritten.
 * **Nothing was pushed and nothing was deployed.** No remote-write command was executed in this
   session.
+
+# 11. Second finalization pass — gap closure, defects found, full re-verification (2026-10-03)
+
+This pass re-checked the shipped navigation restructure against the requirement list, closed the one
+requirement that §10 still listed as INCOMPLETE (destination-body localisation), fixed three defects
+that surfaced while re-verifying, and re-ran every gate and every evidence script. Nothing was pushed
+and nothing was deployed; all commits stay local.
+
+## 11.1 Closing the destination-body i18n gap (was INCOMPLETE in §10)
+
+`ApplicationCenter` — the body of **My Applications** — was the last destination body that was still
+hard-coded English. It is now fully localised through a new `applications` namespace, appended last in
+`src/i18n/messages/en.json`, `uz.json` and `ru.json` (35 keys, identical shape in all three files).
+The component was updated end-to-end:
+
+* headings, explanation, empty/loading/error states, the add form (5 fields), the status chip, the
+  status change control, the consent line and the statistics strip all resolve through `t()`;
+* the 10 status labels come from `status.*` and the 5 outcome labels from `result.*`, so the label set
+  can no longer drift from the values stored in the database;
+* real labels and accessible names were added while translating: `<label class="sr-only">` + matching
+  `id` for all five form fields, `required`/`aria-required` on the university field, a per-row
+  `aria-label` on the status `<select>` ("Application status for <university>"), an `aria-label` on the
+  delete button, and `aria-pressed` on the outcome buttons;
+* `thrown` error fallbacks are localised too; a server-provided `data.error` message still wins.
+
+Verified in the browser in all three locales (details in §11.4): heading, the 7 statistic labels, all
+10 status options, and both row-level `aria-label`s match the message files exactly, with no overflow
+and no clipped labels at 320 px or 390 px.
+
+## 11.2 Defects found and fixed in this pass
+
+| # | Defect | Evidence it was real | Fix | Re-verified by |
+|---|--------|----------------------|-----|----------------|
+| G1 | `<html lang>` was hard-coded to `uz` (`src/app/layout.tsx`), so **every** page was announced as Uzbek by assistive tech in all three locales | fresh-browser probe returned `htmlLang=uz` for `en`, `uz` **and** `ru` sessions | layout now reads the same `scholarbridge_locale` cookie the app renders from (falling back to `defaultLocale`); `LocaleProvider` re-applies `document.documentElement.lang` when the language is switched without a reload | probe: `htmlLang=en/uz/ru` per locale; switch test: `lang` `en`→`uz` with no reload |
+| G2 | Language switcher's only accessible name was hard-coded English `aria-label="Language"` (both variants) | code: two occurrences in `LanguageSwitcher.tsx` | uses the existing `language.label` key (`Language` / `Til` / `Язык`) via `useTranslations` | switch test: `selectAria` `"Language"` → `"Til"` after switching to Uzbek |
+| G3 | Landing-page legal links were 43×16 px and 51×16 px — below the 24×24 px minimum target size (WCAG 2.5.8) | measured in the browser at 390 px | `inline-flex min-h-6 items-center px-1` + visible focus ring (same treatment the app footer already had from F3) | re-measured: 43×24 and 51×24; sweep now reports every small target ≥24 px tall |
+
+## 11.3 Checked and deliberately *not* changed (no defect)
+
+* **Onboarding password minimum.** `OnboardingWizard` already imports the shared
+  `MIN_PASSWORD_LENGTH` (8) and its copy says "at least 8 characters"; measured behaviour: 6 characters
+  keeps *Next* disabled, 8 characters enables it. A note in the working log about a 6-character rule
+  was stale — the code and the running UI agree with the server.
+* **Keyboard scrollability of the four data tables.** `ScrollRegion` sets `tabindex=0`, `role="region"`
+  and an `aria-label` *only* when the content actually overflows — exactly the right behaviour, and the
+  sweep reports `unlabeledScrollers=0` across 84 destination/viewport combinations.
+* **Navigation state semantics.** The active bottom-nav destination carries `aria-current="page"`;
+  *More* carries `aria-expanded`; the header is 57 px tall with no wrap or compression at 320, 768 and
+  820 px, and the brand wordmark is not clipped at 320 px.
+
+## 11.4 The locale question from §10 — resolved (UNVERIFIED → verified)
+
+The earlier pass could not prove that the Uzbek/Russian builds rendered because every locale came back
+English. The root cause was in the **test harness**, not in the app: the single-process Chromium reuse
+cookies across browser contexts, so the locale cookie installed for run 1 leaked into runs 2 and 3.
+With a fresh browser per locale (or `clearCookies()` plus re-adding the session), the app localises
+correctly. The earlier observation is retracted as a harness artefact.
+
+Verified for `en` / `uz` / `ru` at 320×740 and 390×844 on **My Applications** (signed in, real fixture
+row loaded): heading (`My applications` / `Mening arizalarim` / `Мои заявки`), the 7 statistic labels,
+all 10 status options, the per-row status `aria-label`, the delete `aria-label` — every one byte-equal
+to the corresponding message file, with `overflow=false` and zero clipped labels.
+
+## 11.5 The seven previously under-described items
+
+1. **Phone dashboard hierarchy** — measured order at 390×844: *Next steps* → *Upcoming deadlines* →
+   *Application progress* → *Profile readiness* → *Test requirements* → *Recommended for you* →
+   *Universities* → *Funding*. The next action, the urgent deadlines and journey progress all sit above
+   the secondary metrics, and the four statistics render as a compact 2×2 block (160×112 px at 390,
+   341×95 px in 4 columns at 1440) — no needlessly long stack.
+2. **Phone applications** — **no `<table>` exists at any width**; applications are stacked cards
+   (296 px wide at 320, 366 px at 390, 704 px at 768+). University, program, intake, deadline, status
+   chip, status control and *Open workspace* are all present and unclipped; the statistics strip is
+   2 / 3 / 6 columns at phone / tablet / desktop. Tablet readers get full-width cards rather than a
+   horizontally scrolled table.
+3. **Recommender end-to-end** — `/api/programs/recommend` returns per-field `inputSources` provenance
+   and an explicit `probability {available:false, reason:"no-validated-methodology"}`; result cards
+   distinguish *Verified · Last verified Oct 3, 2026* from *Not yet verified* and link the *Official
+   program page*; the score is labelled "A 0–100 ranking score. It is not an admission probability…";
+   requirements are reported as met / unmet / unknown separately from affordability. Save, compare and
+   *make an application plan* are covered by `npm run test:recommend` (74 assertions, 0 failures) and
+   reproduce in the browser (`rec-e2e.mjs`).
+4. **Onboarding** — step 1 marks 3 required fields with `required` + `aria-required`, uses
+   `aria-invalid` when blocked, and both help texts explain what is needed; the password rule matches
+   the server; progress state survives a reload (step 2 of 8 after reload).
+5. **Sign-in / profile picker** — `role="dialog"` + `aria-modal`, focus moved inside on open, background
+   scroll locked, `Escape` closes and returns focus to the opener; a wrong password returns HTTP 401 and
+   shows `role="alert"` "Incorrect email or password". One nit remains open: the field itself is not
+   marked `aria-invalid` when the message appears.
+6. **QA data safety** — see §11.6.
+7. **Prototypes** — `public/dashboard.html` derives its sample dates from `new Date()` plus day offsets,
+   so its sample deadline can never be presented as current-but-stale; the banner ("Prototype (static
+   design) — sample data, not a real account") renders in en, uz and ru, and the cycle label reads
+   *Fall 2027*. No junk text and no overflow at 320 px.
+
+## 11.6 QA data safety
+
+* `.env.local` contains only `DATABASE_URL`, `SESSION_SECRET`, `APP_URL` and the three `ADMIN_*` values:
+  **zero** Supabase / Groq / Upstash / Vercel / OpenAI / Stripe / mail-provider keys, and none are
+  present in the process environment either.
+* `DATABASE_URL` points at the local PostgreSQL container (`127.0.0.1:5433/scholarbridge`).
+* `ai_provider_credentials` and `telegram_links` are both **empty**, so no configured path can call an
+  external AI or messaging service — the recommender therefore reports uncertainty rather than
+  inventing probabilities.
+* The data is visibly test data: 5 student profiles, all with `@local.test` addresses; the only
+  programs present are 5 rows named "… (local QA fixture)" alongside the 12 universities and
+  8 scholarships that ship in `src/db/seed.ts`; 1 application, 1 `admission_offers` row and 2
+  `funding_items` rows provide the populated offer/funding states used on the *After Admission* pages.
+* No production credential exists in this environment, so a production write is not reachable from this
+  build; every QA write in this session went to the local database only.
+* Residue to clean before a demo: a throwaway `pwprobe…@local.test` profile left behind by a
+  password-policy probe.
+
+## 11.7 Commands run in this pass (real output)
+
+| Command | Result |
+|---------|--------|
+| `npx tsc --noEmit` | exit 0 |
+| `npm run check:i18n` | passed — 2 355 keys per locale, 63 translated component files, 1 530 `t()` call sites |
+| `npm run lint:baseline` | passed — 50 pre-existing issues remain baselined, no new or worsened rule |
+| `npm run test:journey` | passed, 90 assertions |
+| `npm run test:recommend` | 74 passed, 0 failed |
+| `npm run build` | exit 0 (all routes compiled) |
+| navigation sweep (14 destinations × 6 viewports) | 84/84 rendered, `overflow=false`, `unlabeledScrollers=0`, 8 small targets — all now ≥24 px tall |
+| responsive evidence script (landing + dashboard + applications × 10 viewports) | 30 screenshots, `overflow=false` everywhere |
+| locale scripts (`en`/`uz`/`ru` × 320/390) | 6/6 fully localised, no clipping |
+| evidence scripts `item1b`, `item2b`, `rec-e2e`, `rec-compare`, `onb-verify`, `item5c`, `proto2` | all re-run on the changed tree, all reproduced their earlier results |
+
+## 11.8 Still UNVERIFIED — manual QA required
+
+* **Physical devices** — iOS Safari and Android Chrome on real hardware (safe-area insets on a notched
+  phone, bottom-nav overlap, touch scrolling).
+* **Real mobile keyboards** — form usability with the on-screen keyboard open (visual viewport resize,
+  focused-field visibility) needs a device; `844×390` viewport simulation is not a substitute.
+* **Human screen-reader testing** — NVDA (Windows), VoiceOver (macOS/iOS) or TalkBack. The `lang`,
+  accessible-name and state fixes above are code- and DOM-level verified only.
+* **Pixel visual baseline** — no golden-image comparison was recorded; §11.4/§11.5 evidence is
+  geometric (bounding boxes, overflow, clipping) plus screenshots in `verify-shots/final/`.
+* **Two known cosmetics**: at 320 px the English bottom-nav label *Applications* ellipsises (the full
+  text remains the accessible name, and it fits at 360 px and above), and the sign-in error field does
+  not yet set `aria-invalid`.
+
+## 11.9 Branch, commit and working-tree status
+
+* Branch **`arena/01a100ca-scholarbridgeai`**; HEAD before this pass `ceb5bb1`.
+* This pass committed the localisation closure and the three fixes above as local commit
+  **`<RECORDED_IN_11_10>`** on top of `ceb5bb1`; the two earlier commits (`0416113`, `ceb5bb1`) were
+  not amended or rewritten.
+* **Nothing was pushed and nothing was deployed.**

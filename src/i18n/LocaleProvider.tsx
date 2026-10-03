@@ -44,6 +44,12 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleCookie(next);
   }, []);
 
+  // Keep <html lang> truthful when the language changes without a reload:
+  // assistive tech re-pronounces the page from the new lang attribute.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const messages = useMemo(
     () => dictionaries[locale] ?? dictionaries[defaultLocale],
     [locale]

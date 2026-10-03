@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Globe } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { localeNames, locales, type Locale } from "@/i18n/config";
 
@@ -13,6 +14,8 @@ interface LanguageSwitcherProps {
 
 export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSwitcherProps) {
   const { locale, setLocale } = useLocaleContext();
+  // Accessible name of the control, in the language currently on screen.
+  const t = useTranslations("language");
 
   const handleChange = (next: string) => {
     const value = next as Locale;
@@ -28,7 +31,7 @@ export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSw
           value={locale}
           onChange={(e) => handleChange(e.target.value)}
           className="cursor-pointer bg-transparent py-1.5 pl-1 pr-1 text-[11px] font-bold uppercase text-slate-800 focus:outline-none"
-          aria-label="Language"
+          aria-label={t("label")}
         >
           {locales.map((l) => (
             <option key={l} value={l}>
@@ -47,7 +50,7 @@ export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSw
         value={locale}
         onChange={(e) => handleChange(e.target.value)}
         className="bg-transparent text-xs sm:text-sm font-semibold text-slate-800 py-1 pl-1 pr-6 focus:outline-none cursor-pointer"
-        aria-label="Language"
+        aria-label={t("label")}
       >
         {locales.map((l) => (
           <option key={l} value={l}>

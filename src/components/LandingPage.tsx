@@ -497,9 +497,11 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
       <footer className="border-t border-slate-200 py-9 text-xs text-slate-400">
         <div className="mx-auto flex w-[min(1160px,92%)] flex-col items-center justify-between gap-4 sm:flex-row">
           <div>© {new Date().getFullYear()} {t("footerLeft")}</div>
+          {/* min-h-6 keeps the tap targets at the 24px minimum even though the
+              type is xs; px-1 widens them without changing the visual rhythm. */}
           <div className="flex items-center gap-4">
-            <a href="/privacy" className="hover:text-slate-600">{t("footerPrivacy")}</a>
-            <a href="/terms" className="hover:text-slate-600">{t("footerTerms")}</a>
+            <a href="/privacy" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerPrivacy")}</a>
+            <a href="/terms" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerTerms")}</a>
           </div>
         </div>
       </footer>

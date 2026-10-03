@@ -9,6 +9,7 @@ import {
   Trash2,
   Trophy,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
 
@@ -21,18 +22,24 @@ import { RecLetterPanel } from "./RecLetterPanel";
  * consent it also improves the chancing engine for everyone.
  */
 
-const STATUSES: { value: string; label: string; chip: string }[] = [
-  { value: "not_started", label: "Not started", chip: "bg-slate-100 text-slate-600" },
-  { value: "preparing", label: "Preparing", chip: "bg-slate-100 text-slate-700" },
-  { value: "essay", label: "Essay", chip: "bg-amber-100 text-amber-800" },
-  { value: "documents", label: "Documents", chip: "bg-amber-100 text-amber-800" },
-  { value: "recommendations", label: "Recommendations", chip: "bg-amber-100 text-amber-800" },
-  { value: "fee_paid", label: "Fee paid", chip: "bg-sky-100 text-sky-800" },
-  { value: "submitted", label: "Submitted", chip: "bg-sky-100 text-sky-800" },
-  { value: "interview", label: "Interview", chip: "bg-violet-100 text-violet-800" },
-  { value: "decision", label: "Decision", chip: "bg-emerald-100 text-emerald-800" },
-  { value: "withdrawn", label: "Withdrawn", chip: "bg-slate-200 text-slate-600" },
+const STATUSES: { value: string; chip: string }[] = [
+  { value: "not_started", chip: "bg-slate-100 text-slate-600" },
+  { value: "preparing", chip: "bg-slate-100 text-slate-700" },
+  { value: "essay", chip: "bg-amber-100 text-amber-800" },
+  { value: "documents", chip: "bg-amber-100 text-amber-800" },
+  { value: "recommendations", chip: "bg-amber-100 text-amber-800" },
+  { value: "fee_paid", chip: "bg-sky-100 text-sky-800" },
+  { value: "submitted", chip: "bg-sky-100 text-sky-800" },
+  { value: "interview", chip: "bg-violet-100 text-violet-800" },
+  { value: "decision", chip: "bg-emerald-100 text-emerald-800" },
+  { value: "withdrawn", chip: "bg-slate-200 text-slate-600" },
 ];
+
+/** Result options offered when a decision arrives. */
+const RESULTS = ["accepted", "rejected", "waitlisted", "deferred", "withdrawn"] as const;
+
+/** Small helper: a visually hidden <label> keeps the compact form accessible. */
+const srLabel = "sr-only";
 
 const RESULT_STYLE: Record<string, string> = {
   accepted: "bg-emerald-100 text-emerald-800",
@@ -72,6 +79,7 @@ interface ApplicationCenterProps {
 }
 
 export function ApplicationCenter({ activeProfile, onOpenWorkspace }: ApplicationCenterProps) {
+  const t = useTranslations("applications");
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -125,14 +133,14 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
     try {
       const res = await fetch(`/api/applications?profileId=${activeProfile.id}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load applications");
+      if (!res.ok) throw new Error(data.error || t("loadError"));
       setRows(data.applications ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load applications");
+      setError(err instanceof Error ? err.message : t("loadError"));
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, t]);
 
   useEffect(() => {
     void load();
@@ -149,12 +157,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         body: JSON.stringify({ profileId: activeProfile.id, ...draft }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add application");
+      if (!res.ok) throw new Error(data.error || t("addError"));
       setDraft({ universityName: "", programName: "", deadline: "", applicationRound: "RD" });
       setAdding(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add application");
+      setError(err instanceof Error ? err.message : t("addError"));
     } finally {
       setBusy(false);
     }
@@ -167,10 +175,10 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
-      if (!res.ok) throw new Error("Failed to update status");
+      if (!res.ok) throw new Error(t("statusError"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
+      setError(err instanceof Error ? err.message : t("statusError"));
     }
   };
 
@@ -179,7 +187,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       await fetch(`/api/applications?id=${id}`, { method: "DELETE" });
       await load();
     } catch {
-      setError("Failed to delete application");
+      setError(t("deleteError"));
     }
   };
 
@@ -199,12 +207,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to record result");
+      if (!res.ok) throw new Error(data.error || t("resultError"));
       setReporting(null);
       setScholarship("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to record result");
+      setError(err instanceof Error ? err.message : t("resultError"));
     } finally {
       setBusy(false);
     }
@@ -228,13 +236,13 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
           of scrolling before the first application card. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { label: "Applied", value: rows.length },
-          { label: "Submitted", value: submitted },
-          { label: "In progress", value: Math.max(0, rows.length - submitted) },
-          { label: "Decisions", value: decided },
-          { label: "Accepted", value: accepted },
-          { label: "Scholarship matches", value: scholarshipMatchCount },
-          { label: "Deadlines ≤45d", value: deadlineCount },
+          { label: t("statApplied"), value: rows.length },
+          { label: t("statSubmitted"), value: submitted },
+          { label: t("statInProgress"), value: Math.max(0, rows.length - submitted) },
+          { label: t("statDecisions"), value: decided },
+          { label: t("statAccepted"), value: accepted },
+          { label: t("statScholarships"), value: scholarshipMatchCount },
+          { label: t("statDeadlines"), value: deadlineCount },
         ].map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
             <div className="text-2xl font-extrabold text-slate-900">
@@ -248,13 +256,13 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
           <Target className="h-5 w-5 text-indigo-600" />
-          My applications
+          {t("title")}
         </h2>
         <button
           onClick={() => setAdding((v) => !v)}
           className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
         >
-          <Plus className="h-4 w-4" /> Add application
+          <Plus className="h-4 w-4" /> {t("add")}
         </button>
       </div>
 
@@ -264,26 +272,50 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
       {adding && (
         <div className="grid gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 sm:grid-cols-4">
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder="University name *"
-            value={draft.universityName}
-            onChange={(e) => setDraft({ ...draft, universityName: e.target.value })}
-          />
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder="Program"
-            value={draft.programName}
-            onChange={(e) => setDraft({ ...draft, programName: e.target.value })}
-          />
-          <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            type="date"
-            value={draft.deadline}
-            onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
-          />
+          <div>
+            <label htmlFor="app-university" className={srLabel}>
+              {t("formUniversity")}
+            </label>
+            <input
+              id="app-university"
+              required
+              aria-required="true"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              placeholder={t("formUniversity")}
+              value={draft.universityName}
+              onChange={(e) => setDraft({ ...draft, universityName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="app-program" className={srLabel}>
+              {t("formProgram")}
+            </label>
+            <input
+              id="app-program"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              placeholder={t("formProgram")}
+              value={draft.programName}
+              onChange={(e) => setDraft({ ...draft, programName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="app-deadline" className={srLabel}>
+              {t("formDeadline")}
+            </label>
+            <input
+              id="app-deadline"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              type="date"
+              value={draft.deadline}
+              onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
+            />
+          </div>
           <div className="flex gap-2">
+            <label htmlFor="app-round" className={srLabel}>
+              {t("formRound")}
+            </label>
             <select
+              id="app-round"
               className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
               value={draft.applicationRound}
               onChange={(e) => setDraft({ ...draft, applicationRound: e.target.value })}
@@ -299,7 +331,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               disabled={busy}
               className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("addSubmit")}
             </button>
           </div>
         </div>
@@ -307,13 +339,13 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
       {loading && !rows.length && (
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
         </div>
       )}
 
       {!loading && !rows.length && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          No applications yet — add your first one above.
+          {t("empty")}
         </div>
       )}
 
@@ -327,13 +359,13 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                   <h3 className="font-bold text-slate-900">{row.universityName}</h3>
                   <p className="text-xs text-slate-500">
                     {[row.programName, row.applicationRound, row.intakeTerm].filter(Boolean).join(" · ") ||
-                      "No program set"}
-                    {row.deadline ? ` · deadline ${row.deadline}` : ""}
+                      t("noProgram")}
+                    {row.deadline ? ` · ${t("deadlineOn", { date: row.deadline })}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${status.chip}`}>
-                    {status.label}
+                    {t(`status.${status.value}`)}
                   </span>
                   {row.outcome && (
                     <span
@@ -353,18 +385,19 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                     onClick={() => onOpenWorkspace(row.id)}
                     className="flex min-h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
                   >
-                    <Target className="h-3.5 w-3.5" /> Open workspace
+                    <Target className="h-3.5 w-3.5" /> {t("openWorkspace")}
                   </button>
                 )}
 
                 <select
+                  aria-label={t("statusLabelFor", { name: row.universityName })}
                   className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
                   value={row.status}
                   onChange={(e) => void setStatus(row.id, e.target.value)}
                 >
                   {STATUSES.map((s) => (
                     <option key={s.value} value={s.value}>
-                      {s.label}
+                      {t(`status.${s.value}`)}
                     </option>
                   ))}
                 </select>
@@ -377,11 +410,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                     }}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                   >
-                    <Trophy className="h-3.5 w-3.5" /> Report result
+                    <Trophy className="h-3.5 w-3.5" /> {t("reportResult")}
                   </button>
                 )}
 
                 <button
+                  aria-label={t("deleteLabel")}
                   onClick={() => void remove(row.id)}
                   className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                 >
@@ -395,24 +429,29 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
       {reporting && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-          <h3 className="font-bold text-slate-900">What was the result?</h3>
+          <h3 className="font-bold text-slate-900">{t("resultsQuestion")}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {["accepted", "rejected", "waitlisted", "deferred", "withdrawn"].map((r) => (
+            {RESULTS.map((r) => (
               <button
                 key={r}
+                aria-pressed={result === r}
                 onClick={() => setResult(r)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
                   result === r ? "bg-emerald-600 text-white" : "bg-white text-slate-700 border border-slate-200"
                 }`}
               >
-                {r}
+                {t(`result.${r}`)}
               </button>
             ))}
           </div>
 
+          <label htmlFor="app-scholarship" className={srLabel}>
+            {t("formScholarship")}
+          </label>
           <input
+            id="app-scholarship"
             className="mt-3 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder="Scholarship amount (USD, optional)"
+            placeholder={t("formScholarship")}
             type="number"
             value={scholarship}
             onChange={(e) => setScholarship(e.target.value)}
@@ -425,11 +464,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               onChange={(e) => setConsent(e.target.checked)}
               className="mt-0.5 h-4 w-4"
             />
-            <span>
-              Anonymously contribute this result to improve ScholarBridge&apos;s admission
-              predictions. Rejections are just as valuable as acceptances — they stop the model
-              from assuming every strong profile gets in.
-            </span>
+            <span>{t("consent")}</span>
           </label>
 
           <div className="mt-3 flex gap-2">
@@ -439,13 +474,13 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              Save result
+              {t("saveResult")}
             </button>
             <button
               onClick={() => setReporting(null)}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
             >
-              Cancel
+              {t("cancel")}
             </button>
           </div>
         </div>
