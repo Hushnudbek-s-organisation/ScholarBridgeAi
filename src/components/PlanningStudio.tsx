@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
   Calculator,
@@ -108,10 +109,10 @@ interface PlanningData {
 const money = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
 
 const TABS = [
-  { id: "cost", label: "Cost calculator", icon: Calculator },
-  { id: "scholarship", label: "Scholarship portfolio", icon: Wallet },
-  { id: "cv", label: "CV builder", icon: FileText },
-  { id: "compare", label: "Compare universities", icon: Table2 },
+  { id: "cost", labelKey: "tabCost", icon: Calculator },
+  { id: "scholarship", labelKey: "tabScholarship", icon: Wallet },
+  { id: "cv", labelKey: "tabCv", icon: FileText },
+  { id: "compare", labelKey: "tabCompare", icon: Table2 },
 ] as const;
 
 interface PlanningStudioProps {
@@ -119,6 +120,7 @@ interface PlanningStudioProps {
 }
 
 export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
+  const t = useTranslations("planning");
   const [data, setData] = useState<PlanningData | null>(null);
   const [universityId, setUniversityId] = useState<number | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("cost");
@@ -138,14 +140,14 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
       if (universityId) params.set("universityId", String(universityId));
       const res = await fetch(`/api/planning?${params.toString()}`);
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Failed to build your plan");
+      if (!res.ok) throw new Error(payload.error || t("loadError"));
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to build your plan");
+      setError(err instanceof Error ? err.message : t("loadError"));
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id, universityId]);
+  }, [activeProfile?.id, universityId, t]);
 
   useEffect(() => {
     void load();
@@ -154,7 +156,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to build your plan.
+        {t("signedOut")}
       </div>
     );
   }
@@ -166,7 +168,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("Could not copy — select the text manually.");
+      setError(t("copyError"));
     }
   };
 
@@ -175,30 +177,29 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="text-lg font-bold text-slate-900">Planning studio</h2>
+        <h2 className="text-lg font-bold text-slate-900">{t("title")}</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Real costs, real funding gaps, a CV built from your profile, and a side-by-side
-          comparison — all from your own data.
+          {t("subtitle")}
         </p>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {TABS.map((t) => (
+          {TABS.map((tabDef) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={tabDef.id}
+              onClick={() => setTab(tabDef.id)}
               className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold ${
-                tab === t.id ? "bg-indigo-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                tab === tabDef.id ? "bg-indigo-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
-              <t.icon className="h-3.5 w-3.5" />
-              {t.label}
+              <tabDef.icon className="h-3.5 w-3.5" />
+              {t(tabDef.labelKey)}
             </button>
           ))}
         </div>
 
         {data && data.universities.length > 0 && (tab === "cost" || tab === "compare") && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">University</span>
+            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("university")}</span>
             {tab === "cost" ? (
               <select
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
@@ -213,7 +214,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               </select>
             ) : (
               <span className="text-xs text-slate-600">
-                {compareIds.length} saved — showing up to 6
+                {t("savedUpTo", { count: compareIds.length })}
               </span>
             )}
           </div>
@@ -226,7 +227,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
       {loading && !data && (
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Building…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("building")}
         </div>
       )}
 
@@ -237,7 +238,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
             <div className="space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-bold text-slate-900">
-                  {data.costTarget ? `${data.costTarget.name} — true annual cost` : "Annual cost"}
+                  {data.costTarget ? t("annualCostFor", { name: data.costTarget.name }) : t("annualCost")}
                 </h3>
                 <ul className="mt-3 divide-y divide-slate-100">
                   {data.costs.lines.map((line) => (
@@ -246,23 +247,23 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                         {line.label}
                         {line.estimated && (
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-                            estimated
+                            {t("estimated")}
                           </span>
                         )}
                       </span>
                       <span className="text-xs font-bold text-slate-900">
                         {money(line.annualUsd)}
-                        <span className="ml-1 font-normal text-slate-400">/yr</span>
+                        <span className="ml-1 font-normal text-slate-400">{t("perYear")}</span>
                       </span>
                     </li>
                   ))}
                 </ul>
                 <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
-                  <span className="text-xs font-extrabold text-slate-800">Total per year</span>
+                  <span className="text-xs font-extrabold text-slate-800">{t("totalPerYear")}</span>
                   <span className="text-base font-extrabold text-slate-900">{money(data.costs.annualTotalUsd)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">Whole programme</span>
+                  <span className="text-[11px] text-slate-500">{t("wholeProgramme")}</span>
                   <span className="text-xs font-bold text-slate-600">{money(data.costs.totalUsd)}</span>
                 </div>
               </div>
@@ -270,7 +271,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               {data.costs.unknowns.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">
-                    Verify these — they are estimates, not quotes
+                    {t("verifyThese")}
                   </h4>
                   <ul className="mt-1.5 space-y-1">
                     {data.costs.unknowns.map((u, i) => (
@@ -290,7 +291,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                    Remaining gap after funding
+                    {t("remainingGap")}
                   </span>
                   <span className="text-xl font-extrabold text-slate-900">
                     {money(data.costs.net.gapAnnualUsd)}
@@ -299,9 +300,11 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-slate-700">{data.costs.verdict}</p>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Best-case scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · family{" "}
-                  {money(data.costs.net.familyContributionUsd)}/yr · total gap{" "}
-                  {money(data.costs.net.gapTotalUsd)}
+                  {t("bestCase", {
+                    best: money(data.costs.scholarship.bestCaseAnnualUsd),
+                    family: money(data.costs.net.familyContributionUsd),
+                    gap: money(data.costs.net.gapTotalUsd),
+                  })}
                 </p>
               </div>
             </div>
@@ -312,14 +315,14 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-4">
                 {[
-                  { label: "Saved", value: String(data.portfolio.count) },
-                  { label: "Expected /yr", value: money(data.portfolio.expectedAnnualUsd) },
-                  { label: "Coverage", value: `${data.portfolio.expectedCoveragePct}%` },
-                  { label: "Chance of ≥1 award", value: `${data.portfolio.chanceOfAnyAwardPct}%` },
+                  { key: "statSaved", value: String(data.portfolio.count) },
+                  { key: "statExpected", value: money(data.portfolio.expectedAnnualUsd) },
+                  { key: "statCoverage", value: `${data.portfolio.expectedCoveragePct}%` },
+                  { key: "statChance", value: `${data.portfolio.chanceOfAnyAwardPct}%` },
                 ].map((s) => (
-                  <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+                  <div key={s.key} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
                     <div className="text-xl font-extrabold text-slate-900">{s.value}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{s.label}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t(s.key)}</div>
                   </div>
                 ))}
               </div>
@@ -334,7 +337,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 }`}
               >
                 <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                  Portfolio: {data.portfolio.diversification}
+                  {t("portfolio", { level: t(`portfolioLevel.${data.portfolio.diversification}`) })}
                 </h3>
                 <ul className="mt-2 space-y-1.5">
                   {data.portfolio.advice.map((a, i) => (
@@ -345,13 +348,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   ))}
                   {data.portfolio.advice.length === 0 && (
                     <li className="text-xs text-slate-600">
-                      A well-balanced portfolio. Keep the deadlines in the calendar.
+                      {t("balanced")}
                     </li>
                   )}
                 </ul>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Win probabilities are a neutral 20% prior — we do not know your odds, and inventing
-                  them would be worse than useless. Replace them with your own read.
+                  {t("prior")}
                 </p>
               </div>
 
@@ -372,10 +374,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Application CV</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{t("cvTitle")}</h3>
                   <p className="text-[11px] text-slate-500">
-                    {data.cv.totalItems} entries · about {data.cv.estimatedPages} page
-                    {data.cv.estimatedPages === 1 ? "" : "s"}
+                    {t("cvMeta", { items: data.cv.totalItems, pages: data.cv.estimatedPages })}
                   </p>
                 </div>
                 <button
@@ -383,7 +384,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  {copied ? "Copied" : "Copy as text"}
+                  {copied ? t("copied") : t("copy")}
                 </button>
               </div>
 
@@ -403,10 +404,10 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               {data.cv.missing.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                    Missing from your profile
+                    {t("missingTitle")}
                   </h4>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    These are left out of the CV rather than invented. Fill them in and the CV grows.
+                    {t("missingNote")}
                   </p>
                   <ul className="mt-2 grid gap-1 sm:grid-cols-2">
                     {data.cv.missing.map((m, i) => (
@@ -453,20 +454,20 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
               {compareIds.length < 2 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-                  Save at least two universities to compare them.
+                  {t("compareEmpty")}
                 </div>
               ) : (
-                <ScrollRegion label="University comparison" className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <ScrollRegion label={t("compareLabel")} className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="px-3 py-2 font-extrabold text-slate-600">Measure</th>
+                        <th className="px-3 py-2 font-extrabold text-slate-600">{t("measure")}</th>
                         {compareIds.map((u) => (
                           <th key={u.id} className="px-3 py-2 font-extrabold text-slate-700">
                             {u.name}
                             {data.comparison.scores[u.id] && (
                               <span className="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] text-indigo-700">
-                                {data.comparison.scores[u.id].wins} won
+                                {t("won", { count: data.comparison.scores[u.id].wins })}
                               </span>
                             )}
                           </th>
@@ -485,7 +486,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                                 key={u.id}
                                 className={`px-3 py-2 ${isWinner ? "bg-emerald-50 font-bold text-emerald-800" : "text-slate-700"}`}
                               >
-                                {value ?? <span className="text-slate-300">not published</span>}
+                                {value ?? <span className="text-slate-300">{t("notPublished")}</span>}
                               </td>
                             );
                           })}
@@ -498,7 +499,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
               {data.comparison.dataGaps.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">Missing data</h4>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">{t("missingData")}</h4>
                   <ul className="mt-1.5 space-y-1">
                     {data.comparison.dataGaps.map((gap) => (
                       <li key={gap.universityId} className="text-xs text-amber-900">
@@ -507,7 +508,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                     ))}
                   </ul>
                   <p className="mt-2 text-[11px] text-amber-800">
-                    A blank cell is not a zero — it means the university has not published it.
+                    {t("blankCell")}
                   </p>
                 </div>
               )}

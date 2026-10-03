@@ -38,6 +38,9 @@ const STATUSES: { value: string; chip: string }[] = [
 /** Result options offered when a decision arrives. */
 const RESULTS = ["accepted", "rejected", "waitlisted", "deferred", "withdrawn"] as const;
 
+/** Application rounds. The stored value stays English; only the label is translated. */
+const ROUNDS = ["RD", "ED", "EA", "Rolling", "Winter", "Summer", "Spring"] as const;
+
 /** Small helper: a visually hidden <label> keeps the compact form accessible. */
 const srLabel = "sr-only";
 
@@ -225,7 +228,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to track your applications.
+        {t("signedOut")}
       </div>
     );
   }
@@ -320,9 +323,9 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               value={draft.applicationRound}
               onChange={(e) => setDraft({ ...draft, applicationRound: e.target.value })}
             >
-              {["RD", "ED", "EA", "Rolling", "Winter", "Summer", "Spring"].map((r) => (
+              {ROUNDS.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {t(`round.${r}`)}
                 </option>
               ))}
             </select>
