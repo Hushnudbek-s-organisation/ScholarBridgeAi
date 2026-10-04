@@ -24,6 +24,7 @@
  *  - community   user-generated content (forum, stories)
  *  - thirdParty  mentors, courses and payment providers
  *  - prototype   unfinished / changing features
+ *  - certificate course certificates are not university credit
  *
  * WHY NOT `useTranslations`: a warning must never be the reason a panel fails
  * to render. Several components here are rendered on their own (render smoke
@@ -48,7 +49,8 @@ export type AppNoteKind =
   | "visa"
   | "community"
   | "thirdParty"
-  | "prototype";
+  | "prototype"
+  | "certificate";
 
 const TONE: Record<AppNoteKind, string> = {
   general: "text-slate-500 dark:text-slate-400",
@@ -61,6 +63,7 @@ const TONE: Record<AppNoteKind, string> = {
   community: "text-slate-500 dark:text-slate-400",
   thirdParty: "text-amber-700 dark:text-amber-200",
   prototype: "text-slate-500 dark:text-slate-400",
+  certificate: "text-slate-500 dark:text-slate-400",
 };
 
 export function AppNote({

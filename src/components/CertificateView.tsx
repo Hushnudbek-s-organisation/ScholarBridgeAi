@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Printer, Award } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 export interface CertificateData {
   id: number;
@@ -71,6 +72,8 @@ export function CertificateView({ certificate, profileName }: CertificateViewPro
           </div>
         </div>
       </div>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="certificate" className="mt-2" />
     </div>
   );
 }

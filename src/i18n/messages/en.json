@@ -2519,7 +2519,8 @@
     "visa": "Visa and immigration rules change often and depend on your personal case. This is not legal advice — the official embassy or immigration website makes the decision.",
     "community": "Community content is written by other students. It is not verified advice and may be wrong — treat it as a starting point, not a fact.",
     "thirdParty": "Mentors, courses and payment providers are independent third parties. ScholarBridgeAI does not operate their services — check their terms, refunds and prices before you pay.",
-    "prototype": "Prototype build: some data and features are incomplete and can change without notice. Do not treat this as a final source."
+    "prototype": "Prototype build: some data and features are incomplete and can change without notice. Do not treat this as a final source.",
+    "certificate": "Certificates are issued by ScholarBridgeAI for completing its own courses. They are not university credits or an accredited qualification."
   },
   "applications": {
     "title": "My applications",

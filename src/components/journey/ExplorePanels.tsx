@@ -18,6 +18,7 @@ import { ArrowRight, GraduationCap, Search } from "lucide-react";
 import { CAREER_PATHS } from "@/lib/journey/careers";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { AppNote } from "@/components/AppNote";
 
 // ===========================================================================
 // CAREER & MAJOR EXPLORER (spec §15)
@@ -162,6 +163,8 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
           </Button>
         </div>
       </JourneyCard>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2" />
     </div>
   );
 }
@@ -280,6 +283,8 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
           </ul>
         </JourneyCard>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="visa" className="mt-2" />
     </div>
   );
 }

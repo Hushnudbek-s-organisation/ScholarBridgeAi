@@ -14,6 +14,7 @@ import { CalendarPlus, Check, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { AppNote } from "@/components/AppNote";
 
 // ===========================================================================
 // DOCUMENT VAULT (spec §7)
@@ -387,6 +388,8 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
           </ul>
         </JourneyCard>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="planning" className="mt-2" />
     </div>
   );
 }
@@ -573,6 +576,8 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
           The progress numbers come from your real data — they update whenever your profile, tests or applications change.
         </p>
       </JourneyCard>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="planning" className="mt-2" />
     </div>
   );
 }

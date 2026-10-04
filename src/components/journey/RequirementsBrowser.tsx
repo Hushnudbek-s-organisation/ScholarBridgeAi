@@ -15,6 +15,7 @@ import { useTranslations } from "next-intl";
 import { ExternalLink } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, StatusIcon, daysLabel, toneForDays } from "./ui";
+import { AppNote } from "@/components/AppNote";
 
 interface AppRow {
   id: number;
@@ -212,6 +213,8 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
           </div>
         </JourneyCard>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2" />
     </div>
   );
 }
