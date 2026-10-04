@@ -332,7 +332,10 @@ export function Navbar({
         const res = await fetch("/api/config/nav", { cache: "no-store" });
         const data = await res.json();
         if (alive && Array.isArray(data.hidden)) {
-          setHiddenItems(data.hidden.filter((v: unknown): v is string => typeof v === "string"));
+          // Re-normalize on the client too: legacy configs can otherwise hide
+          // a locked destination and the Edit Profile link would bounce back to
+          // the dashboard when its target pane is opened.
+          setHiddenItems(parseHiddenNav(JSON.stringify(data.hidden)));
         }
       } catch {
         // offline / API down — keep the defaults, the sidebar still works.

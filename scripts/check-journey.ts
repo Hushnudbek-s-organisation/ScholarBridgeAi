@@ -1091,21 +1091,28 @@ check("the after-admission destinations run offer → funding → visa in order"
   assert.deepEqual(after, ["offers", "post-admission-funding", "visa"]);
 });
 
-check("the profile editor pane can never be hidden (navbar Edit targets it)", () => {
-  // The profile card's Edit button deep-links to profile/details; a hidden
-  // pane is unreachable even via deep link, so hiding it broke editing.
+check("the profile Edit link stays reachable even with stale hidden-navigation config", () => {
+  // The profile card's Edit button deep-links to profile/details. Both the
+  // locked destination and its editor pane must survive old hidden lists;
+  // otherwise Navbar redirects the student to the dashboard.
+  assert.ok(!DEFAULT_HIDDEN_NAV_ITEMS.includes("profile"), "profile hidden by default");
   assert.ok(!DEFAULT_HIDDEN_NAV_ITEMS.includes("details"), "details hidden by default");
+  assert.ok(!parseHiddenNav(null).includes("profile"), "default config hides Profile & Goals");
   assert.ok(!parseHiddenNav(null).includes("details"), "default config hides details");
-  // A stale stored value from before the fix must be healed on read.
-  const stale = parseHiddenNav(JSON.stringify(["details", "parent"]));
+
+  // Heal stale values from before the destination/pane became locked, while
+  // leaving unrelated user-configured hidden entries alone.
+  const stale = parseHiddenNav(JSON.stringify(["profile", "details", "parent"]));
+  assert.ok(!stale.includes("profile"), "a stored 'profile' survives parsing");
   assert.ok(!stale.includes("details"), "a stored 'details' survives parsing");
   assert.ok(stale.includes("parent"), "other stored ids must survive");
-  // With the default hidden list applied the pane must stay visible…
+
+  const profileSection = NAV_SECTIONS.find((section) => section.id === "profile");
+  assert.equal(profileSection?.locked, true, "Profile & Goals should remain a locked destination");
   assert.ok(
-    visiblePanes("profile", parseHiddenNav(null)).some((p) => p.id === "details"),
+    visiblePanes("profile", stale).some((p) => p.id === "details"),
     "details pane filtered out of Profile & Goals"
   );
-  // …and the deep link must resolve to it.
   const target = resolveNavTarget("profile/details");
   assert.ok(target && target.section === "profile" && target.pane === "details", "profile/details does not resolve");
 });

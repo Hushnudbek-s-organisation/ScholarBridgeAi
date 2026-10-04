@@ -336,16 +336,18 @@ export function isNewBadgeActive(now: Date = new Date()): boolean {
 /**
  * Ids that must never be hidden, whatever the stored config says.
  *
- * `details` is the Profile & Goals → "Profile details" pane — the profile
- * editor. The Edit button on the navbar profile card (and the legacy
- * `profile-details` deep link) navigate straight to `profile/details`, and a
- * hidden pane is unreachable even via deep link. Hiding it therefore breaks
- * profile editing entirely (the student lands on the Readiness overview and
- * can never reach the form). It used to hide a legacy standalone "My
- * Profile" section that no longer exists; the id was later reused by the
- * pane, which is what made the old default break editing.
+ * Locked destinations stay available even if a legacy config lists them as
+ * hidden. This matters especially for `profile`: the navbar's Edit button
+ * deep-links to `profile/details`, and hiding the destination makes the
+ * Navbar send the student back to the dashboard before the editor can open.
+ * The `details` pane is also fixed visible because the editor is the only way
+ * to update the full profile; hiding it would leave the user on Readiness.
  */
-export const UNHIDEABLE_NAV_ITEMS = ["details"];
+const LOCKED_NAV_SECTION_IDS = NAV_SECTIONS.filter((section) => section.locked).map(
+  (section) => section.id
+);
+
+export const UNHIDEABLE_NAV_ITEMS = [...LOCKED_NAV_SECTION_IDS, "details"];
 
 /**
  * Sections hidden from the sidebar by default. The admin can change this any
