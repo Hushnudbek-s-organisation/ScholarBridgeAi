@@ -8,7 +8,6 @@ import {
   NAV_GROUPS,
   NAV_SECTIONS,
   NAV_UTILITY_SECTIONS,
-  UNHIDEABLE_NAV_ITEMS,
   navLabelKey,
   parseHiddenNav,
 } from "@/lib/navSections";
@@ -246,43 +245,28 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
               .map((row) => {
                 const visible = !hidden.includes(row.id);
                 const saving = savingId === row.id;
-                // Some tabs are the fixed target of built-in buttons (the
-                // profile card's Edit button opens Profile details) — they are
-                // always on, exactly like the locked destinations above.
-                const unhideable = UNHIDEABLE_NAV_ITEMS.includes(row.id);
                 return (
                   <li key={row.id} className="flex items-center gap-4 px-4 py-2.5 hover:bg-slate-50/60">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-700">{row.label}</span>
                         <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{row.id}</code>
-                        {unhideable && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600">
-                            <Lock className="h-2.5 w-2.5" /> Always on
-                          </span>
-                        )}
                       </div>
                       <p className="mt-0.5 truncate text-[11px] text-slate-500">{row.description}</p>
                     </div>
-                    {unhideable ? (
-                      <span className="shrink-0 text-[11px] font-bold text-emerald-600">
-                        Visible
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => toggle(row.id)}
-                        disabled={saving || savingId !== ""}
-                        className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                          visible
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200"
-                        }`}
-                        title={visible ? "Hide from the app" : "Show in the app"}
-                      >
-                        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                        {visible ? "Visible" : "Hidden"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => toggle(row.id)}
+                      disabled={saving || savingId !== ""}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                        visible
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                      title={visible ? "Hide from the app" : "Show in the app"}
+                    >
+                      {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {visible ? "Visible" : "Hidden"}
+                    </button>
                   </li>
                 );
               })}

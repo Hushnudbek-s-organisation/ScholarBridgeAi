@@ -18,12 +18,14 @@ import { trackScreen } from "@/lib/tracker";
 import { PageTransition } from "@/components/motion";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
+  isProfileEditorTarget,
   parseHiddenNav,
   resolveNavTarget,
 } from "@/lib/navSections";
 import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
 import { TelegramSettings } from "@/components/telegram/TelegramSettings";
+import { SessionsPanel } from "@/components/SessionsPanel";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
 import {
@@ -45,12 +47,17 @@ import {
 /**
  * Any destination, pane, legacy section id or utility screen may appear in the
  * URL hash (`#universities`, `#universities/outlook`, `#vault`, `#payments`).
- * Old links keep working because `resolveNavTarget` maps every previous id.
+ * Legacy section ids still resolve, and former profile-editor links open the
+ * modal instead of navigating to a removed pane.
  */
-function targetFromHash(): { section: string; pane: string | null } | null {
+function targetFromHash(): { section: string; pane: string | null; openProfileEditor?: boolean } | null {
   if (typeof window === "undefined") return null;
   const raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
   if (!raw) return null;
+  if (isProfileEditorTarget(raw)) {
+    const profile = resolveNavTarget("profile");
+    return profile ? { section: profile.section, pane: profile.pane, openProfileEditor: true } : null;
+  }
   const target = resolveNavTarget(raw);
   if (!target) return null;
   return { section: target.section, pane: target.utility ? null : target.pane };
@@ -122,6 +129,11 @@ export default function Home() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerMessage, setPickerMessage] = useState("");
 
+  const openProfileModal = useCallback((isNew = false) => {
+    setIsNewProfile(isNew);
+    setIsProfileModalOpen(true);
+  }, []);
+
   // IDs of the accounts created / signed-in WITHIN THIS BROWSER. Other
   // people's accounts are never shown — only these.
   const [myProfileIds, setMyProfileIds] = useState<number[]>(() => {
@@ -162,12 +174,16 @@ export default function Home() {
    * instead of silently dumping the student on the dashboard.
    */
   const handleNavigateTab = useCallback((id: string) => {
+    if (isProfileEditorTarget(id)) {
+      openProfileModal(false);
+      return;
+    }
     const target = resolveNavTarget(id);
     if (!target) return;
     setActiveTabState(target.section);
     setActivePane(target.utility ? null : target.pane);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [openProfileModal]);
 
   const openPane = useCallback(
     (pane: string) => {
@@ -352,6 +368,7 @@ export default function Home() {
         if (linked && (linked.section !== "admin" || data.profile.isAdmin)) {
           setActiveTabState(linked.section);
           setActivePane(linked.pane);
+          if (linked.openProfileEditor) openProfileModal(false);
         }
         // Fire-and-forget: check for approaching deadlines → notifications.
         try {
@@ -401,7 +418,7 @@ export default function Home() {
       return;
     }
     setView("landing");
-  }, [hydrateProfileData, rememberProfile]);
+  }, [hydrateProfileData, openProfileModal, rememberProfile]);
 
   // Keep the URL hash in step with the open section so the browser Back
   // button works and a section can be shared/bookmarked (#scholarships).
@@ -444,6 +461,13 @@ export default function Home() {
       if (!linked) return;
       setActiveTabState(linked.section);
       setActivePane(linked.pane);
+      if (linked.openProfileEditor) {
+        // Normalize this old modal deep link without adding another history entry.
+        hashSynced.current = false;
+        openProfileModal(false);
+      } else {
+        setIsProfileModalOpen(false);
+      }
     };
     window.addEventListener("popstate", onNav);
     window.addEventListener("hashchange", onNav);
@@ -451,7 +475,7 @@ export default function Home() {
       window.removeEventListener("popstate", onNav);
       window.removeEventListener("hashchange", onNav);
     };
-  }, []);
+  }, [openProfileModal]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -701,10 +725,9 @@ export default function Home() {
   };
 
   /**
-   * Deep links that used to open the full-page "My Profile" section now open
-   * the Edit Profile modal instead — every field from My Profile lives there
-   * now (the My Profile sidebar entry was removed). All other targets navigate
-   * as before.
+   * The former profile-details destination is still intercepted by
+   * `handleNavigateTab` and `targetFromHash`, so older journey links open the
+   * Edit Profile modal without restoring a full-page editor pane.
    */
 
   // ---- Landing / onboarding flow ----
@@ -816,10 +839,7 @@ export default function Home() {
         setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         activeProfileId={activeProfile?.id ?? null}
-        onOpenProfileModal={(isNew) => {
-          setIsNewProfile(!!isNew);
-          setIsProfileModalOpen(true);
-        }}
+        onOpenProfileModal={openProfileModal}
         onSwitchProfile={openProfilePicker}
         onStartOnboarding={startOnboarding}
         onLocaleChange={handleLocaleChange}
@@ -931,7 +951,7 @@ export default function Home() {
               setPane={openPane}
               navigate={handleNavigateTab}
               hidden={hiddenNav}
-              onProfileSaved={handleProfileUpdated}
+              onOpenProfileModal={openProfileModal}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1042,7 +1062,10 @@ export default function Home() {
           {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
 
           {activeTab === "notifications" && (
-            <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />
+            <div className="space-y-6">
+              <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />
+              <SessionsPanel />
+            </div>
           )}
 
           {activeTab === "parent" && (

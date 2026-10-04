@@ -17,10 +17,10 @@ interface SessionRow {
 /**
  * My active sessions (audit A23) — server-side, revocable.
  *
- * Shown in the profile tab. Lists every device/channel the account is signed
- * in from (web cookies + Telegram channel sessions) and lets the student
- * revoke one session or all others. A stolen token stops working the moment
- * it is revoked; the current session is protected from self-lockout.
+ * Shown with Telegram & alert settings. Lists every device/channel the account
+ * is signed in from (web cookies + Telegram channel sessions) and lets the
+ * student revoke one session or all others. A stolen token stops working the
+ * moment it is revoked; the current session is protected from self-lockout.
  */
 export function SessionsPanel() {
   const t = useTranslations("sessions");

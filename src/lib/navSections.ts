@@ -189,7 +189,6 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
       { id: "activities", label: "Activities", description: "Volunteering, leadership, projects and competitions — with evidence." },
       { id: "stories", label: "Stories", isNew: true, description: "Moderated stories of admitted students and a 'find my twin' match." },
       { id: "similar", label: "Students like me", description: "Accepted students whose profiles are close to yours." },
-      { id: "details", label: "Profile details", description: "Edit the academic, personal, financial and activity fields behind all of the above." },
     ],
   },
   {
@@ -312,7 +311,7 @@ export interface NavUtilityMeta {
 
 export const NAV_UTILITY_SECTIONS: NavUtilityMeta[] = [
   { id: "payments", label: "Premium", description: "Premium subscription, plans and payment history." },
-  { id: "notifications", label: "Telegram & alerts", description: "Connect the Telegram bot, pause it, or choose which alerts to receive.", isNew: true },
+  { id: "notifications", label: "Telegram & alerts", description: "Connect the Telegram bot, choose your alerts, and review active sign-in sessions.", isNew: true },
   { id: "rewards", label: "Rewards & referrals", description: "Referral program, points and rewards." },
   { id: "parent", label: "Parents", description: "Share a read-only progress page with your family.", premium: true },
   { id: "admin", label: "Admin panel", description: "Platform administration.", adminOnly: true },
@@ -337,17 +336,14 @@ export function isNewBadgeActive(now: Date = new Date()): boolean {
  * Ids that must never be hidden, whatever the stored config says.
  *
  * Locked destinations stay available even if a legacy config lists them as
- * hidden. This matters especially for `profile`: the navbar's Edit button
- * deep-links to `profile/details`, and hiding the destination makes the
- * Navbar send the student back to the dashboard before the editor can open.
- * The `details` pane is also fixed visible because the editor is the only way
- * to update the full profile; hiding it would leave the user on Readiness.
+ * hidden. Profile editing is opened in its own modal from the account card,
+ * rather than being a separate navigation pane.
  */
 const LOCKED_NAV_SECTION_IDS = NAV_SECTIONS.filter((section) => section.locked).map(
   (section) => section.id
 );
 
-export const UNHIDEABLE_NAV_ITEMS = [...LOCKED_NAV_SECTION_IDS, "details"];
+export const UNHIDEABLE_NAV_ITEMS = [...LOCKED_NAV_SECTION_IDS];
 
 /**
  * Sections hidden from the sidebar by default. The admin can change this any
@@ -370,22 +366,22 @@ export const DEFAULT_HIDDEN_NAV_ITEMS = [
 
 /** Parse the stored config value into a list of hidden ids. */
 export function parseHiddenNav(raw: string | null | undefined): string[] {
-  const stripUnhideable = (ids: string[]) =>
-    ids.filter((id) => !UNHIDEABLE_NAV_ITEMS.includes(id));
-  if (!raw) return stripUnhideable([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  const stripUnavailable = (ids: string[]) =>
+    ids.filter((id) => id !== "details" && !UNHIDEABLE_NAV_ITEMS.includes(id));
+  if (!raw) return stripUnavailable([...DEFAULT_HIDDEN_NAV_ITEMS]);
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      // A stored "details" predates the fix that made the profile editor
-      // pane unhideable — drop it so an old config cannot break editing.
-      return stripUnhideable(
+      // Older configs could hide the former profile-details pane. Profile
+      // editing now opens in a modal, so discard that stale navigation id.
+      return stripUnavailable(
         parsed.filter((v): v is string => typeof v === "string" && !!v)
       );
     }
   } catch {
     // corrupt value — fall back to defaults instead of breaking the sidebar
   }
-  return stripUnhideable([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  return stripUnavailable([...DEFAULT_HIDDEN_NAV_ITEMS]);
 }
 
 /**
@@ -418,7 +414,9 @@ export const LEGACY_SECTION_ALIASES: Record<string, { section: string; pane?: st
   activities: { section: "profile", pane: "activities" },
   stories: { section: "profile", pane: "stories" },
   similar: { section: "profile", pane: "similar" },
-  "profile-details": { section: "profile", pane: "details" },
+  // The app shell intercepts this former editor destination and opens the
+  // profile modal; generic navigation resolution falls back to Readiness.
+  "profile-details": { section: "profile", pane: "readiness" },
   // Applications
   tracker: { section: "applications", pane: "tracker" },
   workspace: { section: "applications", pane: "workspace" },
@@ -454,6 +452,12 @@ export interface NavTarget {
   pane: string | null;
   /** Utility screen (Premium, Telegram & alerts …) instead of a destination. */
   utility: boolean;
+}
+
+/** Former profile-editor destinations now launch the separate edit modal. */
+export function isProfileEditorTarget(id: string): boolean {
+  const target = id.trim().toLowerCase();
+  return target === "profile/details" || target === "profile-details";
 }
 
 /**

@@ -36,7 +36,6 @@ import {
   Calculator,
   ClipboardCheck,
   FileText,
-  GraduationCap,
   Headset,
   Home,
   Mic,
@@ -192,7 +191,6 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   activities: Users,
   stories: Trophy,
   similar: Users,
-  details: GraduationCap,
   tracker: CheckSquare,
   workspace: PanelsTopLeft,
   requirements: ListChecks,
@@ -255,7 +253,6 @@ const PANE_KEYWORDS: Record<string, string> = {
   "profile/activities": "My Activities extracurricular activities portfolio",
   "profile/stories": "Admission Stories stories admitted students",
   "profile/similar": "Students Like Me similar profiles",
-  "profile/details": "My Profile complete profile edit personal academic financial",
   "applications/tracker": "Applications tracker status",
   "applications/workspace": "Application Workspace workspace per university",
   "materials/requirements": "Application Requirements requirements checklist",
@@ -673,7 +670,7 @@ export function Navbar({
         <button
           onClick={() => {
             setDrawerOpen(false);
-            go("profile/details");
+            onOpenProfileModal(false);
           }}
           className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
           title={t("editProfile")}

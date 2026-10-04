@@ -19,8 +19,7 @@ Audit performed locally against the application source and Drizzle schema. No pr
 These controls intentionally remain free text or free-form lists so existing users can enter countries outside the requested set and no saved-value workflow is redesigned:
 
 - Authentication sign-up/sign-in has no country control; the onboarding wizard is the first structured destination choice.
-- `ProfileModal.tsx`: country of residence.
-- `CompleteProfileForm.tsx`: home country and comma-separated preferred-country list.
+- `ProfileModal.tsx`: country of residence; this remains free text rather than a fixed selector.
 - `journey/PreparePanels.tsx`: study-plan target country.
 - `journey/ExplorePanels.tsx` (`VisaCenterPanel`): country text search for `/api/visa/requirements`; it is not constrained to a database-provided selector. The API now resolves known aliases against the already-published country labels.
 - `growth/SuccessStories.tsx`: submitted home and admitted country text fields.

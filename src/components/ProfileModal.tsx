@@ -540,7 +540,6 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     step="0.01"
                     min="0"
                     max="100"
-                    required
                     value={formData.gpa}
                     onChange={(e) => setFormData({ ...formData, gpa: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
                     className="w-2/3 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"

@@ -24,8 +24,6 @@ import { TaskRoadmap } from "@/components/TaskRoadmap";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
-import { CompleteProfileForm } from "@/components/CompleteProfileForm";
-import { SessionsPanel } from "@/components/SessionsPanel";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { PremiumGate } from "@/components/PremiumGate";
 import { AiSopStudio } from "@/components/AiSopStudio";
@@ -85,6 +83,7 @@ export interface HubProps {
   onUnsaveScholarship?: (scholarshipId: number) => Promise<void>;
   autoOpenUniversityId?: number | null;
   onProfileSaved?: (profile: StudentProfile) => void;
+  onOpenProfileModal?: (isNew?: boolean) => void;
 }
 
 /** Resolve a destination's panes with their translated labels. */
@@ -308,7 +307,7 @@ export function ProfileHub({
   pane,
   setPane,
   hidden,
-  onProfileSaved,
+  onOpenProfileModal,
 }: HubProps) {
   const t = useTranslations("hubs");
   const td = useTranslations("disclaimers");
@@ -321,7 +320,7 @@ export function ProfileHub({
       title={label}
       intro={t("introProfile")}
       primaryLabel={t("primaryProfile")}
-      onPrimary={() => setPane(visible.some((p) => p.id === "details") ? "details" : active)}
+      onPrimary={() => onOpenProfileModal?.(false)}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -333,12 +332,6 @@ export function ProfileHub({
       {active === "activities" && <ActivityPortfolioPanel profileId={profile.id} />}
       {active === "stories" && <SuccessStories activeProfile={profile} />}
       {active === "similar" && <SimilarProfiles activeProfile={profile} />}
-      {active === "details" && (
-        <div className="space-y-6">
-          <CompleteProfileForm key={`profile-${profile.id}`} activeProfile={profile} onSaved={onProfileSaved ?? (() => undefined)} />
-          <SessionsPanel />
-        </div>
-      )}
     </HubPage>
   );
 }
