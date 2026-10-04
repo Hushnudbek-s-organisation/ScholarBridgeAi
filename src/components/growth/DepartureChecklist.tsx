@@ -8,6 +8,7 @@ import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
 import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "./ui";
+import { AppNote } from "@/components/AppNote";
 
 interface CheckItem {
   id: number;
@@ -194,6 +195,8 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
         </>
       )}
       <Toast message={toast} />
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="visa" className="mt-2" />
     </div>
   );
 }

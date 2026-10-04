@@ -7,6 +7,7 @@ import { StudentProfile } from "./Navbar";
 import { SubscriptionStatusBadge } from "./SubscriptionStatusBadge";
 import { PaymentHistory, PaymentItem } from "./PaymentHistory";
 import { CheckoutModal } from "./CheckoutModal";
+import { AppNote } from "@/components/AppNote";
 
 interface PaymentsSectionProps {
   activeProfile: StudentProfile | null;
@@ -238,6 +239,8 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
           loadData();
         }}
       />
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="thirdParty" className="mt-2" />
     </div>
   );
 }

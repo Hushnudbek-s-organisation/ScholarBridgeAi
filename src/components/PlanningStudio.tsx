@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { ScrollRegion } from "@/components/hubs/ui";
+import { AppNote } from "@/components/AppNote";
 
 /**
  * Planning Studio (Phase 3) — cost calculator, scholarship portfolio, CV
@@ -515,6 +516,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           )}
         </>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="money" className="mt-2" />
     </div>
   );
 }

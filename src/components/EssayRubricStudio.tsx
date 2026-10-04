@@ -16,6 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { AppNote } from "@/components/AppNote";
 
 /**
  * Advanced Essay AI (#8) — the rubric and version-history half.
@@ -919,6 +920,8 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
         <Eye className="h-3 w-3" />
         Reviews are structured and averaged — no single reader moves your number, and no names are shared either way.
       </p>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="ai" className="mt-2" />
     </div>
   );
 }

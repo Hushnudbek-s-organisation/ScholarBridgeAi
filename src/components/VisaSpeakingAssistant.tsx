@@ -34,6 +34,7 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 // ---------------------------------------------------------------------------
 // Web Speech API typings (fallback mode; not in the TS DOM lib).
@@ -2379,6 +2380,8 @@ export function VisaSpeakingAssistant({
           </div>
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="visa" className="mt-2" />
     </div>
   );
 }

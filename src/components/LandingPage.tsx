@@ -20,9 +20,19 @@ const heroItem = {
 };
 import { useTranslations } from "next-intl";
 import {
-  ArrowRight, Award, Bot, CheckCircle2, ClipboardCheck, Crown, FileText, GraduationCap,
-  LayoutDashboard, Mic, Search, ShieldCheck, Sparkles, Wallet, Trophy,
+  ArrowRight, Award, Bot, CheckCircle2, CheckSquare, Compass, Crown, FileText,
+  FolderOpen, Gift, GraduationCap, HandCoins, LayoutDashboard, ListChecks,
+  MessagesSquare, PiggyBank, Plane, Route, Search, Send, ShieldCheck, Sparkles,
+  Target, Trophy, Wallet,
 } from "lucide-react";
+import {
+  NAV_GROUPS,
+  NAV_GROUP_I18N,
+  NAV_SECTIONS,
+  NAV_SECTION_LABEL_KEYS,
+  NAV_UTILITY_SECTIONS,
+} from "@/lib/navSections";
+import { AppNote } from "./AppNote";
 
 interface LandingPageProps {
   onStart: () => void;
@@ -50,6 +60,9 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
   const t = useTranslations("landing");
   const nav = useTranslations("nav");
   const tm = useTranslations("meta");
+  // The preview mirrors the real dashboard, so it reads the dashboard's own
+  // strings instead of keeping a second, drifting copy of them.
+  const td = useTranslations("dashboard");
 
   /**
    * Phone/tablet menu. The four section links used to live in an
@@ -98,23 +111,60 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
     { num: "3", title: t("r3Title"), text: t("r3Text") },
   ];
 
-  const mockSidebar = [
-    { label: nav("dashboard"), icon: LayoutDashboard, active: true },
-    { label: nav("universities"), icon: Search },
-    { label: nav("scholarships"), icon: Award },
-    { label: nav("myApplications"), icon: GraduationCap },
-    { label: t("mockSidebarAiSop"), icon: FileText, pro: true },
-    { label: t("mockSidebarTasks"), icon: ClipboardCheck, pro: true },
-    { label: t("mockSidebarMentor"), icon: Bot },
-    { label: t("mockSidebarVisa"), icon: Mic },
-    { label: t("mockSidebarPremium"), icon: Crown },
+  /**
+   * The dashboard preview is built from the SAME navigation source of truth
+   * the app itself uses (`NAV_SECTIONS` groups + the `nav` translations) and
+   * from the dashboard's own copy (`dashboard` namespace). The preview used to
+   * be a hand-written list of flat, pre-reorganization links, which is exactly
+   * how it ended up advertising an old dashboard for months. Deriving it here
+   * means it cannot drift again.
+   */
+  const mockIcon: Record<string, React.ComponentType<{ className?: string }>> = {
+    dashboard: LayoutDashboard,
+    universities: Search,
+    scholarships: Award,
+    "study-plan": Route,
+    tasks: ListChecks,
+    profile: Target,
+    funding: PiggyBank,
+    applications: CheckSquare,
+    materials: FolderOpen,
+    offers: Trophy,
+    "post-admission-funding": HandCoins,
+    visa: Plane,
+    guidance: Bot,
+    community: MessagesSquare,
+  };
+  const mockSidebarGroups = NAV_GROUPS.map((group) => ({
+    id: group,
+    label: nav(NAV_GROUP_I18N[group] as never),
+    items: NAV_SECTIONS.filter((section) => section.group === group).map((section) => ({
+      id: section.id,
+      label: nav(NAV_SECTION_LABEL_KEYS[section.id] as never),
+      icon: mockIcon[section.id] ?? Sparkles,
+      pro: Boolean(section.premium),
+    })),
+  })).filter((group) => group.items.length > 0);
+  const mockAccountItems = NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map((u) => ({
+    id: u.id,
+    label: nav(NAV_SECTION_LABEL_KEYS[u.id] as never),
+    icon: u.id === "payments" ? Crown : u.id === "notifications" ? Send : Gift,
+    pro: Boolean(u.premium),
+  }));
+
+  // Sample numbers on purpose — the title bar labels the whole panel as
+  // "Demo · sample data". Every label is the string the real dashboard uses.
+  const mockStats = [
+    { label: td("statShortlisted"), value: "12", sub: td("statShortlistedSub"), icon: GraduationCap, tone: "bg-indigo-50 text-indigo-600" },
+    { label: td("statScholarships"), value: "5", sub: td("statScholarshipsSub"), icon: Award, tone: "bg-emerald-50 text-emerald-600" },
+    { label: td("statMilestones"), value: "7", sub: td("statMilestonesSub"), icon: CheckCircle2, tone: "bg-amber-50 text-amber-600" },
+    { label: td("statSop"), value: td("statSopReady"), sub: td("statSopSub"), icon: FileText, tone: "bg-violet-50 text-violet-600" },
   ];
 
-  const mockStats = [
-    { label: t("mockStatShortlisted"), value: "12", sub: t("mockStatShortlistedSub"), icon: GraduationCap, tone: "bg-indigo-50 text-indigo-600" },
-    { label: t("mockStatScholarships"), value: "5", sub: t("mockStatScholarshipsSub"), icon: Award, tone: "bg-emerald-50 text-emerald-600" },
-    { label: t("mockStatMilestones"), value: "7", sub: t("mockStatMilestonesSub"), icon: CheckCircle2, tone: "bg-amber-50 text-amber-600" },
-    { label: t("mockStatAiSop"), value: t("mockReady"), sub: t("mockStatAiSopSub"), icon: FileText, tone: "bg-violet-50 text-violet-600" },
+  const mockPortfolio = [
+    { label: t("mockReach"), examples: td("reachExamples"), tone: "border-purple-200 bg-purple-50 text-purple-900" },
+    { label: t("mockMatch"), examples: td("matchExamples"), tone: "border-blue-200 bg-blue-50 text-blue-900" },
+    { label: t("mockSafety"), examples: td("safetyExamples"), tone: "border-emerald-200 bg-emerald-50 text-emerald-900" },
   ];
 
   return (
@@ -276,30 +326,52 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                   </span>
                 </div>
                 <div className="grid min-h-[420px] grid-cols-1 sm:grid-cols-[150px_1fr]">
+                  {/* Sidebar — the same six journey groups, fourteen
+                      destinations and account cluster the app renders. */}
                   <aside className="hidden border-r border-slate-200 bg-white p-2.5 sm:block">
-                    <div className="mb-3 flex items-center gap-1.5 px-1">
+                    <div className="mb-2 flex items-center gap-1.5 px-1">
                       <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-md ring-1 ring-slate-200">
                         <BrandingImage alt={t("logoAlt")} className="h-6 w-6 object-cover" />
                       </span>
                       <span className="text-[11px] font-extrabold text-slate-800">ScholarBridge</span>
                       <span className="rounded bg-indigo-50 px-1 text-[7px] font-bold text-indigo-600">AI</span>
                     </div>
-                    {mockSidebar.map(({ label, icon: Icon, active, pro }) => (
-                      <div
-                        key={label}
-                        className={`mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[9px] font-semibold ${
-                          active
-                            ? "bg-indigo-600 text-white"
-                            : pro
-                            ? "border border-amber-200 text-amber-700"
-                            : "text-slate-600"
-                        }`}
-                      >
-                        <Icon className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{label}</span>
-                        {pro && <span className="ml-auto rounded bg-amber-100 px-1 text-[6px] font-bold">PRO</span>}
+                    {mockSidebarGroups.map((group) => (
+                      <div key={group.id} className="mb-1">
+                        <div className="px-2 pb-0.5 pt-1 text-[7px] font-black uppercase tracking-wider text-slate-400">
+                          {group.label}
+                        </div>
+                        {group.items.map(({ id, label, icon: Icon, pro }) => (
+                          <div
+                            key={id}
+                            className={`mb-0.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[9px] font-semibold ${
+                              id === "dashboard"
+                                ? "bg-indigo-600 text-white"
+                                : pro
+                                ? "border border-amber-200 text-amber-700"
+                                : "text-slate-600"
+                            }`}
+                          >
+                            <Icon className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{label}</span>
+                            {pro && <span className="ml-auto rounded bg-amber-100 px-1 text-[6px] font-bold text-amber-800">PRO</span>}
+                          </div>
+                        ))}
                       </div>
                     ))}
+                    {/* Account & settings — Premium, Telegram & alerts, Rewards. */}
+                    <div className="mt-1 border-t border-slate-100 pt-1">
+                      <div className="px-2 pb-0.5 text-[7px] font-black uppercase tracking-wider text-slate-400">
+                        {nav("accountCluster")}
+                      </div>
+                      {mockAccountItems.map(({ id, label, icon: Icon, pro }) => (
+                        <div key={id} className={`mb-0.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[9px] font-semibold ${pro ? "border border-amber-200 text-amber-700" : "text-slate-600"}`}>
+                          <Icon className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{label}</span>
+                          {pro && <span className="ml-auto rounded bg-amber-100 px-1 text-[6px] font-bold text-amber-800">PRO</span>}
+                        </div>
+                      ))}
+                    </div>
                   </aside>
                   <div className="bg-slate-50 p-3 sm:p-4">
                     <div className="flex gap-3 rounded-2xl bg-gradient-to-br from-[#12143a] via-[#1b1f5e] to-[#2a3ba8] p-4 text-white">
@@ -308,7 +380,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                           <Sparkles className="h-2.5 w-2.5 text-amber-300" /> {t("mockActiveApplicant")}
                         </span>
                         <div className="mt-2 text-[13px] font-extrabold leading-tight sm:text-[15px]">
-                          {t("mockHubTitle")}
+                          {td("heroTitle")}
                         </div>
                         <p className="mt-1.5 text-[8px] leading-snug text-slate-300">
                           {t("mockHubSub")}
@@ -320,13 +392,13 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                         </div>
                       </div>
                       <div className="hidden w-[110px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/5 p-2 sm:flex">
-                        <div className="text-[7px] font-bold tracking-wider text-slate-300">{t("mockAdmissionsIndex")}</div>
+                        <div className="text-[7px] font-bold tracking-wider text-slate-300">{td("admissionsIndex")}</div>
                         <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/60">
                           <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
                         </div>
-                        <div className="text-[7px] font-semibold">{t("mockNeedsStrengthening")}</div>
+                        <div className="text-[7px] font-semibold">{td("tierNeeds")}</div>
                         <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900 sb-ink-on-warm">
-                          <Bot className="h-2.5 w-2.5" /> {t("mockRunAiAudit")}
+                          <Bot className="h-2.5 w-2.5" /> {td("runAudit")}
                         </div>
                       </div>
                     </div>
@@ -344,14 +416,17 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                     </div>
                     <div className="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
                       <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-700">
-                        <Bot className="h-3 w-3" /> {t("mockStrategicEval")}
+                        <Compass className="h-3 w-3" /> {td("portfolioTitle")}
                       </div>
-                      <div className="mt-2 text-[9px] font-bold">{t("mockOverallScore")}</div>
-                      <ul className="mt-1 list-disc space-y-0.5 pl-3.5 text-[8px] text-slate-600">
-                        <li>{t("mockScoreLine")}</li>
-                        <li>{t("mockPercentileLine")}</li>
-                        <li>{t("mockStrengthLine")}</li>
-                      </ul>
+                      <div className="mt-2 grid grid-cols-3 gap-1.5">
+                        {mockPortfolio.map((tier) => (
+                          <div key={tier.label} className={`rounded-lg border p-1.5 ${tier.tone}`}>
+                            <div className="text-[7px] font-black uppercase tracking-wide">{tier.label}</div>
+                            <div className="mt-0.5 text-[7px] leading-tight">{tier.examples}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[7px] leading-snug text-slate-400">{t("mockPortfolioNote")}</p>
                     </div>
                   </div>
                 </div>
@@ -503,6 +578,12 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             <a href="/privacy" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerPrivacy")}</a>
             <a href="/terms" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerTerms")}</a>
           </div>
+        </div>
+        {/* Honest small print, always just above the Privacy / Terms links:
+            the app is a guide, and both AI text and catalogue data can be
+            wrong. The same line sits in the in-app footer. */}
+        <div className="mx-auto mt-5 w-[min(1160px,92%)] border-t border-slate-100 pt-4">
+          <AppNote kind="general" className="mx-auto max-w-[900px]" />
         </div>
       </footer>
     </div>

@@ -5,6 +5,7 @@ import { Globe2, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { countriesMatch, countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { ScrollRegion } from "@/components/hubs/ui";
+import { AppNote } from "@/components/AppNote";
 
 interface Comparison {
   country: string;
@@ -179,6 +180,8 @@ export function CountryComparePanel() {
           <p className="mt-2 text-[10px] text-slate-400">{t("publishedNote")}</p>
         </ScrollRegion>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2" />
     </div>
   );
 }

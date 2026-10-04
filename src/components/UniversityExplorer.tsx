@@ -12,6 +12,7 @@ import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { ScrollRegion } from "@/components/hubs/ui";
+import { AppNote } from "./AppNote";
 import { 
   Search, 
   Globe, 
@@ -649,6 +650,13 @@ export function UniversityExplorer({
         />
       )}
 
+      {/* The end of the list is where a student decides to apply, so the
+          "verify this" line belongs here as well: tuition, rankings, deadlines
+          and requirement numbers come from the catalogue and can age. */}
+      {!loading && !fetchError && filteredUniversities.length > 0 && (
+        <AppNote kind="catalogue" className="border-t border-slate-200 pt-3" />
+      )}
+
       {/* Side-by-Side Comparison Modal */}
       {showCompareModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -739,6 +747,9 @@ export function UniversityExplorer({
               </table>
               )}
             </ScrollRegion>
+            <div className="border-t border-slate-100 px-6 py-3">
+              <AppNote kind="catalogue" />
+            </div>
           </div>
         </div>
       )}

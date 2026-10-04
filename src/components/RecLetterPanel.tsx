@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, FileText, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AppNote } from "@/components/AppNote";
 
 interface Brief {
   forUniversity: string | null;
@@ -182,6 +183,8 @@ export function RecLetterPanel() {
           </div>
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="ai" className="mt-2" />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   Flag,
   Layers
 } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 export interface TaskItem {
   id: number;
@@ -376,6 +377,8 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
           ))}
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="planning" className="mt-2" />
     </div>
   );
 }
