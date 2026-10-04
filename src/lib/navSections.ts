@@ -334,19 +334,31 @@ export function isNewBadgeActive(now: Date = new Date()): boolean {
 }
 
 /**
+ * Ids that must never be hidden, whatever the stored config says.
+ *
+ * `details` is the Profile & Goals → "Profile details" pane — the profile
+ * editor. The Edit button on the navbar profile card (and the legacy
+ * `profile-details` deep link) navigate straight to `profile/details`, and a
+ * hidden pane is unreachable even via deep link. Hiding it therefore breaks
+ * profile editing entirely (the student lands on the Readiness overview and
+ * can never reach the form). It used to hide a legacy standalone "My
+ * Profile" section that no longer exists; the id was later reused by the
+ * pane, which is what made the old default break editing.
+ */
+export const UNHIDEABLE_NAV_ITEMS = ["details"];
+
+/**
  * Sections hidden from the sidebar by default. The admin can change this any
  * time from Admin → Navigation (stored in `app_config.nav_hidden_items`).
  *
  * These are the less-essential pieces of the larger destinations: the
  * country comparison and opportunities panes, the parents page, the AI
- * advisor in the guidance hub, the mentor marketplace, and the standalone
- * profile editor (its fields live in Profile & Goals → Profile details).
+ * advisor in the guidance hub and the mentor marketplace.
  *
  * The fourteen destinations themselves are NOT hidden: the whole point of
  * the structure is that a new student can see their journey.
  */
 export const DEFAULT_HIDDEN_NAV_ITEMS = [
-  "details",
   "advisor",
   "mentors",
   "opportunities",
@@ -356,16 +368,22 @@ export const DEFAULT_HIDDEN_NAV_ITEMS = [
 
 /** Parse the stored config value into a list of hidden ids. */
 export function parseHiddenNav(raw: string | null | undefined): string[] {
-  if (!raw) return [...DEFAULT_HIDDEN_NAV_ITEMS];
+  const stripUnhideable = (ids: string[]) =>
+    ids.filter((id) => !UNHIDEABLE_NAV_ITEMS.includes(id));
+  if (!raw) return stripUnhideable([...DEFAULT_HIDDEN_NAV_ITEMS]);
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter((v): v is string => typeof v === "string" && !!v);
+      // A stored "details" predates the fix that made the profile editor
+      // pane unhideable — drop it so an old config cannot break editing.
+      return stripUnhideable(
+        parsed.filter((v): v is string => typeof v === "string" && !!v)
+      );
     }
   } catch {
     // corrupt value — fall back to defaults instead of breaking the sidebar
   }
-  return [...DEFAULT_HIDDEN_NAV_ITEMS];
+  return stripUnhideable([...DEFAULT_HIDDEN_NAV_ITEMS]);
 }
 
 /**

@@ -79,6 +79,7 @@ import {
   LEGACY_SECTION_ALIASES,
   NAV_GROUPS,
   NAV_SECTIONS,
+  parseHiddenNav,
   resolveNavTarget,
   visiblePanes,
 } from "../src/lib/navSections";
@@ -1088,6 +1089,25 @@ check("hidden-by-default ids are real panes, account screens or legacy ids", () 
 check("the after-admission destinations run offer → funding → visa in order", () => {
   const after = NAV_SECTIONS.filter((s) => s.group === "after").map((s) => s.id);
   assert.deepEqual(after, ["offers", "post-admission-funding", "visa"]);
+});
+
+check("the profile editor pane can never be hidden (navbar Edit targets it)", () => {
+  // The profile card's Edit button deep-links to profile/details; a hidden
+  // pane is unreachable even via deep link, so hiding it broke editing.
+  assert.ok(!DEFAULT_HIDDEN_NAV_ITEMS.includes("details"), "details hidden by default");
+  assert.ok(!parseHiddenNav(null).includes("details"), "default config hides details");
+  // A stale stored value from before the fix must be healed on read.
+  const stale = parseHiddenNav(JSON.stringify(["details", "parent"]));
+  assert.ok(!stale.includes("details"), "a stored 'details' survives parsing");
+  assert.ok(stale.includes("parent"), "other stored ids must survive");
+  // With the default hidden list applied the pane must stay visible…
+  assert.ok(
+    visiblePanes("profile", parseHiddenNav(null)).some((p) => p.id === "details"),
+    "details pane filtered out of Profile & Goals"
+  );
+  // …and the deep link must resolve to it.
+  const target = resolveNavTarget("profile/details");
+  assert.ok(target && target.section === "profile" && target.pane === "details", "profile/details does not resolve");
 });
 
 check("hiding a pane never removes the destination it belongs to", () => {
