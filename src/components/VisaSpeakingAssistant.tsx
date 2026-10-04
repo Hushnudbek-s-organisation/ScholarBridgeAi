@@ -5,6 +5,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage } from "@google/genai";
 import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { localeToLanguageName } from "@/i18n/config";
+import { countryTranslationKey } from "@/lib/countries";
 import {
   VISA_COUNTRIES,
   VISA_LIVE_VOICES,
@@ -596,6 +597,7 @@ export function VisaSpeakingAssistant({
   activeProfile,
 }: VisaSpeakingAssistantProps) {
   const t = useTranslations("visa");
+  const tCountry = useTranslations("countryNames");
   const locale = useLocale();
 
   const [screen, setScreen] = useState<Screen>("setup");
@@ -716,6 +718,10 @@ export function VisaSpeakingAssistant({
   const micHoldUntilRef = useRef(0);
 
   const country = getVisaCountry(countryCode);
+  const localizedCountryName = (name: string) => {
+    const key = countryTranslationKey(name);
+    return key ? tCountry(key) : name;
+  };
   const lastOfficer = [...messages]
     .reverse()
     .find((m) => m.role === "officer");
@@ -1735,7 +1741,7 @@ export function VisaSpeakingAssistant({
                         selected ? "text-blue-900" : "text-slate-800"
                       }`}
                     >
-                      {c.name}
+                      {localizedCountryName(c.name)}
                     </div>
                     <div
                       className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -1862,7 +1868,7 @@ export function VisaSpeakingAssistant({
             <span className="text-3xl leading-none">{country.flag}</span>
             <div className="min-w-0">
               <div className="truncate text-sm font-bold text-slate-900">
-                {country.name}
+                {localizedCountryName(country.name)}
               </div>
               <div className="flex items-center gap-1 text-[11px] text-slate-500">
                 <Globe className="h-3 w-3" />
@@ -1920,7 +1926,7 @@ export function VisaSpeakingAssistant({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-black">
-                        {t("officer")} · {country.name}
+                        {t("officer")} · {localizedCountryName(country.name)}
                       </div>
                       <div className="text-xs text-slate-400">
                         {reactorStatus === "SPEAKING"
@@ -2272,7 +2278,7 @@ export function VisaSpeakingAssistant({
                     >
                       <span className="text-xs font-semibold text-slate-700">
                         {t("session")} {i + 1}
-                        {s.country ? ` · ${s.country}` : ""}
+                        {s.country ? ` · ${localizedCountryName(s.country)}` : ""}
                         {isCurrent && (
                           <span className="ml-2 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
                             now
@@ -2313,7 +2319,7 @@ export function VisaSpeakingAssistant({
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xs">
             <p className="text-3xl leading-none">{country.flag}</p>
             <h2 className="mt-2 text-lg font-extrabold text-slate-900">
-              {country.name} · {t("visaChance")}
+              {localizedCountryName(country.name)} · {t("visaChance")}
             </h2>
             <div className="mt-4 flex justify-center">
               <ScoreRing

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
@@ -89,6 +90,7 @@ const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
  */
 export function SuccessStories({ activeProfile }: { activeProfile: StudentProfile | null }) {
   const t = useTranslations("stories");
+  const tCountry = useTranslations("countryNames");
   const [view, setView] = useState<"browse" | "share" | "mine">("browse");
   const [items, setItems] = useState<Story[] | null>(null);
   const [countries, setCountries] = useState<string[]>([]);
@@ -288,11 +290,14 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
             </div>
             <select value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} aria-label={t("country")}>
               <option value="">{t("allCountries")}</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {withQsTop200Countries(countries).map((c) => {
+                const countryKey = countryTranslationKey(c);
+                return (
+                  <option key={c} value={c}>
+                    {countryKey ? tCountry(countryKey) : c}
+                  </option>
+                );
+              })}
             </select>
             <select value={degree} onChange={(e) => setDegree(e.target.value)} className={inputCls} aria-label={t("degree")}>
               <option value="">{t("allDegrees")}</option>

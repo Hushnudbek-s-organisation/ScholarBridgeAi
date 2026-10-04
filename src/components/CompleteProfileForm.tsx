@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2, Save, Sparkles } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
+import { StudyInterestPicker } from "@/components/StudyInterestPicker";
+import {
+  compatibilityTargetMajor,
+  isStudyInterestSelectionValid,
+  selectionsFromProfile,
+  serializeStudyInterestSelections,
+  type StudyInterestSelection,
+} from "@/lib/studyInterests";
 
 /**
  * Complete Student Profile (#1).
@@ -52,7 +61,6 @@ const SECTIONS = [
       { key: "age", label: "Age", type: "number" },
       { key: "graduationYear", label: "Graduation year", type: "number", placeholder: "2027" },
       { key: "degreeLevel", label: "Intended degree", type: "select", options: ["Bachelor", "Master", "PhD", "Diploma"] },
-      { key: "targetMajor", label: "Intended major", type: "text", placeholder: "Computer Science" },
     ],
   },
   {
@@ -107,6 +115,8 @@ interface CompleteProfileFormProps {
 }
 
 export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileFormProps) {
+  const tStudy = useTranslations("studyInterest");
+  const studyInterestsTouched = useRef(false);
   const initial = useMemo(() => {
     const record: Record<string, string> = {};
     for (const section of SECTIONS) {
@@ -119,8 +129,15 @@ export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileF
     }
     return record;
   }, [activeProfile]);
+  const initialStudyInterests = useMemo(
+    () => selectionsFromProfile(activeProfile.studyInterests, activeProfile.targetMajor),
+    [activeProfile]
+  );
 
   const [form, setForm] = useState<Record<string, string>>(initial);
+  const [studyInterests, setStudyInterests] = useState<StudyInterestSelection[]>(initialStudyInterests);
+  const [targetMajor, setTargetMajor] = useState(activeProfile.targetMajor || "");
+  const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [openSection, setOpenSection] = useState<string>("academic");
@@ -131,12 +148,19 @@ export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileF
       const v = form[k];
       return v !== undefined && v !== "" && v !== "false";
     }).length;
-    return Math.round((filled / keys.length) * 100);
-  }, [form]);
+    const interestFilled = isStudyInterestSelectionValid(studyInterests) ? 1 : 0;
+    return Math.round(((filled + interestFilled) / (keys.length + 1)) * 100);
+  }, [form, studyInterests]);
 
   const save = async () => {
-    setBusy(true);
     setMessage("");
+    if (!isStudyInterestSelectionValid(studyInterests)) {
+      setStudyInterestAttempted(true);
+      setMessage(tStudy("requiredError"));
+      return;
+    }
+    setStudyInterestAttempted(false);
+    setBusy(true);
     try {
       const payload: Record<string, unknown> = {};
       for (const section of SECTIONS) {
@@ -152,6 +176,10 @@ export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileF
           else payload[field.key] = raw.trim();
         }
       }
+      payload.studyInterests = serializeStudyInterestSelections(studyInterests);
+      payload.targetMajor = studyInterestsTouched.current
+        ? compatibilityTargetMajor(studyInterests)
+        : targetMajor;
 
       const res = await fetch(`/api/profiles/${activeProfile.id}`, {
         method: "PUT",
@@ -208,6 +236,21 @@ export function CompleteProfileForm({ activeProfile, onSaved }: CompleteProfileF
             </button>
             {open && (
               <div className="grid gap-3 border-t border-slate-100 p-4 sm:grid-cols-2">
+                {section.id === "personal" && (
+                  <div className="sm:col-span-2">
+                    <StudyInterestPicker
+                      value={studyInterests}
+                      onChange={(next) => {
+                        studyInterestsTouched.current = true;
+                        setStudyInterests(next);
+                        setTargetMajor(compatibilityTargetMajor(next));
+                        setMessage("");
+                      }}
+                      showError={studyInterestAttempted}
+                      idPrefix="complete-profile-study-interests"
+                    />
+                  </div>
+                )}
                 {(section.fields as readonly FieldDef[]).map((field) => (
                   <label key={field.key} className="block text-xs font-semibold text-slate-600">
                     {field.label}

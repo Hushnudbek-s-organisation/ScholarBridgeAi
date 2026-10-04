@@ -13,6 +13,8 @@
  *    from exactly this kind of assumption)
  */
 
+import { countriesMatch, countryTranslationKey, normalizeCountryAlias } from "@/lib/countries";
+
 export interface UniInput {
   country: string | null;
   annualTuitionUsd?: number | null;
@@ -47,11 +49,9 @@ function oneDecimal(values: number[]): number | null {
   return Math.round(mean * 10) / 10;
 }
 
-const sameCountry = (a: string | null, b: string) => (a ?? "").trim().toLowerCase() === b.trim().toLowerCase();
-
 export function compareCountries(country: string, unis: UniInput[], schs: SchInput[]): CountryComparison {
-  const inCountry = unis.filter((u) => sameCountry(u.country, country));
-  const inSchs = schs.filter((s) => sameCountry(s.country, country));
+  const inCountry = unis.filter((u) => countriesMatch(u.country, country));
+  const inSchs = schs.filter((s) => countriesMatch(s.country, country));
 
   const tuition = inCountry.map((u) => u.annualTuitionUsd).filter((n): n is number => n != null && Number.isFinite(n));
   const living = inCountry.map((u) => u.annualLivingEstUsd).filter((n): n is number => n != null && Number.isFinite(n));
@@ -77,17 +77,16 @@ export function compareCountries(country: string, unis: UniInput[], schs: SchInp
 
 /** Distinct countries present in the database, biggest first (for the picker). */
 export function listCountries(unis: UniInput[]): { country: string; universities: number }[] {
-  const byCountry = new Map<string, number>();
+  const byCountry = new Map<string, { country: string; universities: number }>();
   for (const u of unis) {
-    const c = (u.country ?? "").trim();
-    if (!c) continue;
-    const key = c.toLowerCase();
-    byCountry.set(key, (byCountry.get(key) ?? 0) + 1);
+    const country = (u.country ?? "").trim();
+    if (!country) continue;
+    const key = countryTranslationKey(country) ?? normalizeCountryAlias(country);
+    const current = byCountry.get(key);
+    if (current) current.universities += 1;
+    else byCountry.set(key, { country, universities: 1 });
   }
-  const items = [...byCountry.entries()].map(([key, n]) => ({
-    country: unis.find((u) => (u.country ?? "").trim().toLowerCase() === key)?.country ?? key,
-    universities: n,
-  }));
+  const items = [...byCountry.values()];
   items.sort((a, b) => b.universities - a.universities || a.country.localeCompare(b.country));
   return items;
 }

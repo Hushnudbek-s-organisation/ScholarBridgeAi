@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
+import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
@@ -61,6 +62,18 @@ export interface University {
   sourceLastVerifiedAt?: string | null;
 }
 
+const UNIVERSITY_FILTER_COUNTRIES = withQsTop200Countries([
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Germany",
+  "Singapore",
+  "Australia",
+  "Switzerland",
+  "Netherlands",
+  "Japan",
+]);
+
 interface UniversityExplorerProps {
   activeProfile: StudentProfile | null;
   savedUniIds: Set<number>;
@@ -82,6 +95,7 @@ export function UniversityExplorer({
   autoOpenUniversityId,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
+  const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
 
   const [universities, setUniversities] = useState<University[]>([]);
@@ -306,15 +320,15 @@ export function UniversityExplorer({
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
             >
               <option value="All">{t("exCountryAll")}</option>
-              <option value="United States">{t("exCountryUS")}</option>
-              <option value="United Kingdom">{t("exCountryGB")}</option>
-              <option value="Canada">{t("exCountryCA")}</option>
-              <option value="Germany">{t("exCountryDE")}</option>
-              <option value="Singapore">{t("exCountrySG")}</option>
-              <option value="Australia">{t("exCountryAU")}</option>
-              <option value="Switzerland">{t("exCountryCH")}</option>
-              <option value="Netherlands">{t("exCountryNL")}</option>
-              <option value="Japan">{t("exCountryJP")}</option>
+              {UNIVERSITY_FILTER_COUNTRIES.map((country) => {
+                const countryKey = countryTranslationKey(country);
+                const countryOption = qsCountryOption(country);
+                return (
+                  <option key={country} value={country}>
+                    {countryOption ? `${countryOption.flag} ` : ""}{countryKey ? tCountry(countryKey) : country}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

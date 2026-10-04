@@ -31,7 +31,6 @@ import {
   Loader2,
   MapPin,
   PiggyBank,
-  Plus,
   Scale,
   Search,
   Sparkles,
@@ -44,6 +43,17 @@ import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { StudyInterestPicker } from "@/components/StudyInterestPicker";
+import {
+  compatibilityTargetMajor,
+  isStudyInterestSelectionValid,
+  selectionsFromProfile,
+  serializeStudyInterestSelections,
+  studyInterestRecommendationTerms,
+  studyInterestTranslationReference,
+  type StudyInterestSelection,
+} from "@/lib/studyInterests";
+import type { StudentProfile } from "@/components/Navbar";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors of the API response — src/app/api/programs/recommend)
@@ -59,6 +69,7 @@ interface StudioProfile {
   satScore?: number | null;
   actScore?: number | null;
   targetMajor?: string | null;
+  studyInterests?: string | null;
   degreeLevel?: string | null;
   budgetAnnualUsd?: number | null;
   preferredCountries?: string | null;
@@ -278,14 +289,21 @@ const EMPTY_FORM: FormState = {
 
 const MAX_COMPARE = 3;
 
-export function RecommendationStudio({ activeProfile }: { activeProfile: StudioProfile | null }) {
+export function RecommendationStudio({
+  activeProfile,
+  onProfileSaved,
+}: {
+  activeProfile: StudioProfile | null;
+  onProfileSaved?: (profile: StudentProfile) => void;
+}) {
   const t = useTranslations("recommend");
+  const tStudy = useTranslations("studyInterest");
   const { locale } = useLocaleContext();
 
-  const [interests, setInterests] = useState<string[]>([]);
-  /** True once the user added/removed interests — stops profile prefill from overwriting. */
+  const [studyInterests, setStudyInterests] = useState<StudyInterestSelection[]>([]);
+  /** A changed selection is persisted to the profile before recommendations run. */
   const userTouchedInterests = useRef(false);
-  const [interestInput, setInterestInput] = useState("");
+  const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const baseline = useRef<Record<string, unknown>>({});
   const prefilledProfile = useRef<number | null>(null);
@@ -355,36 +373,55 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
         budget: profile.budgetAnnualUsd != null ? String(profile.budgetAnnualUsd) : f.budget,
         countries: countries.length ? countries : f.countries,
       }));
-      if (profile.targetMajor && !userTouchedInterests.current) {
-        setInterests([profile.targetMajor]);
+      if (!userTouchedInterests.current) {
+        setStudyInterests(selectionsFromProfile(profile.studyInterests, profile.targetMajor));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile?.id]);
 
-  // ---- Interests ------------------------------------------------------------
-  const addInterest = useCallback(() => {
-    const v = interestInput.trim().slice(0, 60);
-    if (!v) return;
-    userTouchedInterests.current = true;
-    setInterests((list) => (list.includes(v) || list.length >= 12 ? list : [...list, v]));
-    setInterestInput("");
-  }, [interestInput]);
+  const interests = useMemo(() => studyInterestRecommendationTerms(studyInterests), [studyInterests]);
 
   // ---- Run -------------------------------------------------------------------
   const run = useCallback(async () => {
-    if (interests.length === 0) {
+    if (!isStudyInterestSelectionValid(studyInterests)) {
+      setStudyInterestAttempted(true);
       setError({ code: "interests_required", message: t("errorInterests") });
       setStatus("idle");
       return;
     }
+    setStudyInterestAttempted(false);
     setStatus("loading");
     setError(null);
     try {
+      // Persist an intentional edit first, so leaving the recommender and
+      // returning later restores exactly the same stable-ID selections.
+      if (activeProfile?.id && userTouchedInterests.current) {
+        const saveResponse = await fetch(`/api/profiles/${activeProfile.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studyInterests: serializeStudyInterestSelections(studyInterests),
+            targetMajor: compatibilityTargetMajor(studyInterests),
+          }),
+        });
+        const savedBody = (await saveResponse.json().catch(() => ({}))) as Record<string, any>;
+        if (!saveResponse.ok || !savedBody.profile) {
+          setError({ code: "study_interests_save_failed", message: tStudy("saveError") });
+          setStatus("idle");
+          return;
+        }
+        onProfileSaved?.(savedBody.profile as StudentProfile);
+        userTouchedInterests.current = false;
+      }
+
+      const requestBody = buildPayload(form, baseline.current, interests);
+      // IDs, not localized labels, identify structured choices on the server.
+      requestBody.studyInterests = studyInterests;
       const res = await fetch("/api/programs/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(form, baseline.current, interests)),
+        body: JSON.stringify(requestBody),
       });
       const body = (await res.json().catch(() => ({}))) as Record<string, any>;
       if (!res.ok) {
@@ -392,6 +429,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
         let message = String(body?.error ?? t("errorGeneric"));
         if (res.status === 401) message = t("errorAuth");
         else if (code === "interests_required") message = t("errorInterests");
+        else if (code === "study_interests_invalid") message = tStudy("requiredError");
         else if (code === "data_unavailable" || res.status === 503) message = t("errorDataUnavailable");
         setError({ code, message });
         setStatus("idle");
@@ -403,7 +441,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
       setError({ code: "network", message: t("errorGeneric") });
       setStatus("idle");
     }
-  }, [interests, form, t]);
+  }, [activeProfile, form, interests, onProfileSaved, studyInterests, t, tStudy]);
 
   // ---- Actions ---------------------------------------------------------------
   const saveProgram = useCallback(
@@ -463,9 +501,9 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
   }, []);
 
   const clearInputs = useCallback(() => {
-    userTouchedInterests.current = false;
-    setInterests([]);
-    setInterestInput("");
+    userTouchedInterests.current = true;
+    setStudyInterests([]);
+    setStudyInterestAttempted(false);
     setForm(EMPTY_FORM);
     baseline.current = {};
     prefilledProfile.current = null;
@@ -531,6 +569,17 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
     [t]
   );
 
+  const localizeStudyTerm = useCallback(
+    (term: string) => {
+      const reference = studyInterestTranslationReference(term);
+      if (!reference) return term;
+      return reference.kind === "area"
+        ? tStudy(`areaLabels.${reference.id}` as never)
+        : tStudy(`specializationLabels.${reference.id}` as never);
+    },
+    [tStudy]
+  );
+
   const inputRows = useMemo(() => {
     if (!data) return [];
     const order = ["interests", "degreeLevel", "gpa", "gpaScale", "ielts", "toefl", "duolingo", "sat", "act", "countries", "budgetUsd", "fundingNeed", "languagePref", "startYear"];
@@ -539,12 +588,18 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
       .map((k) => {
         const v = data.inputs[k].value;
         let display: string;
-        if (Array.isArray(v)) display = v.length ? v.join(", ") : "—";
+        if (k === "interests" && Array.isArray(v)) {
+          display = v.length
+            ? v.map((interest) => localizeStudyTerm(String(interest))).join(", ")
+            : data.inputs.interestMode?.value === "exploring"
+              ? tStudy("exploring")
+              : "—";
+        } else if (Array.isArray(v)) display = v.length ? v.join(", ") : "—";
         else if (v == null || v === "") display = "—";
         else display = String(v);
         return { key: k, value: display, source: data.inputs[k].source };
       });
-  }, [data]);
+  }, [data, localizeStudyTerm, tStudy]);
 
   // ---- Render -----------------------------------------------------------------
   const inputCls =
@@ -598,50 +653,17 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
 
         {/* ---- Inputs --------------------------------------------------------- */}
         <div className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="rec-interests" className={labelCls}>
-              {t("interests")}
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="rec-interests"
-                value={interestInput}
-                onChange={(e) => setInterestInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addInterest();
-                  }
-                }}
-                placeholder={t("interestsPlaceholder")}
-                className={inputCls}
-              />
-              <button type="button" onClick={addInterest} className={btnGhost} aria-label={t("interestAdd")}>
-                <Plus className="h-3.5 w-3.5" /> {t("interestAdd")}
-              </button>
-            </div>
-            {interests.length > 0 && (
-              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={t("interests")}>
-                {interests.map((i) => (
-                  <li key={i} className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300">
-                    {i}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        userTouchedInterests.current = true;
-                        setInterests((list) => list.filter((x) => x !== i));
-                      }}
-                      aria-label={`${t("ariaRemoveInterest")}: ${i}`}
-                      className="rounded-full p-0.5 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:hover:bg-indigo-900"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className={hintCls}>{t("interestsHint")}</p>
-          </div>
+          <StudyInterestPicker
+            value={studyInterests}
+            onChange={(next) => {
+              userTouchedInterests.current = true;
+              setStudyInterests(next);
+              setStudyInterestAttempted(false);
+              setError(null);
+            }}
+            showError={studyInterestAttempted}
+            idPrefix="recommendation-study-interests"
+          />
 
           {/* Skippable core fields */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -927,7 +949,7 @@ export function RecommendationStudio({ activeProfile }: { activeProfile: StudioP
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <Badge tone={fitTone(r.subjectFit.level)}>{fitLabel(r.subjectFit.level)}</Badge>
                               {r.subjectFit.matchedInterests.length > 0 ? (
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{r.subjectFit.matchedInterests.join(", ")}</span>
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{r.subjectFit.matchedInterests.map(localizeStudyTerm).join(", ")}</span>
                               ) : null}
                             </div>
                           </div>

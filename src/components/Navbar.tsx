@@ -76,6 +76,7 @@ export interface StudentProfile {
   email: string;
   degreeLevel: string;
   targetMajor: string;
+  studyInterests?: string | null;
   gpa: number;
   gpaScale: number;
   ieltsScore?: number | null;

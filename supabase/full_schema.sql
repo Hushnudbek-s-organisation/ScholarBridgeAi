@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS "student_profiles" (
   "password_hash" text,
   "degree_level" text NOT NULL DEFAULT 'Master',
   "target_major" text NOT NULL DEFAULT 'Computer Science',
+  "study_interests" text,
   "gpa" double precision NOT NULL DEFAULT 3.5,
   "gpa_scale" double precision NOT NULL DEFAULT 4,
   "ielts_score" double precision DEFAULT 7,
@@ -1267,6 +1268,7 @@ ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "email" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "password_hash" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "degree_level" text NOT NULL DEFAULT 'Master';
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "target_major" text NOT NULL DEFAULT 'Computer Science';
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "study_interests" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa" double precision NOT NULL DEFAULT 3.5;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa_scale" double precision NOT NULL DEFAULT 4;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "ielts_score" double precision DEFAULT 7;

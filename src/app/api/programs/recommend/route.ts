@@ -28,6 +28,11 @@ import {
   type RecommendScholarship,
   type RecommendUniversity,
 } from "@/lib/recommend";
+import {
+  parseStudyInterestSelections,
+  studyInterestDisplayTerms,
+  studyInterestRecommendationTerms,
+} from "@/lib/studyInterests";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +53,12 @@ export const dynamic = "force-dynamic";
  *  - A database failure returns 503 — the catalog is NEVER replaced with
  *    mock/sample data.
  *
- * BODY (all fields optional except interests):
+ * BODY (all other fields optional; interest input has two compatible forms):
  *  {
  *    profileId?: number,            // own profile id (checked vs session)
- *    interests: string[],           // required, 1–12 subjects/interests
- *    degreeLevel?: string | null,   // null = "don't know yet"
+ *    interests?: string[],          // legacy callers: required, 1–12 subjects/interests
+ *    studyInterests?: StudyInterestSelection[], // structured stable IDs, max 5; {kind:"exploring"} sends no subject
+ *    degreeLevel?: string | null,  // null = "don't know yet"
  *    gpa?: number | null,
  *    gpaScale?: number | null,      // 4 / 5 / 100 / ...
  *    ielts?: number | null,
@@ -143,8 +149,29 @@ export async function POST(req: Request) {
   const profileId = access.targetId!;
 
   // ---- Validate inputs (everything skippable, nothing invented) ----------
-  const interests = clampInterestList(body.interests);
-  if (!interests || interests.length === 0) {
+  const hasStructuredInterests = body.studyInterests !== undefined;
+  const structuredInterests = hasStructuredInterests
+    ? parseStudyInterestSelections(body.studyInterests)
+    : null;
+  if (hasStructuredInterests && !structuredInterests) {
+    return NextResponse.json(
+      { error: "Choose at least one valid study interest", code: "study_interests_invalid" },
+      { status: 400 }
+    );
+  }
+  const isExploring =
+    structuredInterests?.length === 1 && structuredInterests[0]?.kind === "exploring";
+  const interests = hasStructuredInterests
+    ? studyInterestRecommendationTerms(structuredInterests!)
+    : clampInterestList(body.interests);
+  const displayedInterests = hasStructuredInterests
+    ? studyInterestDisplayTerms(structuredInterests!)
+    : interests ?? [];
+
+  // Legacy callers retain the original required 1–12 strings contract.
+  // The new explicit exploration choice is valid, but expands to [] so
+  // subjectAffinity returns “unknown” rather than matching a literal phrase.
+  if (!interests || (!isExploring && interests.length === 0)) {
     return NextResponse.json(
       {
         error: "At least one subject or interest is required — the recommender matches programs to what you want to study.",
@@ -383,7 +410,8 @@ export async function POST(req: Request) {
     probability: ADMISSION_PROBABILITY,
     // Transparency: where each input value came from.
     inputs: {
-      interests: { value: interests, source: "request" as InputSource },
+      interests: { value: displayedInterests, source: "request" as InputSource },
+      interestMode: { value: isExploring ? "exploring" : "selected", source: "request" as InputSource },
       degreeLevel: { value: degreeLevel.value, source: degreeLevel.source },
       gpa: { value: gpa.value, source: gpa.source },
       gpaScale: { value: gpaScale.value, source: gpaScale.source },

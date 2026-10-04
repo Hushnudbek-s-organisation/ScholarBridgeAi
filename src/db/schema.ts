@@ -11,6 +11,9 @@ export const studentProfiles = pgTable("student_profiles", {
   passwordHash: text("password_hash"),
   degreeLevel: text("degree_level").notNull().default("Master"),
   targetMajor: text("target_major").notNull().default("Computer Science"),
+  // Structured, locale-independent selections from the study-interest picker.
+  // Nullable for existing profiles and callers that still only send targetMajor.
+  studyInterests: text("study_interests"),
   gpa: doublePrecision("gpa").notNull().default(3.5),
   gpaScale: doublePrecision("gpa_scale").notNull().default(4.0),
   ieltsScore: doublePrecision("ielts_score").default(7.0),

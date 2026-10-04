@@ -189,7 +189,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-slate-900 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -416,6 +416,7 @@ export function ProgressRing({
   strokeWidth = 9,
   label,
   caption,
+  ariaValueText,
   tone = "brand",
 }: {
   pct: number;
@@ -423,6 +424,7 @@ export function ProgressRing({
   strokeWidth?: number;
   label?: string;
   caption?: string;
+  ariaValueText?: string;
   tone?: "brand" | "good" | "warn" | "bad";
 }) {
   const value = Math.max(0, Math.min(100, Math.round(pct)));
@@ -433,7 +435,15 @@ export function ProgressRing({
     bad: "stroke-rose-500",
   };
   return (
-    <div className="flex items-center gap-3">
+    <div
+      className="flex min-w-0 items-center gap-3"
+      role="progressbar"
+      aria-label={label ?? "Progress"}
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={ariaValueText ?? `${value}%`}
+    >
       <AnimatedRing
         value={value}
         size={size}
@@ -441,12 +451,12 @@ export function ProgressRing({
         trackClassName="stroke-slate-200 dark:stroke-slate-700"
         progressClassName={strokes[tone]}
       >
-        <span className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white">{value}%</span>
+        <span aria-hidden="true" className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white">{value}%</span>
       </AnimatedRing>
       {(label || caption) && (
         <div className="min-w-0">
           {label && <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{label}</p>}
-          {caption && <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{caption}</p>}
+          {caption && <p className="mt-0.5 break-words text-[11px] text-slate-500 dark:text-slate-400">{caption}</p>}
         </div>
       )}
     </div>

@@ -13,6 +13,7 @@ import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
+import { countriesMatch } from "@/lib/countries";
 
 /**
  * Resilient university select: tries the full schema first. If the database
@@ -95,12 +96,13 @@ export async function GET(req: Request) {
         u.name.toLowerCase().includes(search) ||
         (u.programMajor ?? "").toLowerCase().includes(search) ||
         (u.city ?? "").toLowerCase().includes(search) ||
-        u.country.toLowerCase().includes(search)
+        u.country.toLowerCase().includes(search) ||
+        countriesMatch(u.country, search)
       );
     }
 
     if (country && country !== "All") {
-      allUnis = allUnis.filter(u => u.country === country);
+      allUnis = allUnis.filter((u) => countriesMatch(u.country, country));
     }
 
     // Keep the owner's target degree authoritative and recognise equivalent

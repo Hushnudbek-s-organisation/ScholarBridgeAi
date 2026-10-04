@@ -155,6 +155,7 @@ export function UniversitiesHub({
   onSaveUniversity,
   onUnsaveUniversity,
   autoOpenUniversityId,
+  onProfileSaved,
 }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
@@ -182,7 +183,7 @@ export function UniversitiesHub({
         />
       )}
       {active === "careers" && <CareerExplorerPanel onNavigateTab={() => setPane("search")} />}
-      {active === "matches" && <RecommendationStudio activeProfile={profile} />}
+      {active === "matches" && <RecommendationStudio activeProfile={profile} onProfileSaved={onProfileSaved} />}
       {active === "outlook" && (
         <div className="space-y-3">
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[13px] leading-relaxed text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
