@@ -3,6 +3,7 @@ import { and, asc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { visaRequirements } from "@/db/schema";
 import { guardAdmin, guardStudent, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
+import { countriesMatch } from "@/lib/countries";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,19 @@ export async function GET(req: Request) {
   const country = (searchParams.get("country") ?? "").trim();
   const visaType = (searchParams.get("visaType") ?? "").trim();
   try {
+    // The distinct countries we have published something for. Resolving known
+    // aliases against these saved labels keeps the API contract and stored
+    // values unchanged while allowing searches such as USA → United States.
+    const countries = await db
+      .selectDistinct({ country: visaRequirements.country })
+      .from(visaRequirements)
+      .orderBy(asc(visaRequirements.country));
+    const matchedCountry = country
+      ? countries.find((entry) => countriesMatch(entry.country, country))?.country ?? country
+      : "";
+
     const conditions = [];
-    if (country) conditions.push(ilike(visaRequirements.country, country));
+    if (country) conditions.push(ilike(visaRequirements.country, matchedCountry));
     if (visaType) conditions.push(eq(visaRequirements.visaType, visaType));
     const rows = conditions.length
       ? await db
@@ -32,12 +44,6 @@ export async function GET(req: Request) {
           .orderBy(asc(visaRequirements.sortOrder), asc(visaRequirements.id))
           .limit(100)
       : [];
-
-    // The distinct countries we have published something for.
-    const countries = await db
-      .selectDistinct({ country: visaRequirements.country })
-      .from(visaRequirements)
-      .orderBy(asc(visaRequirements.country));
 
     return NextResponse.json({
       requirements: rows.map((r) => ({

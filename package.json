@@ -36,6 +36,7 @@
     "test:essay-adapter": "tsx scripts/check-essay-adapter.ts",
     "test:rec-letter": "tsx scripts/check-rec-letter.ts",
     "test:country-compare": "tsx scripts/check-country-compare.ts",
+    "test:countries": "tsx scripts/check-countries.ts",
     "test:opportunities": "tsx scripts/check-opportunities.ts",
     "test:essay-reviews": "tsx scripts/check-essay-reviews.ts",
     "test:integration": "tsx scripts/check-integration.ts",
@@ -49,7 +50,8 @@
     "lint:baseline": "tsx scripts/check-lint-baseline.ts",
     "test:schema-repair": "tsx scripts/check-schema-repair.ts",
     "test:provenance": "tsx scripts/check-provenance.ts",
-    "test:recommend": "tsx scripts/check-recommend.ts"
+    "test:recommend": "tsx scripts/check-recommend.ts",
+    "test:study-interests": "tsx scripts/check-study-interests.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

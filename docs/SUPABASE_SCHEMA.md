@@ -29,7 +29,7 @@ o'qiydi/yozadi" savoliga javob. Har bir qator haqiqiy API so'roviga mos.
 
 | Ilova joyi (bo'lim) | Jadvalar | Qanday ma'lumot chiqadi / saqlanadi |
 |---|---|---|
-| **Profil / Autentifikatsiya** (kirish, onboarding) | `student_profiles` | Ism, email, **parol hashing** (hech qachon ochiq matn), GPA, Ielts/Toefl/SAT/GRE, byudjet, mamlakatlar, hujjatlar haqidagi to'liq profil (akademik, moliyaviy, sport, olimpiadalar), onboarding qadami, premium holati, parent-link |
+| **Profil / Autentifikatsiya** (kirish, onboarding) | `student_profiles` | Ism, email, **parol hashing** (hech qachon ochiq matn), GPA, Ielts/Toefl/SAT/GRE, byudjet, mamlakatlar, barqaror ID'li qiziqish yo'nalishlari (`study_interests`) va eski `target_major`, hujjatlar haqidagi to'liq profil (akademik, moliyaviy, sport, olimpiadalar), onboarding qadami, premium holati, parent-link |
 | **Universitetlar sahifasi** (`/universities`) | `universities`, `university_rankings`, `university_sources` | Nomi, mamlakat, shahar, reyting (QS/THE yil-bosma), har bir kurs haqiqiy puli (summa + valyuta + davr), kirish talablari (min GPA/IELTS), rahbariyat, ofitsial saytlar, manba + so'nggi tekshiruv vaqti |
 | **Universitet ichida dasturlar** (programmasi) | `programs`, `program_requirements`, `application_cycles`, `program_sources` | Har bir universitetning dasturlari (yo'nalish, daraja, davomiyligi, puli, til), dastur uchun aniq talablar (IELTS/TOEFL/DET/GPA, portfolio, intervyu), hujjat topshirish muddatlari (Fall/Spring, round) |
 | **Stipendiya markazi** (`/scholarships`) | `scholarships`, `scholarship_sources`, `scholarship_decisions` | Stipendiya nomi, beruvchi, qamrov turi, summa (valyuta + davr bilan), muddat, talab GPA/IELTS, qaysi mamlakatlar/darajalar, hujjatlar ro'yxati, manba + holat |

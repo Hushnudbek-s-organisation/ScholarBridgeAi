@@ -1,12 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
+import { countriesMatch, countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { StudentProfile } from "./Navbar";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Target } from "lucide-react";
 import { formatNumber } from "@/lib/format";
-import { STUDY_FIELD_CATEGORIES, STUDY_FIELDS } from "@/lib/studyFields";
+import { StudyInterestPicker } from "@/components/StudyInterestPicker";
+import {
+  compatibilityTargetMajor,
+  isStudyInterestSelectionValid,
+  selectionsFromProfile,
+  serializeStudyInterestSelections,
+  type StudyInterestSelection,
+} from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 
@@ -43,11 +52,15 @@ const toList = (raw?: string | null): string => {
 };
 
 export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: ProfileModalProps) {
+  const tCountry = useTranslations("countryNames");
+  const tStudy = useTranslations("studyInterest");
+  const studyInterestsTouched = useRef(false);
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
     degreeLevel: string;
     targetMajor: string;
+    studyInterests: StudyInterestSelection[];
     gpa: number | string;
     gpaScale: number;
     ieltsScore: number | string;
@@ -90,6 +103,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     password: "",
     degreeLevel: "Master",
     targetMajor: "Computer Science",
+    studyInterests: [],
     // No fabricated test scores: empty fields stay empty until entered.
     gpa: "",
     gpaScale: 4.0,
@@ -130,8 +144,10 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
 
   useEffect(() => {
+    studyInterestsTouched.current = false;
     if (profile && !isNew) {
       let countries: string[] = ["United States", "United Kingdom", "Canada"];
       try {
@@ -150,6 +166,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
         degreeLevel: profile.degreeLevel || "Master",
         targetMajor: profile.targetMajor || "Computer Science",
+        studyInterests: selectionsFromProfile(profile.studyInterests, profile.targetMajor),
         // NEVER fabricate values: empty fields stay empty instead of being
         // saved as fake defaults (7.0/95/1350/315) when a profile has no
         // test scores yet.
@@ -196,6 +213,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         email: "",
         degreeLevel: "Master",
         targetMajor: "",
+        studyInterests: [],
         // Never pre-fill fabricated academic data — the student enters
         // their real GPA/test scores (NULL-safe, spec §19).
         gpa: "",
@@ -240,14 +258,17 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   // Clear any previous error each time the modal opens.
   useEffect(() => {
-    if (isOpen) setErrorMsg("");
+    if (isOpen) {
+      setErrorMsg("");
+      setStudyInterestAttempted(false);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const degreeControlValue = normalizeDegreeLevel(formData.degreeLevel) ?? formData.degreeLevel;
 
-  const countryOptions = [
+  const countryOptions = withQsTop200Countries([
     "United States",
     "United Kingdom",
     "Canada",
@@ -259,22 +280,21 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     "Japan",
     "France",
     "Sweden",
-  ];
+  ]);
 
   const handleCountryToggle = (country: string) => {
     setFormData((prev) => {
-      const exists = prev.preferredCountries.includes(country);
+      const exists = prev.preferredCountries.some((value) => countriesMatch(value, country));
       if (exists) {
         return {
           ...prev,
-          preferredCountries: prev.preferredCountries.filter((c) => c !== country),
-        };
-      } else {
-        return {
-          ...prev,
-          preferredCountries: [...prev.preferredCountries, country],
+          preferredCountries: prev.preferredCountries.filter((value) => !countriesMatch(value, country)),
         };
       }
+      return {
+        ...prev,
+        preferredCountries: [...prev.preferredCountries, country],
+      };
     });
   };
 
@@ -283,6 +303,12 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+    if (!isStudyInterestSelectionValid(formData.studyInterests)) {
+      setStudyInterestAttempted(true);
+      setErrorMsg(tStudy("requiredError"));
+      return;
+    }
+    setStudyInterestAttempted(false);
     const password = formData.password.trim();
     if (isNew && password.length < MIN_PASSWORD_LENGTH) {
       setErrorMsg(`Parol kiriting (kamida ${MIN_PASSWORD_LENGTH} belgi) — keyin shu email + parol bilan kirish qilasiz.`);
@@ -296,11 +322,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     try {
       const {
         gpa, ieltsScore, toeflScore, satScore, greScore,
-        actScore, duolingoScore, age, graduationYear, familyIncomeUsd,
+        actScore, duolingoScore, age, graduationYear, familyIncomeUsd, studyInterests,
         ...rest
       } = formData;
       await onSave({
         ...rest,
+        targetMajor: studyInterestsTouched.current ? compatibilityTargetMajor(studyInterests) : rest.targetMajor,
+        studyInterests: serializeStudyInterestSelections(studyInterests),
         // Empty numeric fields are saved as null (NULL in DB), never 0.
         gpa: gpa === "" ? null : Number(gpa),
         ieltsScore: ieltsScore === "" ? null : Number(ieltsScore),
@@ -470,6 +498,21 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Award className="h-3.5 w-3.5 text-indigo-600" />
               Academic Credentials & Standardized Scores
             </h3>
+            <div className="mb-5">
+              <StudyInterestPicker
+                value={formData.studyInterests}
+                onChange={(studyInterests) => {
+                  studyInterestsTouched.current = true;
+                  setFormData((previous) => ({
+                    ...previous,
+                    studyInterests,
+                    targetMajor: compatibilityTargetMajor(studyInterests),
+                  }));
+                }}
+                showError={studyInterestAttempted}
+                idPrefix="profile-modal-study-interests"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Target Degree</label>
@@ -488,28 +531,6 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Major / Field</label>
-                <select
-                  required
-                  value={formData.targetMajor}
-                  onChange={(e) => setFormData({ ...formData, targetMajor: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                >
-                  <option value="" disabled>Select your target program…</option>
-                  {formData.targetMajor && !STUDY_FIELDS.includes(formData.targetMajor) && (
-                    <option value={formData.targetMajor}>{formData.targetMajor}</option>
-                  )}
-                  {STUDY_FIELD_CATEGORIES.map((category) => (
-                    <optgroup key={category.name} label={category.name}>
-                      {category.fields.map((field) => (
-                        <option key={field} value={field}>{field}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <p className="mt-1 text-[10px] text-slate-500">Choose the program you plan to study.</p>
-              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">GPA & Scale</label>
@@ -742,11 +763,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             </h3>
             <div className="flex flex-wrap gap-2">
               {countryOptions.map((country) => {
-                const selected = formData.preferredCountries.includes(country);
+                const selected = formData.preferredCountries.some((value) => countriesMatch(value, country));
+                const countryKey = countryTranslationKey(country);
                 return (
                   <button
                     type="button"
                     key={country}
+                    aria-pressed={selected}
                     onClick={() => handleCountryToggle(country)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                       selected
@@ -755,7 +778,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     }`}
                   >
                     {selected ? "✓ " : "+ "}
-                    {country}
+                    {countryKey ? tCountry(countryKey) : country}
                   </button>
                 );
               })}

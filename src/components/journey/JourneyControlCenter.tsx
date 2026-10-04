@@ -12,10 +12,11 @@
  *   6. What should I look at? → recommendations based on the real profile
  */
 import React, { useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
-import { ArrowRight, CalendarClock, Compass, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarClock, ChevronDown, Compass, RefreshCw, Sparkles } from "lucide-react";
 import { AnimatedNumber as CountUp, RevealGroup, RevealItem, SectionTransition } from "@/components/motion";
 import {
   Button,
@@ -146,6 +147,7 @@ export function JourneyControlCenter({
   onOpenWorkspace: (applicationId: number) => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const t = useTranslations("journey");
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
@@ -186,6 +188,46 @@ export function JourneyControlCenter({
   if (!data) return null;
 
   const { journey, nextSteps, deadlines, applications, readiness, recommended } = data;
+  const translatedStageLabel = (id: string, fallback: string) => {
+    switch (id) {
+      case "discover": return t("stageDiscover");
+      case "match": return t("stageMatch");
+      case "prepare": return t("stagePrepare");
+      case "apply": return t("stageApply");
+      case "accepted": return t("stageAccepted");
+      case "fund": return t("stageFund");
+      case "visa": return t("stageVisa");
+      case "depart": return t("stageDepart");
+      default: return fallback;
+    }
+  };
+  const translatedStillNeeded = (text: string) => {
+    switch (text) {
+      case "Complete your profile so matches are personalised": return t("ccNeedDiscover");
+      case "Save universities you are considering": return t("ccNeedMatchSave");
+      case "Check which of them fit your profile": return t("ccNeedMatchCheck");
+      case "Start an application to generate your checklist": return t("ccNeedPrepareApplication");
+      case "Add universities to research": return t("ccNeedPrepareUniversities");
+      case "Build your funding plan": return t("ccNeedPrepareFunding");
+      case "Start your first application": return t("ccNeedApplyStart");
+      case "Finish and submit your application": return t("ccNeedApplySubmit");
+      case "Record the offers you receive": return t("ccNeedAcceptedRecord");
+      case "Decide on the offers you received": return t("ccNeedAcceptedDecide");
+      case "Add your scholarship and family budget": return t("ccNeedFundAdd");
+      case "Close the funding gap for your offer": return t("ccNeedFundClose");
+      case "Start your visa case": return t("ccNeedVisaStart");
+      case "Finish your visa case": return t("ccNeedVisaFinish");
+      case "Complete the departure checklist": return t("ccNeedDepart");
+      default: return text;
+    }
+  };
+  const currentStageLabel = translatedStageLabel(journey.current, journey.currentLabel);
+  const nextStageLabel = journey.next ? translatedStageLabel(journey.next, journey.next) : null;
+  const currentDescription = journey.stillNeeded.length > 0
+    ? translatedStillNeeded(journey.stillNeeded[0].text)
+    : t("ccStageComplete");
+  const doneStageCount = journey.stages.filter((stage) => stage.done).length;
+  const totalStages = journey.stages.length;
   const completedBeforeOpen = journey.stages.some((stage, index) =>
     stage.done && journey.stages.slice(0, index).some((earlier) => !earlier.done)
   );
@@ -194,95 +236,127 @@ export function JourneyControlCenter({
     <div className="space-y-4">
       {/* ---- 1. The journey bar ------------------------------------------ */}
       <JourneyCard tone="hero">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0 flex-1">
-            {/* The label carries the journey's own accent in both themes — the
-                generic `text-indigo-500` remap washes out on the dark hero. */}
-            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">Your Study Abroad Journey</p>
-            {/* The stage icon gets a soft halo so the hero reads at a glance. */}
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-5">
+          <div className="min-w-0">
+            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">{t("ccEyebrow")}</p>
+            <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
               <motion.span
                 aria-hidden
-                initial={{ scale: 0.6, opacity: 0 }}
+                initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="grid h-10 w-10 place-items-center rounded-2xl bg-white/70 shadow-sm ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-400/30"
+                transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 18 }}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 shadow-sm ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-400/30"
               >
                 {journey.currentIcon}
               </motion.span>
-              <span className="sb-gradient-text">{journey.currentLabel}</span>
+              <span className="sb-gradient-text min-w-0 break-words">{currentStageLabel}</span>
             </h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              {journey.stillNeeded.length > 0
-                ? journey.stillNeeded[0].text
-                : "This stage is complete — your dashboard now points at the next one."}
+            <p className="mt-2 max-w-2xl break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              {currentDescription}
             </p>
-            {journey.next && (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">
-                Next up <ArrowRight className="h-3 w-3" aria-hidden /> {journey.next}
+            {nextStageLabel && (
+              <p className="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">
+                <span className="font-bold">{t("ccNextUp")}</span>
+                <ArrowRight className="h-3 w-3 shrink-0" aria-hidden />
+                <span className="min-w-0 break-words">{nextStageLabel}</span>
               </p>
             )}
           </div>
-          <ProgressRing
-            pct={journey.progressPct}
-            size={104}
-            label="Journey progress"
-            caption={`${journey.stages.filter((st) => st.done).length} of ${journey.stages.length} stages done`}
-            tone={journey.progressPct >= 100 ? "good" : "brand"}
-          />
+          <div className="min-w-0 border-t border-slate-200/70 pt-3 dark:border-slate-700/70 sm:border-0 sm:pt-1">
+            <ProgressRing
+              pct={journey.progressPct}
+              size={88}
+              label={t("ccJourneyProgress")}
+              caption={t("ccStagesDone", { done: doneStageCount, total: totalStages })}
+              ariaValueText={t("ccProgressAria", { pct: Math.round(journey.progressPct), done: doneStageCount, total: totalStages })}
+              tone={journey.progressPct >= 100 ? "good" : "brand"}
+            />
+          </div>
         </div>
 
-        {/* The seven-stage visual bar, with the current stage highlighted. */}
-        <ol className="mt-4 flex flex-wrap items-center gap-1.5" aria-label="Journey stages">
-          {journey.stages.map((s, i) => (
-            <motion.li
-              key={s.id}
-              className="flex items-center gap-1.5"
-              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: reduceMotion ? 0 : i * 0.05, duration: 0.32 }}
-            >
-              <motion.button
-                type="button"
-                onClick={() => onNavigateTab(s.tab)}
-                title={s.doneWhen}
-                whileHover={reduceMotion ? undefined : { y: -1, scale: 1.03 }}
-                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                className={`group flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
-                  s.current
-                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                    : s.done
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                      : "border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
-                }`}
+        <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+          <Button
+            className="min-h-11 w-full px-4 py-2.5 sm:w-auto"
+            onClick={() => onNavigateTab(journey.continueTab)}
+          >
+            <span className="min-w-0 break-words">{t("ccContinue", { stage: currentStageLabel })}</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-11 w-full px-4 py-2.5 sm:w-auto"
+            onClick={() => onNavigateTab("study-plan")}
+          >
+            {t("ccSeeStudyPlan")}
+          </Button>
+        </div>
+
+        <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={t("ccStagesAria")}>
+          {journey.stages.map((s, i) => {
+            const stageLabel = translatedStageLabel(s.id, s.label);
+            const stageStatus = s.current
+              ? t("ccStatusCurrent")
+              : s.done
+                ? t("ccStatusCompleted")
+                : t("ccStatusUpcoming");
+            const stageClass = s.current
+              ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+              : s.done
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+            const statusClass = s.current
+              ? "text-indigo-100"
+              : s.done
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-slate-500 dark:text-slate-400";
+
+            return (
+              <motion.li
+                key={s.id}
+                className="min-w-0"
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.32 }}
               >
-                <span aria-hidden>{s.icon}</span>
-                <span className="hidden sm:inline">{s.label}</span>
-                <span className="sm:hidden">{s.label.slice(0, 3)}</span>
-              </motion.button>
-              {i < journey.stages.length - 1 && (
-                <span aria-hidden className={`h-px w-3 ${s.done ? "bg-emerald-300" : "bg-slate-200 dark:bg-slate-700"}`} />
-              )}
-            </motion.li>
-          ))}
+                <motion.button
+                  type="button"
+                  onClick={() => onNavigateTab(s.tab)}
+                  title={s.doneWhen}
+                  aria-current={s.current ? "step" : undefined}
+                  whileHover={reduceMotion ? undefined : { y: -1, scale: 1.02 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                  className={`group flex min-h-14 w-full min-w-0 flex-col items-start justify-center rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${stageClass}`}
+                >
+                  <span className="flex w-full min-w-0 items-start gap-1.5">
+                    <span aria-hidden className="shrink-0 leading-none">{s.icon}</span>
+                    <span className="min-w-0 break-words">{stageLabel}</span>
+                  </span>
+                  <span className={`mt-1.5 text-[10px] font-semibold leading-tight ${statusClass}`}>{stageStatus}</span>
+                </motion.button>
+              </motion.li>
+            );
+          })}
         </ol>
-        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-          This journey has 8 stages. The study plan expands the same route into 10 detailed work phases.
-        </p>
-        {completedBeforeOpen && (
-          <p className="mt-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-            Stages can overlap. Your submitted application is recorded, while earlier preparation can still be in progress.
-          </p>
-        )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={() => onNavigateTab(journey.continueTab)}>
-            Continue {journey.currentLabel} <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="outline" onClick={() => onNavigateTab("study-plan")}>
-            See my study plan
-          </Button>
+        <details className="group mt-3 min-w-0 rounded-xl border border-slate-200/70 bg-white/40 text-slate-600 dark:border-slate-700 dark:bg-slate-900/20 dark:text-slate-300 sm:hidden">
+          <summary className="group flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 [&::-webkit-details-marker]:hidden">
+            <span>{t("ccAboutJourney")}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="space-y-2 border-t border-slate-200/70 px-3 pb-3 pt-2 text-xs leading-relaxed dark:border-slate-700">
+            <p>{t("ccEightStagesNote")}</p>
+            {completedBeforeOpen && <p>{t("ccOverlapNote")}</p>}
+          </div>
+        </details>
+        <div className="mt-2 hidden space-y-1 text-[11px] text-slate-500 dark:text-slate-400 sm:block">
+          <p>{t("ccEightStagesNote")}</p>
+          {completedBeforeOpen && (
+            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              {t("ccOverlapNote")}
+            </p>
+          )}
         </div>
+
       </JourneyCard>
 
       {/* ---- 1b. At a glance ---------------------------------------------

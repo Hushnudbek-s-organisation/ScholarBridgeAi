@@ -10,6 +10,7 @@ import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { currentOwnerId } from "@/lib/ownership/service";
 import { writeAudit } from "@/lib/audit";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { parseStudyInterestSelections } from "@/lib/studyInterests";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -112,6 +113,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
+    const hasStudyInterests = body.studyInterests !== undefined;
+    const submittedStudyInterests = hasStudyInterests
+      ? parseStudyInterestSelections(body.studyInterests)
+      : null;
+    if (hasStudyInterests && !submittedStudyInterests) {
+      return NextResponse.json(
+        { error: "Choose at least one valid study interest", code: "study_interests_invalid" },
+        { status: 400 }
+      );
+    }
+    const isExploringInterests =
+      submittedStudyInterests?.length === 1 && submittedStudyInterests[0]?.kind === "exploring";
 
     // Stored as a JSON array string. Anything that is not an array or a
     // string (e.g. an object) is ignored rather than crashing the insert.
@@ -182,7 +195,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         passwordHash: newPasswordHash,
         // NOT NULL text columns: an empty/garbage value leaves them untouched.
         degreeLevel: clampString(body.degreeLevel, 60) || undefined,
-        targetMajor: clampString(body.targetMajor, 160) || undefined,
+        // Keep legacy callers' blank value as a no-op, except an explicit
+        // exploration selection, which must never be stored as a literal major.
+        targetMajor: isExploringInterests ? "" : clampString(body.targetMajor, 160) || undefined,
+        studyInterests: submittedStudyInterests ? JSON.stringify(submittedStudyInterests) : undefined,
         // Numbers go through optionalNumber: `Number("abc")` is NaN and
         // Postgres would store NaN in a double column. NOT NULL columns
         // treat "cleared" (null) as "unchanged" instead of failing with 500.

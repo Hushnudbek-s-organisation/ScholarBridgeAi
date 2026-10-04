@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
+import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { StudentProfile } from "./Navbar";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
@@ -67,6 +69,15 @@ function awardLabel(s: Scholarship): string {
   return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : "Not specified";
 }
 
+const SCHOLARSHIP_FILTER_COUNTRIES = withQsTop200Countries([
+  "United States",
+  "United Kingdom",
+  "Germany",
+  "European Union",
+  "Canada",
+  "Japan",
+]);
+
 interface ScholarshipHubProps {
   activeProfile: StudentProfile | null;
   savedScholarshipIds: Set<number>;
@@ -80,6 +91,7 @@ export function ScholarshipHub({
   onSaveScholarship,
   onUnsaveScholarship,
 }: ScholarshipHubProps) {
+  const tCountry = useTranslations("countryNames");
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -192,12 +204,16 @@ export function ScholarshipHub({
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">🌐 All Host Countries</option>
-              <option value="United States">🇺🇸 United States</option>
-              <option value="United Kingdom">🇬🇧 United Kingdom</option>
-              <option value="Germany">🇩🇪 Germany</option>
-              <option value="European Union">🇪🇺 European Union</option>
-              <option value="Canada">🇨🇦 Canada</option>
-              <option value="Japan">🇯🇵 Japan</option>
+              {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
+                const countryKey = countryTranslationKey(country);
+                const countryOption = qsCountryOption(country);
+                const flag = countryOption?.flag ?? (country === "European Union" ? "🇪🇺" : "");
+                return (
+                  <option key={country} value={country}>
+                    {flag ? `${flag} ` : ""}{countryKey ? tCountry(countryKey) : country}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

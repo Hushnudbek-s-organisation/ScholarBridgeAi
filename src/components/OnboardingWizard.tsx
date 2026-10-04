@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
+import {
+  countriesMatch,
+  countryTranslationKey,
+  withQsTop200Countries,
+} from "@/lib/countries";
 import {
   User,
   GraduationCap,
@@ -20,7 +26,14 @@ import { StudentProfile } from "./Navbar";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
-import { STUDY_FIELD_CATEGORIES } from "@/lib/studyFields";
+import { StudyInterestPicker } from "@/components/StudyInterestPicker";
+import {
+  compatibilityTargetMajor,
+  isStudyInterestSelectionValid,
+  selectionsFromProfile,
+  serializeStudyInterestSelections,
+  type StudyInterestSelection,
+} from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 
 interface OnboardingWizardProps {
@@ -40,6 +53,7 @@ interface FormState {
   password: string;
   degreeLevel: string;
   targetMajor: string;
+  studyInterests: StudyInterestSelection[];
   gpa: string;
   gpaScale: string;
   ieltsScore: string;
@@ -54,7 +68,7 @@ interface FormState {
   extracurriculars: string;
 }
 
-const COUNTRIES = [
+const COUNTRIES = withQsTop200Countries([
   "United States",
   "United Kingdom",
   "Canada",
@@ -69,7 +83,7 @@ const COUNTRIES = [
   "South Korea",
   "United Arab Emirates",
   "China",
-];
+]);
 
 const DEGREES = ["Bachelor", "Master", "PhD"];
 
@@ -89,16 +103,27 @@ const inputCls =
 const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5";
 
 export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
-  // Resume: continue from the saved step (0-based), defaulting to step 0.
-  const startStep = profile
-    ? Math.min(Math.max(profile.onboardingStep ?? 0, 0), 7)
-    : 0;
+  const tCountry = useTranslations("countryNames");
+  const tStudy = useTranslations("studyInterest");
+  const resumeStudyInterests = selectionsFromProfile(profile?.studyInterests, profile?.targetMajor, {
+    // A new profile is created before the interest step; the legacy default
+    // “Computer Science” must not satisfy onboarding's required selection.
+    ignoreDefaultComputerScience: Boolean(profile && !profile.onboardingCompleted && !profile.studyInterests),
+  });
+  // Resume from the saved step, but send legacy profiles without any valid
+  // interest back to the required interest step before they can finish.
+  const requestedStartStep = profile ? Math.min(Math.max(profile.onboardingStep ?? 0, 0), 7) : 0;
+  const startStep =
+    profile && requestedStartStep > 2 && !isStudyInterestSelectionValid(resumeStudyInterests)
+      ? 2
+      : requestedStartStep;
 
   const [step, setStep] = useState<number>(startStep);
   const [createdId, setCreatedId] = useState<number | null>(profile?.id ?? null);
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
+  const studyInterestsTouched = useRef(false);
   // Telegram-only accounts carry a technical placeholder email; never show it
   // as if the student had typed it, and keep the email optional for them.
   const placeholderEmail = isTelegramPlaceholderEmail(profile?.email) ? profile!.email : "";
@@ -107,7 +132,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     email: placeholderEmail ? "" : profile?.email || "",
     password: "",
     degreeLevel: profile?.degreeLevel || "",
-    targetMajor: profile?.targetMajor === "Computer Science" ? "" : profile?.targetMajor || "",
+    targetMajor: profile?.targetMajor || "",
+    studyInterests: resumeStudyInterests,
     gpa: profile?.gpa ? String(profile.gpa) : "",
     gpaScale: profile?.gpaScale ? String(profile.gpaScale) : "",
     ieltsScore: profile?.ieltsScore ? String(profile.ieltsScore) : "",
@@ -154,7 +180,12 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         name: form.name,
         email: form.email.trim() || placeholderEmail || form.email,
         degreeLevel: form.degreeLevel || "Master",
-        targetMajor: form.targetMajor || "Computer Science",
+        targetMajor:
+          form.studyInterests.some((selection) => selection.kind === "exploring")
+            ? ""
+            : studyInterestsTouched.current
+              ? compatibilityTargetMajor(form.studyInterests)
+              : form.targetMajor || compatibilityTargetMajor(form.studyInterests) || "Computer Science",
         gpa: form.gpa ? Number(form.gpa) : 3.5,
         gpaScale: form.gpaScale ? Number(form.gpaScale) : 4.0,
         ieltsScore: form.ieltsScore ? Number(form.ieltsScore) : null,
@@ -172,6 +203,9 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         onboardingStep: nextStep,
         onboardingCompleted: completed,
       };
+      if (isStudyInterestSelectionValid(form.studyInterests)) {
+        payload.studyInterests = serializeStudyInterestSelections(form.studyInterests);
+      }
 
       if (createdId == null) {
         // Step 1: create the profile (name + email + password are mandatory
@@ -230,6 +264,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     // Must match MIN_PASSWORD_LENGTH in src/lib/password.ts (server rejects
     // anything shorter, so a 6-char pass here would only fail later).
     (isNewAccount && form.password.trim().length < MIN_PASSWORD_LENGTH);
+  const step2Invalid = !isStudyInterestSelectionValid(form.studyInterests);
 
   const handleNext = async () => {
     if (step === 0 && step0Invalid) {
@@ -240,6 +275,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
       );
       return;
     }
+    if (step === 2 && step2Invalid) return;
     if (step === STEPS.length - 1) {
       const updated = await persist(8, true);
       if (updated) {
@@ -253,6 +289,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   };
 
   const handleSkip = async () => {
+    if (step === 2 && step2Invalid) return;
     if (step === STEPS.length - 1) {
       const updated = await persist(8, true);
       if (updated) {
@@ -270,13 +307,15 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     setStep((s) => Math.max(0, s - 1));
   };
 
-  const toggleCountry = (c: string) =>
+  const toggleCountry = (c: string) => {
+    const selected = form.preferredCountries.some((value) => countriesMatch(value, c));
     set(
       "preferredCountries",
-      form.preferredCountries.includes(c)
-        ? form.preferredCountries.filter((x) => x !== c)
+      selected
+        ? form.preferredCountries.filter((value) => !countriesMatch(value, c))
         : [...form.preferredCountries, c]
     );
+  };
 
   // ---------------- Done screen ----------------
   if (finished) {
@@ -306,7 +345,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const StepIcon = stepInfo.icon;
   const progressPct = Math.round((step / (STEPS.length - 1)) * 100);
   const isLast = step === STEPS.length - 1;
-  const nextDisabled = saving || (step === 0 && step0Invalid);
+  const nextDisabled = saving || (step === 0 && step0Invalid) || (step === 2 && step2Invalid);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -330,7 +369,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
             <StepIcon className="h-4 w-4" />
           </div>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">{stepInfo.title}</h2>
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">{step === 2 ? tStudy("title") : stepInfo.title}</h2>
         </div>
       </div>
 
@@ -445,30 +484,19 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
         )}
 
-        {/* STEP 3 — Target major */}
+        {/* STEP 3 — Study interests */}
         {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <label className={labelCls}>Target Major / Field</label>
-              <select
-                className={inputCls}
-                value={form.targetMajor}
-                onChange={(e) => set("targetMajor", e.target.value)}
-              >
-                <option value="" disabled>Select your target program…</option>
-                {STUDY_FIELD_CATEGORIES.map((category) => (
-                  <optgroup key={category.name} label={category.name}>
-                    {category.fields.map((field) => (
-                      <option key={field} value={field}>{field}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Select the program you plan to study. We use it to find matching universities and scholarships.
-              </p>
-            </div>
-          </div>
+          <StudyInterestPicker
+            value={form.studyInterests}
+            onChange={(studyInterests) => {
+              studyInterestsTouched.current = true;
+              set("studyInterests", studyInterests);
+              set("targetMajor", compatibilityTargetMajor(studyInterests));
+              setError("");
+            }}
+            showError={step2Invalid}
+            idPrefix="onboarding-study-interests"
+          />
         )}
 
         {/* STEP 4 — GPA + scale */}
@@ -592,11 +620,13 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {step === 6 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {COUNTRIES.map((c) => {
-              const active = form.preferredCountries.includes(c);
+              const active = form.preferredCountries.some((value) => countriesMatch(value, c));
+              const countryKey = countryTranslationKey(c);
               return (
                 <button
                   key={c}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => toggleCountry(c)}
                   className={`rounded-xl border-2 px-3 py-2.5 text-xs font-bold transition-all ${
                     active
@@ -604,7 +634,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                       : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
                   }`}
                 >
-                  {c}
+                  {countryKey ? tCountry(countryKey) : c}
                 </button>
               );
             })}
@@ -682,8 +712,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
             <button
               type="button"
               onClick={handleSkip}
-              disabled={saving}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              disabled={saving || (step === 2 && step2Invalid)}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <SkipForward className="h-3.5 w-3.5" /> Skip
             </button>

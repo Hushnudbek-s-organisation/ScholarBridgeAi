@@ -826,7 +826,7 @@ export default function Home() {
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <main className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
         {/* Sections swap with a short cross-fade + lift. Keyed on what is
             actually on screen so the wizard and every tab participate. */}
@@ -877,6 +877,7 @@ export default function Home() {
               onSaveUniversity={handleSaveUniversity}
               onUnsaveUniversity={handleUnsaveUniversity}
               autoOpenUniversityId={focusUniversityId}
+              onProfileSaved={handleProfileUpdated}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />

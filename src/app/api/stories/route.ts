@@ -7,6 +7,7 @@ import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { guardStudent, guardTables, idParam, jsonError, readBody, serverError } from "@/lib/growth/api";
 import { parseList, twinScore, type TwinProfile } from "@/lib/growth/logic";
 import { publicStory, storyValues } from "@/lib/growth/stories";
+import { countriesMatch } from "@/lib/countries";
 
 export const dynamic = "force-dynamic";
 
@@ -62,14 +63,14 @@ export async function GET(req: Request) {
     const sort = url.searchParams.get("sort") || (me ? "twin" : "featured");
 
     let rows = await db.select().from(successStories).where(eq(successStories.status, "approved"));
-    if (country) rows = rows.filter((r) => (r.admittedCountry || "").toLowerCase() === country.toLowerCase());
+    if (country) rows = rows.filter((r) => countriesMatch(r.admittedCountry, country));
     if (degree) rows = rows.filter((r) => (r.degreeLevel || "") === degree);
     if (q) {
       rows = rows.filter((r) =>
         [r.admittedUniversity, r.major, r.admittedCountry, r.displayName, r.essayTitle, r.otherAdmits]
           .join(" ")
           .toLowerCase()
-          .includes(q)
+          .includes(q) || countriesMatch(r.admittedCountry, q)
       );
     }
 

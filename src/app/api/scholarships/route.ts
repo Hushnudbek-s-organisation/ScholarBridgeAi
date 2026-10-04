@@ -12,6 +12,7 @@ import { withStatus } from "@/lib/scholarshipStatus";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
+import { countriesMatch } from "@/lib/countries";
 
 export async function GET(req: Request) {
   try {
@@ -42,12 +43,13 @@ export async function GET(req: Request) {
         s.title.toLowerCase().includes(search) ||
         s.provider.toLowerCase().includes(search) ||
         s.country.toLowerCase().includes(search) ||
-        s.description.toLowerCase().includes(search)
+        s.description.toLowerCase().includes(search) ||
+        countriesMatch(s.country, search)
       );
     }
 
     if (country && country !== "All") {
-      allScholarships = allScholarships.filter(s => s.country === country);
+      allScholarships = allScholarships.filter((s) => countriesMatch(s.country, country));
     }
 
     if (coverageType && coverageType !== "All") {

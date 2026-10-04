@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
-import { HelpCircle, Lightbulb, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ChevronDown, HelpCircle, Lightbulb, X } from "lucide-react";
 import { HELP_SECTIONS, type HelpSection, type SectionHelpOverride } from "@/lib/growth/defaults";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +81,7 @@ export function isHelpSection(id: string): id is HelpSection {
  */
 export function SectionIntro({ section }: { section: string }) {
   const t = useTranslations("help");
+  const reduceMotion = useReducedMotion();
   const [overrides, setOverrides] = useState<Record<string, SectionHelpOverride> | null>(helpCache);
   const dismissedRaw = useSyncExternalStore(subscribe, readDismissed, () => "[]");
   const dismissed = parse(dismissedRaw);
@@ -114,39 +115,68 @@ export function SectionIntro({ section }: { section: string }) {
   return (
     <AnimatePresence initial={false} mode="wait">
       {isDismissed ? (
-        <motion.div key="chip" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-3 flex justify-end">
+        <motion.div
+          key="chip"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
+          className="mb-3 flex justify-end"
+        >
           <button
             onClick={toggle}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:border-indigo-200 hover:text-indigo-600"
+            className="inline-flex min-h-10 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-indigo-200"
           >
-            <HelpCircle className="h-3.5 w-3.5" /> {t("show")}
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden /> {t("show")}
           </button>
         </motion.div>
       ) : (
         <motion.div
           key="banner"
-          initial={{ opacity: 0, y: -6 }}
+          initial={reduceMotion ? false : { opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.2 }}
-          className="mb-4 flex items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3"
-          role="note"
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
+          className="mb-4"
         >
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-xs">
-            <Lightbulb className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-indigo-900">{t("title")}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-indigo-800">{text}</p>
-          </div>
-          <button
-            onClick={toggle}
-            className="shrink-0 rounded-lg p-1 text-indigo-400 hover:bg-white hover:text-indigo-700"
-            aria-label={t("hide")}
-            title={t("hide")}
+          <details className="group rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-900 dark:border-indigo-900/70 dark:bg-indigo-950/40 dark:text-indigo-100 sm:hidden">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 [&::-webkit-details-marker]:hidden">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-xs dark:bg-indigo-900/70 dark:text-indigo-200">
+                <Lightbulb className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1 text-xs font-bold">{t("title")}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-indigo-500 transition-transform group-open:rotate-180 dark:text-indigo-300" aria-hidden />
+            </summary>
+            <div className="border-t border-indigo-100 px-4 pb-3 pl-14 pt-2 dark:border-indigo-900/70">
+              <p className="text-xs leading-relaxed text-indigo-800 dark:text-indigo-200">{text}</p>
+              <button
+                onClick={toggle}
+                className="mt-2 inline-flex min-h-10 items-center rounded-lg px-2 text-xs font-semibold text-indigo-700 hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-200 dark:hover:bg-white/10"
+              >
+                {t("hide")}
+              </button>
+            </div>
+          </details>
+          <div
+            className="hidden items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-indigo-900 dark:border-indigo-900/70 dark:bg-indigo-950/40 dark:text-indigo-100 sm:flex"
+            role="note"
           >
-            <X className="h-4 w-4" />
-          </button>
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-xs dark:bg-indigo-900/70 dark:text-indigo-200">
+              <Lightbulb className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold">{t("title")}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-indigo-800 dark:text-indigo-200">{text}</p>
+            </div>
+            <button
+              onClick={toggle}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-indigo-500 hover:bg-white hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-900/70 dark:hover:text-white"
+              aria-label={t("hide")}
+              title={t("hide")}
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

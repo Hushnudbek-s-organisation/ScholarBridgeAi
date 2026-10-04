@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Globe2, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { countriesMatch, countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { ScrollRegion } from "@/components/hubs/ui";
 
 interface Comparison {
@@ -31,6 +32,7 @@ function money(v: number | null): string {
  */
 export function CountryComparePanel() {
   const t = useTranslations("countryCompare");
+  const tCountry = useTranslations("countryNames");
   const [data, setData] = useState<CompareData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,7 +75,17 @@ export function CountryComparePanel() {
   }, []);
 
   const toggle = (c: string) =>
-    setSelected((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : prev.length >= 6 ? prev : [...prev, c]));
+    setSelected((prev) =>
+      prev.some((value) => countriesMatch(value, c))
+        ? prev.filter((value) => !countriesMatch(value, c))
+        : prev.length >= 6
+          ? prev
+          : [...prev, c]
+    );
+  const availableRows = data?.available ?? [];
+  const countryOptions = withQsTop200Countries(
+    availableRows.slice(0, 14).map((country) => country.country)
+  );
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -85,19 +97,28 @@ export function CountryComparePanel() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {(data?.available ?? []).slice(0, 14).map((c) => (
-          <button
-            key={c.country}
-            onClick={() => toggle(c.country)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
-              selected.includes(c.country)
-                ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            {c.country} <span className="text-[9px] opacity-60">({c.universities})</span>
-          </button>
-        ))}
+        {countryOptions.map((country) => {
+          const countryKey = countryTranslationKey(country);
+          const count = availableRows
+            .filter((row) => countriesMatch(row.country, country))
+            .reduce((total, row) => total + row.universities, 0);
+          const isSelected = selected.some((value) => countriesMatch(value, country));
+          return (
+            <button
+              key={country}
+              type="button"
+              onClick={() => toggle(country)}
+              aria-pressed={isSelected}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                isSelected
+                  ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              {countryKey ? tCountry(countryKey) : country} <span className="text-[9px] opacity-60">({count})</span>
+            </button>
+          );
+        })}
         <button
           onClick={() => void load(selected)}
           disabled={loading || selected.length < 1}
@@ -125,24 +146,27 @@ export function CountryComparePanel() {
               </tr>
             </thead>
             <tbody>
-              {data.countries.map((c) => (
-                <tr key={c.country} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-bold text-slate-800">{c.country}</td>
-                  <td className="py-2 pr-3">{c.universities}</td>
-                  <td className="py-2 pr-3">
-                    {money(c.tuition.avgUsd)} <span className="text-[9px] text-slate-400">({c.tuition.published})</span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    {money(c.living.avgUsd)} <span className="text-[9px] text-slate-400">({c.living.published})</span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    {c.minIelts.avg ?? "—"} <span className="text-[9px] text-slate-400">({c.minIelts.published})</span>
-                  </td>
-                  <td className="py-2 pr-3">{c.scholarships.count}</td>
-                  <td className="py-2 pr-3 font-semibold text-indigo-700">{money(c.scholarships.totalUsd)}</td>
-                  <td className="py-2 text-slate-400">{t("notPublished")}</td>
-                </tr>
-              ))}
+              {data.countries.map((c) => {
+                const countryKey = countryTranslationKey(c.country);
+                return (
+                  <tr key={c.country} className="border-b border-slate-100">
+                    <td className="py-2 pr-3 font-bold text-slate-800">{countryKey ? tCountry(countryKey) : c.country}</td>
+                      <td className="py-2 pr-3">{c.universities}</td>
+                    <td className="py-2 pr-3">
+                      {money(c.tuition.avgUsd)} <span className="text-[9px] text-slate-400">({c.tuition.published})</span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      {money(c.living.avgUsd)} <span className="text-[9px] text-slate-400">({c.living.published})</span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      {c.minIelts.avg ?? "—"} <span className="text-[9px] text-slate-400">({c.minIelts.published})</span>
+                    </td>
+                    <td className="py-2 pr-3">{c.scholarships.count}</td>
+                    <td className="py-2 pr-3 font-semibold text-indigo-700">{money(c.scholarships.totalUsd)}</td>
+                    <td className="py-2 text-slate-400">{t("notPublished")}</td>
+                  </tr>
+                );
+              })}
               {data.countries.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-6 text-center text-slate-400">

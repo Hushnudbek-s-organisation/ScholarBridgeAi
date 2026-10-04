@@ -13,6 +13,7 @@ import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampString, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { parseStudyInterestSelections } from "@/lib/studyInterests";
 
 /** Detect a schema-mismatch error (new columns missing in the database). */
 function isMissingColumnsError(err: unknown): boolean {
@@ -78,6 +79,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
+    const hasStudyInterests = body.studyInterests !== undefined;
+    const submittedStudyInterests = hasStudyInterests
+      ? parseStudyInterestSelections(body.studyInterests)
+      : null;
+    if (hasStudyInterests && !submittedStudyInterests) {
+      return NextResponse.json(
+        { error: "Choose at least one valid study interest", code: "study_interests_invalid" },
+        { status: 400 }
+      );
+    }
+    const isExploringInterests =
+      submittedStudyInterests?.length === 1 && submittedStudyInterests[0]?.kind === "exploring";
 
     // Sign up: one account per email (case-insensitive). If the email already
     // has an account, the visitor must sign in instead of creating a second
@@ -160,7 +173,8 @@ export async function POST(req: Request) {
         name: clampString(body.name, 120) || "New Student Profile",
         email: emailInput,
         degreeLevel: body.degreeLevel || "Master",
-        targetMajor: body.targetMajor || "Computer Science",
+        targetMajor: isExploringInterests ? "" : body.targetMajor || "Computer Science",
+        studyInterests: submittedStudyInterests ? JSON.stringify(submittedStudyInterests) : undefined,
         gpa: numOrNull(body.gpa) ?? 3.5, // schema default; real GPA entered later
         gpaScale: numOrNull(body.gpaScale) ?? 4.0,
         ieltsScore: scoreOrNull(body.ieltsScore),
