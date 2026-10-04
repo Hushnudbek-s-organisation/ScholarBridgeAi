@@ -199,6 +199,14 @@ export default async function ScholarshipsPage({
       )}
 
       <Pagination currentPage={currentPage} totalPages={totalPages} />
+
+      {/* Independent guide: the figures on these cards are compiled and can
+          age, so the list carries its own line — not only the Terms page. */}
+      <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-500">
+        ScholarBridgeAI is an independent guide, not affiliated with any university or provider.
+        Tuition, deadlines and requirement numbers are compiled from public sources and can be out of
+        date — always confirm them on the official page before you apply.
+      </p>
     </main>
   );
 }

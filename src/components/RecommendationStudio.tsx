@@ -54,6 +54,7 @@ import {
   type StudyInterestSelection,
 } from "@/lib/studyInterests";
 import type { StudentProfile } from "@/components/Navbar";
+import { AppNote } from "@/components/AppNote";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors of the API response — src/app/api/programs/recommend)
@@ -1144,6 +1145,8 @@ export function RecommendationStudio({
           </>
         )}
       </div>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="estimate" className="mt-2" />
     </section>
   );
 }

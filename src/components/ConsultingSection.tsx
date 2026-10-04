@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Headset, Send, Loader2, CheckCircle2, Clock } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { AppNote } from "@/components/AppNote";
 
 interface ConsultingSectionProps {
   activeProfile: StudentProfile | null;
@@ -139,6 +140,8 @@ export function ConsultingSection({ activeProfile }: ConsultingSectionProps) {
           </p>
         </form>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="thirdParty" className="mt-2" />
     </div>
   );
 }

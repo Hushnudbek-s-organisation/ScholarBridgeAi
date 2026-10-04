@@ -22,6 +22,7 @@ import {
   resolveNavTarget,
 } from "@/lib/navSections";
 import { SectionIntro } from "@/components/SectionIntro";
+import { AppNote } from "@/components/AppNote";
 import { TelegramSettings } from "@/components/telegram/TelegramSettings";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
@@ -1064,6 +1065,12 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white pt-6 pb-24 lg:pb-6 mt-12 text-center text-xs text-slate-500">
+        {/* Small print above Terms / Privacy: the app shows AI-written text
+            and compiled catalogue data, both of which can be wrong or out of
+            date. One honest line wherever the user ends up. */}
+        <div className="mx-auto mb-4 max-w-7xl border-b border-slate-100 px-4 pb-4">
+          <AppNote kind="general" className="mx-auto max-w-[900px] text-left" />
+        </div>
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>

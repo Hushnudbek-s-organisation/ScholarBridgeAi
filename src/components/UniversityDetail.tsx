@@ -27,6 +27,7 @@ import {
 import { formatMoney, formatCount, formatNumber } from "@/lib/format";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { isStaleVerified } from "@/lib/provenance";
+import { AppNote } from "@/components/AppNote";
 
 interface UniversityDetailData {
   id: number;
@@ -1069,6 +1070,8 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           )}
         </div>
       </div>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2" />
     </div>
   );
 }

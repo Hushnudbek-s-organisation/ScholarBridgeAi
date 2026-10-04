@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Lightbulb, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AppNote } from "@/components/AppNote";
 
 interface StrengthSection {
   key: string;
@@ -159,6 +160,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
           </ul>
         </div>
       </div>
+      <AppNote kind="estimate" className="text-[11px]" />
     </div>
   );
 }

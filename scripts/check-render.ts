@@ -172,6 +172,29 @@ check(
   /Admission estimate/.test(landingHtml) && /intentionally does not invent a probability/i.test(landingHtml)
 );
 check("landing footer links to privacy and terms", /\/privacy/.test(landingHtml) && /\/terms/.test(landingHtml));
+// The footer carries the honest small print the app itself shows above its
+// Terms / Privacy links — the marketing page must not be more confident than
+// the product.
+check(
+  "landing footer explains that the guide is independent and can be wrong",
+  /independent guide/i.test(landingHtml) &&
+    /not affiliated with any university/i.test(landingHtml) &&
+    /can be wrong or out of date/i.test(landingHtml)
+);
+// Regression guard for the dashboard preview: it used to advertise the
+// pre-reorganization sidebar (~30 flat links). It is now derived from
+// NAV_SECTIONS, so the six groups and the account cluster must be present.
+check(
+  "landing dashboard preview mirrors the current navigation",
+  /Study Plan &amp; Tests/.test(landingHtml) &&
+    /After Admission/.test(landingHtml) &&
+    /Account &amp; settings/.test(landingHtml) &&
+    /University Portfolio Strategy/.test(landingHtml)
+);
+check(
+  "landing dashboard preview no longer shows the old flat sidebar links",
+  !/Tasks &amp; Roadmap/.test(landingHtml) && !/mockSidebar/.test(landingHtml)
+);
 
 // ---------------------------------------------------------------------------
 section("7. UniversityExplorer & UniversityDetail render in every locale");

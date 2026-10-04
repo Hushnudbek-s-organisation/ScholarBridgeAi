@@ -16,6 +16,7 @@ import {
 import { formatMoney } from "@/lib/format";
 import { AiFormattedText } from "./AiFormattedText";
 import { AnimatePresence, motion } from "framer-motion";
+import { AppNote } from "@/components/AppNote";
 
 interface AiChatMentorProps {
   activeProfile: StudentProfile | null;
@@ -138,6 +139,11 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
             </p>
           </div>
         </div>
+      </div>
+
+      {/* AI disclosure — visible before the first reply, not only in Terms. */}
+      <div className="border-b border-slate-100 bg-amber-50/70 px-4 py-1.5">
+        <AppNote kind="ai" />
       </div>
 
       {/* Messages Scroll View */}

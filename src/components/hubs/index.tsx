@@ -159,6 +159,7 @@ export function UniversitiesHub({
 }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("universities");
   const active = useActivePane(pane, visible, hidden);
 
@@ -172,6 +173,7 @@ export function UniversitiesHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "search" && (
         <UniversityExplorer
@@ -211,6 +213,7 @@ export function ScholarshipsHub({
   onUnsaveScholarship,
 }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("scholarships");
   const active = useActivePane(pane, visible, hidden);
 
@@ -224,6 +227,7 @@ export function ScholarshipsHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "browse" && (
         <ScholarshipHub
@@ -246,6 +250,7 @@ export function ScholarshipsHub({
  * ====================================================================== */
 export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("study-plan");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -260,6 +265,7 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("planning") }}
     >
       {active === "plan" && <StudyPlanPanel profileId={profile.id} onNavigateTab={navigate} />}
       {active === "tests" && <TestPlannerPanel profileId={profile.id} />}
@@ -273,6 +279,7 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
  * ====================================================================== */
 export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("tasks");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -285,6 +292,7 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("planning") }}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
       {active === "deadlines" && <DeadlineCenter profileId={profile.id} />}
@@ -303,6 +311,7 @@ export function ProfileHub({
   onProfileSaved,
 }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("profile");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -317,6 +326,7 @@ export function ProfileHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "warn", text: td("estimate") }}
     >
       {active === "readiness" && <ProfileStrengthPanel activeProfile={profile} />}
       {active === "goals" && <GoalPlanner activeProfile={profile} />}
@@ -338,6 +348,7 @@ export function ProfileHub({
  * ====================================================================== */
 export function FundingHub({ profile, navigate }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { label } = usePanes("funding");
   if (!profile) return <MissingProfile />;
   return (
@@ -346,6 +357,7 @@ export function FundingHub({ profile, navigate }: HubProps) {
       intro={t("introFunding")}
       primaryLabel={t("primaryScholarships")}
       onPrimary={() => navigate("scholarships")}
+      note={{ tone: "warn", text: td("money") }}
     >
       <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
     </HubPage>
@@ -357,6 +369,7 @@ export function FundingHub({ profile, navigate }: HubProps) {
  * ====================================================================== */
 export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, workspaceId, setWorkspaceId }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("applications");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -376,6 +389,7 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("planning") }}
     >
       {active === "tracker" && <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />}
       {active === "workspace" && (
@@ -396,6 +410,7 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
  * ====================================================================== */
 export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspaceId, setWorkspaceId }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("materials");
   const active = useActivePane(pane, visible, hidden);
   const profileId = profile?.id ?? null;
@@ -483,6 +498,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "warn", text: td("ai") }}
     >
       {context}
       {active === "requirements" && (
@@ -570,6 +586,7 @@ export function PostAdmissionFundingHub({ profile, navigate }: HubProps) {
  * ====================================================================== */
 export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("visa");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -584,7 +601,7 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: t("afterAdmissionNote") }}
+      note={{ tone: "warn", text: td("visa") }}
     >
       {active === "visa" && (
         <div className="space-y-4">
@@ -640,6 +657,7 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
  * ====================================================================== */
 export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
   const t = useTranslations("hubs");
+  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("community");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -654,6 +672,7 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      note={{ tone: "info", text: td("community") }}
     >
       {active === "forum" && <ForumSection activeProfile={profile} isModerator={profile.isAdmin ?? false} />}
       {active === "courses" && (

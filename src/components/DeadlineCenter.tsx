@@ -12,6 +12,7 @@ import {
   FileText,
   FlaskConical,
 } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 interface DeadlineItem {
   id: string;
@@ -212,6 +213,8 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
           </ul>
         )}
       </div>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="planning" className="mt-2" />
     </div>
   );
 }

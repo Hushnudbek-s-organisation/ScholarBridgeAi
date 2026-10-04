@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, Compass, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AppNote } from "@/components/AppNote";
 
 interface OppItem {
   id: number;
@@ -176,6 +177,8 @@ export function OpportunitiesPanel() {
           ))}
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2 border-t border-slate-100 pt-3" />
     </div>
   );
 }

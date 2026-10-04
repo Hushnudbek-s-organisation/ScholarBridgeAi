@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "./ui";
+import { AppNote } from "@/components/AppNote";
 
 interface Story {
   id: number;
@@ -582,6 +583,8 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
         )}
       </AnimatePresence>
       <Toast message={toast} />
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="community" className="mt-2" />
     </div>
   );
 }

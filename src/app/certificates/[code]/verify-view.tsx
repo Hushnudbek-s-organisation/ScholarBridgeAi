@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import { Award, BadgeCheck, BadgeX, GraduationCap, Loader2 } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 interface VerifyRow {
   id: number;
@@ -125,6 +126,12 @@ export function CertificateVerifyView({ code }: { code: string }) {
             <p className="mt-3 text-sm text-rose-700 dark:text-rose-400">{t("invalidHelp")}</p>
           </div>
         )}
+      </div>
+
+      {/* What "valid" means — the check confirms this platform issued the
+          certificate, not that any university or employer recognises it. */}
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+        <AppNote kind="certificate" />
       </div>
 
       <footer className="mt-6 text-center">

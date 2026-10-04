@@ -8,6 +8,7 @@ import { ForumCategoryList, ForumCategory } from "./ForumCategoryList";
 import { ForumThreadList, ForumThreadSummary, ForumSort } from "./ForumThreadList";
 import { ForumThreadView, ForumReplyItem } from "./ForumThreadView";
 import { ForumModerationPanel, ForumReportItem } from "./ForumModerationPanel";
+import { AppNote } from "@/components/AppNote";
 
 interface ForumSectionProps {
   activeProfile: StudentProfile | null;
@@ -448,6 +449,8 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
           </div>
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="community" className="mt-2 border-t border-slate-100 pt-3" />
     </div>
   );
 }

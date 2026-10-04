@@ -665,10 +665,55 @@ async function main() {
     assert.match(gate, /data\?\.features\?\.\[feature\]/);
     const lockedBranch = gate.slice(gate.indexOf("if (isPremium) {"));
     assert.equal((lockedBranch.match(/\{children\}/g) || []).length, 1, "children may only render in the unlocked branch");
-    const page = readFileSync(join(ROOT, "src/app/page.tsx"), "utf8");
-    const uses = page.match(/<PremiumGate[\s\S]*?>/g) || [];
-    // SOP + parent (and any future Pro-only sections) — free sections no longer wrap PremiumGate.
-    assert.ok(uses.length >= 2 && uses.every((u) => /feature="[a-z_]+"/.test(u)), "every PremiumGate names its feature");
+    // Every mount, wherever it lives — the app shell renders PremiumGate
+    // directly and the hub wrapper (`Gated`) renders it for the Pro panes —
+    // must name the feature it unlocks: a gate without a feature cannot check
+    // the right entitlement. This used to read only `app/page.tsx`, which the
+    // hub refactor emptied of all but one mount, so the assertion rotted.
+    const openingTag = (src: string, start: number) => {
+      let depth = 0;
+      for (let i = start; i < src.length; i += 1) {
+        const ch = src[i];
+        if (ch === "{") depth += 1;
+        else if (ch === "}") depth -= 1;
+        // Brace-aware: `onUpgrade={() => …}` must not cut the tag short.
+        else if (ch === ">" && depth === 0) return src.slice(start, i + 1);
+      }
+      return src.slice(start);
+    };
+    const mounts: { file: string; tag: string }[] = [];
+    (function walk(dir: string) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith(".tsx")) {
+          const src = readFileSync(full, "utf8");
+          let i = src.indexOf("<PremiumGate");
+          while (i !== -1) {
+            mounts.push({ file: full.replace(ROOT, ""), tag: openingTag(src, i) });
+            i = src.indexOf("<PremiumGate", i + 1);
+          }
+        }
+      }
+    })(join(ROOT, "src"));
+    assert.ok(mounts.length >= 2, `PremiumGate is mounted (found ${mounts.length})`);
+    assert.ok(
+      mounts.every((m) => /feature=("[a-z_]+"|\{[A-Za-z_$][\w$]*\})/.test(m.tag)),
+      `every PremiumGate names its feature — missing in ${mounts.filter((m) => !/feature=/.test(m.tag)).map((m) => m.file).join(", ")}`
+    );
+    // `Gated` forwards its `feature` prop, so every call site must pass a
+    // concrete feature (never undefined, never a computed empty string).
+    const hubs = readFileSync(join(ROOT, "src/components/hubs/index.tsx"), "utf8");
+    const gated: string[] = [];
+    let gi = hubs.indexOf("<Gated");
+    while (gi !== -1) {
+      gated.push(openingTag(hubs, gi));
+      gi = hubs.indexOf("<Gated", gi + 1);
+    }
+    assert.ok(
+      gated.length >= 1 && gated.every((c) => /feature="[a-z_]+"/.test(c)),
+      "every Gated call names its feature"
+    );
   });
 
   check("public / cross-account data exposure fixes stay in place", () => {

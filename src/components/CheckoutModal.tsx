@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, CreditCard, ArrowRight } from "lucide-react";
+import { AppNote } from "@/components/AppNote";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -120,6 +121,8 @@ export function CheckoutModal({
           {t("cancel")} <ArrowRight className="h-3.5 w-3.5 rotate-180" />
         </button>
       </div>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="thirdParty" className="mt-2" />
     </div>
   );
 }

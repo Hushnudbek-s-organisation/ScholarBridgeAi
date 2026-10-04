@@ -21,6 +21,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { AppNote } from "@/components/AppNote";
 
 export interface Scholarship {
   id: number;
@@ -427,6 +428,8 @@ export function ScholarshipHub({
           onPageChange={handlePageChange}
         />
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="catalogue" className="mt-2 border-t border-slate-100 pt-3" />
     </div>
   );
 }

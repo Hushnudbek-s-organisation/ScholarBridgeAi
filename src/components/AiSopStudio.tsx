@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toPlainText } from "@/lib/ai/format-reply";
 import { AiFormattedText } from "./AiFormattedText";
+import { AppNote } from "@/components/AppNote";
 
 interface AiSopStudioProps {
   activeProfile: StudentProfile | null;
@@ -315,6 +316,8 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
           </div>
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="ai" className="mt-2" />
     </div>
   );
 }

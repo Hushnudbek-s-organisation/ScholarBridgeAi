@@ -234,17 +234,32 @@ section("5. Advisor brief contains only real numbers");
 
 const brief = buildAdvisorBrief(advisorInput);
 check("the brief names the student", brief.includes("Aziza"));
-check("the brief keeps fit and admission separate", /fit 78%, admission estimate 18–27%/.test(brief));
+// PROBABILITY POLICY: the brief carries the fit score but deliberately
+// carries NO admission probability — the model may not invent one, so the
+// brief must not hand it a number to quote either.
+check(
+  "the brief keeps fit and admission probability separate",
+  /fit 78%/.test(brief) &&
+    /Admission probability: UNAVAILABLE/.test(brief) &&
+    !/\b18\b|\b27\b/.test(brief)
+);
 check("the brief lists the weak points", brief.includes("SAT below the published 25th percentile"));
 check("the brief carries the question", brief.includes("Is my university list balanced?"));
 check("the brief states the completeness figure", brief.includes("88% complete"));
 
 section("6. Hallucinated numbers are rejected");
 
+check("a reply inventing an admission probability is still rejected", (() => {
+  const r = isTrustworthyReply(
+    "Your fit at Ivy Selective is 78%, and the model puts your admission probability at 18%.",
+    advisorInput
+  );
+  return !r.ok;
+})());
 check(
   "a reply quoting a real figure is accepted",
   isTrustworthyReply(
-    "Your fit at Ivy Selective is 78%, and the model puts admission at 18–27%. Focus on the essays.",
+    "Your fit at Ivy Selective is 78%, and that is a requirements match. We do not provide an admission probability — treat the fit score as a match, not as odds.",
     advisorInput
   ).ok
 );
@@ -269,7 +284,10 @@ check(
 check("an empty reply is rejected", !isTrustworthyReply("", advisorInput).ok);
 check("a stub reply is rejected", !isTrustworthyReply("Yes.", advisorInput).ok);
 check("the system prompt forbids invented numbers", /never compute, estimate, adjust or invent/i.test(ADVISOR_SYSTEM_PROMPT));
-check("the system prompt keeps fit and admission apart", /FIT vs ADMISSION are different things/.test(ADVISOR_SYSTEM_PROMPT));
+check(
+  "the system prompt keeps fit and admission probability apart",
+  /FIT IS NOT ADMISSION PROBABILITY/.test(ADVISOR_SYSTEM_PROMPT)
+);
 check("the system prompt forbids guarantees", /NO GUARANTEES/.test(ADVISOR_SYSTEM_PROMPT));
 
 section("7. Rules-based advice stands alone");
@@ -281,21 +299,33 @@ check("advice gives exactly three steps", advice.steps.length === 3);
 check("advice lists strengths", advice.strengths.length > 0);
 check("advice lists risks", advice.risks.length > 0);
 check("advice has a strategy line", advice.strategy.length > 20);
+// The engine reasons about FIT tiers (requirements match), not reach/target/
+// safety bands — the bands implied admission odds, which we do not estimate.
+const stretchOnly = rulesAdvice({
+  ...advisorInput,
+  chances: [chance({ universityName: "Stretch U", fitScore: 40 })],
+});
 check(
-  "an all-reach list is called out",
-  /no safety/i.test(rulesAdvice(advisorInput).risks.join(" ") + rulesAdvice(advisorInput).strategy)
+  "a list where every fit is unmet is called out",
+  /unmet requirements/i.test(stretchOnly.risks.join(" ") + stretchOnly.strategy)
 );
 
 const balanced = rulesAdvice({
   ...advisorInput,
   chances: [
-    chance({ universityName: "Reach U", admission: { low: 8, high: 14, mid: 11, band: "reach", label: "Reach" } }),
-    chance({ universityName: "Target U", admission: { low: 35, high: 50, mid: 42, band: "target", label: "Target" } }),
-    chance({ universityName: "Safety U", admission: { low: 70, high: 85, mid: 78, band: "safety", label: "Safety" } }),
+    chance({ universityName: "Stretch U", fitScore: 40 }),
+    chance({ universityName: "Moderate U", fitScore: 75 }),
+    chance({ universityName: "Strong U", fitScore: 90 }),
   ],
 });
-check("a balanced list gets a different strategy", /Balanced list: 1 reach, 1 target, 1 safety/.test(balanced.strategy));
-check("a balanced list raises no safety warning", !balanced.risks.some((r) => /no safety/i.test(r)));
+check(
+  "a balanced list gets a different strategy",
+  /Balanced list: 1 stretch, 1 moderate, 1 strong fit/.test(balanced.strategy)
+);
+check(
+  "a balanced list raises no unmet-requirements warning",
+  !balanced.risks.some((r) => /unmet requirements/i.test(r))
+);
 
 const emptyList = rulesAdvice({ ...advisorInput, chances: [] });
 check("an empty shortlist tells the student to build one", /build a shortlist/i.test(emptyList.summary + emptyList.strategy));

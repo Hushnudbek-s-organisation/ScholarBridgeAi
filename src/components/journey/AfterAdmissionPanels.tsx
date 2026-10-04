@@ -28,6 +28,7 @@ import {
   SourceTag,
   inputClass,
 } from "./ui";
+import { AppNote } from "@/components/AppNote";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
@@ -225,6 +226,8 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
           </JourneyCard>
         ))
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="money" className="mt-2" />
     </div>
   );
 }
@@ -448,6 +451,8 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
           ))}
         </div>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="ai" className="mt-2" />
     </div>
   );
 }
@@ -714,6 +719,8 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
           </Button>
         </JourneyCard>
       )}
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="money" className="mt-2" />
     </div>
   );
 }
@@ -807,6 +814,8 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
           </>
         )}
       </JourneyCard>
+      {/* Standing small print: this panel can be wrong — say so where it is read. */}
+      <AppNote kind="thirdParty" className="mt-2" />
     </div>
   );
 }
