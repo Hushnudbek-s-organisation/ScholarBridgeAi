@@ -76,6 +76,7 @@ import {
 import { ALL_MAJORS, CAREER_PATHS } from "../src/lib/journey/careers";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
+  isProfileEditorTarget,
   LEGACY_SECTION_ALIASES,
   NAV_GROUPS,
   NAV_SECTIONS,
@@ -1091,30 +1092,31 @@ check("the after-admission destinations run offer → funding → visa in order"
   assert.deepEqual(after, ["offers", "post-admission-funding", "visa"]);
 });
 
-check("the profile Edit link stays reachable even with stale hidden-navigation config", () => {
-  // The profile card's Edit button deep-links to profile/details. Both the
-  // locked destination and its editor pane must survive old hidden lists;
-  // otherwise Navbar redirects the student to the dashboard.
+check("profile editing stays in a modal instead of a separate navigation pane", () => {
+  // The account-card Edit button and the old profile-details deep links open
+  // ProfileModal; the Profile & Goals hub remains for readiness and goals.
   assert.ok(!DEFAULT_HIDDEN_NAV_ITEMS.includes("profile"), "profile hidden by default");
-  assert.ok(!DEFAULT_HIDDEN_NAV_ITEMS.includes("details"), "details hidden by default");
   assert.ok(!parseHiddenNav(null).includes("profile"), "default config hides Profile & Goals");
-  assert.ok(!parseHiddenNav(null).includes("details"), "default config hides details");
 
-  // Heal stale values from before the destination/pane became locked, while
-  // leaving unrelated user-configured hidden entries alone.
+  // Heal old configs that still name the removed editor pane, while leaving
+  // unrelated user-configured hidden entries alone.
   const stale = parseHiddenNav(JSON.stringify(["profile", "details", "parent"]));
   assert.ok(!stale.includes("profile"), "a stored 'profile' survives parsing");
-  assert.ok(!stale.includes("details"), "a stored 'details' survives parsing");
+  assert.ok(!stale.includes("details"), "a stored legacy 'details' id survives parsing");
   assert.ok(stale.includes("parent"), "other stored ids must survive");
 
   const profileSection = NAV_SECTIONS.find((section) => section.id === "profile");
   assert.equal(profileSection?.locked, true, "Profile & Goals should remain a locked destination");
-  assert.ok(
-    visiblePanes("profile", stale).some((p) => p.id === "details"),
-    "details pane filtered out of Profile & Goals"
-  );
-  const target = resolveNavTarget("profile/details");
-  assert.ok(target && target.section === "profile" && target.pane === "details", "profile/details does not resolve");
+  assert.ok(!profileSection?.panes.some((p) => p.id === "details"), "the former editor pane should be removed from Profile & Goals");
+  assert.ok(!visiblePanes("profile", stale).some((p) => p.id === "details"), "legacy editor pane is still visible");
+
+  // Existing journey links still resolve to the profile area; the app shell
+  // intercepts the exact editor links and opens the modal instead.
+  for (const id of ["profile/details", "profile-details"]) {
+    assert.ok(isProfileEditorTarget(id), `${id} is not recognized as an editor link`);
+    const target = resolveNavTarget(id);
+    assert.ok(target && target.section === "profile" && target.pane === "readiness", `${id} does not resolve to the profile hub`);
+  }
 });
 
 check("hiding a pane never removes the destination it belongs to", () => {

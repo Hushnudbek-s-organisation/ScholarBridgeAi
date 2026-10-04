@@ -29,7 +29,6 @@ import { ProfileModal } from "../src/components/ProfileModal";
 import { OnboardingWizard } from "../src/components/OnboardingWizard";
 import { DashboardView } from "../src/components/DashboardView";
 import { RecommendationStudio } from "../src/components/RecommendationStudio";
-import { CompleteProfileForm } from "../src/components/CompleteProfileForm";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
 
 let passed = 0;
@@ -325,8 +324,8 @@ for (const locale of ["en", "uz", "ru"]) {
   check(`dashboard displays the paired degree name (${locale})`, dashboard.error === null && text(dashboard.html).includes(expected.Bachelor), dashboard.error ?? "missing paired badge");
   const recommend = renderLocalized(locale, React.createElement(RecommendationStudio, { activeProfile: null }));
   check(`recommendation studio still renders (${locale})`, recommend.error === null && recommend.html.length > 50, recommend.error ?? "");
-  const complete = renderLocalized(locale, React.createElement(CompleteProfileForm, { activeProfile: profile, onSaved: () => {} }));
-  check(`complete-profile form still renders (${locale})`, complete.error === null && complete.html.length > 50, complete.error ?? "");
+  const editor = renderLocalized(locale, React.createElement(ProfileModal, { isOpen: true, isNew: false, profile, onClose: () => {}, onSave: async () => {} }));
+  check(`existing profile editor remains a separate modal (${locale})`, editor.error === null && editor.html.includes("Edit Academic Profile") && editor.html.includes("Save Profile Changes") && editor.html.includes("Extracurriculars"), editor.error ?? "missing editor fields");
 }
 
 for (const [name, condition] of [
