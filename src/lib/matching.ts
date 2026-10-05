@@ -1,3 +1,7 @@
+import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
+import { gpaTo40Scale } from "./gpa";
+import { canonicalSubjectTokens, subjectAffinity, subjectTokens } from "./subjectAffinity";
+
 export interface StudentProfileData {
   id?: number;
   name?: string;
@@ -7,6 +11,7 @@ export interface StudentProfileData {
   gpaScale: number;
   ieltsScore?: number | null;
   toeflScore?: number | null;
+  duolingoScore?: number | null;
   satScore?: number | null;
   greScore?: number | null;
   budgetAnnualUsd: number;
@@ -58,6 +63,75 @@ export interface ScholarshipData {
   websiteUrl: string;
 }
 
+/**
+ * Word-token overlap between two field/major names — the ONE comparison used
+ * for every field match in this module.
+ *
+ * Why not substring matching: a student major of "AI" would otherwise match
+ * "Sustain-AI-nable Engineering", and a blank major would match everything
+ * (`"".includes("")` is true). Why not `majorSimilarity()`: it drops tokens
+ * shorter than 3 characters, so "AI"/"IT" fall back to its 0.5 "unknown"
+ * value and would pass an eligibility threshold they should not pass.
+ *
+ * Returns null when either side has no usable tokens → the caller must treat
+ * the comparison as UNKNOWN (never as a match, never as a failure).
+ */
+export { subjectTokens } from "./subjectAffinity";
+
+export function majorOverlap(a: string | null | undefined, b: string | null | undefined): number | null {
+  const A = subjectTokens(a);
+  const B = subjectTokens(b);
+  if (!A.length || !B.length) return null;
+  const setB = new Set(B);
+  const overlap = A.filter((w) => setB.has(w)).length;
+  return Math.min(1, overlap / Math.min(A.length, B.length));
+}
+
+/**
+ * Subject alignment between the student's target major and the university's
+ * published program focus.
+ *
+ * Uses the synonym-aware affinity engine from the recommender
+ * (`gpaTo40Scale`/`subjectAffinity`), so "Informatics", "Software
+ * Engineering" and "AI" relate to "Computer Science" the same way they do in
+ * the Program-match tab. Conservative:
+ *   • either side unknown/blank → "unknown" (no score change, no claim);
+ *   • exact/synonym             → strong positive reason;
+ *   • partial/weak              → modest positive reason;
+ *   • no relation               → a visible issue (never hidden).
+ * This exists because a match score that ignores the field can rank a
+ * Law-bound student above a CS-bound one at the same university.
+ */
+/**
+ * Canonical field tokens (SUBJECT_TOKEN_CANON) now live in
+ * src/lib/subjectAffinity.ts, together with the synonym groups, so the
+ * university matcher, the recommender and chancing share one definition.
+ */
+const canonicalTokens = canonicalSubjectTokens;
+
+export function subjectAlignment(
+  profileMajor: string | null | undefined,
+  programMajor: string | null | undefined
+): { level: "strong" | "partial" | "none" | "unknown"; similarity: number | null } {
+  const a = (profileMajor ?? "").trim();
+  const b = (programMajor ?? "").trim();
+  const A = canonicalTokens(a);
+  const B = canonicalTokens(b);
+  if (!a || !b || !A.size || !B.size) return { level: "unknown", similarity: null };
+
+  const fit = subjectAffinity([a], b);
+  const overlap = [...A].filter((t) => B.has(t)).length;
+  const ratio = overlap / Math.min(A.size, B.size);
+  if (fit.level === "exact" || fit.level === "synonym" || ratio >= 0.5) {
+    return { level: "strong", similarity: Math.max(ratio, fit.score) };
+  }
+  if (fit.level === "partial" || fit.level === "weak" || overlap > 0) {
+    return { level: "partial", similarity: Math.max(ratio, fit.score) };
+  }
+  if (fit.level === "none") return { level: "none", similarity: 0 };
+  return { level: "unknown", similarity: null };
+}
+
 export function calculateUniversityMatch(profile: StudentProfileData, uni: UniversityData) {
   let score = 70;
   // Weighted reasons/issues — ranked by importance so the UI can show the
@@ -65,11 +139,13 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   const reasons: { text: string; weight: number }[] = [];
   const potentialIssues: { text: string; weight: number }[] = [];
 
-  // Normalize GPA to 4.0 scale (spec §23 — explain the score)
-  const normGpa = Math.min(4.0, profile.gpaScale > 0 ? (profile.gpa / profile.gpaScale) * 4.0 : profile.gpa);
+  // Normalize GPA to 4.0 scale. An unknown scale with a value > 4 stays
+  // unknown (never clamped to a perfect 4.0) — see src/lib/gpa.ts.
+  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
 
-  // GPA — only when the university officially specifies a minimum (spec §14).
-  if (uni.minGpa != null) {
+  // GPA — only when the university officially specifies a minimum (spec §14)
+  // AND the student's GPA is comparable (normGpa != null).
+  if (uni.minGpa != null && normGpa != null) {
     const gpaDiff = normGpa - uni.minGpa;
     if (gpaDiff >= 0.5) {
       score += 15;
@@ -95,11 +171,30 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   if (uni.minIelts != null) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      score -= 25;
-      potentialIssues.push({
-        text: `IELTS ${uni.minIelts} required — you don't have an IELTS score yet`,
-        weight: 25,
-      });
+      // An equivalent test (TOEFL / Duolingo) is NOT the same as "no English
+      // certificate", so it carries a smaller, clearly-worded issue: the
+      // published bar is IELTS, and acceptance of the alternative must be
+      // confirmed with the university — we never silently treat it as met.
+      const hasAlternative =
+        (typeof profile.toeflScore === "number" && profile.toeflScore > 0) ||
+        (typeof profile.duolingoScore === "number" && profile.duolingoScore > 0);
+      if (hasAlternative) {
+        const alt =
+          typeof profile.toeflScore === "number" && profile.toeflScore > 0
+            ? `TOEFL ${profile.toeflScore}`
+            : `Duolingo ${profile.duolingoScore}`;
+        score -= 5;
+        potentialIssues.push({
+          text: `IELTS ${uni.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
+          weight: 5,
+        });
+      } else {
+        score -= 25;
+        potentialIssues.push({
+          text: `IELTS ${uni.minIelts} required — you don't have an IELTS score yet`,
+          weight: 25,
+        });
+      }
     } else if (profile.ieltsScore! >= uni.minIelts + 0.5) {
       score += 8;
       reasons.push({ text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8 });
@@ -115,8 +210,12 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     }
   }
 
-  // SAT — only when the university officially specifies a minimum.
-  if (uni.minSat != null) {
+  // SAT — only when the university officially specifies a minimum AND the
+  // test can actually be part of this student's admission. A graduate
+  // applicant (or a graduate-only institution) must not be told that a
+  // published undergraduate SAT minimum is "required", nor be penalised for
+  // not holding a score they never needed.
+  if (uni.minSat != null && undergraduateTestApplies(uni.degreeLevel, profile.degreeLevel)) {
     const hasSat = typeof profile.satScore === "number" && profile.satScore > 0;
     if (!hasSat) {
       score -= 20;
@@ -134,6 +233,23 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
         weight: 15,
       });
     }
+  }
+
+  // Subject alignment — the university's published program focus vs the
+  // student's target major. Unknown on either side stays neutral (no claim).
+  const alignment = subjectAlignment(profile.targetMajor, uni.programMajor);
+  if (alignment.level === "strong") {
+    score += 12;
+    reasons.push({ text: `Offers your field: ${uni.programMajor}`, weight: 12 });
+  } else if (alignment.level === "partial") {
+    score += 4;
+    reasons.push({ text: `Partly related to your field: ${uni.programMajor}`, weight: 4 });
+  } else if (alignment.level === "none") {
+    score -= 15;
+    potentialIssues.push({
+      text: `Programmes focus on ${uni.programMajor} — check whether your field (${profile.targetMajor}) is offered here`,
+      weight: 15,
+    });
   }
 
   // Budget Alignment — only when tuition data is verified AND the profile has a budget
@@ -212,9 +328,10 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   const reasons: string[] = [];
   const potentialIssues: string[] = [];
 
-  // GPA check (spec §22 — explain WHY it matches)
-  const normGpa = Math.min(4.0, profile.gpaScale > 0 ? (profile.gpa / profile.gpaScale) * 4.0 : profile.gpa);
-  if (scholarship.minGpa) {
+  // GPA check (spec §22 — explain WHY it matches). Unknown scale → unknown
+  // GPA: no comparison, no claim (see src/lib/gpa.ts).
+  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
+  if (scholarship.minGpa && scholarship.minGpa > 0 && normGpa != null) {
     if (normGpa >= scholarship.minGpa + 0.4) {
       score += 15;
       reasons.push(`GPA ${normGpa.toFixed(2)} well above the ${scholarship.minGpa} minimum`);
@@ -229,12 +346,28 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
 
   // IELTS check — a missing test is a real penalty (same rule as
   // calculateUniversityMatch): a scholarship requiring IELTS must NEVER show
-  // a high match for a student without an IELTS score.
-  if (scholarship.minIelts) {
+  // a high match for a student without an IELTS score. An equivalent test
+  // (TOEFL / Duolingo) is a smaller, clearly-worded issue: the published bar
+  // is IELTS and acceptance of the alternative must be confirmed.
+  if (scholarship.minIelts && scholarship.minIelts > 0) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      score -= 15;
-      potentialIssues.push(`IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`);
+      const hasAlternative =
+        (typeof profile.toeflScore === "number" && profile.toeflScore > 0) ||
+        (typeof profile.duolingoScore === "number" && profile.duolingoScore > 0);
+      if (hasAlternative) {
+        const alt =
+          typeof profile.toeflScore === "number" && profile.toeflScore > 0
+            ? `TOEFL ${profile.toeflScore}`
+            : `Duolingo ${profile.duolingoScore}`;
+        score -= 3;
+        potentialIssues.push(
+          `IELTS ${scholarship.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`
+        );
+      } else {
+        score -= 15;
+        potentialIssues.push(`IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`);
+      }
     } else if (profile.ieltsScore! >= scholarship.minIelts) {
       score += 10;
       reasons.push(`IELTS ${profile.ieltsScore} meets the ${scholarship.minIelts} requirement`);
@@ -253,30 +386,64 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     levels = [];
   }
   if (levels.length > 0) {
-    if (levels.includes("All") || levels.some(l => l.toLowerCase() === profile.degreeLevel.toLowerCase())) {
+    // Alias-aware comparison (src/lib/degreeLevels.ts): "Master's", "MSc",
+    // "магистратура" and the catalogue's "Master" all compare equal. An
+    // unrecognised label on either side is UNKNOWN — never a mismatch, and
+    // never claimed as a match.
+    const levelFit = compareDegreeLevels(profile.degreeLevel, scholarship.degreeLevels);
+    if (levelFit === "match") {
       score += 10;
       reasons.push(`Open to ${profile.degreeLevel} applicants`);
-    } else {
+    } else if (levelFit === "mismatch") {
       score -= 25;
       potentialIssues.push(`Only open to: ${levels.join(", ")}`);
+    } else {
+      potentialIssues.push(
+        `Levels on this award (${levels.join(", ")}) could not be compared with your level — check the official page`
+      );
     }
   }
 
-  // Eligible majors (spec §22)
+  // Eligible majors (spec §22). Matching is WORD-based, so a short token
+  // ("AI", "IT") can never match an unrelated word by substring accident.
+  // Unknown major on either side is neutral: the student is not told their
+  // field is eligible when we do not know it.
   try {
     const parsed = scholarship.eligibleMajors ? JSON.parse(scholarship.eligibleMajors) : [];
     const majors: string[] = Array.isArray(parsed) ? parsed : [];
-    if (majors.length && !majors.includes("All")) {
-      const matchMajor = majors.some((m) =>
-        m.toLowerCase().includes(profile.targetMajor.toLowerCase().split(" ")[0]) ||
-        profile.targetMajor.toLowerCase().includes(m.toLowerCase())
-      );
-      if (matchMajor) {
-        score += 8;
-        reasons.push(`Your field (${profile.targetMajor}) is eligible`);
+    const studentMajor = (profile.targetMajor ?? "").trim();
+    if (majors.length && !majors.some((m) => m.trim().toLowerCase() === "all")) {
+      // "Eligible" needs a real relation on either scale: a shared subject
+      // word, or an exact/synonym hit on the synonym-aware affinity engine
+      // ("Software Engineering" ↔ "Computer Science").
+      const bestSimilarity = studentMajor
+        ? Math.max(
+            ...majors.map((m) => {
+              const tokenOverlap = majorOverlap(studentMajor, m);
+              if (tokenOverlap != null && tokenOverlap > 0) return tokenOverlap;
+              const fit = subjectAffinity([studentMajor], m);
+              return fit.level === "exact" || fit.level === "synonym" ? fit.score : tokenOverlap ?? 0;
+            })
+          )
+        : null;
+      if (studentMajor && !subjectTokens(studentMajor).length) {
+        // The profile has a value, but it carries no comparable words
+        // ("—", "n/a"): unknown, not a match and not a penalty.
+        potentialIssues.push(
+          `This award lists eligible fields (${majors.join(", ")}) — your target major could not be compared, check the official page`
+        );
+      } else if (bestSimilarity == null) {
+        potentialIssues.push(
+          `This award lists eligible fields (${majors.join(", ")}) — add your target major to your profile to be matched`
+        );
       } else {
-        score -= 10;
-        potentialIssues.push(`Field limited to: ${majors.join(", ")}`);
+        if (bestSimilarity >= 0.5) {
+          score += 8;
+          reasons.push(`Your field (${studentMajor}) is eligible`);
+        } else {
+          score -= 10;
+          potentialIssues.push(`Field limited to: ${majors.join(", ")}`);
+        }
       }
     }
   } catch {
@@ -291,7 +458,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
 
   // Merit based vs GPA & Publications
   if (scholarship.meritBased) {
-    if (normGpa >= 3.6 || (profile.researchPublications || 0) > 0) {
+    if ((normGpa != null && normGpa >= 3.6) || (profile.researchPublications || 0) > 0) {
       score += 10;
       reasons.push("Merit-based — strong academic record / publications");
     }

@@ -25,7 +25,7 @@
  * Usage: npm run test:provenance
  */
 import pg from "pg";
-import "dotenv/config";
+import "./lib/env";
 import { isStaleVerified } from "../src/lib/provenance";
 
 const APP_URL = process.env.PROVENANCE_APP_URL || "http://127.0.0.1:3000";

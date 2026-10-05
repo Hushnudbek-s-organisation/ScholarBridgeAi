@@ -15,6 +15,7 @@
  */
 
 import { majorSimilarity } from "./chancing";
+import { subjectSimilarity } from "./subjectAffinity";
 
 export type OpportunityType = "competition" | "research" | "internship" | "summer_school";
 export type OpportunityLevel = "high_school" | "undergrad" | "grad" | "phd" | "any";
@@ -96,7 +97,12 @@ export function scoreOpportunity(
     match += 25;
     reasons.push("open to all fields");
   } else if (profile.major?.trim()) {
-    const best = Math.max(...fields.map((f) => majorSimilarity(profile.major, f)));
+    // Field relatedness uses the app-wide synonym-aware matcher; the plain
+    // word-overlap value is kept as a floor so a genuine overlap is never
+    // scored lower than before.
+    const best = Math.max(
+      ...fields.map((f) => Math.max(majorSimilarity(profile.major, f), subjectSimilarity(profile.major, f)))
+    );
     if (best >= 0.5) {
       match += Math.round(best * 40);
       reasons.push(`field match: ${profile.major}`);

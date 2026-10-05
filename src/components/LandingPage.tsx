@@ -392,7 +392,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                         </div>
                       </div>
                       <div className="hidden w-[110px] shrink-0 flex-col items-center rounded-xl border border-white/10 bg-white/5 p-2 sm:flex">
-                        <div className="text-[7px] font-bold tracking-wider text-slate-300">{td("admissionsIndex")}</div>
+                        <div className="text-[7px] font-bold tracking-wider text-slate-300">{td("readinessLabel")}</div>
                         <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/60">
                           <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
                         </div>
@@ -489,9 +489,12 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               </ul>
             </Reveal>
             <Reveal delay={0.12} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-7">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <strong className="text-sm font-extrabold">{t("chanceCardLabel")}</strong>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">{t("chanceHybrid")}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">{t("demoBadge")}</span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">{t("chanceBadge")}</span>
+                </span>
               </div>
               <div className="mt-2 flex items-center justify-between border-b border-slate-100 py-3.5">
                 <span className="text-sm text-slate-600">{t("chanceMatch")}</span>
@@ -502,8 +505,8 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <span className="text-4xl font-black tracking-tight text-indigo-600">—</span>
               </div>
               <div className="flex items-center justify-between py-3.5">
-                <span className="text-sm text-slate-600">{t("chanceEvidence")}</span>
-                <strong className="text-base font-black">{t("chanceBuilding")}</strong>
+                <span className="text-sm text-slate-600">{t("chanceDataBasis")}</span>
+                <strong className="text-base font-black">{t("chanceDataPublished")}</strong>
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{t("chanceNote")}</p>
             </Reveal>

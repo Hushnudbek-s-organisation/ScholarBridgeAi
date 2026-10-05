@@ -14,6 +14,7 @@ import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
+import { pickBestSource } from "@/lib/sourcePick";
 
 /**
  * Resilient university select: tries the full schema first. If the database
@@ -69,8 +70,6 @@ export async function GET(req: Request) {
     const sort = searchParams.get("sort");
     const uniType = searchParams.get("type"); // Public | Private
     const ieltsFilter = searchParams.get("ielts"); // e.g. "6.5" → only unis with minIelts <= 6.5
-    const scholarshipOnly = searchParams.get("scholarships") === "true";
-    const englishOnly = searchParams.get("english") === "true";
     const minRank = searchParams.get("minRank") ? Number(searchParams.get("minRank")) : null;
     const maxRank = searchParams.get("maxRank") ? Number(searchParams.get("maxRank")) : null;
 
@@ -129,11 +128,6 @@ export async function GET(req: Request) {
     if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
-    // Scholarship availability: universities that have at least one scholarship
-    // in the app scholarships table (matched by name similarity is not reliable —
-    // so this filter only applies when scholarships are linked via programs later).
-    void scholarshipOnly;
-
     // Program search: universities offering a program in the searched field.
     const programFilter = searchParams.get("program");
     if (programFilter && programFilter !== "All") {
@@ -157,7 +151,7 @@ export async function GET(req: Request) {
           .where(inArray(universitySources.universityId, uniIds));
 
         const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
-        let srcById = new Map<number, { url: string; title: string; accessedAt: Date | null }>();
+        let srcById = new Map<number, { id: number; url: string; title: string; accessedAt: Date | null }>();
         if (srcIds.length > 0) {
           try {
             const srcRows = await db
@@ -179,28 +173,12 @@ export async function GET(req: Request) {
         }
 
         for (const [uniId, uniLinks] of grouped) {
-          let bestUrl: string | null = null;
-          let bestVerified: Date | null = null;
-          let bestTitle: string | null = null;
-          for (const l of uniLinks) {
-            if (l.sourceId == null) continue;
-            const src = srcById.get(l.sourceId);
-            if (!src) continue;
-            const accessed = src.accessedAt ? new Date(src.accessedAt) : null;
-            if (!bestUrl || (accessed && (!bestVerified || accessed > bestVerified))) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-              bestVerified = accessed;
-            } else if (!bestUrl) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-            }
-          }
-          if (bestUrl) {
+          const best = pickBestSource(uniLinks, srcById);
+          if (best?.url) {
             sourceMap.set(uniId, {
-              sourceUrl: bestUrl,
-              lastVerifiedAt: bestVerified ? bestVerified.toISOString() : null,
-              sourceTitle: bestTitle,
+              sourceUrl: best.url,
+              lastVerifiedAt: best.accessedAt ? best.accessedAt.toISOString() : null,
+              sourceTitle: best.title,
             });
           }
         }

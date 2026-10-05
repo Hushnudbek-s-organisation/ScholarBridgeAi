@@ -55,7 +55,19 @@ function cleanLabel(value: string): string {
  */
 function recognisedLevels(value: string | null | undefined): DegreeLevel[] | null {
   if (!value?.trim()) return null;
-  const label = cleanLabel(value);
+  // Several catalogue columns store a JSON array (["Master","PhD"]); accept
+  // it everywhere a label is accepted so a stored list is never "unknown".
+  let raw = value;
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) raw = parsed.map((x) => String(x)).join("/");
+    } catch {
+      // not valid JSON — fall through and treat it as a label
+    }
+  }
+  const label = cleanLabel(raw);
   const direct = aliases.get(label);
   if (direct) return [direct];
 
@@ -102,4 +114,72 @@ export function formatDegreeLevel(
   if (!levels) return translate("unspecified");
   if (levels.includes("All")) return translate("all");
   return levels.map((level) => translate(labelKeys[level])).join(" / ");
+}
+
+/**
+ * Compare a student's level with a catalogue record's level for SCORING.
+ *
+ *   • "match"    — both sides recognised and they intersect ("All" matches
+ *                  anything, in either direction);
+ *   • "mismatch" — both sides recognised and they do NOT intersect
+ *                  (e.g. student Bachelor, catalogue Master only);
+ *   • "unknown"  — at least one side is unrecognised/empty. Unknown is NEVER
+ *                  treated as a mismatch (the record may well be open) and
+ *                  never as a match (we do not claim eligibility).
+ *
+ * This is the same recognition table the discovery filters use, so a label
+ * like "Master's", "MSc", "магистратура" or "Master (graduate)" all compare
+ * equal to the catalogue's "Master".
+ */
+export type DegreeLevelComparison = "match" | "mismatch" | "unknown";
+
+export function compareDegreeLevels(
+  studentLevel: string | null | undefined,
+  catalogueLevels: string | null | undefined,
+): DegreeLevelComparison {
+  const student = recognisedLevels(studentLevel);
+  const offered = recognisedLevels(catalogueLevels);
+  if (!student || !offered || !student.length || !offered.length) return "unknown";
+  if (student.includes("All") || offered.includes("All")) return "match";
+  return offered.some((level) => student.includes(level)) ? "match" : "mismatch";
+}
+
+/**
+ * SAT/ACT are UNDERGRADUATE-admission tests. A published SAT/ACT minimum is
+ * evidence about undergraduate entry, so it must never be presented (or
+ * scored) as a requirement for a known graduate applicant, and it does not
+ * apply at all to an institution that does not admit undergraduates.
+ *
+ * The test is suppressed only when we KNOW it cannot apply — an unrecognised
+ * label never hides a published requirement:
+ *   • the student's level is recognised and contains only graduate levels
+ *     (Master / PhD / Diploma), or
+ *   • the university's level is recognised and offers no Bachelor intake.
+ */
+export function undergraduateTestApplies(
+  universityLevel: string | null | undefined,
+  studentLevel?: string | null,
+): boolean {
+  if (studentLevel !== undefined) {
+    const student = recognisedLevels(studentLevel);
+    if (
+      student?.length &&
+      !student.includes("All") &&
+      student.every((level) => level === "Master" || level === "PhD" || level === "Diploma")
+    ) {
+      return false;
+    }
+  }
+  const offered = recognisedLevels(universityLevel);
+  if (offered?.length && !offered.includes("All") && !offered.includes("Bachelor")) {
+    return false;
+  }
+  return true;
+}
+
+/** True when the catalogue record is KNOWN to admit undergraduates. */
+export function hasUndergraduateAdmission(universityLevel: string | null | undefined): boolean {
+  const offered = recognisedLevels(universityLevel);
+  if (!offered?.length) return false;
+  return offered.includes("All") || offered.includes("Bachelor");
 }

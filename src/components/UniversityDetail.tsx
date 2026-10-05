@@ -630,7 +630,9 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field
             label="SAT"
             value={
-              universityRequirements?.satRequired
+              universityRequirements?.undergraduateTestsApply === false
+                ? t("satNotApplicable")
+                : universityRequirements?.satRequired
                 ? universityRequirements?.satMinimumPublished
                   ? req(universityRequirements, "sat", (v) => `${v}`)
                   : t("satNoMin")
@@ -640,7 +642,9 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field
             label="ACT"
             value={
-              universityRequirements?.actRequired
+              universityRequirements?.undergraduateTestsApply === false
+                ? t("satNotApplicable")
+                : universityRequirements?.actRequired
                 ? universityRequirements?.actMinimumPublished
                   ? req(universityRequirements, "act", (v) => `${v}`)
                   : t("satNoMin")
@@ -650,6 +654,15 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field label="PTE Academic" value={req(universityRequirements, "pte", (v) => `${v}`)} />
           <Field label="Cambridge English" value={req(universityRequirements, "cambridgeEnglish", (v) => `${v}`)} />
         </div>
+        {/* The grid summarises every catalogued programme. When the values
+            differ per programme it shows a range (e.g. IELTS 7-7.5) — say so,
+            otherwise a lower bound reads like the requirement for all of
+            them. */}
+        {["ielts", "toefl", "duolingo", "gpa", "sat", "act", "pte", "cambridgeEnglish"].some(
+          (key) => Array.isArray(universityRequirements?.[key]?.values) && universityRequirements[key].values.length > 1,
+        ) && (
+          <p className="mt-2 text-[11px] text-amber-700">{t("reqVariesByProgram")}</p>
+        )}
 
         {/* Long text requirements: full-width, clamped by default */}
         {(() => {

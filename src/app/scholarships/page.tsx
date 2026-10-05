@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { asc, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { scholarships as scholarshipsTable } from "@/db/schema";
 
 export const metadata: Metadata = {
   title: "Scholarships",
@@ -45,72 +47,67 @@ export default async function ScholarshipsPage({
   const requestedPage =
     Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
 
-  // --- 2. Supabase client (server-only) --------------------------------------
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
-          <h1 className="text-lg font-bold text-amber-900">
-            Supabase is not configured
-          </h1>
-          <p className="mt-2 text-sm text-amber-800">
-            Set <code className="font-mono">SUPABASE_URL</code> and{" "}
-            <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code> in
-            your environment to enable server-side pagination.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  // --- 3. Exact total (head-only query — transfers no rows) ------------------
-  // IMPORTANT: apply the SAME filters here as in the data query below,
-  // otherwise `totalPages` won't match the listed rows.
-  const { count } = await supabase
-    .from("scholarships")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", true);
-
-  const totalItems = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-
-  // --- 4. Out-of-range ?page= → bounce to the last valid page ---------------
-  if (requestedPage > totalPages) {
-    redirect(
-      totalPages > 1 ? `/scholarships?page=${totalPages}` : "/scholarships",
-    );
-  }
-  const currentPage = requestedPage;
-
-  // --- 5. range(from, to) — INCLUSIVE on both ends ---------------------------
-  // Page 1 → range(0, 23) · Page 2 → range(24, 47) · Page N → …
-  const from = (currentPage - 1) * ITEMS_PER_PAGE;
-  const to = from + ITEMS_PER_PAGE - 1;
-
-  const { data, error } = await supabase
-    .from("scholarships")
-    .select(
-      "id, title, provider, country, coverage_type, amount_usd_value, deadline, website_url",
-    )
-    .eq("is_active", true)
-    .order("id", { ascending: true })
-    .range(from, to);
-
-  if (error) {
+  // --- 2. Data comes from the app's OWN database (DATABASE_URL + Drizzle),
+  // the same source every API route reads — this page previously required the
+  // optional Supabase env vars and showed "Supabase is not configured" on a
+  // valid PostgreSQL/Render deployment.
+  let rows: ScholarshipRow[];
+  let totalItems: number;
+  try {
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(scholarshipsTable)
+      .where(eq(scholarshipsTable.isActive, true));
+    totalItems = Number(countRow?.n ?? 0);
+    const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    if (requestedPage > totalPagesForQuery) {
+      redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
+    }
+    const from = (requestedPage - 1) * ITEMS_PER_PAGE;
+    const data = await db
+      .select({
+        id: scholarshipsTable.id,
+        title: scholarshipsTable.title,
+        provider: scholarshipsTable.provider,
+        country: scholarshipsTable.country,
+        coverageType: scholarshipsTable.coverageType,
+        amountUsdValue: scholarshipsTable.amountUsdValue,
+        deadline: scholarshipsTable.deadline,
+        websiteUrl: scholarshipsTable.websiteUrl,
+      })
+      .from(scholarshipsTable)
+      .where(eq(scholarshipsTable.isActive, true))
+      .orderBy(asc(scholarshipsTable.id))
+      .limit(ITEMS_PER_PAGE)
+      .offset(from);
+    rows = data.map((r) => ({
+      id: r.id,
+      title: r.title,
+      provider: r.provider,
+      country: r.country,
+      coverage_type: r.coverageType,
+      amount_usd_value: r.amountUsdValue,
+      deadline: r.deadline,
+      website_url: r.websiteUrl,
+    }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown error";
     return (
       <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
           <h1 className="text-lg font-bold text-red-900">
             Couldn&apos;t load scholarships
           </h1>
-          <p className="mt-2 text-sm text-red-700">{error.message}</p>
+          <p className="mt-2 text-sm text-red-700">{message}</p>
         </div>
       </main>
     );
   }
 
-  const scholarships = (data ?? []) as ScholarshipRow[];
+  const scholarships = rows;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const showingFrom = totalItems === 0 ? 0 : from + 1;
   const showingTo = from + scholarships.length;
 

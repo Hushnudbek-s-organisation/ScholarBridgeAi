@@ -162,6 +162,7 @@ function toChancingUniversity(row: typeof universities.$inferSelect): ChancingUn
     minGpa: row.minGpa,
     minIelts: row.minIelts,
     minSat: row.minSat,
+    degreeLevel: row.degreeLevel,
     acceptanceRate: row.acceptanceRate,
     programMajor: row.programMajor,
     annualTuitionUsd: row.annualTuitionUsd,

@@ -195,8 +195,71 @@ check(
   !/Tasks &amp; Roadmap/.test(landingHtml) && !/mockSidebar/.test(landingHtml)
 );
 
+// Landing-page self-check (2026-10): the marketing page must be as honest and
+// as consistent as the product it advertises.
+const anchorIds = ["how", "features", "chancing", "roadmap"];
+check(
+  "every landing anchor link has a matching section id",
+  anchorIds.every((id) => landingHtml.includes(`id="${id}"`)),
+  anchorIds.filter((id) => !landingHtml.includes(`id="${id}"`)).join(", ")
+);
+check(
+  "landing still scopes the admission estimate to evidence (never a number)",
+  /Admission estimate/.test(landingHtml) && !/Admission estimate<\/span>\s*<[^>]*>\s*\d/.test(landingHtml)
+);
+
+// The dashboard preview used to show an "Admissions Index" percentage — a
+// second, differently-computed number that read like an admission chance. It
+// now shows the same profile-readiness score the Readiness pane uses.
+const strengthLabel: Record<string, string> = {
+  en: "Readiness",
+  uz: "Tayyorlik",
+  ru: "Готовность",
+};
+const noRawKeys: Record<string, boolean> = {};
+for (const locale of ["en", "uz", "ru"]) {
+  const { html } = renderLanding(locale);
+  const text = html.replace(/<[^>]+>/g, " ");
+  // A missing message renders as "landing.someKey" — a raw key in the visible
+  // text means the page ships with placeholder copy.
+  noRawKeys[locale] = !/\b(landing|dashboard|nav|meta|hubs|degrees)\.[a-z][A-Za-z0-9]*/.test(text);
+  check(`landing leaks no unresolved message keys (${locale})`, noRawKeys[locale]);
+  check(
+    `landing dashboard mock uses the localized readiness label (${locale})`,
+    html.includes(strengthLabel[locale]),
+    strengthLabel[locale]
+  );
+  check(`landing no longer advertises an "Admissions Index" (${locale})`, !/Admissions Index/.test(html));
+}
+
 // ---------------------------------------------------------------------------
 section("7. UniversityExplorer & UniversityDetail render in every locale");
+
+// DashboardView must not compute its own second strength number: on the first
+// paint (effects have not run) the ring shows a neutral dash, and the card is
+// labelled as profile readiness — never as an admission index.
+for (const locale of ["en", "uz", "ru"]) {
+  const dash = render(
+    // eslint-disable-next-line react/no-children-prop
+    React.createElement(NextIntlClientProvider, {
+      locale,
+      messages: loadMessages(locale),
+      children: React.createElement(DashboardView, {
+        profile: { id: 7, name: "Test Student", gpa: 3.6, gpaScale: 4, ieltsScore: 7, budgetAnnualUsd: 30000, degreeLevel: "Master", targetMajor: "Computer Science" } as any,
+        onNavigateTab: () => {},
+        savedUniCount: 0,
+        savedScholarshipCount: 0,
+        savedProgramCount: 0,
+        taskCount: 0,
+        onEditProfile: () => {},
+      }),
+    })
+  );
+  const dashText = dash.html.replace(/<[^>]+>/g, " ");
+  check(`DashboardView renders (${locale})`, dash.error === null, dash.error ?? "");
+  check(`DashboardView waits for the shared strength score (${locale})`, dashText.includes("—"));
+  check(`DashboardView does not label the ring as an admission index (${locale})`, !/Admissions Index/.test(dashText));
+}
 
 // Both components fetch in useEffect, so SSR shows the initial paint: the
 // explorer's filter shell and the detail's loading state. That initial paint

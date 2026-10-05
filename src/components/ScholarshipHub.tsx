@@ -58,16 +58,20 @@ export interface Scholarship {
   sourceLastVerifiedAt?: string | null;
 }
 
-function awardLabel(s: Scholarship): string {
-  if (s.awardBasis === "need_based") return "Need-based; varies by applicant";
-  if (s.awardBasis === "full_tuition") return "Full tuition coverage";
-  if (s.awardBasis === "variable") return "Variable award; see details";
+type HubTranslator = (key: string, values?: Record<string, string | number>) => string;
+
+/** Award value label. Every branch is translated (uz/ru included) — the
+ *  numeric amount alone is language-neutral, so it keeps `formatMoney`. */
+export function awardLabel(s: Scholarship, t: HubTranslator): string {
+  if (s.awardBasis === "need_based") return t("awardNeedBased");
+  if (s.awardBasis === "full_tuition") return t("awardFullTuition");
+  if (s.awardBasis === "variable") return t("awardVariable");
   if (s.awardAmount != null) {
-    const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
+    const period = s.awardPeriod === "year" ? t("perYear") : s.awardPeriod === "month" ? t("perMonth") : "";
     return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
   }
   if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
-  return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : "Not specified";
+  return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : t("awardNotSpecified");
 }
 
 const SCHOLARSHIP_FILTER_COUNTRIES = withQsTop200Countries([
@@ -92,6 +96,7 @@ export function ScholarshipHub({
   onSaveScholarship,
   onUnsaveScholarship,
 }: ScholarshipHubProps) {
+  const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,10 +181,10 @@ export function ScholarshipHub({
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Award className="h-5 w-5 text-amber-500" />
-            Global Financial Aid & Scholarship Discovery Engine
+            {t("title")}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Discover fully-funded government awards, university merit grants, and need-based financial aid.
+            {t("subtitle")}
           </p>
         </div>
 
@@ -190,7 +195,7 @@ export function ScholarshipHub({
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search scholarship name, provider, or country..."
+              placeholder={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
@@ -204,7 +209,7 @@ export function ScholarshipHub({
               onChange={(e) => setSelectedCountry(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
-              <option value="All">🌐 All Host Countries</option>
+              <option value="All">{t("allCountries")}</option>
               {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
                 const countryKey = countryTranslationKey(country);
                 const countryOption = qsCountryOption(country);
@@ -225,10 +230,10 @@ export function ScholarshipHub({
               onChange={(e) => setSelectedCoverage(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
-              <option value="All">💵 All Coverage Levels</option>
-              <option value="Full Tuition + Stipend">Full Tuition + Living Stipend</option>
-              <option value="Full Tuition">Full Tuition Only</option>
-              <option value="Partial Tuition">Partial Grant / Subsidy</option>
+              <option value="All">{t("allCoverage")}</option>
+              <option value="Full Tuition + Stipend">{t("coverageFullStipend")}</option>
+              <option value="Full Tuition">{t("coverageFullTuition")}</option>
+              <option value="Partial Tuition">{t("coveragePartial")}</option>
             </select>
           </div>
         </div>
@@ -237,20 +242,23 @@ export function ScholarshipHub({
       {/* Results Count */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
-          Showing {totalCount === 0 ? 0 : (page - 1) * perPage + 1}-
-          {(page - 1) * perPage + filtered.length} of {totalCount} scholarships
+          {t("showing", {
+            from: totalCount === 0 ? 0 : (page - 1) * perPage + 1,
+            to: (page - 1) * perPage + filtered.length,
+            total: totalCount,
+          })}
         </span>
-        <span className="shrink-0">Page {page} of {totalPages}</span>
+        <span className="shrink-0">{t("pageOf", { page, totalPages })}</span>
       </div>
 
       {/* Grid List */}
       {loading ? (
         <div className="p-12 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
-          Loading global scholarship dataset & checking eligibility...
+          {t("loading")}
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
-          No scholarships found matching criteria. Try resetting filters.
+          {t("empty")}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -275,12 +283,18 @@ export function ScholarshipHub({
                     </div>
 
                     {score != null ? (
-                      <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
-                        {score}% Eligibility
+                      // This number is a FIT/match score (requirements + field +
+                      // funding) — labelling it "Eligibility" implied more than the
+                      // score means. The hint says what it is, and what it is not.
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0"
+                        title={t("matchHint")}
+                      >
+                        {t("matchBadge", { score })}
                       </span>
                     ) : (
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                        Select a profile to score
+                        {t("selectProfile")}
                       </span>
                     )}
                   </div>
@@ -291,13 +305,13 @@ export function ScholarshipHub({
                       {s.matchReasons?.map((r, i) => (
                         <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
                           <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>Strong match because</b> {r}</span>
+                          <span><b>{t("strongBecause")}</b> {r}</span>
                         </p>
                       ))}
                       {s.matchIssues?.map((r, i) => (
                         <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
                           <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>Potential issue:</b> {r}</span>
+                          <span><b>{t("potentialIssue")}</b> {r}</span>
                         </p>
                       ))}
                     </div>
@@ -335,17 +349,17 @@ export function ScholarshipHub({
                 {/* Key Details Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
-                    <span className="text-slate-400 block font-medium">Award Value:</span>
-                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s)}</strong>
+                    <span className="text-slate-400 block font-medium">{t("awardValue")}</span>
+                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t)}</strong>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block font-medium">Coverage:</span>
+                    <span className="text-slate-400 block font-medium">{t("coverage")}</span>
                     <strong className="text-slate-800 font-bold">{s.coverageType}</strong>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block font-medium">Deadline:</span>
+                    <span className="text-slate-400 block font-medium">{t("deadline")}</span>
                     <strong className="text-amber-800 font-bold flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {s.deadline}
@@ -356,7 +370,7 @@ export function ScholarshipHub({
                 {/* Requirements Text */}
                 <div className="text-xs bg-amber-50/50 p-2.5 rounded-xl border border-amber-100 text-amber-900 space-y-1">
                   <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-800">
-                    Requirements & Eligibility:
+                    {t("requirements")}
                   </span>
                   <p className="text-[11px] leading-relaxed">{s.requirements}</p>
                 </div>
@@ -370,17 +384,17 @@ export function ScholarshipHub({
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-slate-500 hover:text-amber-600 transition-colors"
                     >
-                      <ExternalLink className="h-3 w-3" /> Source
+                      <ExternalLink className="h-3 w-3" /> {t("source")}
                     </a>
                   ) : (
-                    <span className="text-slate-400">Source: pending verification</span>
+                    <span className="text-slate-400">{t("sourcePending")}</span>
                   )}
                   {s.sourceLastVerifiedAt ? (
                     <span className="text-slate-400">
-                      Last verified: {new Date(s.sourceLastVerifiedAt).toLocaleDateString()}
+                      {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
                     </span>
                   ) : s.sourceUrl ? (
-                    <span className="text-slate-400">Last verified: —</span>
+                    <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
                   ) : null}
                 </div>
 
@@ -392,7 +406,7 @@ export function ScholarshipHub({
                     rel="noreferrer"
                     className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1"
                   >
-                    Official Application Portal <ExternalLink className="h-3.5 w-3.5" />
+                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
                   </a>
 
                   {isSaved ? (
@@ -401,7 +415,7 @@ export function ScholarshipHub({
                       className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
                     >
                       <Check className="h-3.5 w-3.5" />
-                      Tracked
+                      {t("tracked")}
                     </button>
                   ) : (
                     <button
@@ -409,7 +423,7 @@ export function ScholarshipHub({
                       className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 sb-ink-on-warm font-bold rounded-xl text-xs shadow-xs transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Track Scholarship
+                      {t("track")}
                     </button>
                   )}
                 </div>

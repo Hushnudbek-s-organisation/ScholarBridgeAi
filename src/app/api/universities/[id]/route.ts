@@ -10,6 +10,7 @@ import {
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
+import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
 
 /**
  * GENERIC structured parser for `other_requirements` free-text.
@@ -357,10 +358,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       pte: summarize("pte", null) ?? (parsedOther.pte != null ? { values: [parsedOther.pte], min: parsedOther.pte, max: parsedOther.pte, range: String(parsedOther.pte), single: parsedOther.pte } : null),
       cambridgeEnglish: summarize("cambridgeenglish", null) ?? (parsedOther.cambridgeEnglish != null ? { values: [parsedOther.cambridgeEnglish], min: parsedOther.cambridgeEnglish, max: parsedOther.cambridgeEnglish, range: String(parsedOther.cambridgeEnglish), single: parsedOther.cambridgeEnglish } : null),
       // Requirement row exists (even without a published minimum):
-      satRequired: (uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.satRequired === true || parsedOther.sat != null,
-      actRequired: (uniReqs.act?.values.length ?? 0) > 0 || parsedOther.actRequired === true || parsedOther.act != null,
-      satMinimumPublished: (uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.sat != null,
-      actMinimumPublished: (uniReqs.act?.values.length ?? 0) > 0 || parsedOther.act != null,
+      // SAT/ACT are undergraduate tests: a graduate-only institution's
+      // published undergraduate minimum is not a requirement for the
+      // programmes it actually offers, so it is reported as
+      // "not applicable" instead of "required". The stored value is never
+      // rewritten — only its applicability is stated.
+      undergraduateTestsApply: undergraduateTestApplies(uni.degreeLevel),
+      hasUndergraduateAdmission: hasUndergraduateAdmission(uni.degreeLevel),
+      satRequired:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.satRequired === true || parsedOther.sat != null),
+      actRequired:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.act?.values.length ?? 0) > 0 || parsedOther.actRequired === true || parsedOther.act != null),
+      satMinimumPublished:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.sat != null),
+      actMinimumPublished:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.act?.values.length ?? 0) > 0 || parsedOther.act != null),
       portfolioRequired: flagAgg.portfolio,
       interviewRequired: flagAgg.interview,
       recommendationRequired: flagAgg.recommendation,

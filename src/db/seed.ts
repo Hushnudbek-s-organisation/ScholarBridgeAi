@@ -1,4 +1,7 @@
 import { db } from "./index";
+import { seedProgramCatalog } from "./seedProgramCatalog";
+import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
+import { seedOpportunities } from "./seedOpportunities";
 import {
   studentProfiles,
   universities,
@@ -165,6 +168,24 @@ export async function seedDatabase() {
     // Check if universities already seeded
     const existingUnis = await db.select().from(universities).limit(1);
     if (existingUnis.length > 0) {
+      // Universities exist, but older installs never received the program
+      // catalogue (programs/requirements/cycles), which the recommender reads
+      // exclusively. The call is idempotent — it only inserts what is missing.
+      try {
+        await seedProgramCatalog();
+      } catch (err) {
+        console.error("Program catalogue top-up failed:", err);
+      }
+      try {
+        await refreshSeededScholarshipCycles();
+      } catch (err) {
+        console.error("Seeded scholarship cycle refresh failed:", err);
+      }
+      try {
+        await seedOpportunities();
+      } catch (err) {
+        console.error("Opportunities catalogue top-up failed:", err);
+      }
       return;
     }
 
@@ -414,6 +435,23 @@ export async function seedDatabase() {
       }
     ]).returning();
 
+    // Program catalogue for the universities above (programs, per-program
+    // requirements, application cycles, provenance links). Without this the
+    // recommender has no programmes to rank on a fresh install.
+    try {
+      await seedProgramCatalog();
+    } catch (err) {
+      console.error("Failed to seed the program catalogue:", err);
+    }
+
+    // Opportunities catalogue (competitions / research / internships /
+    // summer schools) — the feed was empty on a fresh install.
+    try {
+      await seedOpportunities();
+    } catch (err) {
+      console.error("Failed to seed opportunities:", err);
+    }
+
     // Insert Default Scholarships
     await db.insert(scholarships).values([
       {
@@ -555,31 +593,14 @@ export async function seedDatabase() {
     ]);
 
     // Fill dynamic lifecycle fields for seeded scholarships (spec §4):
-    // convert legacy text deadlines to deadlineDate + deadlineType where possible.
+    // the seed ships fixed published dates; roll them to the next annual
+    // occurrence and label the cycle as recurring + unverified, so a fresh
+    // install does not present eight annual programmes as permanently CLOSED.
     try {
-      const seededScholarships = await db.select().from(scholarships);
-      for (const sc of seededScholarships) {
-        const parsed = sc.deadline ? Date.parse(sc.deadline) : Number.NaN;
-        if (sc.deadline && !isNaN(parsed) && !sc.deadlineDate) {
-          await db
-            .update(scholarships)
-            .set({
-              deadlineDate: sc.deadline,
-              deadlineType: "exact",
-              applicationStatus: new Date(sc.deadline) >= new Date() ? "open" : "closed",
-              recurrence: "annual",
-              expectedDeadlinePeriod: sc.deadline,
-              lastVerifiedAt: new Date(),
-              verificationStatus: "unverified",
-              sourceUrl: sc.websiteUrl || null,
-            })
-            .where(eq(scholarships.id, sc.id));
-        }
-      }
+      await refreshSeededScholarshipCycles();
     } catch (err) {
-      console.error("Failed to backfill scholarship lifecycle fields:", err);
+      console.error("Failed to backfill seeded scholarship cycles:", err);
     }
-
 
     // Insert Default Student Profile
     const [profile] = await db.insert(studentProfiles).values({

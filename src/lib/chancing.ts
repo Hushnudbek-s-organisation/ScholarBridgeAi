@@ -30,6 +30,9 @@
  * database (see scripts/check-chancing.ts).
  */
 
+import { undergraduateTestApplies } from "./degreeLevels";
+import { subjectSimilarity } from "./subjectAffinity";
+
 /**
  * The single source of truth for student-facing probability availability.
  * Any route/UI that mentions admission probability must read this — never
@@ -85,6 +88,8 @@ export interface ChancingUniversity {
   minGpa?: number | null;
   minIelts?: number | null;
   minSat?: number | null;
+  /** Catalogue degree level — SAT/ACT only apply to undergraduate entry. */
+  degreeLevel?: string | null;
   /** 0–100 (percent). NULL = not published. */
   acceptanceRate?: number | null;
   programMajor?: string | null;
@@ -340,22 +345,27 @@ function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
     factor *= minIelts ? 0.7 : 0.85;
   }
 
-  // Standardised test — only judged when the university actually asks for one.
-  if (sat || act) {
+  // Standardised test — judged ONLY when the institution actually publishes a
+  // minimum AND the test can be part of this student's admission. SAT/ACT are
+  // undergraduate tests: a graduate applicant (or a graduate-only institution)
+  // is neither credited nor penalised, and a test score is never measured
+  // against an invented "typical" bar when no minimum is published.
+  const satApplies = minSat != null && undergraduateTestApplies(uni.degreeLevel, profile.degreeLevel);
+  if (satApplies && (sat || act)) {
     const equivalentSat = sat ?? (act ? clamp(act * 40 + 180, 400, 1600) : null);
     if (equivalentSat != null) {
-      const req = minSat ?? 1300;
-      const delta = (equivalentSat - req) / 200;
+      const delta = (equivalentSat - minSat) / 200;
       parts.push(clamp(65 + delta * 14, 10, 100));
-      if (delta >= 0.5) notes.positive ??= `Test score ${equivalentSat} is above the typical ${req}`;
-      if (delta < 0) notes.negative ??= `Test score ${equivalentSat} is below the typical ${req}`;
+      if (delta >= 0.5) notes.positive ??= `Test score ${equivalentSat} is above the published ${minSat}`;
+      if (delta < 0) notes.negative ??= `Test score ${equivalentSat} is below the published ${minSat}`;
       factor *= clamp(1 + delta * 0.12, 0.75, 1.25);
     }
-  } else if (minSat) {
+  } else if (satApplies) {
     parts.push(40);
     notes.negative = `No SAT/ACT submitted — this programme lists ${minSat}`;
     factor *= 0.8;
   } else {
+    // Not applicable / nothing published: neutral, and never invented.
     parts.push(60);
   }
 
@@ -397,7 +407,11 @@ function majorSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
   factor: number;
   notes: { positive?: string; negative?: string };
 } {
-  const sim = majorSimilarity(profile.targetMajor, uni.programMajor);
+  // Synonym-aware, shared with the recommender and the university matcher:
+  // "Computer Science" vs "Informatics & Data Engineering" is a RELATED field
+  // (the fit engine already says so) — the plain word-overlap helper used to
+  // call it "a shift from", contradicting the fit reasons in the same payload.
+  const sim = subjectSimilarity(profile.targetMajor, uni.programMajor);
   const score = round(clamp(40 + sim * 60, 20, 100));
   const factor = clamp(0.85 + sim * 0.3, 0.85, 1.15);
   const notes: { positive?: string; negative?: string } = {};

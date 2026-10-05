@@ -49,6 +49,11 @@ export function DashboardView({
   const [isEvaluating, setIsEvaluating] = useState(false);
   // Real scholarship match count (fetched, never a hardcoded claim).
   const [scholarshipMatchCount, setScholarshipMatchCount] = useState<number | null>(null);
+  // Profile readiness — the SAME number the Readiness pane shows, from the
+  // same endpoint (src/lib/chancing.ts `profileStrength`). The dashboard used
+  // to compute its own second formula ("Admissions Index"), so one student saw
+  // two different strength numbers in two screens.
+  const [strength, setStrength] = useState<{ overall: number; completeness: number } | null>(null);
 
   // Count how many scholarships actually match this profile (matchScore >= 60).
   useEffect(() => {
@@ -66,6 +71,28 @@ export function DashboardView({
         }
       } catch {
         // keep null — the UI shows a neutral message instead of a number
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/profile-strength?profileId=${profile.id}`);
+        const data = await res.json();
+        if (!cancelled && res.ok && data?.strength) {
+          setStrength({
+            overall: Number(data.strength.overall) || 0,
+            completeness: Number(data.strength.completeness) || 0,
+          });
+        }
+      } catch {
+        // keep null — the card shows a neutral dash instead of a made-up score
       }
     })();
     return () => {
@@ -100,33 +127,16 @@ export function DashboardView({
     }
   };
 
-  // Admissions Index — deterministic quick estimate (NOT AI).
-  // Same honesty rule as the match scorer: a missing IELTS is NOT treated
-  // as 6.5 — it contributes 0 points. No work/pub = 0 points.
-  const normGpa = Math.min(4.0, profile.gpaScale > 0 ? (profile.gpa / profile.gpaScale) * 4.0 : profile.gpa);
-  const gpaPercent = Math.round((normGpa / 4.0) * 100);
-  const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
-  const ieltsPoints = hasIelts ? (profile.ieltsScore! / 9) * 25 : 0;
-  const compositeScore = Math.min(
-    96,
-    Math.max(
-      30,
-      Math.round(
-        gpaPercent * 0.5 +
-          ieltsPoints +
-          ((profile.workExperienceYears || 0) > 0 ? 10 : 0) +
-          ((profile.researchPublications || 0) > 0 ? 10 : 0)
-      )
-    )
-  );
-
-  // Score-based tier label (deterministic, not AI).
+  // Readiness tier label (deterministic, from the fetched profile-strength
+  // score — no second scoring formula lives in this component).
   const admissionTier =
-    compositeScore >= 85
+    strength == null
+      ? null
+      : strength.overall >= 85
       ? t("tierTop")
-      : compositeScore >= 70
+      : strength.overall >= 70
       ? t("tierCompetitive")
-      : compositeScore >= 55
+      : strength.overall >= 55
       ? t("tierDeveloping")
       : t("tierNeeds");
 
@@ -186,19 +196,29 @@ export function DashboardView({
           {/* Readiness Score Card */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/15 text-center flex flex-col items-center justify-center space-y-3">
             <div className="text-xs font-semibold tracking-wider text-indigo-200 uppercase">
-              {t("admissionsIndex")}
+              {t("readinessLabel")}
             </div>
 
             <div className="relative flex items-center justify-center">
               <div className="h-24 w-24 rounded-full border-4 border-indigo-400/30 flex items-center justify-center bg-indigo-900/40 shadow-inner">
-                <span className="text-3xl font-extrabold text-amber-300">{compositeScore}</span>
-                <span className="text-xs text-slate-300 font-semibold">%</span>
+                <span className="text-3xl font-extrabold text-amber-300">
+                  {strength == null ? "—" : strength.overall}
+                </span>
+                {strength != null && <span className="text-xs text-slate-300 font-semibold">%</span>}
               </div>
             </div>
 
             <div className="text-xs text-indigo-100 font-medium">
-              {admissionTier}
+              {admissionTier ?? t("strengthUnavailable")}
             </div>
+
+            {strength != null && (
+              <div className="text-[11px] text-indigo-200">
+                {t("strengthCompleteness", { percent: strength.completeness })}
+              </div>
+            )}
+
+            <p className="text-[10px] leading-snug text-indigo-200/80">{t("readinessNote")}</p>
 
             <button
               onClick={runAiAudit}
@@ -276,7 +296,7 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Groq AI Evaluation Report Output Modal/Card */}
+      {/* AI Evaluation Report Output Modal/Card */}
       {aiEvaluation && (
         <div className="bg-white rounded-2xl p-6 border-2 border-indigo-200 shadow-lg space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">

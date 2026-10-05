@@ -34,7 +34,12 @@
  */
 
 import { ADMISSION_PROBABILITY } from "./chancing";
+import { gpaTo40Scale } from "./gpa";
 import { isStaleVerified } from "./provenance";
+import { undergraduateTestApplies } from "./degreeLevels";
+
+/** Re-exported for callers/tests that import from the recommender. */
+export { gpaTo40Scale };
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -157,147 +162,27 @@ export interface RecommendationCatalog {
 }
 
 // ---------------------------------------------------------------------------
-// Subject affinity (synonyms + word overlap, deterministic)
+// Subject affinity — implemented ONCE in src/lib/subjectAffinity.ts and
+// re-exported here so every caller (recommender, university matcher, chancing)
+// compares two field labels with the same rules.
 // ---------------------------------------------------------------------------
 
-/**
- * Conservative synonym groups. A student writing any member matches the
- * others at "synonym" strength. Deliberately small: an unknown pair falls to
- * word overlap, and unknown stays unknown — we do not guess relationships.
- */
-const SYNONYM_GROUPS: string[][] = [
-  ["computer science", "computing", "computer engineering", "software engineering", "information technology", "it", "computer systems"],
-  ["data science", "data analytics", "big data", "statistics", "statistical science"],
-  ["artificial intelligence", "machine learning", "ai", "deep learning"],
-  ["business", "business administration", "management", "business management", "commerce"],
-  ["economics", "economy"],
-  ["finance", "financial management", "banking"],
-  ["marketing", "business marketing"],
-  ["engineering", "general engineering"],
-  ["mechanical engineering", "mechanical"],
-  ["electrical engineering", "electrical", "electronics", "electrical electronics"],
-  ["civil engineering", "civil"],
-  ["chemical engineering", "chemical"],
-  ["biomedical engineering", "biomedical"],
-  ["medicine", "medicines", "clinical medicine"],
-  ["nursing"],
-  ["psychology", "behavioural science", "behavioral science"],
-  ["mathematics", "math", "applied mathematics", "pure mathematics"],
-  ["physics"],
-  ["chemistry", "applied chemistry"],
-  ["biology", "biological sciences", "life sciences"],
-  ["biotechnology", "biotech", "molecular biology"],
-  ["law", "legal studies", "jurisprudence"],
-  ["economics and finance"],
-  ["international relations", "international relations and diplomacy", "political science", "international relations and geopolitics"],
-  ["sociology"],
-  ["history"],
-  ["philosophy"],
-  ["linguistics", "applied linguistics"],
-  ["english", "english language", "english literature", "english language and literature"],
-  ["journalism", "mass communications", "communications", "media studies", "media and journalism"],
-  ["design", "graphic design", "industrial design", "visual arts", "art", "arts"],
-  ["architecture"],
-  ["education", "pedagogy", "teacher education"],
-  ["social work"],
-  ["geography", "geology", "geoscience", "earth sciences"],
-  ["astronomy", "astrophysics", "space science"],
-  ["environmental science", "environmental engineering", "environmental studies", "sustainability"],
-  ["food science", "agriculture", "agronomy", "food technology"],
-  ["pharmacy", "pharmaceutical sciences"],
-  ["aerospace engineering", "aerospace"],
-  ["aerospace and aviation"],
-  ["robotics", "mechatronics", "control systems"],
-  ["cybersecurity", "information security"],
-  ["network engineering", "telecommunications", "communication engineering"],
-  ["health sciences", "public health"],
-];
+import {
+  normalizeSubject,
+  subjectAffinity,
+  subjectSimilarity,
+  type SubjectFit,
+  type SubjectFitLevel,
+} from "./subjectAffinity";
 
-const SYNONYM_TO_GROUP = new Map<string, number>();
-SYNONYM_GROUPS.forEach((group, i) => {
-  for (const member of group) SYNONYM_TO_GROUP.set(normalizeSubject(member), i);
-});
-
-export function normalizeSubject(s: string | null | undefined): string {
-  return (s || "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Word set of a normalised subject (drops short/stop words). */
-function subjectWords(s: string): Set<string> {
-  return new Set(
-    s
-      .split(" ")
-      .filter((w) => w.length > 2 && !["and", "the", "of", "for", "applied", "science", "sciences", "studies", "technology", "technologies"].includes(w))
-  );
-}
-
-export type SubjectFitLevel = "exact" | "synonym" | "partial" | "weak" | "none" | "unknown";
-
-export interface SubjectFit {
-  level: SubjectFitLevel;
-  /** 0–1 affinity used for ranking (never shown as a probability). */
-  score: number;
-  matchedInterests: string[];
-}
-
-/**
- * Best affinity between ANY of the student's interests and the program field.
- * Levels: exact (string equality) > synonym (same group) > partial (word
- * overlap ≥1 meaningful word) > weak (group-adjacent via a shared token) >
- * none (program has no field) / unknown (student gave no interests).
- */
-export function subjectAffinity(interests: string[] | undefined, programField: string | null | undefined): SubjectFit {
-  const interestList = (interests || []).map(normalizeSubject).filter(Boolean);
-  const field = normalizeSubject(programField);
-  if (!interestList.length) return { level: "unknown", score: 0.5, matchedInterests: [] };
-  if (!field) return { level: "none", score: 0.2, matchedInterests: [] };
-
-  let best: SubjectFit = { level: "none", score: 0, matchedInterests: [] };
-  const fieldWords = subjectWords(field);
-  const fieldGroup = SYNONYM_TO_GROUP.get(field);
-
-  for (const interest of interestList) {
-    let level: SubjectFitLevel = "none";
-    let score = 0;
-    if (interest === field) {
-      level = "exact";
-      score = 1;
-    } else {
-      const interestGroup = SYNONYM_TO_GROUP.get(interest);
-      // Full-group membership or exact group membership on the field side.
-      const inSameGroup =
-        fieldGroup != null &&
-        interestGroup != null &&
-        fieldGroup === interestGroup;
-      const groupContains =
-        fieldGroup != null && SYNONYM_GROUPS[fieldGroup].some((m) => normalizeSubject(m) === interest);
-      if (inSameGroup || groupContains) {
-        level = "synonym";
-        score = 0.85;
-      } else {
-        const interestWords = subjectWords(interest);
-        const overlap = [...interestWords].filter((w) => fieldWords.has(w));
-        if (overlap.length > 0) {
-          const ratio = overlap.length / Math.min(interestWords.size || 1, fieldWords.size || 1);
-          level = ratio >= 0.5 ? "partial" : "weak";
-          score = ratio >= 0.5 ? 0.6 : 0.35;
-        } else if (interestGroup != null && fieldGroup != null) {
-          level = "none";
-          score = 0;
-        }
-      }
-    }
-    if (score > best.score) {
-      best = { level, score, matchedInterests: [interest] };
-    }
-  }
-  return best;
-}
+export {
+  normalizeSubject,
+  subjectAffinity,
+  subjectSimilarity,
+  SUBJECT_SIMILARITY_BY_LEVEL,
+  type SubjectFit,
+  type SubjectFitLevel,
+} from "./subjectAffinity";
 
 // ---------------------------------------------------------------------------
 // Eligibility — met / unmet / unknown (kept strictly separate)
@@ -320,23 +205,18 @@ export interface Eligibility {
   textRequirements: { kind: string; text: string }[];
 }
 
-/** GPA on the student's scale → 4.0 scale. Unknown scale → unknown (no guess). */
-export function gpaTo40Scale(gpa: number | null | undefined, scale: number | null | undefined): number | null {
-  const g = Number(gpa);
-  if (!Number.isFinite(g) || g <= 0) return null;
-  if (scale == null) {
-    // No scale given: only a 4.0-scale GPA is safe to compare directly.
-    // We cannot assume, so treat as unknown unless it is clearly ≤ 4.
-    return g <= 4 ? g : null;
-  }
-  const s = Number(scale);
-  if (!Number.isFinite(s) || s <= 0) return null;
-  if (s === 4) return Math.min(4, g);
-  // Percentage / 5.0 / other scales: convert proportionally.
-  return Math.min(4, (g / s) * 4);
-}
+/**
+ * GPA on the student's scale → 4.0 scale. Single shared implementation in
+ * `src/lib/gpa.ts` (re-exported here for callers of the recommender).
+ * Unknown scale → unknown (no guess, no clamp to a perfect 4.0).
+ */
 
-export function assessEligibility(input: RecommendationInput, reqs: RecommendRequirement[]): Eligibility {
+export function assessEligibility(
+  input: RecommendationInput,
+  reqs: RecommendRequirement[],
+  /** The programme's own level — SAT/ACT only apply to undergraduate entry. */
+  programDegreeLevel?: string | null
+): Eligibility {
   const items: RequirementAssessment[] = [];
   const textRequirements: { kind: string; text: string }[] = [];
   // A program can have multiple requirement rows (per academic year); use the
@@ -365,8 +245,14 @@ export function assessEligibility(input: RecommendationInput, reqs: RecommendReq
     add("ielts", first.minIelts, input.ielts);
     add("toefl", first.minToefl, input.toefl);
     add("duolingo", first.minDet, input.duolingo);
-    add("sat", first.minSat, input.sat);
-    add("act", first.minAct, input.act);
+    // SAT/ACT are undergraduate-admission tests. A graduate programme (or a
+    // graduate applicant) must not be scored against a stray SAT minimum —
+    // that would report a requirement the student can never satisfy and never
+    // needed. Same rule as the university matcher (src/lib/degreeLevels.ts).
+    if (undergraduateTestApplies(programDegreeLevel ?? null, input.degreeLevel ?? undefined)) {
+      add("sat", first.minSat, input.sat);
+      add("act", first.minAct, input.act);
+    }
     if (first.ibRequirement) textRequirements.push({ kind: "ib", text: first.ibRequirement });
     if (first.aLevelRequirement) textRequirements.push({ kind: "alevel", text: first.aLevelRequirement });
     if (first.apRequirement) textRequirements.push({ kind: "ap", text: first.apRequirement });
@@ -528,7 +414,7 @@ export function recommend(
     const reqs = catalog.requirements.get(program.id) ?? [];
     const cycles = catalog.cycles.get(program.id) ?? [];
     const fit = subjectAffinity(input.interests, program.field);
-    const eligibility = assessEligibility(input, reqs);
+    const eligibility = assessEligibility(input, reqs, program.degreeLevel);
     const affordability = assessAffordability(input, program, university, catalog.scholarships, university.country);
 
     // ---- Match score (0–100) -------------------------------------------
