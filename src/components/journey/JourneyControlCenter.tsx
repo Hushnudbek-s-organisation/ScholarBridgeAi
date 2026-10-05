@@ -56,9 +56,13 @@ export interface JourneyDashboard {
   deadlines: { id: string; kind: string; title: string; dueDate: string; daysRemaining: number | null; tab: string }[];
   applications: { total: number; preparing: number; submitted: number; decision: number };
   readiness: {
+    /** Application checklist: what is filled in and linked (documents, applications, funding). */
     categories: { key: string; label: string; pct: number; state: string; gaps: string[]; tab: string }[];
     weakest: { key: string; label: string; pct: number; gaps: string[]; tab: string }[];
+    /** Checklist overall — NOT the profile readiness score. */
     overall: number;
+    /** The shared profile readiness score (same engine as Profile & Goals → Readiness). */
+    profile: { overall: number; completeness: number } | null;
   };
   phases: { key: string; title: string; icon: string; tab: string; status: string; pct: number; missing: string[] }[];
   testGaps: { testType: string; state: string; current: number | null; required: number; message: string }[];
@@ -375,12 +379,18 @@ export function JourneyControlCenter({
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Profile readiness"
-            value={readiness.overall}
+            label={t("ccReadinessTile")}
+            value={readiness.profile?.overall ?? "—"}
             suffix="%"
-            hint="Profile readiness across 7 areas — not an admission chance"
+            hint={t("ccReadinessTileHint")}
             icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
-            state={readiness.overall >= 75 ? "good" : readiness.overall >= 45 ? "warn" : "bad"}
+            state={
+              (readiness.profile?.overall ?? 0) >= 75
+                ? "good"
+                : (readiness.profile?.overall ?? 0) >= 45
+                  ? "warn"
+                  : "bad"
+            }
           />
         </RevealItem>
         <RevealItem>
@@ -537,8 +547,8 @@ export function JourneyControlCenter({
 
       {/* ---- 5. Profile readiness ----------------------------------------- */}
       <JourneyCard
-        title="Profile readiness"
-        subtitle="How ready each area is — and exactly what to improve. This is not an admission chance."
+        title={t("ccChecklistTitle", { pct: readiness.overall })}
+        subtitle={t("ccChecklistSubtitle")}
       >
         {/* 2 columns on phones too: seven full-width tiles made a ~700px
             stack that pushed the next actions off the first screen. */}

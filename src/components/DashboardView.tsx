@@ -357,6 +357,11 @@ export function DashboardView({
                 <p className="text-[11px] text-emerald-700">{t("safetyText")}</p>
               </div>
             </div>
+
+            {/* These tiers are the same fit bands the Chancing pane uses
+                (match score < 68 / 68–84 / 85+). They are NOT admission odds,
+                so the panel says so instead of implying a probability. */}
+            <p className="text-[11px] leading-snug text-slate-500">{t("portfolioNote")}</p>
           </div>
 
           {/* Key Quick Launcher Tools */}

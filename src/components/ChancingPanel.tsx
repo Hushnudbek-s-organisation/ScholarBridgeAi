@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Target,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 
 /**
@@ -48,28 +49,20 @@ export interface ChancingResult {
   negatives: string[];
   dataBasis: "public-estimate" | "hybrid" | "scholarbridge-data";
   sampleSize: number;
+  /** Only meaningful for `public-estimate`: which published data backs it. */
+  basisSource?: "acceptance-rate" | "ranking-tier" | null;
   /** Single source of truth from /api/chancing — never hardcode the state. */
   probability: { available: boolean; reason: string };
 }
 
-const SUBSCORE_LABELS: { key: keyof ChancingResult["subScores"]; label: string }[] = [
-  { key: "academicFit", label: "Academic fit" },
-  { key: "testFit", label: "Test fit" },
-  { key: "extracurricularFit", label: "Extracurricular fit" },
-  { key: "majorFit", label: "Major fit" },
-  { key: "internationalFactors", label: "International factors" },
-  { key: "financialFit", label: "Financial fit" },
+const SUBSCORE_KEYS: { key: keyof ChancingResult["subScores"]; labelKey: string }[] = [
+  { key: "academicFit", labelKey: "subAcademic" },
+  { key: "testFit", labelKey: "subTest" },
+  { key: "extracurricularFit", labelKey: "subExtracurricular" },
+  { key: "majorFit", labelKey: "subMajor" },
+  { key: "internationalFactors", labelKey: "subInternational" },
+  { key: "financialFit", labelKey: "subFinancial" },
 ];
-
-function basisLabel(basis: ChancingResult["dataBasis"], sampleSize: number) {
-  if (basis === "scholarbridge-data") {
-    return `Signals based on ${sampleSize} ScholarBridge application outcomes`;
-  }
-  if (basis === "hybrid") {
-    return `Signals based on public data + ${sampleSize} ScholarBridge outcomes`;
-  }
-  return "Signals based on published university data";
-}
 
 interface ChancingPanelProps {
   activeProfile: StudentProfile | null;
@@ -79,6 +72,7 @@ interface ChancingPanelProps {
 }
 
 export function ChancingPanel({ activeProfile, universityId, compact }: ChancingPanelProps) {
+  const t = useTranslations("chancing");
   const [results, setResults] = useState<ChancingResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,23 +88,35 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
       else params.set("all", "1");
       const res = await fetch(`/api/chancing?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to assess");
+      if (!res.ok) throw new Error(data.error || t("loadFailed"));
       setResults(data.results ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assess your shortlist");
+      setError(err instanceof Error && err.message ? err.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id, universityId]);
+  }, [activeProfile?.id, universityId, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  /**
+   * What the fit is based on. `public-estimate` covers two very different
+   * sources — a published acceptance rate, or the model's ranking-tier
+   * fallback — and saying "published university data" for the fallback would
+   * claim data that does not exist.
+   */
+  const basisLabel = (r: ChancingResult) => {
+    if (r.dataBasis === "scholarbridge-data") return t("basisScholarbridge", { count: r.sampleSize });
+    if (r.dataBasis === "hybrid") return t("basisHybrid", { count: r.sampleSize });
+    return r.basisSource === "ranking-tier" ? t("basisRankingTier") : t("basisAcceptanceRate");
+  };
+
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to see your profile fit assessments.
+        {t("signIn")}
       </div>
     );
   }
@@ -121,19 +127,16 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
             <Target className="h-5 w-5 text-indigo-600" />
-            Profile fit
+            {t("title")}
           </h2>
-          <p className="text-xs text-slate-500">
-            Fit measures how well your profile meets each university&apos;s published requirements —
-            it is not a probability of admission.
-          </p>
+          <p className="text-xs text-slate-500">{t("subtitle")}</p>
         </div>
         <button
           onClick={() => void load()}
           className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("refresh")}
         </button>
       </div>
 
@@ -141,9 +144,7 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
       <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
         <div className="text-xs text-amber-800">
-          <span className="font-bold">Admission probability: unavailable.</span> We do not estimate
-          the chance of admission until a validated methodology and enough real outcome data exist.
-          A high fit score is not a guarantee of admission.
+          <span className="font-bold">{t("unavailableTitle")}</span> {t("unavailableBody")}
         </div>
       </div>
 
@@ -155,13 +156,13 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
       {loading && !results.length && (
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Assessing…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("assessing")}
         </div>
       )}
 
       {!loading && !results.length && !error && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          Save universities or add applications first — fit is assessed for your shortlist.
+          {t("empty")}
         </div>
       )}
 
@@ -174,13 +175,13 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
                 <div className="min-w-0">
                   <h3 className="truncate font-bold text-slate-900">{r.universityName}</h3>
                   <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                    Requirements fit — not an admission probability
+                    {t("fitBadge")}
                   </span>
                 </div>
 
                 <div className="rounded-xl bg-indigo-50 px-3 py-2 text-center">
                   <div className="text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                    Fit score
+                    {t("fitScore")}
                   </div>
                   <div className="text-xl font-extrabold text-indigo-700">
                     {r.fitScore == null ? "—" : `${r.fitScore}%`}
@@ -194,17 +195,17 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
                   className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                 >
                   {open ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                  {open ? "Hide" : "Why?"} — sub-scores and reasons
+                  {open ? t("toggleHide") : t("toggleShow")}
                 </button>
               )}
 
               {(open || compact) && (
                 <div className="mt-3 space-y-4 border-t border-slate-100 pt-3">
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {SUBSCORE_LABELS.map(({ key, label }) => (
+                    {SUBSCORE_KEYS.map(({ key, labelKey }) => (
                       <div key={key}>
                         <div className="flex justify-between text-[11px] font-semibold text-slate-600">
-                          <span>{label}</span>
+                          <span>{t(labelKey as never)}</span>
                           <span>{r.subScores[key]}%</span>
                         </div>
                         <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -238,7 +239,7 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
                   <p className="flex items-start gap-1.5 text-[11px] text-slate-500">
                     <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{basisLabel(r.dataBasis, r.sampleSize)}.</span>
+                    <span>{basisLabel(r)}</span>
                   </p>
                 </div>
               )}
@@ -249,9 +250,7 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
 
       <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
         <Gauge className="h-3.5 w-3.5" />
-        Fit signals get sharper as ScholarBridge collects real outcomes (accepted and rejected)
-        from students who opt in. An admission probability will appear here only once a validated
-        methodology exists.
+        {t("footnote")}
       </p>
     </div>
   );

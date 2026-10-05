@@ -11,6 +11,11 @@ import {
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
 import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
+import { authenticate } from "@/lib/auth";
+import { calculateUniversityMatch } from "@/lib/matching";
+import { toMatchProfile } from "@/lib/profileMapping";
+import { selectUniversities } from "@/lib/universities";
+import { studentProfiles } from "@/db/schema";
 
 /**
  * GENERIC structured parser for `other_requirements` free-text.
@@ -127,6 +132,39 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     if (!uni) {
       return NextResponse.json({ error: "University not found" }, { status: 404 });
+    }
+
+    // ---- Profile match (same engine + same row shape as the explorer) -----
+    // The student's own fit score used to exist only on the list screen, so a
+    // university badge could vanish the moment the student opened it. Read
+    // privately: only the owner (or an admin) gets a personalised score; the
+    // public payload stays unpersonalised, exactly like GET /api/universities.
+    let match: {
+      score: number;
+      category: "Reach" | "Match" | "Safety";
+      reasons: string[];
+      issues: string[];
+    } | null = null;
+    const profileIdParam = new URL(req.url).searchParams.get("profileId");
+    if (profileIdParam) {
+      const pId = Number.parseInt(profileIdParam, 10);
+      const auth = await authenticate(req);
+      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
+        if (p) {
+          const rows = await selectUniversities();
+          const row = rows.find((r) => r.id === uniId);
+          if (row) {
+            const result = calculateUniversityMatch(toMatchProfile(p), row);
+            match = {
+              score: result.matchScore,
+              category: result.matchCategory,
+              reasons: result.reasons,
+              issues: result.potentialIssues,
+            };
+          }
+        }
+      }
     }
 
     // ---------- Programs (existing `programs` table) ----------
@@ -534,6 +572,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       applicationCycles: cycles,
       sources: uniSources,
       scholarships: uniScholarships,
+      match,
       campuses: [],
       images: [],
     });

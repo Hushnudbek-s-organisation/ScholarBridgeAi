@@ -3,49 +3,10 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { essayVersions, studentProfiles } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
-import {
-  analyzeExtracurriculars,
-  profileStrength,
-  type ChancingProfile,
-} from "@/lib/chancing";
+import { analyzeExtracurriculars, profileStrength } from "@/lib/chancing";
+import { chancingProfileWithActivities } from "@/lib/profileMapping";
 
 export const dynamic = "force-dynamic";
-
-/** Map a student_profiles row onto the chancing input shape (same fields as /api/chancing). */
-function toChancingProfile(row: typeof studentProfiles.$inferSelect): ChancingProfile {
-  return {
-    gpa: row.gpa,
-    gpaScale: row.gpaScale,
-    ieltsScore: row.ieltsScore,
-    toeflScore: row.toeflScore,
-    satScore: row.satScore,
-    actScore: row.actScore,
-    greScore: row.greScore,
-    duolingoScore: row.duolingoScore,
-    country: row.country,
-    targetMajor: row.targetMajor,
-    degreeLevel: row.degreeLevel,
-    extracurriculars: row.extracurriculars,
-    leadership: row.leadership,
-    volunteering: row.volunteering,
-    sports: row.sports,
-    clubs: row.clubs,
-    researchExperience: row.researchExperience,
-    projects: row.projects,
-    olympiads: row.olympiads,
-    awards: row.awards,
-    competitions: row.competitions,
-    certificates: row.certificates,
-    workExperienceYears: row.workExperienceYears,
-    researchPublications: row.researchPublications,
-    budgetAnnualUsd: row.budgetAnnualUsd,
-    careerGoal: row.careerGoal,
-    graduationYear: row.graduationYear,
-    needScholarship: row.needScholarship,
-    needsFinancialAid: row.needsFinancialAid,
-    requiresFullScholarship: row.requiresFullScholarship,
-  };
-}
 
 /**
  * #22 Profile strength dashboard + #21 extracurricular analysis.
@@ -73,7 +34,7 @@ export async function GET(req: Request) {
     const row = rows[0];
     if (!row) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-    const p = toChancingProfile(row);
+    const p = await chancingProfileWithActivities(row);
     const essayScore = latestEssay.length ? (latestEssay[0].rubricTotal ?? null) : null;
 
     return NextResponse.json({

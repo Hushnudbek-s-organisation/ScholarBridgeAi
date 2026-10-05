@@ -6,6 +6,7 @@ import {
   aiEvaluations,
   applications,
   checklistItems,
+  essayVersions,
   fundingItems,
   journeyDeadlines,
   learningProviderLinks,
@@ -23,6 +24,8 @@ import {
 import { guardStudent, serverError } from "@/lib/journey/api";
 import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/journey/stages";
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
+import { profileStrength } from "@/lib/chancing";
+import { chancingProfileWithActivities } from "@/lib/profileMapping";
 import { buildPhaseProgress } from "@/lib/journey/planning";
 import { buildFundingPlan } from "@/lib/journey/funding";
 import { profileCompleteness } from "@/lib/growth/logic";
@@ -258,7 +261,32 @@ export async function GET(req: Request) {
       fundingItems: fundingRows.length,
       familyBudget: profile?.familyIncomeUsd ?? null,
     };
-    const readiness = profileReadiness(readinessInput);
+    const checklist = profileReadiness(readinessInput);
+
+    // The PROFILE readiness score — the same engine, and therefore the same
+    // number, as Profile & Goals → Readiness and the dashboard ring. The
+    // `checklist` above answers a different question (what is filled in and
+    // linked across documents/applications/funding), so the two are exposed
+    // separately and the UI labels them as different things. Previously both
+    // were called "readiness" and showed different numbers for one student.
+    const [latestEssay] = profile
+      ? await db
+          .select({ rubricTotal: essayVersions.rubricTotal })
+          .from(essayVersions)
+          .where(eq(essayVersions.profileId, profile.id))
+          .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
+          .limit(1)
+      : [];
+    const strength = profile
+      ? profileStrength(await chancingProfileWithActivities(profile), {
+          essayScore: latestEssay?.rubricTotal ?? null,
+        })
+      : null;
+    const readiness = {
+      ...checklist,
+      /** Shared profile readiness (the Readiness pane's number). */
+      profile: strength ? { overall: strength.overall, completeness: strength.completeness } : null,
+    };
 
     // ---- Test gaps against the student's own target universities -----------
     const gaps = await testGapsFor(profileId, profile);
@@ -343,8 +371,10 @@ export async function GET(req: Request) {
         id: profileId,
         name: profile?.name ?? "",
         plan: profilePlan({ isAdmin: !!profile?.isAdmin, isPremium: !!profile?.isPremium, premiumUntil: profile?.premiumUntil ?? null }),
-        // profileCompleteness already returns 0–100 (percentage points).
-        completeness: Math.round(profileCompleteness(profile ?? null)),
+        // Same completeness number the Readiness pane shows (shared engine).
+        // The old growth-logic percentage was a second, slightly different
+        // count and could appear next to the shared one on one screen.
+        completeness: strength?.completeness ?? Math.round(profileCompleteness(profile ?? null)),
       },
       journey,
       nextSteps,

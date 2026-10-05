@@ -98,19 +98,86 @@ Checked against the app, not just for looks:
   "Готовность" — with no raw keys. A visitor never signed in can no longer be
   shown "Dashboard temporarily unavailable" when the session endpoint fails.
 
-## 4. Known remaining gap (not hidden)
+## 4. Contradictions found and fixed in this second pass
 
-The **engine prose and five live panes are still English-only**: match/issue
-sentences from `matching.ts` / `chancing.ts` / `opportunities.ts`, and the
-Chancing, Tasks roadmap, Deadline center, Planning studio and
-Students-like-me panels (`ChancingPanel.tsx`, `TaskRoadmap.tsx`,
-`DeadlineCenter.tsx`, `PlanningStudio.tsx`, `SimilarProfiles.tsx`). Fixing it
-properly means returning reason codes (with parameters) from the engines and
-translating them in the UI — an own pass, tracked as the next item.
-`ApplicationTracker.tsx` is dead code (only its types are imported); it was left
-untouched rather than deleted inside a data-consistency pass.
+The first pass fixed eight contradictions (§2). The finish pass below fixed
+the ones that survived, all found by driving the real APIs, not by reading code.
 
-## 5. Suite results
+9. **Two different numbers called "Profile readiness".** `/api/dashboard`
+   returned `readiness.overall` 33 (a checklist count of documents, applications
+   and funding) while `/api/profile-strength` returned 45 (the profile score),
+   and `JourneyControlCenter` printed the first under the label "Profile
+   readiness" while the dashboard ring and the Readiness pane showed the second.
+   Now `/api/dashboard` returns them as two explicitly named things:
+   `readiness.overall` (+ `categories`) is the **Application checklist** and
+   `readiness.profile.overall` is the shared **profile readiness** — the same
+   engine and therefore the same number as Profile & Goals → Readiness
+   (`profileStrength` in `src/lib/chancing.ts`). The tile and the checklist card
+   say which is which. Live (profile 2): checklist 43, profile readiness 69,
+   `/api/profile-strength` 69.
+10. **Two different profile-completeness percentages on one screen.** The
+    dashboard's `profile.completeness` came from `growth/logic` (different
+    checks) and the next-actions badge from a hand-built profile object that
+    ignored saved activity rows — 42 % vs 50 % for the same student. Both now
+    read `profileStrength(...).completeness` through the shared mapping layer;
+    live (profile 2) every surface reports **58 %**.
+11. **The fit score disappeared when you opened a university.** `/api/universities/[id]`
+    returned no match fields at all, so the detail view could not show the same
+    fit the explorer card showed. The route now computes it with the same
+    `calculateUniversityMatch` engine and the same row shape (extracted to
+    `src/lib/universities.ts`, shared with the list route) and returns `match`
+    privately (owner/admin only, like the list). The hero shows
+    "Profile fit: {score}% • {category}" plus the honest note that fit is not an
+    admission chance. Live: TUM is **99 Safety** in both the list and the detail.
+12. **"Signals based on published university data" was false for ranked-only
+    rows.** The chancing engine falls back to ranking tiers when no acceptance
+    rate is published, but the panel still claimed published data. The engine
+    now exposes `basisSource`, and the panel says either "published acceptance
+    rate" or "no acceptance rate published — signals use the published ranking
+    tier".
+13. **Probability/guarantee wording in three locales.** "Admission Chancing",
+    "Check your chances", "Scholarship Match **Guarantee**" and the
+    "Match (50-60 %)" reach/match/safety chips contradicted the product policy
+    that no admission probability is published. They are now "Admission
+    outlook", "Check your fit", "Scholarships matching your profile", and the
+    portfolio tiers carry the real fit bands (`Reach < 68`, `Match 68–84`,
+    `Safety 85+`) with the note that tiers describe fit, not admission chances.
+    The `nav.strength` label now matches the pane title it opens ("Readiness",
+    not "Profile Strength"). 15 dead `landing.mock*` keys were deleted.
+14. **The Chancing pane was English-only while its numbers were not.** The panel
+    that renders the chancing API had no `next-intl` at all. It now has a
+    `chancing` namespace in en/uz/ru (verified by SSR-rendering it in all three
+    locales — no key leaks).
+15. **The AI profile report lost its renderer contract.** The rewritten
+    `evaluate-profile` prompt had a shortened format rule; `test:ai-format`
+    asserts all four AI routes carry the full FORMAT RULES block that
+    `AiFormattedText` can render (no HTML, no tables). Restored and re-verified.
+
+## 5. Known remaining gaps (not hidden)
+
+* **Engine prose and the remaining journey panes are English-only.** Match/issue
+  sentences from `matching.ts` / `chancing.ts` / `opportunities.ts` and
+  `TaskRoadmap`, `DeadlineCenter`, `PlanningStudio`, `SimilarProfiles`,
+  `AfterAdmissionPanels`, `ApplicationWorkspacePanel`, `NextActionsPanel` and
+  the admin/Telegram components have no translations yet. Fixing it properly
+  means returning reason codes with parameters from the engines and translating
+  in the UI — that is the next pass, and it is the largest remaining item.
+* **The profile readiness score averages only the sections that have data.**
+  An empty section (0) is excluded from the average rather than dragging it
+  down, so the score answers "how strong is what you have filled in" and the
+  completeness % next to it answers "how much have you filled in". Both are
+  shown together for exactly that reason.
+* **Empty-by-design feeds for a brand-new account:** stories, students-like-me,
+  mentors, offers and saved-* lists are empty until the student (or the
+  consented cohort) creates data. The panes explain the empty state; no sample
+  rows are injected.
+* **AI provider credentials are absent in this environment**, so AI routes
+  serve their grounded fallbacks (`aiUsed: false`). This is the designed
+  behaviour, not a defect — and every fallback is verified to carry the same
+  numbers as the deterministic engines.
+* `ApplicationTracker.tsx` is dead code (only its types are imported).
+
+## 6. Suite results
 
 `test:ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
 `security` 68 · `match` 74 · `api-security` 236 handlers refused anonymously ·
@@ -122,3 +189,17 @@ untouched rather than deleted inside a data-consistency pass.
 `ownership` 83 · `portability` 57 · `journey` 91 · `dark` ✓ ·
 `schema-repair` 15 · `provenance` ✓ · `recommend` 74 · `study-interests` 35
 — **37/37 PASS**, `tsc` clean, `build` rc 0, lint gate passed.
+
+Re-run after this pass (dev DB rebuilt from scratch, profile 2 = Alex Chen):
+`ai-settings`, `ai-format` (40), `groq` (27), `schema`, `security` (68), `match`
+(74), `chancing` (64), `roadmap` (52), `documents` (35), `essays` (36), `visa`
+(50), `costs` (44), `cv` (44), `compare` (43), `mentors` (37), `parent` (41),
+`dataset` (50), `render` (144), `essay-adapter` (39), `rec-letter` (28),
+`country-compare` (17), `countries`, `opportunities` (14), `essay-reviews` (16),
+`integration` (246), `growth` (28), `telegram` (27), `telegram-integration`
+(119), `ownership` (83), `portability` (57), `journey` (91), `dark`,
+`schema-repair` (15), `provenance`, `recommend` (74), `study-interests` (35).
+`api-security`: **236 handlers across 131 route files refused anonymous access** —
+run in slices (`PROBE_START`/`PROBE_END`), because a single 236-request burst
+exhausts the sandbox's dev server; every slice exits green.
+`check:i18n` passed; `ChancingPanel` SSR-renders in en/uz/ru with no key leaks.

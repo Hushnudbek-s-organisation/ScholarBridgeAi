@@ -72,6 +72,14 @@ export interface ChancingProfile {
   certificates?: string | null;
   workExperienceYears?: number | null;
   researchPublications?: number | null;
+  /**
+   * Rows from the Activities pane (`student_activities`). The profile's own
+   * text columns are what the student typed in the profile; this is the
+   * structured portfolio they maintain on the Activities tab. Both describe
+   * the SAME person, so readiness must count both — otherwise adding an
+   * activity changes nothing and the portfolio looks disconnected.
+   */
+  savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
   budgetAnnualUsd?: number | null;
   careerGoal?: string | null;
   graduationYear?: number | null;
@@ -137,6 +145,12 @@ export interface ChancingResult {
   dataBasis: DataBasis;
   /** Consented ScholarBridge outcomes behind the estimate (0 = none yet). */
   sampleSize: number;
+  /**
+   * For `public-estimate`: whether the baseline came from the university's
+   * published acceptance rate or from the ranking-tier fallback. The UI must
+   * not claim "published acceptance data" when only a rank exists.
+   */
+  basisSource: "acceptance-rate" | "ranking-tier";
   /** Shown under the number — never imply certainty. */
   disclaimer: string;
 }
@@ -203,6 +217,10 @@ export function majorSimilarity(a?: string | null, b?: string | null): number {
 }
 
 /** Count distinct extracurricular/achievement items across all columns. */
+/** Roles that make an activity a leadership role (case-insensitive). */
+const LEADERSHIP_ROLE =
+  /\b(lead|leader|president|vice[- ]?president|captain|head|founder|co-?founder|chair|coordinator|director|manager|mentor)\b/i;
+
 export function countActivities(profile: ChancingProfile): {
   activities: number;
   leadership: number;
@@ -219,13 +237,32 @@ export function countActivities(profile: ChancingProfile): {
   const leadership = parseListColumn(profile.leadership).length;
   const research =
     parseListColumn(profile.researchExperience).length + Number(profile.researchPublications ?? 0);
+  const saved = profile.savedActivities ?? [];
+  const savedLeadership = saved.filter(
+    (a) =>
+      a.category === "leadership" ||
+      LEADERSHIP_ROLE.test(String(a.role ?? ""))
+  ).length;
+  const savedResearch = saved.filter((a) => a.category === "research").length;
+  // A competition ENTRY is an activity; it only becomes an award once the
+  // student recorded an achievement for it. Counting entries as awards would
+  // inflate the score without evidence.
+  const savedAwards = saved.filter(
+    (a) => a.category === "competition" && String(a.achievements ?? "").trim().length > 0
+  ).length;
+
   const awards = [
     ...parseListColumn(profile.awards),
     ...parseListColumn(profile.olympiads),
     ...parseListColumn(profile.competitions),
     ...parseListColumn(profile.certificates),
-  ].length;
-  return { activities, leadership, research, awards };
+  ].length + savedAwards;
+  return {
+    activities: activities + saved.length,
+    leadership: leadership + savedLeadership,
+    research: research + savedResearch,
+    awards,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -608,6 +645,7 @@ export function estimateAdmissionChance(
     confidence: round(confidence),
     dataBasis,
     sampleSize,
+    basisSource: base.source,
     disclaimer:
       dataBasis === "public-estimate"
         ? "Model estimate from published university data — not a guarantee. Your own outcomes data sharpens this over time."
