@@ -50,7 +50,10 @@ async function main() {
 
   if (process.argv.includes("--init")) {
     await run("npx", ["drizzle-kit", "push", "--force"], url);
-    await run("npx", ["tsx", "src/db/seed.ts"], url);
+    // `src/db/seed.ts` is a module with no CLI entry — seeding it directly did
+    // nothing, so this ran the documented "start + push + seed" without the
+    // seed half. `scripts/seed-db.ts` is the real entry point.
+    await run("npx", ["tsx", "scripts/seed-db.ts"], url);
   }
 
   const stop = async () => {

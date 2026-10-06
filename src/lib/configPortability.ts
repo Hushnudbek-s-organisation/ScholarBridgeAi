@@ -54,6 +54,9 @@ const INTEGER_KEYS = new Set([
   "refresh_interval_hours",
   "referral_premium_multiple",
   "referral_premium_days",
+  "referral_points_referrer",
+  "referral_points_referred",
+  "referral_activation_completeness",
 ]);
 const JSON_KEYS = new Set(["nav_hidden_items", "journey_steps", "section_help"]);
 const PROVIDER_KEYS = new Set([DEFAULT_PROVIDER_CONFIG_KEY, ...AI_TASKS.map((t) => taskProviderConfigKey(t.id))]);

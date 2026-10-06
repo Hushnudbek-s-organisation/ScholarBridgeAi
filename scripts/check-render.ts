@@ -15,7 +15,7 @@
  */
 
 import React from "react";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { PlanningStudio } from "../src/components/PlanningStudio";
@@ -30,6 +30,7 @@ import { OnboardingWizard } from "../src/components/OnboardingWizard";
 import { DashboardView } from "../src/components/DashboardView";
 import { RecommendationStudio } from "../src/components/RecommendationStudio";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
+import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
 
 let passed = 0;
 let failed = 0;
@@ -195,8 +196,71 @@ check(
   !/Tasks &amp; Roadmap/.test(landingHtml) && !/mockSidebar/.test(landingHtml)
 );
 
+// Landing-page self-check (2026-10): the marketing page must be as honest and
+// as consistent as the product it advertises.
+const anchorIds = ["how", "features", "chancing", "roadmap"];
+check(
+  "every landing anchor link has a matching section id",
+  anchorIds.every((id) => landingHtml.includes(`id="${id}"`)),
+  anchorIds.filter((id) => !landingHtml.includes(`id="${id}"`)).join(", ")
+);
+check(
+  "landing still scopes the admission estimate to evidence (never a number)",
+  /Admission estimate/.test(landingHtml) && !/Admission estimate<\/span>\s*<[^>]*>\s*\d/.test(landingHtml)
+);
+
+// The dashboard preview used to show an "Admissions Index" percentage — a
+// second, differently-computed number that read like an admission chance. It
+// now shows the same profile-readiness score the Readiness pane uses.
+const strengthLabel: Record<string, string> = {
+  en: "Readiness",
+  uz: "Tayyorlik",
+  ru: "Готовность",
+};
+const noRawKeys: Record<string, boolean> = {};
+for (const locale of ["en", "uz", "ru"]) {
+  const { html } = renderLanding(locale);
+  const text = html.replace(/<[^>]+>/g, " ");
+  // A missing message renders as "landing.someKey" — a raw key in the visible
+  // text means the page ships with placeholder copy.
+  noRawKeys[locale] = !/\b(landing|dashboard|nav|meta|hubs|degrees)\.[a-z][A-Za-z0-9]*/.test(text);
+  check(`landing leaks no unresolved message keys (${locale})`, noRawKeys[locale]);
+  check(
+    `landing dashboard mock uses the localized readiness label (${locale})`,
+    html.includes(strengthLabel[locale]),
+    strengthLabel[locale]
+  );
+  check(`landing no longer advertises an "Admissions Index" (${locale})`, !/Admissions Index/.test(html));
+}
+
 // ---------------------------------------------------------------------------
 section("7. UniversityExplorer & UniversityDetail render in every locale");
+
+// DashboardView must not compute its own second strength number: on the first
+// paint (effects have not run) the ring shows a neutral dash, and the card is
+// labelled as profile readiness — never as an admission index.
+for (const locale of ["en", "uz", "ru"]) {
+  const dash = render(
+    // eslint-disable-next-line react/no-children-prop
+    React.createElement(NextIntlClientProvider, {
+      locale,
+      messages: loadMessages(locale),
+      children: React.createElement(DashboardView, {
+        profile: { id: 7, name: "Test Student", gpa: 3.6, gpaScale: 4, ieltsScore: 7, budgetAnnualUsd: 30000, degreeLevel: "Master", targetMajor: "Computer Science" } as any,
+        onNavigateTab: () => {},
+        savedUniCount: 0,
+        savedScholarshipCount: 0,
+        savedProgramCount: 0,
+        taskCount: 0,
+        onEditProfile: () => {},
+      }),
+    })
+  );
+  const dashText = dash.html.replace(/<[^>]+>/g, " ");
+  check(`DashboardView renders (${locale})`, dash.error === null, dash.error ?? "");
+  check(`DashboardView waits for the shared strength score (${locale})`, dashText.includes("—"));
+  check(`DashboardView does not label the ring as an admission index (${locale})`, !/Admissions Index/.test(dashText));
+}
 
 // Both components fetch in useEffect, so SSR shows the initial paint: the
 // explorer's filter shell and the detail's loading state. That initial paint
@@ -341,6 +405,209 @@ for (const [name, condition] of [
 ] as [string, boolean][]) {
   check(name, condition);
 }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+section("15. Recommended for you is built from the profile, not from popularity");
+
+/** The API payload shape, with only the fields the panel reads. */
+function recPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    personalised: true,
+    basis: ["countries", "gpa"],
+    missing: [],
+    universities: [
+      {
+        id: 3,
+        name: "Technical University of Munich (TUM)",
+        country: "Germany",
+        city: "Munich",
+        flagEmoji: "DE",
+        worldRanking: 22,
+        programMajor: "Informatics & Data Engineering",
+        sourceUrl: "https://www.tum.de",
+        minGpa: 3.2,
+        minIelts: 6.5,
+        annualTuition: null,
+        annualTuitionUsd: null,
+        verificationStatus: "unverified",
+        lastVerifiedAt: null,
+        saved: true,
+        matchScore: 99,
+        matchCategory: "Safety",
+        matchReasons: ["GPA 3.72 well above the 3.2 minimum"],
+        matchIssues: [],
+      },
+    ],
+    scholarships: [
+      {
+        id: 1,
+        title: "Fulbright Foreign Student Program",
+        provider: "United States Department of State",
+        country: "United States",
+        amountUsdValue: 55000,
+        awardAmount: null,
+        awardCurrency: null,
+        awardPeriod: null,
+        awardBasis: "full_tuition",
+        deadlineDate: "2026-10-15",
+        minGpa: 3.3,
+        eligibleCountries: null,
+        verificationStatus: "unverified",
+        tuitionCoverage: "Full tuition",
+        sourceUrl: "https://foreign.fulbrightonline.org",
+        lastVerifiedAt: null,
+        gpaOk: true,
+        gpaProvided: true,
+        matchScore: 98,
+        matchReasons: ["GPA 3.72 well above the 3.3 minimum"],
+        matchIssues: [],
+        countryEligibility: "unknown",
+      },
+    ],
+    opportunities: [
+      {
+        id: 1,
+        title: "Google Summer of Code",
+        provider: "Google",
+        country: null,
+        type: "internship",
+        deadlineDate: null,
+        url: "https://summerofcode.withgoogle.com",
+        inPreferredCountry: false,
+      },
+    ],
+    ...overrides,
+  } as any;
+}
+
+const recFull = renderLocalized("en", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check("recommended panel renders a full profile payload", recFull.error === null, recFull.error ?? "");
+check(
+  "recommended panel shows the engine fit score and band, not a generic label",
+  recFull.html.includes("Fit 99%") && recFull.html.includes("Safety"),
+  recFull.html.slice(0, 200)
+);
+check(
+  "recommended panel repeats the engine's own evidence line",
+  recFull.html.includes("GPA 3.72 well above the 3.2 minimum")
+);
+check(
+  "recommended panel states an unknown citizenship rule instead of implying eligibility",
+  recFull.html.includes("Citizenship rule not in our data")
+);
+
+const recEmpty = renderLocalized("en", React.createElement(RecommendedPanel, {
+  recommended: recPayload({
+    personalised: false,
+    basis: [],
+    missing: ["degreeLevel", "major", "countries", "gpa"],
+    universities: [],
+    scholarships: [],
+    opportunities: [],
+  }),
+  onNavigateTab: () => {},
+}));
+check(
+  "empty profile: no university cards and no fit score at all",
+  !recEmpty.html.includes("Fit ") && !recEmpty.html.includes("Technical University of Munich")
+);
+check(
+  "empty profile: names the exact profile fields to add",
+  recEmpty.html.includes("your target major") && recEmpty.html.includes("your GPA")
+);
+check(
+  "empty profile: says the list is not popularity-based",
+  recEmpty.html.includes("never from popularity")
+);
+
+const recUz = renderLocalized("uz", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check(
+  "recommended panel is localized (uz chip + band)",
+  text(recUz.html).includes("Moslik 99%") && text(recUz.html).includes("Ishonchli"),
+  text(recUz.html).slice(0, 200)
+);
+const recRu = renderLocalized("ru", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check(
+  "recommended panel is localized (ru chip)",
+  text(recRu.html).includes("Соответствие 99%")
+);
+
+// ---------------------------------------------------------------------------
+section("Profile editors never pre-answer the student's questions");
+
+// A form that OPENS with "Master / Computer Science / 4.0 / scholarship needed"
+// silently writes those answers into the profile the moment the student saves
+// anything — the profile then drives every score with data nobody entered.
+const profileModal = readFileSync(new URL("../src/components/ProfileModal.tsx", import.meta.url), "utf8");
+const wizard = readFileSync(new URL("../src/components/OnboardingWizard.tsx", import.meta.url), "utf8");
+const sopStudio = readFileSync(new URL("../src/components/AiSopStudio.tsx", import.meta.url), "utf8");
+
+check(
+  "the profile modal starts with no degree, major or scale chosen",
+  !/degreeLevel: "Master"/.test(profileModal) &&
+    !/targetMajor: "Computer Science"/.test(profileModal) &&
+    !/gpaScale: 4\.0,/.test(profileModal),
+  "found an invented default in ProfileModal"
+);
+check(
+  "the profile modal does not claim a scholarship need nobody expressed",
+  /needScholarship: false,/.test(profileModal) &&
+    !/needScholarship: true,/.test(profileModal),
+  "found needScholarship: true as a default"
+);
+check(
+  "an unset GPA scale is saved as NULL, not as 4.0",
+  /gpaScale: rest\.gpaScale === "" \? null/.test(profileModal),
+  "the scale is not NULL-safe"
+);
+check(
+  "the wizard does not pre-tick the scholarship step",
+  /needScholarship: profile\?\.needScholarship \?\? false/.test(wizard) &&
+    !/needScholarship: form\.needScholarship \|\| true/.test(wizard),
+  "the wizard answers the scholarship question for the student"
+);
+check(
+  "the SOP studio does not write for an invented major",
+  !/targetMajor \|\| "Computer Science"/.test(sopStudio),
+  "SOP defaults to Computer Science"
+);
+
+// ---------------------------------------------------------------------------
+// Shipped surface: no design scratch page, and a sitemap that names every
+// public page. `/preview` was a leftover "hero redesign — before/after" demo
+// page: unlinked, listed nowhere, and it threw a 500 for anyone who typed the
+// URL (it rendered UniversityDetail outside the intl provider). It is gone.
+check(
+  "no design-scratch preview page ships under /preview",
+  !existsSync(new URL("../src/app/preview/page.tsx", import.meta.url))
+);
+const sitemapSource = readFileSync(new URL("../src/app/sitemap.ts", import.meta.url), "utf8");
+const publicPages = ["/universities", "/scholarships", "/terms", "/privacy"];
+check(
+  "the sitemap lists every public page, not just the landing page",
+  publicPages.every((p) => sitemapSource.includes(`${p}`)) && sitemapSource.includes("${SITE_URL}/`"),
+  publicPages.filter((p) => !sitemapSource.includes(p)).join(", ")
+);
+check(
+  "every page the sitemap lists actually exists as a route",
+  ["universities", "scholarships", "terms", "privacy"].every((dir) =>
+    existsSync(new URL(`../src/app/${dir}/page.tsx`, import.meta.url))
+  )
+);
+check(
+  "nothing behind sign-in is advertised to crawlers",
+  !/dashboard|admin|visa|essays/.test(sitemapSource)
+);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { savedScholarships, scholarshipDecisions, scholarships, studentProfiles } from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { guardStudent, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
 import {
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
   const g = await guardStudent(req, new URL(req.url).searchParams.get("profileId"));
   if (!g.ok) return g.response;
   const { profileId } = g.value;
+  const locale = localeFromRequest(req);
   try {
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
     if (!profile) return jsonError(404, "Profile not found", "not_found");
@@ -64,8 +66,8 @@ export async function GET(req: Request) {
         websiteUrl: s.applicationUrl || s.websiteUrl,
         statusLabel: st.statusLabel,
         isEligible: m.isEligible,
-        reasons: (m.reasons ?? []).slice(0, 3),
-        issues: (m.potentialIssues ?? []).slice(0, 2),
+        reasons: translateReasons(locale, "scholarship", m.reasonDetails, m.reasons).slice(0, 3),
+        issues: translateReasons(locale, "scholarship", m.issueDetails, m.potentialIssues).slice(0, 2),
         tags: autopilotTags(item, now),
         priority: autopilotPriority(item, now),
         decision: decisionById.get(s.id) ?? null,

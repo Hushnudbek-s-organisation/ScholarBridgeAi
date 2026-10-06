@@ -10,6 +10,13 @@ import {
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
+import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
+import { authenticate } from "@/lib/auth";
+import { calculateUniversityMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
+import { toMatchProfile } from "@/lib/profileMapping";
+import { selectUniversities } from "@/lib/universities";
+import { studentProfiles } from "@/db/schema";
 
 /**
  * GENERIC structured parser for `other_requirements` free-text.
@@ -126,6 +133,40 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     if (!uni) {
       return NextResponse.json({ error: "University not found" }, { status: 404 });
+    }
+
+    // ---- Profile match (same engine + same row shape as the explorer) -----
+    // The student's own fit score used to exist only on the list screen, so a
+    // university badge could vanish the moment the student opened it. Read
+    // privately: only the owner (or an admin) gets a personalised score; the
+    // public payload stays unpersonalised, exactly like GET /api/universities.
+    let match: {
+      score: number;
+      category: "Reach" | "Match" | "Safety";
+      reasons: string[];
+      issues: string[];
+    } | null = null;
+    const locale = localeFromRequest(req);
+    const profileIdParam = new URL(req.url).searchParams.get("profileId");
+    if (profileIdParam) {
+      const pId = Number.parseInt(profileIdParam, 10);
+      const auth = await authenticate(req);
+      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
+        if (p) {
+          const rows = await selectUniversities();
+          const row = rows.find((r) => r.id === uniId);
+          if (row) {
+            const result = calculateUniversityMatch(toMatchProfile(p), row);
+            match = {
+              score: result.matchScore,
+              category: result.matchCategory,
+              reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
+              issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
+            };
+          }
+        }
+      }
     }
 
     // ---------- Programs (existing `programs` table) ----------
@@ -357,10 +398,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       pte: summarize("pte", null) ?? (parsedOther.pte != null ? { values: [parsedOther.pte], min: parsedOther.pte, max: parsedOther.pte, range: String(parsedOther.pte), single: parsedOther.pte } : null),
       cambridgeEnglish: summarize("cambridgeenglish", null) ?? (parsedOther.cambridgeEnglish != null ? { values: [parsedOther.cambridgeEnglish], min: parsedOther.cambridgeEnglish, max: parsedOther.cambridgeEnglish, range: String(parsedOther.cambridgeEnglish), single: parsedOther.cambridgeEnglish } : null),
       // Requirement row exists (even without a published minimum):
-      satRequired: (uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.satRequired === true || parsedOther.sat != null,
-      actRequired: (uniReqs.act?.values.length ?? 0) > 0 || parsedOther.actRequired === true || parsedOther.act != null,
-      satMinimumPublished: (uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.sat != null,
-      actMinimumPublished: (uniReqs.act?.values.length ?? 0) > 0 || parsedOther.act != null,
+      // SAT/ACT are undergraduate tests: a graduate-only institution's
+      // published undergraduate minimum is not a requirement for the
+      // programmes it actually offers, so it is reported as
+      // "not applicable" instead of "required". The stored value is never
+      // rewritten — only its applicability is stated.
+      undergraduateTestsApply: undergraduateTestApplies(uni.degreeLevel),
+      hasUndergraduateAdmission: hasUndergraduateAdmission(uni.degreeLevel),
+      satRequired:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.satRequired === true || parsedOther.sat != null),
+      actRequired:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.act?.values.length ?? 0) > 0 || parsedOther.actRequired === true || parsedOther.act != null),
+      satMinimumPublished:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.sat?.values.length ?? 0) > 0 || uni.minSat != null || parsedOther.sat != null),
+      actMinimumPublished:
+        undergraduateTestApplies(uni.degreeLevel) &&
+        ((uniReqs.act?.values.length ?? 0) > 0 || parsedOther.act != null),
       portfolioRequired: flagAgg.portfolio,
       interviewRequired: flagAgg.interview,
       recommendationRequired: flagAgg.recommendation,
@@ -518,6 +574,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       applicationCycles: cycles,
       sources: uniSources,
       scholarships: uniScholarships,
+      match,
       campuses: [],
       images: [],
     });

@@ -7,16 +7,20 @@ import {
   scholarshipSources,
   sources,
 } from "@/db/schema";
-import { calculateScholarshipMatch } from "@/lib/matching";
+import { calculateScholarshipMatch, type ReasonDetail } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
+import { pickBestSource } from "@/lib/sourcePick";
 
 export async function GET(req: Request) {
   try {
     await seedDatabase();
+    // Match sentences are translated for the caller's language (cookie).
+    const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.toLowerCase();
@@ -67,7 +71,7 @@ export async function GET(req: Request) {
           .where(inArray(scholarshipSources.scholarshipId, schIds));
 
         const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
-        let srcById = new Map<number, { url: string; title: string; accessedAt: Date | null }>();
+        let srcById = new Map<number, { id: number; url: string; title: string; accessedAt: Date | null }>();
         if (srcIds.length > 0) {
           try {
             const srcRows = await db
@@ -88,28 +92,12 @@ export async function GET(req: Request) {
         }
 
         for (const [schId, schLinks] of grouped) {
-          let bestUrl: string | null = null;
-          let bestVerified: Date | null = null;
-          let bestTitle: string | null = null;
-          for (const l of schLinks) {
-            if (l.sourceId == null) continue;
-            const src = srcById.get(l.sourceId);
-            if (!src) continue;
-            const accessed = src.accessedAt ? new Date(src.accessedAt) : null;
-            if (!bestUrl || (accessed && (!bestVerified || accessed > bestVerified))) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-              bestVerified = accessed;
-            } else if (!bestUrl) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-            }
-          }
-          if (bestUrl) {
+          const best = pickBestSource(schLinks, srcById);
+          if (best?.url) {
             sourceMap.set(schId, {
-              sourceUrl: bestUrl,
-              lastVerifiedAt: bestVerified ? bestVerified.toISOString() : null,
-              sourceTitle: bestTitle,
+              sourceUrl: best.url,
+              lastVerifiedAt: best.accessedAt ? best.accessedAt.toISOString() : null,
+              sourceTitle: best.title,
             });
           }
         }
@@ -135,6 +123,8 @@ export async function GET(req: Request) {
         isEligible: boolean | null;
         reasons?: string[];
         potentialIssues?: string[];
+        reasonDetails?: ReasonDetail[];
+        issueDetails?: ReasonDetail[];
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
       if (profileData) {
         matchInfo = calculateScholarshipMatch(profileData, s);
@@ -146,8 +136,8 @@ export async function GET(req: Request) {
         ...s,
         matchScore: matchInfo.matchScore,
         isEligible: matchInfo.isEligible,
-        matchReasons: matchInfo.reasons ?? [],
-        matchIssues: matchInfo.potentialIssues ?? [],
+        matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),
+        matchIssues: translateReasons(locale, "scholarship", matchInfo.issueDetails, matchInfo.potentialIssues),
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,
@@ -158,20 +148,41 @@ export async function GET(req: Request) {
     });
 
     if (profileData) {
-      // NULL match scores sort last (no profile data -> never ranked by score).
+      // Sort: match score desc, then the nearest deadline (soonest first,
+      // unknown deadlines last), then id. Without the deadline/id tie-break,
+      // equal-scoring scholarships changed order between requests (Postgres
+      // row order is not stable) — a student would see a shuffled list on
+      // every refresh.
       results.sort((a, b) => {
         if (a.matchScore == null && b.matchScore == null) return 0;
         if (a.matchScore == null) return 1;
         if (b.matchScore == null) return -1;
-        return b.matchScore - a.matchScore;
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        // `deadlineDate` arrives as a Date (json serialized to ISO) — turning
+        // it into a string directly would compare "Wed Oct 15" lexicographically.
+        const asYmd = (v: Date | string | null): string => {
+          if (!v) return "";
+          if (v instanceof Date) return v.toISOString().slice(0, 10);
+          const t = new Date(v);
+          return Number.isNaN(t.getTime()) ? String(v) : t.toISOString().slice(0, 10);
+        };
+        const ad = asYmd(a.deadlineDate) || a.deadline || "";
+        const bd = asYmd(b.deadlineDate) || b.deadline || "";
+        if (ad !== bd) {
+          if (!ad) return 1;
+          if (!bd) return -1;
+          return ad.localeCompare(bd);
+        }
+        return a.id - b.id;
       });
     } else {
       // NULL amounts sort after verified amounts (never treat NULL as $0).
       results.sort((a, b) => {
-        if (a.amountUsdValue == null && b.amountUsdValue == null) return 0;
+        if (a.amountUsdValue == null && b.amountUsdValue == null) return a.id - b.id;
         if (a.amountUsdValue == null) return 1;
         if (b.amountUsdValue == null) return -1;
-        return b.amountUsdValue - a.amountUsdValue;
+        if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
+        return a.id - b.id;
       });
     }
 

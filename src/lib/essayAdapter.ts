@@ -19,6 +19,7 @@
  */
 
 import { majorSimilarity, normalizedGpa, parseListColumn } from "./chancing";
+import { subjectSimilarity } from "./subjectAffinity";
 
 export interface EssayInput {
   text: string;
@@ -244,7 +245,12 @@ export function scoreEssayFit(essay: EssayInput, sh: ScholarshipInput, profile: 
     codes.push("major_unknown");
     gaps.push("your major is not set in the profile — eligibility cannot be verified");
   } else {
-    const best = Math.max(...majors.map((m) => majorSimilarity(profile.major, m)));
+    // Same relatedness rule as the recommender/opportunities: a synonym hit
+    // ("Software Engineering" for "Computer Science") must not be reported as
+    // "not in the eligible list".
+    const best = Math.max(
+      ...majors.map((m) => Math.max(majorSimilarity(profile.major, m), subjectSimilarity(profile.major, m)))
+    );
     if (best >= 0.5) {
       fit += round(best * 15);
       matched.push(`major "${profile.major}" matches the eligible list`);

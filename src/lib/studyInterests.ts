@@ -498,28 +498,89 @@ export function parseStudyInterestSelections(raw: unknown): StudyInterestSelecti
   return isStudyInterestSelectionValid(selections) ? selections : null;
 }
 
-/**
- * Legacy target_major migration for display only; it never writes to the DB.
- * Known legacy majors become stable taxonomy IDs. Unknown values remain
- * visible and editable as Other instead of being discarded.
- */
-export function selectionsFromLegacyTargetMajor(value: string | null | undefined): StudyInterestSelection[] {
-  const raw = typeof value === "string" ? value.trim() : "";
-  if (!raw) return [];
-  const normalized = normalizeStudySearchText(raw);
+/** The two concrete taxonomy selections a legacy label can resolve to. */
+type ResolvedStudyInterest =
+  | { kind: "area"; areaId: string }
+  | { kind: "specialization"; areaId: string; specializationId: string };
 
+/** Resolve ONE canonical/alias label to a taxonomy selection (or null). */
+function resolveSingleLegacyMajor(raw: string): ResolvedStudyInterest | null {
+  const normalized = normalizeStudySearchText(raw);
+  if (!normalized) return null;
   for (const area of STUDY_INTEREST_AREAS) {
     for (const item of area.specializations) {
       if ([item.canonical, ...item.aliases].some((candidate) => normalizeStudySearchText(candidate) === normalized)) {
-        return [{ kind: "specialization", areaId: area.id, specializationId: item.id }];
+        return { kind: "specialization", areaId: area.id, specializationId: item.id };
       }
     }
   }
   for (const area of STUDY_INTEREST_AREAS) {
     if ([area.canonical, ...area.aliases].some((candidate) => normalizeStudySearchText(candidate) === normalized)) {
-      return [{ kind: "area", areaId: area.id }];
+      return { kind: "area", areaId: area.id };
     }
   }
+  return null;
+}
+
+/** Compound separators used in stored majors: "A & B", "A, B", "A / B", "A and B". */
+const COMPOUND_MAJOR_SEPARATOR = /\s*(?:&|,|\/|\+|;|\band\b)\s*/i;
+
+/**
+ * Legacy target_major migration for display only; it never writes to the DB.
+ * Known legacy majors become stable taxonomy IDs. Unknown values remain
+ * visible and editable as Other instead of being discarded.
+ *
+ * Compound labels are resolved part by part: "Computer Science & Data Science"
+ * becomes the two taxonomy selections instead of one opaque string — an opaque
+ * string only ever reaches the matcher through word overlap, so a student with
+ * a compound major was systematically scored below one with a single-field
+ * major. Parts that cannot be resolved are kept verbatim as Other (the
+ * taxonomy information is never dropped silently).
+ */
+export function selectionsFromLegacyTargetMajor(value: string | null | undefined): StudyInterestSelection[] {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return [];
+
+  const direct = resolveSingleLegacyMajor(raw);
+  if (direct) return [direct];
+
+  const parts = raw
+    .split(COMPOUND_MAJOR_SEPARATOR)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length > 1) {
+    const seen = new Set<string>();
+    const resolved: ResolvedStudyInterest[] = [];
+    const unresolved: string[] = [];
+    for (const part of parts) {
+      const selection = resolveSingleLegacyMajor(part);
+      if (!selection) {
+        unresolved.push(part);
+        continue;
+      }
+      const key =
+        selection.kind === "specialization"
+          ? `specialization:${selection.areaId}:${selection.specializationId}`
+          : `area:${selection.areaId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      resolved.push(selection);
+    }
+
+    const candidates: StudyInterestSelection[][] = [];
+    if (unresolved.length === 0) {
+      candidates.push(resolved);
+      // An area and one of its specializations are alternatives, never a pair.
+      candidates.push(resolved.filter((selection) => selection.kind === "specialization"));
+    } else if (resolved.length > 0) {
+      // Keep the understood parts AND the raw remainder (one Other slot).
+      candidates.push([...resolved, { kind: "other", value: unresolved.join(" ") }]);
+    }
+    for (const candidate of candidates) {
+      if (candidate.length > 0 && isStudyInterestSelectionValid(candidate)) return candidate;
+    }
+  }
+
   return [{ kind: "other", value: raw }];
 }
 

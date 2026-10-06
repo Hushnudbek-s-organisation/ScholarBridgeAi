@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { asc, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 
 export const metadata: Metadata = {
@@ -15,10 +17,10 @@ interface UniversityRow {
   id: number;
   name: string;
   country: string;
-  city: string;
-  flag_emoji: string;
-  world_ranking: number;
-  program_major: string;
+  city: string | null;
+  flag_emoji: string | null;
+  world_ranking: number | null;
+  program_major: string | null;
   official_website_url: string | null;
 }
 
@@ -32,53 +34,66 @@ export default async function UniversitiesPage({
 }: UniversitiesPageProps) {
   // 1. Page from URL: /universities?page=2
   const requestedPage = parsePage((await searchParams).page);
+  const { from } = getRange(requestedPage);
 
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-16">
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-sm text-amber-800">
-          Supabase is not configured. Set <code>SUPABASE_URL</code> and{" "}
-          <code>SUPABASE_SERVICE_ROLE_KEY</code>.
-        </p>
-      </main>
-    );
-  }
-
-  // 2. range(from, to) → exactly 24 rows. `count: "exact"` returns the total
-  //    in the same request, so one round-trip gives rows + totalPages.
-  const { from, to } = getRange(requestedPage);
-  const { data, count, error } = await supabase
-    .from("universities")
-    .select(
-      "id, name, country, city, flag_emoji, world_ranking, program_major, official_website_url",
-      { count: "exact" },
-    )
-    .order("world_ranking", { ascending: true })
-    .order("id", { ascending: true }) // stable tie-breaker → no duplicates across pages
-    .range(from, to);
-
-  const totalItems = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-
-  // 3. Out-of-range page (?page=999) → last valid page.
-  //    (PostgREST returns a 416 error for offsets past the end, so check first.)
-  if (requestedPage > totalPages && count !== null) {
-    redirect(totalPages > 1 ? `/universities?page=${totalPages}` : "/universities");
-  }
-
-  if (error) {
+  // 2. Data comes from the app's OWN database (DATABASE_URL, Drizzle) — the
+  //    same source every API route reads. This page used to require the
+  //    optional Supabase env vars and rendered "Supabase is not configured"
+  //    on a perfectly valid PostgreSQL (Render/self-hosted) deployment.
+  let rows: UniversityRow[];
+  let totalItems: number;
+  try {
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(universitiesTable);
+    totalItems = Number(countRow?.n ?? 0);
+    const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    if (requestedPage > lastPage) {
+      redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
+    }
+    const data = await db
+      .select({
+        id: universitiesTable.id,
+        name: universitiesTable.name,
+        country: universitiesTable.country,
+        city: universitiesTable.city,
+        flagEmoji: universitiesTable.flagEmoji,
+        worldRanking: universitiesTable.worldRanking,
+        programMajor: universitiesTable.programMajor,
+        officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
+        websiteUrl: universitiesTable.websiteUrl,
+      })
+      .from(universitiesTable)
+      .where(eq(universitiesTable.isActive, true))
+      .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
+      .limit(ITEMS_PER_PAGE)
+      .offset(from);
+    // Nullable columns stay null (never "" or 0) — the card renders nothing
+    // rather than pretending a ranking/focus exists.
+    rows = data.map((u) => ({
+      id: u.id,
+      name: u.name,
+      country: u.country,
+      city: u.city,
+      flag_emoji: u.flagEmoji,
+      world_ranking: u.worldRanking,
+      program_major: u.programMajor,
+      official_website_url: u.officialWebsiteUrl || u.websiteUrl,
+    }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown error";
     return (
       <main className="mx-auto max-w-7xl px-4 py-16">
         <p className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
-          Couldn&apos;t load universities: {error.message}
+          Couldn&apos;t load universities: {message}
         </p>
       </main>
     );
   }
 
-  const universities = (data ?? []) as UniversityRow[];
-  const currentPage = requestedPage;
+  const universities = rows;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const currentPage = Math.min(requestedPage, totalPages);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -107,18 +122,22 @@ export default async function UniversitiesPage({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-2xl" aria-hidden>{u.flag_emoji}</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 ring-inset">
-                  <Trophy className="h-3 w-3" aria-hidden />#{u.world_ranking}
-                </span>
+                {u.world_ranking != null && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 ring-inset">
+                    <Trophy className="h-3 w-3" aria-hidden />#{u.world_ranking}
+                  </span>
+                )}
               </div>
               <h2 className="mt-2 line-clamp-2 text-sm font-bold text-slate-900 sm:text-base">
                 {u.name}
               </h2>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                <span className="truncate">{u.city}, {u.country}</span>
+                <span className="truncate">{[u.city, u.country].filter(Boolean).join(", ")}</span>
               </p>
-              <p className="mt-1 truncate text-xs text-slate-500">{u.program_major}</p>
+              {u.program_major && (
+                <p className="mt-1 truncate text-xs text-slate-500">{u.program_major}</p>
+              )}
               {u.official_website_url && (
                 <Link
                   href={u.official_website_url}

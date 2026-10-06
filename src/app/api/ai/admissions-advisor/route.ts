@@ -5,9 +5,10 @@ import { eq, inArray } from "drizzle-orm";
 import { callAI } from "@/lib/ai";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { ADVISOR_SYSTEM_PROMPT, buildAdvisorBrief, isTrustworthyReply, rulesAdvice, type AdvisorInput } from "@/lib/advisor";
-import { ADMISSION_PROBABILITY, estimateAdmissionChance, profileCompletenessRatio, type ChancingProfile, type ChancingResult } from "@/lib/chancing";
+import { ADMISSION_PROBABILITY, estimateAdmissionChance, profileCompletenessRatio, type ChancingResult } from "@/lib/chancing";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
-import { calculateUniversityMatch, type StudentProfileData } from "@/lib/matching";
+import { calculateUniversityMatch } from "@/lib/matching";
+import { chancingProfileWithActivities, toChancingUniversity, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 
 /**
  * AI Admissions Advisor (#3).
@@ -39,55 +40,16 @@ export async function POST(req: Request) {
     const appUniIds = apps.map((a) => a.universityId).filter((id): id is number => id !== null);
     const uniIds = [...new Set([...savedUnis.map((s) => s.universityId), ...appUniIds])];
 
-    const chancingProfile: ChancingProfile = {
-      gpa: profile.gpa,
-      gpaScale: profile.gpaScale,
-      ieltsScore: profile.ieltsScore,
-      toeflScore: profile.toeflScore,
-      satScore: profile.satScore,
-      actScore: profile.actScore,
-      duolingoScore: profile.duolingoScore,
-      country: profile.country,
-      targetMajor: profile.targetMajor,
-      degreeLevel: profile.degreeLevel,
-      leadership: profile.leadership,
-      volunteering: profile.volunteering,
-      clubs: profile.clubs,
-      researchExperience: profile.researchExperience,
-      awards: profile.awards,
-      olympiads: profile.olympiads,
-      budgetAnnualUsd: profile.budgetAnnualUsd,
-      careerGoal: profile.careerGoal,
-      graduationYear: profile.graduationYear,
-      requiresFullScholarship: profile.requiresFullScholarship,
-    };
-
-    const matchProfile: StudentProfileData = {
-      id: profile.id,
-      name: profile.name,
-      degreeLevel: profile.degreeLevel,
-      targetMajor: profile.targetMajor,
-      gpa: profile.gpa,
-      gpaScale: profile.gpaScale,
-      ieltsScore: profile.ieltsScore,
-      toeflScore: profile.toeflScore,
-      satScore: profile.satScore,
-      greScore: profile.greScore,
-      budgetAnnualUsd: profile.budgetAnnualUsd,
-      preferredCountries: profile.preferredCountries,
-      needScholarship: profile.needScholarship,
-      extracurriculars: profile.extracurriculars,
-      workExperienceYears: profile.workExperienceYears,
-      researchPublications: profile.researchPublications,
-    };
+    const chancingProfile = await chancingProfileWithActivities(profile);
+    const matchProfile = toMatchProfile(profile);
 
     const chances: ChancingResult[] = [];
     if (uniIds.length > 0) {
       const uniRows = await db.select().from(universities).where(inArray(universities.id, uniIds));
       for (const uni of uniRows) {
-        const fit = calculateUniversityMatch(matchProfile, uni as never);
+        const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni));
         chances.push(
-          estimateAdmissionChance(chancingProfile, uni as never, { fitScore: fit.matchScore })
+          estimateAdmissionChance(chancingProfile, toChancingUniversity(uni), { fitScore: fit.matchScore })
         );
       }
     }

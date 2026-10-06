@@ -8,50 +8,15 @@ import {
   universitySources,
   sources,
 } from "@/db/schema";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch, type ReasonDetail } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
-
-/**
- * Resilient university select: tries the full schema first. If the database
- * is missing an unexpected column (the DB is the source of truth and may
- * differ), falls back to a core subset so the list still works.
- */
-async function selectUniversities() {
-  try {
-    return await db.select().from(universities);
-  } catch {
-    return await db
-      .select({
-        id: universities.id,
-        name: universities.name,
-        country: universities.country,
-        city: universities.city,
-        flagEmoji: universities.flagEmoji,
-        worldRanking: universities.worldRanking,
-        degreeLevel: universities.degreeLevel,
-        programMajor: universities.programMajor,
-        annualTuitionUsd: universities.annualTuitionUsd,
-        annualLivingEstUsd: universities.annualLivingEstUsd,
-        minGpa: universities.minGpa,
-        minIelts: universities.minIelts,
-        minSat: universities.minSat,
-        acceptanceRate: universities.acceptanceRate,
-        postStudyWorkVisaYears: universities.postStudyWorkVisaYears,
-        description: universities.description,
-        highlights: universities.highlights,
-        websiteUrl: universities.websiteUrl,
-        imageUrl: universities.imageUrl,
-        verificationStatus: universities.verificationStatus,
-        lastVerifiedAt: universities.lastVerifiedAt,
-        sourceUrl: universities.sourceUrl,
-      })
-      .from(universities);
-  }
-}
+import { pickBestSource } from "@/lib/sourcePick";
+import { selectUniversities } from "@/lib/universities";
 
 /**
  * University discovery API (spec §16).
@@ -60,6 +25,8 @@ async function selectUniversities() {
 export async function GET(req: Request) {
   try {
     await seedDatabase();
+    // Match sentences are translated for the caller's language (cookie).
+    const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.toLowerCase();
@@ -69,8 +36,6 @@ export async function GET(req: Request) {
     const sort = searchParams.get("sort");
     const uniType = searchParams.get("type"); // Public | Private
     const ieltsFilter = searchParams.get("ielts"); // e.g. "6.5" → only unis with minIelts <= 6.5
-    const scholarshipOnly = searchParams.get("scholarships") === "true";
-    const englishOnly = searchParams.get("english") === "true";
     const minRank = searchParams.get("minRank") ? Number(searchParams.get("minRank")) : null;
     const maxRank = searchParams.get("maxRank") ? Number(searchParams.get("maxRank")) : null;
 
@@ -129,11 +94,6 @@ export async function GET(req: Request) {
     if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
-    // Scholarship availability: universities that have at least one scholarship
-    // in the app scholarships table (matched by name similarity is not reliable —
-    // so this filter only applies when scholarships are linked via programs later).
-    void scholarshipOnly;
-
     // Program search: universities offering a program in the searched field.
     const programFilter = searchParams.get("program");
     if (programFilter && programFilter !== "All") {
@@ -157,7 +117,7 @@ export async function GET(req: Request) {
           .where(inArray(universitySources.universityId, uniIds));
 
         const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
-        let srcById = new Map<number, { url: string; title: string; accessedAt: Date | null }>();
+        let srcById = new Map<number, { id: number; url: string; title: string; accessedAt: Date | null }>();
         if (srcIds.length > 0) {
           try {
             const srcRows = await db
@@ -179,28 +139,12 @@ export async function GET(req: Request) {
         }
 
         for (const [uniId, uniLinks] of grouped) {
-          let bestUrl: string | null = null;
-          let bestVerified: Date | null = null;
-          let bestTitle: string | null = null;
-          for (const l of uniLinks) {
-            if (l.sourceId == null) continue;
-            const src = srcById.get(l.sourceId);
-            if (!src) continue;
-            const accessed = src.accessedAt ? new Date(src.accessedAt) : null;
-            if (!bestUrl || (accessed && (!bestVerified || accessed > bestVerified))) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-              bestVerified = accessed;
-            } else if (!bestUrl) {
-              bestUrl = src.url;
-              bestTitle = src.title;
-            }
-          }
-          if (bestUrl) {
+          const best = pickBestSource(uniLinks, srcById);
+          if (best?.url) {
             sourceMap.set(uniId, {
-              sourceUrl: bestUrl,
-              lastVerifiedAt: bestVerified ? bestVerified.toISOString() : null,
-              sourceTitle: bestTitle,
+              sourceUrl: best.url,
+              lastVerifiedAt: best.accessedAt ? best.accessedAt.toISOString() : null,
+              sourceTitle: best.title,
             });
           }
         }
@@ -235,6 +179,8 @@ export async function GET(req: Request) {
         matchCategory: "Reach" | "Match" | "Safety" | null;
         reasons?: string[];
         potentialIssues?: string[];
+        reasonDetails?: ReasonDetail[];
+        issueDetails?: ReasonDetail[];
       } = { matchScore: null, matchCategory: null, reasons: [], potentialIssues: [] };
       if (profileData) {
         matchInfo = calculateUniversityMatch(profileData, uni);
@@ -244,8 +190,8 @@ export async function GET(req: Request) {
         ...uni,
         matchScore: matchInfo.matchScore,
         matchCategory: matchInfo.matchCategory,
-        matchReasons: matchInfo.reasons ?? [],
-        matchIssues: matchInfo.potentialIssues ?? [],
+        matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
+        matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         sourceUrl: src?.sourceUrl ?? null,
         sourceTitle: src?.sourceTitle ?? null,
         sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,

@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkCheck,
+  Target,
 } from "lucide-react";
 import { formatMoney, formatCount, formatNumber } from "@/lib/format";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
@@ -62,6 +63,13 @@ interface UniversityDetailData {
   applicationUrl: string | null;
   imageUrl: string | null;
   verificationStatus: string;
+  /** Profile fit from the shared matching engine (null when signed out). */
+  match?: {
+    score: number;
+    category: string;
+    reasons: string[];
+    issues: string[];
+  } | null;
 }
 
 interface ProgramData {
@@ -247,6 +255,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
   const [money, setMoney] = useState<any>(null);
   const [scholarships, setScholarships] = useState<ScholarshipData[]>([]);
   const [sources, setSources] = useState<SourceData[]>([]);
+  const [match, setMatch] = useState<UniversityDetailData["match"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Presentation-only UI state (no fetch/API changes)
@@ -321,7 +330,8 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/universities/${universityId}`);
+        const qs = activeProfile?.id ? `?profileId=${activeProfile.id}` : "";
+        const res = await fetch(`/api/universities/${universityId}${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "load-failed");
         if (!cancelled) {
@@ -332,6 +342,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           setMoney(data.money || null);
           setScholarships(data.scholarships || []);
           setSources(data.sources || []);
+          setMatch(data.match ?? null);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "load-failed");
@@ -342,7 +353,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
     return () => {
       cancelled = true;
     };
-  }, [universityId]);
+  }, [universityId, activeProfile?.id]);
 
   if (loading) {
     return (
@@ -415,6 +426,20 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                 <MapPin className="h-3.5 w-3.5" />
                 {uni.city}, {uni.country} {uni.flagEmoji}
               </p>
+              {match && (
+                <div className="mt-3 space-y-1">
+                  <div className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-emerald-400/15 backdrop-blur-md border border-emerald-300/30 px-3 py-1.5">
+                    <Target className="h-4 w-4 text-emerald-300" />
+                    <span className="text-xs font-bold">
+                      {t("fitBadge", { score: match.score, category: match.category })}
+                    </span>
+                  </div>
+                  <p className="max-w-xl text-[11px] leading-snug text-indigo-100/90">
+                    {t("fitNotChance")}
+                    {match.reasons[0] ? ` ${match.reasons[0]}` : ""}
+                  </p>
+                </div>
+              )}
               <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
                 <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
                 <span className="text-xs font-bold">{t("qsRanking")}</span>
@@ -630,7 +655,9 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field
             label="SAT"
             value={
-              universityRequirements?.satRequired
+              universityRequirements?.undergraduateTestsApply === false
+                ? t("satNotApplicable")
+                : universityRequirements?.satRequired
                 ? universityRequirements?.satMinimumPublished
                   ? req(universityRequirements, "sat", (v) => `${v}`)
                   : t("satNoMin")
@@ -640,7 +667,9 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field
             label="ACT"
             value={
-              universityRequirements?.actRequired
+              universityRequirements?.undergraduateTestsApply === false
+                ? t("satNotApplicable")
+                : universityRequirements?.actRequired
                 ? universityRequirements?.actMinimumPublished
                   ? req(universityRequirements, "act", (v) => `${v}`)
                   : t("satNoMin")
@@ -650,6 +679,15 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           <Field label="PTE Academic" value={req(universityRequirements, "pte", (v) => `${v}`)} />
           <Field label="Cambridge English" value={req(universityRequirements, "cambridgeEnglish", (v) => `${v}`)} />
         </div>
+        {/* The grid summarises every catalogued programme. When the values
+            differ per programme it shows a range (e.g. IELTS 7-7.5) — say so,
+            otherwise a lower bound reads like the requirement for all of
+            them. */}
+        {["ielts", "toefl", "duolingo", "gpa", "sat", "act", "pte", "cambridgeEnglish"].some(
+          (key) => Array.isArray(universityRequirements?.[key]?.values) && universityRequirements[key].values.length > 1,
+        ) && (
+          <p className="mt-2 text-[11px] text-amber-700">{t("reqVariesByProgram")}</p>
+        )}
 
         {/* Long text requirements: full-width, clamped by default */}
         {(() => {

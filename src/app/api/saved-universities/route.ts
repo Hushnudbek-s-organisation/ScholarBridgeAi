@@ -23,6 +23,11 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
+    const [profile] = await db
+      .select()
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, profileId));
+
     const saved = await db
       .select({
         id: savedUniversities.id,
@@ -39,7 +44,23 @@ export async function GET(req: Request) {
       .innerJoin(universities, eq(savedUniversities.universityId, universities.id))
       .where(eq(savedUniversities.profileId, profileId));
 
-    return NextResponse.json({ savedUniversities: saved });
+    // The row stores the fit score AT SAVE TIME. The fit engine is the single
+    // source of truth, so the response recomputes it (a scorer change or a
+    // profile edit must never leave this list contradicting the Explorer /
+    // Chancing screens). The stored pair is kept for audit.
+    const withLiveMatch = saved.map((row) => {
+      if (!profile) return row;
+      const live = calculateUniversityMatch(profile, row.university);
+      return {
+        ...row,
+        matchScore: live.matchScore,
+        matchCategory: live.matchCategory,
+        storedMatchScore: row.matchScore,
+        storedMatchCategory: row.matchCategory,
+      };
+    });
+
+    return NextResponse.json({ savedUniversities: withLiveMatch });
   } catch (error) {
     console.error("GET /api/saved-universities error:", error);
     return NextResponse.json({ error: "Failed to fetch saved universities" }, { status: 500 });

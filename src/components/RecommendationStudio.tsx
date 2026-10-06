@@ -820,7 +820,9 @@ export function RecommendationStudio({
             {data.results.length === 0 ? (
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                 <Search className="mx-auto mb-2 h-6 w-6 text-slate-400" />
-                {t("empty")}
+                {/* An empty CATALOGUE is not the same as "no match for your
+                    interests" — say which one it is (0 programs scanned). */}
+                {data.totalProgramsScanned === 0 ? t("emptyCatalog") : t("empty")}
               </div>
             ) : (
               <>

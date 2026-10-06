@@ -9,7 +9,9 @@ import {
   universities,
 } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
-import { calculateUniversityMatch, type StudentProfileData } from "@/lib/matching";
+import { calculateUniversityMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
+import { chancingProfileWithActivities, toChancingUniversity, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 import {
   ADMISSION_PROBABILITY,
   estimateAdmissionChance,
@@ -97,78 +99,6 @@ async function datasetReadiness() {
   }
 }
 
-/** Map a student_profiles row onto the chancing input shape. */
-function toChancingProfile(row: typeof studentProfiles.$inferSelect): ChancingProfile {
-  return {
-    gpa: row.gpa,
-    gpaScale: row.gpaScale,
-    ieltsScore: row.ieltsScore,
-    toeflScore: row.toeflScore,
-    satScore: row.satScore,
-    actScore: row.actScore,
-    greScore: row.greScore,
-    duolingoScore: row.duolingoScore,
-    country: row.country,
-    targetMajor: row.targetMajor,
-    degreeLevel: row.degreeLevel,
-    extracurriculars: row.extracurriculars,
-    leadership: row.leadership,
-    volunteering: row.volunteering,
-    sports: row.sports,
-    clubs: row.clubs,
-    researchExperience: row.researchExperience,
-    projects: row.projects,
-    olympiads: row.olympiads,
-    awards: row.awards,
-    competitions: row.competitions,
-    certificates: row.certificates,
-    workExperienceYears: row.workExperienceYears,
-    researchPublications: row.researchPublications,
-    budgetAnnualUsd: row.budgetAnnualUsd,
-    needScholarship: row.needScholarship,
-    needsFinancialAid: row.needsFinancialAid,
-    requiresFullScholarship: row.requiresFullScholarship,
-  };
-}
-
-/** matching.ts input shape (Fit score) — required fields, no nulls. */
-function toMatchProfile(row: typeof studentProfiles.$inferSelect): StudentProfileData {
-  return {
-    id: row.id,
-    name: row.name,
-    degreeLevel: row.degreeLevel,
-    targetMajor: row.targetMajor,
-    gpa: row.gpa,
-    gpaScale: row.gpaScale,
-    ieltsScore: row.ieltsScore,
-    toeflScore: row.toeflScore,
-    satScore: row.satScore,
-    greScore: row.greScore,
-    budgetAnnualUsd: row.budgetAnnualUsd,
-    preferredCountries: row.preferredCountries,
-    needScholarship: row.needScholarship,
-    extracurriculars: row.extracurriculars,
-    workExperienceYears: row.workExperienceYears,
-    researchPublications: row.researchPublications,
-  };
-}
-
-function toChancingUniversity(row: typeof universities.$inferSelect): ChancingUniversity {
-  return {
-    id: row.id,
-    name: row.name,
-    country: row.country,
-    worldRanking: row.worldRanking,
-    minGpa: row.minGpa,
-    minIelts: row.minIelts,
-    minSat: row.minSat,
-    acceptanceRate: row.acceptanceRate,
-    programMajor: row.programMajor,
-    annualTuitionUsd: row.annualTuitionUsd,
-    internationalStudentsPercentage: row.internationalStudentsPercentage,
-  };
-}
-
 /**
  * Consented ScholarBridge outcomes for a set of universities.
  *
@@ -246,7 +176,8 @@ export async function GET(req: Request) {
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
-    const chancingProfile = toChancingProfile(profile);
+    const locale = localeFromRequest(req);
+    const chancingProfile = await chancingProfileWithActivities(profile);
     const matchProfile = toMatchProfile(profile);
 
     // Which universities are we estimating?
@@ -286,7 +217,7 @@ export async function GET(req: Request) {
     const samples = await outcomeSamples(universityIds);
 
     const results = unis.map((uni) => {
-      const fit = calculateUniversityMatch(matchProfile, uni as never);
+      const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni));
       const estimate = estimateAdmissionChance(chancingProfile, toChancingUniversity(uni), {
         fitScore: fit.matchScore,
         outcomes: samples.get(uni.id) ?? null,
@@ -296,13 +227,14 @@ export async function GET(req: Request) {
         universityName: estimate.universityName,
         fitScore: estimate.fitScore,
         fitCategory: fit.matchCategory,
-        fitReasons: fit.reasons,
-        fitIssues: fit.potentialIssues,
+        fitReasons: translateReasons(locale, "university", fit.reasonDetails, fit.reasons),
+        fitIssues: translateReasons(locale, "university", fit.issueDetails, fit.potentialIssues),
         subScores: estimate.subScores,
         positives: estimate.positives,
         negatives: estimate.negatives,
         dataBasis: estimate.dataBasis,
         sampleSize: estimate.sampleSize,
+        basisSource: estimate.basisSource,
         // The numeric admission range is intentionally NOT returned (see
         // policy header). Students see the probability dimension labelled
         // unavailable, never a percentage we cannot stand behind.

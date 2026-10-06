@@ -527,6 +527,36 @@ export const VISA_COUNTRIES: VisaCountry[] = [
 
 const byCode = new Map(VISA_COUNTRIES.map((c) => [c.code, c]));
 
+/**
+ * The officer's next line when no AI provider is configured.
+ *
+ * The visa interview is a VOICE feature, and its value is practising speech
+ * under questioning — the score at the end is computed from the student's own
+ * transcript by the deterministic rubric, not by the model. Without this, a
+ * server without AI keys answered 503 and the interview could not even START:
+ * no officer question, no microphone, nothing to practise. The questions are
+ * the typical consular questions already shipped per country (the same list the
+ * setup screen shows), asked in order.
+ *
+ * Returns `closing: true` when the list is exhausted so the caller can invite
+ * the student to finish and see the score.
+ */
+export function nextScriptedQuestion(
+  country: VisaCountry,
+  messages: VisaMessage[],
+): { reply: string; closing: boolean } {
+  const questions = country.questions ?? [];
+  const asked = messages.filter((m) => m.role === "officer").length;
+  if (asked < questions.length) {
+    return { reply: questions[asked], closing: false };
+  }
+  return {
+    reply:
+      "Thank you — that concludes the interview. Tap “Finish” to see your feedback and score.",
+    closing: true,
+  };
+}
+
 export function getVisaCountry(
   code: string | null | undefined,
 ): VisaCountry | undefined {

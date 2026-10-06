@@ -16,7 +16,8 @@
 
 import EmbeddedPostgres from "embedded-postgres";
 import { execSync } from "child_process";
-import { eq, and, inArray } from "drizzle-orm";
+import { rmSync } from "node:fs";
+import { eq, and, inArray, like } from "drizzle-orm";
 
 let passed = 0;
 let failed = 0;
@@ -43,6 +44,10 @@ const SECRET = "integration-test-secret-value-0123456789";
 let pg: EmbeddedPostgres | null = null;
 
 async function main() {
+  // Throwaway cluster: a leftover directory from an interrupted run would make
+  // `initdb` fail ("directory exists but is not empty"), so it is always
+  // removed first — the same guard the other embedded-Postgres suites use.
+  rmSync("/tmp/sb-it-pg", { recursive: true, force: true });
   pg = new EmbeddedPostgres({
     databaseDir: "/tmp/sb-it-pg",
     user: "test",
@@ -1056,10 +1061,35 @@ async function main() {
   //    (drizzle-kit push runs at the top of this file).
   section("8a. /api/opportunities — curated feed, scored per session");
 
+  // Fixture rows are test-scoped (TEST-FIXTURE marker) and removed before
+  // they are (re-)inserted: the feed also contains the real seeded catalogue,
+  // so absolute totals must never be asserted — and leftover fixtures from an
+  // earlier run must not accumulate in the student-facing feed.
+  const OPP_FIXTURE = "TEST-FIXTURE";
+  await db.delete(schema.opportunities).where(like(schema.opportunities.title, `${OPP_FIXTURE}%`));
+  // Legacy fixtures from earlier versions of this test (no marker, but exact
+  // title+provider pairs that never belong to the seeded catalogue).
+  await db
+    .delete(schema.opportunities)
+    .where(
+      and(
+        eq(schema.opportunities.title, "International Collegiate Programming Contest"),
+        eq(schema.opportunities.provider, "ICPC Foundation"),
+      ),
+    );
+  await db
+    .delete(schema.opportunities)
+    .where(
+      and(
+        eq(schema.opportunities.title, "Germany Biotech Internship"),
+        eq(schema.opportunities.provider, "Example Biotech"),
+      ),
+    );
+
   await db.insert(schema.opportunities).values([
     {
       type: "competition",
-      title: "International Collegiate Programming Contest",
+      title: `${OPP_FIXTURE} International Programming Contest`,
       provider: "ICPC Foundation",
       country: null,
       fields: '["Computer Science", "Mathematics"]',
@@ -1071,7 +1101,7 @@ async function main() {
     },
     {
       type: "internship",
-      title: "Germany Biotech Internship",
+      title: `${OPP_FIXTURE} Germany Biotech Internship`,
       provider: "Example Biotech",
       country: "Germany",
       fields: '["Biology"]',
@@ -1086,12 +1116,19 @@ async function main() {
   const { GET: oppGet } = await import("../src/app/api/opportunities/route");
   const opp = await call(oppGet as any, "/api/opportunities");
   check("responds 200", opp.status === 200, `got ${opp.status} ${JSON.stringify(opp.body)?.slice(0, 200)}`);
-  check("counts by type are right", opp.body?.counts?.competition === 1 && opp.body?.counts?.internship === 1, JSON.stringify(opp.body?.counts));
+  const oppCounts = opp.body?.counts ?? {};
+  check(
+    "counts by type cover both fixtures and add up to the total",
+    oppCounts.competition >= 1 &&
+      oppCounts.internship >= 1 &&
+      Object.values(oppCounts).reduce((a: number, b: unknown) => a + Number(b ?? 0), 0) === opp.body?.count,
+    JSON.stringify({ counts: oppCounts, count: opp.body?.count })
+  );
   check("the signed-in profile gets a numeric match", Array.isArray(opp.body?.items) && opp.body.items.every((o: any) => typeof o.match === "number" && o.match >= 0 && o.match <= 100));
   check("scored for the profile's major", opp.body?.scoredFor === "Computer Science", `got ${opp.body?.scoredFor}`);
-  const icpcRow = opp.body?.items?.find((o: any) => o.title.startsWith("International"));
+  const icpcRow = opp.body?.items?.find((o: any) => o.title.startsWith(OPP_FIXTURE) && o.type === "competition");
   check("CS undergrad scores high on the CS contest", icpcRow && icpcRow.match >= 70, `got ${icpcRow?.match}`);
-  const biotechRow = opp.body?.items?.find((o: any) => o.title.startsWith("Germany"));
+  const biotechRow = opp.body?.items?.find((o: any) => o.title.startsWith(OPP_FIXTURE) && o.type === "internship");
   check("level/field mismatch is flagged, not hidden", biotechRow && biotechRow.flags.length >= 1 && biotechRow.match < icpcRow.match, `flags=${JSON.stringify(biotechRow?.flags)}`);
 
   const oppAnon = await (async () => {
@@ -1101,7 +1138,16 @@ async function main() {
   check("anonymous still gets the catalog, unscored", oppAnon.status === 200 && oppAnon.body?.items?.every((o: any) => o.match === null) && oppAnon.body?.scoredFor === null);
 
   const oppFiltered = await call(oppGet as any, "/api/opportunities?type=internship");
-  check("type filter works", oppFiltered.status === 200 && oppFiltered.body?.count === 1 && oppFiltered.body.items[0].type === "internship");
+  check(
+    "type filter returns only that type, and its count matches byType",
+    oppFiltered.status === 200 &&
+      oppFiltered.body?.count === oppCounts.internship &&
+      oppFiltered.body?.items?.length === oppFiltered.body?.count &&
+      oppFiltered.body.items.every((o: any) => o.type === "internship"),
+    JSON.stringify({ count: oppFiltered.body?.count, byType: oppCounts.internship })
+  );
+  // Clean up the fixture rows so the student-facing feed keeps only real data.
+  await db.delete(schema.opportunities).where(like(schema.opportunities.title, `${OPP_FIXTURE}%`));
 
   // -----------------------------------------------------------------------
   section("8b. /api/countries/compare — published data only, work rights null");

@@ -9,22 +9,29 @@ export const studentProfiles = pgTable("student_profiles", {
   // NULL for legacy profiles until a password is set (or ADMIN_PASSWORD seeds
   // one for the admin account).
   passwordHash: text("password_hash"),
-  degreeLevel: text("degree_level").notNull().default("Master"),
-  targetMajor: text("target_major").notNull().default("Computer Science"),
+  // NULL = the student has not said yet. The app must never invent academic
+  // data (spec §19): a default of "Master"/"Computer Science" made every
+  // recommendation look personalised for a profile the student never filled in.
+  degreeLevel: text("degree_level"),
+  targetMajor: text("target_major"),
   // Structured, locale-independent selections from the study-interest picker.
   // Nullable for existing profiles and callers that still only send targetMajor.
   studyInterests: text("study_interests"),
-  gpa: doublePrecision("gpa").notNull().default(3.5),
-  gpaScale: doublePrecision("gpa_scale").notNull().default(4.0),
-  ieltsScore: doublePrecision("ielts_score").default(7.0),
-  toeflScore: integer("toefl_score").default(95),
-  satScore: integer("sat_score").default(1350),
-  greScore: integer("gre_score").default(315),
-  budgetAnnualUsd: integer("budget_annual_usd").notNull().default(25000),
-  preferredCountries: text("preferred_countries").notNull().default("[\"United States\", \"United Kingdom\", \"Canada\", \"Germany\"]"),
-  needScholarship: boolean("need_scholarship").notNull().default(true),
-  extracurriculars: text("extracurriculars").default("Hackathon winner, Peer Tutor, Student Council Vice President"),
-  workExperienceYears: integer("work_experience_years").default(1),
+  // Academic + financial values are NULL until the student enters them. The
+  // old column defaults (3.5 GPA, IELTS 7.0, SAT 1350, $25 000 budget, a
+  // fabricated activity list) were indistinguishable from real answers, so
+  // every score, match and recommendation silently used them.
+  gpa: doublePrecision("gpa"),
+  gpaScale: doublePrecision("gpa_scale"),
+  ieltsScore: doublePrecision("ielts_score"),
+  toeflScore: integer("toefl_score"),
+  satScore: integer("sat_score"),
+  greScore: integer("gre_score"),
+  budgetAnnualUsd: integer("budget_annual_usd"),
+  preferredCountries: text("preferred_countries"),
+  needScholarship: boolean("need_scholarship").notNull().default(false),
+  extracurriculars: text("extracurriculars"),
+  workExperienceYears: integer("work_experience_years"),
   researchPublications: integer("research_publications").default(0),
   preferredLocale: text("preferred_locale").notNull().default("en"),
   isAdmin: boolean("is_admin").notNull().default(false),

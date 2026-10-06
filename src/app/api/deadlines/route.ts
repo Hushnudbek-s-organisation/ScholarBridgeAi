@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
+import { daysUntil } from "@/lib/nextActions";
 
 /**
  * Unified deadline center (spec §21 + user request #10). Merges:
@@ -73,7 +74,7 @@ export async function GET(req: Request) {
           subtitle: s.provider,
           date: date.toISOString(),
           status: statusLabel(status),
-          daysRemaining: Math.ceil((date.getTime() - now.getTime()) / 86400000),
+          daysRemaining: daysUntil(now, date.toISOString()),
           source: s.sourceUrl || s.websiteUrl || null,
           saved: savedSchIds.includes(s.id),
         });
@@ -120,7 +121,7 @@ export async function GET(req: Request) {
         subtitle: t.category,
         date: due ? due.toISOString() : null,
         status: t.isCompleted ? "COMPLETED" : "PENDING",
-        daysRemaining: due ? Math.ceil((due.getTime() - now.getTime()) / 86400000) : null,
+        daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
         source: null,
         saved: false,
       });
@@ -141,7 +142,7 @@ export async function GET(req: Request) {
         subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · ") || "Application",
         date: due ? due.toISOString() : null,
         status: a.status,
-        daysRemaining: due ? Math.ceil((due.getTime() - now.getTime()) / 86400000) : null,
+        daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
         source: a.portalUrl || null,
         saved: true,
       });
@@ -161,7 +162,7 @@ export async function GET(req: Request) {
         subtitle: b.registered ? "Registered" : "Not registered yet",
         date: testDay.toISOString(),
         status: b.registered ? "REGISTERED" : "PENDING",
-        daysRemaining: Math.ceil((testDay.getTime() - now.getTime()) / 86400000),
+        daysRemaining: daysUntil(now, testDay.toISOString()),
         source: null,
         saved: true,
       });

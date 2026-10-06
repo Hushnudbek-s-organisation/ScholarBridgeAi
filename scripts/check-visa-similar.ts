@@ -12,6 +12,16 @@
  */
 
 import { scoreVisaInterview, visaChanceDisclaimer, type VisaTurn } from "../src/lib/visaScoring";
+import { getVisaCountry, nextScriptedQuestion, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
+import {
+  classifySpeechError,
+  LIVE_SPEAK_WATCHDOG_MS,
+  MAX_MIC_START_ATTEMPTS,
+  MIC_RESTART_DELAY_MS,
+  shouldSubmitInterimOnEnd,
+  speakWatchdogMs,
+} from "../src/lib/visa-mic";
+import { readFileSync } from "node:fs";
 import {
   englishToIelts,
   findSimilarProfiles,
@@ -264,5 +274,172 @@ check("ACT converts to an SAT band", stdToSat({ act: 32 }) === 1460);
 check("missing scores return null", englishToIelts({}) === null && stdToSat({}) === null);
 
 // ---------------------------------------------------------------------------
+section("#11 The interview microphone is never a dead end");
+
+// A browser that never fires onend on a SpeechSynthesisUtterance used to leave
+// the officer "speaking" forever — the mic button stayed disabled and the only
+// way to continue was typing. The watchdog must always finish the turn.
+check(
+  "a short question still gets a floor-long watchdog",
+  speakWatchdogMs("Why this university?") >= 5000,
+  String(speakWatchdogMs("Why this university?"))
+);
+check(
+  "a long question gets proportionally longer",
+  speakWatchdogMs("A ".repeat(1)) < speakWatchdogMs(Array(120).fill("word").join(" ")),
+  `${speakWatchdogMs("A")} vs ${speakWatchdogMs(Array(120).fill("word").join(" "))}`
+);
+check("the watchdog is capped", speakWatchdogMs(Array(5000).fill("word").join(" ")) <= 60000);
+check("an empty text still ends", speakWatchdogMs("") >= 5000);
+
+// Chrome's SpeechRecognition errors are not all fatal: treating "aborted" or a
+// session-still-winding-down as "unsupported" killed voice permanently.
+check("permission errors are classified as blocked", classifySpeechError("not-allowed") === "blocked" && classifySpeechError("service-not-allowed") === "blocked");
+check("no-microphone is blocked, not fatal", classifySpeechError("audio-capture") === "blocked");
+check("aborted/network/empty are transient, not fatal", classifySpeechError("aborted") === "transient" && classifySpeechError("network") === "transient" && classifySpeechError("") === "transient");
+check("unknown errors are fatal (no retry loop)", classifySpeechError("language-not-supported") === "fatal");
+
+// Chrome ends the session when the student pauses; the answer must be sent.
+check("speech that only arrived as interim is still submitted", shouldSubmitInterimOnEnd(false, "I want to study computer science") === true);
+check("a submitted final is not sent twice", shouldSubmitInterimOnEnd(true, "I want to study") === false);
+check("silence submits nothing", shouldSubmitInterimOnEnd(false, "   ") === false);
+
+const visaLib = readFileSync(new URL("../src/lib/visa-mic.ts", import.meta.url), "utf8");
+const visaUi = readFileSync(new URL("../src/components/VisaSpeakingAssistant.tsx", import.meta.url), "utf8");
+check("the retry budget and delay are bounded", MAX_MIC_START_ATTEMPTS === 3 && MIC_RESTART_DELAY_MS > 0 && MIC_RESTART_DELAY_MS < 2000);
+check(
+  "the live watchdog waits long enough not to cut real speech, but not forever",
+  LIVE_SPEAK_WATCHDOG_MS >= 5000 && LIVE_SPEAK_WATCHDOG_MS <= 30000,
+  String(LIVE_SPEAK_WATCHDOG_MS)
+);
+check(
+  "a stalled live turn re-opens the microphone (only when nothing plays or generates)",
+  /armLiveSpeakWatchdog\(\)/.test(visaUi) &&
+    /livePlaybackActiveRef\.current \|\| liveGenerationActiveRef\.current/.test(visaUi) &&
+    /micHoldUntilRef\.current = 0;/.test(visaUi)
+);
+check(
+  "a failed start() retries instead of declaring the browser unsupported",
+  /micStartAttemptsRef\.current < MAX_MIC_START_ATTEMPTS/.test(visaUi) &&
+    /MIC_RESTART_DELAY_MS/.test(visaUi) &&
+    // the ONLY remaining setSttSupported(false) is the "no API at all" branch
+    (visaUi.match(/setSttSupported\(false\)/g) ?? []).length === 1
+);
+check(
+  "the officer's turn always ends with a watchdog",
+  /speakWatchdogRef\.current = window\.setTimeout\(finishSpeaking, speakWatchdogMs\(text\)\)/.test(visaUi) &&
+    /utter\.onerror = finishSpeaking/.test(visaUi)
+);
+check(
+  "the voice path re-opens by itself after every question",
+  /void ensureMicPermissionThenListen\(token\)/.test(visaUi) &&
+    /micDeniedRef\.current = false;\n\s*micStartAttemptsRef\.current = 0;/.test(visaUi)
+);
+// THE root cause: the site's own security header forbade the microphone that
+// this voice feature requires (`microphone=()` disables it for the document
+// itself). Assert BOTH places that set it, and that the unused features stay off.
+const nextConfig = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+const proxySrc = readFileSync(new URL("../src/proxy.ts", import.meta.url), "utf8");
+const policyLines = [nextConfig, proxySrc].flatMap(
+  (s) => s.match(/camera=\(\).*?usb=\(\)/g) ?? []
+);
+check(
+  "the Permissions-Policy header allows the microphone for this site",
+  policyLines.length >= 2 && policyLines.every((l) => l.includes("microphone=(self)")),
+  policyLines.join(" | ")
+);
+check(
+  "no Permissions-Policy line disables the microphone outright",
+  policyLines.every((l) => !/microphone=\(\)/.test(l)),
+  policyLines.join(" | ")
+);
+check(
+  "camera, geolocation, payment and usb stay disabled",
+  policyLines.length >= 2 &&
+    policyLines.every((l) =>
+      ["camera=()", "geolocation=()", "payment=()", "usb=()"].every((p) => l.includes(p))
+    ),
+  policyLines.join(" | ")
+);
+check(
+  "an embedded app offers a way into its own tab",
+  /window\.self !== window\.top/.test(visaUi) &&
+    /useSyncExternalStore/.test(visaUi) &&
+    !/setState-in-effect|eslint-disable/.test(visaUi) &&
+    /t\("micOpenTab"\)/.test(visaUi) &&
+    /target="_blank"/.test(visaUi)
+);
+check(
+  "a blocked microphone offers an explicit retry and guidance",
+  /t\("micRetry"\)/.test(visaUi) && /t\("micInlineHint"\)/.test(visaUi) && /t\("micStartFailed"\)/.test(visaUi)
+);
+const messages = ["en", "uz", "ru"].map((l) =>
+  JSON.parse(readFileSync(new URL(`../src/i18n/messages/${l}.json`, import.meta.url), "utf8")).visa
+);
+// Without an AI provider the interview used to answer 503, so the officer never
+// asked anything and the voice feature could not even start. It now runs the
+// country's standard consular question script, and the score was always the
+// deterministic rubric over the student's own answers.
+const us = getVisaCountry("US")!;
+const asOfficer = (n: number): VisaMessage[] =>
+  Array.from({ length: n }, (_, i) => ({ role: "officer", text: `Q${i + 1}` }));
+check(
+  "the scripted officer asks the country's questions in order",
+  us.questions.every((q, i) => nextScriptedQuestion(us, asOfficer(i)).reply === q),
+  nextScriptedQuestion(us, asOfficer(2)).reply
+);
+check(
+  "the scripted officer closes the interview when the list is done",
+  nextScriptedQuestion(us, asOfficer(us.questions.length)).closing === true &&
+    nextScriptedQuestion(us, asOfficer(us.questions.length - 1)).closing === false
+);
+check(
+  "every country with a script has questions to ask",
+  VISA_COUNTRIES.every((c) => Array.isArray(c.questions) && c.questions.length > 0) &&
+    VISA_COUNTRIES.every((c) => nextScriptedQuestion(c, []).reply.length > 0),
+  `${VISA_COUNTRIES.length} countries`
+);
+check(
+  "the script never repeats a question back-to-back",
+  VISA_COUNTRIES.every((c) => {
+    const asked = new Set<string>();
+    for (let i = 0; i < c.questions.length; i += 1) {
+      const q = nextScriptedQuestion(c, asOfficer(i)).reply;
+      if (asked.has(q)) return false;
+      asked.add(q);
+    }
+    return true;
+  })
+);
+
+const chatRoute = readFileSync(new URL("../src/app/api/visa/chat/route.ts", import.meta.url), "utf8");
+check(
+  "the chat route serves the script instead of 503 when no provider is configured",
+  /isAiConfigured\("visa"\)/.test(chatRoute) &&
+    /nextScriptedQuestion\(/.test(chatRoute) &&
+    /source: "script"/.test(chatRoute) &&
+    !/not configured on the server/.test(chatRoute)
+);
+check(
+  "the country is validated before the provider check (script path needs it)",
+  chatRoute.indexOf("getVisaCountry(body") < chatRoute.indexOf('isAiConfigured("visa")'),
+  "order matters"
+);
+check(
+  "the student is told when the officer is running offline",
+  /t\("offlinePractice"\)/.test(visaUi) && messages.every((m) => typeof m.offlinePractice === "string")
+);
+check(
+  "the retry UI is localised in all three languages",
+  messages.every(
+    (m) =>
+      typeof m.micRetry === "string" &&
+      typeof m.micInlineHint === "string" &&
+      typeof m.micStartFailed === "string" &&
+      typeof m.micOpenTab === "string"
+  ),
+  messages.map((m) => m.micRetry).join(" | ")
+);
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;

@@ -658,7 +658,15 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             <MiniStat label="Quiz urinishlari" value={formatNumber(e?.quizAttempts ?? 0)} hint={`${formatNumber(e?.quizPassed ?? 0)} muvaffaqiyatli`} tone="amber" />
             <MiniStat label="Ballar berilgan" value={compactNumber(e?.pointsAwarded ?? 0)} tone="amber" />
             <MiniStat label="Badge'lar" value={formatNumber(e?.badgesAwarded ?? 0)} hint={`${formatNumber(e?.badgeKinds ?? 0)} xil`} tone="rose" />
-            <MiniStat label="Referrallar" value={formatNumber(e?.referralsTotal ?? 0)} hint={`${formatNumber(e?.referralsCompleted ?? 0)} yakunlangan`} tone="violet" />
+            {/* Referrals live on student_profiles now (the legacy table stayed
+                empty while students were inviting each other), so the live
+                numbers are shown first and the legacy rows are named as such. */}
+            <MiniStat
+              label="Referrallar (tizimda)"
+              value={formatNumber(e?.referralsKnown ?? 0)}
+              hint={`${formatNumber(e?.referralsRewarded ?? 0)} mukofot olgan · eski jadval: ${formatNumber(e?.referralsTotal ?? 0)}`}
+              tone="violet"
+            />
             <MiniStat label="Bildirishnomalar" value={formatNumber(e?.notifications ?? 0)} tone="slate" />
           </div>
           <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">

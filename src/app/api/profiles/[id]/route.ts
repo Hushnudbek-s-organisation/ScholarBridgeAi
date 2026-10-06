@@ -51,6 +51,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
  * `undefined` means "not sent" → the column is left untouched. An empty
  * string/array means "cleared" → NULL. Values are never invented.
  */
+/**
+ * PATCH semantics for a nullable column: absent key = leave unchanged,
+ * explicit null/"" = clear to NULL (unknown), otherwise the parsed number.
+ */
+function patchNumber(
+  value: unknown,
+  opts: { min: number; max: number; integer?: boolean },
+): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return optionalNumber(value, opts);
+}
+
+/** Same semantics for nullable text: absent = unchanged, blank = NULL. */
+function patchText(value: unknown, max: number): string | null | undefined {
+  if (value === undefined) return undefined;
+  const text = clampString(value, max);
+  return text.length ? text : null;
+}
+
 function numField(value: unknown): number | null | undefined {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
@@ -193,31 +213,31 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         // An empty email would break sign-in — leave the stored one untouched.
         email: body.email !== undefined ? clampString(body.email, 320) || undefined : undefined,
         passwordHash: newPasswordHash,
-        // NOT NULL text columns: an empty/garbage value leaves them untouched.
-        degreeLevel: clampString(body.degreeLevel, 60) || undefined,
+        // Text fields can now be cleared to NULL ("not chosen yet").
+        degreeLevel: patchText(body.degreeLevel, 60),
         // Keep legacy callers' blank value as a no-op, except an explicit
         // exploration selection, which must never be stored as a literal major.
-        targetMajor: isExploringInterests ? "" : clampString(body.targetMajor, 160) || undefined,
+        targetMajor: isExploringInterests ? "" : patchText(body.targetMajor, 160),
         studyInterests: submittedStudyInterests ? JSON.stringify(submittedStudyInterests) : undefined,
-        // Numbers go through optionalNumber: `Number("abc")` is NaN and
-        // Postgres would store NaN in a double column. NOT NULL columns
-        // treat "cleared" (null) as "unchanged" instead of failing with 500.
-        gpa: optionalNumber(body.gpa, { min: 0, max: 100 }) ?? undefined,
-        gpaScale: optionalNumber(body.gpaScale, { min: 1, max: 100 }) ?? undefined,
+        // Numbers: `Number("abc")` is NaN and Postgres would store NaN in a
+        // double column. Clearing a field (null/"") now stores NULL — the
+        // column is nullable on purpose, so "I don't know this yet" is
+        // representable and every engine reads it as unknown.
+        gpa: patchNumber(body.gpa, { min: 0, max: 100 }),
+        gpaScale: patchNumber(body.gpaScale, { min: 1, max: 100 }),
         // Test scores: null/0/negative -> NULL (a 0 is not a real score).
         // Integer columns are rounded — "95.5" would otherwise be a 500.
         ieltsScore: optionalScore(body.ieltsScore, 9),
         toeflScore: roundOpt(optionalScore(body.toeflScore, 120)),
         satScore: roundOpt(optionalScore(body.satScore, 1600)),
         greScore: roundOpt(optionalScore(body.greScore, 340)),
-        budgetAnnualUsd:
-          optionalNumber(body.budgetAnnualUsd, { min: 0, max: 10_000_000, integer: true }) ?? undefined,
+        budgetAnnualUsd: patchNumber(body.budgetAnnualUsd, { min: 0, max: 10_000_000, integer: true }),
         preferredCountries: countriesStr,
         needScholarship:
           typeof body.needScholarship === "boolean" ? body.needScholarship : undefined,
         extracurriculars: textField(body.extracurriculars, 4000),
-        workExperienceYears: optionalNumber(body.workExperienceYears, { min: 0, max: 80, integer: true }),
-        researchPublications: optionalNumber(body.researchPublications, { min: 0, max: 1000, integer: true }),
+        workExperienceYears: patchNumber(body.workExperienceYears, { min: 0, max: 80, integer: true }),
+        researchPublications: patchNumber(body.researchPublications, { min: 0, max: 1000, integer: true }),
         preferredLocale:
           body.preferredLocale === "en" || body.preferredLocale === "ru" || body.preferredLocale === "uz"
             ? body.preferredLocale

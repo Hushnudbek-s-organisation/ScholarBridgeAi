@@ -22,7 +22,7 @@
  *   DATABASE_URL=… npm run db:verify   # live (Supabase: Project → Settings → Database)
  */
 import { readFileSync } from "node:fs";
-import * as dotenv from "dotenv";
+import "./lib/env";
 import {
   collectDrizzleTables,
   compareSchemas,
@@ -35,7 +35,6 @@ import {
   type ColumnIssue,
 } from "./lib/schema-tools";
 
-dotenv.config();
 
 const live = process.argv.includes("--live") || process.argv.includes("--db");
 

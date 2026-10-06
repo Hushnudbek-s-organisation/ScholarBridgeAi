@@ -12,7 +12,8 @@ import {
 import { eq } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
-import { profileCompletenessRatio, parseListColumn, type ChancingProfile } from "@/lib/chancing";
+import { profileStrength } from "@/lib/chancing";
+import { chancingProfileWithActivities } from "@/lib/profileMapping";
 
 /**
  * Personalized Roadmap — "What should I do next?" (#4).
@@ -80,25 +81,11 @@ export async function GET(req: Request) {
       (d) => d.documentType === "recommendation" && d.status !== "missing"
     );
 
-    const chancingProfile: ChancingProfile = {
-      gpa: profile.gpa,
-      gpaScale: profile.gpaScale,
-      ieltsScore: profile.ieltsScore,
-      toeflScore: profile.toeflScore,
-      satScore: profile.satScore,
-      actScore: profile.actScore,
-      duolingoScore: profile.duolingoScore,
-      country: profile.country,
-      targetMajor: profile.targetMajor,
-      degreeLevel: profile.degreeLevel,
-      leadership: profile.leadership,
-      awards: profile.awards,
-      olympiads: profile.olympiads,
-      budgetAnnualUsd: profile.budgetAnnualUsd,
-      careerGoal: profile.careerGoal,
-      graduationYear: profile.graduationYear,
-      requiresFullScholarship: profile.requiresFullScholarship,
-    };
+    // Built through the shared mapping layer so saved activity rows count too.
+    // Completeness must match Profile & Goals → Readiness exactly; a second
+    // hand-built profile object here produced a different percentage (42 vs 50)
+    // for the same student on the same dashboard.
+    const chancingProfile = await chancingProfileWithActivities(profile);
 
     const hasEnglish =
       Number(profile.ieltsScore) > 0 || Number(profile.toeflScore) > 0 || Number(profile.duolingoScore) > 0;
@@ -107,7 +94,7 @@ export async function GET(req: Request) {
 
     const context: NextActionsContext = {
       today,
-      completeness: profileCompletenessRatio(chancingProfile),
+      completeness: profileStrength(chancingProfile).completeness / 100,
       deadlines,
       applications: apps.map((a) => ({
         id: a.id,

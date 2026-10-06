@@ -52,6 +52,9 @@ const toList = (raw?: string | null): string => {
 };
 
 export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: ProfileModalProps) {
+  // The modal is wrapped in NextIntlClientProvider by its host; the explicit
+  // fallback keeps the string out of the UI if a host ever forgets the provider.
+  const t = useTranslations("profile");
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
   const studyInterestsTouched = useRef(false);
@@ -62,14 +65,15 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     targetMajor: string;
     studyInterests: StudyInterestSelection[];
     gpa: number | string;
-    gpaScale: number;
+    /** Empty until the student picks a scale — never defaulted. */
+    gpaScale: number | "";
     ieltsScore: number | string;
     toeflScore: number | string;
     satScore: number | string;
     greScore: number | string;
     actScore: number | string;
     duolingoScore: number | string;
-    budgetAnnualUsd: number;
+    budgetAnnualUsd: number | "";
     familyIncomeUsd: number | string;
     preferredCountries: string[];
     targetUniversities: string;
@@ -101,24 +105,27 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     name: "",
     email: "",
     password: "",
-    degreeLevel: "Master",
-    targetMajor: "Computer Science",
+    // Nothing is pre-answered: an untouched form must not turn into a
+    // "Master / Computer Science / 4.0 scale / scholarship needed" profile
+    // (spec §19 — every score and recommendation must come from the student).
+    degreeLevel: "",
+    targetMajor: "",
     studyInterests: [],
     // No fabricated test scores: empty fields stay empty until entered.
     gpa: "",
-    gpaScale: 4.0,
+    gpaScale: "",
     ieltsScore: "",
     toeflScore: "",
     satScore: "",
     greScore: "",
     actScore: "",
     duolingoScore: "",
-    budgetAnnualUsd: 25000,
+    budgetAnnualUsd: "",
     familyIncomeUsd: "",
-    preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+    preferredCountries: [],
     targetUniversities: "",
     careerGoal: "",
-    needScholarship: true,
+    needScholarship: false,
     needsFinancialAid: false,
     requiresFullScholarship: false,
     country: "",
@@ -149,7 +156,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   useEffect(() => {
     studyInterestsTouched.current = false;
     if (profile && !isNew) {
-      let countries: string[] = ["United States", "United Kingdom", "Canada"];
+      // No invented fallback: an empty list means "no preference chosen yet".
+      let countries: string[] = [];
       try {
         if (typeof profile.preferredCountries === "string") {
           countries = JSON.parse(profile.preferredCountries);
@@ -164,26 +172,26 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         name: profile.name || "",
         // Telegram-only accounts have a technical email — show an empty field.
         email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
-        degreeLevel: profile.degreeLevel || "Master",
-        targetMajor: profile.targetMajor || "Computer Science",
+        degreeLevel: profile.degreeLevel || "",
+        targetMajor: profile.targetMajor || "",
         studyInterests: selectionsFromProfile(profile.studyInterests, profile.targetMajor),
         // NEVER fabricate values: empty fields stay empty instead of being
         // saved as fake defaults (7.0/95/1350/315) when a profile has no
         // test scores yet.
         gpa: profile.gpa ?? "",
-        gpaScale: profile.gpaScale || 4.0,
+        gpaScale: profile.gpaScale ?? "",
         ieltsScore: profile.ieltsScore ?? "",
         toeflScore: profile.toeflScore ?? "",
         satScore: profile.satScore ?? "",
         greScore: profile.greScore ?? "",
         actScore: profile.actScore ?? "",
         duolingoScore: profile.duolingoScore ?? "",
-        budgetAnnualUsd: profile.budgetAnnualUsd || 25000,
+        budgetAnnualUsd: profile.budgetAnnualUsd ?? "",
         familyIncomeUsd: profile.familyIncomeUsd ?? "",
         preferredCountries: countries,
         targetUniversities: toList(profile.targetUniversities),
         careerGoal: profile.careerGoal || "",
-        needScholarship: profile.needScholarship ?? true,
+        needScholarship: profile.needScholarship ?? false,
         needsFinancialAid: profile.needsFinancialAid ?? false,
         requiresFullScholarship: profile.requiresFullScholarship ?? false,
         country: profile.country || "",
@@ -211,25 +219,25 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
       setFormData({
         name: "",
         email: "",
-        degreeLevel: "Master",
+        degreeLevel: "",
         targetMajor: "",
         studyInterests: [],
         // Never pre-fill fabricated academic data — the student enters
         // their real GPA/test scores (NULL-safe, spec §19).
         gpa: "",
-        gpaScale: 4.0,
+        gpaScale: "",
         ieltsScore: "",
         toeflScore: "",
         satScore: "",
         greScore: "",
         actScore: "",
         duolingoScore: "",
-        budgetAnnualUsd: 25000,
+        budgetAnnualUsd: "",
         familyIncomeUsd: "",
-        preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+        preferredCountries: [],
         targetUniversities: "",
         careerGoal: "",
-        needScholarship: true,
+        needScholarship: false,
         needsFinancialAid: false,
         requiresFullScholarship: false,
         country: "",
@@ -329,7 +337,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         ...rest,
         targetMajor: studyInterestsTouched.current ? compatibilityTargetMajor(studyInterests) : rest.targetMajor,
         studyInterests: serializeStudyInterestSelections(studyInterests),
-        // Empty numeric fields are saved as null (NULL in DB), never 0.
+        // Empty fields are saved as null (NULL in DB), never as a default.
+        budgetAnnualUsd: rest.budgetAnnualUsd === "" ? null : Number(rest.budgetAnnualUsd),
         gpa: gpa === "" ? null : Number(gpa),
         ieltsScore: ieltsScore === "" ? null : Number(ieltsScore),
         toeflScore: toeflScore === "" ? null : Number(toeflScore),
@@ -341,6 +350,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         graduationYear: graduationYear === "" ? null : Number(graduationYear),
         familyIncomeUsd: familyIncomeUsd === "" ? null : Number(familyIncomeUsd),
         preferredCountries: JSON.stringify(formData.preferredCountries),
+        // An unset scale is not a scale: send NULL so the completeness check
+        // does not count a field the student never filled in.
+        gpaScale: rest.gpaScale === "" ? null : Number(rest.gpaScale),
       });
       onClose();
     } catch (err: any) {
@@ -546,9 +558,15 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   />
                   <select
                     value={formData.gpaScale}
-                    onChange={(e) => setFormData({ ...formData, gpaScale: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        gpaScale: e.target.value === "" ? "" : parseFloat(e.target.value),
+                      })
+                    }
                     className="w-1/3 px-2 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
+                    <option value="">—</option>
                     <option value={4.0}>/ 4.0</option>
                     <option value={5.0}>/ 5.0</option>
                     <option value={10.0}>/ 10.0</option>
@@ -688,12 +706,17 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     step="1000"
                     min="0"
                     value={formData.budgetAnnualUsd}
-                    onChange={(e) => setFormData({ ...formData, budgetAnnualUsd: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormData({ ...formData, budgetAnnualUsd: raw === "" ? "" : Number(raw) });
+                    }}
                     className="w-full pl-7 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Current: {formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}
+                  {formData.budgetAnnualUsd === ""
+                    ? t("budgetNotSet")
+                    : `Current: ${formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}`}
                 </p>
               </div>
 

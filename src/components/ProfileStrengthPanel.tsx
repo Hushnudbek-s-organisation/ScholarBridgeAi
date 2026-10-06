@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
 
 interface StrengthSection {
+  /** True when the student has not entered the data this dimension needs. */
+  unknown?: boolean;
   key: string;
   label: string;
   score: number;
@@ -24,7 +26,32 @@ interface StrengthData {
 
 const SECTION_KEYS = ["academics", "tests", "extracurriculars", "leadership", "awards", "essays", "financial"] as const;
 
-function Bar({ label, score, hint }: { label: string; score: number; hint?: string }) {
+function Bar({
+  label,
+  score,
+  hint,
+  unknown,
+  unknownLabel,
+}: {
+  label: string;
+  score: number;
+  hint?: string;
+  /** No data behind this dimension yet — print the label, not a fake number. */
+  unknown?: boolean;
+  unknownLabel?: string;
+}) {
+  if (unknown) {
+    return (
+      <div>
+        <div className="flex items-baseline justify-between">
+          <span className="text-[11px] font-semibold text-slate-600">{label}</span>
+          <span className="text-xs font-bold text-slate-400">—</span>
+        </div>
+        {unknownLabel && <p className="mt-0.5 text-[10px] text-slate-400">{unknownLabel}</p>}
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100" />
+      </div>
+    );
+  }
   return (
     <div>
       <div className="flex items-baseline justify-between">
@@ -128,7 +155,11 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
               key={s.key}
               label={sectionLabel(s.key)}
               score={s.score}
-              hint={s.key === "essays" && s.score === 0 ? t("essaysHint") : undefined}
+              unknown={s.unknown && s.score === 0}
+              unknownLabel={t("notProvided")}
+              hint={
+                !s.unknown && s.key === "essays" && s.score === 0 ? t("essaysHint") : undefined
+              }
             />
           ))}
         </div>

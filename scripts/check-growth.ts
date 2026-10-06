@@ -40,12 +40,14 @@ import {
   goalProgress,
   nextExpectedDeadline,
   parseSteps,
+  profileCompleteness,
   similarScholarships,
   twinScore,
   type AutopilotScholarship,
   type JourneyCounts,
 } from "../src/lib/growth/logic";
 import { NAV_GROUPS, NAV_SECTIONS, resolveNavTarget } from "../src/lib/navSections";
+import { profileCompletenessRatio } from "../src/lib/chancing";
 
 let passed = 0;
 const failures: string[] = [];
@@ -285,6 +287,49 @@ check("no growth route builds SQL by string concatenation", () => {
   const routes = walk("src/app/api").filter((p) => /(journey|autopilot|vault|goals|departure|stories|goal-templates|answer-prompts|checklist|guide|overview)/.test(p));
   for (const p of routes) assert.ok(!/sql\.raw\(|`\s*SELECT .*\$\{/i.test(readFileSync(p, "utf8")), p);
 });
+
+// ---------------------------------------------------------------------------
+// One definition of "profile completeness" for the whole product.
+// ---------------------------------------------------------------------------
+// The journey + dashboard + study plan (this module) and the readiness /
+// chancing / referral engines used to count different checklists, so the same
+// profile showed 44 % in the journey bar and 42 % in the dashboard. They now
+// share one function; these asserts keep it that way.
+console.log("\nProfile completeness — single definition");
+
+const richProfile = {
+  gpa: 3.6,
+  gpaScale: 4,
+  ieltsScore: 7,
+  satScore: 1400,
+  country: "Uzbekistan",
+  targetMajor: "Computer Science",
+  budgetAnnualUsd: 25000,
+  careerGoal: "ML engineer",
+  graduationYear: 2027,
+  leadership: '["Robotics club captain"]',
+  awards: '["National olympiad bronze"]',
+  extracurriculars: '["Robotics"]',
+};
+const sparseProfile = { gpa: 3.2 };
+
+check("the journey and the chancing engine agree on a rich profile", () => {
+  assert.equal(
+    profileCompleteness(richProfile),
+    Math.round(profileCompletenessRatio(richProfile as never) * 100)
+  );
+});
+check("they agree on a sparse profile too", () => {
+  assert.equal(
+    profileCompleteness(sparseProfile),
+    Math.round(profileCompletenessRatio(sparseProfile as never) * 100)
+  );
+});
+check("no profile → 0", () => assert.equal(profileCompleteness(null), 0));
+check("a fully filled profile reaches 100", () =>
+  assert.equal(profileCompleteness(richProfile), 100));
+check("more data never scores lower than less data", () =>
+  assert.ok(profileCompleteness(sparseProfile) < profileCompleteness(richProfile)));
 
 if (failures.length) {
   console.log(`\ngrowth test FAILED: ${failures.length} failure(s)`);

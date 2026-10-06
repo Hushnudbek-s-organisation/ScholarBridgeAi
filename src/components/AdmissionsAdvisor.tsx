@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Target,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { AiFormattedText } from "./AiFormattedText";
 import { StudentProfile } from "./Navbar";
 
@@ -53,6 +54,7 @@ interface AdmissionsAdvisorProps {
 }
 
 export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
+  const t = useTranslations("ai");
   const [question, setQuestion] = useState("");
   const [data, setData] = useState<AdvisorResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +63,7 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to talk to your admissions advisor.
+        {t("advisorSignedOut")}
       </div>
     );
   }
@@ -77,20 +79,20 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
         body: JSON.stringify({ profileId: activeProfile.id, message: q || undefined }),
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "The advisor could not answer");
+      if (!res.ok) throw new Error(payload.error || t("advisorError"));
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The advisor could not answer");
+      setError(err instanceof Error ? err.message : t("advisorError"));
     } finally {
       setBusy(false);
     }
   };
 
   const suggestions = [
-    "Is my university list balanced?",
-    "What is my weakest point right now?",
-    "Which scholarships should I target?",
-    "Should I retake the IELTS?",
+    t("advisorSuggestion1"),
+    t("advisorSuggestion2"),
+    t("advisorSuggestion3"),
+    t("advisorSuggestion4"),
   ];
 
   return (
@@ -98,17 +100,16 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
           <Bot className="h-5 w-5 text-indigo-600" />
-          AI Admissions Advisor
+          {t("advisorTitle")}
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Ask anything about your applications. The advisor reads your real profile and shows fit
-          scores — not admission probabilities.
+          {t("advisorSubtitle")}
         </p>
 
         <div className="mt-3 flex gap-2">
           <input
             className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none"
-            placeholder="e.g. Is my list balanced for Fall 2027?"
+            placeholder={t("advisorPlaceholder")}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => {
@@ -121,7 +122,7 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
             className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Ask
+            {t("advisorAsk")}
           </button>
         </div>
 
@@ -152,7 +153,7 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
           {data.aiUsed && data.aiReply && (
             <div className="rounded-2xl border border-indigo-100 bg-white p-4">
               <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-indigo-600">
-                <Bot className="h-3.5 w-3.5" /> AI answer
+                <Bot className="h-3.5 w-3.5" /> {t("advisorAiAnswer")}
               </div>
               <div className="mt-2 text-sm text-slate-800">
                 <AiFormattedText text={data.aiReply} />
@@ -164,7 +165,7 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
               <ShieldCheck className="h-3.5 w-3.5" />
-              {data.aiUsed ? "Computed assessment" : "Assessment (no AI provider configured)"}
+              {data.aiUsed ? t("advisorComputed") : t("advisorComputedNoAi")}
             </div>
 
             <p className="mt-2 text-sm leading-relaxed text-slate-700">{data.advice.summary}</p>
@@ -179,21 +180,18 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
                     <span className="truncate text-xs font-bold text-slate-800">{c.universityName}</span>
                     <span className="flex items-center gap-2 text-[11px] font-bold">
                       <span className="rounded-md bg-white px-2 py-0.5 text-slate-600">
-                        fit {c.fitScore ?? "—"}%
+                        {t("advisorFit", { score: c.fitScore ?? "—" })}
                       </span>
                     </span>
                   </div>
                 ))}
-                <p className="text-[11px] text-slate-400">
-                  Fit = how well your profile meets each university&apos;s published requirements.
-                  We do not show an admission probability — a fit score is not a chance of getting in.
-                </p>
+                <p className="text-[11px] text-slate-400">{t("advisorFitNote")}</p>
               </div>
             )}
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wide text-emerald-700">Strengths</h4>
+                <h4 className="text-xs font-extrabold uppercase tracking-wide text-emerald-700">{t("advisorStrengths")}</h4>
                 <ul className="mt-1.5 space-y-1">
                   {data.advice.strengths.map((s, i) => (
                     <li key={i} className="flex gap-1.5 text-xs text-slate-700">
@@ -202,12 +200,12 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
                     </li>
                   ))}
                   {data.advice.strengths.length === 0 && (
-                    <li className="text-xs text-slate-400">Fill in your profile to see strengths.</li>
+                    <li className="text-xs text-slate-400">{t("advisorNoStrengths")}</li>
                   )}
                 </ul>
               </div>
               <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wide text-rose-700">Risks</h4>
+                <h4 className="text-xs font-extrabold uppercase tracking-wide text-rose-700">{t("advisorRisks")}</h4>
                 <ul className="mt-1.5 space-y-1">
                   {data.advice.risks.map((r, i) => (
                     <li key={i} className="flex gap-1.5 text-xs text-slate-700">
@@ -216,7 +214,7 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
                     </li>
                   ))}
                   {data.advice.risks.length === 0 && (
-                    <li className="text-xs text-slate-400">No red flags found.</li>
+                    <li className="text-xs text-slate-400">{t("advisorNoRisks")}</li>
                   )}
                 </ul>
               </div>
@@ -224,13 +222,13 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
 
             <div className="mt-4 rounded-xl bg-indigo-50 p-3">
               <h4 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-indigo-700">
-                <Target className="h-3.5 w-3.5" /> Strategy
+                <Target className="h-3.5 w-3.5" /> {t("advisorStrategy")}
               </h4>
               <p className="mt-1 text-xs text-slate-700">{data.advice.strategy}</p>
             </div>
 
             <div className="mt-4">
-              <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">This week</h4>
+              <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{t("advisorThisWeek")}</h4>
               <ol className="mt-1.5 space-y-1">
                 {data.advice.steps.map((s, i) => (
                   <li key={i} className="flex gap-2 text-xs text-slate-700">
@@ -242,18 +240,13 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-400">
-            The fit scores are computed from your profile and each university&apos;s published
-            requirements. Admission probabilities are not shown — we do not present them until a
-            validated methodology and enough outcome data exist. Nothing here is a guarantee of
-            admission.
-          </p>
+          <p className="text-[11px] text-slate-400">{t("advisorDisclaimer")}</p>
         </>
       )}
 
       {!data && !busy && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
-          Ask a question above, or press Enter, to get an assessment of your applications.
+          {t("advisorIdle")}
         </div>
       )}
     </div>

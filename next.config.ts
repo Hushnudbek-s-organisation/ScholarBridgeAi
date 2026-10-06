@@ -19,7 +19,12 @@ async function securityHeaders() {
     { key: "X-DNS-Prefetch-Control", value: "off" },
     {
       key: "Permissions-Policy",
-      value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      // `microphone=(self)` — the visa interview is a VOICE feature (the
+      // student speaks their answers), so an empty allowlist here silently
+      // killed it: the browser refuses getUserMedia/SpeechRecognition for the
+      // page itself and the only option left was typing. The other four are
+      // genuinely unused, so they stay off for every origin.
+      value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
     },
     // Never let an authenticated JSON response be cached by a shared proxy.
     { key: "Cache-Control", value: "no-store", has: [{ type: "header", key: "cookie" }] },

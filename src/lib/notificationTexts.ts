@@ -166,6 +166,62 @@ export const NOTIFY_TEXTS = {
     }[lang];
   },
 
+  /**
+   * The person who INVITED somebody: their friend activated the account, so
+   * the promised reward has actually been paid out.
+   */
+  referralRewarded(lang: NotifyLang, p: { name: string; points: number; premiumDays: number }): NotifyText {
+    const n = cut(p.name, 60);
+    const pts = p.points > 0 ? `+${p.points}` : "";
+    const prem = p.premiumDays > 0 ? p.premiumDays : 0;
+    return {
+      uz: {
+        title: "🎉 Taklifingiz ishladi!",
+        body: prem
+          ? `${n} profilini to'ldirdi. Siz ${pts} ball va ${prem} kunlik Premium oldingiz.`
+          : `${n} profilini to'ldirdi. Siz ${pts} ball oldingiz.`,
+      },
+      ru: {
+        title: "🎉 Ваше приглашение сработало!",
+        body: prem
+          ? `${n} заполнил(а) профиль. Вы получили ${pts} баллов и Premium на ${prem} дней.`
+          : `${n} заполнил(а) профиль. Вы получили ${pts} баллов.`,
+      },
+      en: {
+        title: "🎉 Your invite paid off!",
+        body: prem
+          ? `${n} completed their profile. You earned ${pts} points and ${prem} days of Premium.`
+          : `${n} completed their profile. You earned ${pts} points.`,
+      },
+    }[lang];
+  },
+
+  /** The INVITED student: their signup bonus has been credited. */
+  referralWelcome(lang: NotifyLang, p: { points: number; referrerName: string | null }): NotifyText {
+    const who = p.referrerName ? cut(p.referrerName, 60) : null;
+    const pts = p.points > 0 ? `+${p.points}` : "";
+    return {
+      uz: {
+        title: "🎁 Xush kelibsiz — bonus hisobingizda",
+        body: who
+          ? `${who} sizni taklif qildi. Profilingiz uchun ${pts} ball qo'shildi — taklif qilishni davom ettiring!`
+          : `Profilingiz uchun ${pts} ball qo'shildi — do'stlaringizni taklif qiling!`,
+      },
+      ru: {
+        title: "🎁 Добро пожаловать — бонус начислен",
+        body: who
+          ? `${who} пригласил(а) вас. За заполнение профиля начислено ${pts} баллов — приглашайте друзей!`
+          : `За заполнение профиля начислено ${pts} баллов — приглашайте друзей!`,
+      },
+      en: {
+        title: "🎁 Welcome — your bonus is in",
+        body: who
+          ? `${who} invited you. Your completed profile earned ${pts} points — now invite your friends!`
+          : `Your completed profile earned ${pts} points — now invite your friends!`,
+      },
+    }[lang];
+  },
+
   adminForumReport(lang: NotifyLang, p: { isThread: boolean; id: number | string; reason: string }): NotifyText {
     const r = cut(p.reason, 120);
     return {

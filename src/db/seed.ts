@@ -1,4 +1,7 @@
 import { db } from "./index";
+import { seedProgramCatalog } from "./seedProgramCatalog";
+import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
+import { seedOpportunities } from "./seedOpportunities";
 import {
   studentProfiles,
   universities,
@@ -93,18 +96,16 @@ export async function seedDatabase() {
             console.log("ADMIN_EMAIL is no longer the platform owner — not re-promoting it.");
           }
         } else if (!transferredAway) {
+          // Identity ONLY. The bootstrap account is an operator, not a student:
+          // it must not carry an invented GPA/budget/major that the operator
+          // never entered (spec §19) — an empty profile shows honest "not
+          // provided yet" states everywhere. `onboardingCompleted` is set so the
+          // operator lands in the admin area instead of the student wizard.
           const [created] = await db
             .insert(studentProfiles)
             .values({
               name: adminNameEnv || "Admin",
               email: adminEmail,
-              degreeLevel: "Master",
-              targetMajor: "Computer Science",
-              gpa: 3.5,
-              gpaScale: 4.0,
-              budgetAnnualUsd: 25000,
-              preferredCountries: JSON.stringify(["United States", "United Kingdom", "Canada", "Germany"]),
-              needScholarship: true,
               isAdmin: true,
               onboardingCompleted: true,
               onboardingStep: 8,
@@ -165,6 +166,24 @@ export async function seedDatabase() {
     // Check if universities already seeded
     const existingUnis = await db.select().from(universities).limit(1);
     if (existingUnis.length > 0) {
+      // Universities exist, but older installs never received the program
+      // catalogue (programs/requirements/cycles), which the recommender reads
+      // exclusively. The call is idempotent — it only inserts what is missing.
+      try {
+        await seedProgramCatalog();
+      } catch (err) {
+        console.error("Program catalogue top-up failed:", err);
+      }
+      try {
+        await refreshSeededScholarshipCycles();
+      } catch (err) {
+        console.error("Seeded scholarship cycle refresh failed:", err);
+      }
+      try {
+        await seedOpportunities();
+      } catch (err) {
+        console.error("Opportunities catalogue top-up failed:", err);
+      }
       return;
     }
 
@@ -414,6 +433,23 @@ export async function seedDatabase() {
       }
     ]).returning();
 
+    // Program catalogue for the universities above (programs, per-program
+    // requirements, application cycles, provenance links). Without this the
+    // recommender has no programmes to rank on a fresh install.
+    try {
+      await seedProgramCatalog();
+    } catch (err) {
+      console.error("Failed to seed the program catalogue:", err);
+    }
+
+    // Opportunities catalogue (competitions / research / internships /
+    // summer schools) — the feed was empty on a fresh install.
+    try {
+      await seedOpportunities();
+    } catch (err) {
+      console.error("Failed to seed opportunities:", err);
+    }
+
     // Insert Default Scholarships
     await db.insert(scholarships).values([
       {
@@ -555,31 +591,14 @@ export async function seedDatabase() {
     ]);
 
     // Fill dynamic lifecycle fields for seeded scholarships (spec §4):
-    // convert legacy text deadlines to deadlineDate + deadlineType where possible.
+    // the seed ships fixed published dates; roll them to the next annual
+    // occurrence and label the cycle as recurring + unverified, so a fresh
+    // install does not present eight annual programmes as permanently CLOSED.
     try {
-      const seededScholarships = await db.select().from(scholarships);
-      for (const sc of seededScholarships) {
-        const parsed = sc.deadline ? Date.parse(sc.deadline) : Number.NaN;
-        if (sc.deadline && !isNaN(parsed) && !sc.deadlineDate) {
-          await db
-            .update(scholarships)
-            .set({
-              deadlineDate: sc.deadline,
-              deadlineType: "exact",
-              applicationStatus: new Date(sc.deadline) >= new Date() ? "open" : "closed",
-              recurrence: "annual",
-              expectedDeadlinePeriod: sc.deadline,
-              lastVerifiedAt: new Date(),
-              verificationStatus: "unverified",
-              sourceUrl: sc.websiteUrl || null,
-            })
-            .where(eq(scholarships.id, sc.id));
-        }
-      }
+      await refreshSeededScholarshipCycles();
     } catch (err) {
-      console.error("Failed to backfill scholarship lifecycle fields:", err);
+      console.error("Failed to backfill seeded scholarship cycles:", err);
     }
-
 
     // Insert Default Student Profile
     const [profile] = await db.insert(studentProfiles).values({
@@ -599,7 +618,10 @@ export async function seedDatabase() {
       extracurriculars: "Lead Developer of Campus Open Source Project, Winner of National Hackathon 2024, Undergraduate Research Assistant in ML",
       workExperienceYears: 1,
       researchPublications: 1,
-      isAdmin: true
+      // Demo data for the student screens — NEVER an admin account: a seeded
+      // demo profile that can open the admin panel is a privilege leak, and the
+      // bootstrap admin (ADMIN_EMAIL) is the only operator account.
+      isAdmin: false,
     }).returning();
 
     // Insert saved universities for this student
@@ -632,14 +654,23 @@ export async function seedDatabase() {
       ]);
     }
 
-    // Insert sample application tasks
+    // Insert sample application tasks.
+    // Due dates are RELATIVE to the moment of seeding: fixed absolute dates
+    // went stale (a fresh install showed the demo student with every task
+    // ~500 days overdue and the dashboard announcing "3 deadlines need you
+    // today"). A relative offset keeps the demo coherent whenever it runs.
+    const daysFromNow = (days: number): string => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
     await db.insert(applicationTasks).values([
       {
         profileId: profile.id,
         universityId: insertedUnis[2]?.id || null,
         title: "Draft Statement of Purpose (SOP) tailored for TUM",
         category: "SOP & Essays",
-        dueDate: "2025-05-15",
+        dueDate: daysFromNow(12),
         isCompleted: false,
         priority: "High"
       },
@@ -648,7 +679,7 @@ export async function seedDatabase() {
         universityId: null,
         title: "Request Recommendation Letter from Dr. Vance (ML Professor)",
         category: "LOR",
-        dueDate: "2025-05-01",
+        dueDate: daysFromNow(-30),
         isCompleted: true,
         priority: "High"
       },
@@ -657,7 +688,7 @@ export async function seedDatabase() {
         universityId: null,
         title: "Order WES Official Academic Transcript Evaluation",
         category: "Document Prep",
-        dueDate: "2025-05-20",
+        dueDate: daysFromNow(26),
         isCompleted: false,
         priority: "Medium"
       },
@@ -666,7 +697,7 @@ export async function seedDatabase() {
         universityId: insertedUnis[3]?.id || null,
         title: "Submit University of Toronto Online Application Portal",
         category: "Document Prep",
-        dueDate: "2025-06-01",
+        dueDate: daysFromNow(40),
         isCompleted: false,
         priority: "High"
       }

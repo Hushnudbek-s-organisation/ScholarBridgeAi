@@ -184,7 +184,41 @@ export async function activateSubscription(paymentId: number, profileId: number 
     })
     .returning();
 
+  // Mirror the paid period onto the profile columns. They are the denormalised
+  // "is this student premium" flag the dashboard badge, the readiness gates and
+  // the admin list read — without this, a student who PAID showed as free on
+  // their own dashboard while /api/premium/status (subscription-aware) said
+  // Premium. The window is the UNION of paid and referral grants: paying must
+  // never shorten a referral window the student already earned.
+  const [current] = await db
+    .select({ premiumUntil: studentProfiles.premiumUntil })
+    .from(studentProfiles)
+    .where(eq(studentProfiles.id, targetProfileId));
+  const existing = current?.premiumUntil ? new Date(current.premiumUntil).getTime() : 0;
+  const mergedUntil = new Date(Math.max(existing, periodEnd.getTime()));
+  await db
+    .update(studentProfiles)
+    .set({ isPremium: true, premiumUntil: mergedUntil, updatedAt: now })
+    .where(eq(studentProfiles.id, targetProfileId));
+
   return subscription;
+}
+
+/**
+ * Recompute the profile premium columns from the PAID side after a change
+ * (revoke / expiry) so the flag can never outlive its source. `fallbackUntil`
+ * is the referral window the caller wants preserved, if any.
+ */
+export async function syncProfilePremium(profileId: number, fallbackUntil?: Date | null) {
+  const sub = await findActiveSubscription(profileId);
+  const paidUntil = subscriptionIsActive(sub) && sub ? new Date(sub.currentPeriodEnd) : null;
+  const candidates = [paidUntil, fallbackUntil ?? null].filter((d): d is Date => !!d && d.getTime() > Date.now());
+  const until = candidates.length ? new Date(Math.max(...candidates.map((d) => d.getTime()))) : null;
+  await db
+    .update(studentProfiles)
+    .set({ isPremium: !!until, premiumUntil: until, updatedAt: new Date() })
+    .where(eq(studentProfiles.id, profileId));
+  return until;
 }
 
 export async function findActiveSubscription(profileId: number | null) {

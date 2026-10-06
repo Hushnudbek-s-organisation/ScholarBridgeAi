@@ -22,6 +22,17 @@ interface AdminProfileRow {
   isAdmin?: boolean;
   isPremium: boolean;
   premiumUntil: string | null;
+  /** Where the premium comes from — a paid plan or a referral milestone. */
+  premiumSource?: "subscription" | "referral" | null;
+  /** Referral data — comes from /api/admin/profiles, not from the UI. */
+  referralCode?: string | null;
+  referredBy?: number | null;
+  referralPoints?: number | null;
+  referralRewarded?: boolean | null;
+  referredCount?: number | null;
+  referredRewardedCount?: number | null;
+  plan?: string | null;
+  createdAt?: string | null;
   [key: string]: any;
 }
 
@@ -260,7 +271,8 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
                     <span className="truncate text-xs font-bold text-slate-800">{p.name}</span>
                     {p.isPremium && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        <Crown className="h-3 w-3" /> Premium
+                        <Crown className="h-3 w-3" />
+                        {p.premiumSource === "referral" ? "Premium (referral)" : "Premium"}
                       </span>
                     )}
                     {p.isAdmin && (
@@ -275,6 +287,26 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
                       <span className="text-amber-600">
                         {" "}· until {new Date(p.premiumUntil).toLocaleDateString()}
                       </span>
+                    )}
+                  </div>
+                  {/* Referral data is part of "managing students": who invited
+                      whom, how many points, who was paid out. Read-only here —
+                      the rules themselves live in Settings → Referral rewards. */}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
+                    <span>
+                      Referral:{" "}
+                      <span className="font-mono font-bold text-slate-500">{p.referralCode || "—"}</span>
+                    </span>
+                    <span>
+                      Points: <span className="font-bold text-slate-600">{p.referralPoints ?? 0}</span>
+                    </span>
+                    <span>
+                      Invited: <span className="font-bold text-slate-600">{p.referredCount ?? 0}</span>
+                      {" "}
+                      (rewarded {p.referredRewardedCount ?? 0})
+                    </span>
+                    {p.referredBy != null && (
+                      <span className="text-slate-400">referred by #{p.referredBy}</span>
                     )}
                   </div>
                 </div>

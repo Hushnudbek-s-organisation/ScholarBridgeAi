@@ -30,6 +30,9 @@
  * database (see scripts/check-chancing.ts).
  */
 
+import { undergraduateTestApplies } from "./degreeLevels";
+import { subjectSimilarity } from "./subjectAffinity";
+
 /**
  * The single source of truth for student-facing probability availability.
  * Any route/UI that mentions admission probability must read this — never
@@ -69,6 +72,14 @@ export interface ChancingProfile {
   certificates?: string | null;
   workExperienceYears?: number | null;
   researchPublications?: number | null;
+  /**
+   * Rows from the Activities pane (`student_activities`). The profile's own
+   * text columns are what the student typed in the profile; this is the
+   * structured portfolio they maintain on the Activities tab. Both describe
+   * the SAME person, so readiness must count both — otherwise adding an
+   * activity changes nothing and the portfolio looks disconnected.
+   */
+  savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
   budgetAnnualUsd?: number | null;
   careerGoal?: string | null;
   graduationYear?: number | null;
@@ -85,6 +96,8 @@ export interface ChancingUniversity {
   minGpa?: number | null;
   minIelts?: number | null;
   minSat?: number | null;
+  /** Catalogue degree level — SAT/ACT only apply to undergraduate entry. */
+  degreeLevel?: string | null;
   /** 0–100 (percent). NULL = not published. */
   acceptanceRate?: number | null;
   programMajor?: string | null;
@@ -132,6 +145,12 @@ export interface ChancingResult {
   dataBasis: DataBasis;
   /** Consented ScholarBridge outcomes behind the estimate (0 = none yet). */
   sampleSize: number;
+  /**
+   * For `public-estimate`: whether the baseline came from the university's
+   * published acceptance rate or from the ranking-tier fallback. The UI must
+   * not claim "published acceptance data" when only a rank exists.
+   */
+  basisSource: "acceptance-rate" | "ranking-tier";
   /** Shown under the number — never imply certainty. */
   disclaimer: string;
 }
@@ -198,6 +217,10 @@ export function majorSimilarity(a?: string | null, b?: string | null): number {
 }
 
 /** Count distinct extracurricular/achievement items across all columns. */
+/** Roles that make an activity a leadership role (case-insensitive). */
+const LEADERSHIP_ROLE =
+  /\b(lead|leader|president|vice[- ]?president|captain|head|founder|co-?founder|chair|coordinator|director|manager|mentor)\b/i;
+
 export function countActivities(profile: ChancingProfile): {
   activities: number;
   leadership: number;
@@ -214,13 +237,32 @@ export function countActivities(profile: ChancingProfile): {
   const leadership = parseListColumn(profile.leadership).length;
   const research =
     parseListColumn(profile.researchExperience).length + Number(profile.researchPublications ?? 0);
+  const saved = profile.savedActivities ?? [];
+  const savedLeadership = saved.filter(
+    (a) =>
+      a.category === "leadership" ||
+      LEADERSHIP_ROLE.test(String(a.role ?? ""))
+  ).length;
+  const savedResearch = saved.filter((a) => a.category === "research").length;
+  // A competition ENTRY is an activity; it only becomes an award once the
+  // student recorded an achievement for it. Counting entries as awards would
+  // inflate the score without evidence.
+  const savedAwards = saved.filter(
+    (a) => a.category === "competition" && String(a.achievements ?? "").trim().length > 0
+  ).length;
+
   const awards = [
     ...parseListColumn(profile.awards),
     ...parseListColumn(profile.olympiads),
     ...parseListColumn(profile.competitions),
     ...parseListColumn(profile.certificates),
-  ].length;
-  return { activities, leadership, research, awards };
+  ].length + savedAwards;
+  return {
+    activities: activities + saved.length,
+    leadership: leadership + savedLeadership,
+    research: research + savedResearch,
+    awards,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -340,22 +382,27 @@ function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
     factor *= minIelts ? 0.7 : 0.85;
   }
 
-  // Standardised test — only judged when the university actually asks for one.
-  if (sat || act) {
+  // Standardised test — judged ONLY when the institution actually publishes a
+  // minimum AND the test can be part of this student's admission. SAT/ACT are
+  // undergraduate tests: a graduate applicant (or a graduate-only institution)
+  // is neither credited nor penalised, and a test score is never measured
+  // against an invented "typical" bar when no minimum is published.
+  const satApplies = minSat != null && undergraduateTestApplies(uni.degreeLevel, profile.degreeLevel);
+  if (satApplies && (sat || act)) {
     const equivalentSat = sat ?? (act ? clamp(act * 40 + 180, 400, 1600) : null);
     if (equivalentSat != null) {
-      const req = minSat ?? 1300;
-      const delta = (equivalentSat - req) / 200;
+      const delta = (equivalentSat - minSat) / 200;
       parts.push(clamp(65 + delta * 14, 10, 100));
-      if (delta >= 0.5) notes.positive ??= `Test score ${equivalentSat} is above the typical ${req}`;
-      if (delta < 0) notes.negative ??= `Test score ${equivalentSat} is below the typical ${req}`;
+      if (delta >= 0.5) notes.positive ??= `Test score ${equivalentSat} is above the published ${minSat}`;
+      if (delta < 0) notes.negative ??= `Test score ${equivalentSat} is below the published ${minSat}`;
       factor *= clamp(1 + delta * 0.12, 0.75, 1.25);
     }
-  } else if (minSat) {
+  } else if (satApplies) {
     parts.push(40);
     notes.negative = `No SAT/ACT submitted — this programme lists ${minSat}`;
     factor *= 0.8;
   } else {
+    // Not applicable / nothing published: neutral, and never invented.
     parts.push(60);
   }
 
@@ -397,7 +444,11 @@ function majorSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
   factor: number;
   notes: { positive?: string; negative?: string };
 } {
-  const sim = majorSimilarity(profile.targetMajor, uni.programMajor);
+  // Synonym-aware, shared with the recommender and the university matcher:
+  // "Computer Science" vs "Informatics & Data Engineering" is a RELATED field
+  // (the fit engine already says so) — the plain word-overlap helper used to
+  // call it "a shift from", contradicting the fit reasons in the same payload.
+  const sim = subjectSimilarity(profile.targetMajor, uni.programMajor);
   const score = round(clamp(40 + sim * 60, 20, 100));
   const factor = clamp(0.85 + sim * 0.3, 0.85, 1.15);
   const notes: { positive?: string; negative?: string } = {};
@@ -594,6 +645,7 @@ export function estimateAdmissionChance(
     confidence: round(confidence),
     dataBasis,
     sampleSize,
+    basisSource: base.source,
     disclaimer:
       dataBasis === "public-estimate"
         ? "Model estimate from published university data — not a guarantee. Your own outcomes data sharpens this over time."
@@ -627,7 +679,7 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
 export interface ProfileStrength {
   overall: number;
   completeness: number;
-  sections: { key: string; label: string; score: number }[];
+  sections: { key: string; label: string; score: number; unknown?: boolean }[];
 }
 
 /** One number per dimension, for the radar/bar dashboard. */
@@ -635,8 +687,12 @@ export function profileStrength(
   profile: ChancingProfile,
   opts: { essayScore?: number | null } = {}
 ): ProfileStrength {
+  // No GPA on file is UNKNOWN, not a low score: the section is flagged so the
+  // UI can print "not provided yet" and the overall average skips it instead
+  // of inventing a 30/100 for a student who never entered a grade.
   const gpa = normalizedGpa(profile);
-  const academics = gpa == null ? 30 : round(clamp(((gpa - 2.5) / 1.5) * 100, 5, 100));
+  const academics = gpa == null ? 0 : round(clamp(((gpa - 2.5) / 1.5) * 100, 5, 100));
+  const academicsUnknown = gpa == null;
 
   const english =
     Number(profile.ieltsScore) > 0
@@ -667,16 +723,18 @@ export function profileStrength(
   const awardsScore = round(clamp(awards * 18, 0, 100));
   const essays =
     typeof opts.essayScore === "number" && opts.essayScore > 0 ? round(clamp(opts.essayScore, 0, 100)) : 0;
-  const financial = Number(profile.budgetAnnualUsd) > 0 ? (profile.requiresFullScholarship ? 55 : 88) : 35;
+  const financial =
+    Number(profile.budgetAnnualUsd) > 0 ? (profile.requiresFullScholarship ? 55 : 88) : 0;
+  const financialUnknown = !(Number(profile.budgetAnnualUsd) > 0);
 
   const sections = [
-    { key: "academics", label: "Academics", score: academics },
-    { key: "tests", label: "Tests", score: tests },
+    { key: "academics", label: "Academics", score: academics, unknown: academicsUnknown },
+    { key: "tests", label: "Tests", score: tests, unknown: english == null && std == null },
     { key: "extracurriculars", label: "Extracurriculars", score: extracurriculars },
     { key: "leadership", label: "Leadership", score: leadershipScore },
     { key: "awards", label: "Awards", score: awardsScore },
     { key: "essays", label: "Essays", score: essays },
-    { key: "financial", label: "Financial", score: financial },
+    { key: "financial", label: "Financial", score: financial, unknown: financialUnknown },
   ];
   const completeness = round(profileCompletenessRatio(profile) * 100);
   const filled = sections.filter((s) => s.score > 0);

@@ -34,6 +34,9 @@ jobs:
       - name: Security regression tests
         run: npm run test:security
 
+      - name: Discovery matcher tests — university/scholarship Match %
+        run: npm run test:match
+
       - name: AI settings tests
         run: npm run test:ai-settings
 

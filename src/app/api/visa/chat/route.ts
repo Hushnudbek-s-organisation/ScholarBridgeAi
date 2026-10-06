@@ -6,8 +6,10 @@ import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
   getVisaCountry,
+  nextScriptedQuestion,
   sanitizeHistory,
   type VisaApplicantProfile,
+  type VisaMessage,
   type VisaOfficerGender,
 } from "@/lib/visa-interview";
 import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
@@ -40,14 +42,6 @@ export async function POST(req: Request) {
       : checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
-    // Provider = admin's "visa" mapping (default Groq); see lib/ai/settings.
-    if (!(await isAiConfigured("visa"))) {
-      return NextResponse.json(
-        { error: "The AI provider for the visa interview is not configured on the server." },
-        { status: 503 },
-      );
-    }
-
     const parsed = await readJsonBody<Record<string, any>>(req, 128 * 1024);
     const body = parsed.ok ? parsed.body : {};
     const country = getVisaCountry(body?.countryCode);
@@ -56,6 +50,23 @@ export async function POST(req: Request) {
         { error: "Valid countryCode is required." },
         { status: 400 },
       );
+    }
+
+    // Provider = admin's "visa" mapping (default Groq); see lib/ai/settings.
+    // Without one, the interview must still WORK: the officer asks the
+    // country's standard consular questions in order, and the final score is
+    // the deterministic rubric over the student's own transcript. It used to
+    // answer 503, so the voice interview could not start at all on a server
+    // with no AI keys — a dead end for the whole feature.
+    if (!(await isAiConfigured("visa"))) {
+      const history = sanitizeHistory(Array.isArray(body?.messages) ? body.messages : []);
+      const scripted = nextScriptedQuestion(country, history as VisaMessage[]);
+      return NextResponse.json({
+        reply: scripted.reply,
+        aiUsed: false,
+        source: "script",
+        closing: scripted.closing,
+      });
     }
 
     const gender: VisaOfficerGender =

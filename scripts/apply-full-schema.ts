@@ -12,10 +12,8 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import * as dotenv from "dotenv";
 import pg from "pg";
-
-dotenv.config();
+import "./lib/env";
 
 const url = process.env.DATABASE_URL;
 if (!url) {

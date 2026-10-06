@@ -141,7 +141,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     satScore: profile?.satScore ? String(profile.satScore) : "",
     greScore: profile?.greScore ? String(profile.greScore) : "",
     budgetAnnualUsd: profile?.budgetAnnualUsd ? String(profile.budgetAnnualUsd) : "",
-    needScholarship: profile?.needScholarship ?? true,
+    // Unchecked until the student ticks the step that asks this question.
+    needScholarship: profile?.needScholarship ?? false,
     preferredCountries: safeParseCountries(profile?.preferredCountries),
     workExperienceYears: profile?.workExperienceYears != null ? String(profile.workExperienceYears) : "",
     researchPublications: profile?.researchPublications != null ? String(profile.researchPublications) : "",
@@ -176,30 +177,36 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     setSaving(true);
     setError("");
     try {
-      const payload: Record<string, unknown> = {
+      // Empty answers are sent as NULL/empty, NEVER as invented defaults: the
+    // wizard used to save "Master", "Computer Science", GPA 3.5, $25 000 and a
+    // 4-country list when the student skipped a step, which made every later
+    // score and recommendation look personalised for data nobody entered.
+    const num = (v: string): number | null => {
+      const n = Number(v);
+      return v.trim() !== "" && Number.isFinite(n) ? n : null;
+    };
+    const payload: Record<string, unknown> = {
         name: form.name,
         email: form.email.trim() || placeholderEmail || form.email,
-        degreeLevel: form.degreeLevel || "Master",
+        degreeLevel: form.degreeLevel || null,
         targetMajor:
           form.studyInterests.some((selection) => selection.kind === "exploring")
             ? ""
             : studyInterestsTouched.current
               ? compatibilityTargetMajor(form.studyInterests)
-              : form.targetMajor || compatibilityTargetMajor(form.studyInterests) || "Computer Science",
-        gpa: form.gpa ? Number(form.gpa) : 3.5,
-        gpaScale: form.gpaScale ? Number(form.gpaScale) : 4.0,
-        ieltsScore: form.ieltsScore ? Number(form.ieltsScore) : null,
-        toeflScore: form.toeflScore ? Number(form.toeflScore) : null,
-        satScore: form.satScore ? Number(form.satScore) : null,
-        greScore: form.greScore ? Number(form.greScore) : null,
-        budgetAnnualUsd: form.budgetAnnualUsd ? Number(form.budgetAnnualUsd) : 25000,
+              : form.targetMajor || compatibilityTargetMajor(form.studyInterests) || null,
+        gpa: num(form.gpa),
+        gpaScale: num(form.gpaScale),
+        ieltsScore: num(form.ieltsScore),
+        toeflScore: num(form.toeflScore),
+        satScore: num(form.satScore),
+        greScore: num(form.greScore),
+        budgetAnnualUsd: num(form.budgetAnnualUsd),
         needScholarship: form.needScholarship,
-        preferredCountries: form.preferredCountries.length
-          ? form.preferredCountries
-          : ["United States", "United Kingdom", "Canada", "Germany"],
-        workExperienceYears: form.workExperienceYears ? Number(form.workExperienceYears) : 0,
-        researchPublications: form.researchPublications ? Number(form.researchPublications) : 0,
-        extracurriculars: form.extracurriculars || "",
+        preferredCountries: form.preferredCountries,
+        workExperienceYears: num(form.workExperienceYears),
+        researchPublications: num(form.researchPublications),
+        extracurriculars: form.extracurriculars || null,
         onboardingStep: nextStep,
         onboardingCompleted: completed,
       };

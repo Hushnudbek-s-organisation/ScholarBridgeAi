@@ -1,12 +1,128 @@
 import { NextResponse } from "next/server";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles, aiEvaluations } from "@/db/schema";
+import { aiEvaluations, essayVersions, scholarships, studentProfiles, universities } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
-import { formatMoney } from "@/lib/format";
 import { guardAiRequest } from "@/lib/ai/guard";
-import { eq } from "drizzle-orm";
-import { localeToLanguageName } from "@/i18n/config";
+import { localeToLanguageName, type Locale } from "@/i18n/config";
+import { asLocale, translateReasons } from "@/lib/engineText";
+import { profileStrength } from "@/lib/chancing";
+import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { chancingProfileWithActivities, toMatchProfile } from "@/lib/profileMapping";
+import {
+  buildProfileReport,
+  type ReportFacts,
+  type ReportMatchFact,
+  type ReportScholarshipFact,
+} from "@/lib/profileReportFallback";
+
+/**
+ * Profile evaluation ("Run AI Audit").
+ *
+ * HONESTY RULES (same policy as the Chancing pane):
+ *   • the readiness number comes from the shared `profileStrength` engine —
+ *     this route must never invent a second score;
+ *   • universities and scholarships come from the live engines and the
+ *     catalogue — never from a hardcoded list in the prompt;
+ *   • the model is explicitly forbidden from producing percentiles,
+ *     acceptance rates or "chance of admission" figures, because the platform
+ *     has no validated methodology for them;
+ *   • when the AI provider is unavailable, the built-in report is built from
+ *     the very same facts (`buildProfileReport`), so the fallback can never
+ *     contradict the rest of the app either.
+ */
+
+async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: Locale): Promise<ReportFacts> {
+  const [uniRows, scholarshipRows, latestEssay] = await Promise.all([
+    db.select().from(universities).where(eq(universities.isActive, true)),
+    db.select().from(scholarships),
+    db
+      .select({ rubricTotal: essayVersions.rubricTotal })
+      .from(essayVersions)
+      .where(eq(essayVersions.profileId, profile.id))
+      .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
+      .limit(1),
+  ]);
+
+  const essayScore = latestEssay.length ? (latestEssay[0].rubricTotal ?? null) : null;
+  const strength = profileStrength(await chancingProfileWithActivities(profile), { essayScore });
+  const matchProfile = toMatchProfile(profile);
+
+  const scored = uniRows
+    .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, uni) }))
+    .sort((a, b) => b.match.matchScore - a.match.matchScore);
+
+  // The fit engine already ranks and trims these (top 2 evidence, top 2
+  // issues) — take the first of each, never re-rank them here.
+  const toFact = (row: (typeof scored)[number]): ReportMatchFact => ({
+    name: row.uni.name,
+    country: row.uni.country,
+    score: row.match.matchScore,
+    category: row.match.matchCategory,
+    // The report is written in the student's language, so its evidence lines
+    // must be too (the engine emits codes; engineText does the wording).
+    reason: translateReasons(locale, "university", row.match.reasonDetails, row.match.reasons)[0] ?? null,
+    issue: translateReasons(locale, "university", row.match.issueDetails, row.match.potentialIssues)[0] ?? null,
+  });
+  const byCategory = (category: string) =>
+    scored.filter((row) => row.match.matchCategory === category).slice(0, 3).map(toFact);
+
+  const scholarshipFacts: ReportScholarshipFact[] = scholarshipRows
+    .map((row) => ({ row, match: calculateScholarshipMatch(matchProfile, row) }))
+    .sort((a, b) => b.match.matchScore - a.match.matchScore)
+    .filter(({ match }) => match.matchScore >= 60)
+    .slice(0, 4)
+    .map(({ row }) => ({
+      title: row.title,
+      provider: row.provider,
+      coverageType: row.coverageType,
+      deadlineDate: row.deadlineDate ? String(row.deadlineDate).slice(0, 10) : null,
+    }));
+
+  return {
+    name: profile.name,
+    degreeLevel: profile.degreeLevel,
+    targetMajor: profile.targetMajor,
+    gpa: profile.gpa,
+    gpaScale: profile.gpaScale,
+    ieltsScore: profile.ieltsScore ?? null,
+    budgetAnnualUsd: profile.budgetAnnualUsd ?? null,
+    needScholarship: Boolean(profile.needScholarship),
+    workExperienceYears: profile.workExperienceYears ?? 0,
+    researchPublications: profile.researchPublications ?? 0,
+    extracurriculars: profile.extracurriculars ?? null,
+    readiness: {
+      overall: strength.overall,
+      completeness: strength.completeness,
+      sections: strength.sections.map((s) => ({ key: s.key, score: s.score })),
+    },
+    reached: byCategory("Reach"),
+    matched: byCategory("Match"),
+    safety: byCategory("Safety"),
+    scholarships: scholarshipFacts,
+  };
+}
+
+function factsForPrompt(facts: ReportFacts): string {
+  const uni = (rows: ReportMatchFact[]) =>
+    rows.length
+      ? rows.map((r) => `${r.name} (${r.country}) — fit ${r.score}%${r.issue ? `; main gap: ${r.issue}` : r.reason ? `; strength: ${r.reason}` : ""}`).join("\n  ")
+      : "none";
+  return [
+    `- Readiness score: ${facts.readiness.overall}/100 (ScholarBridge readiness engine — NOT a probability of admission)`,
+    `- Profile completeness: ${facts.readiness.completeness}%`,
+    `- Readiness by section: ${facts.readiness.sections.map((s) => `${s.key} ${s.score}`).join(", ")}`,
+    "- Universities whose fit the platform actually computed (use these names ONLY):",
+    `  Reach:\n  ${uni(facts.reached)}`,
+    `  Match:\n  ${uni(facts.matched)}`,
+    `  Safety:\n  ${uni(facts.safety)}`,
+    "- Scholarships from the catalogue (use these ONLY):",
+    facts.scholarships.length
+      ? facts.scholarships.map((s) => `  ${s.title} — ${s.provider} (${s.coverageType}); deadline: ${s.deadlineDate ?? "not published"}`).join("\n")
+      : "  none matched this profile",
+  ].join("\n");
+}
 
 export async function POST(req: Request) {
   try {
@@ -26,91 +142,51 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    const prompt = `You are ScholarBridgeAI, an elite international admissions counselor and scholarship evaluator. Analyze the following student profile and produce a detailed, highly strategic evaluation.
-IMPORTANT: Write the ENTIRE evaluation in ${localeToLanguageName(profile.preferredLocale || "en")}. Translate section headings, bullet points, and recommendations into this language.
+    const locale = profile.preferredLocale || "en";
+    const facts = await loadFacts(profile, asLocale(locale));
 
-STUDENT PROFILE DATA:
+    const prompt = `You are ScholarBridgeAI, an international admissions counselor. Evaluate the student below using ONLY the verified platform data provided. Write the ENTIRE evaluation in ${localeToLanguageName(locale)}.
+
+STUDENT PROFILE (as saved by the student):
 - Name: ${profile.name}
-- Degree Level Target: ${profile.degreeLevel}
-- Target Major: ${profile.targetMajor}
-- GPA: ${profile.gpa} / ${profile.gpaScale}
-- Standardized Test Scores: IELTS (${profile.ieltsScore ?? "N/A"}), TOEFL (${profile.toeflScore ?? "N/A"}), SAT (${profile.satScore ?? "N/A"}), GRE (${profile.greScore ?? "N/A"})
-- Annual Budget (USD): ${formatMoney(profile.budgetAnnualUsd, "USD", { placeholder: "Not specified" })}
-- Preferred Study Countries: ${profile.preferredCountries}
-- Scholarship Requirement: ${profile.needScholarship ? "Yes, urgently needed" : "No, self-funded/partial"}
-- Work Experience: ${profile.workExperienceYears ?? 0} years
-- Research Publications: ${profile.researchPublications ?? 0}
-- Extracurricular Highlights: ${profile.extracurriculars || "None stated"}
+- Degree level target: ${profile.degreeLevel ?? "not provided"}
+- Target major: ${profile.targetMajor ?? "not provided"}
+- GPA: ${profile.gpa == null ? "not provided" : `${profile.gpa} / ${profile.gpaScale ?? "?"}`}
+- IELTS: ${profile.ieltsScore ?? "not provided"} · TOEFL: ${profile.toeflScore ?? "not provided"} · SAT: ${profile.satScore ?? "not provided"} · GRE: ${profile.greScore ?? "not provided"}
+- Annual budget: ${facts.budgetAnnualUsd == null ? "not specified" : `$${facts.budgetAnnualUsd.toLocaleString("en-US")}`}
+- Scholarship needed: ${facts.needScholarship ? "yes" : "no"}
+- Work experience: ${facts.workExperienceYears} years · Publications: ${facts.researchPublications}
+- Extracurriculars: ${facts.extracurriculars || "none stated"}
 
-Generate a structured assessment covering exactly these sections (use one short markdown heading per section, no emoji in headings):
-1. Overall Profile Score & Readiness Assessment
-   - Score out of 100 with percentile ranking
-   - Profile competitive category (e.g. Tier 1 Ivy/Oxbridge, Top 30 World, Top 100 World)
-2. Key Competitive Strengths
-   - Bullet points highlighting academic or practical highlights
-3. Critical Admissions Gaps & Mitigation Plan
-   - Weak points (e.g., test score cutoffs, budget gap, publication needs) and actionable ways to fix them before applying
-4. Tailored University Strategy (Reach, Match, Safety)
-   - Country-by-country recommendations based on preferences
-5. Financial Aid & Scholarship Playbook
-   - Specific global scholarships to target given this profile
-6. Actionable 6-Month Timeline
-   - Step-by-step milestones to maximize acceptance rate
+VERIFIED PLATFORM DATA — the only numbers, names and claims you may use:
+${factsForPrompt(facts)}
+
+ABSOLUTE RULES (a violation makes the whole answer wrong):
+1. NEVER invent or estimate an acceptance rate, percentile, ranking, probability, scholarship amount or deadline. If a number is not in the verified data above, write that it is not published.
+2. NEVER state or imply a chance of admission. Readiness/fit scores measure the profile against published requirements — say so explicitly once.
+3. Do not name universities or scholarships that are not listed above.
+4. Do not promise admission, funding or visa outcomes.
 
 FORMAT RULES (follow exactly):
-- Plain markdown only: one short heading (## or ###) per section + short bullet points; bold for key terms.
-- NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences, at most 1-2 emojis in the whole reply.
+- Plain markdown only: one short heading (##) per section, bold for key terms, short bullet points.
+- NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences.
+- At most 1-2 emojis in the whole reply.
+Sections: 1) Overall Profile Score & Readiness Assessment (use the readiness score above and explain what it measures), 2) Key Competitive Strengths, 3) Critical Gaps & How to Fix Them, 4) Tailored University Strategy (the Reach/Match/Safety lists above, with the stated gap/strength for each), 5) Funding (the catalogue entries above, noting deadlines that are not published), 6) Suggested Next Steps.`;
 
-Make the tone encouraging, professional, precise, and practical.`;
+    const systemInstruction =
+      "You are ScholarBridge's senior AI Admissions Strategist. You are strictly factual: you only use the verified platform data given to you, you never invent statistics, and you never promise admission.";
 
-    const systemInstruction = "You are ScholarBridge's senior AI Admissions Strategist. Provide structured, practical markdown evaluation with clear actionable insights.";
-
-    let evaluationResult = await callAI(prompt, systemInstruction, { taskType: "admissions", profileId: guarded.usageProfileId });
+    let evaluationResult = await callAI(prompt, systemInstruction, {
+      taskType: "admissions",
+      profileId: guarded.usageProfileId,
+    });
     // aiUsed=true only when the AI provider actually returned an evaluation.
-    // When AI is unavailable the route returns a built-in estimate flagged
-    // as fallback so the UI never presents fixed info as "AI analysis".
+    // When AI is unavailable the route returns a built-in report flagged as
+    // fallback so the UI never presents fixed info as "AI analysis".
     const aiUsed = Boolean(evaluationResult);
 
     if (!evaluationResult) {
-      // Fallback realistic AI evaluation (honest scoring: missing IELTS = 0,
-      // no experience/pubs = 0, same rule as the dashboard Admissions Index).
-      const normGpa = Math.min(4.0, profile.gpaScale > 0 ? (profile.gpa / profile.gpaScale) * 4.0 : profile.gpa);
-      const gpaPercent = Math.round((normGpa / 4.0) * 100);
-      const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
-      const ieltsPoints = hasIelts ? (profile.ieltsScore! / 9) * 25 : 0;
-      const compositeScore = Math.min(96, Math.max(30, Math.round(gpaPercent * 0.5 + ieltsPoints + ((profile.workExperienceYears || 0) > 0 ? 10 : 0) + ((profile.researchPublications || 0) > 0 ? 10 : 0))));
-
-      evaluationResult = normalizeAiReply(`### Overall Profile Score & Readiness Assessment
-**Profile Readiness Score: ${compositeScore} / 100** *(Competitive Global Candidate)*
-- **Target Tier:** Top 30 to Top 100 Global Universities for ${profile.degreeLevel} in ${profile.targetMajor}.
-- **Academic Index:** GPA of **${profile.gpa}/${profile.gpaScale}** places you in the upper bracket of applicants. ${profile.ieltsScore ? `IELTS score of **${profile.ieltsScore}** meets or exceeds cutoffs for 92% of world universities.` : "Consider submitting an official IELTS or TOEFL score to unlock tier-1 university waivers."}
-
-### Key Competitive Strengths
-- **Solid Academic Foundation:** strong GPA in core prerequisite subjects aligned with **${profile.targetMajor}**.
-- **Practical Exposure:** ${profile.workExperienceYears ? `${profile.workExperienceYears} year(s) of relevant experience provides practical context for SOP essays.` : "Active participation in extracurricular and technical project initiatives."}
-- ${profile.researchPublications ? `**Research Distinction:** ${profile.researchPublications} peer-reviewed publication/conference presentation demonstrates academic research maturity.` : "**Extracurricular Momentum:** " + (profile.extracurriculars || "Demonstrated initiative in projects and leadership.")}
-- **Target Alignment:** high compatibility with universities in preferred destination countries.
-
-### Critical Admissions Gaps & Mitigation Plan
-1. **Budget-Tuition Differential:** annual tuition budget of ${formatMoney(profile.budgetAnnualUsd, "USD", { placeholder: "Not specified" })} is ${profile.budgetAnnualUsd == null ? "not yet specified — confirm the budget before finalizing the university shortlist." : profile.budgetAnnualUsd < 35000 ? "below private US university rates (~$55k+). Prioritize public European universities (Germany, Netherlands, Switzerland) or fully-funded scholarships." : "well-positioned for public and state university tuition worldwide."}
-2. **LOR Selection Strategy:** secure 2 academic recommendations from senior faculty and 1 professional reference highlighting leadership and analytical problem solving.
-3. **GRE / Test Waiver Strategy:** ${profile.greScore ? `GRE score of ${profile.greScore} is a strong asset for US engineering/business schools.` : "Target universities with official GRE waivers or focus on UK/Germany where GRE is optional."}
-
-### Tailored University Strategy (Reach, Match, Safety)
-- **Reach Universities (acceptance ~5-15%):** University of Oxford (UK), MIT (USA), ETH Zurich (Switzerland). Highlight a unique research methodology and publish an updated preprint or technical portfolio.
-- **Match Universities (acceptance ~20-40%):** Technical University of Munich (Germany), University of Toronto (Canada), TU Delft (Netherlands). Focus the SOP on alignment with specific faculty research labs and course modules.
-- **Safety Universities (acceptance ~50%+):** University of Melbourne (Australia), UBC (Canada), Arizona State University (USA). Submit during priority early rounds for maximum merit scholarship eligibility.
-
-### Financial Aid & Scholarship Playbook
-${profile.needScholarship ? `- **Fulbright Foreign Student Program:** full tuition + monthly stipend for graduate study in the USA.
-- **DAAD EPOS / TUM Merit Scholarships:** exceptional fit for low/no-tuition German universities.
-- **Chevening Scholarship (UK):** fully funded 1-year master's degree in the United Kingdom.
-- **Erasmus Mundus Joint Master Degrees:** zero tuition + about 1,400 EUR monthly stipend across multiple EU countries.` : "- **University Departmental Assistantships (RA/TA):** inquire directly with program directors for 50-100% tuition waivers in exchange for 10-20 hours per week of teaching or lab research."}
-
-### Actionable 6-Month Timeline
-- **Months 1-2:** finalize the SOP outline, request 3 LORs, and start transcript WES evaluation.
-- **Months 3-4:** submit priority university applications and Fulbright/Chevening scholarship files.
-- **Months 5-6:** prepare financial proof documents (blocked account / bank balance certificate) and schedule the visa embassy appointment.`);
+      evaluationResult = normalizeAiReply(buildProfileReport(locale, facts));
     }
 
     // Save to AI evaluations table

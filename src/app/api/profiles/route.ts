@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { seedDatabase } from "@/db/seed";
@@ -131,8 +131,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Parse preferredCountries if passed as array
-    let countriesStr = "[\"United States\", \"United Kingdom\", \"Canada\"]";
+    // Parse preferredCountries if passed as array. Nothing is invented when
+    // the student has not chosen: the column stays NULL (= "not chosen yet").
+    let countriesStr: string | null = null;
     if (body.preferredCountries) {
       if (typeof body.preferredCountries === "string") {
         countriesStr = body.preferredCountries;
@@ -141,8 +142,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // NEVER fabricate academic data (spec §19): empty/missing test scores
-    // are stored as NULL, not fake defaults (7.0/95/1350/315/3.5).
+    // NEVER fabricate academic data (spec §19): empty/missing answers are
+    // stored as NULL, not as fake defaults (3.5 GPA, IELTS 7.0, SAT 1350,
+    // $25 000 budget, a fabricated target major / degree / country list).
+    // NULL is what the engines read as "unknown", so a half-filled profile
+    // produces honest "not enough data" answers instead of a personalised-
+    // looking score built on numbers the student never entered.
     const numOrNull = (v: unknown): number | null => {
       if (v === null || v === undefined || v === "") return null;
       const n = Number(v);
@@ -172,21 +177,24 @@ export async function POST(req: Request) {
       [newProfile] = await db.insert(studentProfiles).values({
         name: clampString(body.name, 120) || "New Student Profile",
         email: emailInput,
-        degreeLevel: body.degreeLevel || "Master",
-        targetMajor: isExploringInterests ? "" : body.targetMajor || "Computer Science",
+        degreeLevel: clampString(body.degreeLevel, 60) || null,
+        targetMajor: isExploringInterests ? "" : clampString(body.targetMajor, 160) || null,
         studyInterests: submittedStudyInterests ? JSON.stringify(submittedStudyInterests) : undefined,
-        gpa: numOrNull(body.gpa) ?? 3.5, // schema default; real GPA entered later
-        gpaScale: numOrNull(body.gpaScale) ?? 4.0,
+        gpa: scoreOrNull(body.gpa),
+        gpaScale: scoreOrNull(body.gpaScale),
         ieltsScore: scoreOrNull(body.ieltsScore),
         toeflScore: scoreOrNull(body.toeflScore),
         satScore: scoreOrNull(body.satScore),
         greScore: scoreOrNull(body.greScore),
-        budgetAnnualUsd: numOrNull(body.budgetAnnualUsd) ?? 25000,
+        budgetAnnualUsd:
+          numOrNull(body.budgetAnnualUsd) != null && Number(body.budgetAnnualUsd) >= 0
+            ? Math.round(Number(body.budgetAnnualUsd))
+            : null,
         preferredCountries: countriesStr,
-        needScholarship: body.needScholarship ?? true,
-        extracurriculars: body.extracurriculars || "",
-        workExperienceYears: numOrNull(body.workExperienceYears) ?? 0,
-        researchPublications: numOrNull(body.researchPublications) ?? 0,
+        needScholarship: body.needScholarship === true,
+        extracurriculars: clampString(body.extracurriculars, 4000) || null,
+        workExperienceYears: numOrNull(body.workExperienceYears),
+        researchPublications: numOrNull(body.researchPublications),
         preferredLocale: body.preferredLocale || "en",
         // The onboarding wizard saves the step it will resume from on EVERY
         // save — including the very first one, which creates the account. Without
@@ -248,10 +256,21 @@ export async function POST(req: Request) {
       console.error("Failed to set up referral for new profile:", err);
     }
 
+    // The referral setup above CHANGED the row (its own code, and referred_by
+    // when a ?ref= code was applied), so the freshly inserted object would ship
+    // a stale `referredBy: null` to the client — which stores this payload as
+    // the active profile. Re-read the row so the response, the database and
+    // every later screen agree.
+    const [freshProfile] = await db
+      .select()
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, newProfile.id));
+
     // The new account is immediately the caller's session — the browser gets
     // a signed HttpOnly cookie, not just an id to keep in localStorage.
-    const response = NextResponse.json({ profile: sanitizeProfile(newProfile) });
-    response.headers.set("Set-Cookie", sessionCookieHeader(newProfile, req));
+    const profileForClient = freshProfile ?? newProfile;
+    const response = NextResponse.json({ profile: sanitizeProfile(profileForClient) });
+    response.headers.set("Set-Cookie", sessionCookieHeader(profileForClient, req));
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
