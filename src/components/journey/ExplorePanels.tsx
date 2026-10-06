@@ -19,17 +19,55 @@ import { CAREER_PATHS } from "@/lib/journey/careers";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
+import { subjectAffinity } from "@/lib/subjectAffinity";
 
 // ===========================================================================
 // CAREER & MAJOR EXPLORER (spec §15)
 // ===========================================================================
+
+/**
+ * Does this university offer the selected major?
+ * Checks BOTH the legacy `programMajor` summary and the detailed `programs`
+ * catalogue (programFields) that admins use for the 200-university import.
+ * Uses the same synonym-aware engine as the recommender/matcher, so
+ * "Computer Science" matches "Informatics", "IT", "Software Engineering", etc.
+ */
+function majorAffinityScore(u: any, major: string): number {
+  const candidates: string[] = [];
+  if (u.programMajor) candidates.push(String(u.programMajor));
+  if (Array.isArray(u.programFields)) candidates.push(...u.programFields.filter(Boolean).map(String));
+  // legacy fallback: some older API payloads include programs array
+  if (Array.isArray(u.programs)) {
+    for (const p of u.programs) {
+      if (p?.field) candidates.push(String(p.field));
+      else if (typeof p === "string") candidates.push(p);
+    }
+  }
+  if (candidates.length === 0) {
+    const fit = subjectAffinity([major], u.name ?? "");
+    return fit.level === "exact" || fit.level === "synonym" ? fit.score : 0;
+  }
+  let best = 0;
+  for (const field of candidates) {
+    const fit = subjectAffinity([major], field);
+    if (fit.level === "exact" || fit.level === "synonym" || fit.level === "partial") {
+      if (fit.score > best) best = fit.score;
+    }
+  }
+  return best;
+}
+
+function universityOffersMajor(u: any, major: string): boolean {
+  return majorAffinityScore(u, major) > 0;
+}
 
 export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
   const [career, setCareer] = useState<string>(CAREER_PATHS[0].id);
   const [major, setMajor] = useState<string>(CAREER_PATHS[0].majors[0]);
   const [unis, setUnis] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string>("");
 
   // The catalogue is English data; titles/blurbs are a closed set the UI translates.
   const careerTitle = (id: string) => t(`careerTitle${id[0].toUpperCase()}${id.slice(1)}`);
@@ -44,22 +82,92 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
   };
 
   // Universities are fetched from the EXISTING endpoint — no second source of
-  // truth, no duplicated data.
+  // truth, no duplicated data. The server now supports `?major=` with synonym-aware
+  // filtering and also returns `programFields` per university, so the client can
+  // verify with the same affinity engine. This fixes the old first-word substring
+  // logic that missed "Informatics ↔ Computer Science", "IT ↔ Information Systems", etc.
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setFetchError("");
     (async () => {
       try {
-        const res = await fetch(`/api/universities?limit=400`, { cache: "no-store" });
+        // Prefer server-side major filtering (uses programs table + programMajor + subjectAffinity).
+        // If the server doesn't yet support `major`, it will ignore the param and return all — we detect and do client filtering.
+        const params = new URLSearchParams();
+        params.set("major", major);
+        // No perPage/page → server returns full filtered list (important for the 200-university case).
+        const res = await fetch(`/api/universities?${params.toString()}`, { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
-        if (cancelled || !res.ok) return;
-        const all: any[] = json.universities ?? [];
-        const q = major.toLowerCase();
-        const match = all.filter(
-          (u) =>
-            String(u.programMajor ?? "").toLowerCase().includes(q.split(" ")[0]) ||
-            String(u.name ?? "").toLowerCase().includes(q.split(" ")[0])
-        );
-        setUnis((match.length ? match : all).slice(0, 12));
+        if (cancelled) return;
+        if (!res.ok) {
+          // Server error — try client-side fallback by fetching all
+          const fallbackRes = await fetch(`/api/universities`, { cache: "no-store" });
+          const fallbackJson = await fallbackRes.json().catch(() => ({}));
+          if (cancelled || !fallbackRes.ok) {
+            setFetchError(json?.error || fallbackJson?.error || t("ceEmptyHint"));
+            setUnis([]);
+            return;
+          }
+          const all: any[] = fallbackJson.universities ?? [];
+          const filtered = all.filter((u) => universityOffersMajor(u, major));
+          filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+          setUnis(filtered.slice(0, 12));
+          return;
+        }
+        let list: any[] = json.universities ?? [];
+        // If server returned an unfiltered list (doesn't support major yet), filter client-side.
+        // Heuristic: if list is large and contains universities that clearly don't offer this major via affinity, do client filter.
+        // We always run client affinity verification when programFields are present to guarantee correctness.
+        const hasProgramFields = list.some((u: any) => Array.isArray(u.programFields));
+        if (hasProgramFields && list.length > 0) {
+          const clientFiltered = list.filter((u) => universityOffersMajor(u, major));
+          clientFiltered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+          // If server claimed to filter but client finds no matches while server returned many, server didn't filter — use client result.
+          // If server returned a small filtered set, clientFiltered should equal list; we keep the intersection to be safe.
+          if (clientFiltered.length > 0 && clientFiltered.length < list.length) {
+            list = clientFiltered;
+          } else if (clientFiltered.length === 0 && list.length >= 12) {
+            // Server returned all 200 unfiltered but client finds some matches — need full dataset to find all matches
+            // Fetch all without major param and filter properly
+            const allRes = await fetch(`/api/universities`, { cache: "no-store" });
+            const allJson = await allRes.json().catch(() => ({}));
+            if (!cancelled && allRes.ok) {
+              const all: any[] = allJson.universities ?? [];
+              const filtered = all.filter((u) => universityOffersMajor(u, major));
+              filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+              setUnis(filtered.slice(0, 12));
+              return;
+            } else {
+              // Keep clientFiltered (empty) — honest empty state
+              list = clientFiltered;
+            }
+          }
+        } else if (!hasProgramFields && list.length > 0) {
+          // Older server without programFields — fetch full list and filter client-side for accuracy
+          const allRes = await fetch(`/api/universities`, { cache: "no-store" });
+          const allJson = await allRes.json().catch(() => ({}));
+          if (!cancelled && allRes.ok) {
+            const all: any[] = allJson.universities ?? [];
+            // Need programFields for accurate matching; if still missing, use programMajor only fallback
+            const filtered = all.filter((u) => universityOffersMajor(u, major));
+            filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+            if (filtered.length > 0) {
+              setUnis(filtered.slice(0, 12));
+              return;
+            }
+          }
+        }
+        if (!cancelled) {
+          // Ensure result is ranked by affinity before showing
+          list.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+          setUnis(list.slice(0, 12));
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setFetchError(e?.message || "");
+          setUnis([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,7 +175,7 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
     return () => {
       cancelled = true;
     };
-  }, [major]);
+  }, [major, t]);
 
   return (
     <div className="space-y-4">
@@ -131,7 +239,7 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
         {loading ? (
           <Loading />
         ) : unis.length === 0 ? (
-          <Empty title={t("ceEmptyTitle")} hint={t("ceEmptyHint")} />
+          <Empty title={t("ceEmptyTitle")} hint={fetchError || t("ceEmptyHint")} />
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {unis.map((u) => (
@@ -142,6 +250,24 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
                 <p className="text-[11px] text-slate-500">
                   {u.city}, {u.country} · #{u.worldRanking}
                 </p>
+                {/* Show matched field(s) so the student sees WHY this university appears for the chosen major */}
+                {(u.programMajor || (Array.isArray(u.programFields) && u.programFields.length > 0)) && (
+                  <p className="mt-1 line-clamp-2 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                    {(() => {
+                      const fields: string[] = Array.isArray(u.programFields) && u.programFields.length > 0
+                        ? u.programFields
+                        : u.programMajor ? [String(u.programMajor)] : [];
+                      // Highlight the field(s) that matched the selected major first
+                      const matched = fields.filter((f) => {
+                        const fit = subjectAffinity([major], f);
+                        return fit.level === "exact" || fit.level === "synonym" || fit.level === "partial";
+                      });
+                      const rest = fields.filter((f) => !matched.includes(f));
+                      const ordered = [...matched, ...rest];
+                      return ordered.slice(0, 3).join(" · ") + (ordered.length > 3 ? " +" + (ordered.length - 3) : "");
+                    })()}
+                  </p>
+                )}
                 <p className="mt-1 text-[11px] text-slate-500">
                   {u.minGpa != null && `GPA ≥ ${u.minGpa} · `}
                   {u.minIelts != null && `IELTS ≥ ${u.minIelts} · `}

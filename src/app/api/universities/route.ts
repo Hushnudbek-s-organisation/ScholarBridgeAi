@@ -17,6 +17,7 @@ import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import { pickBestSource } from "@/lib/sourcePick";
 import { selectUniversities } from "@/lib/universities";
+import { subjectAffinity } from "@/lib/subjectAffinity";
 
 /**
  * University discovery API (spec §16).
@@ -53,6 +54,28 @@ export async function GET(req: Request) {
         const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
         if (p) profileData = p;
       }
+    }
+
+    // ---------- Pre-fetch program fields per university ----------
+    // Needed for career/major filtering and for enriching the response so the
+    // client can do synonym-aware matching without a second round-trip.
+    const programFieldsByUni = new Map<number, string[]>();
+    try {
+      const uniIdsForProg = allUnis.map((u) => u.id);
+      if (uniIdsForProg.length > 0) {
+        const progRows = await db
+          .select({ universityId: universityPrograms.universityId, field: universityPrograms.field })
+          .from(universityPrograms)
+          .where(inArray(universityPrograms.universityId, uniIdsForProg));
+        for (const r of progRows) {
+          if (!r.field) continue;
+          const arr = programFieldsByUni.get(r.universityId) ?? [];
+          arr.push(r.field);
+          programFieldsByUni.set(r.universityId, arr);
+        }
+      }
+    } catch {
+      // programs table missing or query failed — major filter will fall back to programMajor only
     }
 
     // ---------- Filtering (NULL values excluded from numeric filters) ----------
@@ -94,7 +117,7 @@ export async function GET(req: Request) {
     if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
-    // Program search: universities offering a program in the searched field.
+    // Program search: universities offering a program in the searched field (exact).
     const programFilter = searchParams.get("program");
     if (programFilter && programFilter !== "All") {
       const programRows = await db
@@ -103,6 +126,45 @@ export async function GET(req: Request) {
         .where(inArray(universityPrograms.field, [programFilter]));
       const uniIds = new Set(programRows.map((r) => r.universityId));
       allUnis = allUnis.filter(u => uniIds.has(u.id));
+    }
+
+    // Career & major explorer: filter by selected major using synonym-aware affinity.
+    // Checks both the legacy `programMajor` summary and the detailed `programs` catalogue,
+    // so universities added via either path are found. Uses subjectAffinity (same engine
+    // as matching/recommender) so "Computer Science" also matches "Informatics", "IT", "Software Engineering", etc.
+    const majorFilter = searchParams.get("major");
+    if (majorFilter && majorFilter !== "All" && majorFilter.trim()) {
+      const major = majorFilter.trim();
+      allUnis = allUnis.filter((u) => {
+        const candidates: string[] = [];
+        if (u.programMajor) candidates.push(u.programMajor);
+        const fields = programFieldsByUni.get(u.id);
+        if (fields) candidates.push(...fields);
+        // Also consider name contains major as very weak fallback via affinity on name
+        if (candidates.length === 0) {
+          // No programme info at all — can't claim it offers this major.
+          // We still check name with affinity, but only exact/synonym counts.
+          const fit = subjectAffinity([major], u.name);
+          return fit.level === "exact" || fit.level === "synonym";
+        }
+        return candidates.some((field) => {
+          const fit = subjectAffinity([major], field);
+          return fit.level === "exact" || fit.level === "synonym" || fit.level === "partial";
+        });
+      });
+      // Rank by major affinity so the best subject match appears first (exact > synonym > partial),
+      // then by world ranking as a tie-breaker. This ensures the 12 shown for a major are the most relevant.
+      allUnis.sort((a, b) => {
+        const fieldsA = [...(a.programMajor ? [a.programMajor] : []), ...(programFieldsByUni.get(a.id) ?? [])];
+        const fieldsB = [...(b.programMajor ? [b.programMajor] : []), ...(programFieldsByUni.get(b.id) ?? [])];
+        const scoreA = fieldsA.length ? Math.max(...fieldsA.map((f) => subjectAffinity([major], f).score)) : 0;
+        const scoreB = fieldsB.length ? Math.max(...fieldsB.map((f) => subjectAffinity([major], f).score)) : 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        if (a.worldRanking == null && b.worldRanking == null) return a.name.localeCompare(b.name);
+        if (a.worldRanking == null) return 1;
+        if (b.worldRanking == null) return -1;
+        return a.worldRanking - b.worldRanking;
+      });
     }
 
     // ---------- Fetch source signals (university_sources -> sources) ----------
@@ -186,8 +248,10 @@ export async function GET(req: Request) {
         matchInfo = calculateUniversityMatch(profileData, uni);
       }
       const src = sourceMap.get(uni.id) || null;
+      const progFields = programFieldsByUni.get(uni.id) ?? [];
       return {
         ...uni,
+        programFields: progFields,
         matchScore: matchInfo.matchScore,
         matchCategory: matchInfo.matchCategory,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
@@ -242,7 +306,7 @@ export async function GET(req: Request) {
     // Never substitute sample universities: during a database outage students
     // would be shown made-up data as if it were real. Clients show the error
     // (the website's explorer / detail views, and the Telegram bot's
-    // "temporarily unavailable" message for 503).
+    // \"temporarily unavailable\" message for 503).
     return NextResponse.json(
       { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
       { status: 503 },
