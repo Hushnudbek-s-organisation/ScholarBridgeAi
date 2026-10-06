@@ -328,6 +328,59 @@ crash while closing the pool) and `provenance` only passes with the dev server
 up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
 (1 743 `t()` sites) · `lint:baseline` passed (50 pre-existing, baselined).
 
+The dev database was rebuilt from scratch during this round (the sandbox lost
+its `.pgdata`, `node_modules` and `.env.local` between turns, which is also how
+the "db:dev:init does not seed" bug surfaced) and left in a canonical,
+self-consistent state:
+
+* schema pushed, catalogue seeded through the NEW `npm run db:seed`: 12
+  universities, 24 programmes, 8 scholarships, 16 opportunities, 5 forum
+  categories, 1 course, 4 levels, 5 badges — re-running is a no-op;
+* two profiles: the bootstrap operator (`admin@local.test`) with an honestly
+  EMPTY student profile (`completeness 0`, `personalised: false`, 0
+  recommendations, `fitScore: null`, `plan: null`, but still the only admin) and
+  the seeded demo student Alex Chen (not an admin; the admin API answers 403);
+* no `app_config` rows for the referral keys, so the code defaults apply — live
+  `/api/referral` payload: `{premiumMultiple: 5, premiumDays: 30,
+  referrerPoints: 100, referredPoints: 50, activationCompleteness: 50}`;
+* one referral E2E left in place so the mechanic is visible in the UI: profile 3
+  ("Rebuild Probe") was invited with Alex's code, crossed the 50 % bar (58 %), so
+  Alex shows `1 / 5` on the referral card with both notifications delivered and
+  the 100/50-point ledger rows written. No premium window is left active
+  (the grant/revoke test ended in `revoke`), so no student is premium by
+  accident.
+
+Everything that was mutated only for a test was reverted through the app's own
+endpoints (premium grant → revoke, config edit → defaults restored) or deleted
+(the 3 generic roadmap tasks the empty-profile probe generated).
+
+## 6. Suite results
+
+**38/38 suites green.** New this pass: `test:referral` — 56 asserts against a
+real PostgreSQL (embedded, port 55442, its own database): every rule read from
+`app_config`, code mint/reuse/refusal, the activation bar (bare signup refused,
+33 % refused, 58 % pays), idempotency, both-side points, premium multiples and
+stacking, notification creation + localisation, the paid/subscription mirror,
+and static guards on the card/route/engine.
+
+Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
+`security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
+`essays` 36 · `visa` 50 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
+`parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
+28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
+`essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
+`telegram-integration` 119 · `ownership` 83 · `portability` 57 · `journey` 91 ·
+`dark` ✓ · `schema-repair` 15 · `provenance` ✓ (needs :3000 running) ·
+`recommend` 74 · `study-interests` 35 · **`referral` 56** ·
+`api-security` **236 handlers across 131 route files refused anonymous access**
+(401/403 everywhere).
+
+Two runs needed the right conditions, both re-verified green: `integration`
+flaked once *in teardown* after a neighbouring suite (246 passed, 0 failed,
+crash while closing the pool) and `provenance` only passes with the dev server
+up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
+(1 743 `t()` sites) · `lint:baseline` passed (50 pre-existing, baselined).
+
 The dev database was left in a canonical, self-consistent state:
 
 * no `app_config` rows for the referral keys, so the code defaults apply
