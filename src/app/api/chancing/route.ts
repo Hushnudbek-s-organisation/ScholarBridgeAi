@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
 import { calculateUniversityMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { chancingProfileWithActivities, toChancingUniversity, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 import {
   ADMISSION_PROBABILITY,
@@ -175,6 +176,7 @@ export async function GET(req: Request) {
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
+    const locale = localeFromRequest(req);
     const chancingProfile = await chancingProfileWithActivities(profile);
     const matchProfile = toMatchProfile(profile);
 
@@ -225,8 +227,8 @@ export async function GET(req: Request) {
         universityName: estimate.universityName,
         fitScore: estimate.fitScore,
         fitCategory: fit.matchCategory,
-        fitReasons: fit.reasons,
-        fitIssues: fit.potentialIssues,
+        fitReasons: translateReasons(locale, "university", fit.reasonDetails, fit.reasons),
+        fitIssues: translateReasons(locale, "university", fit.issueDetails, fit.potentialIssues),
         subScores: estimate.subScores,
         positives: estimate.positives,
         negatives: estimate.negatives,

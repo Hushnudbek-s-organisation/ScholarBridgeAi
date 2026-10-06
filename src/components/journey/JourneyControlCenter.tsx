@@ -69,6 +69,12 @@ export interface JourneyDashboard {
   funding: { annualCost: number; isCovered: boolean; fundingGap: number; securedGap: number; items: number; calculated: boolean; estimated: boolean };
   expiringDocuments: { id: number; title: string; docType: string; expiresAt: string | null; daysRemaining: number | null }[];
   recommended: {
+    /** False = the profile has no basis yet, so nothing is personalised. */
+    personalised: boolean;
+    /** Profile facts the list WAS built from ("countries", "gpa", …). */
+    basis: string[];
+    /** Profile facts that are still missing ("major", "budget", …). */
+    missing: string[];
     universities: {
       id: number;
       name: string;
@@ -85,7 +91,11 @@ export interface JourneyDashboard {
       verificationStatus: string;
       lastVerifiedAt: string | null;
       saved: boolean;
-      reason: string;
+      /** Real fit from the shared match engine — same number as the Explorer. */
+      matchScore: number;
+      matchCategory: string;
+      matchReasons: string[];
+      matchIssues: string[];
     }[];
     scholarships: {
       id: number;
@@ -106,23 +116,59 @@ export interface JourneyDashboard {
       lastVerifiedAt: string | null;
       gpaOk: boolean;
       gpaProvided: boolean;
+      matchScore: number;
+      matchReasons: string[];
+      matchIssues: string[];
+      /** What we can honestly say about the citizenship rule. */
+      countryEligibility: "open-to-all" | "citizenship-match" | "unknown";
     }[];
-    opportunities: { id: number; title: string; provider: string; country: string | null; type: string; deadlineDate: string | null; url: string }[];
+    opportunities: {
+      id: number;
+      title: string;
+      provider: string;
+      country: string | null;
+      type: string;
+      deadlineDate: string | null;
+      url: string;
+      inPreferredCountry: boolean;
+    }[];
   };
   learning: { connected: boolean; providers: { providerKey: string; name: string; kind: string; linked: boolean }[] };
 }
 
-function scholarshipAwardLabel(s: JourneyDashboard["recommended"]["scholarships"][number]): string {
-  if (s.awardBasis === "need_based") return "Need-based; varies by applicant";
-  if (s.awardBasis === "full_tuition") return "Full tuition coverage";
-  if (s.awardBasis === "range") return "Award varies within a range — see official details";
-  if (s.awardBasis === "variable") return "Variable award — see official details";
-  if (s.awardAmount != null) {
-    const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
-    return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
-  }
-  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
-  return s.tuitionCoverage || "Award amount not published";
+/** Profile fields the recommendation list is built from / still needs. */
+type RecTranslator = (key: string, values?: Record<string, string | number>) => string;
+const REC_FIELD_KEYS: Record<string, string> = {
+  degreeLevel: "ccRecFieldDegreeLevel",
+  major: "ccRecFieldMajor",
+  countries: "ccRecFieldCountries",
+  gpa: "ccRecFieldGpa",
+  budget: "ccRecFieldBudget",
+  ielts: "ccRecFieldIelts",
+};
+function recFieldLabel(t: RecTranslator) {
+  return (field: string) => (REC_FIELD_KEYS[field] ? t(REC_FIELD_KEYS[field]) : field);
+}
+function recBandLabel(t: RecTranslator, category: string): string {
+  if (category === "Safety") return t("ccRecBandSafety");
+  if (category === "Reach") return t("ccRecBandReach");
+  return t("ccRecBandMatch");
+}
+
+function useScholarshipAwardLabel() {
+  const t = useTranslations("journey");
+  return (s: JourneyDashboard["recommended"]["scholarships"][number]): string => {
+    if (s.awardBasis === "need_based") return t("ccAwardNeed");
+    if (s.awardBasis === "full_tuition") return t("ccAwardFullTuition");
+    if (s.awardBasis === "range") return t("ccAwardVaries");
+    if (s.awardBasis === "variable") return t("ccAwardVariable");
+    if (s.awardAmount != null) {
+      const period = s.awardPeriod === "year" ? " / year" : s.awardPeriod === "month" ? " / month" : "";
+      return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
+    }
+    if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+    return s.tuitionCoverage || t("ccAwardNotPublished");
+  };
 }
 
 function actionLabelForStep(id: string, tab: string): string {
@@ -141,6 +187,191 @@ function actionLabelForStep(id: string, tab: string): string {
   return `Open ${tab.replaceAll("-", " ")}`;
 }
 
+/**
+ * "Recommended for you" — the dashboard tile that must never show the user
+ * something their own profile did not justify.
+ *
+ * It is a separate component so the profile-driven contract can be RENDERED and
+ * asserted (scripts/check-render.ts) instead of only typechecked:
+ *   • `personalised: false` (an empty profile) shows the fields to add and no
+ *     university cards at all — never a generic "top ranked" list;
+ *   • fit chips and evidence lines come straight from the payload, which the
+ *     API fills from the shared match engine;
+ *   • an award whose citizenship rule is not in our data says so.
+ */
+export function RecommendedPanel({
+  recommended,
+  onNavigateTab,
+}: {
+  recommended: JourneyDashboard["recommended"];
+  onNavigateTab: (tab: string) => void;
+}) {
+  const t = useTranslations("journey");
+  const awardLabel = useScholarshipAwardLabel();
+  // Every row here is justified by THIS profile: the list stays empty (and
+  // names the fields to add) until the profile supplies a basis, the order is
+  // the shared fit engine's score, and each card shows the engine's own
+  // evidence lines. Nothing is praised that the student did not provide.
+  return (
+    <JourneyCard
+      title={t("ccRecommendedTitle")}
+      subtitle={t("ccRecommendedSubtitle")}
+      action={<Compass className="h-4 w-4 text-slate-400" aria-hidden />}
+    >
+      <div className="space-y-4">
+        {!recommended.personalised && (
+          <div className="rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-3 text-xs text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+            <p className="font-semibold">{t("ccRecNoBasis")}</p>
+            {recommended.missing.length > 0 && (
+              <p className="mt-1">
+                {t("ccRecMissing", { fields: recommended.missing.map(recFieldLabel(t)).join(", ") })}
+              </p>
+            )}
+          </div>
+        )}
+        {recommended.personalised && recommended.missing.length > 0 && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t("ccRecMissing", { fields: recommended.missing.map(recFieldLabel(t)).join(", ") })}
+          </p>
+        )}
+
+        <div>
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("ccUnisHeading")}</h3>
+          {recommended.universities.length === 0 ? (
+            <p className="text-xs text-slate-500">
+              {recommended.personalised ? t("ccNoUnis") : t("ccRecNoBasisUnis")}
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {recommended.universities.slice(0, 6).map((u) => (
+                <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {u.flagEmoji} {u.name}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : t("ccRankingUnavailable")}
+                  </p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+                      {t("ccRecFitChip", { score: u.matchScore, band: recBandLabel(t, u.matchCategory) })}
+                    </span>
+                    {u.saved && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                        {t("ccRecSaved")}
+                      </span>
+                    )}
+                  </p>
+                  {u.matchReasons.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {u.matchReasons.slice(0, 2).map((r, i) => (
+                        <li key={i} className="text-xs text-emerald-800 dark:text-emerald-300">+ {r}</li>
+                      ))}
+                      {u.matchIssues.slice(0, 2).map((r, i) => (
+                        <li key={i} className="text-xs text-amber-800 dark:text-amber-300">− {r}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <SourceTag
+                      url={u.sourceUrl}
+                      verificationStatus={u.verificationStatus}
+                      lastVerified={u.lastVerifiedAt}
+                    />
+                    <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>
+                      {t("ccView")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {recommended.scholarships.length > 0 ? (
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("ccScholarshipsHeading")}</h3>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {recommended.scholarships.slice(0, 6).map((s) => (
+                <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                    {awardLabel(s)}
+                  </p>
+                  {s.deadlineDate && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {t("ccScholarshipDeadline", { date: new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString() })}
+                    </p>
+                  )}
+                  {s.matchReasons.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {s.matchReasons.slice(0, 2).map((r, i) => (
+                        <li key={i} className="text-xs text-emerald-800 dark:text-emerald-300">+ {r}</li>
+                      ))}
+                      {s.matchIssues.slice(0, 1).map((r, i) => (
+                        <li key={i} className="text-xs text-amber-800 dark:text-amber-300">− {r}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className={`text-xs ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
+                    {s.minGpa == null ? t("ccGpaNotSpecified") : !s.gpaProvided ? t("ccGpaAdd", { gpa: s.minGpa }) : s.gpaOk ? t("ccGpaMeets", { gpa: s.minGpa }) : t("ccGpaBelow", { gpa: s.minGpa })}
+                  </p>
+                  {/* Citizenship rule: stated when it is known, never assumed. */}
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    {s.countryEligibility === "open-to-all"
+                      ? t("ccRecCitOpen")
+                      : s.countryEligibility === "citizenship-match"
+                        ? t("ccRecCitMatch")
+                        : t("ccRecCitUnknown")}
+                  </p>
+                  <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            {t("ccNoScholarships")}
+          </div>
+        )}
+
+        {recommended.opportunities.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("ccOpportunitiesHeading")}</h3>
+            <ul className="space-y-1.5">
+              {recommended.opportunities.map((o) => (
+                <li key={o.id} className="flex items-center gap-2 text-sm">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">
+                    {o.title}
+                    {o.provider && <span className="text-slate-400"> · {o.provider}</span>}
+                    <span className="text-slate-400">
+                      {o.deadlineDate ? ` · ${t("ccScholarshipDeadline", { date: new Date(`${o.deadlineDate}T00:00:00`).toLocaleDateString() })}` : ` · ${t("ccRecNoDeadline")}`}
+                    </span>
+                  </span>
+                  {o.url && (
+                    <a
+                      href={o.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                    >
+                      {t("ccOpen")}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          {t("ccRecNote")}
+        </p>
+      </div>
+    </JourneyCard>
+  );
+}
+
 export function JourneyControlCenter({
   profileId,
   onNavigateTab,
@@ -152,6 +383,7 @@ export function JourneyControlCenter({
 }) {
   const reduceMotion = useReducedMotion();
   const t = useTranslations("journey");
+  const awardLabel = useScholarshipAwardLabel();
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
@@ -607,105 +839,8 @@ export function JourneyControlCenter({
         </JourneyCard>
       )}
 
-      {/* ---- 6. Recommended for you --------------------------------------- */}
-      <JourneyCard
-        title="Recommended for you"
-        subtitle="Based on your profile, budget and countries — not on popularity."
-        action={<Compass className="h-4 w-4 text-slate-400" aria-hidden />}
-      >
-        <div className="space-y-4">
-          <div>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Universities</h3>
-            {recommended.universities.length === 0 ? (
-              <p className="text-xs text-slate-500">No universities match your country preferences yet.</p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {recommended.universities.slice(0, 6).map((u) => (
-                  <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {u.flagEmoji} {u.name}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
-                      {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : "Ranking unavailable"}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">{u.reason}</p>
-                    <div className="mt-1.5 flex items-center justify-between gap-2">
-                      <SourceTag
-                        url={u.sourceUrl}
-                        verificationStatus={u.verificationStatus}
-                        lastVerified={u.lastVerifiedAt}
-                      />
-                      <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {recommended.scholarships.length > 0 ? (
-            <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Scholarships</h3>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {recommended.scholarships.slice(0, 6).map((s) => (
-                  <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
-                    <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                      {scholarshipAwardLabel(s)}
-                    </p>
-                    {s.deadlineDate && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300">
-                        Deadline: {new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString()}
-                      </p>
-                    )}
-                    <p className={`text-xs ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
-                      {s.minGpa == null ? "GPA eligibility not specified" : !s.gpaProvided ? `Minimum GPA ${s.minGpa} — add your GPA to check` : `Minimum GPA ${s.minGpa}${s.gpaOk ? " — meets listed minimum" : " — below listed minimum"}`}
-                    </p>
-                    <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-              No upcoming scholarship matches verified eligibility and current-cycle deadlines yet. Check your citizenship and degree level in your profile, then confirm awards on their official pages.
-            </div>
-          )}
-
-          {recommended.opportunities.length > 0 && (
-            <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Opportunities</h3>
-              <ul className="space-y-1.5">
-                {recommended.opportunities.map((o) => (
-                  <li key={o.id} className="flex items-center gap-2 text-sm">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">
-                      {o.title}
-                      {o.provider && <span className="text-slate-400"> · {o.provider}</span>}
-                    </span>
-                    {o.url && (
-                      <a
-                        href={o.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
-                      >
-                        Open
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
-            Recommendations are planning aids, not admission or funding decisions. Confirm current eligibility, costs and deadlines with each official provider.
-          </p>
-        </div>
-      </JourneyCard>
+      {/* ---- 6. Recommended for you — profile-driven; see RecommendedPanel -- */}
+      <RecommendedPanel recommended={recommended} onNavigateTab={onNavigateTab} />
 
       {/* ---- Documents about to expire (spec §7) -------------------------- */}
       {data.expiringDocuments.length > 0 && (

@@ -53,7 +53,8 @@
     "test:schema-repair": "tsx scripts/check-schema-repair.ts",
     "test:provenance": "tsx scripts/check-provenance.ts",
     "test:recommend": "tsx scripts/check-recommend.ts",
-    "test:study-interests": "tsx scripts/check-study-interests.ts"
+    "test:study-interests": "tsx scripts/check-study-interests.ts",
+    "test:referral": "tsx scripts/check-referral.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -140,7 +140,8 @@ export function DashboardView({
       ? t("tierDeveloping")
       : t("tierNeeds");
 
-  let preferredCountriesList: string[] = ["United States", "United Kingdom", "Canada"];
+  // No invented fallback list: "not chosen yet" is stated, not filled in.
+  let preferredCountriesList: string[] = [];
   try {
     if (typeof profile.preferredCountries === "string") {
       preferredCountriesList = JSON.parse(profile.preferredCountries);
@@ -150,6 +151,14 @@ export function DashboardView({
   } catch {
     // fallback
   }
+
+  // "IELTS 7.5" / "TOEFL 95" / "Duolingo 120" / an honest "no English test yet".
+  const englishTestLine = (() => {
+    if (typeof profile.ieltsScore === "number" && profile.ieltsScore > 0) return `IELTS ${profile.ieltsScore}`;
+    if (typeof profile.toeflScore === "number" && profile.toeflScore > 0) return `TOEFL ${profile.toeflScore}`;
+    if (typeof profile.duolingoScore === "number" && profile.duolingoScore > 0) return `Duolingo ${profile.duolingoScore}`;
+    return t("noEnglishTest");
+  })();
 
   return (
     <div className="space-y-6">
@@ -169,13 +178,21 @@ export function DashboardView({
             
             <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
               {t.rich("heroBody", {
+                // Every slot states what the profile actually holds. A field the
+                // student has not filled in reads "not provided" — the old
+                // version printed the DB default (3.5 / Computer Science /
+                // $25 000) as if the student had entered it.
                 b: (chunks) => <strong className="font-bold text-white">{chunks}</strong>,
-                gpa: profile.gpa,
-                scale: profile.gpaScale,
-                test: profile.ieltsScore ? `IELTS ${profile.ieltsScore}` : t("testPrepActive"),
-                degree: formatDegreeLevel(profile.degreeLevel, tDegrees),
-                major: profile.targetMajor,
-                countries: preferredCountriesList.slice(0, 3).join(", "),
+                gpa: profile.gpa ?? t("valueNotProvided"),
+                scale: profile.gpaScale ?? t("valueNotProvided"),
+                test: englishTestLine,
+                degree: profile.degreeLevel
+                  ? formatDegreeLevel(profile.degreeLevel, tDegrees)
+                  : t("valueNotProvided"),
+                major: profile.targetMajor || t("valueNotProvided"),
+                countries: preferredCountriesList.length
+                  ? preferredCountriesList.slice(0, 3).join(", ")
+                  : t("countriesNotChosen"),
               })}
             </p>
 

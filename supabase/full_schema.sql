@@ -45,20 +45,20 @@ CREATE TABLE IF NOT EXISTS "student_profiles" (
   "name" text NOT NULL,
   "email" text CONSTRAINT "uq_student_profiles_email" UNIQUE NOT NULL,
   "password_hash" text,
-  "degree_level" text NOT NULL DEFAULT 'Master',
-  "target_major" text NOT NULL DEFAULT 'Computer Science',
+  "degree_level" text,
+  "target_major" text,
   "study_interests" text,
-  "gpa" double precision NOT NULL DEFAULT 3.5,
-  "gpa_scale" double precision NOT NULL DEFAULT 4,
-  "ielts_score" double precision DEFAULT 7,
-  "toefl_score" integer DEFAULT 95,
-  "sat_score" integer DEFAULT 1350,
-  "gre_score" integer DEFAULT 315,
-  "budget_annual_usd" integer NOT NULL DEFAULT 25000,
-  "preferred_countries" text NOT NULL DEFAULT '["United States", "United Kingdom", "Canada", "Germany"]',
-  "need_scholarship" boolean NOT NULL DEFAULT TRUE,
-  "extracurriculars" text DEFAULT 'Hackathon winner, Peer Tutor, Student Council Vice President',
-  "work_experience_years" integer DEFAULT 1,
+  "gpa" double precision,
+  "gpa_scale" double precision,
+  "ielts_score" double precision,
+  "toefl_score" integer,
+  "sat_score" integer,
+  "gre_score" integer,
+  "budget_annual_usd" integer,
+  "preferred_countries" text,
+  "need_scholarship" boolean NOT NULL DEFAULT FALSE,
+  "extracurriculars" text,
+  "work_experience_years" integer,
   "research_publications" integer DEFAULT 0,
   "preferred_locale" text NOT NULL DEFAULT 'en',
   "is_admin" boolean NOT NULL DEFAULT FALSE,
@@ -1266,20 +1266,20 @@ CREATE TABLE IF NOT EXISTS "visa_requirements" (
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "name" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "email" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "password_hash" text;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "degree_level" text NOT NULL DEFAULT 'Master';
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "target_major" text NOT NULL DEFAULT 'Computer Science';
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "degree_level" text;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "target_major" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "study_interests" text;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa" double precision NOT NULL DEFAULT 3.5;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa_scale" double precision NOT NULL DEFAULT 4;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "ielts_score" double precision DEFAULT 7;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "toefl_score" integer DEFAULT 95;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "sat_score" integer DEFAULT 1350;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gre_score" integer DEFAULT 315;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "budget_annual_usd" integer NOT NULL DEFAULT 25000;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "preferred_countries" text NOT NULL DEFAULT '["United States", "United Kingdom", "Canada", "Germany"]';
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "need_scholarship" boolean NOT NULL DEFAULT TRUE;
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "extracurriculars" text DEFAULT 'Hackathon winner, Peer Tutor, Student Council Vice President';
-ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "work_experience_years" integer DEFAULT 1;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa" double precision;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gpa_scale" double precision;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "ielts_score" double precision;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "toefl_score" integer;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "sat_score" integer;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "gre_score" integer;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "budget_annual_usd" integer;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "preferred_countries" text;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "need_scholarship" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "extracurriculars" text;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "work_experience_years" integer;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "research_publications" integer DEFAULT 0;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "preferred_locale" text NOT NULL DEFAULT 'en';
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "is_admin" boolean NOT NULL DEFAULT FALSE;

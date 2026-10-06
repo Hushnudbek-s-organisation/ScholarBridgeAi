@@ -73,17 +73,22 @@ export interface StudentProfile {
   id: number;
   name: string;
   email: string;
-  degreeLevel: string;
-  targetMajor: string;
+  /**
+   * NULL = the student has not entered this yet. These columns are nullable on
+   * purpose: the UI must be able to say "not provided" instead of printing a
+   * default that was never the student's answer.
+   */
+  degreeLevel: string | null;
+  targetMajor: string | null;
   studyInterests?: string | null;
-  gpa: number;
-  gpaScale: number;
+  gpa: number | null;
+  gpaScale: number | null;
   ieltsScore?: number | null;
   toeflScore?: number | null;
   satScore?: number | null;
   greScore?: number | null;
-  budgetAnnualUsd: number;
-  preferredCountries: string;
+  budgetAnnualUsd: number | null;
+  preferredCountries: string | null;
   needScholarship: boolean;
   extracurriculars?: string | null;
   workExperienceYears?: number | null;

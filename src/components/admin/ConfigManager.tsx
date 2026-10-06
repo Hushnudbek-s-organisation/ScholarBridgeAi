@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Gift, Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
 
 interface ConfigManagerProps {
   adminProfileId: number;
@@ -134,6 +135,8 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
         </div>
       </div>
 
+      <ReferralRewardsCard rows={rows} savingKey={savingKey} onSave={save} />
+
       <ConfigTransferCard onApplied={load} />
 
       {message && (
@@ -190,6 +193,106 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Referral rewards — the rules students actually see, in human terms.
+ *
+ * The keys below drive the live engine (src/lib/referrals.ts) and the student
+ * card (/api/referral → rules): how many ACTIVATED referrals buy one Premium
+ * grant, how many days that grant is worth, what each side earns in points,
+ * and how complete the invited profile must be before a referral counts — so
+ * a bare signup cannot be farmed for free Premium.
+ *
+ * They are the same `app_config` rows listed further down; this card exists
+ * because "nechta referalga premium berish" must be answerable without
+ * knowing a config key by name.
+ */
+const REFERRAL_FIELDS: { key: string; labelKey: string; hintKey: string; min: number; max: number }[] = [
+  { key: "referral_premium_multiple", labelKey: "refMultipleLabel", hintKey: "refMultipleHint", min: 1, max: 1000 },
+  { key: "referral_premium_days", labelKey: "refDaysLabel", hintKey: "refDaysHint", min: 1, max: 3650 },
+  { key: "referral_points_referrer", labelKey: "refReferrerPointsLabel", hintKey: "refReferrerPointsHint", min: 0, max: 100000 },
+  { key: "referral_points_referred", labelKey: "refReferredPointsLabel", hintKey: "refReferredPointsHint", min: 0, max: 100000 },
+  { key: "referral_activation_completeness", labelKey: "refCompletenessLabel", hintKey: "refCompletenessHint", min: 0, max: 100 },
+];
+
+function ReferralRewardsCard({
+  rows,
+  savingKey,
+  onSave,
+}: {
+  rows: ConfigRow[];
+  savingKey: string;
+  onSave: (key: string, value: string) => Promise<void> | void;
+}) {
+  const t = useTranslations("admin");
+  const valueOf = (key: string) => rows.find((r) => r.key === key)?.value ?? "";
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const numbers = REFERRAL_FIELDS.map((f) => Number(draft[f.key] ?? valueOf(f.key)));
+  const [multiple, days, referrerPoints, referredPoints, completeness] = numbers;
+  const preview = REFERRAL_FIELDS.every((f, i) => Number.isFinite(numbers[i]) && numbers[i] >= f.min && numbers[i] <= f.max);
+
+  return (
+    <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
+      <div className="flex items-start gap-3 mb-4">
+        <Gift className="h-5 w-5 text-violet-600 mt-0.5" />
+        <div>
+          <h3 className="text-sm font-extrabold text-slate-800">{t("refTitle")}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{t("refSubtitle")}</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {REFERRAL_FIELDS.map((field) => {
+          const stored = valueOf(field.key);
+          const current = draft[field.key] ?? stored;
+          const dirty = current !== stored;
+          const valid = /^\d{1,12}$/.test(current) && Number(current) >= field.min && Number(current) <= field.max;
+          return (
+            <div key={field.key} className="rounded-xl border border-white bg-white p-3 shadow-xs">
+              <label className="text-xs font-extrabold text-slate-700" htmlFor={`cfg-${field.key}`}>
+                {t(field.labelKey)}
+              </label>
+              <p className="mt-0.5 text-[10px] text-slate-400">{t(field.hintKey)}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  id={`cfg-${field.key}`}
+                  inputMode="numeric"
+                  value={current}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  onClick={() => dirty && valid && onSave(field.key, current)}
+                  disabled={!dirty || !valid || savingKey === field.key}
+                  className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {savingKey === field.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  {t("save")}
+                </button>
+              </div>
+              {!valid && (
+                <p className="mt-1 text-[10px] font-semibold text-red-600">
+                  {t("refNumberRange", { min: field.min, max: field.max })}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {preview && (
+        <p className="mt-3 rounded-xl border border-violet-200 bg-white px-3 py-2 text-[11px] font-semibold text-violet-800">
+          {t("refPreview", {
+            multiple: multiple || 1,
+            days: days || 1,
+            referrer: referrerPoints || 0,
+            referred: referredPoints || 0,
+            percent: completeness || 0,
+          })}
+        </p>
+      )}
     </div>
   );
 }

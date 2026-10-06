@@ -30,13 +30,20 @@ export async function getPremiumStatus(profileId: number): Promise<PremiumStatus
   const sub = await findActiveSubscription(profileId);
   const subscriptionActive = subscriptionIsActive(sub);
   const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
-  const referralActive = profile ? referralPremiumActive(profile) : false;
-  const isPremium = subscriptionActive || referralActive;
-  const source = subscriptionActive ? "subscription" : referralActive ? "referral" : "none";
+  // Subscription first: a paid plan is its own source and its own period end.
+  // Only when there is no active subscription is the profile window treated as
+  // the referral/admin-gift side of the union.
+  const profileWindowActive = profile ? referralPremiumActive(profile) : false;
+  const isPremium = subscriptionActive || profileWindowActive;
+  const source = subscriptionActive ? "subscription" : profileWindowActive ? "referral" : "none";
   return {
     isPremium,
     source,
-    premiumUntil: referralActive ? profile?.premiumUntil ?? null : subscriptionActive ? sub?.currentPeriodEnd ?? null : null,
+    premiumUntil: subscriptionActive
+      ? sub?.currentPeriodEnd ?? null
+      : profileWindowActive
+        ? profile?.premiumUntil ?? null
+        : null,
     // premium_until only bounds referral grants — a paid subscription carries
     // its own period end, so it must not be cut short by an old referral date.
     plan: profile

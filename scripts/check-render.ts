@@ -30,6 +30,7 @@ import { OnboardingWizard } from "../src/components/OnboardingWizard";
 import { DashboardView } from "../src/components/DashboardView";
 import { RecommendationStudio } from "../src/components/RecommendationStudio";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
+import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
 
 let passed = 0;
 let failed = 0;
@@ -404,6 +405,142 @@ for (const [name, condition] of [
 ] as [string, boolean][]) {
   check(name, condition);
 }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+section("15. Recommended for you is built from the profile, not from popularity");
+
+/** The API payload shape, with only the fields the panel reads. */
+function recPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    personalised: true,
+    basis: ["countries", "gpa"],
+    missing: [],
+    universities: [
+      {
+        id: 3,
+        name: "Technical University of Munich (TUM)",
+        country: "Germany",
+        city: "Munich",
+        flagEmoji: "DE",
+        worldRanking: 22,
+        programMajor: "Informatics & Data Engineering",
+        sourceUrl: "https://www.tum.de",
+        minGpa: 3.2,
+        minIelts: 6.5,
+        annualTuition: null,
+        annualTuitionUsd: null,
+        verificationStatus: "unverified",
+        lastVerifiedAt: null,
+        saved: true,
+        matchScore: 99,
+        matchCategory: "Safety",
+        matchReasons: ["GPA 3.72 well above the 3.2 minimum"],
+        matchIssues: [],
+      },
+    ],
+    scholarships: [
+      {
+        id: 1,
+        title: "Fulbright Foreign Student Program",
+        provider: "United States Department of State",
+        country: "United States",
+        amountUsdValue: 55000,
+        awardAmount: null,
+        awardCurrency: null,
+        awardPeriod: null,
+        awardBasis: "full_tuition",
+        deadlineDate: "2026-10-15",
+        minGpa: 3.3,
+        eligibleCountries: null,
+        verificationStatus: "unverified",
+        tuitionCoverage: "Full tuition",
+        sourceUrl: "https://foreign.fulbrightonline.org",
+        lastVerifiedAt: null,
+        gpaOk: true,
+        gpaProvided: true,
+        matchScore: 98,
+        matchReasons: ["GPA 3.72 well above the 3.3 minimum"],
+        matchIssues: [],
+        countryEligibility: "unknown",
+      },
+    ],
+    opportunities: [
+      {
+        id: 1,
+        title: "Google Summer of Code",
+        provider: "Google",
+        country: null,
+        type: "internship",
+        deadlineDate: null,
+        url: "https://summerofcode.withgoogle.com",
+        inPreferredCountry: false,
+      },
+    ],
+    ...overrides,
+  } as any;
+}
+
+const recFull = renderLocalized("en", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check("recommended panel renders a full profile payload", recFull.error === null, recFull.error ?? "");
+check(
+  "recommended panel shows the engine fit score and band, not a generic label",
+  recFull.html.includes("Fit 99%") && recFull.html.includes("Safety"),
+  recFull.html.slice(0, 200)
+);
+check(
+  "recommended panel repeats the engine's own evidence line",
+  recFull.html.includes("GPA 3.72 well above the 3.2 minimum")
+);
+check(
+  "recommended panel states an unknown citizenship rule instead of implying eligibility",
+  recFull.html.includes("Citizenship rule not in our data")
+);
+
+const recEmpty = renderLocalized("en", React.createElement(RecommendedPanel, {
+  recommended: recPayload({
+    personalised: false,
+    basis: [],
+    missing: ["degreeLevel", "major", "countries", "gpa"],
+    universities: [],
+    scholarships: [],
+    opportunities: [],
+  }),
+  onNavigateTab: () => {},
+}));
+check(
+  "empty profile: no university cards and no fit score at all",
+  !recEmpty.html.includes("Fit ") && !recEmpty.html.includes("Technical University of Munich")
+);
+check(
+  "empty profile: names the exact profile fields to add",
+  recEmpty.html.includes("your target major") && recEmpty.html.includes("your GPA")
+);
+check(
+  "empty profile: says the list is not popularity-based",
+  recEmpty.html.includes("never from popularity")
+);
+
+const recUz = renderLocalized("uz", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check(
+  "recommended panel is localized (uz chip + band)",
+  text(recUz.html).includes("Moslik 99%") && text(recUz.html).includes("Ishonchli"),
+  text(recUz.html).slice(0, 200)
+);
+const recRu = renderLocalized("ru", React.createElement(RecommendedPanel, {
+  recommended: recPayload(),
+  onNavigateTab: () => {},
+}));
+check(
+  "recommended panel is localized (ru chip)",
+  text(recRu.html).includes("Соответствие 99%")
+);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

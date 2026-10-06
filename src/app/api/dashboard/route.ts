@@ -25,7 +25,12 @@ import { guardStudent, serverError } from "@/lib/journey/api";
 import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/journey/stages";
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
 import { profileStrength } from "@/lib/chancing";
-import { chancingProfileWithActivities } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
+import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
+import { supportsDegreeLevel } from "@/lib/degreeLevels";
+import { countriesMatch } from "@/lib/countries";
+import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
 import { buildFundingPlan } from "@/lib/journey/funding";
 import { profileCompleteness } from "@/lib/growth/logic";
@@ -348,15 +353,18 @@ export async function GET(req: Request) {
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
-    const recommended = await recommendedFor(
-      profileId,
-      profile?.preferredCountries ?? "[]",
-      profile?.targetMajor ?? "",
-      profile?.gpa ?? null,
-      todayIso,
-      profile?.degreeLevel ?? null,
-      profile?.country ?? null
-    );
+    // Built from this profile's own facts — see recommendedFor() for the rules.
+    const locale = localeFromRequest(req);
+    const recommended = profile
+      ? await recommendedFor(profileId, profile, locale, todayIso)
+      : {
+          personalised: false,
+          basis: [] as string[],
+          missing: ["degreeLevel", "major", "countries", "gpa", "budget"],
+          universities: [],
+          scholarships: [],
+          opportunities: [],
+        };
 
     // ---- External learning providers (spec §32) ---------------------------
     const providerRows = await db.select().from(learningProviders).where(eq(learningProviders.isEnabled, true));
@@ -504,74 +512,125 @@ async function highestTestTarget(profileId: number, testType: string): Promise<n
  * opportunities the profile actually points at. Filtered server-side by the
  * student's own country/major/GPA preferences; no client-side guesswork.
  */
+/**
+ * "Recommended for you" — every row here must be justified by THIS profile.
+ *
+ * The old version took the six highest-ranked universities in the student's
+ * preferred countries and called them recommendations: a student with an empty
+ * profile still saw MIT, and the badge ("In your preferred country") was
+ * computed from fields the student had never filled in. That is exactly the
+ * behaviour this platform must not have, so the rules are now:
+ *
+ *   • NOTHING is recommended until the profile supplies a basis — no countries,
+ *     no target major and no GPA means an empty list plus the `missing` fields
+ *     the student can add to unlock it (`personalised: false`);
+ *   • the degree level is a hard filter (a Master's applicant is never shown a
+ *     Bachelor's-only institution);
+ *   • preferred countries are a hard filter when the student stated them;
+ *   • target major is a hard filter when the student stated one and no country
+ *     preference exists (the country list is the stronger signal);
+ *   • the ORDER is the real fit score from `calculateUniversityMatch` — the
+ *     same engine the Explorer and the Chancing pane use, so the control
+ *     centre can never disagree with them;
+ *   • the reason under each card is the engine's own top evidence, translated
+ *     (`translateReasons`), never a hand-written praise line.
+ *
+ * Scholarships keep the eligibility rules (degree level + citizenship) and gain
+ * the engine's fit score + reasons. A scholarship open to all countries no
+ * longer disappears just because the student has not entered their citizenship.
+ *
+ * Opportunities are filtered by the student's level and field and sorted by the
+ * nearest deadline — the previous query sorted by the FURTHEST deadline.
+ */
 async function recommendedFor(
   profileId: number,
-  countriesJson: string,
-  major: string,
-  gpa: number | null,
-  todayIso: string,
-  degreeLevel: string | null,
-  applicantCountry: string | null
+  profile: typeof studentProfiles.$inferSelect,
+  locale: Locale,
+  todayIso: string
 ) {
-  const countries = parseList(countriesJson);
-  const countryFilter = countries.length ? inArray(universities.country, countries) : undefined;
+  const countries = parseList(profile.preferredCountries);
+  const major = (profile.targetMajor ?? "").trim();
+  const gpa = profile.gpa ?? null;
+  const degreeLevel = profile.degreeLevel ?? null;
+  const applicantCountry = profile.country ?? null;
 
-  const uniRows = await db
-    .select({
-      id: universities.id,
-      name: universities.name,
-      country: universities.country,
-      city: universities.city,
-      flagEmoji: universities.flagEmoji,
-      worldRanking: universities.worldRanking,
-      programMajor: universities.programMajor,
-      minGpa: universities.minGpa,
-      minIelts: universities.minIelts,
-      annualTuition: universities.annualTuition,
-      annualTuitionUsd: universities.annualTuitionUsd,
-      verificationStatus: universities.verificationStatus,
-      lastVerifiedAt: universities.lastVerifiedAt,
-      sourceUrl: universities.sourceUrl,
-    })
-    .from(universities)
-    .where(and(eq(universities.isActive, true), countryFilter))
-    .orderBy(universities.worldRanking)
-    .limit(6);
+  const matchProfile = toMatchProfile(profile);
+
+  // Which profile facts exist, and which would unlock a better list.
+  const basis: string[] = [];
+  if (countries.length) basis.push("countries");
+  if (major) basis.push("major");
+  if (gpa != null) basis.push("gpa");
+  if (degreeLevel) basis.push("degreeLevel");
+  if (profile.budgetAnnualUsd != null) basis.push("budget");
+  if (profile.ieltsScore != null) basis.push("ielts");
+  const missing: string[] = [];
+  if (!degreeLevel) missing.push("degreeLevel");
+  if (!major) missing.push("major");
+  if (!countries.length) missing.push("countries");
+  if (gpa == null) missing.push("gpa");
+  if (profile.budgetAnnualUsd == null) missing.push("budget");
+
+  // Personalisation needs an academic OR geographic signal. A name and an
+  // email are not a basis for a recommendation.
+  const hasBasis = countries.length > 0 || !!major || gpa != null;
+  const uniLimit = 6;
 
   const savedIds = new Set(
-    (await db.select({ universityId: savedUniversities.universityId }).from(savedUniversities).where(eq(savedUniversities.profileId, profileId)))
-      .map((s) => s.universityId)
+    (await db
+      .select({ universityId: savedUniversities.universityId })
+      .from(savedUniversities)
+      .where(eq(savedUniversities.profileId, profileId))
+    ).map((s) => s.universityId)
   );
 
-  const scoredUnis = uniRows
-    .map((u) => {
-      const gpaOk = u.minGpa == null || gpa == null || gpa >= u.minGpa;
-      const majorOk = !major || !u.programMajor || similar(u.programMajor, major);
-      const saved = savedIds.has(u.id);
-      return { ...u, saved, reason: reasonFor(gpaOk, majorOk, saved, gpa == null) };
-    })
-    .sort((a, b) => Number(b.saved) - Number(a.saved));
+  let scored: { uni: typeof universities.$inferSelect; match: ReturnType<typeof calculateUniversityMatch> }[] = [];
+  if (hasBasis) {
+    const pool = await db
+      .select()
+      .from(universities)
+      .where(eq(universities.isActive, true));
+
+    scored = pool
+      .filter((u) => supportsDegreeLevel(u.degreeLevel, degreeLevel))
+      .filter((u) => {
+        if (countries.length) {
+          return countries.some((c) => countriesMatch(u.country, c));
+        }
+        // No country preference: fall back to the stated field, so a major-only
+        // profile still gets a list that has something to do with their field.
+        if (major && u.programMajor) return similar(u.programMajor, major);
+        return true;
+      })
+      .map((u) => ({ uni: u, match: calculateUniversityMatch(matchProfile, toUniversityData(u)) }))
+      .sort((a, b) => b.match.matchScore - a.match.matchScore)
+      .slice(0, uniLimit);
+  }
+
+  const universitiesOut = scored.map(({ uni: u, match }) => ({
+      id: u.id,
+      name: u.name,
+      country: u.country,
+      city: u.city,
+      flagEmoji: u.flagEmoji,
+      worldRanking: u.worldRanking,
+      programMajor: u.programMajor,
+      minGpa: u.minGpa,
+      minIelts: u.minIelts,
+      annualTuition: u.annualTuition,
+      annualTuitionUsd: u.annualTuitionUsd,
+      verificationStatus: u.verificationStatus,
+      lastVerifiedAt: u.lastVerifiedAt,
+      sourceUrl: u.sourceUrl,
+      saved: savedIds.has(u.id),
+      matchScore: match.matchScore,
+      matchCategory: match.matchCategory,
+      matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
+      matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
+  }));
 
   const schRows = await db
-    .select({
-      id: scholarships.id,
-      title: scholarships.title,
-      provider: scholarships.provider,
-      country: scholarships.country,
-      amountUsdValue: scholarships.amountUsdValue,
-      awardAmount: scholarships.awardAmount,
-      awardCurrency: scholarships.awardCurrency,
-      awardPeriod: scholarships.awardPeriod,
-      awardBasis: scholarships.awardBasis,
-      degreeLevels: scholarships.degreeLevels,
-      deadlineDate: scholarships.deadlineDate,
-      minGpa: scholarships.minGpa,
-      eligibleCountries: scholarships.eligibleCountries,
-      verificationStatus: scholarships.verificationStatus,
-      tuitionCoverage: scholarships.tuitionCoverage,
-      sourceUrl: scholarships.sourceUrl,
-      lastVerifiedAt: scholarships.lastVerifiedAt,
-    })
+    .select()
     .from(scholarships)
     .where(and(eq(scholarships.isActive, true), gte(scholarships.deadlineDate, todayIso)))
     .orderBy(
@@ -581,49 +640,148 @@ async function recommendedFor(
     )
     .limit(100);
 
-  const oppRows = await db
-    .select({
-      id: opportunities.id,
-      title: opportunities.title,
-      provider: opportunities.provider,
-      country: opportunities.country,
-      type: opportunities.type,
-      deadlineDate: opportunities.deadlineDate,
-      url: opportunities.url,
-      isVerified: opportunities.isVerified,
-    })
-    .from(opportunities)
-    .orderBy(desc(opportunities.deadlineDate))
-    .limit(4);
-
   const seenScholarships = new Set<string>();
-  const relevantScholarships = schRows.filter((s) => {
-    if (!degreeLevel || !degreeMatches(s.degreeLevels, degreeLevel)) return false;
-    if (!applicantCountry || !countryMatches(s.eligibleCountries, applicantCountry)) return false;
-    const title = normalizeScholarshipTitle(s.title);
-    const key = `${normalizeScholarshipTitle(s.provider)}:${title}`;
-    if (!title || seenScholarships.has(key)) return false;
-    seenScholarships.add(key);
-    return true;
-  }).slice(0, 6);
-
-  return {
-    universities: scoredUnis,
-    scholarships: relevantScholarships.map((s) => ({
-      ...s,
+  const relevantScholarships = schRows
+    .filter((s) => {
+      if (!degreeMatches(s.degreeLevels, degreeLevel)) return false;
+      // Citizenship: "open to all" is a fact we can state; a LIST of eligible
+      // countries needs the student's citizenship to compare; an EMPTY list is
+      // unknown, and unknown is not a refusal — those awards stay visible with
+      // an explicit "eligibility not in our data" note (the catalogue has no
+      // country rules for several well-known awards, and dropping every one of
+      // them emptied this section for every student).
+      if (scholarshipCountryVerdict(s.eligibleCountries, applicantCountry) === "out") return false;
+      const title = normalizeScholarshipTitle(s.title);
+      const key = `${normalizeScholarshipTitle(s.provider)}:${title}`;
+      if (!title || seenScholarships.has(key)) return false;
+      seenScholarships.add(key);
+      return true;
+    })
+    .map((s) => ({ row: s, match: calculateScholarshipMatch(matchProfile, s) }))
+    .sort((a, b) => b.match.matchScore - a.match.matchScore)
+    .slice(0, 6)
+    .map(({ row: s, match }) => ({
+      id: s.id,
+      title: s.title,
+      provider: s.provider,
+      country: s.country,
+      amountUsdValue: s.amountUsdValue,
+      awardAmount: s.awardAmount,
+      awardCurrency: s.awardCurrency,
+      awardPeriod: s.awardPeriod,
+      awardBasis: s.awardBasis,
+      degreeLevels: s.degreeLevels,
+      deadlineDate: s.deadlineDate,
+      minGpa: s.minGpa,
+      eligibleCountries: s.eligibleCountries,
+      verificationStatus: s.verificationStatus,
+      tuitionCoverage: s.tuitionCoverage,
+      sourceUrl: s.sourceUrl,
+      lastVerifiedAt: s.lastVerifiedAt,
+      matchScore: match.matchScore,
+      matchReasons: translateReasons(locale, "scholarship", match.reasonDetails, match.reasons),
+      matchIssues: translateReasons(locale, "scholarship", match.issueDetails, match.potentialIssues),
       gpaOk: s.minGpa == null || gpa == null || gpa >= s.minGpa,
       gpaProvided: gpa != null,
-    })),
-    opportunities: oppRows,
+      /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */
+      countryEligibility: scholarshipCountryVerdict(s.eligibleCountries, applicantCountry),
+    }));
+
+  // Opportunities: level + field are profile facts, so use them. A row whose
+  // field list is ["All"] or whose level is "any" is open to this student.
+  const oppRows = await db.select().from(opportunities).limit(200);
+  const opportunitiesOut = oppRows
+    .filter((o) => opportunityLevelMatches(o.level, degreeLevel))
+    .filter((o) => opportunityFieldMatches(o.fields, major))
+    .sort((a, b) => {
+      const aIn = countries.some((c) => countriesMatch(a.country, c)) ? 0 : 1;
+      const bIn = countries.some((c) => countriesMatch(b.country, c)) ? 0 : 1;
+      if (aIn !== bIn) return aIn - bIn;
+      const aD = a.deadlineDate ? String(a.deadlineDate).slice(0, 10) : null;
+      const bD = b.deadlineDate ? String(b.deadlineDate).slice(0, 10) : null;
+      if (aD && bD) return aD < bD ? -1 : aD > bD ? 1 : 0;
+      if (aD) return -1; // a known deadline beats an unknown one
+      if (bD) return 1;
+      return 0;
+    })
+    .slice(0, 4)
+    .map((o) => ({
+      id: o.id,
+      title: o.title,
+      provider: o.provider,
+      country: o.country,
+      type: o.type,
+      deadlineDate: o.deadlineDate ? String(o.deadlineDate).slice(0, 10) : null,
+      url: o.url,
+      inPreferredCountry: countries.some((c) => countriesMatch(o.country, c)),
+    }));
+
+  return {
+    /** False = nothing here is personalised yet (empty profile). */
+    personalised: hasBasis,
+    basis,
+    missing,
+    universities: universitiesOut,
+    scholarships: relevantScholarships,
+    opportunities: opportunitiesOut,
   };
 }
 
-function reasonFor(gpaOk: boolean, majorOk: boolean, saved: boolean, gpaUnknown: boolean): string {
-  if (saved) return "Already on your list";
-  if (gpaUnknown) return "In your preferred country; GPA fit not assessed";
-  if (gpaOk && majorOk) return "Matches your major and GPA";
-  if (gpaOk) return "Matches your GPA";
-  return "In your preferred country";
+/**
+ * What we can honestly say about an award's citizenship rule:
+ *   • "open-to-all"        — the award states it takes any nationality;
+ *   • "citizenship-match"  — it lists countries and the student's is among them;
+ *   • "unknown"            — no country rule in our data (or no citizenship
+ *                            stored): the student must confirm on the official
+ *                            page, and we never imply eligibility;
+ *   • "out"                — it lists countries and the student's is not one.
+ */
+function scholarshipCountryVerdict(
+  raw: string | null | undefined,
+  applicantCountry: string | null
+): "open-to-all" | "citizenship-match" | "unknown" | "out" {
+  const eligible = parseList(raw).map((v) => v.toLowerCase().replace(/[^a-z]/g, ""));
+  if (!eligible.length) return "unknown";
+  if (eligible.some((value) => /^(all|allcountries|international|worldwide|anycountry)$/.test(value))) {
+    return "open-to-all";
+  }
+  if (!applicantCountry) return "unknown";
+  return countryMatches(raw, applicantCountry) ? "citizenship-match" : "out";
+}
+
+/** profile.degreeLevel → the `opportunities.level` values that apply. */
+function opportunityLevelMatches(raw: string | null | undefined, degreeLevel: string | null): boolean {
+  const level = (raw ?? "any").toLowerCase().replace(/[^a-z_]/g, "");
+  if (!level || level === "any" || level === "all") return true;
+  if (!degreeLevel) return true; // unknown on either side is never a mismatch
+  const requested = degreeLevel.toLowerCase();
+  const undergraduate = /bachelor|undergraduate/.test(requested);
+  const graduate = /master|graduate/.test(requested) && !undergraduate;
+  const doctoral = /phd|doctor/.test(requested);
+  if (undergraduate) return level === "undergrad" || level === "high_school" || level === "undergraduate";
+  if (doctoral) return level === "phd" || level === "grad" || level === "graduate";
+  if (graduate) return level === "grad" || level === "graduate" || level === "phd";
+  return true;
+}
+
+/** `opportunities.fields` (JSON list) vs the student's target major. */
+function opportunityFieldMatches(raw: string | null | undefined, major: string): boolean {
+  const fields = parseList(raw);
+  if (!fields.length || fields.some((f) => /^(all|any)$/i.test(f.trim()))) return true;
+  if (!major) return true; // no stated field → no claim to the contrary
+  return fields.some((f) => similar(f, major)) || subjectOverlap(fields, major);
+}
+
+/** Token-overlap fallback for "Data Science" vs "Computer Science". */
+function subjectOverlap(fields: string[], major: string): boolean {
+  const majorTokens = new Set(
+    major.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter((w) => w.length > 2)
+  );
+  if (!majorTokens.size) return false;
+  return fields.some((f) => {
+    const tokens = f.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/);
+    return tokens.some((token) => token.length > 2 && majorTokens.has(token));
+  });
 }
 
 function similar(a: string, b: string): boolean {
@@ -633,7 +791,9 @@ function similar(a: string, b: string): boolean {
   return A.includes(B) || B.includes(A);
 }
 
-function degreeMatches(raw: string | null | undefined, target: string): boolean {
+function degreeMatches(raw: string | null | undefined, target: string | null): boolean {
+  // No stated level = eligibility cannot be verified, so nothing is claimed.
+  if (!target) return false;
   const eligible = parseList(raw).map((v) => v.toLowerCase().replace(/[^a-z]/g, ""));
   if (eligible.includes("all")) return true;
   if (!eligible.length) return false;
@@ -649,12 +809,13 @@ function degreeMatches(raw: string | null | undefined, target: string): boolean 
   });
 }
 
-function countryMatches(raw: string | null | undefined, country: string): boolean {
+function countryMatches(raw: string | null | undefined, country: string | null): boolean {
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z]/g, "");
-  const applicant = normalize(country);
+  const applicant = normalize(country ?? "");
   const eligible = parseList(raw).map(normalize);
   if (!eligible.length) return false;
   if (eligible.some((value) => /^(all|allcountries|international|worldwide|anycountry)$/.test(value))) return true;
+  if (!applicant) return false; // country-limited award, citizenship unknown
   return eligible.some((value) => value === applicant || value.includes(applicant) || applicant.includes(value));
 }
 

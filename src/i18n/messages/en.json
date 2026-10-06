@@ -271,7 +271,25 @@
     "codeInvalid": "Invalid referral code",
     "completed": "Completed",
     "pendingReferral": "Pending",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "refTitle": "Referral program",
+    "refSubtitle": "Invite friends and gift them Premium",
+    "refLoading": "Loading your referral data…",
+    "refLoadFailed": "Could not load your referral data.",
+    "refPremiumActive": "Premium active until {date}",
+    "refToNext": "{count} more activated friend(s) to your next Premium grant",
+    "refProgressLabel": "{points} referral points",
+    "refActiveCount": "{count} activated",
+    "refRule": "Every {multiple} activated referrals add {days} days of Premium (grants stack).",
+    "refHow": "Send the link — when a friend signs up and fills in their profile, the referral counts and you both earn points.",
+    "refYourLink": "Your referral link",
+    "refInvited": "Invited friends ({count})",
+    "refNone": "You have not invited anyone yet.",
+    "refStatusActive": "Activated",
+    "refStatusPending": "Waiting for profile",
+    "refPointsEarn": "+{points} points",
+    "refActivationNote": "A referral counts once their profile reaches {percent}% completeness.",
+    "refYourPoints": "Your points"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI Counselor",
@@ -419,7 +437,7 @@
     "guaranteeNoCount": "Scholarship matches are calculated from your profile — open the Scholarship Hub to see how many fit your credentials.",
     "guaranteeTitle": "Scholarships matching your profile",
     "guaranteeWithCount": "Based on your profile, {count, plural, one {# scholarship currently matches} other {# scholarships currently match}} your credentials — open the Scholarship Hub to compare them.",
-    "heroBody": "Matching your academic credentials (<b>GPA {gpa}/{scale}</b>, {test}) for <b>{degree} in {major}</b> across top universities in {countries}.",
+    "heroBody": "Working from your saved profile: GPA {gpa}/{scale}, {test}. Targets: {degree} in {major}. Preferred countries: {countries}.",
     "heroTitle": "Global Admissions & Scholarship Discovery Hub",
     "levelBadge": "Level",
     "matchExamples": "TUM, U of Toronto, NUS",
@@ -465,7 +483,10 @@
     "strengthUnavailable": "Not available yet",
     "readinessLabel": "Readiness",
     "readinessNote": "Readiness from your saved profile — not a chance of admission.",
-    "portfolioNote": "Tiers describe profile fit (match score), not your chance of admission. ScholarBridge does not invent admission probabilities."
+    "portfolioNote": "Tiers describe profile fit (match score), not your chance of admission. ScholarBridge does not invent admission probabilities.",
+    "valueNotProvided": "not provided yet",
+    "noEnglishTest": "no English test on file yet",
+    "countriesNotChosen": "countries not chosen yet"
   },
   "visa": {
     "title": "Visa Speaking Assistant",
@@ -556,7 +577,8 @@
     "consistency": "Consistency",
     "academicFit": "Academic fit",
     "suggestions": "What to do in the next 3 months",
-    "loading": "Loading readiness…"
+    "loading": "Loading readiness…",
+    "notProvided": "Not provided yet — add it to make this score real."
   },
   "recLetter": {
     "title": "Recommendation letter helper",
@@ -1293,7 +1315,25 @@
     "ccReadinessTile": "Profile readiness",
     "ccReadinessTileHint": "The same score as Profile & Goals → Readiness — not an admission chance",
     "ccChecklistTitle": "Application checklist — {pct}% complete",
-    "ccChecklistSubtitle": "What you have filled in and linked across documents, applications and funding. A checklist count, not your profile readiness score."
+    "ccChecklistSubtitle": "What you have filled in and linked across documents, applications and funding. A checklist count, not your profile readiness score.",
+    "ccRecNoBasis": "Nothing here is personalised yet — this list is built from your own profile, never from popularity.",
+    "ccRecNoBasisUnis": "No universities can be recommended yet: add your target major, your preferred countries or your GPA and the list is built from that.",
+    "ccRecMissing": "Adding {fields} to your profile makes this list more accurate.",
+    "ccRecFieldDegreeLevel": "your degree level",
+    "ccRecFieldMajor": "your target major",
+    "ccRecFieldCountries": "your preferred countries",
+    "ccRecFieldGpa": "your GPA",
+    "ccRecFieldBudget": "your yearly budget",
+    "ccRecFieldIelts": "your IELTS score",
+    "ccRecFitChip": "Fit {score}% · {band}",
+    "ccRecBandReach": "Reach",
+    "ccRecBandMatch": "Match",
+    "ccRecBandSafety": "Safety",
+    "ccRecSaved": "On your list",
+    "ccRecCitOpen": "Open to all nationalities",
+    "ccRecCitMatch": "Open to your citizenship",
+    "ccRecCitUnknown": "Citizenship rule not in our data — confirm on the official page",
+    "ccRecNoDeadline": "Deadline not published"
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -1598,7 +1638,22 @@
       "audit": "Who changed what, and when.",
       "telegram": "Connect the bot, sign-in with codes, notifications, broadcast and delivery log.",
       "ownership": "Platform owner, safe ownership transfer and administrators."
-    }
+    },
+    "refTitle": "Referral rewards",
+    "refSubtitle": "Everything a student sees about referrals comes from these numbers — the engine, the progress bar and the reward text.",
+    "refMultipleLabel": "Referrals per Premium grant",
+    "refMultipleHint": "How many activated referrals buy one Premium grant (e.g. 5).",
+    "refDaysLabel": "Premium days per grant",
+    "refDaysHint": "Days added each time the milestone is reached (grants stack).",
+    "refReferrerPointsLabel": "Points for the referrer",
+    "refReferrerPointsHint": "Gamification points the inviter earns per activated referral (0 = none).",
+    "refReferredPointsLabel": "Points for the invited student",
+    "refReferredPointsHint": "Points the invited student earns when their referral activates (0 = none).",
+    "refCompletenessLabel": "Activation bar (% complete)",
+    "refCompletenessHint": "Profile completeness the invited account must reach before the referral counts (0 = signup is enough).",
+    "refNumberRange": "Enter a whole number between {min} and {max}.",
+    "refPreview": "Reported to students exactly as: every {multiple} activated referrals add {days} days of Premium; the referrer earns {referrer} points and the invited student {referred} points; a referral counts at {percent}% profile completeness.",
+    "save": "Save"
   },
   "adminGrowth": {
     "search": "Search…",
@@ -2861,5 +2916,50 @@
     "basisRankingTier": "No acceptance rate published — signals use the published ranking tier.",
     "footnote": "Fit signals get sharper as ScholarBridge collects real outcomes (accepted and rejected) from students who opt in. An admission probability will appear here only once a validated methodology exists.",
     "loadFailed": "Failed to assess your shortlist. Please try again."
+  },
+  "matchReasons": {
+    "university": {
+      "gpa_well_above": "GPA {gpa} well above the {min} minimum",
+      "gpa_above": "GPA {gpa} above the {min} minimum",
+      "gpa_meets": "GPA {gpa} meets the {min} minimum",
+      "gpa_slightly_below": "GPA {gpa} slightly below the {min} minimum",
+      "gpa_below": "GPA {gpa} is below the {min} requirement",
+      "ielts_alternative": "IELTS {min} is the published bar — you have {alt}; confirm whether it is accepted",
+      "ielts_missing": "IELTS {min} required — you don't have an IELTS score yet",
+      "ielts_above": "IELTS {score} above the {min} requirement",
+      "ielts_meets": "IELTS {score} meets the {min} requirement",
+      "ielts_below": "IELTS {min} required — you have {score}",
+      "sat_missing": "SAT {min} required — you don't have an SAT score yet",
+      "sat_meets": "SAT {score} meets the {min} requirement",
+      "sat_below": "SAT {min} required — you have {score}",
+      "major_strong": "Offers your field: {major}",
+      "major_partial": "Partly related to your field: {major}",
+      "major_not_offered": "Programmes focus on {major} — check whether your field ({field}) is offered here",
+      "budget_fits": "Estimated cost ${cost}/yr fits your budget",
+      "budget_exceeds": "Estimated cost ${cost}/yr exceeds your ${budget} budget",
+      "country_preferred": "{country} is on your preferred list",
+      "experience_boost": "Research / work experience strengthens your application"
+    },
+    "scholarship": {
+      "gpa_well_above": "GPA {gpa} well above the {min} minimum",
+      "gpa_meets": "GPA {gpa} meets the {min} minimum",
+      "gpa_below": "GPA {gpa} is below the {min} requirement",
+      "ielts_alternative": "IELTS {min} is the published bar — you have {alt}; confirm whether it is accepted",
+      "ielts_missing": "IELTS {min} required — you don't have an IELTS score yet",
+      "ielts_meets": "IELTS {score} meets the {min} requirement",
+      "ielts_below": "IELTS {min} required — you have {score}",
+      "level_open": "Open to {level} applicants",
+      "level_mismatch": "Only open to: {levels}",
+      "level_unclear": "Levels on this award ({levels}) could not be compared with your level — check the official page",
+      "major_unclear": "This award lists eligible fields ({majors}) — your target major could not be compared, check the official page",
+      "major_missing": "This award lists eligible fields ({majors}) — add your target major to your profile to be matched",
+      "major_eligible": "Your field ({field}) is eligible",
+      "major_limited": "Field limited to: {majors}",
+      "need_based": "Need-based — matches your scholarship requirement",
+      "merit_based": "Merit-based — strong academic record / publications"
+    }
+  },
+  "profile": {
+    "budgetNotSet": "No budget set yet — leave empty if you do not know."
   }
 }

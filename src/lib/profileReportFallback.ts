@@ -33,12 +33,33 @@ export interface ReportScholarshipFact {
   deadlineDate: string | null;
 }
 
+/** "not provided yet" in the report's own language — never a bare null. */
+function notProvided(loc: "en" | "uz" | "ru"): string {
+  return loc === "uz" ? "hali kiritilmagan" : loc === "ru" ? "пока не указано" : "not provided yet";
+}
+
+/** "Degree in Major" only when both are known; otherwise what IS known. */
+function studyLine(loc: "en" | "uz" | "ru", degree: string | null, major: string | null): string {
+  const d = degree ?? notProvided(loc);
+  const m = major ?? notProvided(loc);
+  if (loc === "uz") return `${m} bo‘yicha ${d}`;
+  if (loc === "ru") return `${d} по направлению ${m}`;
+  return `${d} in ${m}`;
+}
+
+/** "GPA 3.72/4.0" or an explicit "not provided yet" — never "null/null". */
+function gpaLine(loc: "en" | "uz" | "ru", gpa: number | null, scale: number | null): string {
+  if (gpa == null) return `GPA: ${notProvided(loc)}`;
+  return `GPA ${gpa}${scale == null ? "" : `/${scale}`}`;
+}
+
 export interface ReportFacts {
   name: string;
-  degreeLevel: string;
-  targetMajor: string;
-  gpa: number;
-  gpaScale: number;
+  /** null = the student has not told us yet — the report must say so. */
+  degreeLevel: string | null;
+  targetMajor: string | null;
+  gpa: number | null;
+  gpaScale: number | null;
   ieltsScore: number | null;
   budgetAnnualUsd: number | null;
   needScholarship: boolean;
@@ -184,7 +205,7 @@ export function buildProfileReport(locale: string, f: ReportFacts): string {
         "- Prepare transcripts, two academic references and a statement of purpose draft.",
         "- Track every deadline inside the app so nothing depends on memory.",
       ].join("\n"),
-      student: `Profile: ${f.name} · ${f.degreeLevel} in ${f.targetMajor} · GPA ${f.gpa}/${f.gpaScale}${factLines ? ` · ${factLines}` : ""}`,
+      student: `Profile: ${f.name} · ${studyLine("en", f.degreeLevel, f.targetMajor)} · ${gpaLine("en", f.gpa, f.gpaScale)}${factLines ? ` · ${factLines}` : ""}`,
       budget: `Annual budget: ${money("en", f.budgetAnnualUsd)}${f.needScholarship ? " · scholarship needed" : ""}`,
     },
     uz: {
@@ -209,7 +230,7 @@ export function buildProfileReport(locale: string, f: ReportFacts): string {
         "- Transkript, ikkita akademik tavsiyanoma va motivatsion xat loyihasini tayyorlang.",
         "- Har bir muddatni ilovada kuzatib boring — hech narsa xotiraga bog‘liq bo‘lmasin.",
       ].join("\n"),
-      student: `Profil: ${f.name} · ${f.targetMajor} bo‘yicha ${f.degreeLevel} · GPA ${f.gpa}/${f.gpaScale}${factLines ? ` · ${factLines}` : ""}`,
+      student: `Profil: ${f.name} · ${studyLine("uz", f.degreeLevel, f.targetMajor)} · ${gpaLine("uz", f.gpa, f.gpaScale)}${factLines ? ` · ${factLines}` : ""}`,
       budget: `Yillik byudjet: ${money("uz", f.budgetAnnualUsd)}${f.needScholarship ? " · grant zarur" : ""}`,
     },
     ru: {
@@ -234,7 +255,7 @@ export function buildProfileReport(locale: string, f: ReportFacts): string {
         "- Подготовьте транскрипты, две академические рекомендации и черновик мотивационного письма.",
         "- Отслеживайте все сроки в приложении, чтобы ничего не зависело от памяти.",
       ].join("\n"),
-      student: `Профиль: ${f.name} · ${f.degreeLevel} по направлению ${f.targetMajor} · GPA ${f.gpa}/${f.gpaScale}${factLines ? ` · ${factLines}` : ""}`,
+      student: `Профиль: ${f.name} · ${studyLine("ru", f.degreeLevel, f.targetMajor)} · ${gpaLine("ru", f.gpa, f.gpaScale)}${factLines ? ` · ${factLines}` : ""}`,
       budget: `Годовой бюджет: ${money("ru", f.budgetAnnualUsd)}${f.needScholarship ? " · нужна стипендия" : ""}`,
     },
   }[loc];

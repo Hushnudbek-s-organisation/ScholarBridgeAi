@@ -43,9 +43,21 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   // Data refresh (spec §9)
   refresh_interval_hours: "24",
   refresh_default_scope: "all",
-  // Referral (spec — existing)
+  // Referral rewards — EVERY rule is admin-editable (Admin → Settings →
+  // Referral rewards). Nothing about the reward may be hardcoded: the engine,
+  // the student card and the admin screen all read these keys.
+  //   premium_multiple        how many activated referrals give one premium grant
+  //   premium_days            how many premium days one grant adds (stacking)
+  //   points_referrer         gamification points the referrer earns per activation
+  //   points_referred         gamification points the new student earns
+  //   activation_completeness profile completeness (%) a referred account must
+  //                           reach before the reward counts — so a bare signup
+  //                           cannot be farmed for premium
   referral_premium_multiple: "5",
   referral_premium_days: "30",
+  referral_points_referrer: "100",
+  referral_points_referred: "50",
+  referral_activation_completeness: "50",
   // Branding (editable from Admin → Settings)
   branding_logo_url: "",
   branding_favicon_url: "",

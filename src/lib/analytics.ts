@@ -310,6 +310,10 @@ export interface EngagementStats {
   badgeKinds: number;
   referralsTotal: number;
   referralsCompleted: number;
+  /** Referrals recorded on student_profiles (the live system). */
+  referralsKnown: number;
+  /** Referrals that actually paid out (activation bar met). */
+  referralsRewarded: number;
   notifications: number;
   auditLogs: number;
   refreshJobs: number;
@@ -1027,6 +1031,8 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
     badgeKinds,
     referralsTotal,
     referralsCompleted,
+    referralsKnown,
+    referralsRewarded,
     notificationsTotal,
     auditLogsTotal,
     refreshJobsTotal,
@@ -1069,8 +1075,27 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
     ),
     safe("badges awarded", warnings, 0, () => countTable(userBadges)),
     safe("badge kinds", warnings, 0, () => countTable(badges)),
+    // The referral system now lives on student_profiles (referral_code /
+    // referred_by / referral_rewarded). Counting the legacy `referrals` table
+    // made the admin dashboard show 0 referrals while students were inviting
+    // each other — the numbers must come from where the data actually is.
+    // Legacy rows are counted too so an older install stays truthful.
     safe("referrals", warnings, 0, () => countTable(referrals)),
     safe("completed referrals", warnings, 0, () => countTable(referrals, eq(referrals.status, "completed"))),
+    safe("referrals known", warnings, 0, () =>
+      db
+        .select({ value: count() })
+        .from(studentProfiles)
+        .where(isNotNull(studentProfiles.referredBy))
+        .then((r) => num(r[0]?.value))
+    ),
+    safe("referrals rewarded", warnings, 0, () =>
+      db
+        .select({ value: count() })
+        .from(studentProfiles)
+        .where(eq(studentProfiles.referralRewarded, true))
+        .then((r) => num(r[0]?.value))
+    ),
     safe("notifications", warnings, 0, () => countTable(notifications)),
     safe("audit logs", warnings, 0, () => countTable(auditLogs)),
     safe("refresh jobs", warnings, 0, () => countTable(refreshJobs)),
@@ -1102,6 +1127,8 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
     badgeKinds,
     referralsTotal,
     referralsCompleted,
+    referralsKnown,
+    referralsRewarded,
     notifications: notificationsTotal,
     auditLogs: auditLogsTotal,
     refreshJobs: refreshJobsTotal,

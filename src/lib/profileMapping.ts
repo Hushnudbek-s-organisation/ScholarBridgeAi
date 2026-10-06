@@ -104,7 +104,7 @@ export function toMatchProfile(row: ProfileRow): StudentProfileData {
     greScore: row.greScore,
     budgetAnnualUsd: row.budgetAnnualUsd,
     preferredCountries: row.preferredCountries,
-    needScholarship: row.needScholarship,
+    needScholarship: row.needScholarship ?? false,
     extracurriculars: row.extracurriculars,
     workExperienceYears: row.workExperienceYears,
     researchPublications: row.researchPublications,

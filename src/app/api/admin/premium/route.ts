@@ -4,6 +4,7 @@ import { studentProfiles, payments, subscriptions } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { eq, and, ilike } from "drizzle-orm";
 import { sanitizeProfile } from "@/lib/password";
+import { syncProfilePremium } from "@/lib/payments";
 
 export async function POST(req: Request) {
   try {
@@ -47,6 +48,15 @@ export async function POST(req: Request) {
     const now = new Date();
     const periodEnd = new Date(now.getTime() + days * 86400000);
 
+    // An ADMIN-GIFTED grant also lands on the profile columns, which is what
+    // the dashboard, the readiness entitlements and /api/premium/status read.
+    // Writing only the subscription row meant a gifted student stayed "free"
+    // on their own screens until they reloaded some other way.
+    await db
+      .update(studentProfiles)
+      .set({ isPremium: true, premiumUntil: periodEnd, updatedAt: now })
+      .where(eq(studentProfiles.id, profile.id));
+
     // Ledger row for the gift (zero amount, marked paid).
     const [payment] = await db
       .insert(payments)
@@ -75,7 +85,14 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    return NextResponse.json({ subscription, profile: sanitizeProfile(profile) });
+    // Re-read: the update above changed `is_premium`/`premium_until`, and this
+    // payload is what the admin table refreshes from — the pre-update row made
+    // the student look free right after a successful grant.
+    const [granted] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profile.id));
+    return NextResponse.json({
+      subscription,
+      profile: sanitizeProfile(granted ?? profile),
+    });
   } catch (error) {
     console.error("POST /api/admin/premium error:", error);
     return NextResponse.json({ error: "Failed to grant premium" }, { status: 500 });
@@ -98,7 +115,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Profile id is required" }, { status: 400 });
     }
 
-    // Revoke all active subscriptions for that user.
+    // "Revoke premium" takes away BOTH sources: the paid subscription and the
+    // referral-earned window. (A referral-earned premium used to survive this
+    // call, so a student could stay premium after an admin revoked.)
     await db
       .update(subscriptions)
       .set({ status: "canceled" })
@@ -109,7 +128,15 @@ export async function DELETE(req: Request) {
         )
       );
 
-    return NextResponse.json({ success: true });
+    // Recompute the profile flag from what is left instead of blindly nulling
+    // it: with the subscription canceled nothing remains, so this clears it.
+    await syncProfilePremium(profileId, null);
+
+    const [updated] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+    return NextResponse.json({
+      success: true,
+      profile: updated ? sanitizeProfile(updated) : null,
+    });
   } catch (error) {
     console.error("DELETE /api/admin/premium error:", error);
     return NextResponse.json({ error: "Failed to revoke premium" }, { status: 500 });

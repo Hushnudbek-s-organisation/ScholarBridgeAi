@@ -13,6 +13,7 @@ import { eq, asc, inArray } from "drizzle-orm";
 import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfile } from "@/lib/profileMapping";
 import { selectUniversities } from "@/lib/universities";
 import { studentProfiles } from "@/db/schema";
@@ -145,6 +146,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       reasons: string[];
       issues: string[];
     } | null = null;
+    const locale = localeFromRequest(req);
     const profileIdParam = new URL(req.url).searchParams.get("profileId");
     if (profileIdParam) {
       const pId = Number.parseInt(profileIdParam, 10);
@@ -159,8 +161,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             match = {
               score: result.matchScore,
               category: result.matchCategory,
-              reasons: result.reasons,
-              issues: result.potentialIssues,
+              reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
+              issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
             };
           }
         }

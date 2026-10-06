@@ -96,18 +96,16 @@ export async function seedDatabase() {
             console.log("ADMIN_EMAIL is no longer the platform owner — not re-promoting it.");
           }
         } else if (!transferredAway) {
+          // Identity ONLY. The bootstrap account is an operator, not a student:
+          // it must not carry an invented GPA/budget/major that the operator
+          // never entered (spec §19) — an empty profile shows honest "not
+          // provided yet" states everywhere. `onboardingCompleted` is set so the
+          // operator lands in the admin area instead of the student wizard.
           const [created] = await db
             .insert(studentProfiles)
             .values({
               name: adminNameEnv || "Admin",
               email: adminEmail,
-              degreeLevel: "Master",
-              targetMajor: "Computer Science",
-              gpa: 3.5,
-              gpaScale: 4.0,
-              budgetAnnualUsd: 25000,
-              preferredCountries: JSON.stringify(["United States", "United Kingdom", "Canada", "Germany"]),
-              needScholarship: true,
               isAdmin: true,
               onboardingCompleted: true,
               onboardingStep: 8,
@@ -620,7 +618,10 @@ export async function seedDatabase() {
       extracurriculars: "Lead Developer of Campus Open Source Project, Winner of National Hackathon 2024, Undergraduate Research Assistant in ML",
       workExperienceYears: 1,
       researchPublications: 1,
-      isAdmin: true
+      // Demo data for the student screens — NEVER an admin account: a seeded
+      // demo profile that can open the admin panel is a privilege leak, and the
+      // bootstrap admin (ADMIN_EMAIL) is the only operator account.
+      isAdmin: false,
     }).returning();
 
     // Insert saved universities for this student

@@ -68,19 +68,41 @@ export function computeLevel(totalPoints: number, levelRows: typeof levels.$infe
 }
 
 /** 0-100 profile completeness percentage. */
-export function computeProfileCompleteness(profile: typeof studentProfiles.$inferSelect): number {
+/**
+ * The fields the completeness percentage is built from. Structural (not the
+ * full row) so a lightweight query — e.g. the referral list, which only needs
+ * a progress bar — can compute the exact same number the profile screen shows.
+ */
+export interface CompletenessInput {
+  name: string | null;
+  email: string | null;
+  targetMajor: string | null;
+  degreeLevel: string | null;
+  gpa: number | null;
+  gpaScale: number | null;
+  ieltsScore: number | null;
+  toeflScore: number | null;
+  satScore: number | null;
+  greScore: number | null;
+  budgetAnnualUsd: number | null;
+  extracurriculars: string | null;
+  workExperienceYears: number | null;
+  researchPublications: number | null;
+}
+
+export function computeProfileCompleteness(profile: CompletenessInput): number {
   const checks = [
     !!profile.name,
     !!profile.email,
     !!profile.targetMajor,
     !!profile.degreeLevel,
-    profile.gpa > 0,
-    profile.gpaScale > 0,
+    (profile.gpa ?? 0) > 0,
+    (profile.gpaScale ?? 0) > 0,
     profile.ieltsScore != null,
     profile.toeflScore != null,
     profile.satScore != null,
     profile.greScore != null,
-    profile.budgetAnnualUsd > 0,
+    (profile.budgetAnnualUsd ?? 0) > 0,
     !!profile.extracurriculars,
     profile.workExperienceYears != null,
     profile.researchPublications != null,

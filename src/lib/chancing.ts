@@ -679,7 +679,7 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
 export interface ProfileStrength {
   overall: number;
   completeness: number;
-  sections: { key: string; label: string; score: number }[];
+  sections: { key: string; label: string; score: number; unknown?: boolean }[];
 }
 
 /** One number per dimension, for the radar/bar dashboard. */
@@ -687,8 +687,12 @@ export function profileStrength(
   profile: ChancingProfile,
   opts: { essayScore?: number | null } = {}
 ): ProfileStrength {
+  // No GPA on file is UNKNOWN, not a low score: the section is flagged so the
+  // UI can print "not provided yet" and the overall average skips it instead
+  // of inventing a 30/100 for a student who never entered a grade.
   const gpa = normalizedGpa(profile);
-  const academics = gpa == null ? 30 : round(clamp(((gpa - 2.5) / 1.5) * 100, 5, 100));
+  const academics = gpa == null ? 0 : round(clamp(((gpa - 2.5) / 1.5) * 100, 5, 100));
+  const academicsUnknown = gpa == null;
 
   const english =
     Number(profile.ieltsScore) > 0
@@ -719,16 +723,18 @@ export function profileStrength(
   const awardsScore = round(clamp(awards * 18, 0, 100));
   const essays =
     typeof opts.essayScore === "number" && opts.essayScore > 0 ? round(clamp(opts.essayScore, 0, 100)) : 0;
-  const financial = Number(profile.budgetAnnualUsd) > 0 ? (profile.requiresFullScholarship ? 55 : 88) : 35;
+  const financial =
+    Number(profile.budgetAnnualUsd) > 0 ? (profile.requiresFullScholarship ? 55 : 88) : 0;
+  const financialUnknown = !(Number(profile.budgetAnnualUsd) > 0);
 
   const sections = [
-    { key: "academics", label: "Academics", score: academics },
-    { key: "tests", label: "Tests", score: tests },
+    { key: "academics", label: "Academics", score: academics, unknown: academicsUnknown },
+    { key: "tests", label: "Tests", score: tests, unknown: english == null && std == null },
     { key: "extracurriculars", label: "Extracurriculars", score: extracurriculars },
     { key: "leadership", label: "Leadership", score: leadershipScore },
     { key: "awards", label: "Awards", score: awardsScore },
     { key: "essays", label: "Essays", score: essays },
-    { key: "financial", label: "Financial", score: financial },
+    { key: "financial", label: "Financial", score: financial, unknown: financialUnknown },
   ];
   const completeness = round(profileCompletenessRatio(profile) * 100);
   const filled = sections.filter((s) => s.score > 0);

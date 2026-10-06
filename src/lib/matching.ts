@@ -2,21 +2,50 @@ import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
 import { gpaTo40Scale } from "./gpa";
 import { canonicalSubjectTokens, subjectAffinity, subjectTokens } from "./subjectAffinity";
 
+/**
+ * A match reason carries three things:
+ *
+ *   • `code`   — stable id the API layer translates with
+ *                (`matchReasons.<university|scholarship>.<code>` in
+ *                src/i18n/messages/*.json, see src/lib/engineText.ts);
+ *   • `params` — the values interpolated into that sentence;
+ *   • `text`   — the ENGLISH sentence. It stays the value of every `reasons`
+ *                array (logs, AI prompts, scripts, and the fallback when a
+ *                locale lacks the key), so nothing that consumed the old
+ *                string API breaks. The UI reads the translated form.
+ */
+export interface ReasonDetail {
+  code: string;
+  params: Record<string, string | number>;
+  text: string;
+}
+
+interface WeightedReason extends ReasonDetail {
+  weight: number;
+}
+
+const toDetail = ({ code, params, text }: ReasonDetail): ReasonDetail => ({ code, params, text });
+
 export interface StudentProfileData {
   id?: number;
   name?: string;
-  degreeLevel: string;
-  targetMajor: string;
-  gpa: number;
-  gpaScale: number;
+  /**
+   * NULL = the student has not told us yet. Every field below is nullable on
+   * purpose: an "unknown" must stay unknown and must never be scored as if the
+   * student had answered (spec §19 — NULL is not zero and not a default).
+   */
+  degreeLevel: string | null;
+  targetMajor: string | null;
+  gpa: number | null;
+  gpaScale: number | null;
   ieltsScore?: number | null;
   toeflScore?: number | null;
   duolingoScore?: number | null;
   satScore?: number | null;
   greScore?: number | null;
-  budgetAnnualUsd: number;
-  preferredCountries?: string | string[];
-  needScholarship: boolean;
+  budgetAnnualUsd: number | null;
+  preferredCountries?: string | string[] | null;
+  needScholarship?: boolean | null;
   extracurriculars?: string | null;
   workExperienceYears?: number | null;
   researchPublications?: number | null;
@@ -136,8 +165,8 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   let score = 70;
   // Weighted reasons/issues — ranked by importance so the UI can show the
   // 2 most important + and the 2 biggest − (spec §23 — explain the score).
-  const reasons: { text: string; weight: number }[] = [];
-  const potentialIssues: { text: string; weight: number }[] = [];
+  const reasons: WeightedReason[] = [];
+  const potentialIssues: WeightedReason[] = [];
 
   // Normalize GPA to 4.0 scale. An unknown scale with a value > 4 stays
   // unknown (never clamped to a perfect 4.0) — see src/lib/gpa.ts.
@@ -149,19 +178,19 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     const gpaDiff = normGpa - uni.minGpa;
     if (gpaDiff >= 0.5) {
       score += 15;
-      reasons.push({ text: `GPA ${normGpa.toFixed(2)} well above the ${uni.minGpa} minimum`, weight: 15 });
+      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${uni.minGpa} minimum`, weight: 15 });
     } else if (gpaDiff >= 0.2) {
       score += 10;
-      reasons.push({ text: `GPA ${normGpa.toFixed(2)} above the ${uni.minGpa} minimum`, weight: 10 });
+      reasons.push({ code: "gpa_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} above the ${uni.minGpa} minimum`, weight: 10 });
     } else if (gpaDiff >= 0) {
       score += 5;
-      reasons.push({ text: `GPA ${normGpa.toFixed(2)} meets the ${uni.minGpa} minimum`, weight: 5 });
+      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${uni.minGpa} minimum`, weight: 5 });
     } else if (gpaDiff >= -0.3) {
       score -= 12;
-      potentialIssues.push({ text: `GPA ${normGpa.toFixed(2)} slightly below the ${uni.minGpa} minimum`, weight: 12 });
+      potentialIssues.push({ code: "gpa_slightly_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} slightly below the ${uni.minGpa} minimum`, weight: 12 });
     } else {
       score -= 25;
-      potentialIssues.push({ text: `GPA ${normGpa.toFixed(2)} is below the ${uni.minGpa} requirement`, weight: 25 });
+      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${uni.minGpa} requirement`, weight: 25 });
     }
   }
 
@@ -185,25 +214,31 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
             : `Duolingo ${profile.duolingoScore}`;
         score -= 5;
         potentialIssues.push({
+          code: "ielts_alternative",
+          params: { min: uni.minIelts, alt },
           text: `IELTS ${uni.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
           weight: 5,
         });
       } else {
         score -= 25;
         potentialIssues.push({
+          code: "ielts_missing",
+          params: { min: uni.minIelts },
           text: `IELTS ${uni.minIelts} required — you don't have an IELTS score yet`,
           weight: 25,
         });
       }
     } else if (profile.ieltsScore! >= uni.minIelts + 0.5) {
       score += 8;
-      reasons.push({ text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8 });
+      reasons.push({ code: "ielts_above", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8 });
     } else if (profile.ieltsScore! >= uni.minIelts) {
       score += 4;
-      reasons.push({ text: `IELTS ${profile.ieltsScore} meets the ${uni.minIelts} requirement`, weight: 4 });
+      reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${uni.minIelts} requirement`, weight: 4 });
     } else {
       score -= 20;
       potentialIssues.push({
+        code: "ielts_below",
+        params: { min: uni.minIelts, score: profile.ieltsScore! },
         text: `IELTS ${uni.minIelts} required — you have ${profile.ieltsScore}`,
         weight: 20,
       });
@@ -220,15 +255,19 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     if (!hasSat) {
       score -= 20;
       potentialIssues.push({
+        code: "sat_missing",
+        params: { min: uni.minSat },
         text: `SAT ${uni.minSat} required — you don't have an SAT score yet`,
         weight: 20,
       });
     } else if (profile.satScore! >= uni.minSat) {
       score += 6;
-      reasons.push({ text: `SAT ${profile.satScore} meets the ${uni.minSat} requirement`, weight: 6 });
+      reasons.push({ code: "sat_meets", params: { score: profile.satScore!, min: uni.minSat }, text: `SAT ${profile.satScore} meets the ${uni.minSat} requirement`, weight: 6 });
     } else {
       score -= 15;
       potentialIssues.push({
+        code: "sat_below",
+        params: { min: uni.minSat, score: profile.satScore! },
         text: `SAT ${uni.minSat} required — you have ${profile.satScore}`,
         weight: 15,
       });
@@ -240,13 +279,15 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   const alignment = subjectAlignment(profile.targetMajor, uni.programMajor);
   if (alignment.level === "strong") {
     score += 12;
-    reasons.push({ text: `Offers your field: ${uni.programMajor}`, weight: 12 });
+    reasons.push({ code: "major_strong", params: { major: uni.programMajor ?? "" }, text: `Offers your field: ${uni.programMajor}`, weight: 12 });
   } else if (alignment.level === "partial") {
     score += 4;
-    reasons.push({ text: `Partly related to your field: ${uni.programMajor}`, weight: 4 });
+    reasons.push({ code: "major_partial", params: { major: uni.programMajor ?? "" }, text: `Partly related to your field: ${uni.programMajor}`, weight: 4 });
   } else if (alignment.level === "none") {
     score -= 15;
     potentialIssues.push({
+      code: "major_not_offered",
+      params: { major: uni.programMajor ?? "", field: profile.targetMajor ?? "" },
       text: `Programmes focus on ${uni.programMajor} — check whether your field (${profile.targetMajor}) is offered here`,
       weight: 15,
     });
@@ -262,12 +303,14 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     const totalUniCost = uni.annualTuitionUsd + (uni.annualLivingEstUsd ?? 0);
     if (profile.budgetAnnualUsd >= totalUniCost) {
       score += 10;
-      reasons.push({ text: `Estimated cost $${totalUniCost.toLocaleString()}/yr fits your budget`, weight: 10 });
+      reasons.push({ code: "budget_fits", params: { cost: totalUniCost.toLocaleString() }, text: `Estimated cost $${totalUniCost.toLocaleString()}/yr fits your budget`, weight: 10 });
     } else {
       const budgetDeficit = totalUniCost - profile.budgetAnnualUsd;
       const weight = budgetDeficit > 30000 && !profile.needScholarship ? 20 : 10;
       score -= weight;
       potentialIssues.push({
+        code: "budget_exceeds",
+        params: { cost: totalUniCost.toLocaleString(), budget: profile.budgetAnnualUsd.toLocaleString() },
         text: `Estimated cost $${totalUniCost.toLocaleString()}/yr exceeds your $${profile.budgetAnnualUsd.toLocaleString()} budget`,
         weight,
       });
@@ -288,13 +331,13 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
 
   if (preferredList.some(c => c.toLowerCase() === uni.country.toLowerCase())) {
     score += 8;
-    reasons.push({ text: `${uni.country} is on your preferred list`, weight: 8 });
+    reasons.push({ code: "country_preferred", params: { country: uni.country }, text: `${uni.country} is on your preferred list`, weight: 8 });
   }
 
   // Research / Work Experience Boost for Master/PhD or top ranking
   if ((profile.researchPublications || 0) > 0 || (profile.workExperienceYears || 0) > 0) {
     score += 5;
-    reasons.push({ text: "Research / work experience strengthens your application", weight: 5 });
+    reasons.push({ code: "experience_boost", params: {}, text: "Research / work experience strengthens your application", weight: 5 });
   }
 
   // Clamp Score
@@ -320,13 +363,17 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     matchCategory,
     reasons: reasons.slice(0, 2).map(r => r.text),
     potentialIssues: potentialIssues.slice(0, 2).map(i => i.text),
+    // Structured twins of the two arrays above — same entries, same order —
+    // so /api/* can translate the sentence instead of re-parsing it.
+    reasonDetails: reasons.slice(0, 2).map(toDetail),
+    issueDetails: potentialIssues.slice(0, 2).map(toDetail),
   };
 }
 
 export function calculateScholarshipMatch(profile: StudentProfileData, scholarship: ScholarshipData) {
   let score = 65;
-  const reasons: string[] = [];
-  const potentialIssues: string[] = [];
+  const reasons: ReasonDetail[] = [];
+  const potentialIssues: ReasonDetail[] = [];
 
   // GPA check (spec §22 — explain WHY it matches). Unknown scale → unknown
   // GPA: no comparison, no claim (see src/lib/gpa.ts).
@@ -334,13 +381,13 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   if (scholarship.minGpa && scholarship.minGpa > 0 && normGpa != null) {
     if (normGpa >= scholarship.minGpa + 0.4) {
       score += 15;
-      reasons.push(`GPA ${normGpa.toFixed(2)} well above the ${scholarship.minGpa} minimum`);
+      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${scholarship.minGpa} minimum` });
     } else if (normGpa >= scholarship.minGpa) {
       score += 8;
-      reasons.push(`GPA ${normGpa.toFixed(2)} meets the ${scholarship.minGpa} minimum`);
+      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${scholarship.minGpa} minimum` });
     } else {
       score -= 20;
-      potentialIssues.push(`GPA ${normGpa.toFixed(2)} is below the ${scholarship.minGpa} requirement`);
+      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${scholarship.minGpa} requirement` });
     }
   }
 
@@ -361,19 +408,25 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
             ? `TOEFL ${profile.toeflScore}`
             : `Duolingo ${profile.duolingoScore}`;
         score -= 3;
-        potentialIssues.push(
-          `IELTS ${scholarship.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`
-        );
+        potentialIssues.push({
+          code: "ielts_alternative",
+          params: { min: scholarship.minIelts, alt },
+          text: `IELTS ${scholarship.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
+        });
       } else {
         score -= 15;
-        potentialIssues.push(`IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`);
+        potentialIssues.push({
+          code: "ielts_missing",
+          params: { min: scholarship.minIelts },
+          text: `IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`,
+        });
       }
     } else if (profile.ieltsScore! >= scholarship.minIelts) {
       score += 10;
-      reasons.push(`IELTS ${profile.ieltsScore} meets the ${scholarship.minIelts} requirement`);
+      reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: scholarship.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${scholarship.minIelts} requirement` });
     } else {
       score -= 15;
-      potentialIssues.push(`IELTS ${scholarship.minIelts} required — you have ${profile.ieltsScore}`);
+      potentialIssues.push({ code: "ielts_below", params: { min: scholarship.minIelts, score: profile.ieltsScore! }, text: `IELTS ${scholarship.minIelts} required — you have ${profile.ieltsScore}` });
     }
   }
 
@@ -393,14 +446,16 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     const levelFit = compareDegreeLevels(profile.degreeLevel, scholarship.degreeLevels);
     if (levelFit === "match") {
       score += 10;
-      reasons.push(`Open to ${profile.degreeLevel} applicants`);
+      reasons.push({ code: "level_open", params: { level: profile.degreeLevel ?? "" }, text: `Open to ${profile.degreeLevel} applicants` });
     } else if (levelFit === "mismatch") {
       score -= 25;
-      potentialIssues.push(`Only open to: ${levels.join(", ")}`);
+      potentialIssues.push({ code: "level_mismatch", params: { levels: levels.join(", ") }, text: `Only open to: ${levels.join(", ")}` });
     } else {
-      potentialIssues.push(
-        `Levels on this award (${levels.join(", ")}) could not be compared with your level — check the official page`
-      );
+      potentialIssues.push({
+        code: "level_unclear",
+        params: { levels: levels.join(", ") },
+        text: `Levels on this award (${levels.join(", ")}) could not be compared with your level — check the official page`,
+      });
     }
   }
 
@@ -429,20 +484,24 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
       if (studentMajor && !subjectTokens(studentMajor).length) {
         // The profile has a value, but it carries no comparable words
         // ("—", "n/a"): unknown, not a match and not a penalty.
-        potentialIssues.push(
-          `This award lists eligible fields (${majors.join(", ")}) — your target major could not be compared, check the official page`
-        );
+        potentialIssues.push({
+          code: "major_unclear",
+          params: { majors: majors.join(", ") },
+          text: `This award lists eligible fields (${majors.join(", ")}) — your target major could not be compared, check the official page`,
+        });
       } else if (bestSimilarity == null) {
-        potentialIssues.push(
-          `This award lists eligible fields (${majors.join(", ")}) — add your target major to your profile to be matched`
-        );
+        potentialIssues.push({
+          code: "major_missing",
+          params: { majors: majors.join(", ") },
+          text: `This award lists eligible fields (${majors.join(", ")}) — add your target major to your profile to be matched`,
+        });
       } else {
         if (bestSimilarity >= 0.5) {
           score += 8;
-          reasons.push(`Your field (${studentMajor}) is eligible`);
+          reasons.push({ code: "major_eligible", params: { field: studentMajor }, text: `Your field (${studentMajor}) is eligible` });
         } else {
           score -= 10;
-          potentialIssues.push(`Field limited to: ${majors.join(", ")}`);
+          potentialIssues.push({ code: "major_limited", params: { majors: majors.join(", ") }, text: `Field limited to: ${majors.join(", ")}` });
         }
       }
     }
@@ -453,19 +512,27 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   // Need based vs profile budget
   if (scholarship.financialNeedBased && profile.needScholarship) {
     score += 10;
-    reasons.push("Need-based — matches your scholarship requirement");
+    reasons.push({ code: "need_based", params: {}, text: "Need-based — matches your scholarship requirement" });
   }
 
   // Merit based vs GPA & Publications
   if (scholarship.meritBased) {
     if ((normGpa != null && normGpa >= 3.6) || (profile.researchPublications || 0) > 0) {
       score += 10;
-      reasons.push("Merit-based — strong academic record / publications");
+      reasons.push({ code: "merit_based", params: {}, text: "Merit-based — strong academic record / publications" });
     }
   }
 
   const matchScore = Math.min(98, Math.max(30, Math.round(score)));
   const isEligible = matchScore >= 60;
 
-  return { matchScore, isEligible, reasons: reasons.slice(0, 4), potentialIssues: potentialIssues.slice(0, 3) };
+  return {
+    matchScore,
+    isEligible,
+    reasons: reasons.slice(0, 4).map((r) => r.text),
+    potentialIssues: potentialIssues.slice(0, 3).map((i) => i.text),
+    // Same entries, same order as the two arrays above (see ReasonDetail).
+    reasonDetails: reasons.slice(0, 4),
+    issueDetails: potentialIssues.slice(0, 3),
+  };
 }

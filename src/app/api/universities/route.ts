@@ -8,7 +8,8 @@ import {
   universitySources,
   sources,
 } from "@/db/schema";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch, type ReasonDetail } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
@@ -24,6 +25,8 @@ import { selectUniversities } from "@/lib/universities";
 export async function GET(req: Request) {
   try {
     await seedDatabase();
+    // Match sentences are translated for the caller's language (cookie).
+    const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.toLowerCase();
@@ -176,6 +179,8 @@ export async function GET(req: Request) {
         matchCategory: "Reach" | "Match" | "Safety" | null;
         reasons?: string[];
         potentialIssues?: string[];
+        reasonDetails?: ReasonDetail[];
+        issueDetails?: ReasonDetail[];
       } = { matchScore: null, matchCategory: null, reasons: [], potentialIssues: [] };
       if (profileData) {
         matchInfo = calculateUniversityMatch(profileData, uni);
@@ -185,8 +190,8 @@ export async function GET(req: Request) {
         ...uni,
         matchScore: matchInfo.matchScore,
         matchCategory: matchInfo.matchCategory,
-        matchReasons: matchInfo.reasons ?? [],
-        matchIssues: matchInfo.potentialIssues ?? [],
+        matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
+        matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         sourceUrl: src?.sourceUrl ?? null,
         sourceTitle: src?.sourceTitle ?? null,
         sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,

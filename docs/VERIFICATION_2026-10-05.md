@@ -3,7 +3,8 @@
 **Branch:** `arena/01a10cd6-scholarbridgeai` · **Base:** `main`@`7f6e7e5`
 **Scope:** end-to-end consistency of the product (nothing may contradict anything
 else; all data complementary and accurate) + a full correctness check of the
-landing page.
+landing page. Everything the site shows a student must be based on that
+student's OWN profile — no invented, default-filled or stale numbers anywhere.
 
 ---
 
@@ -11,10 +12,10 @@ landing page.
 
 | Layer | Evidence |
 | --- | --- |
-| Every test suite | 37/37 `npm run test:*` green (see §5) |
+| Every test suite | 38/38 `npm run test:*` green, including the new `test:referral` (56 asserts; see §6) |
 | Types | `npx tsc --noEmit` → clean |
 | Production build | `npm run build` → rc 0 |
-| i18n parity | `node scripts/check-i18n.mjs` → passed (1 652 `t()` call sites) |
+| i18n parity | `node scripts/check-i18n.mjs` → passed (1 743 `t()` call sites) |
 | Lint gate | `npm run lint:baseline` → no new or worsened problems |
 | Live API probes | `/api/universities`, `/api/universities/[id]`, `/api/saved-universities`, `/api/chancing`, `/api/scholarships`, `/api/opportunities`, `/api/programs/recommend` against the dev database |
 | Landing page | server-rendered HTML fetched in en / uz / ru, plus the SSR harness in `scripts/check-render.ts` (144 asserts) |
@@ -153,6 +154,80 @@ the ones that survived, all found by driving the real APIs, not by reading code.
     asserts all four AI routes carry the full FORMAT RULES block that
     `AiFormattedText` can render (no HTML, no tables). Restored and re-verified.
 
+## 4b. Third pass — the referral chain and the premium lifecycle
+
+Everything below was found by driving the RUNNING site (dev server on :3000 +
+the same Postgres the preview uses), not by reading code.
+
+1. **The signup response contradicted the database.** `POST /api/profiles` mints
+   the referral code and applies `?ref=` *after* the insert, then returned the
+   pre-update row — so a student who had just been credited to an inviter was
+   handed `referredBy: null`, and the client stores that payload as its active
+   profile. The route now re-reads the row before answering (and signs the
+   session cookie with the same fresh row). Verified live: probe signup id 5 →
+   response `referredBy: 2`, database `referred_by = 2`.
+2. **Two different "completeness" numbers existed.** The referral activation bar
+   used `computeProfileCompleteness` (gamification, 14 boolean checks) while the
+   profile page showed `profileCompletenessRatio` (chancing, 12 checks) — the
+   same student saw 43 % in one place and 58 % in the other. The engine now uses
+   the chancing number (`referralCompleteness()`), so the bar, the profile card
+   and the referral list can never disagree. Default bar lowered 60 → 50 (= 6 of
+   the 12 checks) so a genuinely filled profile passes, while a bare signup with
+   `onboardingCompleted` still earns nothing.
+3. **A paid or admin-gifted subscription did not reach the profile columns.**
+   `activateSubscription()` wrote only the `subscriptions` row, and the admin
+   gift endpoint wrote only its own rows, while the dashboard badge, readiness
+   gates and the admin table read `is_premium` / `premium_until`. A student who
+   PAID saw "free" on their own dashboard while `/api/premium/status` said
+   Premium. Both now mirror the window onto the profile, and the mirror is the
+   UNION of paid + referral time (paying never shortens an earned window).
+4. **Admin "revoke premium" could not revoke a referral-earned premium**, and
+   the grant response returned the pre-update row (`isPremium: false` right
+   after a successful grant). Revoke now clears both sources and recomputes; the
+   grant returns the fresh profile. Verified live end-to-end: grant → status
+   `subscription`/`premium`, dashboard `premium`, admin table
+   "Premium (subscription)"; revoke → `none`/`free` in all three places.
+5. **The admin table could not tell the two sources apart.** It reported only
+   the subscription, so a referral-earned Premium showed as free, and after the
+   mirror fix it labelled gifts as "referral". It now checks the subscription
+   first and reports `premiumSource: subscription | referral` (the student list
+   renders "Premium (referral)").
+6. **Referral rewards were invisible.** Activating a referral paid points and
+   Premium but wrote nothing the student could see. Both sides now get a
+   localised notification (`referralRewarded` / `referralWelcome`, en/uz/ru)
+   with the friend's name and the exact reward. Verified live for referrer 3 →
+   "🎉 Your invite paid off! Dilnoza Ref completed their profile. You earned
+   +40 points." (40 = the admin-set value at that moment).
+7. **The referral share link could name `localhost:3000`.** `absolutizeLink`
+   completed relative links with the browser origin but passed through an
+   absolute loopback link built from the server's own `APP_URL`, so a link
+   copied in a tunnel/preview/staging session pointed at the recipient's own
+   machine. It now rewrites a loopback origin to the origin the browser is on.
+8. **The premium window and the referral window were checked in the wrong
+   order** in `getPremiumStatus`, so a student with both could be told the wrong
+   source/end date. Subscription wins the label, the profile window is the
+   fallback.
+9. **Legacy rows still carried the seed's fabricated answers.** Profile 1
+   (bootstrap operator) had a 3.5 GPA, $25 000 budget, "Master / Computer
+   Science", the four-country wish list and the invented activity list that
+   nobody had typed — every match and chance score was computed from it — and
+   the seeded demo student was flagged `is_admin`. Fixed in three places: the
+   seed (new installs), `supabase/relax_profile_fabricated_defaults.sql`
+   (schema defaults) and the new `supabase/repair_seeded_fabricated_values.sql`
+   (data), which only touches rows that still match the old defaults exactly.
+   Applied to the dev database: profile 1 is now honestly empty
+   (`completeness 0`, `personalised: false`, 0 recommendations) and still the
+   only admin; profile 2 keeps its real demo answers and lost `is_admin`
+   (admin API: 403).
+10. **Extra live proof of the whole chain** (dev DB, admin defaults restored
+    afterwards): signup with `?ref=` → activation bar blocks a bare profile →
+    fill past 50 % → referrer `+1`, no Premium before the 5th → 5th activation
+    grants 30 days and stacks. `GET /api/referral` carried
+    `{premiumMultiple: 5, premiumDays: 30, referrerPoints: 100, referredPoints:
+    50, activationCompleteness: 50}`; an admin edit to 3/21/25/10 changed the
+    payload immediately, then the shipped defaults were restored and the cached
+    config values reloaded (server restart) so the site is back to spec.
+
 ## 5. Known remaining gaps (not hidden)
 
 * **Engine prose and the remaining journey panes are English-only.** Match/issue
@@ -179,27 +254,44 @@ the ones that survived, all found by driving the real APIs, not by reading code.
 
 ## 6. Suite results
 
-`test:ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
-`security` 68 · `match` 74 · `api-security` 236 handlers refused anonymously ·
-`chancing` 64 · `roadmap` 52 · `documents` 35 · `essays` 36 · `visa` 50 ·
-`costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 · `parent` 41 ·
-`dataset` 50 · `render` 144 · `essay-adapter` 39 · `rec-letter` 28 ·
-`country-compare` 17 · `countries` ✓ · `opportunities` 14 · `essay-reviews` 16 ·
-`integration` 246 · `growth` 28 · `telegram` 27 · `telegram-integration` 119 ·
-`ownership` 83 · `portability` 57 · `journey` 91 · `dark` ✓ ·
-`schema-repair` 15 · `provenance` ✓ · `recommend` 74 · `study-interests` 35
-— **37/37 PASS**, `tsc` clean, `build` rc 0, lint gate passed.
+**38/38 suites green.** New this pass: `test:referral` — 56 asserts against a
+real PostgreSQL (embedded, port 55442, its own database): every rule read from
+`app_config`, code mint/reuse/refusal, the activation bar (bare signup refused,
+33 % refused, 58 % pays), idempotency, both-side points, premium multiples and
+stacking, notification creation + localisation, the paid/subscription mirror,
+and static guards on the card/route/engine.
 
-Re-run after this pass (dev DB rebuilt from scratch, profile 2 = Alex Chen):
-`ai-settings`, `ai-format` (40), `groq` (27), `schema`, `security` (68), `match`
-(74), `chancing` (64), `roadmap` (52), `documents` (35), `essays` (36), `visa`
-(50), `costs` (44), `cv` (44), `compare` (43), `mentors` (37), `parent` (41),
-`dataset` (50), `render` (144), `essay-adapter` (39), `rec-letter` (28),
-`country-compare` (17), `countries`, `opportunities` (14), `essay-reviews` (16),
-`integration` (246), `growth` (28), `telegram` (27), `telegram-integration`
-(119), `ownership` (83), `portability` (57), `journey` (91), `dark`,
-`schema-repair` (15), `provenance`, `recommend` (74), `study-interests` (35).
-`api-security`: **236 handlers across 131 route files refused anonymous access** —
-run in slices (`PROBE_START`/`PROBE_END`), because a single 236-request burst
-exhausts the sandbox's dev server; every slice exits green.
-`check:i18n` passed; `ChancingPanel` SSR-renders in en/uz/ru with no key leaks.
+Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
+`security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
+`essays` 36 · `visa` 50 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
+`parent` 41 · `dataset` 50 · `render` 153 · `essay-adapter` 39 · `rec-letter`
+28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
+`essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
+`telegram-integration` 119 · `ownership` 83 · `portability` 57 · `journey` 91 ·
+`dark` ✓ · `schema-repair` 15 · `provenance` ✓ (needs :3000 running) ·
+`recommend` 74 · `study-interests` 35 · **`referral` 56** ·
+`api-security` **236 handlers across 131 route files refused anonymous access**
+(401/403 everywhere).
+
+Two runs needed the right conditions, both re-verified green: `integration`
+flaked once *in teardown* after a neighbouring suite (246 passed, 0 failed,
+crash while closing the pool) and `provenance` only passes with the dev server
+up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
+(1 743 `t()` sites) · `lint:baseline` passed (50 pre-existing, baselined).
+
+The dev database was left in a canonical, self-consistent state:
+
+* no `app_config` rows for the referral keys, so the code defaults apply
+  (5 referrals → 30 days, 100/50 points, 50 % bar). Live payload:
+  `{premiumMultiple: 5, premiumDays: 30, referrerPoints: 100, referredPoints:
+  50, activationCompleteness: 50}`;
+* the bootstrap operator (profile 1, `admin@local.test`) has an honestly empty
+  student profile (`completeness 0`, `personalised: false`, no recommendations)
+  and is still the only admin — the seeded demo student (profile 2) lost
+  `is_admin` and now gets 403 from `/api/admin/*`;
+* the premium grants used for the live test were revoked through the app's own
+  endpoint, so no window survives a revoked source (profile 2: `free`/`none`,
+  dashboard `free`);
+* profile 2 keeps the two activations from the verification run (points 2 of 5,
+  both invited rows active) — consistent with the rules shown on its card — and
+  profiles 5/6 are those activated referrals.

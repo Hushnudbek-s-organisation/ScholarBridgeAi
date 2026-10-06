@@ -271,7 +271,25 @@
     "codeInvalid": "Noto'g'ri taklif kodi",
     "completed": "Yakunlandi",
     "pendingReferral": "Kutilmoqda",
-    "loading": "Yuklanmoqda..."
+    "loading": "Yuklanmoqda...",
+    "refTitle": "Referal dasturi",
+    "refSubtitle": "Do‘stlaringizni taklif qiling va Premium sovg‘a qiling",
+    "refLoading": "Referal ma’lumotlari yuklanmoqda…",
+    "refLoadFailed": "Referal ma’lumotlarini yuklab bo‘lmadi.",
+    "refPremiumActive": "Premium faol — {date} gacha",
+    "refToNext": "Keyingi Premium sovg‘aga yana {count} ta faol do‘st kerak",
+    "refProgressLabel": "{points} referal balli",
+    "refActiveCount": "{count} ta faol",
+    "refRule": "Har {multiple} ta faol referal +{days} kun Premium beradi (muddatlar qo‘shilib boradi).",
+    "refHow": "Havolani yuboring — do‘stingiz ro‘yxatdan o‘tib profilini to‘ldirsa, referal hisoblanadi va ikkalangiz ham ball olasiz.",
+    "refYourLink": "Sizning referal havolangiz",
+    "refInvited": "Taklif qilinganlar ({count})",
+    "refNone": "Hozircha hech kimni taklif qilmagansiz.",
+    "refStatusActive": "Faol",
+    "refStatusPending": "Profil to‘ldirilishi kutilmoqda",
+    "refPointsEarn": "+{points} ball",
+    "refActivationNote": "Referal faqat taklif qilingan profil {percent}% to‘liq bo‘lganda hisoblanadi.",
+    "refYourPoints": "Sizning ballaringiz"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI maslahatchi",
@@ -419,7 +437,7 @@
     "guaranteeNoCount": "Grant mosligi profilingiz asosida hisoblanadi — nechta mos kelishini bilish uchun Grantlar markazini oching.",
     "guaranteeTitle": "Profilingizga mos grantlar",
     "guaranteeWithCount": "Profilingizga ko'ra, {count, plural, one {# grant} other {# grant}} hozirda mezonlaringizga mos — solishtirish uchun Grantlar markazini oching.",
-    "heroBody": "Akademik ko'rsatkichlaringiz (<b>GPA {gpa}/{scale}</b>, {test}) asosida {countries}dagi yetakchi universitetlarga <b>{major} bo'yicha {degree}</b> uchun tanlov o'tkazilmoqda.",
+    "heroBody": "Saqlangan profilingiz asosida: GPA {gpa}/{scale}, {test}. Maqsadlar: {major} bo‘yicha {degree}. Tanlangan davlatlar: {countries}.",
     "heroTitle": "Global qabul va grantlar kashfiyoti markazi",
     "levelBadge": "Daraja",
     "matchExamples": "TUM, Toronto universiteti, NUS",
@@ -465,7 +483,10 @@
     "strengthUnavailable": "Hozircha mavjud emas",
     "readinessLabel": "Tayyorlik",
     "readinessNote": "Saqlangan profilingiz bo‘yicha tayyorlik — qabul qilinish ehtimoli emas.",
-    "portfolioNote": "Darajalar qabul ehtimolini emas, profil mosligini (moslik balli) bildiradi. ScholarBridge qabul ehtimolini o'ylab topmaydi."
+    "portfolioNote": "Darajalar qabul ehtimolini emas, profil mosligini (moslik balli) bildiradi. ScholarBridge qabul ehtimolini o'ylab topmaydi.",
+    "valueNotProvided": "hali kiritilmagan",
+    "noEnglishTest": "ingliz tili testi hali yo‘q",
+    "countriesNotChosen": "davlatlar hali tanlanmagan"
   },
   "visa": {
     "title": "Viza Speaking Assistant",
@@ -556,7 +577,8 @@
     "consistency": "Muntazamlik",
     "academicFit": "Akademik moslik",
     "suggestions": "Keyingi 3 oyda nima qilish",
-    "loading": "Tayyorlik yuklanmoqda…"
+    "loading": "Tayyorlik yuklanmoqda…",
+    "notProvided": "Hali kiritilmagan — bu ball haqiqiy bo‘lishi uchun ma’lumot qo‘shing."
   },
   "recLetter": {
     "title": "Tavsiyanoma yordamchisi",
@@ -1293,7 +1315,25 @@
     "ccReadinessTile": "Profil tayyorligi",
     "ccReadinessTileHint": "Profil va maqsadlar → Tayyorlik bo‘limidagi aynan shu ball — qabul ehtimoli emas",
     "ccChecklistTitle": "Ariza ro‘yxati — {pct}% bajarildi",
-    "ccChecklistSubtitle": "Hujjatlar, arizalar va moliyalashtirish bo‘yicha nima to‘ldirilgani va bog‘langani. Bu ro‘yxat ko‘rsatkichi, profilingiz tayyorlik balli emas."
+    "ccChecklistSubtitle": "Hujjatlar, arizalar va moliyalashtirish bo‘yicha nima to‘ldirilgani va bog‘langani. Bu ro‘yxat ko‘rsatkichi, profilingiz tayyorlik balli emas.",
+    "ccRecNoBasis": "Bu yerda hozircha shaxsiylashtirilgan narsa yo‘q — ro‘yxat mashhurlikdan emas, faqat sizning profilingizdan tuziladi.",
+    "ccRecNoBasisUnis": "Hozircha universitet tavsiya qilib bo‘lmaydi: maqsadli yo‘nalish, afzal ko‘rgan davlatlar yoki GPA ni kiriting — ro‘yxat shundan tuziladi.",
+    "ccRecMissing": "Profilga {fields} qo‘shsangiz, bu ro‘yxat aniqroq bo‘ladi.",
+    "ccRecFieldDegreeLevel": "ta’lim darajangizni",
+    "ccRecFieldMajor": "maqsadli yo‘nalishingizni",
+    "ccRecFieldCountries": "afzal ko‘rgan davlatlaringizni",
+    "ccRecFieldGpa": "GPA ko‘rsatkichingizni",
+    "ccRecFieldBudget": "yillik byudjetingizni",
+    "ccRecFieldIelts": "IELTS natijangizni",
+    "ccRecFitChip": "Moslik {score}% · {band}",
+    "ccRecBandReach": "Cho‘zilish",
+    "ccRecBandMatch": "Mos",
+    "ccRecBandSafety": "Ishonchli",
+    "ccRecSaved": "Ro‘yxatingizda",
+    "ccRecCitOpen": "Barcha millat vakillari uchun ochiq",
+    "ccRecCitMatch": "Fuqaroligingiz uchun ochiq",
+    "ccRecCitUnknown": "Fuqarolik sharti bizning ma’lumotda yo‘q — rasmiy sahifada tekshiring",
+    "ccRecNoDeadline": "Muddat e’lon qilinmagan"
   },
   "autopilot": {
     "title": "Stipendiya avtopiloti",
@@ -1598,7 +1638,22 @@
       "audit": "Kim, nimani va qachon o'zgartirgani.",
       "telegram": "Botni ulash, kod bilan kirish, bildirishnomalar, hammaga xabar va yuborish jurnali.",
       "ownership": "Platforma egasi, egalikni xavfsiz o'tkazish va adminlar."
-    }
+    },
+    "refTitle": "Referal mukofotlari",
+    "refSubtitle": "Talaba referal bo‘yicha ko‘radigan hamma narsa shu raqamlardan olinadi — hisoblash, jarayon ko‘rsatkichi va mukofot matni.",
+    "refMultipleLabel": "Bitta Premium uchun referallar",
+    "refMultipleHint": "Nechta faol referal bitta Premium sovg‘ani beradi (masalan, 5).",
+    "refDaysLabel": "Bir sovg‘a uchun Premium kunlari",
+    "refDaysHint": "Marraga har yetganda qo‘shiladigan kunlar (muddatlar qo‘shilib boradi).",
+    "refReferrerPointsLabel": "Taklif qiluvchiga ball",
+    "refReferrerPointsHint": "Har bir faol referal uchun taklif qiluvchi oladigan ball (0 = yo‘q).",
+    "refReferredPointsLabel": "Taklif qilinganga ball",
+    "refReferredPointsHint": "Referal faollashganda taklif qilingan talaba oladigan ball (0 = yo‘q).",
+    "refCompletenessLabel": "Faollik chegarasi (% to‘liqlik)",
+    "refCompletenessHint": "Referal hisoblanishi uchun taklif qilingan profil yetishi kerak bo‘lgan to‘liqlik (0 = ro‘yxatdan o‘tish yetarli).",
+    "refNumberRange": "{min} va {max} orasida butun son kiriting.",
+    "refPreview": "Talabalarga aynan shunday ko‘rsatiladi: har {multiple} faol referal {days} kun Premium qo‘shadi; taklif qiluvchi {referrer} ball, taklif qilingan talaba {referred} ball oladi; referal {percent}% profil to‘liqligida hisoblanadi.",
+    "save": "Saqlash"
   },
   "adminGrowth": {
     "search": "Qidirish…",
@@ -2861,5 +2916,50 @@
     "basisRankingTier": "Qabul darajasi e'lon qilinmagan — signallar e'lon qilingan reyting darajasiga asoslanadi.",
     "footnote": "Rozilik bergan talabalardan haqiqiy natijalar (qabul va rad) yig'ilsa, moslik signallari aniqroq bo'ladi. Qabul ehtimoli bu yerda faqat tasdiqlangan metodologiya paydo bo'lganda ko'rsatiladi.",
     "loadFailed": "Ro'yxatingizni baholab bo'lmadi. Qayta urinib ko'ring."
+  },
+  "matchReasons": {
+    "university": {
+      "gpa_well_above": "GPA {gpa} talab qilinadigan {min} minimalidan ancha yuqori",
+      "gpa_above": "GPA {gpa} {min} minimalidan yuqori",
+      "gpa_meets": "GPA {gpa} {min} minimaliga javob beradi",
+      "gpa_slightly_below": "GPA {gpa} {min} minimalidan biroz past",
+      "gpa_below": "GPA {gpa} {min} talabidan past",
+      "ielts_alternative": "E’lon qilingan talab IELTS {min} — sizda {alt} bor; qabul qilinishini universitetdan aniqlang",
+      "ielts_missing": "IELTS {min} talab qilinadi — sizda hali IELTS natijasi yo‘q",
+      "ielts_above": "IELTS {score} {min} talabidan yuqori",
+      "ielts_meets": "IELTS {score} {min} talabiga javob beradi",
+      "ielts_below": "IELTS {min} talab qilinadi — sizda {score}",
+      "sat_missing": "SAT {min} talab qilinadi — sizda hali SAT natijasi yo‘q",
+      "sat_meets": "SAT {score} {min} talabiga javob beradi",
+      "sat_below": "SAT {min} talab qilinadi — sizda {score}",
+      "major_strong": "Sizning yo‘nalishingiz bor: {major}",
+      "major_partial": "Yo‘nalishingiz bilan qisman bog‘liq: {major}",
+      "major_not_offered": "Dasturlar {major}ga qaratilgan — yo‘nalishingiz ({field}) bu yerda borligini tekshiring",
+      "budget_fits": "Taxminiy xarajat ${cost}/yil byudjetingizga sig‘adi",
+      "budget_exceeds": "Taxminiy xarajat ${cost}/yil byudjetingiz ${budget}dan oshadi",
+      "country_preferred": "{country} afzal ko‘rganlar ro‘yxatida",
+      "experience_boost": "Tadqiqot / ish tajribasi arizangizni kuchaytiradi"
+    },
+    "scholarship": {
+      "gpa_well_above": "GPA {gpa} talab qilinadigan {min} minimalidan ancha yuqori",
+      "gpa_meets": "GPA {gpa} {min} minimaliga javob beradi",
+      "gpa_below": "GPA {gpa} {min} talabidan past",
+      "ielts_alternative": "E’lon qilingan talab IELTS {min} — sizda {alt} bor; qabul qilinishini aniqlang",
+      "ielts_missing": "IELTS {min} talab qilinadi — sizda hali IELTS natijasi yo‘q",
+      "ielts_meets": "IELTS {score} {min} talabiga javob beradi",
+      "ielts_below": "IELTS {min} talab qilinadi — sizda {score}",
+      "level_open": "{level} darajasidagi abituriyentlar uchun ochiq",
+      "level_mismatch": "Faqat quyidagilar uchun ochiq: {levels}",
+      "level_unclear": "Bu stipendiya darajalari ({levels}) sizning darajangiz bilan solishtirilmadi — rasmiy sahifani tekshiring",
+      "major_unclear": "Stipendiyada yo‘nalishlar ko‘rsatilgan ({majors}) — sizning yo‘nalishingiz solishtirilmadi, rasmiy sahifani tekshiring",
+      "major_missing": "Stipendiyada yo‘nalishlar ko‘rsatilgan ({majors}) — moslash uchun profilda maqsadli yo‘nalishni kiriting",
+      "major_eligible": "Sizning yo‘nalishingiz ({field}) mos keladi",
+      "major_limited": "Yo‘nalish cheklangan: {majors}",
+      "need_based": "Ehtiyojga asoslangan — stipendiya talabingizga mos",
+      "merit_based": "Yutuqlarga asoslangan — kuchli akademik natija / nashrlar"
+    }
+  },
+  "profile": {
+    "budgetNotSet": "Budjet hali kiritilmagan — bilmasangiz bo'sh qoldiring."
   }
 }

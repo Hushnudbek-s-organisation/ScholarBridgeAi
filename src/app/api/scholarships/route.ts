@@ -7,7 +7,8 @@ import {
   scholarshipSources,
   sources,
 } from "@/db/schema";
-import { calculateScholarshipMatch } from "@/lib/matching";
+import { calculateScholarshipMatch, type ReasonDetail } from "@/lib/matching";
+import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
@@ -18,6 +19,8 @@ import { pickBestSource } from "@/lib/sourcePick";
 export async function GET(req: Request) {
   try {
     await seedDatabase();
+    // Match sentences are translated for the caller's language (cookie).
+    const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.toLowerCase();
@@ -120,6 +123,8 @@ export async function GET(req: Request) {
         isEligible: boolean | null;
         reasons?: string[];
         potentialIssues?: string[];
+        reasonDetails?: ReasonDetail[];
+        issueDetails?: ReasonDetail[];
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
       if (profileData) {
         matchInfo = calculateScholarshipMatch(profileData, s);
@@ -131,8 +136,8 @@ export async function GET(req: Request) {
         ...s,
         matchScore: matchInfo.matchScore,
         isEligible: matchInfo.isEligible,
-        matchReasons: matchInfo.reasons ?? [],
-        matchIssues: matchInfo.potentialIssues ?? [],
+        matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),
+        matchIssues: translateReasons(locale, "scholarship", matchInfo.issueDetails, matchInfo.potentialIssues),
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,

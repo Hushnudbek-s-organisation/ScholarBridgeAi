@@ -5,7 +5,8 @@ import { aiEvaluations, essayVersions, scholarships, studentProfiles, universiti
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest } from "@/lib/ai/guard";
-import { localeToLanguageName } from "@/i18n/config";
+import { localeToLanguageName, type Locale } from "@/i18n/config";
+import { asLocale, translateReasons } from "@/lib/engineText";
 import { profileStrength } from "@/lib/chancing";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { chancingProfileWithActivities, toMatchProfile } from "@/lib/profileMapping";
@@ -32,7 +33,7 @@ import {
  *     contradict the rest of the app either.
  */
 
-async function loadFacts(profile: typeof studentProfiles.$inferSelect): Promise<ReportFacts> {
+async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: Locale): Promise<ReportFacts> {
   const [uniRows, scholarshipRows, latestEssay] = await Promise.all([
     db.select().from(universities).where(eq(universities.isActive, true)),
     db.select().from(scholarships),
@@ -59,8 +60,10 @@ async function loadFacts(profile: typeof studentProfiles.$inferSelect): Promise<
     country: row.uni.country,
     score: row.match.matchScore,
     category: row.match.matchCategory,
-    reason: row.match.reasons?.[0] ?? null,
-    issue: row.match.potentialIssues?.[0] ?? null,
+    // The report is written in the student's language, so its evidence lines
+    // must be too (the engine emits codes; engineText does the wording).
+    reason: translateReasons(locale, "university", row.match.reasonDetails, row.match.reasons)[0] ?? null,
+    issue: translateReasons(locale, "university", row.match.issueDetails, row.match.potentialIssues)[0] ?? null,
   });
   const byCategory = (category: string) =>
     scored.filter((row) => row.match.matchCategory === category).slice(0, 3).map(toFact);
@@ -140,15 +143,15 @@ export async function POST(req: Request) {
     }
 
     const locale = profile.preferredLocale || "en";
-    const facts = await loadFacts(profile);
+    const facts = await loadFacts(profile, asLocale(locale));
 
     const prompt = `You are ScholarBridgeAI, an international admissions counselor. Evaluate the student below using ONLY the verified platform data provided. Write the ENTIRE evaluation in ${localeToLanguageName(locale)}.
 
 STUDENT PROFILE (as saved by the student):
 - Name: ${profile.name}
-- Degree level target: ${profile.degreeLevel}
-- Target major: ${profile.targetMajor}
-- GPA: ${profile.gpa} / ${profile.gpaScale}
+- Degree level target: ${profile.degreeLevel ?? "not provided"}
+- Target major: ${profile.targetMajor ?? "not provided"}
+- GPA: ${profile.gpa == null ? "not provided" : `${profile.gpa} / ${profile.gpaScale ?? "?"}`}
 - IELTS: ${profile.ieltsScore ?? "not provided"} · TOEFL: ${profile.toeflScore ?? "not provided"} · SAT: ${profile.satScore ?? "not provided"} · GRE: ${profile.greScore ?? "not provided"}
 - Annual budget: ${facts.budgetAnnualUsd == null ? "not specified" : `$${facts.budgetAnnualUsd.toLocaleString("en-US")}`}
 - Scholarship needed: ${facts.needScholarship ? "yes" : "no"}

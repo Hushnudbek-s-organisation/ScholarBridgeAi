@@ -52,6 +52,9 @@ const toList = (raw?: string | null): string => {
 };
 
 export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: ProfileModalProps) {
+  // The modal is wrapped in NextIntlClientProvider by its host; the explicit
+  // fallback keeps the string out of the UI if a host ever forgets the provider.
+  const t = useTranslations("profile");
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
   const studyInterestsTouched = useRef(false);
@@ -69,7 +72,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     greScore: number | string;
     actScore: number | string;
     duolingoScore: number | string;
-    budgetAnnualUsd: number;
+    budgetAnnualUsd: number | "";
     familyIncomeUsd: number | string;
     preferredCountries: string[];
     targetUniversities: string;
@@ -113,9 +116,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     greScore: "",
     actScore: "",
     duolingoScore: "",
-    budgetAnnualUsd: 25000,
+    budgetAnnualUsd: "",
     familyIncomeUsd: "",
-    preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+    preferredCountries: [],
     targetUniversities: "",
     careerGoal: "",
     needScholarship: true,
@@ -149,7 +152,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   useEffect(() => {
     studyInterestsTouched.current = false;
     if (profile && !isNew) {
-      let countries: string[] = ["United States", "United Kingdom", "Canada"];
+      // No invented fallback: an empty list means "no preference chosen yet".
+      let countries: string[] = [];
       try {
         if (typeof profile.preferredCountries === "string") {
           countries = JSON.parse(profile.preferredCountries);
@@ -178,7 +182,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         greScore: profile.greScore ?? "",
         actScore: profile.actScore ?? "",
         duolingoScore: profile.duolingoScore ?? "",
-        budgetAnnualUsd: profile.budgetAnnualUsd || 25000,
+        budgetAnnualUsd: profile.budgetAnnualUsd ?? "",
         familyIncomeUsd: profile.familyIncomeUsd ?? "",
         preferredCountries: countries,
         targetUniversities: toList(profile.targetUniversities),
@@ -224,9 +228,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         greScore: "",
         actScore: "",
         duolingoScore: "",
-        budgetAnnualUsd: 25000,
+        budgetAnnualUsd: "",
         familyIncomeUsd: "",
-        preferredCountries: ["United States", "United Kingdom", "Canada", "Germany"],
+        preferredCountries: [],
         targetUniversities: "",
         careerGoal: "",
         needScholarship: true,
@@ -329,7 +333,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         ...rest,
         targetMajor: studyInterestsTouched.current ? compatibilityTargetMajor(studyInterests) : rest.targetMajor,
         studyInterests: serializeStudyInterestSelections(studyInterests),
-        // Empty numeric fields are saved as null (NULL in DB), never 0.
+        // Empty fields are saved as null (NULL in DB), never as a default.
+        budgetAnnualUsd: rest.budgetAnnualUsd === "" ? null : Number(rest.budgetAnnualUsd),
         gpa: gpa === "" ? null : Number(gpa),
         ieltsScore: ieltsScore === "" ? null : Number(ieltsScore),
         toeflScore: toeflScore === "" ? null : Number(toeflScore),
@@ -688,12 +693,17 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     step="1000"
                     min="0"
                     value={formData.budgetAnnualUsd}
-                    onChange={(e) => setFormData({ ...formData, budgetAnnualUsd: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormData({ ...formData, budgetAnnualUsd: raw === "" ? "" : Number(raw) });
+                    }}
                     className="w-full pl-7 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Current: {formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}
+                  {formData.budgetAnnualUsd === ""
+                    ? t("budgetNotSet")
+                    : `Current: ${formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}`}
                 </p>
               </div>
 
