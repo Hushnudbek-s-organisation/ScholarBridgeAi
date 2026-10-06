@@ -1,6 +1,27 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+
+/** Whether this page is running inside somebody else's frame (a preview pane,
+ *  an LMS embed...). Parent frames must grant `allow="microphone"` — the page's
+ *  own header cannot — so the interview offers a way out of the frame.
+ *  It is read through `useSyncExternalStore` rather than an effect, and the
+ *  server render always assumes "not embedded" (the value settles after
+ *  hydration). */
+function subscribeEmbedded(): () => void {
+  return () => {};
+}
+function embeddedSnapshot(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    // Cross-origin parent: reading window.top throws — that IS an embed.
+    return true;
+  }
+}
+function embeddedServerSnapshot(): boolean {
+  return false;
+}
 import { GoogleGenAI, Modality, type LiveServerMessage } from "@google/genai";
 import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
@@ -35,6 +56,14 @@ import {
   Zap,
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import {
+  classifySpeechError,
+  LIVE_SPEAK_WATCHDOG_MS,
+  MAX_MIC_START_ATTEMPTS,
+  MIC_RESTART_DELAY_MS,
+  shouldSubmitInterimOnEnd,
+  speakWatchdogMs,
+} from "@/lib/visa-mic";
 
 // ---------------------------------------------------------------------------
 // Web Speech API typings (fallback mode; not in the TS DOM lib).
@@ -623,6 +652,16 @@ export function VisaSpeakingAssistant({
   );
   const [micBlocked, setMicBlocked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * A page embedded in someone else's frame needs the PARENT to grant
+   * `allow="microphone"` — the app cannot grant it for itself. Detect it so the
+   * student gets a one-click way out instead of a dead microphone.
+   */
+  const embedded = React.useSyncExternalStore(
+    subscribeEmbedded,
+    embeddedSnapshot,
+    embeddedServerSnapshot,
+  );
   const [error, setError] = useState<string | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
   /**
@@ -694,6 +733,16 @@ export function VisaSpeakingAssistant({
   const meterAudioCtxRef = useRef<AudioContext | null>(null);
   const meterStreamRef = useRef<MediaStream | null>(null);
   const meterRafRef = useRef(0);
+  /** Watchdog for a speechSynthesis utterance whose onend never fires. */
+  const speakWatchdogRef = useRef<number | null>(null);
+  /** Watchdog for a Gemini Live turn that stops producing audio mid-speech. */
+  const liveSpeakWatchdogRef = useRef<number | null>(null);
+  /** Retry timer for a `SpeechRecognition.start()` that threw (transient). */
+  const micRetryTimerRef = useRef<number | null>(null);
+  /** Consecutive failed start attempts — stops an infinite retry loop. */
+  const micStartAttemptsRef = useRef(0);
+  /** The student denied the microphone: don't auto-prompt on every question. */
+  const micDeniedRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VisaEngine | null>(null);
 
@@ -774,6 +823,18 @@ export function VisaSpeakingAssistant({
       meterAudioCtxRef.current?.close().catch(() => {});
       meterAudioCtxRef.current = null;
 
+      if (speakWatchdogRef.current !== null) {
+        window.clearTimeout(speakWatchdogRef.current);
+        speakWatchdogRef.current = null;
+      }
+      if (liveSpeakWatchdogRef.current !== null) {
+        window.clearTimeout(liveSpeakWatchdogRef.current);
+        liveSpeakWatchdogRef.current = null;
+      }
+      if (micRetryTimerRef.current !== null) {
+        window.clearTimeout(micRetryTimerRef.current);
+        micRetryTimerRef.current = null;
+      }
       liveIntentionalCloseRef.current = true;
       if (liveReconnectTimerRef.current !== null) {
         window.clearTimeout(liveReconnectTimerRef.current);
@@ -849,6 +910,10 @@ export function VisaSpeakingAssistant({
     }
 
     function stopListening(): void {
+      if (micRetryTimerRef.current !== null) {
+        window.clearTimeout(micRetryTimerRef.current);
+        micRetryTimerRef.current = null;
+      }
       try {
         recognitionRef.current?.stop();
       } catch {
@@ -869,6 +934,35 @@ export function VisaSpeakingAssistant({
       micHoldUntilRef.current = performance.now() + ECHO_GUARD_MS;
     }
 
+    function clearLiveSpeakWatchdog(): void {
+      if (liveSpeakWatchdogRef.current !== null) {
+        window.clearTimeout(liveSpeakWatchdogRef.current);
+        liveSpeakWatchdogRef.current = null;
+      }
+    }
+
+    /**
+     * The officer's turn must always end. If the socket stops mid-speech (or
+     * the audio player never drains), mic chunks stay suppressed forever — the
+     * student is muted with no way back. Re-open the mic when nothing is
+     * playing AND nothing is being generated.
+     */
+    function armLiveSpeakWatchdog(): void {
+      clearLiveSpeakWatchdog();
+      liveSpeakWatchdogRef.current = window.setTimeout(() => {
+        liveSpeakWatchdogRef.current = null;
+        if (engineModeRef.current !== "gemini-live") return;
+        if (livePlaybackActiveRef.current || liveGenerationActiveRef.current) {
+          armLiveSpeakWatchdog();
+          return;
+        }
+        setOfficer("idle");
+        listeningRef.current = true;
+        setListening(true);
+        micHoldUntilRef.current = 0;
+      }, LIVE_SPEAK_WATCHDOG_MS);
+    }
+
     function closeLiveSession(): void {
       clearLiveReconnectTimer();
       liveIntentionalCloseRef.current = true;
@@ -882,6 +976,7 @@ export function VisaSpeakingAssistant({
     }
 
     function stopLiveAudio(): void {
+      clearLiveSpeakWatchdog();
       clearLivePlayback();
       liveMicNodeRef.current?.disconnect();
       liveMicSilenceRef.current?.disconnect();
@@ -964,6 +1059,13 @@ export function VisaSpeakingAssistant({
       }
     }
 
+    function clearSpeakWatchdog(): void {
+      if (speakWatchdogRef.current !== null) {
+        window.clearTimeout(speakWatchdogRef.current);
+        speakWatchdogRef.current = null;
+      }
+    }
+
     function fallbackSpeak(text: string): void {
       const token = sessionRef.current;
       if (mutedRef.current || !("speechSynthesis" in window)) {
@@ -971,6 +1073,19 @@ export function VisaSpeakingAssistant({
         autoListen(token);
         return;
       }
+      // Whatever ends the utterance — onend, onerror or the watchdog — the
+      // interview must continue the same way: officer idle, then LISTEN.
+      // (onerror used to reset the state without reopening the microphone, so
+      // after a question the student had to click the mic themselves; if that
+      // click also failed, typing was the only way forward.)
+      let finished = false;
+      const finishSpeaking = () => {
+        if (finished || sessionRef.current !== token) return;
+        finished = true;
+        clearSpeakWatchdog();
+        setOfficer("idle");
+        autoListen(token);
+      };
       try {
         window.speechSynthesis.cancel();
         const c = getVisaCountry(configRef.current?.countryCode);
@@ -984,18 +1099,17 @@ export function VisaSpeakingAssistant({
         utter.rate = 0.95;
         utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
         setOfficer("speaking");
-        utter.onend = () => {
-          if (sessionRef.current !== token) return;
-          setOfficer("idle");
-          autoListen(token);
-        };
-        utter.onerror = () => {
-          if (sessionRef.current !== token) return;
-          setOfficer("idle");
-        };
+        utter.onend = finishSpeaking;
+        utter.onerror = finishSpeaking;
         window.speechSynthesis.speak(utter);
+        // Some browsers fire neither onend nor onerror (no user activation,
+        // throttled tab, cancelled utterance). Without this the officer stayed
+        // "speaking" forever and the microphone button stayed disabled.
+        clearSpeakWatchdog();
+        speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
       } catch {
         setOfficer("idle");
+        autoListen(token);
       }
     }
 
@@ -1033,6 +1147,12 @@ export function VisaSpeakingAssistant({
           typeof data?.reply === "string" ? data.reply.trim() : "";
         if (!reply) throw new Error(t("loadError"));
         pushMessage({ role: "officer", text: reply });
+        // No AI provider on the server: the officer asks this country's
+        // standard consular questions and the score still comes from the
+        // rubric over the student's own answers. Say so — never pretend.
+        if (data?.source === "script" || data?.aiUsed === false) {
+          setNotice(t("offlinePractice"));
+        }
         fallbackSpeak(reply);
       } catch (e) {
         if (sessionRef.current !== token || !mountedRef.current) return;
@@ -1104,10 +1224,17 @@ export function VisaSpeakingAssistant({
         };
         rec.onerror = (e: VisaSpeechErrorEvent) => {
           if (sessionRef.current !== token) return;
-          if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          const kind = classifySpeechError(e.error);
+          if (kind === "blocked") {
+            micDeniedRef.current = true;
             setMicBlocked(true);
             micReadyRef.current = false;
           } else if (e.error === "no-speech") {
+            setNotice(t("noSpeech"));
+          } else if (kind === "transient") {
+            // "aborted" / "network" / empty: the session hiccuped. Voice must
+            // stay available — a transient error used to leave the student
+            // with nothing but the text box.
             setNotice(t("noSpeech"));
           }
           stopListening();
@@ -1116,8 +1243,16 @@ export function VisaSpeakingAssistant({
           if (sessionRef.current !== token) return;
           listeningRef.current = false;
           setListening(false);
+          const pending = interimRef.current.trim();
+          interimRef.current = "";
           setInterim("");
           stopFallbackMeter();
+          // Chrome ends the session on a pause. The student's answer exists as
+          // an interim transcript at that moment and used to be thrown away —
+          // speak, see nothing happen, type instead. Submit it.
+          if (shouldSubmitInterimOnEnd(finalReceivedRef.current, pending)) {
+            void submitAnswer(pending);
+          }
         };
 
         recognitionRef.current = rec;
@@ -1126,16 +1261,68 @@ export function VisaSpeakingAssistant({
         setListening(true);
         setNotice(null);
         setMicBlocked(false);
+        micStartAttemptsRef.current = 0;
         void startFallbackMeter();
       } catch {
-        setSttSupported(false);
+        // A start() that throws is NOT "this browser cannot listen": Chrome
+        // throws InvalidStateError while the previous session is still
+        // winding down. Marking STT unsupported here killed the voice path for
+        // the rest of the interview after a single hiccup — retry instead.
+        recognitionRef.current = null;
+        listeningRef.current = false;
+        setListening(false);
+        stopFallbackMeter();
+        if (micStartAttemptsRef.current < MAX_MIC_START_ATTEMPTS) {
+          micStartAttemptsRef.current += 1;
+          if (micRetryTimerRef.current !== null) window.clearTimeout(micRetryTimerRef.current);
+          micRetryTimerRef.current = window.setTimeout(() => {
+            micRetryTimerRef.current = null;
+            if (!mountedRef.current) return;
+            if (listeningRef.current || officerStateRef.current !== "idle") return;
+            startListening();
+          }, MIC_RESTART_DELAY_MS);
+        } else {
+          setNotice(t("micStartFailed"));
+        }
       }
+    }
+
+    /**
+     * Open the microphone for the student's answer. Called whenever the
+     * officer finishes a question, so a student never has to hunt for the
+     * button — and never silently loses the voice path because the one-time
+     * permission probe at interview start failed.
+     */
+    async function ensureMicPermissionThenListen(token: number): Promise<void> {
+      if (sessionRef.current !== token || !mountedRef.current) return;
+      if (!micReadyRef.current) {
+        // Already denied this session? Do not pop the prompt on every single
+        // question — the student's explicit mic click retries it instead.
+        if (micDeniedRef.current) return;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+          stream.getTracks().forEach((tr) => tr.stop());
+          if (sessionRef.current !== token || !mountedRef.current) return;
+          micReadyRef.current = true;
+          setMicBlocked(false);
+        } catch {
+          micReadyRef.current = false;
+          micDeniedRef.current = true;
+          setMicBlocked(true);
+          return;
+        }
+      }
+      if (sessionRef.current !== token || !mountedRef.current) return;
+      if (submittingRef.current) return;
+      startListening();
     }
 
     function autoListen(token: number): void {
       if (sessionRef.current !== token || !mountedRef.current) return;
       if (submittingRef.current) return;
-      if (micReadyRef.current) startListening();
+      void ensureMicPermissionThenListen(token);
     }
 
     async function requestLiveToken(): Promise<LiveTokenResponse> {
@@ -1280,6 +1467,7 @@ export function VisaSpeakingAssistant({
       if (liveDropOutputRef.current) return;
       liveGenerationActiveRef.current = true;
       setOfficer("speaking");
+      armLiveSpeakWatchdog();
       listeningRef.current = false;
       setListening(false);
       micHoldUntilRef.current = performance.now() + ECHO_GUARD_MS;
@@ -1432,6 +1620,7 @@ export function VisaSpeakingAssistant({
         setOfficer("thinking");
         listeningRef.current = false;
         setListening(false);
+        armLiveSpeakWatchdog();
         session.sendRealtimeInput({ text: buildInterviewUserPrompt(c, []) });
       }
     }
@@ -1525,6 +1714,10 @@ export function VisaSpeakingAssistant({
       setLiveOutputPartial("");
       listeningRef.current = false;
       setListening(false);
+      clearSpeakWatchdog();
+      micStartAttemptsRef.current = 0;
+      micDeniedRef.current = false;
+      micReadyRef.current = false;
       setOfficer("thinking");
       setScreen("interview");
       try {
@@ -1593,6 +1786,7 @@ export function VisaSpeakingAssistant({
         return;
       }
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      clearSpeakWatchdog();
       stopListening();
       setOfficer("idle");
       autoListen(sessionRef.current);
@@ -1600,6 +1794,7 @@ export function VisaSpeakingAssistant({
 
     function endInterview(): void {
       sessionRef.current += 1;
+      clearSpeakWatchdog();
       commitLiveOutput();
       stopListening();
       stopLiveAll();
@@ -1625,6 +1820,7 @@ export function VisaSpeakingAssistant({
 
     function backToSetup(): void {
       sessionRef.current += 1;
+      clearSpeakWatchdog();
       stopListening();
       stopLiveAll();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -1662,7 +1858,12 @@ export function VisaSpeakingAssistant({
       }
       if (officerStateRef.current !== "idle" || submittingRef.current) return;
       setNotice(null);
-      startListening();
+      // An explicit tap is the student asking for the microphone: clear the
+      // denial flag so permission is requested again and reset the retry
+      // budget, then (re)open the mic.
+      micDeniedRef.current = false;
+      micStartAttemptsRef.current = 0;
+      void ensureMicPermissionThenListen(sessionRef.current);
     }
 
     function retryReply(): void {
@@ -2089,6 +2290,33 @@ export function VisaSpeakingAssistant({
                   <p className="text-[11px] text-slate-300">
                     {!sttSupported ? t("sttUnsupported") : t("micBlocked")}
                   </p>
+                  {sttSupported && (
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => engineRef.current?.onMicClick()}
+                        disabled={officerState !== "idle"}
+                        className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-white/60"
+                      >
+                        <Mic className="h-3.5 w-3.5" />
+                        {t("micRetry")}
+                      </button>
+                      <p className="text-[11px] leading-relaxed text-slate-400">
+                        {t("micInlineHint")}
+                      </p>
+                      {embedded && (
+                        <a
+                          href={typeof window === "undefined" ? "/" : window.location.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-[11px] font-black text-cyan-100 hover:bg-cyan-300/15"
+                        >
+                          <Mic className="h-3.5 w-3.5" />
+                          {t("micOpenTab")}
+                        </a>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <input
                       value={textAnswer}

@@ -17,7 +17,8 @@ student's OWN profile — no invented, default-filled or stale numbers anywhere.
 | Production build | `npm run build` → rc 0 |
 | i18n parity | `node scripts/check-i18n.mjs` → passed (1 743 `t()` call sites) |
 | Lint gate | `npm run lint:baseline` → no new or worsened problems |
-| Live API probes | `/api/universities`, `/api/universities/[id]`, `/api/saved-universities`, `/api/chancing`, `/api/scholarships`, `/api/opportunities`, `/api/programs/recommend` against the dev database |
+| Live API probes | `/api/universities`, `/api/universities/[id]`, `/api/saved-universities`, `/api/chancing`, `/api/scholarships`, `/api/opportunities`, `/api/programs/recommend`, `/api/referral` (rules + status), `/api/premium/status`, `/api/admin/premium` (grant → revoke), `/api/visa/chat` (5-question scripted interview) and `/api/visa/analyze` (rubric without AI) against the dev database |
+| HTTP headers | `curl -D -` on an HTML page and an API route: `Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=(), usb=()` — the microphone the voice interview needs is allowed for this origin |
 | Landing page | server-rendered HTML fetched in en / uz / ru, plus the SSR harness in `scripts/check-render.ts` (144 asserts) |
 
 ## 2. Contradictions found and fixed
@@ -275,6 +276,71 @@ not type?*
    labelled "Demo · sample data" with "no invented probabilities" / "Fit — not a
    probability" stated next to the example numbers.
 
+## 4d. Fifth pass — the visa interview's microphone (reported broken)
+
+Reported by the user: *"in the visa chat, after the officer's question, voice
+input does not work — only typing is possible."* Reproduced by reading the
+request path, and it was the app's own fault, three times over.
+
+1. **The site's security header forbade the microphone.** Every response carried
+   `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(),
+   usb=()` — an empty allowlist disables the feature **for the page itself**, so
+   `getUserMedia` and `SpeechRecognition` were refused no matter what the
+   student allowed in the browser. The feature that asks the student to SPEAK
+   could never have worked, in any browser, on any device. Now
+   `microphone=(self)` (the app's own origin only) while the four genuinely
+   unused features stay off. Proven live: the running server now answers
+   `permissions-policy: camera=(), microphone=(self), geolocation=(), payment=(), usb=()`
+   on both HTML and API responses; `test:visa` asserts both places that set the
+   header (next.config.ts and src/proxy.ts) so it cannot silently regress.
+2. **A single hiccup killed voice for the whole interview.**
+   `SpeechRecognition.start()` throws `InvalidStateError` while the previous
+   session is still winding down; the catch treated ANY start failure as "this
+   browser cannot listen" (`setSttSupported(false)`) — which also revealed the
+   typing box, exactly the state the user described. Start failures are now
+   classified (`blocked` / `transient` / `fatal`) and retried up to 3 times
+   (350 ms apart); only a genuinely missing Web Speech API marks STT
+   unsupported.
+3. **The officer's turn could never end, and then the mic never reopened.**
+   The fallback officer speaks through `speechSynthesis`; if the browser fires
+   neither `onend` nor `onerror` (no user activation, throttled tab, cancelled
+   utterance), the state stayed "speaking" forever and the microphone button
+   stayed disabled. There is now a watchdog (`speakWatchdogMs`, sized from the
+   question length, 5–60 s) that always finishes the turn, `onerror` resumes
+   listening too, and a stalled Gemini Live turn has its own watchdog
+   (`LIVE_SPEAK_WATCHDOG_MS`) so live mode cannot silently mute the student.
+4. **The answer was dropped when the student paused.** Chrome ends a
+   recognition session on silence; the interim transcript (what the student had
+   just said) was thrown away instead of submitted — speak, nothing happens,
+   type instead. `shouldSubmitInterimOnEnd()` now sends it.
+5. **A blocked microphone was a dead end.** The typing box offered no way back
+   to voice. It now has an explicit "Try the microphone again" button (which
+   clears the denial and re-requests permission), a hint about the address-bar
+   lock icon, and — when the app is embedded in someone else's frame (where the
+   PARENT must grant `allow="microphone"`) — a one-click "open the interview in
+   its own tab". All three strings are localised in en/uz/ru.
+6. **Without AI keys the interview could not even start.** `/api/visa/chat`
+   answered 503 when no provider was configured, so there was no officer
+   question at all — and the final score never needed the model: it is the
+   deterministic rubric over the student's own transcript. The route now asks
+   that country's standard consular questions (the list already shipped for the
+   setup screen) in order, marks the payload `source: "script"`, and the UI says
+   plainly that the AI officer is offline. Verified live: five questions in
+   order, then a closing line, and `/api/visa/analyze` still returns the full
+   rubric (`aiAvailable: false`, scores + named risk grounds).
+
+Two quality gates caught the new UI while it was being added, and both were
+fixed properly rather than baselined away: `test:dark` flagged the retry
+button's ink on `bg-emerald-500` (2.47:1 — the button now carries the app's
+`.sb-ink-on-bright` class, 0 unreadable pairs) and `lint:baseline` flagged the
+embedding probe as state-set-from-effect (it is now read through
+`useSyncExternalStore` with a server snapshot of "not embedded"; no rule was
+disabled).
+
+`test:visa` grew from 50 to **80 asserts** covering all of the above (the pure
+rules in `src/lib/visa-mic.ts` plus guards on the component, the header and the
+route).
+
 ## 5. Known remaining gaps (not hidden)
 
 * **Engine prose and the remaining journey panes are English-only.** Match/issue
@@ -312,7 +378,7 @@ and static guards on the card/route/engine.
 
 Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
 `security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
-`essays` 36 · `visa` 50 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
+`essays` 36 · `visa` 80 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
 `parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
 28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
 `essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
@@ -327,6 +393,8 @@ flaked once *in teardown* after a neighbouring suite (246 passed, 0 failed,
 crash while closing the pool) and `provenance` only passes with the dev server
 up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
 (1 743 `t()` sites) · `lint:baseline` passed (50 pre-existing, baselined).
+
+## 7. Environment state after the run
 
 The dev database was rebuilt from scratch during this round (the sandbox lost
 its `.pgdata`, `node_modules` and `.env.local` between turns, which is also how
@@ -354,8 +422,6 @@ Everything that was mutated only for a test was reverted through the app's own
 endpoints (premium grant → revoke, config edit → defaults restored) or deleted
 (the 3 generic roadmap tasks the empty-profile probe generated).
 
-## 6. Suite results
-
 **38/38 suites green.** New this pass: `test:referral` — 56 asserts against a
 real PostgreSQL (embedded, port 55442, its own database): every rule read from
 `app_config`, code mint/reuse/refusal, the activation bar (bare signup refused,
@@ -365,7 +431,7 @@ and static guards on the card/route/engine.
 
 Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
 `security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
-`essays` 36 · `visa` 50 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
+`essays` 36 · `visa` 80 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
 `parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
 28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
 `essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·

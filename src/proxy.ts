@@ -103,7 +103,9 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   headers.set("X-DNS-Prefetch-Control", "off");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  // `microphone=(self)` on purpose: the visa interview asks the student to
+  // SPEAK. An empty allowlist disabled the mic inside the app itself.
+  headers.set("Permissions-Policy", "camera=(), microphone=(self), geolocation=(), payment=(), usb=()");
   // Only meaningful over HTTPS; browsers ignore it otherwise.
   const hsts = strictTransportSecurity();
   if (hsts) headers.set("Strict-Transport-Security", hsts);
