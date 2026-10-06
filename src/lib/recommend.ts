@@ -381,6 +381,12 @@ export interface RecommendationResult {
   program: RecommendProgram;
   university: RecommendUniversity;
   subjectFit: SubjectFit;
+  /**
+   * How the programme's level relates to the student's stated level. When the
+   * student wants a Master's, a Bachelor's programme is a mismatch — it must
+   * never lead the list and must say why it is there.
+   */
+  degreeLevelMatch: "match" | "mismatch" | "unknown";
   eligibility: Eligibility;
   affordability: Affordability;
   /** ALWAYS {available:false} — see header. Kept explicit per result. */
@@ -440,7 +446,18 @@ export function recommend(
     if (input.languagePref && program.language && input.languagePref.trim().toLowerCase() === program.language.trim().toLowerCase()) {
       score += 2;
     }
-    if (input.degreeLevel && program.degreeLevel && input.degreeLevel.trim().toLowerCase() === program.degreeLevel.trim().toLowerCase()) {
+    // Degree level is what the student is actually applying FOR. A programme at
+    // a different level (a Bachelor's for a Master's applicant) was previously
+    // only worth -4 on the score, so it could still be ranked FIRST when its
+    // subject fit was good. It now carries an explicit relation, is pushed below
+    // every matching/unknown programme, and says so in the considerations.
+    const degreeLevelMatch: "match" | "mismatch" | "unknown" =
+      !input.degreeLevel || !program.degreeLevel
+        ? "unknown"
+        : input.degreeLevel.trim().toLowerCase() === program.degreeLevel.trim().toLowerCase()
+          ? "match"
+          : "mismatch";
+    if (degreeLevelMatch === "match") {
       score += 4;
     }
     const matchScore = Math.max(0, Math.min(100, Math.round(score)));
@@ -517,6 +534,11 @@ export function recommend(
     if (input.startYear && nextCycle?.academicYear && !nextCycle.academicYear.startsWith(String(input.startYear))) {
       considerations.push(`The next catalogued cycle is ${nextCycle.academicYear} — confirm ${input.startYear} entry on the official page`);
     }
+    if (degreeLevelMatch === "mismatch") {
+      considerations.push(
+        `This is a ${program.degreeLevel} program while your profile says ${input.degreeLevel} — check that you are eligible to apply`
+      );
+    }
 
     // ---- Stale provenance -------------------------------------------------
     const programStale = isStaleVerified(program.lastVerifiedAt);
@@ -526,6 +548,7 @@ export function recommend(
       program,
       university,
       subjectFit: fit,
+      degreeLevelMatch,
       eligibility,
       affordability,
       probability: ADMISSION_PROBABILITY,
@@ -539,8 +562,17 @@ export function recommend(
     });
   }
 
-  // Rank: subject-fit tier first, then match score, then verified-first.
+  // Rank: degree level FIRST — it is the hard constraint (a Master's applicant
+  // cannot take a Bachelor's programme, however well the subject matches), then
+  // subject-fit tier, then match score, then verified-first.
+  const LEVEL_MATCH_RANK: Record<RecommendationResult["degreeLevelMatch"], number> = {
+    match: 2,
+    unknown: 1,
+    mismatch: 0,
+  };
   results.sort((a, b) => {
+    const lvl = LEVEL_MATCH_RANK[b.degreeLevelMatch] - LEVEL_MATCH_RANK[a.degreeLevelMatch];
+    if (lvl !== 0) return lvl;
     const tier = LEVEL_RANK[b.subjectFit.level] - LEVEL_RANK[a.subjectFit.level];
     if (tier !== 0) return tier;
     if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;

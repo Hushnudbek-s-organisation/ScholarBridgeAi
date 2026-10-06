@@ -62,8 +62,6 @@ export interface NextActionsContext {
   graduationYear?: number | null;
 }
 
-const MONTH_MS = 30 * 86400000;
-
 const urgencyFromScore = (score: number): ActionUrgency => {
   if (score >= 90) return "critical";
   if (score >= 60) return "high";
@@ -98,10 +96,16 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
     const overdue = d.daysRemaining < 0;
     push({
       id: `deadline-${d.id}`,
-      title: overdue ? `Overdue: ${d.title}` : `Due in ${d.daysRemaining} day${d.daysRemaining === 1 ? "" : "s"}: ${d.title}`,
+      title: overdue
+        ? `Overdue: ${d.title}`
+        : d.daysRemaining === 0
+          ? `Due today: ${d.title}`
+          : `Due in ${d.daysRemaining} day${d.daysRemaining === 1 ? "" : "s"}: ${d.title}`,
       why: overdue
         ? "This date has already passed — check whether a late or rolling option still exists, otherwise drop it and move on."
-        : "Less than two weeks left. This is the only thing that should matter today.",
+        : d.daysRemaining === 0
+          ? "Due today. Nothing else on this list matters more."
+          : "Less than two weeks left. This is the only thing that should matter today.",
       urgency: "critical",
       target: d.type === "scholarship" ? "scholarships" : "deadlines",
       score: overdue ? 100 : 98,
@@ -345,8 +349,27 @@ export function buildNextActions(ctx: NextActionsContext, limit = 3): NextAction
   const actions = all.slice(0, limit);
   const criticalCount = all.filter((a) => a.urgency === "critical").length;
 
+  // "Needs you today" is only true for a date that has NOT passed. An overdue
+  // item is critical too, but calling it "today" hides the fact that the date
+  // is already gone — the headline must say which of the two it means.
+  const datedActions = all.filter((a) => typeof a.dueInDays === "number");
+  const overdueCount = datedActions.filter((a) => (a.dueInDays as number) < 0).length;
+  const dueNowCount = datedActions.filter((a) => {
+    const d = a.dueInDays as number;
+    return d >= 0 && d <= 14;
+  }).length;
+
   let headline: string;
-  if (criticalCount > 0) {
+  if (overdueCount > 0 && dueNowCount > 0) {
+    headline = `${overdueCount} deadline${overdueCount === 1 ? "" : "s"} already passed and ${dueNowCount} ${
+      dueNowCount === 1 ? "needs" : "need"
+    } you within two weeks — clear the passed ones first.`;
+  } else if (overdueCount > 0) {
+    headline =
+      overdueCount === 1
+        ? "One deadline has already passed — clear it or drop it first."
+        : `${overdueCount} deadlines have already passed — clear or drop them first.`;
+  } else if (criticalCount > 0) {
     headline =
       criticalCount === 1
         ? "One deadline needs you today."
@@ -362,11 +385,22 @@ export function buildNextActions(ctx: NextActionsContext, limit = 3): NextAction
   return { actions, rest: all.slice(limit), headline, criticalCount };
 }
 
-/** Days from `today` to a YYYY-MM-DD date (negative when past). */
+/**
+ * Whole CALENDAR days from `today` to a YYYY-MM-DD date (negative when past).
+ *
+ * Both sides are truncated to their UTC day first. Rounding a raw timestamp
+ * difference instead made "due today" come out as -1 at any hour past midnight
+ * (so the dashboard called today's deadline "Overdue") and "due tomorrow" as 0
+ * ("Due in 0 days"). Calendar arithmetic is the only definition that matches
+ * what a student sees on a calendar, and it now agrees with
+ * `calendarDaysUntil` (reminders) and `/api/dashboard`.
+ */
 export function daysUntil(today: Date, isoDate: string | null | undefined): number | null {
   if (!isoDate) return null;
-  const target = new Date(isoDate);
-  if (Number.isNaN(target.getTime())) return null;
-  const ms = target.getTime() - today.getTime();
-  return Math.round(ms / MONTH_MS === 0 ? 0 : ms / 86400000);
+  const day = String(isoDate).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const startOfToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const target = Date.parse(`${day}T00:00:00Z`);
+  if (!Number.isFinite(target)) return null;
+  return Math.round((target - startOfToday) / 86400000);
 }

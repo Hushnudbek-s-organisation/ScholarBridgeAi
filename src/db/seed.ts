@@ -654,14 +654,23 @@ export async function seedDatabase() {
       ]);
     }
 
-    // Insert sample application tasks
+    // Insert sample application tasks.
+    // Due dates are RELATIVE to the moment of seeding: fixed absolute dates
+    // went stale (a fresh install showed the demo student with every task
+    // ~500 days overdue and the dashboard announcing "3 deadlines need you
+    // today"). A relative offset keeps the demo coherent whenever it runs.
+    const daysFromNow = (days: number): string => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
     await db.insert(applicationTasks).values([
       {
         profileId: profile.id,
         universityId: insertedUnis[2]?.id || null,
         title: "Draft Statement of Purpose (SOP) tailored for TUM",
         category: "SOP & Essays",
-        dueDate: "2025-05-15",
+        dueDate: daysFromNow(12),
         isCompleted: false,
         priority: "High"
       },
@@ -670,7 +679,7 @@ export async function seedDatabase() {
         universityId: null,
         title: "Request Recommendation Letter from Dr. Vance (ML Professor)",
         category: "LOR",
-        dueDate: "2025-05-01",
+        dueDate: daysFromNow(-30),
         isCompleted: true,
         priority: "High"
       },
@@ -679,7 +688,7 @@ export async function seedDatabase() {
         universityId: null,
         title: "Order WES Official Academic Transcript Evaluation",
         category: "Document Prep",
-        dueDate: "2025-05-20",
+        dueDate: daysFromNow(26),
         isCompleted: false,
         priority: "Medium"
       },
@@ -688,7 +697,7 @@ export async function seedDatabase() {
         universityId: insertedUnis[3]?.id || null,
         title: "Submit University of Toronto Online Application Portal",
         category: "Document Prep",
-        dueDate: "2025-06-01",
+        dueDate: daysFromNow(40),
         isCompleted: false,
         priority: "High"
       }

@@ -3,6 +3,7 @@
  * `scripts/check-growth.ts`.
  */
 import type { JourneyCheck } from "./defaults";
+import { profileCompletenessRatio, type ChancingProfile } from "../chancing";
 
 // ---------------------------------------------------------------------------
 // Small parsing helpers
@@ -72,22 +73,22 @@ export interface CompletenessInput {
   olympiads?: string | null;
 }
 
-/** 0–100. Counts only facts the student entered — no invented defaults. */
-export function profileCompleteness(p: CompletenessInput | null | undefined): number {
+/**
+ * 0–100. Counts only facts the student entered — no invented defaults.
+ *
+ * ONE definition, shared with the readiness/chancing engine
+ * (`profileCompletenessRatio`), so the dashboard, the journey bar, the study
+ * plan and the referral activation bar can never show different percentages
+ * for the same profile. This module used to run its own 9-check list while
+ * chancing ran a 12-check one, and the same profile read 44 % in the journey
+ * and 42 % in the dashboard (reported live).
+ *
+ * It counts the portfolio rows (`savedActivities`) too: an activity the
+ * student added on the Activities pane is part of the same person.
+ */
+export function profileCompleteness(p: ChancingProfile | null | undefined): number {
   if (!p) return 0;
-  const has = (v: unknown) => v !== null && v !== undefined && v !== "" && !(typeof v === "number" && !Number.isFinite(v));
-  const checks = [
-    has(p.gpa) && Number(p.gpa) > 0,
-    has(p.ieltsScore) || has(p.toeflScore) || has(p.duolingoScore),
-    has(p.country),
-    has(p.graduationYear),
-    has(p.targetMajor),
-    has(p.budgetAnnualUsd),
-    has(p.careerGoal),
-    [p.leadership, p.volunteering, p.clubs, p.projects, p.sports].some((v) => parseList(v).length > 0),
-    [p.awards, p.olympiads].some((v) => parseList(v).length > 0),
-  ];
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  return Math.round(profileCompletenessRatio(p) * 100);
 }
 
 // ---------------------------------------------------------------------------

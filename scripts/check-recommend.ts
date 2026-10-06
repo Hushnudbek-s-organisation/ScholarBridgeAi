@@ -293,6 +293,76 @@ section("7. Ranking order and plain-language factors");
 }
 
 // ---------------------------------------------------------------------------
+// 7b. Degree level decides before subject fit
+// ---------------------------------------------------------------------------
+
+section("7b. Degree level is the hard constraint");
+
+{
+  // A Master's applicant must never see a Bachelor's programme lead the list,
+  // however exactly its subject matches. Reported live: "Bachelor of
+  // Engineering in Robotics" (exact fit) ranked #1 for a Master's profile.
+  const bachelorExact = program({
+    id: 1,
+    universityId: 1,
+    name: "RECOMMEND-FIXTURE: BSc Robotics",
+    field: "Robotics",
+    degreeLevel: "Bachelor",
+  });
+  const masterPartial = program({
+    id: 2,
+    universityId: 1,
+    name: "RECOMMEND-FIXTURE: MSc Data Engineering",
+    field: "Data Engineering",
+    degreeLevel: "Master",
+  });
+  const masterSynonym = program({
+    id: 3,
+    universityId: 1,
+    name: "RECOMMEND-FIXTURE: MSc Informatica",
+    field: "Informatics",
+    degreeLevel: "Master",
+  });
+  const mastered = recommend(
+    { interests: ["Robotics"], degreeLevel: "Master" },
+    makeCatalog([bachelorExact, masterPartial, masterSynonym], new Map())
+  );
+  check("a matching level leads even with a weaker subject fit", mastered[0].program.id !== 1, JSON.stringify(mastered.map((r) => r.program.id)));
+  check(
+    "the Bachelor programme is flagged as a mismatch",
+    mastered.find((r) => r.program.id === 1)?.degreeLevelMatch === "mismatch"
+  );
+  check(
+    "every mismatch sorts below every match",
+    (() => {
+      const lastMatch = Math.max(...mastered.map((r, i) => (r.degreeLevelMatch !== "mismatch" ? i : -1)));
+      const firstMismatch = mastered.findIndex((r) => r.degreeLevelMatch === "mismatch");
+      return firstMismatch === -1 || firstMismatch > lastMatch;
+    })(),
+    JSON.stringify(mastered.map((r) => r.degreeLevelMatch))
+  );
+  check(
+    "the card explains WHY it is there",
+    (mastered.find((r) => r.program.id === 1)?.considerations ?? []).some((c) =>
+      /while your profile says Master/.test(c)
+    )
+  );
+  check(
+    "a same-level programme says match",
+    mastered.find((r) => r.program.id === 2)?.degreeLevelMatch === "match"
+  );
+  const noLevel = recommend({ interests: ["Robotics"] }, makeCatalog([bachelorExact], new Map()));
+  check(
+    "an unstated level is 'unknown', not a silent mismatch",
+    noLevel[0].degreeLevelMatch === "unknown"
+  );
+  check(
+    "an unstated level adds no level penalty",
+    !noLevel[0].considerations.some((c) => /while your profile says/.test(c))
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 8. API tests — isolated embedded Postgres + direct route handlers
 // ---------------------------------------------------------------------------
 

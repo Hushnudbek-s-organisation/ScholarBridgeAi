@@ -138,7 +138,13 @@ const withOverdue = buildNextActions({
 check("an overdue deadline is action #1", /Overdue: Purdue/.test(withOverdue.actions[0].title));
 check("an overdue deadline is critical", withOverdue.actions[0].urgency === "critical");
 check("the dashboard counts it", withOverdue.criticalCount === 1);
-check("the headline says so", /today/i.test(withOverdue.headline));
+// An overdue deadline is NOT "today": the headline must say the date passed,
+// and must not claim the student still has time.
+check(
+  "the headline says the deadline has passed",
+  /passed/i.test(withOverdue.headline) && !/needs you today/i.test(withOverdue.headline),
+  withOverdue.headline
+);
 
 const withNear = buildNextActions({
   ...baseContext,
@@ -229,6 +235,40 @@ check(
 );
 check("daysUntil tolerates null", daysUntil(TODAY, null) === null);
 check("daysUntil tolerates garbage", daysUntil(TODAY, "not-a-date") === null);
+// Calendar days, not rounded timestamps: a date ON the reference day is 0
+// (due today, not overdue) and the next day is 1, whatever the time of day.
+check("a date on the reference day is 0 days away", daysUntil(TODAY, "2026-09-25") === 0);
+check(
+  "a date on the reference day is never negative, at any hour",
+  daysUntil(new Date(Date.UTC(2026, 8, 25, 23, 59)), "2026-09-25") === 0
+);
+check("the next calendar day is 1 day away", daysUntil(TODAY, "2026-09-26") === 1);
+check(
+  "the next calendar day is 1 even late at night",
+  daysUntil(new Date(Date.UTC(2026, 8, 25, 23, 59)), "2026-09-26") === 1
+);
+
+const dueToday = buildNextActions({
+  ...baseContext,
+  deadlines: [{ id: "app-9", title: "Purdue — due today", type: "application", daysRemaining: 0 }],
+});
+check("a deadline due today reads 'Due today'", /^Due today: /.test(dueToday.actions[0].title));
+check("a deadline due today is critical", dueToday.actions[0].urgency === "critical");
+check("a deadline due today is not called overdue", !/Overdue/.test(dueToday.actions[0].title));
+check("its headline says today", /needs you today/i.test(dueToday.headline), dueToday.headline);
+
+const mixed = buildNextActions({
+  ...baseContext,
+  deadlines: [
+    { id: "app-7", title: "Overdue one", type: "application", daysRemaining: -4 },
+    { id: "app-8", title: "Soon one", type: "application", daysRemaining: 6 },
+  ],
+});
+check(
+  "a mixed list says what passed AND what is due",
+  /already passed/i.test(mixed.headline) && /need/i.test(mixed.headline),
+  mixed.headline
+);
 
 section("5. Advisor brief contains only real numbers");
 

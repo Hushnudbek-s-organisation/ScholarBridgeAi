@@ -341,6 +341,72 @@ disabled).
 rules in `src/lib/visa-mic.ts` plus guards on the component, the header and the
 route).
 
+## 4e. Sixth pass — "check EVERYTHING again, is it all working?"
+
+Requested after the visa-voice fix: re-verify the whole product end-to-end, not
+just the part that was reported. Everything below was found by driving the live
+app with three real profiles (the bootstrap admin with an empty profile, the
+seeded demo student, and a brand-new account created through the sign-up
+endpoint), not by reading code.
+
+1. **The demo data was permanently stale.** `src/db/seed.ts` shipped FIXED
+   task dates (`2025-05-01` … `2025-06-01`), so a fresh install showed the demo
+   student with three application tasks ~510 days overdue and the dashboard
+   announced *"3 deadlines need you today"*. Scholarship dates had already been
+   fixed with a roll-forward pass; tasks had not. Seed dates are now RELATIVE
+   to the moment of seeding (−30 / +12 / +26 / +40 days), so the demo is
+   coherent whenever it runs. Verified on a wiped cluster: the tasks land at
+   those offsets.
+2. **"Today" was not today.** `/api/dashboard` and the reminder engine compute
+   whole calendar days (`Date.UTC(y,m,d)`), but `/api/next-actions` and
+   `/api/deadlines` rounded a raw millisecond difference — so at any hour past
+   midnight a deadline **due today** reported `-1` and was labelled "Overdue",
+   while **tomorrow** reported `0` and read "Due in 0 days". Caught live by
+   creating tasks for yesterday/today/tomorrow and reading the answers back.
+   `daysUntil()` is now calendar arithmetic and `/api/deadlines` uses the same
+   helper, so the same date reports the same number everywhere.
+3. **The dashboard said "needs you today" about a date that had passed.**
+   `buildNextActions` treated every critical item as due-today. Overdue and
+   due-soon are now counted separately and the headline says which it means
+   ("1 deadline already passed and 4 need you within two weeks — clear the
+   passed ones first"), a deadline dated today reads "Due today" (not "Due in
+   0 days", and never "Overdue").
+4. **A dead design page was answering 500.** `/preview` was a leftover
+   "hero redesign — before/after" scratch page: unlinked from the app, absent
+   from the sitemap, and it threw a 500 for anyone who typed the URL (it
+   rendered `UniversityDetail` outside the intl provider). Removed; the route
+   is a clean 404 and `test:render` now asserts the file cannot come back.
+5. **The sitemap listed one URL.** `/universities` and `/scholarships` serve
+   full server-rendered catalogues — the two pages a student searching for
+   either thing should land on — and neither was listed. The sitemap now names
+   the landing page, both catalogues and the legal pages (5 URLs), and the
+   suite asserts each listed page exists as a route and that nothing behind
+   sign-in is advertised.
+6. **The programme recommender ignored the degree level.** A brand-new
+   Master's applicant asking for "Mechanical Engineering, Robotics" got
+   **"Bachelor of Engineering in Robotics" as result #1** — its subject match
+   was exact and the wrong level only cost −4 on a 0–100 score. Degree level is
+   the hard constraint, so it is now the primary ranking key (matches first,
+   then unknown, then mismatches), mismatches sort below every match, and each
+   card states it: *"This is a Bachelor program while your profile says Master
+   — check that you are eligible to apply"*. Verified live: the 8 mismatching
+   programmes moved to the bottom of the 24, contiguous.
+7. **Three different "profile completeness" numbers existed.** The journey bar
+   read 44 %, the dashboard 42 %, the readiness pane 42 %, and the journey's
+   own profile step displayed 63 % — the same student, at the same moment, from
+   two separate 9-check and 12-check scoring lists, with the referral
+   activation bar and the chancing confidence fed by a third path. There is now
+   ONE definition (`profileCompletenessRatio`) that every surface calls, it
+   counts the Activities-pane portfolio rows too, and the four numbers read
+   42/42/42/42 for the same profile (and 58/58/58 for the demo student).
+
+Every fix above carries an assert so it cannot silently regress:
+`test:roadmap` 52 → **61** (calendar-day arithmetic at 23:59, quiet wording,
+due-today vs overdue, mixed lists), `test:render` 158 → **162** (no scratch
+page, sitemap ↔ routes), `test:recommend` 74 → **81** (level decides before
+subject fit, mismatch explained), `test:growth` 28 → **33** (one definition,
+shared with chancing).
+
 ## 5. Known remaining gaps (not hidden)
 
 * **Engine prose and the remaining journey panes are English-only.** Match/issue
@@ -377,14 +443,14 @@ stacking, notification creation + localisation, the paid/subscription mirror,
 and static guards on the card/route/engine.
 
 Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
-`security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
+`security` 68 · `match` 74 · `chancing` 64 · `roadmap` 61 · `documents` 35 ·
 `essays` 36 · `visa` 80 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
-`parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
+`parent` 41 · `dataset` 50 · `render` 162 · `essay-adapter` 39 · `rec-letter`
 28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
-`essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
+`essay-reviews` 16 · `integration` 246 · `growth` 33 · `telegram` 27 ·
 `telegram-integration` 119 · `ownership` 83 · `portability` 57 · `journey` 91 ·
 `dark` ✓ · `schema-repair` 15 · `provenance` ✓ (needs :3000 running) ·
-`recommend` 74 · `study-interests` 35 · **`referral` 56** ·
+`recommend` 81 · `study-interests` 35 · **`referral` 56** ·
 `api-security` **236 handlers across 131 route files refused anonymous access**
 (401/403 everywhere).
 
@@ -396,70 +462,36 @@ up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
 
 ## 7. Environment state after the run
 
-The dev database was rebuilt from scratch during this round (the sandbox lost
-its `.pgdata`, `node_modules` and `.env.local` between turns, which is also how
-the "db:dev:init does not seed" bug surfaced) and left in a canonical,
-self-consistent state:
+The sandbox drops `node_modules`, `.env.local` and the embedded Postgres
+cluster between sessions (twice during this work), so the run was reproduced
+end-to-end from a WIPED cluster — which is the only way the two data bugs in
+§4e could surface at all.
 
-* schema pushed, catalogue seeded through the NEW `npm run db:seed`: 12
-  universities, 24 programmes, 8 scholarships, 16 opportunities, 5 forum
-  categories, 1 course, 4 levels, 5 badges — re-running is a no-op;
-* two profiles: the bootstrap operator (`admin@local.test`) with an honestly
-  EMPTY student profile (`completeness 0`, `personalised: false`, 0
-  recommendations, `fitScore: null`, `plan: null`, but still the only admin) and
-  the seeded demo student Alex Chen (not an admin; the admin API answers 403);
-* no `app_config` rows for the referral keys, so the code defaults apply — live
-  `/api/referral` payload: `{premiumMultiple: 5, premiumDays: 30,
-  referrerPoints: 100, referredPoints: 50, activationCompleteness: 50}`;
-* one referral E2E left in place so the mechanic is visible in the UI: profile 3
-  ("Rebuild Probe") was invited with Alex's code, crossed the 50 % bar (58 %), so
-  Alex shows `1 / 5` on the referral card with both notifications delivered and
-  the 100/50-point ledger rows written. No premium window is left active
-  (the grant/revoke test ended in `revoke`), so no student is premium by
-  accident.
-
-Everything that was mutated only for a test was reverted through the app's own
-endpoints (premium grant → revoke, config edit → defaults restored) or deleted
-(the 3 generic roadmap tasks the empty-profile probe generated).
-
-**38/38 suites green.** New this pass: `test:referral` — 56 asserts against a
-real PostgreSQL (embedded, port 55442, its own database): every rule read from
-`app_config`, code mint/reuse/refusal, the activation bar (bare signup refused,
-33 % refused, 58 % pays), idempotency, both-side points, premium multiples and
-stacking, notification creation + localisation, the paid/subscription mirror,
-and static guards on the card/route/engine.
-
-Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
-`security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
-`essays` 36 · `visa` 80 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
-`parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
-28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
-`essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
-`telegram-integration` 119 · `ownership` 83 · `portability` 57 · `journey` 91 ·
-`dark` ✓ · `schema-repair` 15 · `provenance` ✓ (needs :3000 running) ·
-`recommend` 74 · `study-interests` 35 · **`referral` 56** ·
-`api-security` **236 handlers across 131 route files refused anonymous access**
-(401/403 everywhere).
-
-Two runs needed the right conditions, both re-verified green: `integration`
-flaked once *in teardown* after a neighbouring suite (246 passed, 0 failed,
-crash while closing the pool) and `provenance` only passes with the dev server
-up. `npx tsc --noEmit` rc 0 · `npm run build` rc 0 · `check-i18n` passed
-(1 743 `t()` sites) · `lint:baseline` passed (50 pre-existing, baselined).
-
-The dev database was left in a canonical, self-consistent state:
-
+* `node scripts/dev-db.mjs --init` = cluster + `drizzle-kit push` + the real
+  seeder. Result: 93 tables, 12 universities, 24 programmes, 8 scholarships,
+  16 opportunities, 5 forum categories, 1 course, 4 levels, 5 badges; a second
+  run inserts nothing;
+* two profiles, both honest: the bootstrap operator (`admin@local.test`) with
+  an EMPTY student profile (strength `overall 0`, `completeness 0`, all three
+  scored sections flagged `unknown`, 0 recommendations, `personalised: false`,
+  `fitScore: null`, `plan: null`, and the dashboard headline "Your profile is
+  still thin"), and the seeded demo student Alex Chen (`completeness 58`,
+  not an admin — `/api/admin/*` answers 403);
+* the demo student's four application tasks are now seeded RELATIVE to the
+  moment of seeding, verified live on the fresh cluster: −30 (completed),
+  +12, +26, +40 days; `/api/next-actions` answers "One deadline needs you
+  today." and `/api/deadlines` reports the same day counts;
+* scholarship deadlines were already rolled to the next annual occurrence at
+  seed time (2026-10-08 … 2027-09-30, all eight in the future, marked
+  `recurring` + `unverified`);
 * no `app_config` rows for the referral keys, so the code defaults apply
-  (5 referrals → 30 days, 100/50 points, 50 % bar). Live payload:
-  `{premiumMultiple: 5, premiumDays: 30, referrerPoints: 100, referredPoints:
-  50, activationCompleteness: 50}`;
-* the bootstrap operator (profile 1, `admin@local.test`) has an honestly empty
-  student profile (`completeness 0`, `personalised: false`, no recommendations)
-  and is still the only admin — the seeded demo student (profile 2) lost
-  `is_admin` and now gets 403 from `/api/admin/*`;
-* the premium grants used for the live test were revoked through the app's own
-  endpoint, so no window survives a revoked source (profile 2: `free`/`none`,
-  dashboard `free`);
-* profile 2 keeps the two activations from the verification run (points 2 of 5,
-  both invited rows active) — consistent with the rules shown on its card — and
-  profiles 5/6 are those activated referrals.
+  (5 referrals → 30 days, 100/50 points, 50 % activation bar).
+
+The signed-in walk-through (sign-up → profile → save → task → application →
+plan → chat) was driven with real session cookies; every row it created was on
+a scratch cluster that was then wiped, so the canonical database above carries
+no E2E leftovers.
+
+Superseded by this run: the admin-owned `.pgdata` written here, and the
+`tmp-*.mts` scratch scripts used to mint session cookies and read the database
+directly — none of them are committed.

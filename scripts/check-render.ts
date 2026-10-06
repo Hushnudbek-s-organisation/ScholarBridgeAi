@@ -15,7 +15,7 @@
  */
 
 import React from "react";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { PlanningStudio } from "../src/components/PlanningStudio";
@@ -580,6 +580,33 @@ check(
   "the SOP studio does not write for an invented major",
   !/targetMajor \|\| "Computer Science"/.test(sopStudio),
   "SOP defaults to Computer Science"
+);
+
+// ---------------------------------------------------------------------------
+// Shipped surface: no design scratch page, and a sitemap that names every
+// public page. `/preview` was a leftover "hero redesign — before/after" demo
+// page: unlinked, listed nowhere, and it threw a 500 for anyone who typed the
+// URL (it rendered UniversityDetail outside the intl provider). It is gone.
+check(
+  "no design-scratch preview page ships under /preview",
+  !existsSync(new URL("../src/app/preview/page.tsx", import.meta.url))
+);
+const sitemapSource = readFileSync(new URL("../src/app/sitemap.ts", import.meta.url), "utf8");
+const publicPages = ["/universities", "/scholarships", "/terms", "/privacy"];
+check(
+  "the sitemap lists every public page, not just the landing page",
+  publicPages.every((p) => sitemapSource.includes(`${p}`)) && sitemapSource.includes("${SITE_URL}/`"),
+  publicPages.filter((p) => !sitemapSource.includes(p)).join(", ")
+);
+check(
+  "every page the sitemap lists actually exists as a route",
+  ["universities", "scholarships", "terms", "privacy"].every((dir) =>
+    existsSync(new URL(`../src/app/${dir}/page.tsx`, import.meta.url))
+  )
+);
+check(
+  "nothing behind sign-in is advertised to crawlers",
+  !/dashboard|admin|visa|essays/.test(sitemapSource)
 );
 
 // ---------------------------------------------------------------------------
