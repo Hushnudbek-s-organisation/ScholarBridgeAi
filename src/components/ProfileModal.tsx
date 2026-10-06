@@ -65,7 +65,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     targetMajor: string;
     studyInterests: StudyInterestSelection[];
     gpa: number | string;
-    gpaScale: number;
+    /** Empty until the student picks a scale — never defaulted. */
+    gpaScale: number | "";
     ieltsScore: number | string;
     toeflScore: number | string;
     satScore: number | string;
@@ -104,12 +105,15 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     name: "",
     email: "",
     password: "",
-    degreeLevel: "Master",
-    targetMajor: "Computer Science",
+    // Nothing is pre-answered: an untouched form must not turn into a
+    // "Master / Computer Science / 4.0 scale / scholarship needed" profile
+    // (spec §19 — every score and recommendation must come from the student).
+    degreeLevel: "",
+    targetMajor: "",
     studyInterests: [],
     // No fabricated test scores: empty fields stay empty until entered.
     gpa: "",
-    gpaScale: 4.0,
+    gpaScale: "",
     ieltsScore: "",
     toeflScore: "",
     satScore: "",
@@ -121,7 +125,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     preferredCountries: [],
     targetUniversities: "",
     careerGoal: "",
-    needScholarship: true,
+    needScholarship: false,
     needsFinancialAid: false,
     requiresFullScholarship: false,
     country: "",
@@ -168,14 +172,14 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         name: profile.name || "",
         // Telegram-only accounts have a technical email — show an empty field.
         email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
-        degreeLevel: profile.degreeLevel || "Master",
-        targetMajor: profile.targetMajor || "Computer Science",
+        degreeLevel: profile.degreeLevel || "",
+        targetMajor: profile.targetMajor || "",
         studyInterests: selectionsFromProfile(profile.studyInterests, profile.targetMajor),
         // NEVER fabricate values: empty fields stay empty instead of being
         // saved as fake defaults (7.0/95/1350/315) when a profile has no
         // test scores yet.
         gpa: profile.gpa ?? "",
-        gpaScale: profile.gpaScale || 4.0,
+        gpaScale: profile.gpaScale ?? "",
         ieltsScore: profile.ieltsScore ?? "",
         toeflScore: profile.toeflScore ?? "",
         satScore: profile.satScore ?? "",
@@ -187,7 +191,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         preferredCountries: countries,
         targetUniversities: toList(profile.targetUniversities),
         careerGoal: profile.careerGoal || "",
-        needScholarship: profile.needScholarship ?? true,
+        needScholarship: profile.needScholarship ?? false,
         needsFinancialAid: profile.needsFinancialAid ?? false,
         requiresFullScholarship: profile.requiresFullScholarship ?? false,
         country: profile.country || "",
@@ -215,13 +219,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
       setFormData({
         name: "",
         email: "",
-        degreeLevel: "Master",
+        degreeLevel: "",
         targetMajor: "",
         studyInterests: [],
         // Never pre-fill fabricated academic data — the student enters
         // their real GPA/test scores (NULL-safe, spec §19).
         gpa: "",
-        gpaScale: 4.0,
+        gpaScale: "",
         ieltsScore: "",
         toeflScore: "",
         satScore: "",
@@ -233,7 +237,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         preferredCountries: [],
         targetUniversities: "",
         careerGoal: "",
-        needScholarship: true,
+        needScholarship: false,
         needsFinancialAid: false,
         requiresFullScholarship: false,
         country: "",
@@ -346,6 +350,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         graduationYear: graduationYear === "" ? null : Number(graduationYear),
         familyIncomeUsd: familyIncomeUsd === "" ? null : Number(familyIncomeUsd),
         preferredCountries: JSON.stringify(formData.preferredCountries),
+        // An unset scale is not a scale: send NULL so the completeness check
+        // does not count a field the student never filled in.
+        gpaScale: rest.gpaScale === "" ? null : Number(rest.gpaScale),
       });
       onClose();
     } catch (err: any) {
@@ -551,9 +558,15 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   />
                   <select
                     value={formData.gpaScale}
-                    onChange={(e) => setFormData({ ...formData, gpaScale: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        gpaScale: e.target.value === "" ? "" : parseFloat(e.target.value),
+                      })
+                    }
                     className="w-1/3 px-2 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
+                    <option value="">—</option>
                     <option value={4.0}>/ 4.0</option>
                     <option value={5.0}>/ 5.0</option>
                     <option value={10.0}>/ 10.0</option>

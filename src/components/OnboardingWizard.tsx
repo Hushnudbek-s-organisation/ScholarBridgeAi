@@ -141,7 +141,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     satScore: profile?.satScore ? String(profile.satScore) : "",
     greScore: profile?.greScore ? String(profile.greScore) : "",
     budgetAnnualUsd: profile?.budgetAnnualUsd ? String(profile.budgetAnnualUsd) : "",
-    needScholarship: profile?.needScholarship ?? true,
+    // Unchecked until the student ticks the step that asks this question.
+    needScholarship: profile?.needScholarship ?? false,
     preferredCountries: safeParseCountries(profile?.preferredCountries),
     workExperienceYears: profile?.workExperienceYears != null ? String(profile.workExperienceYears) : "",
     researchPublications: profile?.researchPublications != null ? String(profile.researchPublications) : "",

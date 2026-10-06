@@ -27,7 +27,9 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
 
   // Drafter State
   const [targetUni, setTargetUni] = useState("");
-  const [targetProgram, setTargetProgram] = useState(activeProfile?.targetMajor || "Computer Science");
+  // An empty field is honest: the SOP prompt must not be written for a major
+  // the student never named. The placeholder suggests, the value does not lie.
+  const [targetProgram, setTargetProgram] = useState(activeProfile?.targetMajor || "");
   const [personalHook, setPersonalHook] = useState("");
   const [careerGoals, setCareerGoals] = useState("");
   const [generatedSop, setGeneratedSop] = useState<string | null>(null);

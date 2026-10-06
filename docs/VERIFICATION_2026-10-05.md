@@ -228,6 +228,53 @@ the same Postgres the preview uses), not by reading code.
     payload immediately, then the shipped defaults were restored and the cached
     config values reloaded (server restart) so the site is back to spec.
 
+## 4c. Fourth pass — "is EVERYTHING based on the user's own profile?"
+
+Re-read every place a profile is written or read, asking one question: *could a
+student see a number, a score or a sentence that comes from something they did
+not type?*
+
+1. **The Edit Profile form pre-answered four questions.** It opened with
+   `degreeLevel: "Master"`, `targetMajor: "Computer Science"`, `gpaScale: 4.0`
+   and `needScholarship: true` — so a student who opened the modal, changed
+   anything and saved also wrote "Master / Computer Science / 4.0 / needs a
+   scholarship" into their profile, and every score built on that profile (and
+   the chancing engine's financial-need branch, and `matching.ts`'s scholarship
+   weighting) used those invented answers. All four are gone: empty stays empty,
+   the GPA scale has an explicit "—" option and is saved as NULL when unset
+   (so it no longer counts as a completed field), and the "+" new-profile form
+   got the same treatment. The onboarding wizard likewise no longer pre-ticks
+   the scholarship step, and the SOP studio no longer writes a statement for
+   "Computer Science" when the profile names no major.
+   Guarded by 5 new asserts in `test:render` (158 total) so it cannot come back.
+2. **`npm run db:dev:init` never seeded anything.** It ran
+   `tsx src/db/seed.ts` — a module with no CLI entry point — so a fresh install
+   got the schema and an empty catalogue while the README promised a seed; the
+   universities/scholarships/programmes then "appeared" only if an API route
+   happened to be hit. There is now a real entry point (`npm run db:seed`,
+   `scripts/seed-db.ts`) that seeds the base catalogue, the programme catalogue,
+   scholarship cycles, opportunities, forum, courses and gamification, and
+   `db:dev:init` calls it. Verified from scratch: 12 universities, 24 programmes,
+   8 scholarships, 16 opportunities, 5 forum categories, 1 course, 4 levels,
+   5 badges; re-running is a no-op.
+3. **The bootstrap admin is not a student.** After the repair, a fresh seed
+   creates the operator account with identity only (no GPA/major/budget) —
+   confirmed live: `completeness 0`, `personalised: false`, 0 recommendations —
+   while still being the only account that can open the admin panel, and the
+   seeded demo student is not an admin (admin API → 403).
+4. **The whole referral chain was re-driven on the rebuilt database** (not just
+   asserted in the suite): `?ref=` capture → signup response carries
+   `referredBy` → the bar refuses a bare profile (`0 %`) → filling it to 58 %
+   pays the referrer `+1` and both sides `+100`/`+50` points (ledger rows tied
+   to the invited profile) → both get the localised notification naming the
+   friend → referral Premium appears as `subscription`/`premium` on
+   `/api/premium/status`, the dashboard and the admin table → revoke returns all
+   three to `free`/`none` simultaneously.
+5. **Landing page re-read in en/uz/ru** after the changes: 200 in all three,
+   no provider names, no `undefined`/`NaN`/`null`, and the demo panel is
+   labelled "Demo · sample data" with "no invented probabilities" / "Fit — not a
+   probability" stated next to the example numbers.
+
 ## 5. Known remaining gaps (not hidden)
 
 * **Engine prose and the remaining journey panes are English-only.** Match/issue
@@ -246,6 +293,8 @@ the same Postgres the preview uses), not by reading code.
   mentors, offers and saved-* lists are empty until the student (or the
   consented cohort) creates data. The panes explain the empty state; no sample
   rows are injected.
+* **The profile editors' remaining decimal defaults are input affordances, not
+  data** — an empty number field is sent as NULL, and the suites assert that.
 * **AI provider credentials are absent in this environment**, so AI routes
   serve their grounded fallbacks (`aiUsed: false`). This is the designed
   behaviour, not a defect — and every fallback is verified to carry the same
@@ -264,7 +313,7 @@ and static guards on the card/route/engine.
 Counts this run: `ai-settings` 83 · `ai-format` 40 · `groq` 27 · `schema` ✓ ·
 `security` 68 · `match` 74 · `chancing` 64 · `roadmap` 52 · `documents` 35 ·
 `essays` 36 · `visa` 50 · `costs` 44 · `cv` 44 · `compare` 43 · `mentors` 37 ·
-`parent` 41 · `dataset` 50 · `render` 153 · `essay-adapter` 39 · `rec-letter`
+`parent` 41 · `dataset` 50 · `render` 158 · `essay-adapter` 39 · `rec-letter`
 28 · `country-compare` 17 · `countries` ✓ · `opportunities` 14 ·
 `essay-reviews` 16 · `integration` 246 · `growth` 28 · `telegram` 27 ·
 `telegram-integration` 119 · `ownership` 83 · `portability` 57 · `journey` 91 ·

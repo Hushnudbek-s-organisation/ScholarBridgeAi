@@ -543,5 +543,45 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+section("Profile editors never pre-answer the student's questions");
+
+// A form that OPENS with "Master / Computer Science / 4.0 / scholarship needed"
+// silently writes those answers into the profile the moment the student saves
+// anything — the profile then drives every score with data nobody entered.
+const profileModal = readFileSync(new URL("../src/components/ProfileModal.tsx", import.meta.url), "utf8");
+const wizard = readFileSync(new URL("../src/components/OnboardingWizard.tsx", import.meta.url), "utf8");
+const sopStudio = readFileSync(new URL("../src/components/AiSopStudio.tsx", import.meta.url), "utf8");
+
+check(
+  "the profile modal starts with no degree, major or scale chosen",
+  !/degreeLevel: "Master"/.test(profileModal) &&
+    !/targetMajor: "Computer Science"/.test(profileModal) &&
+    !/gpaScale: 4\.0,/.test(profileModal),
+  "found an invented default in ProfileModal"
+);
+check(
+  "the profile modal does not claim a scholarship need nobody expressed",
+  /needScholarship: false,/.test(profileModal) &&
+    !/needScholarship: true,/.test(profileModal),
+  "found needScholarship: true as a default"
+);
+check(
+  "an unset GPA scale is saved as NULL, not as 4.0",
+  /gpaScale: rest\.gpaScale === "" \? null/.test(profileModal),
+  "the scale is not NULL-safe"
+);
+check(
+  "the wizard does not pre-tick the scholarship step",
+  /needScholarship: profile\?\.needScholarship \?\? false/.test(wizard) &&
+    !/needScholarship: form\.needScholarship \|\| true/.test(wizard),
+  "the wizard answers the scholarship question for the student"
+);
+check(
+  "the SOP studio does not write for an invented major",
+  !/targetMajor \|\| "Computer Science"/.test(sopStudio),
+  "SOP defaults to Computer Science"
+);
+
+// ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
