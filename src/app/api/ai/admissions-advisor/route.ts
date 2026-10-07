@@ -8,7 +8,7 @@ import { ADVISOR_SYSTEM_PROMPT, buildAdvisorBrief, isTrustworthyReply, rulesAdvi
 import { ADMISSION_PROBABILITY, estimateAdmissionChance, profileCompletenessRatio, type ChancingResult } from "@/lib/chancing";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
 import { calculateUniversityMatch } from "@/lib/matching";
-import { chancingProfileWithActivities, toChancingUniversity, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toChancingUniversity, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 
 /**
  * AI Admissions Advisor (#3).
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     const uniIds = [...new Set([...savedUnis.map((s) => s.universityId), ...appUniIds])];
 
     const chancingProfile = await chancingProfileWithActivities(profile);
-    const matchProfile = toMatchProfile(profile);
+    const matchProfile = await toMatchProfileWithActivities(profile);
 
     const chances: ChancingResult[] = [];
     if (uniIds.length > 0) {

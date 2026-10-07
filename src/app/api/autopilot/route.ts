@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { savedScholarships, scholarshipDecisions, scholarships, studentProfiles } from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
+import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { guardStudent, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
@@ -38,12 +39,13 @@ export async function GET(req: Request) {
       db.select().from(scholarshipDecisions).where(eq(scholarshipDecisions.profileId, profileId)),
       db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
     ]);
+    const matchProfile = await toMatchProfileWithActivities(profile);
     const now = new Date();
     const decisionById = new Map(decisions.map((d) => [d.scholarshipId, d.status]));
     const savedIds = new Set(saved.map((s) => s.scholarshipId));
 
     const all = rows.map((s) => {
-      const m = calculateScholarshipMatch(profile, s);
+      const m = calculateScholarshipMatch(matchProfile, s);
       const st = withStatus(s);
       const item: AutopilotScholarship = {
         id: s.id,

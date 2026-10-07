@@ -11,7 +11,7 @@ import {
 import { requireProfileAccess } from "@/lib/auth";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { chancingProfileWithActivities, toChancingUniversity, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toChancingUniversity, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import {
   ADMISSION_PROBABILITY,
   estimateAdmissionChance,
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
     }
     const locale = localeFromRequest(req);
     const chancingProfile = await chancingProfileWithActivities(profile);
-    const matchProfile = toMatchProfile(profile);
+    const matchProfile = await toMatchProfileWithActivities(profile);
 
     // Which universities are we estimating?
     const singleId = Number(searchParams.get("universityId"));

@@ -2943,7 +2943,13 @@
       "budget_fits": "Estimated cost ${cost}/yr fits your budget",
       "budget_exceeds": "Estimated cost ${cost}/yr exceeds your ${budget} budget",
       "country_preferred": "{country} is on your preferred list",
-      "experience_boost": "Research / work experience strengthens your application"
+      "experience_boost": "Research / work experience strengthens your application",
+      "activity_strength": "{activities} activities strengthen your application",
+      "full_funding_required": "You require full funding — verify that this university offers a full scholarship or financial-aid route",
+      "financial_plan_missing": "You marked financial aid as needed, but this university has no verified full-cost figure",
+      "financial_budget_missing": "Add your annual budget so we can compare this cost with your funding plan",
+      "income_below_cost": "Recorded family income ${income}/yr is below the estimated ${cost} annual cost",
+      "income_supports_cost": "Recorded family income ${income}/yr covers the estimated annual cost"
     },
     "scholarship": {
       "gpa_well_above": "GPA {gpa} well above the {min} minimum",
@@ -2960,7 +2966,11 @@
       "major_missing": "This award lists eligible fields ({majors}) — add your target major to your profile to be matched",
       "major_eligible": "Your field ({field}) is eligible",
       "major_limited": "Field limited to: {majors}",
-      "need_based": "Need-based — matches your scholarship requirement",
+      "need_based": "Need-based — matches your financial-aid requirement",
+      "need_not_applicable": "This award is need-based, while your profile says you do not need financial aid",
+      "financial_need_unknown": "This award is need-based — add your financial-aid need to assess the fit",
+      "full_funding_match": "Coverage appears compatible with your full-scholarship requirement",
+      "full_funding_unclear": "You require full funding — this award's coverage may not cover tuition and living costs",
       "merit_based": "Merit-based — strong academic record / publications"
     }
   },

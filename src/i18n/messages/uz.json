@@ -2943,7 +2943,13 @@
       "budget_fits": "Taxminiy xarajat ${cost}/yil byudjetingizga sig‘adi",
       "budget_exceeds": "Taxminiy xarajat ${cost}/yil byudjetingiz ${budget}dan oshadi",
       "country_preferred": "{country} afzal ko‘rganlar ro‘yxatida",
-      "experience_boost": "Tadqiqot / ish tajribasi arizangizni kuchaytiradi"
+      "experience_boost": "Tadqiqot / ish tajribasi arizangizni kuchaytiradi",
+      "activity_strength": "{activities} ta faoliyatingiz arizangizni kuchaytiradi",
+      "full_funding_required": "Sizga to‘liq moliyalashtirish kerak — bu universitet to‘liq stipendiya yoki moliyaviy yordam berishini tekshiring",
+      "financial_plan_missing": "Moliyaviy yordam kerakligini ko‘rsatdingiz, ammo universitetning tasdiqlangan to‘liq xarajati yo‘q",
+      "financial_budget_missing": "Yillik byudjetingizni kiriting, shunda uni moliyalashtirish rejangiz bilan solishtiramiz",
+      "income_below_cost": "Ko‘rsatilgan oilaviy daromad ${income}/yil taxminiy yillik xarajat ${cost}dan past",
+      "income_supports_cost": "Ko‘rsatilgan oilaviy daromad ${income}/yil taxminiy yillik xarajatni qoplaydi"
     },
     "scholarship": {
       "gpa_well_above": "GPA {gpa} talab qilinadigan {min} minimalidan ancha yuqori",
@@ -2960,7 +2966,11 @@
       "major_missing": "Stipendiyada yo‘nalishlar ko‘rsatilgan ({majors}) — moslash uchun profilda maqsadli yo‘nalishni kiriting",
       "major_eligible": "Sizning yo‘nalishingiz ({field}) mos keladi",
       "major_limited": "Yo‘nalish cheklangan: {majors}",
-      "need_based": "Ehtiyojga asoslangan — stipendiya talabingizga mos",
+      "need_based": "Ehtiyojga asoslangan — moliyaviy yordam ehtiyojingizga mos",
+      "need_not_applicable": "Bu grant ehtiyojga asoslangan, profilingizda esa moliyaviy yordam kerak emasligi ko‘rsatilgan",
+      "financial_need_unknown": "Bu grant ehtiyojga asoslangan — moslikni baholash uchun moliyaviy yordam ehtiyojingizni kiriting",
+      "full_funding_match": "Qoplama turi to‘liq stipendiya talabingizga mos kelishi mumkin",
+      "full_funding_unclear": "Sizga to‘liq moliyalashtirish kerak — bu grant o‘qish va yashash xarajatlarini qoplashini tekshiring",
       "merit_based": "Yutuqlarga asoslangan — kuchli akademik natija / nashrlar"
     }
   },

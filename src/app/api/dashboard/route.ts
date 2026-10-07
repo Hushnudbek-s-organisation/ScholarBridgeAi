@@ -25,7 +25,7 @@ import { guardStudent, serverError } from "@/lib/journey/api";
 import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/journey/stages";
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
 import { profileStrength } from "@/lib/chancing";
-import { chancingProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
@@ -554,7 +554,7 @@ async function recommendedFor(
   const degreeLevel = profile.degreeLevel ?? null;
   const applicantCountry = profile.country ?? null;
 
-  const matchProfile = toMatchProfile(profile);
+  const matchProfile = await toMatchProfileWithActivities(profile);
 
   // Which profile facts exist, and which would unlock a better list.
   const basis: string[] = [];

@@ -8,6 +8,7 @@ import { buildCv, renderCvText } from "@/lib/cv";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
 import { gpaTo4 } from "@/lib/similarProfiles";
 import { calculateUniversityMatch } from "@/lib/matching";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 
 /**
@@ -77,6 +78,7 @@ export async function GET(req: Request) {
     const target = universityId
       ? uniRows.find((u) => u.id === universityId) ?? uniRows[0]
       : uniRows[0];
+    const matchProfile = await toMatchProfileWithActivities(profile);
 
     const costs = calculateCosts({
       annualTuitionUsd: target?.annualTuitionUsd,
@@ -168,7 +170,7 @@ export async function GET(req: Request) {
       // The full university row satisfies the matchers; the raw profile row
       // satisfies StudentProfileData / ChancingProfile.
       const uni = uniRows.find((r) => r.id === u.id)!;
-      const match = calculateUniversityMatch(profile, uni).matchScore;
+      const match = calculateUniversityMatch(matchProfile, toUniversityData(uni)).matchScore;
       return { id: u.id, match };
     });
 

@@ -81,6 +81,7 @@ export interface ChancingProfile {
    */
   savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
   budgetAnnualUsd?: number | null;
+  familyIncomeUsd?: number | null;
   careerGoal?: string | null;
   graduationYear?: number | null;
   needScholarship?: boolean | null;
@@ -102,6 +103,7 @@ export interface ChancingUniversity {
   acceptanceRate?: number | null;
   programMajor?: string | null;
   annualTuitionUsd?: number | null;
+  annualLivingEstUsd?: number | null;
   internationalStudentsPercentage?: number | null;
 }
 
@@ -501,20 +503,34 @@ function financialSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
 } {
   const notes: { positive?: string; negative?: string } = {};
   const tuition = Number(uni.annualTuitionUsd);
+  const living = Number(uni.annualLivingEstUsd);
+  const hasTuition = Number.isFinite(tuition) && tuition > 0;
+  const hasLiving = Number.isFinite(living) && living > 0;
+  const totalCost = hasTuition ? tuition + (hasLiving ? living : 0) : null;
   const budget = Number(profile.budgetAnnualUsd);
-  let score = 75;
-  let factor = 1;
+  let score = totalCost == null && !(Number.isFinite(budget) && budget > 0) ? 50 : 75;
+  let factor = totalCost == null && !(Number.isFinite(budget) && budget > 0) ? 0.95 : 1;
 
-  if (Number.isFinite(tuition) && tuition > 0 && Number.isFinite(budget) && budget > 0) {
-    if (budget >= tuition * 1.4) {
+  if (totalCost != null && Number.isFinite(budget) && budget > 0) {
+    if (budget >= totalCost * 1.4) {
       score = 92;
-      notes.positive = "Budget comfortably covers tuition";
-    } else if (budget >= tuition) {
+      notes.positive = "Budget comfortably covers tuition and estimated living costs";
+    } else if (budget >= totalCost) {
       score = 78;
+      notes.positive = "Budget covers tuition and estimated living costs";
     } else {
       score = 45;
-      notes.negative = `Budget $${budget.toLocaleString()} is below the $${tuition.toLocaleString()} tuition`;
+      notes.negative = `Budget $${budget.toLocaleString()} is below the estimated $${totalCost.toLocaleString()} annual cost`;
+      factor *= 0.82;
     }
+  } else if (totalCost == null && Number.isFinite(budget) && budget > 0) {
+    notes.negative = "Budget is recorded, but the university has no verified full annual cost";
+    factor *= 0.96;
+  } else if (totalCost != null && !(Number.isFinite(budget) && budget > 0)) {
+    notes.negative = "No annual budget submitted — affordability cannot be assessed";
+    factor *= 0.9;
+  } else {
+    notes.negative = "No budget or verified cost submitted — financial fit is unknown";
   }
 
   // Need-aware admissions: requiring full funding genuinely narrows options.
@@ -524,6 +540,17 @@ function financialSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
     notes.negative = "Requiring a full scholarship narrows the pool of funding programmes";
   } else if (profile.needsFinancialAid || profile.needScholarship) {
     score = clamp(score - 8, 5, 100);
+    notes.negative ??= "Financial aid is needed — confirm the university's funding policy";
+  }
+
+  // Family income is supporting context, never silently substituted for the
+  // student's annual budget. It still informs the financial signal when the
+  // student has not supplied a budget and the catalogue has a cost.
+  const income = Number(profile.familyIncomeUsd);
+  if (totalCost != null && !(Number.isFinite(budget) && budget > 0) && Number.isFinite(income) && income > 0 && income < totalCost) {
+    score = clamp(score - 10, 5, 100);
+    factor *= 0.9;
+    notes.negative = `Recorded family income is below the estimated $${totalCost.toLocaleString()} annual cost`;
   }
   return { score: round(score), factor, notes };
 }
@@ -666,7 +693,7 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
     Number(profile.satScore) > 0 || Number(profile.actScore) > 0,
     Boolean(profile.country),
     Boolean(profile.targetMajor),
-    Number(profile.budgetAnnualUsd) > 0,
+    Number(profile.budgetAnnualUsd) > 0 || Number(profile.familyIncomeUsd) > 0 || profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true,
     countActivities(profile).activities > 0,
     parseListColumn(profile.leadership).length > 0,
     parseListColumn(profile.awards).length + parseListColumn(profile.olympiads).length > 0,
@@ -723,9 +750,13 @@ export function profileStrength(
   const awardsScore = round(clamp(awards * 18, 0, 100));
   const essays =
     typeof opts.essayScore === "number" && opts.essayScore > 0 ? round(clamp(opts.essayScore, 0, 100)) : 0;
-  const financial =
-    Number(profile.budgetAnnualUsd) > 0 ? (profile.requiresFullScholarship ? 55 : 88) : 0;
-  const financialUnknown = !(Number(profile.budgetAnnualUsd) > 0);
+  const hasBudget = Number(profile.budgetAnnualUsd) > 0;
+  const hasIncome = Number(profile.familyIncomeUsd) > 0;
+  const hasFundingNeed = profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true;
+  const financial = hasBudget
+    ? profile.requiresFullScholarship ? 55 : profile.needsFinancialAid || profile.needScholarship ? 72 : 88
+    : profile.requiresFullScholarship ? 45 : profile.needsFinancialAid || profile.needScholarship ? 58 : hasIncome ? 60 : 0;
+  const financialUnknown = !(hasBudget || hasIncome || hasFundingNeed);
 
   const sections = [
     { key: "academics", label: "Academics", score: academics, unknown: academicsUnknown },

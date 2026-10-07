@@ -26,6 +26,7 @@ import {
   universities,
 } from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
+import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { createNotification, profileLang } from "@/lib/notifications";
 import { NOTIFY_TEXTS, type NotifyLang } from "@/lib/notificationTexts";
 import { calendarDaysUntil, parseReminderDays, reminderBucket, reminderTimezone } from "@/lib/telegram/reminders";
@@ -152,6 +153,7 @@ async function sweepProfile(profileId: number, _windowDays: number, now: Date): 
       ? await db.select().from(universities).where(inArray(universities.id, savedUnis.map((s) => s.universityId)))
       : [];
     const countries = [...new Set(uniRows.map((u) => u.country))];
+    const matchProfile = await toMatchProfileWithActivities(profile);
     const savedSet = new Set(savedIds);
 
     if (countries.length > 0) {
@@ -160,7 +162,7 @@ async function sweepProfile(profileId: number, _windowDays: number, now: Date): 
       for (const sch of candidates) {
         if (notified >= 3) break; // never spam in one sweep
         if (savedSet.has(sch.id)) continue;
-        const match = calculateScholarshipMatch(profile, sch);
+        const match = calculateScholarshipMatch(matchProfile, sch);
         if (match.matchScore == null || match.matchScore < 60) continue;
         const t = NOTIFY_TEXTS.newMatch(lang, { title: sch.title, country: sch.country, score: match.matchScore });
         if (await notifyOnce(profileId, "scholarship_opened", `/scholarships?id=${sch.id}`, t.title, t.body)) {

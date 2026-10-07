@@ -67,6 +67,7 @@ export interface RecommendationInput {
   /** Preferred countries. Empty/absent = no preference (never a filter-out). */
   countries?: string[];
   budgetUsd?: number | null;
+  familyIncomeUsd?: number | null;
   fundingNeed?: FundingNeed | null;
   /** Preferred teaching language, e.g. "English". Absent = no preference. */
   languagePref?: string | null;
@@ -274,13 +275,16 @@ export function assessEligibility(
 // ---------------------------------------------------------------------------
 
 export interface Affordability {
-  annualCostUsd: number | null; // tuition only; living est. is reported separately
+  annualCostUsd: number | null; // tuition + verified USD living estimate when comparable
   annualTuition: number | null;
   tuitionCurrency: string;
   tuitionPeriod: string;
   livingEstUsd: number | null;
   withinBudget: "yes" | "no" | "unknown";
   budgetUsd: number | null;
+  familyIncomeUsd: number | null;
+  /** Supporting context only — family income is not silently treated as a budget. */
+  incomeVsAnnualCost: "yes" | "no" | "unknown";
   fundingNeed: FundingNeed | null;
   /** Scholarships that plausibly apply (same country or country-agnostic,
    *  same degree level, major-agnostic or major-matched, need-aware). */
@@ -316,9 +320,26 @@ export function assessAffordability(
   // budget is USD. A naive numeric compare across currencies would be
   // fabrication-adjacent, so the budget comparison only runs when the
   // tuition currency is USD; otherwise it stays "unknown" with an explanation.
-  const comparableCurrency = (program.tuitionCurrency || "USD").toUpperCase() === "USD";
+  const tuitionCurrency = (program.tuitionCurrency || "USD").toUpperCase();
+  const living =
+    uni?.annualLivingEst != null && Number.isFinite(Number(uni.annualLivingEst)) && Number(uni.annualLivingEst) > 0
+      ? Number(uni.annualLivingEst)
+      : null;
+  const livingCurrency = (uni?.livingCostCurrency || "USD").toUpperCase();
+  const comparableCurrency = tuitionCurrency === "USD" && (living == null || livingCurrency === "USD");
+  const annualCostUsd = tuition != null && comparableCurrency ? tuition + (living ?? 0) : tuition;
   const withinBudget: Affordability["withinBudget"] =
-    budget == null || tuition == null || !comparableCurrency ? "unknown" : tuition <= budget ? "yes" : "no";
+    budget == null || annualCostUsd == null || !comparableCurrency ? "unknown" : annualCostUsd <= budget ? "yes" : "no";
+  const familyIncome =
+    input.familyIncomeUsd != null && Number.isFinite(Number(input.familyIncomeUsd)) && Number(input.familyIncomeUsd) > 0
+      ? Number(input.familyIncomeUsd)
+      : null;
+  const incomeVsAnnualCost: Affordability["incomeVsAnnualCost"] =
+    familyIncome == null || annualCostUsd == null || !comparableCurrency
+      ? "unknown"
+      : annualCostUsd <= familyIncome
+        ? "yes"
+        : "no";
 
   // Scholarship plausibility — every condition must be known to pass;
   // unknown eligibility is never assumed.
@@ -344,21 +365,26 @@ export function assessAffordability(
         s.eligibleMajors.some((m) => normalizeSubject(m).includes(i) || i.includes(normalizeSubject(m)))
       );
     // Funding need: a need-based scholarship only plausibly matches when the
-    // student has stated a funding need (none/partial/full).
-    const needOk = input.fundingNeed != null ? true : !s.financialNeedBased;
+    // student has explicitly said partial/full aid is needed. "none" is a
+    // real answer and must not be treated like an unknown.
+    const needOk = s.financialNeedBased
+      ? input.fundingNeed === "partial" || input.fundingNeed === "full"
+      : true;
     if (countryOk && levelOk && majorOk && needOk) {
       matched.push({ id: s.id, title: s.title, coverageType: s.coverageType, needBased: s.financialNeedBased });
     }
   }
 
   return {
-    annualCostUsd: tuition,
+    annualCostUsd,
     annualTuition: tuition,
     tuitionCurrency: program.tuitionCurrency || "USD",
     tuitionPeriod: program.tuitionPeriod || "year",
-    livingEstUsd: uni?.annualLivingEst != null ? Number(uni.annualLivingEst) : null,
+    livingEstUsd: living,
     withinBudget,
     budgetUsd: budget,
+    familyIncomeUsd: familyIncome,
+    incomeVsAnnualCost,
     fundingNeed: input.fundingNeed ?? null,
     scholarshipMatches: matched,
   };
@@ -439,7 +465,13 @@ export function recommend(
     }
     if (affordability.withinBudget === "yes") score += 5;
     else if (affordability.withinBudget === "no") score -= 4;
-    // No budget / unknown: no change.
+    // Family income is a supporting signal only when no budget was supplied;
+    // it never replaces the stated budget or crosses currencies.
+    if (affordability.withinBudget === "unknown") {
+      if (affordability.incomeVsAnnualCost === "yes") score += 2;
+      else if (affordability.incomeVsAnnualCost === "no") score -= 2;
+    }
+    // No budget / unknown: no further change.
     if (input.countries?.length && input.countries.some((c) => c.trim().toLowerCase() === university.country.trim().toLowerCase())) {
       score += 4; // preferred location
     }
