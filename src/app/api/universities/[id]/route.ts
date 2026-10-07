@@ -14,7 +14,7 @@ import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degre
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { toMatchProfile } from "@/lib/profileMapping";
+import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { selectUniversities } from "@/lib/universities";
 import { studentProfiles } from "@/db/schema";
 
@@ -157,7 +157,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           const rows = await selectUniversities();
           const row = rows.find((r) => r.id === uniId);
           if (row) {
-            const result = calculateUniversityMatch(toMatchProfile(p), row);
+            const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
             match = {
               score: result.matchScore,
               category: result.matchCategory,

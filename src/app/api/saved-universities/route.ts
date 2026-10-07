@@ -3,6 +3,7 @@ import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { savedUniversities, universities, studentProfiles } from "@/db/schema";
 import { calculateUniversityMatch } from "@/lib/matching";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
 
@@ -48,9 +49,10 @@ export async function GET(req: Request) {
     // source of truth, so the response recomputes it (a scorer change or a
     // profile edit must never leave this list contradicting the Explorer /
     // Chancing screens). The stored pair is kept for audit.
+    const matchProfile = profile ? await toMatchProfileWithActivities(profile) : null;
     const withLiveMatch = saved.map((row) => {
-      if (!profile) return row;
-      const live = calculateUniversityMatch(profile, row.university);
+      if (!matchProfile) return row;
+      const live = calculateUniversityMatch(matchProfile, toUniversityData(row.university));
       return {
         ...row,
         matchScore: live.matchScore,
@@ -111,7 +113,10 @@ export async function POST(req: Request) {
     let cat: "Reach" | "Match" | "Safety" = "Match";
 
     if (profile && uni) {
-      const match = calculateUniversityMatch(profile, uni);
+      const match = calculateUniversityMatch(
+        await toMatchProfileWithActivities(profile),
+        toUniversityData(uni),
+      );
       score = match.matchScore;
       cat = match.matchCategory;
     }

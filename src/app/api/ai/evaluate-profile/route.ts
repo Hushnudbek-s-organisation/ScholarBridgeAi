@@ -9,7 +9,7 @@ import { localeToLanguageName, type Locale } from "@/i18n/config";
 import { asLocale, translateReasons } from "@/lib/engineText";
 import { profileStrength } from "@/lib/chancing";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
-import { chancingProfileWithActivities, toMatchProfile } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   buildProfileReport,
   type ReportFacts,
@@ -47,7 +47,7 @@ async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: L
 
   const essayScore = latestEssay.length ? (latestEssay[0].rubricTotal ?? null) : null;
   const strength = profileStrength(await chancingProfileWithActivities(profile), { essayScore });
-  const matchProfile = toMatchProfile(profile);
+  const matchProfile = await toMatchProfileWithActivities(profile);
 
   const scored = uniRows
     .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, uni) }))
@@ -155,8 +155,11 @@ STUDENT PROFILE (as saved by the student):
 - IELTS: ${profile.ieltsScore ?? "not provided"} · TOEFL: ${profile.toeflScore ?? "not provided"} · SAT: ${profile.satScore ?? "not provided"} · GRE: ${profile.greScore ?? "not provided"}
 - Annual budget: ${facts.budgetAnnualUsd == null ? "not specified" : `$${facts.budgetAnnualUsd.toLocaleString("en-US")}`}
 - Scholarship needed: ${facts.needScholarship ? "yes" : "no"}
+- Financial aid needed: ${profile.needsFinancialAid ? "yes" : "no"} · Full scholarship required: ${profile.requiresFullScholarship ? "yes" : "no"}
+- Family income: ${profile.familyIncomeUsd == null ? "not specified" : `$${profile.familyIncomeUsd.toLocaleString("en-US")}`}
 - Work experience: ${facts.workExperienceYears} years · Publications: ${facts.researchPublications}
 - Extracurriculars: ${facts.extracurriculars || "none stated"}
+- Structured activities: ${[profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates].filter(Boolean).join("; ") || "none stated"}
 
 VERIFIED PLATFORM DATA — the only numbers, names and claims you may use:
 ${factsForPrompt(facts)}

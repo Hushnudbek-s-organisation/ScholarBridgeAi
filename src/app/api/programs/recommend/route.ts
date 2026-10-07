@@ -210,10 +210,9 @@ export async function POST(req: Request) {
       ? { value: parseCatalogJsonArray(profile.preferredCountries) as string[], source: "profile" as InputSource }
       : { value: clampStringList(body.countries), source: "request" as InputSource };
 
-  // Funding need: only EXPLICIT profile flags count as known. The
-  // `need_scholarship` column defaults to true for fresh profiles, so a true
-  // value there is ambiguous (default vs student choice) and is treated as
-  // unknown — never presented as a known student fact.
+  // Funding need: use every explicit financial flag from the profile. A
+  // scholarship requirement is a partial need unless the student explicitly
+  // requires full funding; an absent flag remains unknown.
   let fundingNeed: { value: FundingNeed | null; source: InputSource };
   if (body.fundingNeed !== undefined) {
     const v = body.fundingNeed;
@@ -223,8 +222,10 @@ export async function POST(req: Request) {
     };
   } else if (profile.requiresFullScholarship === true) {
     fundingNeed = { value: "full", source: "profile" };
-  } else if (profile.needsFinancialAid === true) {
+  } else if (profile.needsFinancialAid === true || profile.needScholarship === true) {
     fundingNeed = { value: "partial", source: "profile" };
+  } else if (profile.needsFinancialAid === false && profile.needScholarship === false) {
+    fundingNeed = { value: "none", source: "profile" };
   } else {
     fundingNeed = { value: null, source: "unknown" };
   }
@@ -241,6 +242,7 @@ export async function POST(req: Request) {
     act: act.value as number | null,
     countries: countries.value as string[],
     budgetUsd: budgetUsd.value as number | null,
+    familyIncomeUsd: profile.familyIncomeUsd,
     fundingNeed: fundingNeed.value,
     languagePref: languagePref.value as string | null,
     startYear: startYear.value as number | null,

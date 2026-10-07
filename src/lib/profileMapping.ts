@@ -16,6 +16,32 @@ import type { StudentProfileData, UniversityData } from "@/lib/matching";
 
 type ProfileRow = typeof studentProfiles.$inferSelect;
 type UniversityRow = typeof universities.$inferSelect;
+// `selectUniversities()` has a resilient core-column fallback, so the mapper
+// accepts the fields the engine actually needs rather than requiring every
+// optional admin/provenance column on that fallback shape.
+type UniversityMappingRow = Pick<
+  UniversityRow,
+  | "id"
+  | "name"
+  | "country"
+  | "city"
+  | "flagEmoji"
+  | "worldRanking"
+  | "degreeLevel"
+  | "programMajor"
+  | "annualTuitionUsd"
+  | "annualLivingEstUsd"
+  | "minGpa"
+  | "minIelts"
+  | "minSat"
+  | "acceptanceRate"
+  | "postStudyWorkVisaYears"
+  | "description"
+  | "highlights"
+  | "websiteUrl"
+  | "imageUrl"
+> &
+  Partial<Pick<UniversityRow, "annualTuition" | "tuitionCurrency" | "annualLivingEst" | "livingCostCurrency">>;
 
 /**
  * `student_profiles` → chancing profile.
@@ -50,6 +76,7 @@ export function toChancingProfile(row: ProfileRow): ChancingProfile {
     workExperienceYears: row.workExperienceYears,
     researchPublications: row.researchPublications,
     budgetAnnualUsd: row.budgetAnnualUsd,
+    familyIncomeUsd: row.familyIncomeUsd,
     careerGoal: row.careerGoal,
     graduationYear: row.graduationYear,
     needScholarship: row.needScholarship,
@@ -104,11 +131,33 @@ export function toMatchProfile(row: ProfileRow): StudentProfileData {
     greScore: row.greScore,
     budgetAnnualUsd: row.budgetAnnualUsd,
     preferredCountries: row.preferredCountries,
-    needScholarship: row.needScholarship ?? false,
+    needScholarship: row.needScholarship,
+    familyIncomeUsd: row.familyIncomeUsd,
+    needsFinancialAid: row.needsFinancialAid,
+    requiresFullScholarship: row.requiresFullScholarship,
     extracurriculars: row.extracurriculars,
+    leadership: row.leadership,
+    volunteering: row.volunteering,
+    sports: row.sports,
+    clubs: row.clubs,
+    researchExperience: row.researchExperience,
+    projects: row.projects,
+    olympiads: row.olympiads,
+    awards: row.awards,
+    competitions: row.competitions,
+    certificates: row.certificates,
     workExperienceYears: row.workExperienceYears,
     researchPublications: row.researchPublications,
   };
+}
+
+/**
+ * The matching engine also sees the structured activity portfolio. This keeps
+ * Explorer, saved lists, dashboard and AI reports aligned with Chancing.
+ */
+export async function toMatchProfileWithActivities(row: ProfileRow): Promise<StudentProfileData> {
+  const [profile, activities] = await Promise.all([toMatchProfile(row), loadSavedActivities(row.id)]);
+  return { ...profile, savedActivities: activities };
 }
 
 /**
@@ -117,7 +166,7 @@ export function toMatchProfile(row: ProfileRow): StudentProfileData {
  * Typed as a real return value (not `as never`) so a renamed or missing column
  * becomes a compile error instead of a silently wrong score.
  */
-export function toUniversityData(row: UniversityRow): UniversityData {
+export function toUniversityData(row: UniversityMappingRow): UniversityData {
   return {
     id: row.id,
     name: row.name,
@@ -129,6 +178,10 @@ export function toUniversityData(row: UniversityRow): UniversityData {
     programMajor: row.programMajor,
     annualTuitionUsd: row.annualTuitionUsd,
     annualLivingEstUsd: row.annualLivingEstUsd,
+    annualTuition: row.annualTuition != null ? Number(row.annualTuition) : null,
+    tuitionCurrency: row.tuitionCurrency,
+    annualLivingEst: row.annualLivingEst != null ? Number(row.annualLivingEst) : null,
+    livingCostCurrency: row.livingCostCurrency,
     minGpa: row.minGpa,
     minIelts: row.minIelts,
     minSat: row.minSat,
@@ -155,6 +208,7 @@ export function toChancingUniversity(row: UniversityRow): ChancingUniversity {
     acceptanceRate: row.acceptanceRate,
     programMajor: row.programMajor,
     annualTuitionUsd: row.annualTuitionUsd,
+    annualLivingEstUsd: row.annualLivingEstUsd,
     internationalStudentsPercentage: row.internationalStudentsPercentage,
   };
 }

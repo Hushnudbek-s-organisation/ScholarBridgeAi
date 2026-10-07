@@ -43,9 +43,12 @@ export async function POST(req: Request) {
 - Target Major: ${profile.targetMajor}
 - GPA: ${profile.gpa}/${profile.gpaScale}
 - IELTS/TOEFL: ${profile.ieltsScore || profile.toeflScore || "Not set"}
-- Budget: $${profile.budgetAnnualUsd}/year
+- Budget: ${profile.budgetAnnualUsd == null ? "Not set" : "$" + profile.budgetAnnualUsd.toLocaleString("en-US") + "/year"}
+- Family income: ${profile.familyIncomeUsd == null ? "Not set" : "$" + profile.familyIncomeUsd.toLocaleString("en-US") + "/year"}
+- Financial aid needed: ${profile.needsFinancialAid || profile.needScholarship ? "Yes" : "No"}
+- Full scholarship required: ${profile.requiresFullScholarship ? "Yes" : "No"}
 - Countries: ${profile.preferredCountries}
-- Scholarship needed: ${profile.needScholarship ? "Yes" : "No"}`;
+- Activities: ${[profile.extracurriculars, profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates].filter(Boolean).join("; ") || "Not provided"}`;
       }
     }
 

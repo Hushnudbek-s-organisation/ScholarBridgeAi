@@ -46,7 +46,23 @@ export interface StudentProfileData {
   budgetAnnualUsd: number | null;
   preferredCountries?: string | string[] | null;
   needScholarship?: boolean | null;
+  /** Additional financial facts from the complete profile. */
+  familyIncomeUsd?: number | null;
+  needsFinancialAid?: boolean | null;
+  requiresFullScholarship?: boolean | null;
+  /** Profile activity fields (JSON arrays or legacy comma-separated text). */
   extracurriculars?: string | null;
+  leadership?: string | null;
+  volunteering?: string | null;
+  sports?: string | null;
+  clubs?: string | null;
+  researchExperience?: string | null;
+  projects?: string | null;
+  olympiads?: string | null;
+  awards?: string | null;
+  competitions?: string | null;
+  certificates?: string | null;
+  savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
   workExperienceYears?: number | null;
   researchPublications?: number | null;
 }
@@ -62,6 +78,11 @@ export interface UniversityData {
   programMajor: string | null;
   annualTuitionUsd?: number | null;
   annualLivingEstUsd?: number | null;
+  /** Verified generic-cost columns, used when the legacy USD mirror is empty. */
+  annualTuition?: number | null;
+  tuitionCurrency?: string | null;
+  annualLivingEst?: number | null;
+  livingCostCurrency?: string | null;
   minGpa?: number | null;
   minIelts?: number | null;
   minSat?: number | null;
@@ -159,6 +180,53 @@ export function subjectAlignment(
   }
   if (fit.level === "none") return { level: "none", similarity: 0 };
   return { level: "unknown", similarity: null };
+}
+
+/** Parse both the current JSON activity fields and the legacy comma format. */
+function profileList(raw: string | null | undefined): string[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  const value = raw.trim();
+  if (value.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).map((v) => v.trim()).filter(Boolean);
+    } catch {
+      // Fall back to the legacy separator below.
+    }
+  }
+  return value.split(",").map((v) => v.trim()).filter(Boolean);
+}
+
+function activityFacts(profile: StudentProfileData) {
+  const saved = profile.savedActivities ?? [];
+  const activities = [
+    ...profileList(profile.extracurriculars),
+    ...profileList(profile.leadership),
+    ...profileList(profile.volunteering),
+    ...profileList(profile.sports),
+    ...profileList(profile.clubs),
+    ...profileList(profile.projects),
+    ...profileList(profile.researchExperience),
+    ...saved,
+  ].length;
+  const leadership = profileList(profile.leadership).length + saved.filter((a) =>
+    a.category === "leadership" || /\b(lead|leader|president|captain|founder|chair|director|manager|mentor)\b/i.test(String(a.role ?? ""))
+  ).length;
+  const research = profileList(profile.researchExperience).length +
+    (Number(profile.researchPublications) > 0 ? Number(profile.researchPublications) : 0) +
+    saved.filter((a) => a.category === "research").length;
+  const awards = profileList(profile.olympiads).length +
+    profileList(profile.awards).length +
+    profileList(profile.competitions).length +
+    profileList(profile.certificates).length +
+    saved.filter((a) => a.category === "competition" && String(a.achievements ?? "").trim().length > 0).length;
+  return { activities, leadership, research, awards };
+}
+
+function usdCost(value: number | null | undefined, currency: string | null | undefined): number | null {
+  if (currency && currency.toUpperCase() !== "USD") return null;
+  if (value != null && Number.isFinite(Number(value)) && Number(value) > 0) return Number(value);
+  return null;
 }
 
 export function calculateUniversityMatch(profile: StudentProfileData, uni: UniversityData) {
@@ -293,28 +361,103 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     });
   }
 
-  // Budget Alignment — only when tuition data is verified AND the profile has a budget
-  // (NULL ≠ $0, spec §16; nullable budget must never crash formatting).
-  if (
-    uni.annualTuitionUsd != null &&
-    profile.budgetAnnualUsd != null &&
-    Number.isFinite(profile.budgetAnnualUsd)
-  ) {
-    const totalUniCost = uni.annualTuitionUsd + (uni.annualLivingEstUsd ?? 0);
-    if (profile.budgetAnnualUsd >= totalUniCost) {
+  // Activities — the profile's activity portfolio is part of the fit, not just
+  // the separate readiness page. Empty/unknown activity data stays neutral;
+  // entered activities contribute breadth, leadership, research and awards.
+  const activity = activityFacts(profile);
+  if (activity.activities > 0 || activity.awards > 0) {
+    const portfolioSize = activity.activities + activity.awards;
+    const activityBoost = Math.min(12, portfolioSize * 2 + activity.leadership + activity.research);
+    score += activityBoost;
+    reasons.push({
+      code: "activity_strength",
+      params: { activities: portfolioSize },
+      text: `${portfolioSize} activities and achievements strengthen your application`,
+      weight: activityBoost,
+    });
+  }
+
+  // Financial fit — compare the full verified annual cost, not tuition alone.
+  // Generic cost columns are used only when they are explicitly in USD; a
+  // cross-currency numeric comparison would be misleading.
+  const tuition = usdCost(uni.annualTuitionUsd, "USD") ?? usdCost(uni.annualTuition, uni.tuitionCurrency);
+  const rawLiving = uni.annualLivingEstUsd ?? uni.annualLivingEst;
+  const living = usdCost(uni.annualLivingEstUsd, "USD") ?? usdCost(uni.annualLivingEst, uni.livingCostCurrency);
+  const livingCostIsKnownButNotUsd = rawLiving != null && Number(rawLiving) > 0 && living == null;
+  const totalUniCost = tuition != null && !livingCostIsKnownButNotUsd ? tuition + (living ?? 0) : null;
+  const budget = profile.budgetAnnualUsd != null && Number.isFinite(Number(profile.budgetAnnualUsd)) && Number(profile.budgetAnnualUsd) > 0
+    ? Number(profile.budgetAnnualUsd)
+    : null;
+  const needsAid = profile.needScholarship === true || profile.needsFinancialAid === true || profile.requiresFullScholarship === true;
+  const familyIncome = profile.familyIncomeUsd != null && Number.isFinite(Number(profile.familyIncomeUsd)) && Number(profile.familyIncomeUsd) > 0
+    ? Number(profile.familyIncomeUsd)
+    : null;
+
+  if (totalUniCost != null && budget != null) {
+    if (budget >= totalUniCost) {
       score += 10;
       reasons.push({ code: "budget_fits", params: { cost: totalUniCost.toLocaleString() }, text: `Estimated cost $${totalUniCost.toLocaleString()}/yr fits your budget`, weight: 10 });
     } else {
-      const budgetDeficit = totalUniCost - profile.budgetAnnualUsd;
-      const weight = budgetDeficit > 30000 && !profile.needScholarship ? 20 : 10;
+      const budgetDeficit = totalUniCost - budget;
+      const weight = budgetDeficit > 30000 && !needsAid ? 20 : profile.requiresFullScholarship ? 18 : needsAid ? 14 : 10;
       score -= weight;
       potentialIssues.push({
         code: "budget_exceeds",
-        params: { cost: totalUniCost.toLocaleString(), budget: profile.budgetAnnualUsd.toLocaleString() },
-        text: `Estimated cost $${totalUniCost.toLocaleString()}/yr exceeds your $${profile.budgetAnnualUsd.toLocaleString()} budget`,
+        params: { cost: totalUniCost.toLocaleString(), budget: budget.toLocaleString() },
+        text: `Estimated cost $${totalUniCost.toLocaleString()}/yr exceeds your $${budget.toLocaleString()} budget`,
         weight,
       });
     }
+  }
+
+  // Family income is supporting evidence, not a replacement for the student's
+  // stated budget. When budget is absent, it still prevents the financial
+  // profile from being silently ignored.
+  if (totalUniCost != null && budget == null && familyIncome != null) {
+    if (familyIncome < totalUniCost) {
+      score -= 6;
+      potentialIssues.push({
+        code: "income_below_cost",
+        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
+        text: `Recorded family income $${familyIncome.toLocaleString()}/yr is below the estimated $${totalUniCost.toLocaleString()} annual cost`,
+        weight: 6,
+      });
+    } else {
+      score += 3;
+      reasons.push({
+        code: "income_supports_cost",
+        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
+        text: `Recorded family income $${familyIncome.toLocaleString()}/yr covers the estimated annual cost`,
+        weight: 3,
+      });
+    }
+  }
+
+  // A funding flag is a real profile constraint, not a decorative field. If
+  // there is no comparable cost data, say why the financial assessment is
+  // incomplete instead of silently treating this student as self-funded.
+  if (profile.requiresFullScholarship === true) {
+    score -= 8;
+    potentialIssues.push({
+      code: "full_funding_required",
+      params: {},
+      text: "You require full funding — verify that this university offers a full scholarship or financial-aid route",
+      weight: 8,
+    });
+  } else if (needsAid && totalUniCost == null) {
+    potentialIssues.push({
+      code: "financial_plan_missing",
+      params: {},
+      text: "You marked financial aid as needed, but this university has no verified full-cost figure",
+      weight: 7,
+    });
+  } else if (needsAid && totalUniCost != null && budget == null) {
+    potentialIssues.push({
+      code: "financial_budget_missing",
+      params: {},
+      text: "Add your annual budget so we can compare this cost with your funding plan",
+      weight: 7,
+    });
   }
 
   // Preferred Country Boost
@@ -509,17 +652,46 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     // fallback
   }
 
-  // Need based vs profile budget
-  if (scholarship.financialNeedBased && profile.needScholarship) {
-    score += 10;
-    reasons.push({ code: "need_based", params: {}, text: "Need-based — matches your scholarship requirement" });
+  // Financial need is part of scholarship fit. Account for every profile flag
+  // and never treat a need-based award as a match when the student explicitly
+  // said they do not need aid.
+  const needsAid = profile.needScholarship === true || profile.needsFinancialAid === true || profile.requiresFullScholarship === true;
+  const explicitlySelfFunded = profile.needScholarship === false && profile.needsFinancialAid === false && profile.requiresFullScholarship === false;
+  if (scholarship.financialNeedBased) {
+    if (needsAid) {
+      score += 10;
+      reasons.push({ code: "need_based", params: {}, text: "Need-based — matches your financial-aid requirement" });
+    } else if (explicitlySelfFunded) {
+      score -= 10;
+      potentialIssues.push({ code: "need_not_applicable", params: {}, text: "This award is need-based, while your profile says you do not need financial aid" });
+    } else {
+      potentialIssues.push({ code: "financial_need_unknown", params: {}, text: "This award is need-based — add your financial-aid need to assess the fit" });
+    }
   }
 
-  // Merit based vs GPA & Publications
+  if (profile.requiresFullScholarship === true) {
+    const coverage = String(scholarship.coverageType ?? "").toLowerCase();
+    if (/full|100%|tuition\s*and\s*(living|stipend)|tuition\s*\+\s*(living|stipend)/i.test(coverage)) {
+      score += 8;
+      reasons.push({ code: "full_funding_match", params: {}, text: "Coverage appears compatible with your full-scholarship requirement" });
+    } else {
+      potentialIssues.push({ code: "full_funding_unclear", params: {}, text: "You require full funding — this award's coverage may not cover tuition and living costs" });
+    }
+  }
+
+  // Merit-based awards also read the activity portfolio. Academic numbers and
+  // achievements should not be evaluated in two disconnected worlds.
   if (scholarship.meritBased) {
-    if ((normGpa != null && normGpa >= 3.6) || (profile.researchPublications || 0) > 0) {
+    const activity = activityFacts(profile);
+    if (
+      (normGpa != null && normGpa >= 3.6) ||
+      (profile.researchPublications || 0) > 0 ||
+      activity.leadership > 0 ||
+      activity.research > 0 ||
+      activity.awards > 0
+    ) {
       score += 10;
-      reasons.push({ code: "merit_based", params: {}, text: "Merit-based — strong academic record / publications" });
+      reasons.push({ code: "merit_based", params: {}, text: "Merit-based — strong academic record, activities or publications" });
     }
   }
 

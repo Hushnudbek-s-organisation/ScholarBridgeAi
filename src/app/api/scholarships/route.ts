@@ -15,6 +15,7 @@ import { seedDatabase } from "@/db/seed";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
 import { pickBestSource } from "@/lib/sourcePick";
+import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 
 export async function GET(req: Request) {
   try {
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
     let allScholarships = await db.select().from(scholarships);
 
     let profileData = null;
+    let matchProfile = null;
     if (profileIdStr) {
       const pId = parseInt(profileIdStr, 10);
       // Personalised matching reads private profile data (GPA, scores,
@@ -38,7 +40,10 @@ export async function GET(req: Request) {
       const auth = await authenticate(req);
       if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
         const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-        if (p) profileData = p;
+        if (p) {
+          profileData = p;
+          matchProfile = await toMatchProfileWithActivities(p);
+        }
       }
     }
 
@@ -126,8 +131,8 @@ export async function GET(req: Request) {
         reasonDetails?: ReasonDetail[];
         issueDetails?: ReasonDetail[];
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
-      if (profileData) {
-        matchInfo = calculateScholarshipMatch(profileData, s);
+      if (matchProfile) {
+        matchInfo = calculateScholarshipMatch(matchProfile, s);
       }
       // Computed application status from dates (spec §6) — never stale.
       const statusInfo = withStatus(s);

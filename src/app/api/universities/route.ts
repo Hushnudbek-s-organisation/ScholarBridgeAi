@@ -17,6 +17,7 @@ import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import { pickBestSource } from "@/lib/sourcePick";
 import { selectUniversities } from "@/lib/universities";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 
 /**
@@ -42,8 +43,11 @@ export async function GET(req: Request) {
 
     let allUnis = await selectUniversities();
 
-    // Get profile for match calculation if provided
+    // Get profile for match calculation if provided. The same mapping is used
+    // by Explorer, Chancing and the dashboard, including the structured
+    // activity portfolio and every financial flag.
     let profileData = null;
+    let matchProfile = null;
     if (profileIdStr) {
       const pId = parseInt(profileIdStr, 10);
       // Personalised matching reads private profile data (GPA, scores,
@@ -52,7 +56,10 @@ export async function GET(req: Request) {
       const auth = await authenticate(req);
       if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
         const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-        if (p) profileData = p;
+        if (p) {
+          profileData = p;
+          matchProfile = await toMatchProfileWithActivities(p);
+        }
       }
     }
 
@@ -244,8 +251,8 @@ export async function GET(req: Request) {
         reasonDetails?: ReasonDetail[];
         issueDetails?: ReasonDetail[];
       } = { matchScore: null, matchCategory: null, reasons: [], potentialIssues: [] };
-      if (profileData) {
-        matchInfo = calculateUniversityMatch(profileData, uni);
+      if (matchProfile) {
+        matchInfo = calculateUniversityMatch(matchProfile, toUniversityData(uni));
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
