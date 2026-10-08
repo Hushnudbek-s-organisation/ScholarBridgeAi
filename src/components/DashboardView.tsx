@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { clickableCardProps } from "@/lib/a11y";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
@@ -253,6 +254,7 @@ export function DashboardView({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div 
           onClick={() => onNavigateTab("tracker")}
+          {...clickableCardProps(() => onNavigateTab("tracker"))}
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -272,6 +274,7 @@ export function DashboardView({
 
         <div 
           onClick={() => onNavigateTab("scholarships")}
+          {...clickableCardProps(() => onNavigateTab("scholarships"))}
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -286,6 +289,7 @@ export function DashboardView({
 
         <div 
           onClick={() => onNavigateTab("tasks")}
+          {...clickableCardProps(() => onNavigateTab("tasks"))}
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -300,6 +304,7 @@ export function DashboardView({
 
         <div 
           onClick={() => onNavigateTab("sop")}
+          {...clickableCardProps(() => onNavigateTab("sop"))}
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -385,6 +390,7 @@ export function DashboardView({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div 
               onClick={() => onNavigateTab("sop")}
+              {...clickableCardProps(() => onNavigateTab("sop"))}
               className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl p-5 shadow-md hover:shadow-lg cursor-pointer transition-all space-y-3"
             >
               <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center">
@@ -401,6 +407,7 @@ export function DashboardView({
 
             <div 
               onClick={() => onNavigateTab("chat")}
+              {...clickableCardProps(() => onNavigateTab("chat"))}
               className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white rounded-2xl p-5 shadow-md hover:shadow-lg cursor-pointer transition-all space-y-3"
             >
               <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center">

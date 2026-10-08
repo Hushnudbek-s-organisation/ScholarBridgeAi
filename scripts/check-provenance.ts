@@ -272,7 +272,17 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error("check-provenance: ERROR", e?.message ?? e);
+    // `e.message` can legitimately be an empty string (a refused Postgres
+    // connection), which made this print a bare "ERROR " with nothing after it
+    // and no hint about the prerequisite. Say what actually failed.
+    const detail = e?.message || e?.code || (e ? String(e) : "unknown error");
+    console.error("check-provenance: ERROR", detail);
+    if (e?.code === "ECONNREFUSED" || /connect|ECONNREFUSED|getaddrinfo/i.test(detail)) {
+      console.error(
+        "  This suite needs a running stack: `npm run db:dev:init` (embedded Postgres)" +
+          " and `npm run dev`, or point DATABASE_URL / APP_BASE_URL at a live one."
+      );
+    }
     cleanFixtures().catch(() => {});
     process.exit(1);
   })

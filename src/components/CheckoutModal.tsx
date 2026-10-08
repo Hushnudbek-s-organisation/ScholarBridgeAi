@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, CreditCard, ArrowRight } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
@@ -27,6 +27,18 @@ export function CheckoutModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Escape closes the dialog. Keyboard-only users had no way out except
+  // tabbing to the small × button, and assistive tech could not tell this was
+  // a dialog at all (no role/aria-modal).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const price = packageMeta?.priceUzs ?? 59000;
@@ -44,7 +56,7 @@ export function CheckoutModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Checkout failed. Please try again.");
+        setError(data.error || t("checkoutFailed"));
         setLoading(false);
         return;
       }
@@ -58,17 +70,27 @@ export function CheckoutModal({
       }, 4000);
     } catch (err) {
       console.error(err);
-      setError("Checkout failed. Please try again.");
+      setError(t("checkoutFailed"));
       setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="checkout-modal-title"
+        className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4"
+      >
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 text-lg">{t("checkout")}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+          <h3 id="checkout-modal-title" className="font-bold text-slate-900 text-lg">{t("checkout")}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("cancel")}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>

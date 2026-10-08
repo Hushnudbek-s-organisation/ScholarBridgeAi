@@ -789,8 +789,13 @@ export function RecommendationStudio({
             </div>
 
             {showInputs && (
-              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-                <table className="w-full text-left text-xs">
+              // ScrollRegion, not a plain overflow-hidden div: with three
+              // columns this table does not fit a 320px viewport, and
+              // `overflow-hidden` CLIPPED the hidden columns with no way to
+              // reach them. ScrollRegion scrolls and stays keyboard-reachable
+              // (the same pattern as the compare tray below).
+              <ScrollRegion label={t("inputsUsed")} className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full min-w-[420px] text-left text-xs">
                   <thead className="bg-slate-100 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                     <tr>
                       <th scope="col" className="px-3 py-2 font-semibold">
@@ -814,7 +819,7 @@ export function RecommendationStudio({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollRegion>
             )}
 
             {data.results.length === 0 ? (

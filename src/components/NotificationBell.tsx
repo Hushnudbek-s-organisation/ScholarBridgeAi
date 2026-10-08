@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Bell, CheckCheck, Loader2, Settings2 } from "lucide-react";
+import { computePanelGeometry } from "@/lib/panelPlacement";
 
 interface NotificationItem {
   id: number;
@@ -36,32 +37,27 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
   // open to the right of it instead of 320px to the left of it.)
   const [anchor, setAnchor] = useState<"left" | "right">(placement === "up" ? "left" : "right");
   const [panelWidth, setPanelWidth] = useState<number | null>(null);
+  // Vertical: which way the panel actually opens (may differ from the requested
+  // `placement` when that side does not have room) and how tall it may be.
+  const [openUp, setOpenUp] = useState(placement === "up");
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
 
+  // The geometry is a pure function (src/lib/panelPlacement.ts) so the
+  // placement rules are unit-testable without a browser.
   const computePanel = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const margin = 8; // keep a small gutter from the viewport edge
-    const desired = Math.min(320, vw - margin * 2); // w-80 (320px)
-    const fitsLeft = rect.left + desired <= vw - margin;
-    const fitsRight = rect.right - desired >= margin;
-    let nextAnchor: "left" | "right";
-    if (fitsLeft && fitsRight) nextAnchor = rect.left < vw / 2 ? "left" : "right";
-    else if (fitsLeft) nextAnchor = "left";
-    else if (fitsRight) nextAnchor = "right";
-    else {
-      // Neither side fits the full width (very narrow screens) — use the
-      // roomier side and shrink the panel to fit.
-      const roomLeft = vw - margin - rect.left;
-      const roomRight = rect.right - margin;
-      nextAnchor = roomLeft >= roomRight ? "left" : "right";
-    }
-    const room = nextAnchor === "left" ? vw - margin - rect.left : rect.right - margin;
-    const nextWidth = Math.min(desired, room);
-    setAnchor(nextAnchor);
-    setPanelWidth(nextWidth < 320 ? Math.round(nextWidth) : null);
-  }, []);
+    const g = computePanelGeometry(
+      { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+      { width: window.innerWidth, height: window.innerHeight },
+      placement === "up"
+    );
+    setAnchor(g.anchor);
+    setOpenUp(g.openUp);
+    setPanelWidth(g.width);
+    setMaxHeight(g.maxHeight);
+  }, [placement]);
 
   const toggle = () => {
     if (!open) computePanel(); // anchor before first paint of the panel
@@ -139,14 +135,19 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
 
       {open && (
         <div
-          // Vertical: `placement="up"` opens above the bell (sidebar footer),
-          // "down" opens below it (mobile top header).
+          // Vertical: opens above the bell when it sits near the bottom of the
+          // screen (desktop sidebar footer) and below it in a top header —
+          // `computePanel` picks the direction with enough room and clamps the
+          // height, so the panel is always fully on screen.
           // Horizontal: `left-0` / `right-0` chosen by `computePanel` from the
           // bell's viewport position, so the panel stays fully on screen.
           className={`absolute ${
-            placement === "up" ? "bottom-full mb-2" : "top-full mt-1"
+            openUp ? "bottom-full mb-2" : "top-full mt-1"
           } ${anchor === "left" ? "left-0" : "right-0"} w-80 max-h-96 overflow-y-auto bg-white rounded-2xl border border-slate-200 shadow-xl z-50`}
-          style={panelWidth ? { width: panelWidth } : undefined}
+          style={{
+            ...(panelWidth ? { width: panelWidth } : null),
+            ...(maxHeight ? { maxHeight: maxHeight } : null),
+          }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <p className="text-xs font-extrabold text-slate-800">{t("title")}</p>

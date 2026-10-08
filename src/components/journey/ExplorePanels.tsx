@@ -66,8 +66,14 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
   const [career, setCareer] = useState<string>(CAREER_PATHS[0].id);
   const [major, setMajor] = useState<string>(CAREER_PATHS[0].majors[0]);
   const [unis, setUnis] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // `loading` is DERIVED, not stored. Writing setLoading(true) synchronously in
+  // the effect body triggered a cascading render (react-hooks/set-state-in-effect)
+  // and briefly showed the PREVIOUS major's results as if they were current.
+  // While `loadedFor` differs from the selected major the panel is loading, so
+  // there is no second piece of state to keep in sync and nothing to reset.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string>("");
+  const loading = loadedFor !== major;
 
   // The catalogue is English data; titles/blurbs are a closed set the UI translates.
   const careerTitle = (id: string) => t(`careerTitle${id[0].toUpperCase()}${id.slice(1)}`);
@@ -88,8 +94,13 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
   // logic that missed "Informatics ↔ Computer Science", "IT ↔ Information Systems", etc.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setFetchError("");
+    /** The single place this effect writes state — always after an await. */
+    const finish = (list: any[], error = "") => {
+      if (cancelled) return;
+      setUnis(list);
+      setFetchError(error);
+      setLoadedFor(major);
+    };
     (async () => {
       try {
         // Prefer server-side major filtering (uses programs table + programMajor + subjectAffinity).
@@ -105,15 +116,12 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
           const fallbackRes = await fetch(`/api/universities`, { cache: "no-store" });
           const fallbackJson = await fallbackRes.json().catch(() => ({}));
           if (cancelled || !fallbackRes.ok) {
-            setFetchError(json?.error || fallbackJson?.error || t("ceEmptyHint"));
-            setUnis([]);
-            return;
+            return finish([], json?.error || fallbackJson?.error || t("ceEmptyHint"));
           }
           const all: any[] = fallbackJson.universities ?? [];
           const filtered = all.filter((u) => universityOffersMajor(u, major));
           filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-          setUnis(filtered.slice(0, 12));
-          return;
+          return finish(filtered.slice(0, 12));
         }
         let list: any[] = json.universities ?? [];
         // If server returned an unfiltered list (doesn't support major yet), filter client-side.
@@ -136,8 +144,7 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
               const all: any[] = allJson.universities ?? [];
               const filtered = all.filter((u) => universityOffersMajor(u, major));
               filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-              setUnis(filtered.slice(0, 12));
-              return;
+              return finish(filtered.slice(0, 12));
             } else {
               // Keep clientFiltered (empty) — honest empty state
               list = clientFiltered;
@@ -153,23 +160,15 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
             const filtered = all.filter((u) => universityOffersMajor(u, major));
             filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
             if (filtered.length > 0) {
-              setUnis(filtered.slice(0, 12));
-              return;
+              return finish(filtered.slice(0, 12));
             }
           }
         }
-        if (!cancelled) {
-          // Ensure result is ranked by affinity before showing
-          list.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-          setUnis(list.slice(0, 12));
-        }
+        // Ensure result is ranked by affinity before showing
+        list.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
+        finish(list.slice(0, 12));
       } catch (e: any) {
-        if (!cancelled) {
-          setFetchError(e?.message || "");
-          setUnis([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        finish([], e?.message || "");
       }
     })();
     return () => {
