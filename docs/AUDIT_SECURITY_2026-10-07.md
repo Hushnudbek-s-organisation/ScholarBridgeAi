@@ -324,6 +324,40 @@ Two things worth noting:
 | 2 | 🟠 | `src/lib/research-agent/fetch.ts` | New `fetchGuarded()` — SSRF-guard **every** redirect hop, resolve relative Locations, cap at 5 |
 | 3 | 🟠 | `package.json` | `overrides` pinning `sharp ^0.35.5` and `source-map-js ^1.2.2` (2 high CVEs, both transitive) |
 | 3b | 🟠 | `package.json` | `next` 16.3.6 → **16.4.0**. Six high advisories published against 16.0.0–16.3.7 after the first pass of this audit, including SSRF in Image Optimization (GHSA-cjq9-62q9-8jv4) and SSG/ISR cache poisoning leading to cross-user content substitution (GHSA-mcj8-r9mp-w47p, GHSA-4jqv-mc3x-m676). `next` is pinned exactly, so this needed a deliberate version change rather than an `overrides` entry. Verified: `npm audit --omit=dev` → 0, `next build` exit 0, and 12 suites (~1 115 assertions incl. `render` deployment config and `security`) pass unchanged. |
+| 3c | 🟠 | `package.json` | `overrides` pinning `js-yaml ^4.3.2` (GHSA-2883-xcg3-v3hh, high — unbounded CPU on empty merge sources), reached transitively via `eslint` → `@eslint/eslintrc`. Dev-only, but a real patch exists. Verified the lint gate and `next build` still pass. |
+
+### 🟠 The CI `Dependency audit (high+)` gate cannot currently pass — pre-existing
+
+`.github/workflows/ci.yml` runs `npm audit --audit-level=high` **including dev
+dependencies**. That step has failed on `main` for five consecutive runs
+(`373d47d`, `7f6e7e5`, `2cbdbff`, `1041a28`, `48068e9`) — it is not introduced by
+this branch.
+
+The remaining six high findings are one single transitive chain, all dev-only
+lint tooling that never ships to production:
+
+```
+eslint-config-next → @next/eslint-plugin-next → fast-glob@3.3.1
+                   → micromatch@4.0.8 → braces@3.0.3  (+ brace-expansion)
+```
+
+**There is no upgrade available:** `braces@3.0.3` is the *latest published
+version* on the registry (`npm view braces versions` ends at 3.0.3), and
+`@next/eslint-plugin-next@16.4.0` still depends on `fast-glob@3.3.1`, so
+bumping the ESLint config does not clear it either. `npm audit fix` cannot help
+for the same reason.
+
+Recommended options, in order — **deliberately not applied here**, because
+weakening a security gate is a maintainer decision, not something to slip into a
+feature PR:
+
+1. Wait for an upstream `braces`/`micromatch` release and re-run.
+2. Scope the gate to what actually ships: `npm audit --omit=dev
+   --audit-level=high`. Production exposure is already clean (0 findings), and
+   the excluded packages are a ReDoS in the linter's glob matcher, reachable
+   only by whoever can already run the linter.
+3. Keep the gate strict and accept red CI until upstream fixes land.
+
 | 4 | 🟠 | `src/components/journey/ExplorePanels.tsx` | Derive `loading` instead of `setState` in an effect body — **unblocks the failing CI lint gate** |
 | 5 | 🟡 | `src/app/error.tsx`, `src/app/global-error.tsx`, `src/components/AppErrorFallback.tsx` | App-level error boundaries with retry/reload and a translated (en/uz/ru) fallback |
 | 6 | 🟡 | `src/lib/a11y.ts`, `DashboardView.tsx`, `ForumThreadList.tsx` | `clickableCardProps()` — 7 keyboard-inaccessible cards made reachable |
