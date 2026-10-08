@@ -27,9 +27,23 @@ function isInternalLiteralIp(hostname: string): boolean {
     if (host === "::" || host === "::1") return true;
     if (host.startsWith("fc") || host.startsWith("fd")) return true; // unique local
     if (host.startsWith("fe80")) return true; // link-local
-    // IPv4-mapped (::ffff:127.0.0.1)
-    const mapped = /::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(host);
-    if (mapped) return isInternalLiteralIp(mapped[1]);
+    // IPv4-mapped addresses carry a plain IPv4 address in the last 32 bits, so
+    // `::ffff:127.0.0.1` and `::ffff:169.254.169.254` are loopback and the cloud
+    // metadata endpoint respectively — and both must be refused.
+    //
+    // The hex form matters: WHATWG URL parsing (what Node and every browser do)
+    // NORMALISES `http://[::ffff:127.0.0.1]/` to the host `::ffff:7f00:1`, so a
+    // check that only understands the dotted spelling never fires and the
+    // address sails through as "safe" while still connecting to loopback.
+    const mappedDotted = /::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(host);
+    if (mappedDotted) return isInternalLiteralIp(mappedDotted[1]);
+    const mappedHex = /::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(host);
+    if (mappedHex) {
+      const hi = parseInt(mappedHex[1], 16);
+      const lo = parseInt(mappedHex[2], 16);
+      const dotted = `${hi >>> 8}.${hi & 255}.${lo >>> 8}.${lo & 255}`;
+      return isInternalLiteralIp(dotted);
+    }
     return false;
   }
 

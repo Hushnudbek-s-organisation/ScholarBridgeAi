@@ -39,6 +39,7 @@
     "test:essay-adapter": "tsx scripts/check-essay-adapter.ts",
     "test:rec-letter": "tsx scripts/check-rec-letter.ts",
     "test:country-compare": "tsx scripts/check-country-compare.ts",
+    "test:panel-placement": "tsx scripts/check-panel-placement.ts",
     "test:countries": "tsx scripts/check-countries.ts",
     "test:opportunities": "tsx scripts/check-opportunities.ts",
     "test:essay-reviews": "tsx scripts/check-essay-reviews.ts",
@@ -55,7 +56,8 @@
     "test:provenance": "tsx scripts/check-provenance.ts",
     "test:recommend": "tsx scripts/check-recommend.ts",
     "test:study-interests": "tsx scripts/check-study-interests.ts",
-    "test:referral": "tsx scripts/check-referral.ts"
+    "test:referral": "tsx scripts/check-referral.ts",
+    "test:payments": "tsx scripts/check-payments.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
@@ -67,7 +69,7 @@
     "drizzle-orm": "0.45.2",
     "framer-motion": "^13.4.4",
     "lucide-react": "^1.30.0",
-    "next": "16.3.6",
+    "next": "^16.4.0",
     "next-intl": "^4.13.5",
     "pg": "8.20.0",
     "react": "19.2.6",
@@ -91,5 +93,10 @@
   },
   "engines": {
     "node": ">=20 <23"
+  },
+  "overrides": {
+    "sharp": "^0.35.5",
+    "source-map-js": "^1.2.2",
+    "js-yaml": "^4.3.2"
   }
 }

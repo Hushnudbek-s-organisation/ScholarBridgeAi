@@ -41,6 +41,21 @@ function check(name: string, fn: () => void | Promise<void>) {
 
 const ROOT = join(import.meta.dirname, "..");
 
+/**
+ * `check` is deliberately synchronous (it throws if handed a promise). This is
+ * the awaited counterpart, for assertions that must stub `fetch` and wait on it.
+ */
+async function checkAsync(name: string, fn: () => Promise<void>) {
+  try {
+    await fn();
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } catch (err) {
+    failures.push(`${name} — ${(err as Error).message}`);
+    console.log(`  ✗ ${name} — ${(err as Error).message}`);
+  }
+}
+
 async function main() {
   const auth = await import("../src/lib/auth");
   const { hashPassword, verifyPassword, passwordPolicyError, MIN_PASSWORD_LENGTH } =
@@ -295,6 +310,153 @@ async function main() {
   check("assertSafeOutboundUrl throws for internal targets", () => {
     assert.throws(() => ssrf.assertSafeOutboundUrl("http://localhost:3000/"));
     assert.doesNotThrow(() => ssrf.assertSafeOutboundUrl("https://example.com/"));
+  });
+
+  // -------------------------------------------------------------------------
+  // REGRESSION: IPv4-mapped IPv6 written in HEX.
+  //
+  // WHATWG URL parsing (Node, and every browser) normalises the host
+  // `[::ffff:127.0.0.1]` to the string `::ffff:7f00:1`. The guard only matched
+  // the DOTTED spelling, so the hex form fell through and was treated as a safe
+  // public host — which let the research agent be pointed at loopback and at
+  // the cloud metadata endpoint (`[::ffff:a9fe:a9fe]` = 169.254.169.254, which
+  // answered when this was found). The list above did not contain a single
+  // IPv4-mapped address, so the suite passed with the hole open.
+  // -------------------------------------------------------------------------
+  check("blocks IPv4-mapped IPv6 in BOTH the dotted and the hex spelling", () => {
+    for (const url of [
+      "http://[::ffff:127.0.0.1]/",          // loopback, dotted  → parsed as ::ffff:7f00:1
+      "http://[::ffff:7f00:1]/",             // loopback, hex
+      "http://[::FFFF:7F00:1]/",             // uppercase
+      "http://[::ffff:a9fe:a9fe]/",          // 169.254.169.254 — cloud metadata
+      "http://[::ffff:169.254.169.254]/",    // cloud metadata, dotted
+      "http://[::ffff:10.0.0.5]/",           // private
+      "http://[::ffff:0a00:5]/",             // private, hex
+      "http://[::ffff:192.168.1.1]/",
+      "http://[::ffff:c0a8:101]/",
+    ]) {
+      assert.equal(ssrf.isSafeOutboundUrl(url), false, `should block ${url}`);
+    }
+  });
+
+  check("…without blocking genuine public IPv6 (no over-correction)", () => {
+    for (const url of [
+      "http://[2606:2800:220:1:248:1893:25c8:1946]/",
+      "http://[2001:db8::1]/",
+      "https://[::ffff:8.8.8.8]/",           // IPv4-mapped, but a PUBLIC address
+    ]) {
+      assert.equal(ssrf.isSafeOutboundUrl(url), true, `should allow ${url}`);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // REGRESSION: redirect targets must be re-validated.
+  //
+  // fetchPageText used `redirect: "follow"` after checking only the caller's
+  // URL, so any public page answering `302 Location: http://169.254.169.254/…`
+  // walked straight into the metadata endpoint — the guard never saw that URL.
+  // fetchGuarded() now follows redirects by hand and re-checks every hop.
+  // -------------------------------------------------------------------------
+  const { fetchGuarded } = await import("../src/lib/research-agent/fetch");
+  const realFetch = globalThis.fetch;
+
+  const withStubbedFetch = async (
+    handler: (url: string, hop: number) => { status: number; location?: string; body?: string },
+    run: () => Promise<void>
+  ) => {
+    let hop = 0;
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: unknown) => {
+      const url = String((input as Request)?.url ?? input);
+      seen.push(url);
+      const r = handler(url, hop++);
+      return new Response(r.body ?? "", {
+        status: r.status,
+        headers: r.location ? { location: r.location } : { "content-type": "text/html" },
+      });
+    }) as unknown as typeof fetch;
+    try {
+      await run();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    return seen;
+  };
+
+  console.log("\n— outbound redirects are re-validated —");
+
+  await checkAsync("a public page redirecting to the metadata endpoint is refused", async () => {
+    await withStubbedFetch(
+      () => ({ status: 302, location: "http://169.254.169.254/latest/meta-data/" }),
+      async () => {
+        await assert.rejects(
+          () => fetchGuarded("https://public.example.org/x", {}),
+          /refusing to follow redirect/
+        );
+      }
+    );
+  });
+
+  await checkAsync("a redirect to loopback is refused on the second hop", async () => {
+    await withStubbedFetch(
+      () => ({ status: 302, location: "http://127.0.0.1:5432/" }),
+      async () => {
+        await assert.rejects(
+          () => fetchGuarded("https://public.example.org/x", {}),
+          /refusing to follow redirect/
+        );
+      }
+    );
+  });
+
+  await checkAsync("legitimate multi-hop redirects are still followed", async () => {
+    let finalStatus = 0;
+    const seen = await withStubbedFetch(
+      (_u, n) =>
+        n < 3
+          ? { status: 301, location: `https://public.example.org/hop${n + 1}` }
+          : { status: 200, body: "DONE" },
+      async () => {
+        const res = await fetchGuarded("https://public.example.org/hop0", {});
+        finalStatus = res.status;
+        assert.equal(await res.text(), "DONE");
+      }
+    );
+    assert.equal(finalStatus, 200);
+    assert.equal(seen.length, 4, "initial request + 3 hops");
+  });
+
+  await checkAsync("a relative Location is resolved against the current URL", async () => {
+    const seen = await withStubbedFetch(
+      (_u, n) => (n === 0 ? { status: 302, location: "/relative/path" } : { status: 200, body: "OK" }),
+      async () => {
+        await fetchGuarded("https://public.example.org/a/b", {});
+      }
+    );
+    assert.equal(seen[1], "https://public.example.org/relative/path");
+  });
+
+  await checkAsync("an endless redirect chain is capped instead of looping", async () => {
+    let requests = 0;
+    await withStubbedFetch(
+      () => {
+        requests++;
+        return { status: 302, location: "https://public.example.org/again" };
+      },
+      async () => {
+        await assert.rejects(() => fetchGuarded("https://public.example.org/start", {}), /too many redirects/);
+      }
+    );
+    assert.equal(requests, 6, "1 initial + 5 hops");
+  });
+
+  await checkAsync("a 3xx with no Location is an error, not a silent success", async () => {
+    await withStubbedFetch(
+      () => ({ status: 302 }),
+      async () => {
+        await assert.rejects(() => fetchGuarded("https://public.example.org/x", {}), /without a Location/);
+      }
+    );
   });
 
   console.log("\n— request body limits —");

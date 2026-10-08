@@ -21,7 +21,17 @@
  * protection (rate limit, provider signature, signed Telegram payload, or
  * password check). Everything else must be 401/403 for an anonymous caller.
  *
- * Requires a running server (npm run dev) and the database.
+ * Requires a running server and the database.
+ *
+ * PREFER A PRODUCTION BUILD:
+ *   npx next build && npx next start -p 3000
+ *
+ * `npm run dev` compiles each route module on first request. This audit walks
+ * all 131 of them, which drove the dev server to ~3.6 GB RSS and got it
+ * OOM-killed by the kernel in a 4 GB container — every remaining route then
+ * reported "unreachable TypeError: fetch failed" and the run failed with a
+ * message blaming the server rather than memory. Against `next start` the same
+ * 236 probes finish in a couple of seconds with no compilation at all.
  */
 process.env.DATABASE_URL ||= "postgresql://x:x@localhost:5432/x";
 

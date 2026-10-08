@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { clickableCardProps } from "@/lib/a11y";
 import {
   Pin,
   MessageSquare,
@@ -96,6 +97,7 @@ export function ForumThreadList({
             <div
               key={thread.id}
               onClick={() => onOpenThread(thread.id)}
+              {...clickableCardProps(() => onOpenThread(thread.id))}
               className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between gap-3">

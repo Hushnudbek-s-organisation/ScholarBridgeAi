@@ -272,6 +272,18 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     }
   }, [isOpen]);
 
+  // Escape closes the dialog — a keyboard user otherwise has to tab through
+  // the whole form to reach the × button. A half-filled form is discarded
+  // either way (the × does the same), so the behaviour is consistent.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const degreeControlValue = normalizeDegreeLevel(formData.degreeLevel) ?? formData.degreeLevel;
@@ -365,7 +377,12 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 my-8">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 my-8"
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-700 via-blue-700 to-indigo-800 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -373,11 +390,16 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{isNew ? "Create Student Profile" : "Edit Academic Profile"}</h2>
+              <h2 id="profile-modal-title" className="text-xl font-bold">{isNew ? "Create Student Profile" : "Edit Academic Profile"}</h2>
               <p className="text-xs text-indigo-100">ScholarBridgeAI matching engine calculates recommendations using these metrics.</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("close")}
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>

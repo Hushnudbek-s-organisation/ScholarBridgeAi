@@ -10,6 +10,51 @@ import { unsafeOutboundReason } from "@/lib/ssrf";
 const cache = new Map<string, { html: string; at: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+/** Redirect statuses the agent will follow manually. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+/** Browser-equivalent cap, so a redirect loop cannot pin the worker. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * `fetch` with the SSRF guard applied to EVERY hop, not just the first URL.
+ *
+ * `redirect: "follow"` hands control of the destination to the remote server:
+ * a public page that answers `302 Location: http://169.254.169.254/…` walks
+ * straight into the cloud metadata endpoint, and the guard in
+ * `fetchPageText` never sees that URL because it only checked the one the
+ * caller passed in. Following redirects by hand keeps the ordinary
+ * http→https / apex→www behaviour working while re-checking each target.
+ *
+ * Exported for tests — the redirect chain is the part that cannot be reasoned
+ * about from the call site alone.
+ */
+export async function fetchGuarded(url: string, init: RequestInit): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    if (!REDIRECT_STATUSES.has(res.status)) return res;
+
+    const location = res.headers.get("location");
+    if (!location) throw new Error(`HTTP ${res.status} without a Location header`);
+
+    let next: string;
+    try {
+      // Location may be relative ("…/admissions") or protocol-relative.
+      next = new URL(location, current).toString();
+    } catch {
+      throw new Error(`HTTP ${res.status} with an unparsable Location: ${location}`);
+    }
+    const unsafe = unsafeOutboundReason(next);
+    if (unsafe) {
+      // Deliberately not a retryable error message: the target is refused, so
+      // retrying the same chain would only repeat the refusal.
+      throw new Error(`refusing to follow redirect to ${next}: ${unsafe}`);
+    }
+    current = next;
+  }
+  throw new Error(`too many redirects (>${MAX_REDIRECTS}) from ${url}`);
+}
+
 /** Fetch a page's text content with retries. Returns null on final failure. */
 export async function fetchPageText(url: string): Promise<string | null> {
   // SSRF guard: the agent follows URLs taken from web content and admin input,
@@ -28,10 +73,9 @@ export async function fetchPageText(url: string): Promise<string | null> {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), AGENT_CONFIG.timeoutMs);
-      const res = await fetch(url, {
+      const res = await fetchGuarded(url, {
         headers: { "User-Agent": AGENT_CONFIG.userAgent, Accept: "text/html,application/pdf,*/*" },
         signal: controller.signal,
-        redirect: "follow",
       });
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

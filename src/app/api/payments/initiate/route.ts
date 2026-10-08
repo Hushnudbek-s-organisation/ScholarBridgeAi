@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import {
+  ORDER_KEY,
   PREMIUM_CURRENCY,
   paymeConfig,
   clickConfig,
@@ -69,7 +70,10 @@ export async function POST(req: Request) {
       params = {
         merchant: cfg.merchantId,
         amount: priceUzs * 100, // tiyn
-        account: { profile_id: payment.profileId },
+        // `profile_id` identifies the account; `order_id` lets the Payme
+        // merchant callback find THIS payment row, so the package the student
+        // chose (and its subscription length) survives the round trip.
+        account: { profile_id: payment.profileId, [ORDER_KEY]: payment.id },
       };
       checkoutUrl = `https://checkout.payme.uz/${cfg.merchantId}`;
     }

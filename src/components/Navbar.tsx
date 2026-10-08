@@ -669,7 +669,12 @@ export function Navbar({
             {activeProfile?.email && !isTelegramPlaceholderEmail(activeProfile.email) ? activeProfile.email : activeProfile?.email ? "Telegram" : t("studentProfile")}
           </p>
         </div>
-        {!inDrawer && <NotificationBell profileId={activeProfileId ?? null} />}
+        {/* The bell only renders in the non-drawer card, and that card is only
+            ever used in the FOOTER of the full-height desktop sidebar (see
+            renderProfileCard() below the nav). So the panel must open UPWARD —
+            with the default "down" it rendered below the fold and its bottom
+            was cut off by the viewport. The drawer gets no bell at all. */}
+        {!inDrawer && <NotificationBell profileId={activeProfileId ?? null} placement="up" />}
       </div>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button

@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, subscriptions, studentProfiles } from "@/db/schema";
 import { getConfigNumber } from "@/lib/config";
@@ -56,6 +56,34 @@ export async function periodDaysForPurpose(purpose: string | null | undefined): 
   if (purpose === "premium_season") return getConfigNumber("payment_premium_season_days", 90);
   if (purpose === "premium_yearly") return getConfigNumber("payment_premium_yearly_days", 365);
   return getPremiumPeriodDays();
+}
+
+/** Every checkout package with its live (config-driven) price and length. */
+export async function allPremiumPackages(): Promise<
+  { id: PremiumPackageId; priceUzs: number; days: number; purpose: string }[]
+> {
+  return [
+    await resolvePremiumPackage("monthly"),
+    await resolvePremiumPackage("season"),
+    await resolvePremiumPackage("yearly"),
+  ];
+}
+
+/**
+ * Which package an amount (in UZS) corresponds to, or null when it matches no
+ * configured price.
+ *
+ * Payme's merchant callbacks carry only the amount and the merchant `account`
+ * object — there is no package id. So the price IS the package identifier, and
+ * a callback must be checked against EVERY package price, not just the monthly
+ * one. Comparing against the monthly price alone made the season and yearly
+ * checkouts fail at `CheckPerformTransaction` with "Invalid amount".
+ */
+export async function packageForAmountUzs(amountUzs: number | null | undefined) {
+  if (!Number.isFinite(Number(amountUzs))) return null;
+  const value = Number(amountUzs);
+  const packs = await allPremiumPackages();
+  return packs.find((p) => p.priceUzs === value) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +157,44 @@ export function safeEqual(a: string, b: string): boolean {
 }
 
 export const ACCOUNT_KEY = "profile_id";
+/** `account.order_id` — the `payments.id` created by /api/payments/initiate. */
+export const ORDER_KEY = "order_id";
+
+/**
+ * The pending row `/api/payments/initiate` created for this checkout, matched by
+ * the `account.order_id` Payme echoes back verbatim.
+ *
+ * Linking the callback to that row instead of inserting a second one keeps the
+ * package `purpose` the student actually chose (and therefore the right
+ * subscription length), and stops the payment history from filling up with a
+ * permanent "pending" twin of every completed purchase.
+ *
+ * Deliberately strict: the row must be ours, belong to this profile, still be
+ * pending and carry exactly the amount Payme is reporting. Anything else falls
+ * through to the amount-based package lookup, never to a wrong row.
+ */
+export async function findPendingInitiatedPayment(
+  orderId: unknown,
+  profileId: number | null,
+  amountUzs: number
+) {
+  const id = Number(orderId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const [row] = await db
+    .select()
+    .from(payments)
+    .where(
+      and(
+        eq(payments.id, id),
+        eq(payments.provider, "payme"),
+        eq(payments.status, "pending")
+      )
+    );
+  if (!row) return null;
+  if (profileId != null && row.profileId !== Number(profileId)) return null;
+  if (Number(row.amount) !== amountUzs) return null;
+  return row;
+}
 
 // ---------------------------------------------------------------------------
 // Payment row helpers
@@ -221,6 +287,23 @@ export async function syncProfilePremium(profileId: number, fallbackUntil?: Date
   return until;
 }
 
+/**
+ * The active subscription that defines the student's paid window.
+ *
+ * An account can legitimately hold several ACTIVE rows at once — a monthly
+ * plan bought first and a yearly plan bought later, a referral gift plus a
+ * purchase, an admin gift on top of a payment. Every one of them is a real
+ * paid/granted window, so "the" active subscription is the one that ends
+ * LAST: that is the date the student is actually covered until, and it is
+ * exactly the `Math.max` union `activateSubscription` mirrors onto
+ * `student_profiles.premium_until`.
+ *
+ * Ordering by id (the previous behaviour) returned the OLDEST row instead, so
+ * `/api/premium/status`, the dashboard badge, the Telegram `/account` card and
+ * the admin profile list all showed the first (shortest) purchase's expiry
+ * while a longer paid window was still running — a student who bought the
+ * yearly plan on top of a monthly one was told Premium ended in 30 days.
+ */
 export async function findActiveSubscription(profileId: number | null) {
   if (!profileId) return null;
   const [sub] = await db
@@ -232,7 +315,9 @@ export async function findActiveSubscription(profileId: number | null) {
         eq(subscriptions.status, "active")
       )
     )
-    .orderBy(subscriptions.id);
+    // Latest period end first; id only breaks exact ties so the result is
+    // deterministic.
+    .orderBy(desc(subscriptions.currentPeriodEnd), desc(subscriptions.id));
   return sub ?? null;
 }
 
@@ -305,15 +390,25 @@ export async function handlePaymeRequest(body: PaymeRequest) {
       return { id, ...paymeError(-31003, "Profile not found") };
     }
     const amountUzs = amount / 100;
-    const priceUzs = await getPremiumPriceUzs();
-    if (amountUzs !== priceUzs) {
+    // The student may have picked monthly, season or yearly at checkout — the
+    // amount identifies which. Checking only the monthly price rejected every
+    // season/yearly purchase before Payme would even open the payment page.
+    const initiated = await findPendingInitiatedPayment(account[ORDER_KEY], profileId, amountUzs);
+    const pack = initiated ? null : await packageForAmountUzs(amountUzs);
+    if (!initiated && !pack) {
       return { id, ...paymeError(-31001, "Invalid amount") };
     }
     return {
       id,
       result: {
         allow: true,
-        additional: { profile_id: Number(profileId), purpose: "premium" },
+        additional: {
+          profile_id: Number(profileId),
+          purpose: initiated?.purpose ?? pack!.purpose,
+          // Echoed back to us on CreateTransaction so the purchase is linked
+          // to the row /api/payments/initiate already created.
+          [ORDER_KEY]: initiated?.id ?? undefined,
+        },
       },
     };
   }
@@ -339,18 +434,37 @@ export async function handlePaymeRequest(body: PaymeRequest) {
     if (profileId == null) {
       return { id, ...paymeError(-31003, "Profile not found") };
     }
-    const [payment] = await db
-      .insert(payments)
-      .values({
-        profileId: Number(profileId),
-        provider: "payme",
-        providerTransactionId: txnId,
-        amount: amount / 100,
-        currency: "UZS",
-        status: "pending",
-        purpose: "premium",
-      })
-      .returning();
+
+    const amountUzs = amount / 100;
+    // Prefer the row /api/payments/initiate already created for this checkout:
+    // it carries the package the student chose, so the subscription gets the
+    // right length (30 / 90 / 365 days) instead of always 30.
+    const initiated = await findPendingInitiatedPayment(account[ORDER_KEY], profileId, amountUzs);
+    let payment;
+    if (initiated) {
+      const [linked] = await db
+        .update(payments)
+        .set({ providerTransactionId: txnId, updatedAt: new Date() })
+        .where(
+          and(eq(payments.id, initiated.id), eq(payments.status, "pending"))
+        )
+        .returning();
+      payment = linked ?? initiated;
+    } else {
+      const pack = await packageForAmountUzs(amountUzs);
+      [payment] = await db
+        .insert(payments)
+        .values({
+          profileId: Number(profileId),
+          provider: "payme",
+          providerTransactionId: txnId,
+          amount: amountUzs,
+          currency: "UZS",
+          status: "pending",
+          purpose: pack?.purpose ?? "premium",
+        })
+        .returning();
+    }
 
     const createTime = Math.floor(payment.createdAt.getTime() / 1000);
     return {
