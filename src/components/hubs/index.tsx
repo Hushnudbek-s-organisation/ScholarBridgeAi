@@ -41,6 +41,7 @@ import { GoalPlanner } from "@/components/growth/GoalPlanner";
 import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
 import { SuccessStories } from "@/components/growth/SuccessStories";
 import { CareerExplorerPanel, InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
+import { ArrivalPlanPanel } from "@/components/journey/ArrivalPlanPanel";
 import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
 import {
   FinancialPlanPanel,
@@ -183,7 +184,9 @@ export function UniversitiesHub({
           autoOpenUniversityId={autoOpenUniversityId ?? null}
         />
       )}
-      {active === "careers" && <CareerExplorerPanel onNavigateTab={() => setPane("search")} />}
+      {active === "careers" && (
+        <CareerExplorerPanel profileId={profile?.id ?? null} onNavigateTab={() => setPane("search")} />
+      )}
       {active === "matches" && <RecommendationStudio activeProfile={profile} onProfileSaved={onProfileSaved} />}
       {active === "outlook" && (
         <div className="space-y-3">
@@ -602,7 +605,14 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
           <VisaSpeakingAssistant activeProfile={profile} />
         </div>
       )}
-      {active === "departure" && <DepartureChecklist activeProfile={profile} onNavigate={navigate} />}
+      {active === "departure" && (
+        <div className="space-y-4">
+          <DepartureChecklist activeProfile={profile} onNavigate={navigate} />
+          {/* After arrival: the 7/30/90-day and first-year plan (product journey §14.3-14.4).
+              Lives here so "after the visa" is one place — never a second nav section. */}
+          <ArrivalPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+        </div>
+      )}
     </HubPage>
   );
 }

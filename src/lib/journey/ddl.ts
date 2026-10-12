@@ -348,6 +348,40 @@ CREATE TABLE IF NOT EXISTS visa_requirements (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_visa_requirements_country ON visa_requirements(country, visa_type);
+
+-- ---------------------------------------------------------------------------
+-- Career Discovery (product journey §4) — the "I don't know yet" guided flow.
+-- Stores ONE row per run-up; answers are the student's own, recommendations
+-- are the deterministic engine's output. Never shared with other profiles.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS career_discoveries (
+  id SERIAL PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES student_profiles(id) ON DELETE CASCADE,
+  answers JSONB NOT NULL DEFAULT '{}',
+  trial_feedback JSONB NOT NULL DEFAULT '{}',
+  recommendations JSONB NOT NULL DEFAULT '[]',
+  selected_career_id TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_career_discoveries_profile ON career_discoveries(profile_id);
+
+-- ---------------------------------------------------------------------------
+-- Arrival checklist (product journey §14.3-14.4) — first 7/30/90 days and the
+-- first study year. Generic guidance items; completion state per student.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS arrival_checklist_items (
+  id SERIAL PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES student_profiles(id) ON DELETE CASCADE,
+  item_key TEXT NOT NULL,
+  item_window TEXT NOT NULL DEFAULT 'd7',
+  status TEXT NOT NULL DEFAULT 'pending',
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_arrival_items_profile ON arrival_checklist_items(profile_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_arrival_items_key ON arrival_checklist_items(profile_id, item_key);
 `;
 
 /** Split the DDL into single statements (no functions/`$$` in it). */

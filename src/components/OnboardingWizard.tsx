@@ -27,6 +27,8 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { StudyInterestPicker } from "@/components/StudyInterestPicker";
+import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
+import { selectionsForCareer } from "@/lib/careerDiscovery";
 import {
   compatibilityTargetMajor,
   isStudyInterestSelectionValid,
@@ -35,6 +37,13 @@ import {
   type StudyInterestSelection,
 } from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+
+/**
+ * Where the student says they are right now (product journey §4.1).
+ * THREE EQUAL choices — "not sure yet" is as respectable as "I know my goal",
+ * and none of them forces an answer the student does not have.
+ */
+type OnboardingPath = "goal" | "interests" | "undecided";
 
 interface OnboardingWizardProps {
   /**
@@ -105,6 +114,7 @@ const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-
 export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
+  const tDisc = useTranslations("careerDiscovery");
   const resumeStudyInterests = selectionsFromProfile(profile?.studyInterests, profile?.targetMajor, {
     // A new profile is created before the interest step; the legacy default
     // “Computer Science” must not satisfy onboarding's required selection.
@@ -118,6 +128,14 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
       ? 2
       : requestedStartStep;
 
+  const inferPath = (): OnboardingPath | null => {
+    const sel = resumeStudyInterests;
+    if (sel.some((s) => s.kind === "exploring")) return "undecided";
+    if (sel.some((s) => s.kind === "specialization")) return "goal";
+    if (sel.some((s) => s.kind === "area")) return "interests";
+    return null;
+  };
+  const [onboardingPath, setOnboardingPath] = useState<OnboardingPath | null>(inferPath);
   const [step, setStep] = useState<number>(startStep);
   const [createdId, setCreatedId] = useState<number | null>(profile?.id ?? null);
   const [saving, setSaving] = useState(false);
@@ -491,19 +509,96 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
         )}
 
-        {/* STEP 3 — Study interests */}
+        {/* STEP 3 — Where are you now? (3 equal choices) → study interests,
+            or the guided career-discovery flow for the undecided. */}
         {step === 2 && (
-          <StudyInterestPicker
-            value={form.studyInterests}
-            onChange={(studyInterests) => {
-              studyInterestsTouched.current = true;
-              set("studyInterests", studyInterests);
-              set("targetMajor", compatibilityTargetMajor(studyInterests));
-              setError("");
-            }}
-            showError={step2Invalid}
-            idPrefix="onboarding-study-interests"
-          />
+          <div className="space-y-5">
+            {/* Three equal, equally-respectful starting points. No answer is
+                required before choosing; "I don't know yet" is a full flow. */}
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                {tDisc("pathTitle")}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">{tDisc("pathSubtitle")}</p>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label={tDisc("pathTitle")}>
+                {([
+                  { id: "goal", icon: "🎯" },
+                  { id: "interests", icon: "🌱" },
+                  { id: "undecided", icon: "🧭" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={onboardingPath === opt.id}
+                    onClick={() => {
+                      setOnboardingPath(opt.id);
+                      setError("");
+                    }}
+                    className={`rounded-2xl border-2 px-4 py-4 text-left transition-all ${
+                      onboardingPath === opt.id
+                        ? "border-indigo-600 bg-indigo-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-indigo-300"
+                    }`}
+                  >
+                    <span className="text-2xl" aria-hidden>{opt.icon}</span>
+                    <p className="mt-2 text-sm font-extrabold text-slate-900">{tDisc(`path.${opt.id}.title`)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{tDisc(`path.${opt.id}.body`)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {onboardingPath === "undecided" && (
+              <CareerDiscoveryFlow
+                profileId={createdId}
+                mode="onboarding"
+                compact
+                onSelected={(careerId) => {
+                  // The engine's pick becomes a study-interest selection via
+                  // the SAME legacy mapping as every other import — never a
+                  // free-text guess. The student can still edit it below.
+                  const selections = selectionsForCareer(careerId);
+                  if (selections.length > 0) {
+                    studyInterestsTouched.current = true;
+                    set("studyInterests", selections);
+                    set("targetMajor", compatibilityTargetMajor(selections));
+                  }
+                  setOnboardingPath("goal");
+                }}
+                onUseExploring={() => {
+                  studyInterestsTouched.current = true;
+                  set("studyInterests", [{ kind: "exploring" }]);
+                  set("targetMajor", "");
+                }}
+              />
+            )}
+
+            {onboardingPath === null && (
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                {tDisc("pathPickHint")}
+              </p>
+            )}
+
+            {(onboardingPath === "goal" || onboardingPath === "interests") && (
+              <>
+                <p className="text-sm text-slate-600">
+                  {onboardingPath === "goal" ? tDisc("path.goal.hint") : tDisc("path.interests.hint")}
+                </p>
+                <StudyInterestPicker
+                  value={form.studyInterests}
+                  onChange={(studyInterests) => {
+                    studyInterestsTouched.current = true;
+                    set("studyInterests", studyInterests);
+                    set("targetMajor", compatibilityTargetMajor(studyInterests));
+                    setError("");
+                  }}
+                  showError={step2Invalid}
+                  idPrefix="onboarding-study-interests"
+                />
+              </>
+            )}
+          </div>
         )}
 
         {/* STEP 4 — GPA + scale */}

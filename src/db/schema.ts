@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, index, unique, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, jsonb, index, unique, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
@@ -1872,4 +1872,47 @@ export const visaRequirements = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [index("idx_visa_requirements_country").on(table.country, table.visaType)]
+);
+
+/**
+ * Career Discovery runs (product journey §4) — the guided "I don't know yet"
+ * flow. Answers are the student's own; recommendations are the deterministic
+ * engine output. Additive journey table (see src/lib/journey/ddl.ts).
+ */
+export const careerDiscoveries = pgTable(
+  "career_discoveries",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    answers: jsonb("answers").notNull().default({}),
+    trialFeedback: jsonb("trial_feedback").notNull().default({}),
+    recommendations: jsonb("recommendations").notNull().default([]),
+    selectedCareerId: text("selected_career_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_career_discoveries_profile").on(table.profileId)]
+);
+
+/**
+ * Arrival checklist state (product journey §14.3-14.4) — first 7/30/90 days
+ * and the first study year. Item definitions live in
+ * src/lib/journey/arrival.ts (generic guidance only).
+ */
+export const arrivalChecklistItems = pgTable(
+  "arrival_checklist_items",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    itemKey: text("item_key").notNull(),
+    itemWindow: text("item_window").notNull().default("d7"),
+    status: text("status").notNull().default("pending"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_arrival_items_profile").on(table.profileId),
+    uniqueIndex("uq_arrival_items_key").on(table.profileId, table.itemKey),
+  ]
 );
