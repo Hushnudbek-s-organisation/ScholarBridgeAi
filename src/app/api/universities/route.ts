@@ -8,7 +8,7 @@ import {
   universitySources,
   sources,
 } from "@/db/schema";
-import { calculateUniversityMatch, type ReasonDetail } from "@/lib/matching";
+import { calculateUniversityMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
@@ -250,6 +250,8 @@ export async function GET(req: Request) {
         potentialIssues?: string[];
         reasonDetails?: ReasonDetail[];
         issueDetails?: ReasonDetail[];
+        rawScore?: number;
+        breakdown?: MatchBreakdown;
       } = { matchScore: null, matchCategory: null, reasons: [], potentialIssues: [] };
       if (matchProfile) {
         matchInfo = calculateUniversityMatch(matchProfile, toUniversityData(uni));
@@ -263,6 +265,11 @@ export async function GET(req: Request) {
         matchCategory: matchInfo.matchCategory,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
+        // The exact arithmetic behind the score (two-decimal points per
+        // dimension) so the UI can show HOW the number was reached instead of
+        // asking the student to trust it. Null when there is no profile.
+        matchRawScore: matchInfo.rawScore ?? null,
+        matchBreakdown: matchInfo.breakdown ?? null,
         sourceUrl: src?.sourceUrl ?? null,
         sourceTitle: src?.sourceTitle ?? null,
         sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,

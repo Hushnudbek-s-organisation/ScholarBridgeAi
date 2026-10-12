@@ -31,6 +31,8 @@ import { DashboardView } from "../src/components/DashboardView";
 import { RecommendationStudio } from "../src/components/RecommendationStudio";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
 import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
+import { DailyStreakCard } from "../src/components/DailyStreakCard";
+import { MatchBreakdownStrip } from "../src/components/MatchBreakdownStrip";
 
 let passed = 0;
 let failed = 0;
@@ -607,6 +609,149 @@ check(
 check(
   "nothing behind sign-in is advertised to crawlers",
   !/dashboard|admin|visa|essays/.test(sitemapSource)
+);
+
+// ---------------------------------------------------------------------------
+section("9. Daily streak card — compact row, exact numbers, honest rule");
+
+const streakDays = ["2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12"];
+const streakFixture = {
+  current: 5,
+  longest: 12,
+  activeToday: true,
+  lastActiveDate: "2026-10-12",
+  nextMilestone: 7,
+  daysToMilestone: 2,
+  recentDays: streakDays.map((date, index) => ({ date, active: index >= 2 })),
+};
+
+const compactStreak = renderLocalized("en", React.createElement(DailyStreakCard, { streak: streakFixture, compact: true }));
+check("compact streak renders", compactStreak.error === null, compactStreak.error ?? "");
+check(
+  "compact streak is a single labelled row",
+  /aria-label="Daily learning streak"/.test(compactStreak.html) && /flex-wrap/.test(compactStreak.html)
+);
+check(
+  "compact streak shows the exact count and the record",
+  /\b5\b/.test(compactStreak.html) && /Best: 12/.test(compactStreak.html)
+);
+check(
+  "compact streak names the distance to the next milestone",
+  /2 more to 7/.test(compactStreak.html)
+);
+check(
+  "compact streak keeps the honest rule as its tooltip",
+  /title="A day counts after a real rewarded action/.test(compactStreak.html) && !/A day counts after/.test(compactStreak.html.replace(/title="[^"]*"/g, ""))
+);
+check(
+  "compact streak is not the oversized card (no 3xl counter, no visible note)",
+  !/text-3xl/.test(compactStreak.html)
+);
+const streakTooltips = [...compactStreak.html.matchAll(/title="([^"]+)"/g)].map((m) => m[1]);
+check(
+  "every one of the seven days carries its real date and its counted state",
+  streakDays.every((day, index) => {
+    const formatted = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${day}T00:00:00.000Z`));
+    const expected = `${formatted} — ${index >= 2 ? "rewards activity counted" : "no rewarded activity"}`;
+    return streakTooltips.includes(expected);
+  }),
+  streakTooltips.filter((t) => /—/.test(t)).join(" | ")
+);
+
+const fullStreak = renderLocalized("en", React.createElement(DailyStreakCard, { streak: streakFixture }));
+check("full streak renders for the rewards page", fullStreak.error === null, fullStreak.error ?? "");
+check("full streak spells the rule out in the card", /A day counts after a real rewarded action/.test(fullStreak.html));
+check(
+  "full streak prints the exact milestone arithmetic",
+  /5 of 7 days towards the 7-day milestone/.test(fullStreak.html) && /Last counted day: Oct 12/.test(fullStreak.html)
+);
+
+const nullMilestone = renderLocalized("en", React.createElement(DailyStreakCard, {
+  streak: { ...streakFixture, current: 400, nextMilestone: null, daysToMilestone: 0 },
+  compact: true,
+}));
+check("a streak past the last milestone still renders", nullMilestone.error === null, nullMilestone.error ?? "");
+check(
+  "no NaN/null leaks into the markup",
+  !/NaN|>null</.test(nullMilestone.html) && !/NaN|>null</.test(compactStreak.html)
+);
+
+check(
+  "the same streak renders identically twice",
+  renderLocalized("en", React.createElement(DailyStreakCard, { streak: streakFixture, compact: true })).html === compactStreak.html
+);
+
+check(
+  "the card renders in every locale",
+  ["en", "uz", "ru"].every((locale) => {
+    const out = renderLocalized(locale, React.createElement(DailyStreakCard, { streak: streakFixture, compact: true }));
+    return out.error === null && out.html.length > 200;
+  })
+);
+
+// ---------------------------------------------------------------------------
+section("10. Fit-score breakdown strip — the arithmetic, not just the number");
+
+const breakdownFixture = {
+  rawScore: 96.3,
+  comparedDimensions: 7,
+  totalDimensions: 8,
+  components: [
+    { key: "base" as const, code: null, points: 70, compared: true },
+    { key: "gpa" as const, code: "gpa_above", points: 15, compared: true },
+    { key: "english" as const, code: "ielts_above", points: 8, compared: true },
+    { key: "standardised_test" as const, code: null, points: 0, compared: false },
+    { key: "field" as const, code: "major_strong", points: 12, compared: true },
+    { key: "portfolio" as const, code: "activity_strength", points: 8.49, compared: true },
+    { key: "cost" as const, code: "budget_fits", points: 8, compared: true },
+    { key: "income" as const, code: null, points: -15.19, compared: true },
+    { key: "experience" as const, code: "research_none", points: -10, compared: true },
+  ],
+};
+const sum = Math.round(breakdownFixture.components.reduce((total, c) => total + c.points, 0) * 10) / 10;
+check(
+  "the fixture is arithmetically honest (components sum to rawScore)",
+  Math.abs(sum - breakdownFixture.rawScore) <= 0.06,
+  `sum ${sum} vs raw ${breakdownFixture.rawScore}`
+);
+
+const strip = renderLocalized("en", React.createElement(MatchBreakdownStrip, { breakdown: breakdownFixture }));
+check("breakdown strip renders", strip.error === null, strip.error ?? "");
+check("the neutral base is not shown as a dimension", !/>Base</.test(strip.html));
+check(
+  "every scored dimension appears with its exact signed points",
+  ["GPA", "English", "Field", "+15.0", "+8.0", "+12.0", "+8.5", "-15.2"].every((token) => strip.html.includes(token)),
+  strip.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200)
+);
+check("negative contributions are shown as negative", /-10\.0/.test(strip.html));
+check(
+  "a dimension with no data shows a dash, not a fake zero",
+  /Standardised test<span>—<\/span>/.test(strip.html) &&
+    /No data for this dimension yet/.test(strip.html) &&
+    !/Standardised test<span>[+-]?0/.test(strip.html)
+);
+check(
+  "the strip states how much of the score rests on real data",
+  /7 of 8 dimensions measured/.test(strip.html)
+);
+check(
+  "no strip is rendered when there is nothing to break down",
+  renderLocalized("en", React.createElement(MatchBreakdownStrip, { breakdown: null })).html === "" &&
+    renderLocalized("en", React.createElement(MatchBreakdownStrip, {
+      breakdown: { ...breakdownFixture, components: [breakdownFixture.components[0]] },
+    })).html === ""
+);
+check(
+  "an older API shape (a bare component array) still renders",
+  renderLocalized("en", React.createElement(MatchBreakdownStrip, { breakdown: breakdownFixture.components }))
+    .html.includes("GPA")
+);
+check(
+  "the strip renders in every locale",
+  ["en", "uz", "ru"].every((locale) => {
+    const out = renderLocalized(locale, React.createElement(MatchBreakdownStrip, { breakdown: breakdownFixture }));
+    return out.error === null && out.html.length > 200;
+  })
 );
 
 // ---------------------------------------------------------------------------

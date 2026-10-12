@@ -260,7 +260,7 @@ check(
 );
 
 const strength = profileStrength(strongProfile, { essayScore: 84 });
-check("strength reports 7 sections", strength.sections.length === 7);
+check("strength reports 8 sections", strength.sections.length === 8);
 check("strength scores stay in 0–100", strength.sections.every((s) => s.score >= 0 && s.score <= 100));
 check("the essay score is reflected", strength.sections.find((s) => s.key === "essays")?.score === 84);
 check(
@@ -268,11 +268,84 @@ check(
   profileStrength(strongProfile).overall > profileStrength(weakProfile).overall
 );
 
+// Precision additions: every dimension carries the evidence behind it, and a
+// real zero is counted while "no data" is excluded from the average.
+check(
+  "every section reports how much evidence it stands on",
+  strength.sections.every((s) => typeof s.coverage === "number" && s.coverage >= 0 && s.coverage <= 1)
+);
+check(
+  "every section reports the unrounded value next to the rounded one",
+  strength.sections.every((s) => typeof s.scorePrecise === "number" && Math.abs(s.scorePrecise - s.score) < 1)
+);
+check(
+  "a profile with no data has every dimension unknown and no invented overall",
+  profileStrength({}).sections.every((s) => s.unknown === true) && profileStrength({}).overall === 0
+);
+check(
+  "the overall is the average of the measured dimensions only",
+  (() => {
+    const s = profileStrength(strongProfile);
+    const measured = s.sections.filter((x) => !x.unknown);
+    const expected = measured.reduce((sum, x) => sum + x.scorePrecise, 0) / measured.length;
+    return measured.length > 0 && Math.abs(s.overallPrecise - Math.round(expected * 10) / 10) < 0.11;
+  })(),
+  String(profileStrength(strongProfile).overallPrecise)
+);
+check(
+  "a recorded activity list with no awards scores awards 0 (a real zero, kept in the average)",
+  (() => {
+    const s = profileStrength({ ...strongProfile, awards: null, olympiads: null, certificates: null, competitions: null });
+    const awards = s.sections.find((x) => x.key === "awards");
+    return awards != null && awards.unknown === false && awards.score === 0;
+  })()
+);
+check(
+  "with no activity record at all the same dimensions are unknown, not zero",
+  (() => {
+    const s = profileStrength({ gpa: 3.9, gpaScale: 4, ieltsScore: 7.5 });
+    const awards = s.sections.find((x) => x.key === "awards");
+    const research = s.sections.find((x) => x.key === "research");
+    return awards?.unknown === true && research?.unknown === true;
+  })()
+);
+check(
+  "an unscaled GPA above 4 is unknown — never a clamped perfect 4.0",
+  (() => {
+    const s = profileStrength({ gpa: 85, gpaScale: null });
+    const academics = s.sections.find((x) => x.key === "academics");
+    return academics?.unknown === true && (academics?.missing.length ?? 0) > 0;
+  })()
+);
+check(
+  "English-only and SAT-only students are no longer both capped at 50/100",
+  (() => {
+    const englishOnly = profileStrength({ gpa: 3.8, gpaScale: 4, ieltsScore: 8 }).sections.find((s) => s.key === "tests");
+    const satOnly = profileStrength({ gpa: 3.8, gpaScale: 4, satScore: 1500 }).sections.find((s) => s.key === "tests");
+    return (englishOnly?.scorePrecise ?? 0) > 90 && (satOnly?.scorePrecise ?? 0) > 90;
+  })()
+);
+check(
+  "the strength payload states how the overall was built",
+  /Averaged over \d+ of \d+/.test(profileStrength(strongProfile).basis)
+);
+
 const analysis = analyzeExtracurriculars(weakProfile);
 check("extracurricular analysis returns suggestions for a thin profile", analysis.suggestions.length >= 3);
 check(
   "a strong profile gets no remedial suggestions",
   analyzeExtracurriculars(strongProfile).suggestions.length <= 1
+);
+check(
+  "extracurricular scores expose their unrounded values",
+  (() => {
+    const a = analyzeExtracurriculars(strongProfile);
+    return (
+      Math.abs(a.precise.leadership - a.leadership) < 1 &&
+      Math.abs(a.precise.impact - a.impact) < 1 &&
+      a.precise.impact >= a.impact - 0.5
+    );
+  })()
 );
 
 // ---------------------------------------------------------------------------

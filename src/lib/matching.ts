@@ -1,5 +1,6 @@
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
 import { gpaTo40Scale } from "./gpa";
+import { clamp, interpolate, meets, ratio, roundTo, saturatingCurve, shortfall } from "./scoring";
 import { canonicalSubjectTokens, subjectAffinity, subjectTokens } from "./subjectAffinity";
 
 /**
@@ -18,13 +19,29 @@ export interface ReasonDetail {
   code: string;
   params: Record<string, string | number>;
   text: string;
+  /**
+   * The exact points this reason/issue contributed to the raw score
+   * (one decimal). Numeric on purpose: the UI can render the arithmetic in
+   * any language without a new translation string.
+   */
+  points?: number;
 }
 
 interface WeightedReason extends ReasonDetail {
   weight: number;
 }
 
-const toDetail = ({ code, params, text }: ReasonDetail): ReasonDetail => ({ code, params, text });
+const toDetail = (reason: WeightedReason | ReasonDetail): ReasonDetail => {
+  const explicitPoints = "points" in reason && typeof reason.points === "number" ? reason.points : null;
+  const weight = "weight" in reason && typeof reason.weight === "number" ? reason.weight : null;
+  const points = explicitPoints ?? weight;
+  return {
+    code: reason.code,
+    params: reason.params,
+    text: reason.text,
+    ...(points == null ? {} : { points: roundTo(points, 1) }),
+  };
+};
 
 export interface StudentProfileData {
   id?: number;
@@ -229,8 +246,101 @@ function usdCost(value: number | null | undefined, currency: string | null | und
   return null;
 }
 
+/**
+ * Fit scoring — requirements, affordability, field and portfolio.
+ *
+ * PRECISION CONTRACT (2026-10)
+ * ----------------------------
+ * The score is built from named components (`MatchComponent[]`):
+ *
+ *   1. every component carries the EXACT points it contributed, so the total
+ *      is arithmetic the student can verify, not a black box;
+ *   2. within a component the grade is continuous between documented anchors
+ *      (src/lib/scoring.ts) — a 0.05 GPA shortfall no longer costs the same as
+ *      a 0.29 one, and a budget covering 99% of the cost is no longer treated
+ *      like one covering 10%;
+ *   3. a component with no data is reported as `compared: false` and
+ *      contributes 0 — never a guess, never a penalty (NULL is not zero);
+ *   4. the anchor points are identical to the step values the engine used
+ *      before, so the SAME evidence still produces the SAME verdict — only the
+ *      resolution between anchors changed (asserted in scripts/check-match.ts).
+ *
+ * `rawScore` is the unclamped, one-decimal sum. `matchScore` is that value
+ * clamped to the display range and rounded once, at the end.
+ */
+export type MatchDimension =
+  | "base"
+  | "gpa"
+  | "english"
+  | "standardised_test"
+  | "field"
+  | "portfolio"
+  | "cost"
+  | "income"
+  | "funding_requirement"
+  | "country"
+  | "experience"
+  | "level"
+  | "major_eligibility"
+  | "need_basis"
+  | "funding_coverage"
+  | "merit";
+
+export interface MatchComponent {
+  /** Stable dimension id (see MatchDimension) — UI labels, never a sentence. */
+  key: MatchDimension;
+  /** The reason/issue code this component produced (null = neutral). */
+  code: string | null;
+  /**
+   * Exact points contributed to `rawScore`, at two-decimal precision so the
+   * published breakdown adds back up to the published total (rounding each
+   * component to one decimal would drift the sum by half a point or more).
+   */
+  points: number;
+  /**
+   * False when the profile or the catalogue had nothing to compare on this
+   * dimension. The points are then 0 and no reason/issue claims otherwise.
+   */
+  compared: boolean;
+}
+
+export interface MatchBreakdown {
+  rawScore: number;
+  components: MatchComponent[];
+  /**
+   * Real dimensions that had data behind them / real dimensions the engine
+   * looks at. The neutral base (70 for a university, 65 for a scholarship) is
+   * included in `components` so the arithmetic adds up, but is not counted
+   * here — it is not evidence about the student.
+   */
+  comparedDimensions: number;
+  totalDimensions: number;
+}
+
+function component(
+  key: MatchDimension,
+  points: number,
+  code: string | null,
+  compared = true
+): MatchComponent {
+  return { key, code, points: roundTo(compared ? points : 0, 2), compared };
+}
+
+/** `comparedDimensions` / `totalDimensions` never count the neutral base. */
+function breakdownOf(rawScore: number, components: MatchComponent[]): MatchBreakdown {
+  const evidence = components.filter((c) => c.key !== "base");
+  return {
+    rawScore,
+    components,
+    comparedDimensions: evidence.filter((c) => c.compared).length,
+    totalDimensions: evidence.length,
+  };
+}
+
 export function calculateUniversityMatch(profile: StudentProfileData, uni: UniversityData) {
+  // Base 70 = "nothing is wrong and nothing stands out": neutral, not a claim.
   let score = 70;
+  const components: MatchComponent[] = [component("base", 70, null)];
   // Weighted reasons/issues — ranked by importance so the UI can show the
   // 2 most important + and the 2 biggest − (spec §23 — explain the score).
   const reasons: WeightedReason[] = [];
@@ -242,24 +352,35 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
 
   // GPA — only when the university officially specifies a minimum (spec §14)
   // AND the student's GPA is comparable (normGpa != null).
+  //
+  // Grading: meeting the bar starts at a third of the award and is fully earned
+  // 0.5 above it; a shortfall is fully charged at 1.0 below it. The anchor
+  // points (0.5 → +15, 0.2 → +10, 0 → +5, −0.3 → −12 …) match the previous
+  // step values, but now every margin in between has its own precise value.
   if (uni.minGpa != null && normGpa != null) {
     const gpaDiff = normGpa - uni.minGpa;
+    // Requirement grading is continuous ACROSS the bar: meeting a published
+    // minimum is the zero point (no invented bonus), exceeding it earns up to
+    // +15 at +0.5, falling short is charged up to −25 at −1.0.
+    const points =
+      gpaDiff >= 0
+        ? meets(gpaDiff, 0, 0.5, 15, 0)
+        : shortfall(gpaDiff, 0, 1.0, 25);
+    score += points;
     if (gpaDiff >= 0.5) {
-      score += 15;
-      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${uni.minGpa} minimum`, weight: 15 });
+      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${uni.minGpa} minimum`, weight: 15, points });
     } else if (gpaDiff >= 0.2) {
-      score += 10;
-      reasons.push({ code: "gpa_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} above the ${uni.minGpa} minimum`, weight: 10 });
+      reasons.push({ code: "gpa_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} above the ${uni.minGpa} minimum`, weight: 10, points });
     } else if (gpaDiff >= 0) {
-      score += 5;
-      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${uni.minGpa} minimum`, weight: 5 });
+      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${uni.minGpa} minimum`, weight: 5, points });
     } else if (gpaDiff >= -0.3) {
-      score -= 12;
-      potentialIssues.push({ code: "gpa_slightly_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} slightly below the ${uni.minGpa} minimum`, weight: 12 });
+      potentialIssues.push({ code: "gpa_slightly_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} slightly below the ${uni.minGpa} minimum`, weight: 12, points });
     } else {
-      score -= 25;
-      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${uni.minGpa} requirement`, weight: 25 });
+      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${uni.minGpa} requirement`, weight: 25, points });
     }
+    components.push(component("gpa", points, gpaDiff >= 0 ? "gpa" : "gpa"));
+  } else {
+    components.push(component("gpa", 0, null, false));
   }
 
   // Language Requirement (IELTS) — a missing test is a real penalty:
@@ -287,6 +408,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
           text: `IELTS ${uni.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
           weight: 5,
         });
+        components.push(component("english", -5, "ielts_alternative"));
       } else {
         score -= 25;
         potentialIssues.push({
@@ -295,22 +417,33 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
           text: `IELTS ${uni.minIelts} required — you don't have an IELTS score yet`,
           weight: 25,
         });
+        components.push(component("english", -25, "ielts_missing"));
       }
-    } else if (profile.ieltsScore! >= uni.minIelts + 0.5) {
-      score += 8;
-      reasons.push({ code: "ielts_above", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8 });
-    } else if (profile.ieltsScore! >= uni.minIelts) {
-      score += 4;
-      reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${uni.minIelts} requirement`, weight: 4 });
     } else {
-      score -= 20;
-      potentialIssues.push({
-        code: "ielts_below",
-        params: { min: uni.minIelts, score: profile.ieltsScore! },
-        text: `IELTS ${uni.minIelts} required — you have ${profile.ieltsScore}`,
-        weight: 20,
-      });
+      // 0.5 above the bar earns the full +8; each 0.5 band is worth the same
+      // step, so a 7.5 against a 6.5 bar is worth strictly more than a 7.0.
+      const ieltsDiff = profile.ieltsScore! - uni.minIelts;
+      const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 8, 0) : shortfall(ieltsDiff, 0, 1.5, 25);
+      score += points;
+      if (ieltsDiff >= 0.5) {
+        reasons.push({ code: "ielts_above", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8, points });
+        components.push(component("english", points, "ielts_above"));
+      } else if (ieltsDiff >= 0) {
+        reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${uni.minIelts} requirement`, weight: 4, points });
+        components.push(component("english", points, "ielts_meets"));
+      } else {
+        potentialIssues.push({
+          code: "ielts_below",
+          params: { min: uni.minIelts, score: profile.ieltsScore! },
+          text: `IELTS ${uni.minIelts} required — you have ${profile.ieltsScore}`,
+          weight: 20,
+          points,
+        });
+        components.push(component("english", points, "ielts_below"));
+      }
     }
+  } else {
+    components.push(component("english", 0, null, false));
   }
 
   // SAT — only when the university officially specifies a minimum AND the
@@ -328,18 +461,29 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
         text: `SAT ${uni.minSat} required — you don't have an SAT score yet`,
         weight: 20,
       });
-    } else if (profile.satScore! >= uni.minSat) {
-      score += 6;
-      reasons.push({ code: "sat_meets", params: { score: profile.satScore!, min: uni.minSat }, text: `SAT ${profile.satScore} meets the ${uni.minSat} requirement`, weight: 6 });
+      components.push(component("standardised_test", -20, "sat_missing"));
     } else {
-      score -= 15;
-      potentialIssues.push({
-        code: "sat_below",
-        params: { min: uni.minSat, score: profile.satScore! },
-        text: `SAT ${uni.minSat} required — you have ${profile.satScore}`,
-        weight: 15,
-      });
+      const satDiff = profile.satScore! - uni.minSat;
+      // 200 points above the published bar earns the full +6; a shortfall is
+      // charged progressively up to the full −22 at 300 points below.
+      const points = satDiff >= 0 ? meets(satDiff, 0, 200, 6, 0) : shortfall(satDiff, 0, 300, 22);
+      score += points;
+      if (satDiff >= 0) {
+        reasons.push({ code: "sat_meets", params: { score: profile.satScore!, min: uni.minSat }, text: `SAT ${profile.satScore} meets the ${uni.minSat} requirement`, weight: 6, points });
+        components.push(component("standardised_test", points, "sat_meets"));
+      } else {
+        potentialIssues.push({
+          code: "sat_below",
+          params: { min: uni.minSat, score: profile.satScore! },
+          text: `SAT ${uni.minSat} required — you have ${profile.satScore}`,
+          weight: 15,
+          points,
+        });
+        components.push(component("standardised_test", points, "sat_below"));
+      }
     }
+  } else {
+    components.push(component("standardised_test", 0, null, false));
   }
 
   // Subject alignment — the university's published program focus vs the
@@ -348,9 +492,11 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   if (alignment.level === "strong") {
     score += 12;
     reasons.push({ code: "major_strong", params: { major: uni.programMajor ?? "" }, text: `Offers your field: ${uni.programMajor}`, weight: 12 });
+    components.push(component("field", 12, "major_strong"));
   } else if (alignment.level === "partial") {
     score += 4;
     reasons.push({ code: "major_partial", params: { major: uni.programMajor ?? "" }, text: `Partly related to your field: ${uni.programMajor}`, weight: 4 });
+    components.push(component("field", 4, "major_partial"));
   } else if (alignment.level === "none") {
     score -= 15;
     potentialIssues.push({
@@ -359,15 +505,22 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       text: `Programmes focus on ${uni.programMajor} — check whether your field (${profile.targetMajor}) is offered here`,
       weight: 15,
     });
+    components.push(component("field", -15, "major_not_offered"));
+  } else {
+    components.push(component("field", 0, null, false));
   }
 
   // Activities — the profile's activity portfolio is part of the fit, not just
   // the separate readiness page. Empty/unknown activity data stays neutral;
-  // entered activities contribute breadth, leadership, research and awards.
+  // entered activities contribute breadth, leadership and research. The curve
+  // saturates: the sixth activity is worth less than the first, and no count
+  // can push the portfolio share past its 12-point cap.
   const activity = activityFacts(profile);
-  if (activity.activities > 0 || activity.awards > 0) {
-    const portfolioSize = activity.activities + activity.awards;
-    const activityBoost = Math.min(12, portfolioSize * 2 + activity.leadership + activity.research);
+  const portfolioSize = activity.activities + activity.awards;
+  if (portfolioSize > 0 || activity.leadership > 0 || activity.research > 0) {
+    const breadth = 8 * saturatingCurve(portfolioSize, 6);
+    const depth = 4 * saturatingCurve(activity.leadership + activity.research, 2);
+    const activityBoost = Math.min(12, roundTo(breadth + depth, 2));
     score += activityBoost;
     reasons.push({
       code: "activity_strength",
@@ -375,6 +528,9 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       text: `${portfolioSize} activities and achievements strengthen your application`,
       weight: activityBoost,
     });
+    components.push(component("portfolio", activityBoost, "activity_strength"));
+  } else {
+    components.push(component("portfolio", 0, null, false));
   }
 
   // Financial fit — compare the full verified annual cost, not tuition alone.
@@ -394,35 +550,50 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     : null;
 
   if (totalUniCost != null && budget != null) {
-    if (budget >= totalUniCost) {
-      score += 10;
-      reasons.push({ code: "budget_fits", params: { cost: totalUniCost.toLocaleString() }, text: `Estimated cost $${totalUniCost.toLocaleString()}/yr fits your budget`, weight: 10 });
+    const coverage = ratio(budget, totalUniCost) ?? 0;
+    if (coverage >= 1) {
+      // Meeting the budget exactly is worth +8; a 40% cushion earns the full
+      // +10. Everything in between is proportional.
+      const points = interpolate(coverage, [
+        { x: 1, y: 8 },
+        { x: 1.4, y: 10 },
+      ]);
+      score += points;
+      reasons.push({ code: "budget_fits", params: { cost: totalUniCost.toLocaleString() }, text: `Estimated cost $${totalUniCost.toLocaleString()}/yr fits your budget`, weight: points });
+      components.push(component("cost", points, "budget_fits"));
     } else {
-      const budgetDeficit = totalUniCost - budget;
-      const weight = budgetDeficit > 30000 && !needsAid ? 20 : profile.requiresFullScholarship ? 18 : needsAid ? 14 : 10;
-      score -= weight;
+      // A shortfall is charged progressively (−2 when almost covered, −15 at
+      // half, −20 with nothing covered) and then scaled by how binding the
+      // funding requirement is. The scale is capped so a 95%-funded student
+      // never loses more points than an unfunded one with the same gap.
+      const basePenalty = interpolate(coverage, [
+        { x: 0, y: -20 },
+        { x: 0.5, y: -15 },
+        { x: 1, y: -2 },
+      ]);
+      const deficit = totalUniCost - budget;
+      const scale = profile.requiresFullScholarship ? 1.25 : needsAid ? 1.1 : deficit > 30000 ? 1.2 : 1;
+      const points = Math.max(-25, roundTo(basePenalty * scale, 1));
+      score += points;
       potentialIssues.push({
         code: "budget_exceeds",
         params: { cost: totalUniCost.toLocaleString(), budget: budget.toLocaleString() },
         text: `Estimated cost $${totalUniCost.toLocaleString()}/yr exceeds your $${budget.toLocaleString()} budget`,
-        weight,
+        weight: Math.abs(points),
       });
+      components.push(component("cost", points, "budget_exceeds"));
     }
+  } else {
+    components.push(component("cost", 0, null, false));
   }
 
   // Family income is supporting evidence, not a replacement for the student's
   // stated budget. When budget is absent, it still prevents the financial
-  // profile from being silently ignored.
+  // profile from being silently ignored: how far the recorded income covers
+  // the cost decides how many of the 6 points are lost.
   if (totalUniCost != null && budget == null && familyIncome != null) {
-    if (familyIncome < totalUniCost) {
-      score -= 6;
-      potentialIssues.push({
-        code: "income_below_cost",
-        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
-        text: `Recorded family income $${familyIncome.toLocaleString()}/yr is below the estimated $${totalUniCost.toLocaleString()} annual cost`,
-        weight: 6,
-      });
-    } else {
+    const incomeRatio = ratio(familyIncome, totalUniCost) ?? 0;
+    if (incomeRatio >= 1) {
       score += 3;
       reasons.push({
         code: "income_supports_cost",
@@ -430,7 +601,23 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
         text: `Recorded family income $${familyIncome.toLocaleString()}/yr covers the estimated annual cost`,
         weight: 3,
       });
+      components.push(component("income", 3, "income_supports_cost"));
+    } else {
+      const points = interpolate(incomeRatio, [
+        { x: 0, y: -10 },
+        { x: 1, y: -3 },
+      ]);
+      score += points;
+      potentialIssues.push({
+        code: "income_below_cost",
+        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
+        text: `Recorded family income $${familyIncome.toLocaleString()}/yr is below the estimated $${totalUniCost.toLocaleString()} annual cost`,
+        weight: Math.abs(points),
+      });
+      components.push(component("income", points, "income_below_cost"));
     }
+  } else {
+    components.push(component("income", 0, null, false));
   }
 
   // A funding flag is a real profile constraint, not a decorative field. If
@@ -444,20 +631,33 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       text: "You require full funding — verify that this university offers a full scholarship or financial-aid route",
       weight: 8,
     });
+    components.push(component("funding_requirement", -8, "full_funding_required"));
   } else if (needsAid && totalUniCost == null) {
     potentialIssues.push({
       code: "financial_plan_missing",
       params: {},
       text: "You marked financial aid as needed, but this university has no verified full-cost figure",
       weight: 7,
+      points: 0,
     });
+    components.push(component("funding_requirement", 0, "financial_plan_missing"));
   } else if (needsAid && totalUniCost != null && budget == null) {
     potentialIssues.push({
       code: "financial_budget_missing",
       params: {},
       text: "Add your annual budget so we can compare this cost with your funding plan",
       weight: 7,
+      points: 0,
     });
+    components.push(component("funding_requirement", 0, "financial_budget_missing"));
+  } else {
+    // Compared only when the profile actually stated a funding position —
+    // "not asked yet" must stay an unknown, not a silent pass.
+    const fundingFlagKnown =
+      profile.requiresFullScholarship != null ||
+      profile.needsFinancialAid != null ||
+      profile.needScholarship != null;
+    components.push(component("funding_requirement", 0, null, fundingFlagKnown));
   }
 
   // Preferred Country Boost
@@ -472,19 +672,25 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     preferredList = [];
   }
 
-  if (preferredList.some(c => c.toLowerCase() === uni.country.toLowerCase())) {
+  const countryPreferred = preferredList.some((c) => c.toLowerCase() === uni.country.toLowerCase());
+  if (countryPreferred) {
     score += 8;
     reasons.push({ code: "country_preferred", params: { country: uni.country }, text: `${uni.country} is on your preferred list`, weight: 8 });
   }
+  components.push(component("country", countryPreferred ? 8 : 0, countryPreferred ? "country_preferred" : null, preferredList.length > 0));
 
   // Research / Work Experience Boost for Master/PhD or top ranking
-  if ((profile.researchPublications || 0) > 0 || (profile.workExperienceYears || 0) > 0) {
+  const hasExperience = (profile.researchPublications || 0) > 0 || (profile.workExperienceYears || 0) > 0;
+  const experienceKnown = profile.researchPublications != null || profile.workExperienceYears != null;
+  if (hasExperience) {
     score += 5;
     reasons.push({ code: "experience_boost", params: {}, text: "Research / work experience strengthens your application", weight: 5 });
   }
+  components.push(component("experience", hasExperience ? 5 : 0, hasExperience ? "experience_boost" : null, experienceKnown));
 
-  // Clamp Score
-  const matchScore = Math.min(99, Math.max(35, Math.round(score)));
+  // Clamp Score — rounded exactly once, after every component is summed.
+  const rawScore = roundTo(score, 1);
+  const matchScore = Math.min(99, Math.max(35, Math.round(rawScore)));
 
   // Categorize
   let matchCategory: "Reach" | "Match" | "Safety" = "Match";
@@ -501,9 +707,14 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   reasons.sort((a, b) => b.weight - a.weight);
   potentialIssues.sort((a, b) => b.weight - a.weight);
 
+  const breakdown = breakdownOf(rawScore, components);
+
   return {
     matchScore,
     matchCategory,
+    // Unclamped total and the exact per-dimension arithmetic behind it.
+    rawScore,
+    breakdown,
     reasons: reasons.slice(0, 2).map(r => r.text),
     potentialIssues: potentialIssues.slice(0, 2).map(i => i.text),
     // Structured twins of the two arrays above — same entries, same order —
@@ -514,24 +725,33 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
 }
 
 export function calculateScholarshipMatch(profile: StudentProfileData, scholarship: ScholarshipData) {
+  // Base 65 mirrors the university matcher's neutral start.
   let score = 65;
-  const reasons: ReasonDetail[] = [];
-  const potentialIssues: ReasonDetail[] = [];
+  const components: MatchComponent[] = [component("base", 65, null)];
+  const reasons: WeightedReason[] = [];
+  const potentialIssues: WeightedReason[] = [];
 
   // GPA check (spec §22 — explain WHY it matches). Unknown scale → unknown
-  // GPA: no comparison, no claim (see src/lib/gpa.ts).
+  // GPA: no comparison, no claim (see src/lib/gpa.ts). Meeting the bar starts
+  // at a third of the award and is fully earned 0.4 above it; a shortfall is
+  // charged progressively up to the full −25 at 0.8 below.
   const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
   if (scholarship.minGpa && scholarship.minGpa > 0 && normGpa != null) {
-    if (normGpa >= scholarship.minGpa + 0.4) {
-      score += 15;
-      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${scholarship.minGpa} minimum` });
-    } else if (normGpa >= scholarship.minGpa) {
-      score += 8;
-      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${scholarship.minGpa} minimum` });
+    const gpaDiff = normGpa - scholarship.minGpa;
+    const points = gpaDiff >= 0 ? meets(gpaDiff, 0, 0.4, 15, 0) : shortfall(gpaDiff, 0, 0.8, 25);
+    score += points;
+    if (gpaDiff >= 0.4) {
+      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${scholarship.minGpa} minimum`, weight: 15, points });
+      components.push(component("gpa", points, "gpa_well_above"));
+    } else if (gpaDiff >= 0) {
+      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${scholarship.minGpa} minimum`, weight: 8, points });
+      components.push(component("gpa", points, "gpa_meets"));
     } else {
-      score -= 20;
-      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${scholarship.minGpa} requirement` });
+      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: scholarship.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${scholarship.minGpa} requirement`, weight: Math.abs(points), points });
+      components.push(component("gpa", points, "gpa_below"));
     }
+  } else {
+    components.push(component("gpa", 0, null, false));
   }
 
   // IELTS check — a missing test is a real penalty (same rule as
@@ -555,22 +775,33 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
           code: "ielts_alternative",
           params: { min: scholarship.minIelts, alt },
           text: `IELTS ${scholarship.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
+          weight: 3,
         });
+        components.push(component("english", -3, "ielts_alternative"));
       } else {
         score -= 15;
         potentialIssues.push({
           code: "ielts_missing",
           params: { min: scholarship.minIelts },
           text: `IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`,
+          weight: 15,
         });
+        components.push(component("english", -15, "ielts_missing"));
       }
-    } else if (profile.ieltsScore! >= scholarship.minIelts) {
-      score += 10;
-      reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: scholarship.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${scholarship.minIelts} requirement` });
     } else {
-      score -= 15;
-      potentialIssues.push({ code: "ielts_below", params: { min: scholarship.minIelts, score: profile.ieltsScore! }, text: `IELTS ${scholarship.minIelts} required — you have ${profile.ieltsScore}` });
+      const ieltsDiff = profile.ieltsScore! - scholarship.minIelts;
+      const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 10, 0) : shortfall(ieltsDiff, 0, 1.5, 20);
+      score += points;
+      if (ieltsDiff >= 0) {
+        reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: scholarship.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${scholarship.minIelts} requirement`, weight: 10, points });
+        components.push(component("english", points, "ielts_meets"));
+      } else {
+        potentialIssues.push({ code: "ielts_below", params: { min: scholarship.minIelts, score: profile.ieltsScore! }, text: `IELTS ${scholarship.minIelts} required — you have ${profile.ieltsScore}`, weight: 15, points });
+        components.push(component("english", points, "ielts_below"));
+      }
     }
+  } else {
+    components.push(component("english", 0, null, false));
   }
 
   // Degree Level alignment (NULL-safe: JSON.parse(null) returns null, not []).
@@ -589,17 +820,24 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     const levelFit = compareDegreeLevels(profile.degreeLevel, scholarship.degreeLevels);
     if (levelFit === "match") {
       score += 10;
-      reasons.push({ code: "level_open", params: { level: profile.degreeLevel ?? "" }, text: `Open to ${profile.degreeLevel} applicants` });
+      reasons.push({ code: "level_open", params: { level: profile.degreeLevel ?? "" }, text: `Open to ${profile.degreeLevel} applicants`, weight: 10 });
+      components.push(component("level", 10, "level_open"));
     } else if (levelFit === "mismatch") {
       score -= 25;
-      potentialIssues.push({ code: "level_mismatch", params: { levels: levels.join(", ") }, text: `Only open to: ${levels.join(", ")}` });
+      potentialIssues.push({ code: "level_mismatch", params: { levels: levels.join(", ") }, text: `Only open to: ${levels.join(", ")}`, weight: 25 });
+      components.push(component("level", -25, "level_mismatch"));
     } else {
       potentialIssues.push({
         code: "level_unclear",
         params: { levels: levels.join(", ") },
         text: `Levels on this award (${levels.join(", ")}) could not be compared with your level — check the official page`,
+        weight: 5,
+        points: 0,
       });
+      components.push(component("level", 0, "level_unclear"));
     }
+  } else {
+    components.push(component("level", 0, null, false));
   }
 
   // Eligible majors (spec §22). Matching is WORD-based, so a short token
@@ -631,25 +869,45 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
           code: "major_unclear",
           params: { majors: majors.join(", ") },
           text: `This award lists eligible fields (${majors.join(", ")}) — your target major could not be compared, check the official page`,
+          weight: 5,
+          points: 0,
         });
+        components.push(component("major_eligibility", 0, "major_unclear"));
       } else if (bestSimilarity == null) {
         potentialIssues.push({
           code: "major_missing",
           params: { majors: majors.join(", ") },
           text: `This award lists eligible fields (${majors.join(", ")}) — add your target major to your profile to be matched`,
+          weight: 5,
+          points: 0,
         });
+        components.push(component("major_eligibility", 0, "major_missing"));
       } else {
+        // The award is worth +8 only when the field really is eligible; the
+        // overlap ratio grades how close a near-miss is (a partial word match
+        // is scored between "not eligible" and "fully eligible" instead of
+        // snapping to one of two verdicts).
+        const eligibility = clamp(bestSimilarity, 0, 1);
+        const points = interpolate(eligibility, [
+          { x: 0, y: -10 },
+          { x: 0.5, y: 4 },
+          { x: 1, y: 8 },
+        ]);
         if (bestSimilarity >= 0.5) {
-          score += 8;
-          reasons.push({ code: "major_eligible", params: { field: studentMajor }, text: `Your field (${studentMajor}) is eligible` });
+          score += points;
+          reasons.push({ code: "major_eligible", params: { field: studentMajor }, text: `Your field (${studentMajor}) is eligible`, weight: points, points });
+          components.push(component("major_eligibility", points, "major_eligible"));
         } else {
-          score -= 10;
-          potentialIssues.push({ code: "major_limited", params: { majors: majors.join(", ") }, text: `Field limited to: ${majors.join(", ")}` });
+          score += points;
+          potentialIssues.push({ code: "major_limited", params: { majors: majors.join(", ") }, text: `Field limited to: ${majors.join(", ")}`, weight: Math.abs(points), points });
+          components.push(component("major_eligibility", points, "major_limited"));
         }
       }
+    } else {
+      components.push(component("major_eligibility", 0, null, false));
     }
   } catch {
-    // fallback
+    components.push(component("major_eligibility", 0, null, false));
   }
 
   // Financial need is part of scholarship fit. Account for every profile flag
@@ -660,51 +918,74 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   if (scholarship.financialNeedBased) {
     if (needsAid) {
       score += 10;
-      reasons.push({ code: "need_based", params: {}, text: "Need-based — matches your financial-aid requirement" });
+      reasons.push({ code: "need_based", params: {}, text: "Need-based — matches your financial-aid requirement", weight: 10 });
+      components.push(component("need_basis", 10, "need_based"));
     } else if (explicitlySelfFunded) {
       score -= 10;
-      potentialIssues.push({ code: "need_not_applicable", params: {}, text: "This award is need-based, while your profile says you do not need financial aid" });
+      potentialIssues.push({ code: "need_not_applicable", params: {}, text: "This award is need-based, while your profile says you do not need financial aid", weight: 10 });
+      components.push(component("need_basis", -10, "need_not_applicable"));
     } else {
-      potentialIssues.push({ code: "financial_need_unknown", params: {}, text: "This award is need-based — add your financial-aid need to assess the fit" });
+      potentialIssues.push({ code: "financial_need_unknown", params: {}, text: "This award is need-based — add your financial-aid need to assess the fit", weight: 5, points: 0 });
+      components.push(component("need_basis", 0, "financial_need_unknown"));
     }
+  } else {
+    components.push(component("need_basis", 0, null, false));
   }
 
   if (profile.requiresFullScholarship === true) {
     const coverage = String(scholarship.coverageType ?? "").toLowerCase();
     if (/full|100%|tuition\s*and\s*(living|stipend)|tuition\s*\+\s*(living|stipend)/i.test(coverage)) {
       score += 8;
-      reasons.push({ code: "full_funding_match", params: {}, text: "Coverage appears compatible with your full-scholarship requirement" });
+      reasons.push({ code: "full_funding_match", params: {}, text: "Coverage appears compatible with your full-scholarship requirement", weight: 8 });
+      components.push(component("funding_coverage", 8, "full_funding_match"));
     } else {
-      potentialIssues.push({ code: "full_funding_unclear", params: {}, text: "You require full funding — this award's coverage may not cover tuition and living costs" });
+      potentialIssues.push({ code: "full_funding_unclear", params: {}, text: "You require full funding — this award's coverage may not cover tuition and living costs", weight: 5, points: 0 });
+      components.push(component("funding_coverage", 0, "full_funding_unclear"));
     }
+  } else {
+    components.push(component("funding_coverage", 0, null, false));
   }
 
   // Merit-based awards also read the activity portfolio. Academic numbers and
-  // achievements should not be evaluated in two disconnected worlds.
+  // achievements should not be evaluated in two disconnected worlds: the
+  // strength of the record grades the award, so a 3.9 with publications earns
+  // more of the merit points than a 3.6 with none.
   if (scholarship.meritBased) {
     const activity = activityFacts(profile);
-    if (
-      (normGpa != null && normGpa >= 3.6) ||
-      (profile.researchPublications || 0) > 0 ||
-      activity.leadership > 0 ||
-      activity.research > 0 ||
-      activity.awards > 0
-    ) {
-      score += 10;
-      reasons.push({ code: "merit_based", params: {}, text: "Merit-based — strong academic record, activities or publications" });
+    const academicCase = normGpa != null ? clamp((normGpa - 3.4) / 0.6, 0, 1) : 0;
+    const portfolioCase = clamp(
+      0.5 * saturatingCurve(activity.leadership + activity.research, 2) +
+        0.3 * saturatingCurve(activity.awards, 2) +
+        0.2 * saturatingCurve(Number(profile.researchPublications ?? 0), 2),
+      0,
+      1
+    );
+    const meritStrength = clamp(0.7 * academicCase + 0.3 * portfolioCase, 0, 1);
+    if (meritStrength > 0) {
+      const points = roundTo(10 * meritStrength, 1);
+      score += points;
+      reasons.push({ code: "merit_based", params: {}, text: "Merit-based — strong academic record, activities or publications", weight: points });
+      components.push(component("merit", points, "merit_based"));
+    } else {
+      components.push(component("merit", 0, null, false));
     }
+  } else {
+    components.push(component("merit", 0, null, false));
   }
 
-  const matchScore = Math.min(98, Math.max(30, Math.round(score)));
+  const rawScore = roundTo(score, 1);
+  const matchScore = Math.min(98, Math.max(30, Math.round(rawScore)));
   const isEligible = matchScore >= 60;
 
   return {
     matchScore,
     isEligible,
+    rawScore,
+    breakdown: breakdownOf(rawScore, components),
     reasons: reasons.slice(0, 4).map((r) => r.text),
     potentialIssues: potentialIssues.slice(0, 3).map((i) => i.text),
     // Same entries, same order as the two arrays above (see ReasonDetail).
-    reasonDetails: reasons.slice(0, 4),
-    issueDetails: potentialIssues.slice(0, 3),
+    reasonDetails: reasons.slice(0, 4).map(toDetail),
+    issueDetails: potentialIssues.slice(0, 3).map(toDetail),
   };
 }
