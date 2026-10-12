@@ -77,8 +77,8 @@ export async function POST(req: Request) {
     if (!title) {
       return NextResponse.json({ error: "profileId and title are required" }, { status: 400 });
     }
-    const dueDate = parseDueDate(body.dueDate || undefined);
-    if (dueDate === null) {
+    const dueDate = parseDueDate(body.dueDate);
+    if (!dueDate) {
       return NextResponse.json({ error: "dueDate must be a YYYY-MM-DD date" }, { status: 400 });
     }
 
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       universityId: positiveInt(body.universityId),
       title,
       category: clampString(body.category, 80).trim() || "Document Prep",
-      dueDate: dueDate ?? new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+      dueDate,
       isCompleted: false,
       priority: clampString(body.priority, 40).trim() || "Medium",
     }).returning();

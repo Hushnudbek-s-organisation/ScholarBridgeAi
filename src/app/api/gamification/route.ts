@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { getGamification } from "@/lib/gamification";
-import { seedGamification } from "@/db/seed";
-
 export async function GET(req: Request) {
   try {
-    await seedGamification();
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     if (!profileIdStr) {

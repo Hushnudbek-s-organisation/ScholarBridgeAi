@@ -44,6 +44,7 @@ export function HubTabs({
   hidden?: string[];
   ariaLabel: string;
 }) {
+  const tn = useTranslations("nav");
   const list = panes.filter((p) => !hidden.includes(p.id));
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -99,7 +100,7 @@ export function HubTabs({
                   isActive ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                 }`}
               >
-                New
+                {tn("newBadge")}
               </span>
             )}
             {pane.premium && (
@@ -108,7 +109,7 @@ export function HubTabs({
                   isActive ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900" : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                 }`}
               >
-                Pro
+                {tn("proBadge")}
               </span>
             )}
           </button>

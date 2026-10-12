@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { checklistItems, studentChecklist } from "@/db/schema";
 import { CHECKLIST_PHASES } from "@/lib/growth/defaults";
 import { bool, guardStudent, jsonError, readBody, serverError } from "@/lib/growth/api";
+import { completionSummary } from "@/lib/calculations";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,17 @@ export async function GET(req: Request) {
         .map((i) => ({ id: i.id, title: i.title, description: i.description, linkTab: i.linkTab, done: doneAt.has(i.id), doneAt: doneAt.get(i.id) ?? null }));
       return { phase, items: list, done: list.filter((i) => i.done).length, total: list.length };
     }).filter((p) => p.total > 0);
-    const total = phases.reduce((s, p) => s + p.total, 0);
-    const doneCount = phases.reduce((s, p) => s + p.done, 0);
-    return NextResponse.json({ phases, done: doneCount, total, percent: total ? Math.round((doneCount / total) * 100) : 0 });
+    const progress = completionSummary(
+      phases.reduce((sum, phase) => sum + phase.done, 0),
+      phases.reduce((sum, phase) => sum + phase.total, 0)
+    );
+    return NextResponse.json({
+      phases,
+      done: progress.done,
+      total: progress.total,
+      percent: progress.pct,
+      progress,
+    });
   } catch (err) {
     return serverError("departure GET", err);
   }

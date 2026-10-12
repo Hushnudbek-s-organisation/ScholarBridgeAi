@@ -86,53 +86,48 @@ ${profileContext}`;
 
       let fallback: string;
       if (queryLower.includes("visa") || queryLower.includes("work permit") || queryLower.includes("opt") || queryLower.includes("pgwp")) {
-        fallback = `### Post-Study Work Visas: Top Destinations
+        fallback = `### Visa information needs an official source
 
-How the main study destinations compare on post-graduation work:
+The AI provider is offline, so ScholarBridge will not guess a visa duration, work right, eligibility rule, or route name. These rules change and depend on country, programme, nationality, and date.
 
-- **Canada (PGWP):** up to 3 years of work permit after a 2-year degree, with direct points toward permanent residency.
-- **United States (OPT / STEM OPT):** 1 year of standard OPT plus a 2-year STEM extension (3 years total for STEM majors).
-- **United Kingdom (Graduate Route):** 2 years post-study work for bachelor's and master's graduates, 3 years for PhD.
-- **Germany (Job Seeker Visa):** 18 months to find a job in your field, with fast-track permanent residency.
-- **Australia (Subclass 485):** 2 to 4 years depending on degree level and location.
+- Open **Visa & Departure** and select your destination.
+- Follow the linked government or embassy source.
+- Check the source's last-verified date before acting.
+- Add confirmed requirements to your plan; leave anything unpublished as unknown.
 
-**Pro tip:** if applying to the US, make sure your major is officially classified as STEM (science, tech, engineering, math).`;
+For a personal legal or immigration decision, contact the relevant authority or a qualified adviser.`;
       } else if (queryLower.includes("scholarship") || queryLower.includes("funding") || queryLower.includes("tuition")) {
-        fallback = `### High-Value Scholarships for International Students
+        fallback = `### Funding information needs verified catalogue data
 
-Top fully-funded options for an international profile like yours:
+The AI provider is offline, so ScholarBridge will not invent scholarship names, award values, coverage, eligibility, or deadlines.
 
-- **Fulbright Foreign Student Program (US):** full tuition, monthly stipend, health insurance, and round-trip airfare.
-- **Chevening Scholarship (UK):** fully funded 1-year master's, including fees, living stipend, and travel.
-- **DAAD EPOS / TUM Merit Grants (Germany):** full tuition plus a 934–1,200 EUR monthly allowance.
-- **Erasmus Mundus Joint Master (EU):** zero tuition plus about 1,400 EUR per month across multiple countries.
-- **MEXT (Japan):** 100% tuition coverage, 144,000 JPY monthly stipend, and flight allowance.
+- Open **Scholarships → Browse scholarships** for catalogue entries with source links.
+- Check **Recommended for you** for requirement-based matches, not award probabilities.
+- Verify every amount and deadline on the official provider page.
+- Add saved awards to **My Plan → Financial Plan**; unknown award chances remain unknown.
 
-**Key deadline:** most government scholarship portals close 6–9 months before the intake starts.`;
+A saved or submitted scholarship is not secured funding until you record a confirmed award.`;
       } else if (queryLower.includes("sop") || queryLower.includes("essay") || queryLower.includes("statement")) {
-        fallback = `### Winning SOP Structure (5-Step Framework)
+        fallback = `### Continue with your verified application prompt
 
-A Statement of Purpose that stands out to admissions committees:
+The AI provider is offline, so ScholarBridge will not invent a university prompt, word limit, faculty member, module, achievement, or personal story.
 
-1. **Hook (10%):** open with a specific problem or real challenge that sparked your interest in the field.
-2. **Academics (25%):** core courses, strong grades, and the key concepts you mastered.
-3. **Projects & Impact (30%):** hands-on work with concrete metrics and clear problem-solving.
-4. **Why This University (20%):** name specific faculty, labs, and 2 exact elective modules.
-5. **Future Vision (15%):** your 3-year and 10-year career goals.
-
-Need a draft? Use the **AI SOP Assistant** in the main menu.`;
+1. Copy the exact official prompt and word limit into **Application Materials → Essays**.
+2. Build the draft only from facts already in your profile, activities, and projects.
+3. Explain your preparation, relevant evidence, programme fit, and next goal in the order the prompt requires.
+4. Mark missing programme details for verification instead of filling them with plausible text.
+5. Use the deterministic rubric for structure and specificity; it is feedback, not an admission score.`;
       } else {
-        fallback = `### ScholarBridgeAI Guidance
+        fallback = `### ScholarBridge guidance is temporarily offline
 
-Our AI mentor is offline right now, so here is general guidance instead of a personalised answer.
+No personalised answer was generated, so ScholarBridge will not replace it with invented requirements, dates, scores, or recommendations.
 
-Action items to keep in mind:
+- Check your next verified task on **Dashboard**.
+- Use **Explore** for sourced university and scholarship records.
+- Use **My Plan** for tasks and confirmed deadlines.
+- Use **Applications** for requirements tied to a real application.
 
-1. **Profile calibration:** make sure your GPA, test scores, and budget match your target university cutoffs.
-2. **Documents:** official transcripts, 2–3 recommendation letters (LORs), and an updated CV.
-3. **Deadlines:** fall intake applications usually open in September and close between December and March.
-
-You can compare tuition and acceptance rates in the **University Explorer**, or run the **AI Profile Evaluator** for a full readiness breakdown.`;
+Where a source or profile fact is missing, the platform should show it as unknown.`;
       }
       reply = normalizeAiReply(fallback);
     }

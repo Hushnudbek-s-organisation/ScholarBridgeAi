@@ -1,5 +1,6 @@
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { computeDailyStreak } from "@/lib/streak";
 import {
   userPoints,
   pointsLedger,
@@ -164,14 +165,21 @@ export async function awardPoints(
     relatedEntityId: relatedEntityId ?? null,
   });
 
-  const row = await ensureUserPoints(profileId);
-  const newTotal = row.totalPoints + points;
+  await ensureUserPoints(profileId);
+  // Atomic increment: two simultaneous legitimate rewards must not overwrite
+  // each other's totals (the old read + write sequence could lose one grant).
+  const [updatedPoints] = await db
+    .update(userPoints)
+    .set({ totalPoints: sql`${userPoints.totalPoints} + ${points}`, updatedAt: new Date() })
+    .where(eq(userPoints.profileId, profileId))
+    .returning({ totalPoints: userPoints.totalPoints });
+  const newTotal = updatedPoints.totalPoints;
   const levelRows = await getLevels();
   const currentLevel = computeLevel(newTotal, levelRows);
 
   await db
     .update(userPoints)
-    .set({ totalPoints: newTotal, currentLevel: currentLevel.id, updatedAt: new Date() })
+    .set({ currentLevel: currentLevel.id, updatedAt: new Date() })
     .where(eq(userPoints.profileId, profileId));
 
   const newlyAwardedBadges = await grantBadges(profileId);
@@ -270,12 +278,17 @@ export async function getGamification(profileId: number) {
     .where(eq(userBadges.profileId, profileId))
     .orderBy(desc(userBadges.awardedAt));
 
-  const ledger = await db
+  // Up to one year of rewarded activity is enough for the visible daily streak.
+  // We return only the latest 50 ledger entries, but use the larger bounded set
+  // for streak continuity so a busy day cannot erase older active days.
+  const activityLedger = await db
     .select()
     .from(pointsLedger)
     .where(eq(pointsLedger.profileId, profileId))
     .orderBy(desc(pointsLedger.createdAt))
-    .limit(50);
+    .limit(1000);
+  const ledger = activityLedger.slice(0, 50);
+  const streak = computeDailyStreak(activityLedger.map((entry) => entry.createdAt));
 
   // Next level target for the progress bar.
   let nextLevel = null;
@@ -300,6 +313,7 @@ export async function getGamification(profileId: number) {
     pointsForLevel,
     badges: badgeRows.map((b) => ({ ...b.badge, awardedAt: b.awardedAt })),
     ledger,
+    streak,
     profileCompleteness: completeness,
   };
 }

@@ -59,7 +59,9 @@
     "test:referral": "tsx scripts/check-referral.ts",
     "test:payments": "tsx scripts/check-payments.ts",
     "test:career-discovery": "tsx scripts/check-career-discovery.ts",
-    "test:arrival": "tsx scripts/check-arrival.ts"
+    "test:arrival": "tsx scripts/check-arrival.ts",
+    "test:calculations": "tsx scripts/check-calculations.ts",
+    "test:streak": "tsx scripts/check-streak.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

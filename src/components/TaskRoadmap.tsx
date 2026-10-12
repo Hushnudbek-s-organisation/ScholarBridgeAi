@@ -40,9 +40,7 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Document Prep");
-  const [newDueDate, setNewDueDate] = useState(
-    new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0]
-  );
+  const [newDueDate, setNewDueDate] = useState("");
   const [newPriority, setNewPriority] = useState("Medium");
 
   useEffect(() => {

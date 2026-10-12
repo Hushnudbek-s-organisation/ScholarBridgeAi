@@ -3,6 +3,7 @@ import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { savedPrograms, universityPrograms, universities } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { positiveInt, readJsonBody } from "@/lib/request";
 
 /**
  * Saved programs (spec §24 — program shortlist).
@@ -20,7 +21,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
 
-    const profileId = parseInt(profileIdStr, 10);
+    const profileId = positiveInt(profileIdStr);
+    if (!profileId) {
+      return NextResponse.json({ error: "profileId must be a positive integer" }, { status: 400 });
+    }
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
       return NextResponse.json(
@@ -55,11 +59,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { profileId, programId } = body;
+    const parsed = await readJsonBody<Record<string, unknown>>(req, 8 * 1024);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+    }
+    const profileId = positiveInt(parsed.body.profileId);
+    const programId = positiveInt(parsed.body.programId);
 
     if (!profileId || !programId) {
-      return NextResponse.json({ error: "profileId and programId are required" }, { status: 400 });
+      return NextResponse.json({ error: "profileId and programId must be positive integers" }, { status: 400 });
     }
 
     const access = await requireProfileAccess(req, profileId);
@@ -113,7 +121,10 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const id = parseInt(idStr, 10);
+    const id = positiveInt(idStr);
+    if (!id) {
+      return NextResponse.json({ error: "id must be a positive integer" }, { status: 400 });
+    }
 
     // Row ids are guessable — confirm the row belongs to the caller.
     const [target] = await db.select().from(savedPrograms).where(eq(savedPrograms.id, id));

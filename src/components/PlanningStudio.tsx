@@ -40,7 +40,8 @@ interface CostBreakdown {
   unknowns: string[];
   scholarship: {
     guaranteedAnnualUsd: number;
-    expectedAnnualUsd: number;
+    expectedAnnualUsd: number | null;
+    probabilityDataAvailable: boolean;
     bestCaseAnnualUsd: number;
     coveragePct: number;
     misaligned: string[];
@@ -49,6 +50,7 @@ interface CostBreakdown {
     annualAfterScholarshipUsd: number;
     totalAfterScholarshipUsd: number;
     familyContributionUsd: number;
+    familyContributionKnown: boolean;
     gapAnnualUsd: number;
     gapTotalUsd: number;
     affordable: boolean;
@@ -58,9 +60,10 @@ interface CostBreakdown {
 
 interface Portfolio {
   count: number;
-  expectedAnnualUsd: number;
-  expectedCoveragePct: number;
-  chanceOfAnyAwardPct: number;
+  expectedAnnualUsd: number | null;
+  expectedCoveragePct: number | null;
+  chanceOfAnyAwardPct: number | null;
+  probabilityDataAvailable: boolean;
   diversification: "good" | "thin" | "risky";
   advice: string[];
 }
@@ -106,7 +109,8 @@ interface PlanningData {
   comparison: Comparison;
 }
 
-const money = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
+const money = (v: number | null) => v == null ? "Unknown" : `$${Math.round(v).toLocaleString("en-US")}`;
+const pct = (v: number | null) => v == null ? "Unknown" : `${v}%`;
 
 const TABS = [
   { id: "cost", label: "Cost calculator", icon: Calculator },
@@ -286,7 +290,11 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
               <div
                 className={`rounded-2xl border p-4 ${
-                  data.costs.net.affordable ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"
+                  !data.costs.net.familyContributionKnown
+                    ? "border-slate-200 bg-slate-50"
+                    : data.costs.net.affordable
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-rose-200 bg-rose-50"
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -300,8 +308,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-slate-700">{data.costs.verdict}</p>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Best-case scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · family{" "}
-                  {money(data.costs.net.familyContributionUsd)}/yr · total gap{" "}
+                  Best-case scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · confirmed family{" "}
+                  {data.costs.net.familyContributionKnown ? `${money(data.costs.net.familyContributionUsd)}/yr` : "Unknown"} · total gap{" "}
                   {money(data.costs.net.gapTotalUsd)}
                 </p>
               </div>
@@ -315,8 +323,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 {[
                   { label: "Saved", value: String(data.portfolio.count) },
                   { label: "Expected /yr", value: money(data.portfolio.expectedAnnualUsd) },
-                  { label: "Coverage", value: `${data.portfolio.expectedCoveragePct}%` },
-                  { label: "Chance of ≥1 award", value: `${data.portfolio.chanceOfAnyAwardPct}%` },
+                  { label: "Expected coverage", value: pct(data.portfolio.expectedCoveragePct) },
+                  { label: "Chance of ≥1 award", value: pct(data.portfolio.chanceOfAnyAwardPct) },
                 ].map((s) => (
                   <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
                     <div className="text-xl font-extrabold text-slate-900">{s.value}</div>

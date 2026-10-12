@@ -13,6 +13,7 @@ import {
   certificates,
 } from "@/db/schema";
 import { eq, inArray, asc, and } from "drizzle-orm";
+import { completionSummary } from "@/lib/calculations";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -156,14 +157,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       certificate = cert;
     }
 
-    const totalLessons = allLessonIds.length;
+    const progress = completionSummary(totalCompleted, allLessonIds.length);
 
     return NextResponse.json({
       course,
       modules: visibleModules,
-      totalLessons,
-      completedLessons: totalCompleted,
-      progressPct: totalLessons ? Math.round((totalCompleted / totalLessons) * 100) : 0,
+      totalLessons: progress.total,
+      completedLessons: progress.done,
+      progressPct: progress.pct,
+      progress,
       certificate,
       fullAccess,
       freePreview: !fullAccess,

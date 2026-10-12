@@ -37,6 +37,7 @@ import { profileCompleteness } from "@/lib/growth/logic";
 import { calculateCosts } from "@/lib/costs";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
+import { summarizeApplications } from "@/lib/journey/applicationSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -120,12 +121,7 @@ export async function GET(req: Request) {
           .where(and(eq(admissionOffers.profileId, profileId), inArray(admissionOffers.applicationId, appIds)))
       : [];
 
-    const appProgress = {
-      total: appRows.length,
-      preparing: appRows.filter((a) => !a.submittedAt).length,
-      submitted: appRows.filter((a) => !!a.submittedAt).length,
-      decision: appRows.filter((a) => offerRows.some((o) => o.applicationId === a.id && o.status !== "pending")).length,
-    };
+    const appProgress = summarizeApplications(appRows, offerRows);
 
     // ---- Study plan phases (spec §12) ------------------------------------
     const departureReady =

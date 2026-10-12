@@ -14,6 +14,7 @@
  * an admin-published source) entered.
  */
 import React, { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy, Mail, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import {
@@ -67,20 +68,21 @@ interface OffersData {
 const OFFER_STATUSES = ["pending", "accepted", "rejected", "waitlisted", "deferred"];
 
 export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+  const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<OffersData>(
-    useCallback(() => getJson<OffersData>(`/api/offers?profileId=${profileId}`, "Could not load your offers"), [profileId]),
+    useCallback(() => getJson<OffersData>(`/api/offers?profileId=${profileId}`, t("opLoadError")), [profileId, t]),
     [profileId],
-    { initial: { offers: [], summary: { total: 0, pending: 0, accepted: 0, rejected: 0 } }, errorFallback: "Could not load your offers" }
+    { initial: { offers: [], summary: { total: 0, pending: 0, accepted: 0, rejected: 0 } }, errorFallback: t("opLoadError") }
   );
   const [busy, setBusy] = useState(false);
 
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
     try {
-      await sendJson("/api/offers", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, "Could not update the offer");
+      await sendJson("/api/offers", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("opUpdateError"));
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not update the offer");
+      alert(e instanceof Error ? e.message : t("opUpdateError"));
     } finally {
       setBusy(false);
     }
@@ -91,13 +93,13 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
     await reload();
   };
 
-  if (loading && data.offers.length === 0) return <Loading label="Checking your decisions…" />;
+  if (loading && data.offers.length === 0) return <Loading label={t("opLoading")} />;
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="Offers & decisions"
-        subtitle="Record what each university decided, and keep the real deadline in front of you. Accepting an offer switches on the post-admission checklist automatically."
+        title={t("opTitle")}
+        subtitle={t("opSubtitle")}
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone="slate">{data.summary.total}</Pill>
@@ -107,21 +109,17 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
         }
       >
         {error && <ErrorNote message={error} />}
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Offers are created from a submitted application. Open an application and use “Record offer” to add one.
-        </p>
-        <Button size="sm" variant="outline" className="mt-2" onClick={() => onNavigateTab("applications")}>
-          Go to my applications
-        </Button>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t("opCreatedNote")}</p>
+        <Button size="sm" variant="outline" className="mt-2" onClick={() => onNavigateTab("applications")}>{t("opGoApplications")}</Button>
       </JourneyCard>
 
       {data.offers.length === 0 ? (
-        <Empty title="No offers recorded yet" hint="When a university replies, record it here so the deadline and the funding work appear in one place." />
+        <Empty title={t("opEmptyTitle")} hint={t("opEmptyHint")} />
       ) : (
         data.offers.map((o) => (
           <JourneyCard
             key={o.id}
-            title={o.application?.universityName ?? "Offer"}
+            title={o.application?.universityName ?? t("opOfferFallback")}
             subtitle={o.application?.programName ?? undefined}
             action={
               <div className="flex items-center gap-2">
@@ -137,7 +135,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                     </option>
                   ))}
                 </select>
-                <Button size="sm" variant="danger" onClick={() => void remove(o.id)} aria-label="Delete offer">
+                <Button size="sm" variant="danger" onClick={() => void remove(o.id)} aria-label={t("opDeleteOffer")}>
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
@@ -146,18 +144,18 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
             <div className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-2">
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <Field label="Decided on">
+                  <Field label={t("opDecidedOn")}>
                     <input type="date" className={inputClass} defaultValue={o.decidedAt ?? ""} onChange={(e) => void patch({ id: o.id, decidedAt: e.target.value })} />
                   </Field>
-                  <Field label="Respond by">
+                  <Field label={t("opRespondBy")}>
                     <input type="date" className={inputClass} defaultValue={o.responseDeadline ?? ""} onChange={(e) => void patch({ id: o.id, responseDeadline: e.target.value })} />
                   </Field>
-                  <Field label="Deposit due">
+                  <Field label={t("opDepositDue")}>
                     <input type="date" className={inputClass} defaultValue={o.depositDueDate ?? ""} onChange={(e) => void patch({ id: o.id, depositDueDate: e.target.value })} />
                   </Field>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <Field label="Deposit amount (USD)">
+                  <Field label={t("opDepositAmount")}>
                     <input
                       type="number"
                       className={inputClass}
@@ -165,7 +163,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                       onBlur={(e) => void patch({ id: o.id, depositAmount: e.target.value === "" ? 0 : Number(e.target.value) })}
                     />
                   </Field>
-                  <Field label="Tuition commitment (USD)" hint="Leave empty to use the university's published figure">
+                  <Field label={t("opTuitionCommitment")} hint={t("opTuitionHint")}>
                     <input
                       type="number"
                       className={inputClass}
@@ -174,15 +172,15 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                     />
                   </Field>
                 </div>
-                <Field label="Offer letter">
+                <Field label={t("opOfferLetter")}>
                   <input
                     className={inputClass}
-                    placeholder="Paste a link to the official letter"
+                    placeholder={t("opOfferLetterPlaceholder")}
                     defaultValue={o.offerLetterUrl ?? ""}
                     onBlur={(e) => void patch({ id: o.id, offerLetterUrl: e.target.value })}
                   />
                 </Field>
-                <Field label="Conditions" hint="Copy these from the letter — we never guess at offer conditions.">
+                <Field label={t("opConditions")} hint={t("opConditionsHint")}>
                   <textarea
                     className={`${inputClass} h-20`}
                     defaultValue={o.conditions ?? ""}
@@ -190,18 +188,18 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                   />
                 </Field>
                 {o.offerLetterUrl && (
-                  <SourceTag url={o.offerLetterUrl} name={o.offerLetterName ?? "Official offer letter"} lastVerified={o.decidedAt} />
+                  <SourceTag url={o.offerLetterUrl} name={o.offerLetterName ?? t("opOfficialLetter")} lastVerified={o.decidedAt} />
                 )}
               </div>
 
               {/* SPEC §24: explicit, itemised funding — never "full funding". */}
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Post-admission funding</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("opFundingTitle")}</h3>
                 <dl className="mt-2 space-y-1 text-sm">
-                  <Line label="Tuition commitment" value={o.funding.tuition} />
-                  <Line label="Scholarship" value={o.funding.scholarship} tone="good" />
-                  <Line label="Financial aid" value={o.funding.aid} tone="good" />
-                  <Line label="Deposit payable now" value={o.funding.payableNow.amount} tone="warn" />
+                  <Line label={t("lineTuition")} value={o.funding.tuition} />
+                  <Line label={t("fundScholarship")} value={o.funding.scholarship} tone="good" />
+                  <Line label={t("fundAid")} value={o.funding.aid} tone="good" />
+                  <Line label={t("lineDepositNow")} value={o.funding.payableNow.amount} tone="warn" />
                 </dl>
                 {o.funding.payableNow.dueDate && <p className="mt-1 text-xs text-slate-500">Due {o.funding.payableNow.dueDate} to {o.funding.payableNow.payee}.</p>}
                 <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-slate-500 dark:text-slate-400">
@@ -211,15 +209,11 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                 </ul>
                 {o.status === "accepted" ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => onNavigateTab("funding")}>
-                      Manage funding & deposit
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => onNavigateTab("visa")}>
-                      Start the visa checklist
-                    </Button>
+                    <Button size="sm" onClick={() => onNavigateTab("funding")}>{t("opManageFunding")}</Button>
+                    <Button size="sm" variant="outline" onClick={() => onNavigateTab("visa")}>{t("opStartVisa")}</Button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-[11px] text-slate-400">The funding checklist unlocks once you accept the offer.</p>
+                  <p className="mt-3 text-[11px] text-slate-400">{t("opFundingLocked")}</p>
                 )}
               </div>
             </div>
@@ -275,10 +269,11 @@ interface RecData {
 const REC_STATUSES = ["not_requested", "requested", "opened", "submitted"];
 
 export function RecommendationManagerPanel({ profileId }: { profileId: number }) {
+  const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<RecData>(
-    useCallback(() => getJson<RecData>(`/api/recommendations?profileId=${profileId}`, "Could not load your recommendations"), [profileId]),
+    useCallback(() => getJson<RecData>(`/api/recommendations?profileId=${profileId}`, t("rmLoadError")), [profileId, t]),
     [profileId],
-    { initial: { statuses: REC_STATUSES, types: ["academic", "professional", "personal", "research"], requests: [], summary: { total: 0, submitted: 0, outstanding: 0, notRequested: 0 }, instructionsTemplate: "" }, errorFallback: "Could not load your recommendations" }
+    { initial: { statuses: REC_STATUSES, types: ["academic", "professional", "personal", "research"], requests: [], summary: { total: 0, submitted: 0, outstanding: 0, notRequested: 0 }, instructionsTemplate: "" }, errorFallback: t("rmLoadError") }
   );
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
@@ -296,20 +291,20 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
       await sendJson(
         "/api/recommendations",
         { method: "POST", body: JSON.stringify({ profileId, ...form, applicationId: Number(form.applicationId) }) },
-        "Could not add the recommender"
+        t("rmAddError")
       );
       setForm({ applicationId: "", recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
       setAdding(false);
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not add the recommender");
+      alert(e instanceof Error ? e.message : t("rmAddError"));
     } finally {
       setBusy(false);
     }
   };
 
   const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/recommendations", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, "Could not update");
+    await sendJson("/api/recommendations", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("dvUpdateError"));
     await reload();
   };
 
@@ -318,21 +313,20 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
     await reload();
   };
 
-  if (loading && data.requests.length === 0) return <Loading label="Loading your recommenders…" />;
+  if (loading && data.requests.length === 0) return <Loading label={t("rmLoading")} />;
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="Recommendation manager"
-        subtitle="Track who you asked, when they are due and what they still need to do. Your notes stay private unless you choose to share them."
+        title={t("rmTitle")}
+        subtitle={t("rmSubtitle")}
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone="slate">{data.summary.total}</Pill>
             {data.summary.outstanding > 0 && <Pill tone="warn">{data.summary.outstanding} outstanding</Pill>}
             {data.summary.submitted > 0 && <Pill tone="good">{data.summary.submitted} submitted</Pill>}
             <Button size="sm" onClick={() => setAdding((v) => !v)}>
-              <Plus className="h-3.5 w-3.5" /> Add recommender
-            </Button>
+              <Plus className="h-3.5 w-3.5" />{t("rmAdd")}</Button>
           </div>
         }
       >
@@ -340,9 +334,9 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
 
         {adding && (
           <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-700">
-            <Field label="Application">
+            <Field label={t("secApplication")}>
               <select className={inputClass} value={form.applicationId} onChange={(e) => setForm({ ...form, applicationId: e.target.value })}>
-                <option value="">Choose…</option>
+                <option value="">{t("rmChoose")}</option>
                 {applications.map(([id, a]) => (
                   <option key={id} value={id}>
                     {a.universityName}
@@ -350,22 +344,20 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
                 ))}
               </select>
             </Field>
-            <Field label="Name">
+            <Field label={t("rmFieldName")}>
               <input className={inputClass} value={form.recommenderName} onChange={(e) => setForm({ ...form, recommenderName: e.target.value })} />
             </Field>
-            <Field label="Email">
+            <Field label={t("rmFieldEmail")}>
               <input type="email" className={inputClass} value={form.recommenderEmail} onChange={(e) => setForm({ ...form, recommenderEmail: e.target.value })} />
             </Field>
-            <Field label="Relationship">
-              <input className={inputClass} placeholder="Math teacher" value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} />
+            <Field label={t("rmFieldRelationship")}>
+              <input className={inputClass} placeholder={t("rmRelationshipPlaceholder")} value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} />
             </Field>
-            <Field label="Due" hint="Defaults to the application deadline">
+            <Field label={t("rmFieldDue")} hint={t("rmDueHint")}>
               <input type="date" className={inputClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             </Field>
             <div className="sm:col-span-2 lg:col-span-5">
-              <Button onClick={add} disabled={busy || !form.applicationId || !form.recommenderName.trim()}>
-                Save
-              </Button>
+              <Button onClick={add} disabled={busy || !form.applicationId || !form.recommenderName.trim()}>{t("rmSave")}</Button>
             </div>
           </div>
         )}
@@ -378,7 +370,7 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
       </JourneyCard>
 
       {data.requests.length === 0 ? (
-        <Empty title="No recommenders yet" hint="Most universities ask for one or two letters. Add the person before you need the letter — they need time." />
+        <Empty title={t("rmEmptyTitle")} hint={t("rmEmptyHint")} />
       ) : (
         <div className="grid gap-2 lg:grid-cols-2">
           {data.requests.map((r) => (
@@ -387,7 +379,7 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{r.recommenderName}</p>
                   <p className="text-[11px] text-slate-500">
-                    {r.application?.universityName ?? "Application"}
+                    {r.application?.universityName ?? t("secApplication")}
                     {r.relationship && ` · ${r.relationship}`}
                   </p>
                 </div>
@@ -406,10 +398,10 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
               </div>
 
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <Field label="Due date">
+                <Field label={t("rmFieldDue")}>
                   <input type="date" className={inputClass} defaultValue={r.dueDate ?? ""} onChange={(e) => void patch({ id: r.id, dueDate: e.target.value })} />
                 </Field>
-                <Field label="Email">
+                <Field label={t("rmFieldEmail")}>
                   <input type="email" className={inputClass} defaultValue={r.recommenderEmail ?? ""} onBlur={(e) => void patch({ id: r.id, recommenderEmail: e.target.value })} />
                 </Field>
               </div>
@@ -420,8 +412,7 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
                     href={`mailto:${r.recommenderEmail}?subject=${encodeURIComponent(`Recommendation request — ${r.application?.universityName ?? "my application"}`)}&body=${encodeURIComponent(r.instructions ?? data.instructionsTemplate)}`}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
                   >
-                    <Mail className="h-3.5 w-3.5" /> Email your draft
-                  </a>
+                    <Mail className="h-3.5 w-3.5" />{t("rmEmailDraft")}</a>
                 )}
                 <button
                   type="button"
@@ -432,14 +423,13 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
                   }}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:underline"
                 >
-                  <Copy className="h-3.5 w-3.5" /> {copied === r.id ? "Copied" : "Copy message"}
+                  <Copy className="h-3.5 w-3.5" /> {copied === r.id ? t("rmCopied") : t("rmCopyMessage")}
                 </button>
                 <Button size="sm" variant="ghost" onClick={() => void patch({ id: r.id, status: "submitted" })}>
-                  <Check className="h-3 w-3" /> Mark submitted
-                </Button>
+                  <Check className="h-3 w-3" />{t("rmMarkSubmitted")}</Button>
               </div>
 
-              <Field label="What to ask them for" hint="You write this. The assistant never writes a claim about you on their behalf.">
+              <Field label={t("rmWhatToAsk")} hint={t("rmWhatToAskHint")}>
                 <textarea
                   className={`${inputClass} mt-1 h-20 text-xs`}
                   defaultValue={r.instructions ?? ""}
@@ -496,8 +486,9 @@ const FUNDING_KINDS = ["scholarship", "aid", "family", "savings", "loan", "other
 const FUNDING_STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"];
 
 export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+  const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<FundingData>(
-    useCallback(() => getJson<FundingData>(`/api/funding?profileId=${profileId}`, "Could not load your funding plan"), [profileId]),
+    useCallback(() => getJson<FundingData>(`/api/funding?profileId=${profileId}`, t("fpLoadError")), [profileId, t]),
     [profileId],
     {
       initial: {
@@ -523,7 +514,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         items: [],
         gapActions: { gap: 0, scholarships: [], tab: "scholarships", cta: "" },
       },
-      errorFallback: "Could not load your funding plan",
+      errorFallback: t("fpLoadError"),
     }
   );
   const [busy, setBusy] = useState(false);
@@ -536,19 +527,19 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
       await sendJson(
         "/api/funding",
         { method: "POST", body: JSON.stringify({ profileId, ...form, amountUsd: Number(form.amountUsd), applicationId: data.application?.id ?? null }) },
-        "Could not save"
+        t("tpSaveError")
       );
       setForm({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [], notes: "" });
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not save");
+      alert(e instanceof Error ? e.message : t("tpSaveError"));
     } finally {
       setBusy(false);
     }
   };
 
   const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, "Could not update");
+    await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("dvUpdateError"));
     await reload();
   };
 
@@ -557,19 +548,19 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
     await reload();
   };
 
-  if (loading) return <Loading label="Working out your yearly cost…" />;
+  if (loading) return <Loading label={t("fpLoading")} />;
 
   const pct = data.annualCost > 0 ? Math.round((data.plan.securedTotal / data.annualCost) * 100) : 0;
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="My funding plan"
-        subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : "Add an application to get its published costs."}
+        title={t("fpTitle")}
+        subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : t("fpNoApplication")}
         action={
           <div className="text-right">
             <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">${data.annualCost.toLocaleString()}</p>
-            <p className="text-[10px] font-bold uppercase text-slate-500">Per year</p>
+            <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
           </div>
         }
       >
@@ -578,7 +569,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         {data.university && (
           <p className="mb-3 text-[11px] text-slate-500">
             Published costs for {data.university.name}, {data.university.city}, {data.university.country} ·{" "}
-            <SourceTag url={data.university.sourceUrl} name="University source" lastVerified={data.university.lastVerifiedAt} />
+            <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
           </p>
         )}
         {data.estimatedLines.length > 0 && (
@@ -593,21 +584,21 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label="Secured" value={data.plan.securedTotal} tone="good" hint="awarded or confirmed" />
-          <Metric label="Still possible" value={data.plan.projectedTotal} tone="brand" hint="everything not declined" />
-          <Metric label="Gap if nothing else lands" value={data.plan.fundingGap} tone={data.plan.fundingGap > 0 ? "bad" : "good"} />
-          <Metric label="Gap vs. secured today" value={data.plan.securedGap} tone={data.plan.securedGap > 0 ? "warn" : "good"} />
+          <Metric label={t("fpSecured")} value={data.plan.securedTotal} tone="good" hint={t("fpSecuredHint")} />
+          <Metric label={t("fpStillPossible")} value={data.plan.projectedTotal} tone="brand" hint={t("fpStillPossibleHint")} />
+          <Metric label={t("fpGapNothing")} value={data.plan.fundingGap} tone={data.plan.fundingGap > 0 ? "bad" : "good"} />
+          <Metric label={t("fpGapSecured")} value={data.plan.securedGap} tone={data.plan.securedGap > 0 ? "warn" : "good"} />
         </div>
       </JourneyCard>
 
-      <JourneyCard title="Where the money goes" subtitle="Coverage is per line, and only counts what you told us it covers.">
+      <JourneyCard title={t("fpMoneyTitle")} subtitle={t("fpMoneySubtitle")}>
         <div className="space-y-2">
           {data.plan.byLine.map((l) => (
             <div key={l.key}>
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-700 dark:text-slate-200">
                   {l.label}
-                  {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-400">(estimated)</span>}
+                  {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-400">{t("fpEstimated")}</span>}
                 </span>
                 <span className="tabular-nums text-slate-500">
                   ${l.covered.toLocaleString()} / ${l.cost.toLocaleString()}
@@ -622,9 +613,9 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         </div>
       </JourneyCard>
 
-      <JourneyCard title="Add funding" subtitle="Scholarships, financial aid, family budget, savings, a loan — whatever is real for you.">
+      <JourneyCard title={t("fpAddFundingTitle")} subtitle={t("fpAddFundingSubtitle")}>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Field label="Kind">
+          <Field label={t("fpFieldKind")}>
             <select className={inputClass} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
               {FUNDING_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -633,13 +624,13 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
               ))}
             </select>
           </Field>
-          <Field label="Name">
-            <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="University bursary" />
+          <Field label={t("rmFieldName")}>
+            <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("fpNamePlaceholder")} />
           </Field>
-          <Field label="Amount (USD)">
+          <Field label={t("fpFieldAmount")}>
             <input className={inputClass} type="number" value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} />
           </Field>
-          <Field label="Status">
+          <Field label={t("fpFieldStatus")}>
             <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               {FUNDING_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -648,14 +639,14 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
               ))}
             </select>
           </Field>
-          <Field label="Covers">
+          <Field label={t("fpFieldCovers")}>
             <select
               className={inputClass}
               value={form.covers[0] ?? ""}
               onChange={(e) => setForm({ ...form, covers: e.target.value ? [e.target.value] : [] })}
             >
-              <option value="">Everything</option>
-              {(data.costLines.length ? data.costLines : [{ key: "tuition", label: "Tuition" }]).map((l) => (
+              <option value="">{t("fpEverything")}</option>
+              {(data.costLines.length ? data.costLines : [{ key: "tuition", label: t("lineTuition") }]).map((l) => (
                 <option key={l.key} value={l.key}>
                   {l.label} only
                 </option>
@@ -664,12 +655,11 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
           </Field>
         </div>
         <Button className="mt-3" onClick={add} disabled={busy || !form.name.trim() || !form.amountUsd}>
-          <Plus className="h-3.5 w-3.5" /> Add
-        </Button>
+          <Plus className="h-3.5 w-3.5" />{t("fpAdd")}</Button>
       </JourneyCard>
 
       {data.items.length > 0 && (
-        <JourneyCard title="Your funding items">
+        <JourneyCard title={t("fpItemsTitle")}>
           <ul className="space-y-2">
             {data.items.map((i) => (
               <li key={i.id} className="sb-card-hover flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
@@ -696,7 +686,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
       )}
 
       {data.gapActions.gap > 0 && (
-        <JourneyCard title="Close the gap">
+        <JourneyCard title={t("fpGapTitle")}>
           <p className="text-sm text-slate-700 dark:text-slate-200">
             You are short <strong className="tabular-nums">${data.gapActions.gap.toLocaleString()}</strong> for a year.
           </p>
@@ -712,7 +702,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-xs text-slate-500">No saved scholarship closes this gap yet.</p>
+            <p className="mt-1 text-xs text-slate-500">{t("fpNoScholarshipCloses")}</p>
           )}
           <Button size="sm" className="mt-3" onClick={() => onNavigateTab(data.gapActions.tab)}>
             {data.gapActions.cta}
@@ -762,24 +752,25 @@ interface LearningData {
 }
 
 export function LearningProvidersPanel({ profileId }: { profileId: number }) {
+  const t = useTranslations("journey");
   const { data, loading, error } = useResource<LearningData>(
-    useCallback(() => getJson<LearningData>(`/api/learning/providers?profileId=${profileId}`, "Could not load learning providers"), [profileId]),
+    useCallback(() => getJson<LearningData>(`/api/learning/providers?profileId=${profileId}`, t("lpLoadError")), [profileId, t]),
     [profileId],
     {
       initial: { connected: false, providers: [], suggestedTargets: [], metrics: [], adapters: [], notice: "" },
-      errorFallback: "Could not load learning providers",
+      errorFallback: t("lpLoadError"),
     }
   );
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="Study & test providers"
-        subtitle="ScholarBridge can read practice scores and course progress from an external study platform one day. Nothing is connected yet, and nothing about your journey depends on it."
+        title={t("lpTitle")}
+        subtitle={t("lpSubtitle")}
       >
         {error && <ErrorNote message={error} />}
         {loading ? (
-          <Loading label="Checking for connected providers…" />
+          <Loading label={t("lpLoading")} />
         ) : (
           <>
             <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
@@ -797,7 +788,7 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
                       <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
                         {p.metrics.map((m) => (
                           <li key={`${p.providerKey}-${m.metric}-${m.measuredAt ?? ""}`}>
-                            {m.metric}: {m.value ?? "Not specified"} {m.measuredAt ? `· ${m.measuredAt}` : ""} · source: {m.sourceName}
+                            {m.metric}: {m.value ?? t("uiNotSpecified")} {m.measuredAt ? `· ${m.measuredAt}` : ""} · source: {m.sourceName}
                           </li>
                         ))}
                       </ul>
@@ -807,8 +798,8 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
               </ul>
             ) : (
               <Empty
-                title="No provider configured"
-                hint="When an administrator enables a study or test platform, it will appear here and you can choose to connect it. Until then, enter your own scores in the Test Planner — they are always the source of truth."
+                title={t("lpNoProvider")}
+                hint={t("lpNoProviderHint")}
               />
             )}
           </>

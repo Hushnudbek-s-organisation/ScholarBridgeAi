@@ -241,7 +241,7 @@ export function CommandPalette({
             <ul ref={listRef} className="max-h-[55vh] overflow-y-auto p-2" role="listbox">
               {results.length === 0 && (
                 <li className="px-3 py-8 text-center text-sm text-slate-500">
-                  {searching ? "Searching…" : t("searchEmpty")}
+                  {searching ? t("searchLoading") : t("searchEmpty")}
                 </li>
               )}
               {results.map((it, idx) => {
@@ -268,11 +268,11 @@ export function CommandPalette({
                           {it.label}
                           {it.isNew && (
                             <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
-                              {t("new")}
+                              {t("newBadge")}
                             </span>
                           )}
                           {it.premium && (
-                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">Pro</span>
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">{t("proBadge")}</span>
                           )}
                         </span>
                         {it.hint && <span className="mt-0.5 block text-xs leading-snug text-slate-500">{it.hint}</span>}
