@@ -57,12 +57,22 @@ export interface JourneyDashboard {
   applications: { total: number; preparing: number; submitted: number; decision: number };
   readiness: {
     /** Application checklist: what is filled in and linked (documents, applications, funding). */
-    categories: { key: string; label: string; pct: number; state: string; gaps: string[]; tab: string }[];
+    categories: { key: string; label: string; pct: number; precise?: number; state: string; gaps: string[]; tab: string }[];
     weakest: { key: string; label: string; pct: number; gaps: string[]; tab: string }[];
     /** Checklist overall — NOT the profile readiness score. */
     overall: number;
+    /** Unrounded weighted average behind `overall`. */
+    overallPrecise: number;
     /** The shared profile readiness score (same engine as Profile & Goals → Readiness). */
-    profile: { overall: number; completeness: number } | null;
+    profile: {
+      overall: number;
+      /** Unrounded value behind `overall` — printed so both screens agree. */
+      overallPrecise: number;
+      completeness: number;
+      /** Dimensions that had real data / dimensions the engine measures. */
+      measured: number;
+      total: number;
+    } | null;
   };
   phases: { key: string; title: string; icon: string; tab: string; status: string; pct: number; missing: string[] }[];
   testGaps: { testType: string; state: string; current: number | null; required: number; message: string }[];
@@ -171,20 +181,24 @@ function useScholarshipAwardLabel() {
   };
 }
 
-function actionLabelForStep(id: string, tab: string): string {
-  if (id === "requirements-open") return "Open workspace";
-  if (id.startsWith("test-")) return "Open test planner";
-  if (id.startsWith("readiness-")) return "Improve profile";
-  if (id === "documents-expiring" || id === "documents-missing") return "Review documents";
-  if (id === "funding-gap") return "Find scholarships";
-  if (id === "recommendations") return "Manage letters";
-  if (id === "profile") return "Complete profile";
-  if (tab === "universities") return "Save universities";
-  if (tab === "chancing") return "Check fit";
-  if (tab === "activities") return "Add activities";
-  if (tab === "workspace") return "Open workspace";
-  if (tab === "study-plan") return "Open study plan";
-  return `Open ${tab.replaceAll("-", " ")}`;
+/**
+ * The Continue button's label. Every branch reads a translated string; the
+ * last resort names the destination instead of inventing English.
+ */
+function actionLabelForStep(t: RecTranslator, id: string, tab: string): string {
+  if (id === "requirements-open") return t("ccActionOpenWorkspace");
+  if (id.startsWith("test-")) return t("ccActionTestPlanner");
+  if (id.startsWith("readiness-")) return t("ccActionImproveProfile");
+  if (id === "documents-expiring" || id === "documents-missing") return t("ccActionReviewDocuments");
+  if (id === "funding-gap") return t("ccActionFindScholarships");
+  if (id === "recommendations") return t("ccActionManageLetters");
+  if (id === "profile") return t("ccActionCompleteProfile");
+  if (tab === "universities") return t("ccActionSaveUnis");
+  if (tab === "chancing") return t("ccActionCheckFit");
+  if (tab === "activities") return t("ccActionAddActivities");
+  if (tab === "workspace") return t("ccActionOpenWorkspace");
+  if (tab === "study-plan") return t("ccActionStudyPlan");
+  return t("ccActionOpenFallback", { tab: tab.replaceAll("-", " ") });
 }
 
 /**
@@ -602,9 +616,13 @@ export function JourneyControlCenter({
       <RevealGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4" stagger={0.06}>
         <RevealItem>
           <StatTile
-            label="Applications"
+            label={t("ccApplications")}
             value={applications.total}
-            hint={applications.total === 0 ? "Add your first university" : `${applications.submitted} submitted`}
+            hint={
+              applications.total === 0
+                ? t("ccAddFirstUni")
+                : t("ccSubmittedHint", { n: applications.submitted })
+            }
             icon={<Compass className="h-3.5 w-3.5" aria-hidden />}
             state={applications.total === 0 ? "warn" : "brand"}
           />
@@ -612,9 +630,20 @@ export function JourneyControlCenter({
         <RevealItem>
           <StatTile
             label={t("ccReadinessTile")}
-            value={readiness.profile?.overall ?? "—"}
+            // The unrounded average (one decimal) — the same value the
+            // Readiness pane prints. A bare integer here would silently
+            // disagree with the pane by up to half a point.
+            value={readiness.profile ? readiness.profile.overallPrecise : "—"}
+            decimals={1}
             suffix="%"
-            hint={t("ccReadinessTileHint")}
+            hint={
+              readiness.profile
+                ? t("ccReadinessMeasured", {
+                    measured: readiness.profile.measured,
+                    total: readiness.profile.total,
+                  })
+                : t("ccReadinessTileHint")
+            }
             icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
             state={
               (readiness.profile?.overall ?? 0) >= 75
@@ -627,10 +656,16 @@ export function JourneyControlCenter({
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Financial gap"
+            label={t("ccFinancialGap")}
             value={data.funding.calculated ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
             prefix={data.funding.calculated ? "$" : ""}
-            hint={data.funding.calculated ? `${data.funding.isCovered ? "Your yearly cost is covered" : "Still to find for one year"}${data.funding.estimated ? " · includes estimates" : ""}` : "Not calculated — add a university and budget"}
+            hint={
+              data.funding.calculated
+                ? `${data.funding.isCovered ? t("ccCovered") : t("ccStillToFind")}${
+                    data.funding.estimated ? ` ${t("ccIncludesEstimates")}` : ""
+                  }`
+                : t("ccNotCalculated")
+            }
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
             state={!data.funding.calculated ? "neutral" : data.funding.isCovered ? "good" : "warn"}
             onClick={!data.funding.calculated ? () => onNavigateTab("funding") : undefined}
@@ -638,10 +673,24 @@ export function JourneyControlCenter({
         </RevealItem>
         <RevealItem>
           <StatTile
-            label="Next deadline"
-            value={deadlines.length && deadlines[0].daysRemaining != null ? deadlines[0].daysRemaining < 0 ? "Overdue" : deadlines[0].daysRemaining : "—"}
-            suffix={deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0 ? " days" : ""}
-            hint={deadlines[0] ? `${deadlines[0].title} · due ${deadlines[0].dueDate}` : "Unscheduled"}
+            label={t("ccNextDeadline")}
+            value={
+              deadlines.length && deadlines[0].daysRemaining != null
+                ? deadlines[0].daysRemaining < 0
+                  ? t("ccOverdue")
+                  : deadlines[0].daysRemaining
+                : "—"
+            }
+            suffix={
+              deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0
+                ? t("ccDaysSuffix")
+                : ""
+            }
+            hint={
+              deadlines[0]
+                ? t("ccDueHint", { title: deadlines[0].title, date: deadlines[0].dueDate })
+                : t("ccUnscheduled")
+            }
             icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
             state={
               !deadlines.length || deadlines[0].daysRemaining == null
@@ -657,12 +706,9 @@ export function JourneyControlCenter({
       </RevealGroup>
 
       {/* ---- 2. Next steps ----------------------------------------------- */}
-      <JourneyCard
-        title="Next steps"
-        subtitle="The few things that actually move you forward this week."
-      >
+      <JourneyCard title={t("ccNextStepsTitle")} subtitle={t("ccNextStepsSubtitle")}>
         {nextSteps.length === 0 ? (
-          <Empty title="Nothing outstanding" hint="Add a university to generate your application checklist." />
+          <Empty title={t("ccNothingOutstanding")} hint={t("ccNothingOutstandingHint")} />
         ) : (
           <ul className="space-y-2">
             {nextSteps.map((s, i) => (
@@ -688,7 +734,7 @@ export function JourneyControlCenter({
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => onNavigateTab(s.tab)}>
-                  {actionLabelForStep(s.id, s.tab)}
+                  {actionLabelForStep(t, s.id, s.tab)}
                 </Button>
               </motion.li>
             ))}
@@ -699,14 +745,14 @@ export function JourneyControlCenter({
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ---- 3. Deadlines ---------------------------------------------- */}
         <JourneyCard
-          title="Upcoming deadlines"
-          subtitle="Everything with a real date, nearest first."
+          title={t("ccDeadlinesTitle")}
+          subtitle={t("ccDeadlinesSubtitle")}
           action={<CalendarClock className="h-4 w-4 text-slate-400" aria-hidden />}
         >
           {deadlines.length === 0 ? (
             <Empty
-              title="No deadlines yet"
-              hint="Save a university or add a scholarship and the real dates appear here."
+              title={t("ccNoDeadlines")}
+              hint={t("ccNoDeadlinesHint")}
               action={<Button size="sm" variant="outline" onClick={() => onNavigateTab("universities")}>Explore universities</Button>}
             />
           ) : (
@@ -736,23 +782,23 @@ export function JourneyControlCenter({
 
         {/* ---- 4. Application progress ----------------------------------- */}
         <JourneyCard
-          title="Application progress"
-          subtitle="Every application you are working on, in one number."
+          title={t("ccAppProgressTitle")}
+          subtitle={t("ccAppProgressSubtitle")}
         >
           {applications.total === 0 ? (
             <Empty
-              title="No applications yet"
-              hint="Adding a university is all it takes — we build the checklist, tasks and deadline for you."
+              title={t("ccNoApplications")}
+              hint={t("ccNoApplicationsHint")}
               action={<Button size="sm" onClick={() => onNavigateTab("applications")}>Start an application</Button>}
             />
           ) : (
             <>
               <div className="grid grid-cols-4 gap-2 text-center">
                 {[
-                  { label: "Total", value: applications.total, tone: "text-slate-900 dark:text-white" },
-                  { label: "Preparing", value: applications.preparing, tone: "text-amber-600 dark:text-amber-400" },
-                  { label: "Submitted", value: applications.submitted, tone: "text-sky-600 dark:text-sky-400" },
-                  { label: "Decision", value: applications.decision, tone: "text-emerald-600 dark:text-emerald-400" },
+                  { label: t("ccStatTotal"), value: applications.total, tone: "text-slate-900 dark:text-white" },
+                  { label: t("ccStatPreparing"), value: applications.preparing, tone: "text-amber-600 dark:text-amber-400" },
+                  { label: t("ccStatSubmitted"), value: applications.submitted, tone: "text-sky-600 dark:text-sky-400" },
+                  { label: t("ccStatDecision"), value: applications.decision, tone: "text-emerald-600 dark:text-emerald-400" },
                 ].map((s, i) => (
                   <motion.div
                     key={s.label}
@@ -779,7 +825,11 @@ export function JourneyControlCenter({
 
       {/* ---- 5. Profile readiness ----------------------------------------- */}
       <JourneyCard
-        title={t("ccChecklistTitle", { pct: readiness.overall })}
+        title={t("ccChecklistTitle", {
+          // One decimal here too: "43.7% in place" is the arithmetic the engine
+          // produced, not a rounded restatement of it.
+          pct: typeof readiness.overallPrecise === "number" ? readiness.overallPrecise.toFixed(1) : readiness.overall,
+        })}
         subtitle={t("ccChecklistSubtitle")}
       >
         {/* 2 columns on phones too: seven full-width tiles made a ~700px
@@ -801,7 +851,7 @@ export function JourneyControlCenter({
                     c.pct >= 75 ? "text-emerald-600" : c.pct >= 45 ? "text-amber-600" : "text-rose-600"
                   }`}
                 >
-                  {c.pct}%
+                  {typeof c.precise === "number" ? `${c.precise.toFixed(1)}%` : `${c.pct}%`}
                 </span>
               </div>
               <div className="mt-1.5">
@@ -809,7 +859,7 @@ export function JourneyControlCenter({
                   pct={c.pct}
                   size="sm"
                   tone={c.pct >= 75 ? "good" : c.pct >= 45 ? "warn" : "bad"}
-                  label={c.gaps[0] ?? "Looking good"}
+                  label={c.gaps[0] ?? t("ccLookingGood")}
                 />
               </div>
             </motion.button>
@@ -819,7 +869,7 @@ export function JourneyControlCenter({
 
       {/* ---- Test gaps (spec §8) ------------------------------------------ */}
       {data.testGaps.length > 0 && (
-        <JourneyCard title="Test requirements" subtitle="Compared against the published minimums of your own applications.">
+        <JourneyCard title={t("ccTestReqsTitle")} subtitle={t("ccTestReqsSubtitle")}>
           <ul className="space-y-2">
             {data.testGaps.map((g) => (
               <li key={g.testType} className="flex flex-wrap items-center gap-2 text-sm">
@@ -844,7 +894,7 @@ export function JourneyControlCenter({
 
       {/* ---- Documents about to expire (spec §7) -------------------------- */}
       {data.expiringDocuments.length > 0 && (
-        <JourneyCard title="Documents expiring" subtitle="A passport or certificate that expires can fail a whole application.">
+        <JourneyCard title={t("ccExpiringDocsTitle")} subtitle={t("ccExpiringDocsSubtitle")}>
           <ul className="space-y-1.5">
             {data.expiringDocuments.map((d) => (
               <li key={d.id} className="flex items-center gap-2 text-sm">
@@ -861,22 +911,22 @@ export function JourneyControlCenter({
 
       {/* ---- Funding summary (spec §9) ------------------------------------ */}
       {data.funding.items > 0 && (
-        <JourneyCard title="Funding" subtitle="What your plan covers and what is still missing.">
+        <JourneyCard title={t("ccFundingTitle")} subtitle={t("ccFundingSubtitle")}>
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated annual cost" : "Annual cost"}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedAnnualCost") : t("ccAnnualCost")}</p>
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : "Not calculated"}
+                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : t("ccNotCalculatedShort")}
               </p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? "Estimated remaining gap" : "Remaining gap"}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedGap") : t("ccRemainingGap")}</p>
               <p
                 className={`text-xl font-extrabold ${
                   !data.funding.calculated ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
                 }`}
               >
-                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : "Unavailable"}
+                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : t("ccUnavailable")}
               </p>
             </div>
             {!data.funding.calculated ? (
@@ -892,7 +942,7 @@ export function JourneyControlCenter({
       )}
 
       {/* ---- The ten study-plan phases (spec §12) ------------------------- */}
-      <JourneyCard title="My study plan" subtitle="Ten phases from today to departure. They update themselves.">
+      <JourneyCard title={t("ccStudyPlanTitle")} subtitle={t("ccStudyPlanSubtitle")}>
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {data.phases.map((p) => (
             <li key={p.key}>
@@ -915,7 +965,7 @@ export function JourneyControlCenter({
                   <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                  {p.status === "done" ? "Done" : (p.missing[0] ?? `${p.pct}%`)}
+                  {p.status === "done" ? t("ccPhaseDone") : (p.missing[0] ?? `${p.pct}%`)}
                 </p>
               </button>
             </li>

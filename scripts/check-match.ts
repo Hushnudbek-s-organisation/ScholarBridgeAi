@@ -30,6 +30,7 @@ import {
 import { assessEligibility, type RecommendRequirement } from "../src/lib/recommend";
 import { compareDegreeLevels, hasUndergraduateAdmission, normalizeDegreeLevel, undergraduateTestApplies } from "../src/lib/degreeLevels";
 import { gpaTo40Scale } from "../src/lib/gpa";
+import { roundTo as round1 } from "../src/lib/scoring";
 
 let passed = 0;
 let failed = 0;
@@ -104,10 +105,16 @@ const scholarship = {
 section("1. University match — requirements, cost, country, field");
 // ---------------------------------------------------------------------------
 
-// Base 70 + GPA 3.8 vs 3.5 (diff 0.3 → +10) − IELTS missing (−25) − SAT missing
-// (−20) + budget fits (+10) + preferred country (+8) + field alignment (+12).
+// Base 70
+//   + GPA 3.80 vs 3.50 — 0.30 of the 0.50 span above the bar → +9.0
+//   + field alignment (+12) + preferred country (+8)
+//   + budget $70 000 vs $63 700 cost (coverage 1.099 → +8.49)
+//   − IELTS missing (−25) − SAT missing (−20)
+// = 62.49 raw → 62 (rounded once, at the end). Meeting a published minimum is
+// the zero point of the continuous grade: exceeding it earns, falling short
+// costs, and nothing is awarded for being exactly at the bar.
 const noTests = calculateUniversityMatch({ ...baseProfile }, uni);
-check("no IELTS/SAT → score reflects the two missing bars", noTests.matchScore === 65, String(noTests.matchScore));
+check("no IELTS/SAT → score reflects the two missing bars", noTests.matchScore === 62, String(noTests.matchScore));
 check("no IELTS/SAT → category Reach", noTests.matchCategory === "Reach", noTests.matchCategory);
 check(
   "no IELTS → the issue names the required band and the missing score",
@@ -335,6 +342,118 @@ const masterEligibility = assessEligibility({ gpa: 3.8, gpaScale: 4, ielts: 7, d
 check("a Master programme ignores a stray SAT minimum", !masterEligibility.items.some((i) => i.key === "sat"));
 const bachelorEligibility = assessEligibility({ gpa: 3.8, gpaScale: 4, ielts: 7, degreeLevel: "Bachelor" }, masterProgramReqs, "Bachelor");
 check("a Bachelor programme still assesses the SAT minimum", bachelorEligibility.items.some((i) => i.key === "sat" && i.status === "unknown"));
+
+// ---------------------------------------------------------------------------
+section("6. Precision — continuous grading and visible arithmetic");
+// ---------------------------------------------------------------------------
+
+// The published breakdown must add up to the raw score, and the displayed
+// score must be that raw score clamped and rounded exactly once.
+const breakdownSum = round1(noTests.breakdown.components.reduce((sum, c) => sum + c.points, 0), 1);
+check(
+  "the breakdown components sum to the raw score",
+  Math.abs(breakdownSum - noTests.rawScore) < 0.06,
+  `sum=${breakdownSum} raw=${noTests.rawScore}`
+);
+check(
+  "the displayed score is the raw score rounded once",
+  noTests.matchScore === Math.min(99, Math.max(35, Math.round(noTests.rawScore))),
+  `raw=${noTests.rawScore} shown=${noTests.matchScore}`
+);
+check(
+  "every dimension is reported, with the unmeasured ones marked not-compared",
+  noTests.breakdown.components.length === noTests.breakdown.totalDimensions + 1 &&
+    noTests.breakdown.comparedDimensions <= noTests.breakdown.totalDimensions,
+  JSON.stringify(noTests.breakdown)
+);
+check(
+  "a dimension with no data contributes exactly 0",
+  noTests.breakdown.components.every((c) => c.compared || c.points === 0)
+);
+
+// The reason a student reads carries the same number the breakdown shows.
+const gpaReason = noTests.reasonDetails.find((r) => /GPA/.test(r.text));
+const gpaComponent = noTests.breakdown.components.find((c) => c.key === "gpa");
+check(
+  "the GPA reason carries the exact points it contributed",
+  gpaReason?.points != null &&
+    gpaComponent?.points != null &&
+    Math.abs(gpaReason.points - gpaComponent.points) < 0.11,
+  JSON.stringify(gpaReason)
+);
+check(
+  "GPA 3.80 against a 3.50 bar earns the graded 9.0, not a flat 10",
+  gpaComponent != null && Math.abs(gpaComponent.points - 9) < 0.11,
+  String(gpaComponent?.points)
+);
+check(
+  "meeting a minimum exactly is neutral (0), not a bonus",
+  Math.abs(
+    (calculateUniversityMatch({ ...baseProfile, gpa: 3.5 } as StudentProfileData, uni).breakdown.components.find(
+      (c) => c.key === "gpa"
+    )?.points ?? 99) - 0
+  ) < 0.01
+);
+
+// No cliffs: a 0.02 GPA change can never move the score by more than a point.
+function scoreForGpa(gpa: number) {
+  return calculateUniversityMatch({ ...baseProfile, gpa } as StudentProfileData, uni).matchScore;
+}
+let maxJump = 0;
+for (let g = 3.0; g <= 4.0; g += 0.01) {
+  maxJump = Math.max(maxJump, Math.abs(scoreForGpa(Number(g.toFixed(2))) - scoreForGpa(Number((g + 0.01).toFixed(2)))));
+}
+check("GPA grading has no cliff (max 1 point per 0.01)", maxJump <= 1, `maxJump=${maxJump}`);
+
+// Monotone: a better GPA can never produce a lower score…
+let gpaMonotone = true;
+for (let g = 2.5; g <= 4.0; g += 0.05) {
+  if (scoreForGpa(Number(g.toFixed(2))) > scoreForGpa(Number((g + 0.05).toFixed(2)))) gpaMonotone = false;
+}
+check("a better GPA never scores lower", gpaMonotone);
+// …and the same holds for the budget: more money is never worse.
+function scoreForBudget(budget: number) {
+  return calculateUniversityMatch({ ...baseProfile, budgetAnnualUsd: budget } as StudentProfileData, uni).matchScore;
+}
+let budgetMonotone = true;
+for (let b = 10000; b <= 90000; b += 2500) {
+  if (scoreForBudget(b) > scoreForBudget(b + 2500)) budgetMonotone = false;
+}
+check("a larger budget never scores lower", budgetMonotone);
+
+// A shortfall is graded: being $100 short must cost (far) less than being
+// 60% short, instead of landing in the same penalty bucket.
+const costOfUni = 45500 + 18200;
+const tinyGap = calculateUniversityMatch({ ...baseProfile, budgetAnnualUsd: costOfUni - 100 } as StudentProfileData, uni);
+const bigGap = calculateUniversityMatch({ ...baseProfile, budgetAnnualUsd: costOfUni * 0.4 } as StudentProfileData, uni);
+const costComponent = (r: ReturnType<typeof calculateUniversityMatch>) =>
+  r.breakdown.components.find((c) => c.key === "cost")?.points ?? 0;
+check(
+  "a small budget gap costs far less than a large one",
+  costComponent(tinyGap) > costComponent(bigGap) + 8,
+  `${costComponent(tinyGap)} vs ${costComponent(bigGap)}`
+);
+check("both gaps are still penalties, never awards", costComponent(tinyGap) < 0 && costComponent(bigGap) < 0);
+
+// IELTS above the bar is graded too: a 0.5-band margin beats an exact pass.
+const justMeets = calculateUniversityMatch({ ...baseProfile, ieltsScore: 6.5, satScore: 1400 } as StudentProfileData, uni);
+const aboveBand = calculateUniversityMatch({ ...baseProfile, ieltsScore: 7.0, satScore: 1400 } as StudentProfileData, uni);
+check(
+  "a 0.5-band margin over the IELTS bar scores strictly higher than an exact pass",
+  aboveBand.rawScore > justMeets.rawScore,
+  `${aboveBand.rawScore} vs ${justMeets.rawScore}`
+);
+
+// Scholarship grading is continuous on the same terms.
+const scholarshipBreakdown = base.breakdown.components.reduce((sum, c) => sum + c.points, 0);
+check(
+  "scholarship breakdown also adds up to its raw score",
+  Math.abs(round1(scholarshipBreakdown, 1) - base.rawScore) < 0.06,
+  `sum=${round1(scholarshipBreakdown, 1)} raw=${base.rawScore}`
+);
+const gpaOnly = calculateScholarshipMatch({ ...masterProfile, ieltsScore: null } as StudentProfileData, { ...scholarship, minIelts: null } as ScholarshipData);
+const gpaBetter = calculateScholarshipMatch({ ...masterProfile, gpa: 4.0, ieltsScore: null } as StudentProfileData, { ...scholarship, minIelts: null } as ScholarshipData);
+check("a higher GPA never lowers a scholarship score", gpaBetter.matchScore >= gpaOnly.matchScore);
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

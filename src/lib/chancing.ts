@@ -31,6 +31,8 @@
  */
 
 import { undergraduateTestApplies } from "./degreeLevels";
+import { gpaTo40Scale } from "./gpa";
+import { clamp, interpolate, ratio, roundTo, saturatingCurve, weightedMean } from "./scoring";
 import { subjectSimilarity } from "./subjectAffinity";
 
 /**
@@ -161,7 +163,9 @@ export interface ChancingResult {
 // Small helpers
 // ---------------------------------------------------------------------------
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+// `clamp` and the rounding helpers come from src/lib/scoring.ts — one
+// definition of "clamped" and "rounded", shared with matching.ts and the
+// readiness engine. `round` stays as the integer-only reader.
 const round = (v: number) => Math.round(v);
 
 /** Parse a JSON array column (or a comma-separated legacy string) → items. */
@@ -193,13 +197,19 @@ export function parseListColumn(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-/** GPA normalised to a 4.0 scale. */
+/**
+ * GPA normalised to a 4.0 scale.
+ *
+ * Delegates to the ONE canonical implementation (src/lib/gpa.ts) that the
+ * university matcher and the recommender already use. The previous local copy
+ * clamped an unscaled "85" to a perfect 4.0 — i.e. it INVENTED a top GPA for a
+ * student whose scale is unknown — while the matcher correctly reported
+ * "unknown". Same profile, two answers. Now there is exactly one rule:
+ * an explicit scale converts proportionally, a bare value ≤ 4 is comparable,
+ * anything else is null (unknown, never a 4.0).
+ */
 export function normalizedGpa(profile: ChancingProfile): number | null {
-  const gpa = Number(profile.gpa);
-  if (!Number.isFinite(gpa) || gpa <= 0) return null;
-  const scale = Number(profile.gpaScale);
-  if (!Number.isFinite(scale) || scale <= 0) return clamp(gpa, 0, 4);
-  return clamp((gpa / scale) * 4, 0, 4);
+  return gpaTo40Scale(profile.gpa, profile.gpaScale);
 }
 
 /** Rough word-overlap similarity (0–1) between two free-text majors. */
@@ -312,35 +322,48 @@ function academicSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
       notes: { negative: "No GPA submitted — add it for a real estimate" },
     };
   }
-  // Published minimum when available; otherwise the tier-typical GPA.
-  const target =
-    Number(uni.minGpa) > 0
-      ? Number(uni.minGpa)
-      : (() => {
-          const rank = Number(uni.worldRanking);
-          if (!Number.isFinite(rank) || rank <= 0) return 3.0;
-          if (rank <= 50) return 3.8;
-          if (rank <= 150) return 3.6;
-          if (rank <= 350) return 3.3;
-          return 3.0;
-        })();
+  // Published minimum when available; otherwise the tier-typical GPA (an
+  // explicit, documented inference from the ranking — flagged in the note so
+  // the student is never told a plain number came from the university).
+  const published = Number(uni.minGpa) > 0;
+  const target = published
+    ? Number(uni.minGpa)
+    : (() => {
+        const rank = Number(uni.worldRanking);
+        if (!Number.isFinite(rank) || rank <= 0) return 3.0;
+        if (rank <= 50) return 3.8;
+        if (rank <= 150) return 3.6;
+        if (rank <= 350) return 3.3;
+        return 3.0;
+      })();
 
   const delta = gpa - target;
-  const score = clamp(60 + delta * 40, 5, 100);
-  let factor = clamp(1 + delta * 0.9, 0.3, 2.3);
+  // Continuous grade: at the target the dimension sits at 60/100, and each
+  // 0.3 of GPA is worth a further ~18 points up to the ceiling, or a ~18-point
+  // loss below it. No threshold cliffs.
+  const score = interpolate(delta, [
+    { x: -1.2, y: 8 },
+    { x: -0.6, y: 28 },
+    { x: -0.3, y: 44 },
+    { x: 0, y: 60 },
+    { x: 0.3, y: 78 },
+    { x: 0.6, y: 90 },
+    { x: 1.0, y: 100 },
+  ]);
+  const factor = clamp(1 + delta * 0.9, 0.3, 2.3);
   const notes: { positive?: string; negative?: string } = {};
+  const source = published ? `the published ${target.toFixed(2)} minimum` : `the tier-typical ${target.toFixed(2)} range`;
 
   if (delta >= 0.3) {
-    notes.positive = `GPA ${gpa.toFixed(2)} is well above the typical ${target.toFixed(2)} range`;
+    notes.positive = `GPA ${gpa.toFixed(2)} is well above ${source}`;
   } else if (delta >= 0) {
-    notes.positive = `GPA ${gpa.toFixed(2)} meets the typical ${target.toFixed(2)} range`;
+    notes.positive = `GPA ${gpa.toFixed(2)} meets ${source}`;
   } else if (delta >= -0.3) {
-    factor = clamp(factor, 0.45, 1);
-    notes.negative = `GPA ${gpa.toFixed(2)} is slightly below the typical ${target.toFixed(2)} range`;
+    notes.negative = `GPA ${gpa.toFixed(2)} is slightly below ${source}`;
   } else {
-    notes.negative = `GPA ${gpa.toFixed(2)} is below the typical ${target.toFixed(2)} range`;
+    notes.negative = `GPA ${gpa.toFixed(2)} is ${Math.abs(delta).toFixed(2)} below ${source}`;
   }
-  return { score: round(score), factor, notes };
+  return { score: roundTo(score, 1), factor, notes };
 }
 
 function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
@@ -362,20 +385,48 @@ function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
 
   // English proficiency: IELTS → TOEFL → Duolingo as substitutes.
   if (ielts || toefl || duolingo) {
-    const equivalentIelts = ielts ?? (toefl ? clamp((toefl - 40) / 12, 4, 9) : null) ?? (duolingo ? clamp(duolingo / 15, 4, 9) : null);
-    const req = minIelts ?? 6.5;
+    const equivalentIelts =
+      ielts ??
+      (toefl ? clamp((toefl - 40) / 12, 0, 9) : null) ??
+      (duolingo ? clamp(duolingo / 15, 0, 9) : null);
     if (equivalentIelts != null) {
-      const delta = equivalentIelts - req;
-      parts.push(clamp(65 + delta * 22, 10, 100));
-      if (delta >= 0.5) {
-        notes.positive = `English score ${equivalentIelts.toFixed(1)} is above the ${req} requirement`;
-        factor *= 1.1;
-      } else if (delta >= 0) {
-        notes.positive = `English score meets the ${req} requirement`;
-        factor *= 1.03;
+      if (minIelts) {
+        // Graded against the university's own published bar.
+        const delta = equivalentIelts - minIelts;
+        parts.push(
+          interpolate(delta, [
+            { x: -1.5, y: 12 },
+            { x: -0.5, y: 35 },
+            { x: 0, y: 65 },
+            { x: 0.5, y: 85 },
+            { x: 1.5, y: 100 },
+          ])
+        );
+        if (delta >= 0.5) {
+          notes.positive = `English score ${equivalentIelts.toFixed(1)} is above the ${minIelts} requirement`;
+          factor *= 1.1;
+        } else if (delta >= 0) {
+          notes.positive = `English score meets the ${minIelts} requirement`;
+          factor *= 1.03;
+        } else {
+          notes.negative = `English score ${equivalentIelts.toFixed(1)} is below the ${minIelts} requirement`;
+          factor *= clamp(1 + delta * 0.5, 0.5, 1);
+        }
       } else {
-        notes.negative = `English score ${equivalentIelts.toFixed(1)} is below the ${req} requirement`;
-        factor *= clamp(1 + delta * 0.5, 0.5, 1);
+        // No published minimum: score on the absolute scale and SAY SO —
+        // inventing a 6.5 bar (the old behaviour) compared every student with
+        // a number the university never published.
+        parts.push(
+          interpolate(equivalentIelts, [
+            { x: 5, y: 20 },
+            { x: 6, y: 45 },
+            { x: 6.5, y: 62 },
+            { x: 7, y: 78 },
+            { x: 7.5, y: 90 },
+            { x: 8, y: 100 },
+          ])
+        );
+        notes.positive = `English score ${equivalentIelts.toFixed(1)} (no official minimum published by this university)`;
       }
     }
   } else {
@@ -393,11 +444,19 @@ function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
   if (satApplies && (sat || act)) {
     const equivalentSat = sat ?? (act ? clamp(act * 40 + 180, 400, 1600) : null);
     if (equivalentSat != null) {
-      const delta = (equivalentSat - minSat) / 200;
-      parts.push(clamp(65 + delta * 14, 10, 100));
-      if (delta >= 0.5) notes.positive ??= `Test score ${equivalentSat} is above the published ${minSat}`;
-      if (delta < 0) notes.negative ??= `Test score ${equivalentSat} is below the published ${minSat}`;
-      factor *= clamp(1 + delta * 0.12, 0.75, 1.25);
+      const delta = equivalentSat - minSat;
+      parts.push(
+        interpolate(delta, [
+          { x: -300, y: 15 },
+          { x: -100, y: 45 },
+          { x: 0, y: 65 },
+          { x: 100, y: 85 },
+          { x: 300, y: 100 },
+        ])
+      );
+      if (delta >= 0) notes.positive ??= `Test score ${equivalentSat} is above the published ${minSat}`;
+      else notes.negative ??= `Test score ${equivalentSat} is below the published ${minSat}`;
+      factor *= clamp(1 + (delta / 200) * 0.12, 0.75, 1.25);
     }
   } else if (satApplies) {
     parts.push(40);
@@ -408,8 +467,8 @@ function testSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
     parts.push(60);
   }
 
-  const score = round(parts.reduce((a, b) => a + b, 0) / parts.length);
-  return { score, factor, notes };
+  const score = weightedMean(parts) ?? 60;
+  return { score: roundTo(score, 1), factor, notes };
 }
 
 function extracurricularSubScore(profile: ChancingProfile): {
@@ -420,11 +479,14 @@ function extracurricularSubScore(profile: ChancingProfile): {
   const { activities, leadership, research, awards } = countActivities(profile);
   const years = Number(profile.workExperienceYears ?? 0);
 
-  const breadth = clamp(activities / 6, 0, 1); // 6+ activities = full breadth
-  const depth = clamp((leadership * 2 + research * 2 + awards) / 8, 0, 1);
-  const experience = clamp(years / 3, 0, 1);
+  // Saturating curves instead of hard divisions: the first two activities and
+  // the first leadership role carry most of the signal, and the 20th activity
+  // cannot inflate the score. Every extra item still moves the number.
+  const breadth = saturatingCurve(activities, 6);
+  const depth = saturatingCurve(leadership * 2 + research * 2 + awards, 6);
+  const experience = saturatingCurve(years, 3);
 
-  const score = round(clamp(30 + breadth * 35 + depth * 40 + experience * 10, 10, 100));
+  const score = roundTo(clamp(20 + breadth * 40 + depth * 30 + experience * 10, 10, 100), 1);
   const factor = clamp(0.85 + breadth * 0.2 + depth * 0.35, 0.8, 1.45);
 
   const notes: { positive?: string; negative?: string } = {};
@@ -468,20 +530,34 @@ function internationalSubScore(profile: ChancingProfile, uni: ChancingUniversity
   notes: { positive?: string; negative?: string };
 } {
   const notes: { positive?: string; negative?: string } = {};
-  let score = 70;
-  let factor = 1;
-
   const intlShare = Number(uni.internationalStudentsPercentage);
-  if (Number.isFinite(intlShare) && intlShare > 0) {
-    if (intlShare >= 25) {
-      score = 85;
-      factor = 1.05;
-      notes.positive = `${intlShare}% international students — an internationally oriented intake`;
-    } else if (intlShare < 8) {
-      score = 55;
-      factor = 0.92;
-      notes.negative = `Only ${intlShare}% international students — a competitive pool for international applicants`;
-    }
+  const hasShare = Number.isFinite(intlShare) && intlShare > 0;
+
+  // The share is graded continuously (a published 12% and a published 24%
+  // are different situations, not the same "under 25%" bucket) and only
+  // claims a note when the university actually publishes the figure.
+  let score = hasShare
+    ? interpolate(intlShare, [
+        { x: 2, y: 52 },
+        { x: 8, y: 60 },
+        { x: 15, y: 72 },
+        { x: 25, y: 85 },
+        { x: 45, y: 92 },
+      ])
+    : 70;
+  let factor = hasShare
+    ? interpolate(intlShare, [
+        { x: 2, y: 0.9 },
+        { x: 8, y: 0.93 },
+        { x: 15, y: 1.0 },
+        { x: 25, y: 1.05 },
+        { x: 45, y: 1.08 },
+      ])
+    : 1;
+
+  if (hasShare) {
+    if (intlShare >= 25) notes.positive = `${intlShare}% international students — an internationally oriented intake`;
+    else if (intlShare < 8) notes.negative = `Only ${intlShare}% international students — a competitive pool for international applicants`;
   }
 
   const sameCountry =
@@ -493,7 +569,7 @@ function internationalSubScore(profile: ChancingProfile, uni: ChancingUniversity
     notes.negative ??= "International admission is more competitive than domestic";
     factor *= 0.95;
   }
-  return { score: round(score), factor, notes };
+  return { score: roundTo(score, 1), factor, notes };
 }
 
 function financialSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
@@ -508,25 +584,39 @@ function financialSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
   const hasLiving = Number.isFinite(living) && living > 0;
   const totalCost = hasTuition ? tuition + (hasLiving ? living : 0) : null;
   const budget = Number(profile.budgetAnnualUsd);
-  let score = totalCost == null && !(Number.isFinite(budget) && budget > 0) ? 50 : 75;
-  let factor = totalCost == null && !(Number.isFinite(budget) && budget > 0) ? 0.95 : 1;
+  const hasBudget = Number.isFinite(budget) && budget > 0;
 
-  if (totalCost != null && Number.isFinite(budget) && budget > 0) {
-    if (budget >= totalCost * 1.4) {
-      score = 92;
-      notes.positive = "Budget comfortably covers tuition and estimated living costs";
-    } else if (budget >= totalCost) {
-      score = 78;
-      notes.positive = "Budget covers tuition and estimated living costs";
+  // Nothing to compare on either side: this dimension is unknown, so it stays
+  // near neutral and says so instead of pretending an assessment happened.
+  let score = totalCost == null && !hasBudget ? 50 : 75;
+  let factor = totalCost == null && !hasBudget ? 0.95 : 1;
+
+  if (totalCost != null && hasBudget) {
+    // Continuous: every extra percent of the cost covered is worth points,
+    // and the award/penalty switches exactly at full coverage.
+    const coverage = ratio(budget, totalCost) ?? 0;
+    if (coverage >= 1) {
+      score = interpolate(coverage, [
+        { x: 1, y: 78 },
+        { x: 1.15, y: 85 },
+        { x: 1.4, y: 92 },
+      ]);
+      if (coverage >= 1.4) notes.positive = "Budget comfortably covers tuition and estimated living costs";
+      else notes.positive = "Budget covers tuition and estimated living costs";
     } else {
-      score = 45;
+      score = interpolate(coverage, [
+        { x: 0, y: 40 },
+        { x: 0.5, y: 45 },
+        { x: 0.9, y: 58 },
+        { x: 1, y: 78 },
+      ]);
       notes.negative = `Budget $${budget.toLocaleString()} is below the estimated $${totalCost.toLocaleString()} annual cost`;
       factor *= 0.82;
     }
-  } else if (totalCost == null && Number.isFinite(budget) && budget > 0) {
+  } else if (totalCost == null && hasBudget) {
     notes.negative = "Budget is recorded, but the university has no verified full annual cost";
     factor *= 0.96;
-  } else if (totalCost != null && !(Number.isFinite(budget) && budget > 0)) {
+  } else if (totalCost != null && !hasBudget) {
     notes.negative = "No annual budget submitted — affordability cannot be assessed";
     factor *= 0.9;
   } else {
@@ -544,15 +634,16 @@ function financialSubScore(profile: ChancingProfile, uni: ChancingUniversity): {
   }
 
   // Family income is supporting context, never silently substituted for the
-  // student's annual budget. It still informs the financial signal when the
-  // student has not supplied a budget and the catalogue has a cost.
+  // student's annual budget. When it is the only figure on file, how far it
+  // covers the cost decides the deduction.
   const income = Number(profile.familyIncomeUsd);
-  if (totalCost != null && !(Number.isFinite(budget) && budget > 0) && Number.isFinite(income) && income > 0 && income < totalCost) {
-    score = clamp(score - 10, 5, 100);
+  if (totalCost != null && !hasBudget && Number.isFinite(income) && income > 0 && income < totalCost) {
+    const coverage = ratio(income, totalCost) ?? 0;
+    score = clamp(score - roundTo((1 - coverage) * 10, 1), 5, 100);
     factor *= 0.9;
-    notes.negative = `Recorded family income is below the estimated $${totalCost.toLocaleString()} annual cost`;
+    notes.negative = `Recorded family income covers ${Math.round(coverage * 100)}% of the estimated $${totalCost.toLocaleString()} annual cost`;
   }
-  return { score: round(score), factor, notes };
+  return { score: roundTo(score, 1), factor, notes };
 }
 
 // ---------------------------------------------------------------------------
@@ -703,75 +794,222 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
   return checks.filter(Boolean).length / checks.length;
 }
 
-export interface ProfileStrength {
-  overall: number;
-  completeness: number;
-  sections: { key: string; label: string; score: number; unknown?: boolean }[];
+export interface StrengthSection {
+  key: string;
+  label: string;
+  /**
+   * 0–100, rounded once from the precise value below. This is the number the
+   * dashboard shows; `scorePrecise` is the same score before display rounding.
+   */
+  score: number;
+  /** The same score at one-decimal precision (no display rounding). */
+  scorePrecise: number;
+  /**
+   * True when the student has supplied none of the data this dimension needs.
+   * An unknown dimension is EXCLUDED from the overall average — it is never
+   * scored as a zero, and it is never filled in with a plausible value.
+   */
+  unknown?: boolean;
+  /** 0–1 — how much of this dimension's evidence exists (1 = fully measured). */
+  coverage: number;
+  /** The concrete inputs still missing, most valuable first. */
+  missing: string[];
 }
 
-/** One number per dimension, for the radar/bar dashboard. */
+export interface ProfileStrength {
+  /** 0–100, rounded once from `overallPrecise`. */
+  overall: number;
+  /** The unrounded average (one decimal) — the "how precise" half of the pair. */
+  overallPrecise: number;
+  completeness: number;
+  sections: StrengthSection[];
+  /** Dimensions that had real data / dimensions the dashboard measures. */
+  scoredSections: number;
+  totalSections: number;
+  /**
+   * One plain sentence describing how the overall number was built, so it is
+   * never read as an admission score. The UI prints this next to the number.
+   */
+  basis: string;
+}
+
+/**
+ * One number per dimension, for the radar/bar dashboard.
+ *
+ * PRECISION RULES (2026-10)
+ *   • every dimension is graded continuously between documented anchors
+ *     (src/lib/scoring.ts) — no "0 until 5 activities, then full marks";
+ *   • `coverage` states how much evidence the score stands on, so a 100 built
+ *     from one test is visibly different from a 100 built from five;
+ *   • a dimension with no data is `unknown` and is left OUT of the average
+ *     instead of becoming a 0 (the old `score > 0` filter also dropped real
+ *     zeros — a student who genuinely recorded no awards looked "not
+ *     measured"). Zero evidence and zero result are now different states;
+ *   • every score is returned twice: displayed (integer) and precise
+ *     (one decimal), so the UI can show either without recomputing anything.
+ */
 export function profileStrength(
   profile: ChancingProfile,
   opts: { essayScore?: number | null } = {}
 ): ProfileStrength {
-  // No GPA on file is UNKNOWN, not a low score: the section is flagged so the
-  // UI can print "not provided yet" and the overall average skips it instead
-  // of inventing a 30/100 for a student who never entered a grade.
+  const missing: Record<string, string[]> = {};
+  const section = (
+    key: string,
+    label: string,
+    precise: number | null,
+    coverage: number,
+    gaps: string[] = []
+  ): StrengthSection => {
+    missing[key] = gaps;
+    const unknown = precise == null;
+    const value = unknown ? 0 : clamp(precise, 0, 100);
+    return {
+      key,
+      label,
+      score: unknown ? 0 : Math.round(value),
+      scorePrecise: roundTo(value, 1),
+      unknown,
+      coverage: clamp(coverage, 0, 1),
+      missing: unknown ? gaps : [],
+    };
+  };
+
+  // ---- Academics: the GPA on its own 0–4 scale ----------------------------
   const gpa = normalizedGpa(profile);
-  const academics = gpa == null ? 0 : round(clamp(((gpa - 2.5) / 1.5) * 100, 5, 100));
-  const academicsUnknown = gpa == null;
+  const academics = gpa == null
+    ? null
+    : interpolate(gpa, [
+        { x: 2.0, y: 0 },
+        { x: 2.5, y: 18 },
+        { x: 2.8, y: 32 },
+        { x: 3.0, y: 45 },
+        { x: 3.3, y: 66 },
+        { x: 3.5, y: 78 },
+        { x: 3.7, y: 88 },
+        { x: 3.85, y: 95 },
+        { x: 4.0, y: 100 },
+      ]);
 
-  const english =
-    Number(profile.ieltsScore) > 0
-      ? Number(profile.ieltsScore)
-      : Number(profile.toeflScore) > 0
-        ? clamp((Number(profile.toeflScore) - 40) / 12, 4, 9)
-        : Number(profile.duolingoScore) > 0
-          ? clamp(Number(profile.duolingoScore) / 15, 4, 9)
-          : null;
-  const std =
-    Number(profile.satScore) > 0
-      ? Number(profile.satScore)
-      : Number(profile.actScore) > 0
-        ? clamp(Number(profile.actScore) * 40 + 180, 400, 1600)
-        : null;
-  const tests = round(
-    clamp(
-      ((english ? clamp((english - 5) / 4, 0, 1) : 0) + (std ? clamp((std - 900) / 700, 0, 1) : 0)) *
-        50,
-      0,
-      100
-    )
-  );
+  // ---- Tests: each test is scored on ITS OWN scale ------------------------
+  // A missing SAT is not a zero for a student whose target universities never
+  // ask for it, and a TOEFL 100 is not "0 English" — the previous formula gave
+  // a student with only IELTS 9 a hard 50/100 because the SAT half was empty.
+  const ielts = Number(profile.ieltsScore) > 0 ? Number(profile.ieltsScore) : null;
+  const toefl = Number(profile.toeflScore) > 0 ? Number(profile.toeflScore) : null;
+  const duolingo = Number(profile.duolingoScore) > 0 ? Number(profile.duolingoScore) : null;
+  const english = ielts ?? (toefl ? clamp((toefl - 40) / 12, 0, 9) : null) ?? (duolingo ? clamp(duolingo / 15, 0, 9) : null);
+  const englishScore = english == null
+    ? null
+    : interpolate(english, [
+        { x: 4.5, y: 5 },
+        { x: 5.5, y: 25 },
+        { x: 6, y: 45 },
+        { x: 6.5, y: 62 },
+        { x: 7, y: 78 },
+        { x: 7.5, y: 90 },
+        { x: 8, y: 100 },
+      ]);
+  const sat = Number(profile.satScore) > 0 ? Number(profile.satScore) : null;
+  const act = Number(profile.actScore) > 0 ? Number(profile.actScore) : null;
+  const standardised = sat ?? (act ? clamp(act * 40 + 180, 400, 1600) : null);
+  const standardisedScore = standardised == null
+    ? null
+    : interpolate(standardised, [
+        { x: 800, y: 5 },
+        { x: 1000, y: 30 },
+        { x: 1100, y: 45 },
+        { x: 1200, y: 62 },
+        { x: 1300, y: 78 },
+        { x: 1400, y: 90 },
+        { x: 1500, y: 97 },
+        { x: 1600, y: 100 },
+      ]);
+  const tests = weightedMean([englishScore, standardisedScore]);
+  const testCoverage = (englishScore == null ? 0 : 0.5) + (standardisedScore == null ? 0 : 0.5);
 
+  // ---- Portfolio: breadth, depth, research and awards ----------------------
   const { activities, leadership, research, awards } = countActivities(profile);
-  const extracurriculars = round(clamp(activities * 10 + leadership * 6 + research * 4, 0, 100));
-  const leadershipScore = round(clamp(leadership * 22 + (activities >= 5 ? 20 : 0), 0, 100));
-  const awardsScore = round(clamp(awards * 18, 0, 100));
-  const essays =
-    typeof opts.essayScore === "number" && opts.essayScore > 0 ? round(clamp(opts.essayScore, 0, 100)) : 0;
+  const portfolioEvidence = activities + leadership + research + awards;
+  const extracurriculars = portfolioEvidence === 0
+    ? null
+    : clamp(55 * saturatingCurve(activities, 6) + 45 * saturatingCurve(leadership * 2 + research * 2 + awards, 6), 0, 100);
+  const hasActivityRecord = activities > 0 || leadership > 0 || research > 0;
+  // Leadership/awards are measured 0 when the student HAS an activity record
+  // (a real zero) and unknown when there is no record at all to judge.
+  const leadershipScore = hasActivityRecord ? clamp(100 * saturatingCurve(leadership, 3), 0, 100) : null;
+  const awardsScore = hasActivityRecord ? clamp(100 * saturatingCurve(awards, 3), 0, 100) : null;
+  const researchScore = hasActivityRecord
+    ? clamp(100 * saturatingCurve(research + Number(profile.researchPublications ?? 0), 2), 0, 100)
+    : null;
+
+  // ---- Essays: the rubric score the student already earned -----------------
+  const essayScore =
+    typeof opts.essayScore === "number" && opts.essayScore > 0 ? clamp(opts.essayScore, 0, 100) : null;
+
+  // ---- Financial: how complete and workable the funding picture is --------
   const hasBudget = Number(profile.budgetAnnualUsd) > 0;
   const hasIncome = Number(profile.familyIncomeUsd) > 0;
-  const hasFundingNeed = profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true;
-  const financial = hasBudget
-    ? profile.requiresFullScholarship ? 55 : profile.needsFinancialAid || profile.needScholarship ? 72 : 88
-    : profile.requiresFullScholarship ? 45 : profile.needsFinancialAid || profile.needScholarship ? 58 : hasIncome ? 60 : 0;
-  const financialUnknown = !(hasBudget || hasIncome || hasFundingNeed);
+  const hasFundingNeed =
+    profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true;
+  const financialCoverage = [hasBudget, hasIncome, hasFundingNeed].filter(Boolean).length / 3;
+  const financial =
+    financialCoverage === 0
+      ? null
+      : clamp(50 * (hasBudget ? 1 : 0) + 25 * (hasIncome ? 1 : 0) + 25 * (hasFundingNeed ? 1 : 0), 0, 100);
 
-  const sections = [
-    { key: "academics", label: "Academics", score: academics, unknown: academicsUnknown },
-    { key: "tests", label: "Tests", score: tests, unknown: english == null && std == null },
-    { key: "extracurriculars", label: "Extracurriculars", score: extracurriculars },
-    { key: "leadership", label: "Leadership", score: leadershipScore },
-    { key: "awards", label: "Awards", score: awardsScore },
-    { key: "essays", label: "Essays", score: essays },
-    { key: "financial", label: "Financial", score: financial, unknown: financialUnknown },
+  const sections: StrengthSection[] = [
+    section(
+      "academics",
+      "Academics",
+      academics,
+      gpa == null ? 0 : 1,
+      [
+        profile.gpa != null
+          ? "Add your GPA scale (4.0 / 5.0 / 100) so the grade can be compared with a published minimum"
+          : "Add your GPA — it is the first requirement every university publishes",
+      ]
+    ),
+    section("tests", "Tests", tests, testCoverage, [
+      ...(englishScore == null ? ["Add an English test score (IELTS, TOEFL or Duolingo)"] : []),
+      ...(standardisedScore == null ? ["Add SAT/ACT only if your target universities ask for it"] : []),
+    ]),
+    section("extracurriculars", "Extracurriculars", extracurriculars, portfolioEvidence === 0 ? 0 : 1, [
+      "Add activities (volunteering, projects, clubs, sport) — 4+ sustained items is the competitive baseline",
+    ]),
+    section("leadership", "Leadership", leadershipScore, hasActivityRecord ? 1 : 0, [
+      "Record a leadership role (club officer, team captain, project lead) with its dates",
+    ]),
+    section("awards", "Awards", awardsScore, hasActivityRecord ? 1 : 0, [
+      "Record competitions, olympiads or certifications — even a regional result counts",
+    ]),
+    section("research", "Research", researchScore, hasActivityRecord ? 1 : 0, [
+      "Add a research project, publication or long-term technical project",
+    ]),
+    section("essays", "Essays", essayScore, essayScore == null ? 0 : 1, [
+      "Draft your SOP and run the rubric review to get a measured essay score",
+    ]),
+    section("financial", "Financial", financial, financialCoverage, [
+      ...(hasBudget ? [] : ["Add your annual budget (what your family can pay per year)"]),
+      ...(hasIncome ? [] : ["Add your family income for need-based awards"]),
+      ...(hasFundingNeed ? [] : ["State whether you need financial aid or a full scholarship"]),
+    ]),
   ];
-  const completeness = round(profileCompletenessRatio(profile) * 100);
-  const filled = sections.filter((s) => s.score > 0);
-  const overall = filled.length ? round(filled.reduce((a, s) => a + s.score, 0) / filled.length) : 0;
 
-  return { overall, completeness, sections };
+  const completeness = round(profileCompletenessRatio(profile) * 100);
+  const measured = sections.filter((s) => !s.unknown);
+  const overallPrecise = roundTo(weightedMean(measured.map((s) => s.scorePrecise)) ?? 0, 1);
+
+  return {
+    overall: Math.round(overallPrecise),
+    overallPrecise,
+    completeness,
+    sections,
+    scoredSections: measured.length,
+    totalSections: sections.length,
+    basis: measured.length
+      ? `Averaged over ${measured.length} of ${sections.length} profile dimensions — a dimension with no data is excluded, never counted as zero.`
+      : "No dimension has usable data yet, so there is no overall score — add your GPA and an English test to start measuring.",
+  };
 }
 
 export interface ExtracurricularAnalysis {
@@ -779,27 +1017,61 @@ export interface ExtracurricularAnalysis {
   impact: number;
   consistency: number;
   academicFit: number;
+  /** Precise twins of the four scores above (one decimal, no display rounding). */
+  precise: { leadership: number; impact: number; consistency: number; academicFit: number };
   suggestions: string[];
 }
 
-/** Structured read of the activity list + concrete next-3-months advice. */
+/**
+ * Structured read of the activity list + concrete next-3-months advice.
+ *
+ * The four numbers are graded continuously (the first leadership role is worth
+ * the most, the tenth adds little) and each is returned with its unrounded
+ * value, so a student can see that 2 awards beat 1 even when both display as
+ * the same integer.
+ */
 export function analyzeExtracurriculars(
   profile: ChancingProfile
 ): ExtracurricularAnalysis {
   const { activities, leadership, research, awards } = countActivities(profile);
   const years = Number(profile.workExperienceYears ?? 0);
+  const publications = Number(profile.researchPublications ?? 0);
 
-  const leadershipScore = round(clamp(leadership * 24 + (activities >= 6 ? 15 : 0), 5, 100));
-  const impact = round(clamp(awards * 16 + research * 10 + activities * 5, 5, 100));
-  const consistency = round(clamp(years * 20 + activities * 8, 5, 100));
-  const academicFit = round(clamp(research * 22 + awards * 12, 5, 100));
+  const leadershipPrecise = clamp(100 * saturatingCurve(leadership, 3), 5, 100);
+  const impactPrecise = clamp(
+    55 * saturatingCurve(awards, 3) + 30 * saturatingCurve(research + publications, 2) + 15 * saturatingCurve(activities, 6),
+    5,
+    100
+  );
+  const consistencyPrecise = clamp(
+    70 * saturatingCurve(years, 3) + 30 * saturatingCurve(activities, 6),
+    5,
+    100
+  );
+  const academicFitPrecise = clamp(
+    60 * saturatingCurve(research + publications, 2) + 40 * saturatingCurve(awards, 3),
+    5,
+    100
+  );
 
   const suggestions: string[] = [];
   if (leadership === 0) suggestions.push("Take one leadership role (club officer, team captain, project lead) and keep it for 2+ semesters");
-  if (research === 0) suggestions.push("Join one research or open-source project in your major — 3 months is enough to show real output");
+  if (research === 0 && publications === 0) suggestions.push("Join one research or open-source project in your major — 3 months is enough to show real output");
   if (awards === 0) suggestions.push("Enter 1–2 competitions (olympiad, hackathon, debate) — even a regional result counts");
   if (activities < 4) suggestions.push("Add 2–3 activities you can sustain weekly; depth beats a long list");
   if (!suggestions.length) suggestions.push("Your profile is solid — convert activities into measurable impact (numbers, outcomes, awards)");
 
-  return { leadership: leadershipScore, impact, consistency, academicFit, suggestions };
+  return {
+    leadership: Math.round(leadershipPrecise),
+    impact: Math.round(impactPrecise),
+    consistency: Math.round(consistencyPrecise),
+    academicFit: Math.round(academicFitPrecise),
+    precise: {
+      leadership: roundTo(leadershipPrecise, 1),
+      impact: roundTo(impactPrecise, 1),
+      consistency: roundTo(consistencyPrecise, 1),
+      academicFit: roundTo(academicFitPrecise, 1),
+    },
+    suggestions,
+  };
 }

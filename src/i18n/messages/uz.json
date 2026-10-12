@@ -300,7 +300,14 @@
     "streakLastSeven": "Oxirgi yetti kundagi faollik",
     "streakActiveDay": "{date} kuni faol",
     "streakMilestone": "{milestone} kunlik marraga yetish uchun yana {days} faol kun.",
-    "streakHonestNote": "Kun faqat dars, quiz, referral yoki hamjamiyat hissasi kabi haqiqiy mukofotlanadigan amal bajarilganda sanaladi. Ilovani ochishning o‘zi hisoblanmaydi."
+    "streakHonestNote": "Kun faqat dars, quiz, referral yoki hamjamiyat hissasi kabi haqiqiy mukofotlanadigan amal bajarilganda sanaladi. Ilovani ochishning o‘zi hisoblanmaydi.",
+    "streakCounted": "mukofotlangan faoliyat bor",
+    "streakNotCounted": "mukofotlangan faoliyat yo‘q",
+    "streakToday": "bugun",
+    "streakLastCounted": "Oxirgi hisoblangan kun: {date}",
+    "streakStart": "Hali hech narsa hisoblanmadi — 1-kunni boshlash uchun dars, test yoki jamiyatdagi javobni yakunlang.",
+    "streakMilestoneShort": "{milestone} gacha yana {days} kun",
+    "streakMilestoneProgress": "{milestone} kunlik bosqichga {milestone} kundan {current} tasi"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI maslahatchi",
@@ -597,7 +604,8 @@
       "leadership": "Liderlik",
       "awards": "Mukofotlar",
       "essays": "Insholar",
-      "financial": "Moliya"
+      "financial": "Moliya",
+      "research": "Tadqiqot"
     },
     "extraTitle": "Qo‘shimcha faoliyat tahlili",
     "extraLeadership": "Liderlik",
@@ -606,7 +614,9 @@
     "academicFit": "Akademik moslik",
     "suggestions": "Keyingi 3 oyda nima qilish",
     "loading": "Tayyorlik yuklanmoqda…",
-    "notProvided": "Hali kiritilmagan — bu ball haqiqiy bo‘lishi uchun ma’lumot qo‘shing."
+    "notProvided": "Hali kiritilmagan — bu ball haqiqiy bo‘lishi uchun ma’lumot qo‘shing.",
+    "missing": "Qo‘shing",
+    "basisLine": "{total} profil o‘lchovidan {measured} tasi bo‘yicha o‘rtacha — ma’lumoti yo‘q o‘lchov hisobga olinmaydi, nol deb sanalmaydi."
   },
   "recLetter": {
     "title": "Tavsiyanoma yordamchisi",
@@ -1379,7 +1389,8 @@
     "careerTitleEnergy": "Energetika / quvvat / qayta tiklanuvchi energiya",
     "careerBlurbEnergy": "Energiya ishlab chiqarish va yetkazish — neft va gazdan shamol, quyosh va aqlli tizimlargacha.",
     "careerTitleTourism": "Turizm / mehmondo‘stlik / tadbirlar",
-    "careerBlurbTourism": "Odamlar eslab qoladigan tajribalar yaratish — mehmonxonalar, sayohat, tadbirlar."
+    "careerBlurbTourism": "Odamlar eslab qoladigan tajribalar yaratish — mehmonxonalar, sayohat, tadbirlar.",
+    "ccReadinessMeasured": "{total} profil o‘lchovidan {measured} tasi bo‘yicha o‘lchangan — ma’lumotsiz o‘lchovlar chiqarib tashlanadi, nol deb hisoblanmaydi."
   },
   "autopilot": {
     "title": "Stipendiya avtopiloti",
@@ -2439,7 +2450,28 @@
     "satNotApplicable": "Magistratura qabuliga taalluqli emas",
     "reqVariesByProgram": "Diapazonlar universitetning katalogdagi dasturlari bo‘yicha — ariza topshiradigan dasturingiz o‘z minimumlarini belgilaydi (quyidagi dasturlarga qarang).",
     "fitBadge": "Profil mosligi: {score}% • {category}",
-    "fitNotChance": "Moslik profilingizni e'lon qilingan talablar bilan solishtiradi — bu qabul ehtimoli emas."
+    "fitNotChance": "Moslik profilingizni e'lon qilingan talablar bilan solishtiradi — bu qabul ehtimoli emas.",
+    "exScoreBreakdown": "Ball taqsimoti",
+    "exDimensionsMeasured": "{total} o‘lchovdan {measured} tasi o‘lchangan",
+    "exDimensionUnknown": "Bu o‘lchov uchun ma’lumot yo‘q — 0 ball, o‘lchangan deb hisoblanmaydi",
+    "dim": {
+      "base": "Base",
+      "gpa": "GPA",
+      "english": "English",
+      "standardised_test": "Standardised test",
+      "field": "Field",
+      "portfolio": "Activities",
+      "cost": "Cost vs budget",
+      "income": "Family income",
+      "funding_requirement": "Funding requirement",
+      "country": "Preferred country",
+      "experience": "Research / work",
+      "level": "Degree level",
+      "major_eligibility": "Eligible majors",
+      "need_basis": "Need basis",
+      "funding_coverage": "Funding coverage",
+      "merit": "Merit"
+    }
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -3059,9 +3091,11 @@
     "majorsLabel": "Bog‘liq o‘yo‘nalishlar",
     "unknownsLabel": "Siz haqingizda hali noma’lum:",
     "alternativesLabel": "Shuningdek o‘rganishga arziydi:",
-    "match.strong": "Kuchli moslik",
-    "match.moderate": "O‘rtacha moslik",
-    "match.weak": "Zaif moslik — kengroq o‘rganing",
+    "match": {
+      "strong": "Kuchli moslik",
+      "moderate": "O‘rtacha moslik",
+      "weak": "Zaif moslik — kengroq o‘rganing"
+    },
     "trialLabel": "Sinab ko‘ring — mini loyiha",
     "trialTime": "Taxminan {minutes} daqiqa",
     "trialLiked": "Menga yoqdi",
@@ -3075,14 +3109,22 @@
     "pathTitle": "Hozir qayerdasiz?",
     "pathSubtitle": "Uchala variant ham teng darajada yaxshi boshlanish nuqtasi.",
     "pathPickHint": "Davom etish uchun yuqoridagi uchtasidan birini tanlang.",
-    "path.goal.title": "Kasb maqsadim bor",
-    "path.goal.body": "Men xohlagan kasb yoki sohani bilaman.",
-    "path.goal.hint": "Maqsadingizga eng yaqin soha yoki mutaxassislikni tanlang. Boshqalarini ham qo‘shishingiz mumkin.",
-    "path.interests.title": "Qiziqishlarim bor, mutaxassislikni bilmayman",
-    "path.interests.body": "Nimani yoqtirishimni bilaman — aniqlashga yordam bering.",
-    "path.interests.hint": "Yoqtirgan sohalaringizni tanlang. Biz ularni mutaxassislik va dasturlarga bog‘laymiz.",
-    "path.undecided.title": "Hali bilmayman — yo‘nalish topishga yordam bering",
-    "path.undecided.body": "Qisqa, halol variantli yo‘naltirilgan kashfiyot.",
+    "path": {
+      "goal": {
+        "title": "Kasb maqsadim bor",
+        "body": "Men xohlagan kasb yoki sohani bilaman.",
+        "hint": "Maqsadingizga eng yaqin soha yoki mutaxassislikni tanlang. Boshqalarini ham qo‘shishingiz mumkin."
+      },
+      "interests": {
+        "title": "Qiziqishlarim bor, mutaxassislikni bilmayman",
+        "body": "Nimani yoqtirishimni bilaman — aniqlashga yordam bering.",
+        "hint": "Yoqtirgan sohalaringizni tanlang. Biz ularni mutaxassislik va dasturlarga bog‘laymiz."
+      },
+      "undecided": {
+        "title": "Hali bilmayman — yo‘nalish topishga yordam bering",
+        "body": "Qisqa, halol variantli yo‘naltirilgan kashfiyot."
+      }
+    },
     "modeSwitchAria": "Kasb paneli rejimi",
     "modeDiscover": "Yo‘nalishimni topish",
     "modeCatalog": "Kasb katalogini ko‘rish",

@@ -24,7 +24,7 @@ import {
 import { guardStudent, serverError } from "@/lib/journey/api";
 import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/journey/stages";
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
-import { profileStrength } from "@/lib/chancing";
+import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -243,6 +243,12 @@ export async function GET(req: Request) {
       .slice(0, 8);
 
     // ---- Profile readiness (spec §3, §13) --------------------------------
+    // ONE mapped profile row feeds every scoring engine on this page: the
+    // readiness categories here and the profile strength below. Two mappings
+    // would be two chances for the same student to be counted differently.
+    const chancingProfile = profile ? await chancingProfileWithActivities(profile) : null;
+    const activityFacts = chancingProfile ? countActivities(chancingProfile) : null;
+
     const readinessInput: ReadinessInput = {
       gpa: profile?.gpa ?? null,
       gpaScale: profile?.gpaScale ?? null,
@@ -252,9 +258,16 @@ export async function GET(req: Request) {
       duolingoScore: profile?.duolingoScore ?? null,
       satScore: profile?.satScore ?? null,
       actScore: profile?.actScore ?? null,
+      greScore: profile?.greScore ?? null,
       researchPublications: profile?.researchPublications ?? null,
       workExperienceYears: profile?.workExperienceYears ?? null,
-      activitiesCount: Number(row?.activitiesCount ?? 0),
+      // Counted by the shared activity reader (profile text columns + the
+      // structured Activities pane), not by a second SQL tally that could
+      // disagree with the match engine.
+      leadershipCount: activityFacts?.leadership ?? 0,
+      awardsCount: activityFacts?.awards ?? 0,
+      researchCount: activityFacts?.research ?? 0,
+      activitiesCount: activityFacts?.activities ?? Number(row?.activitiesCount ?? 0),
       documentsReady: Number(row?.documentsReady ?? 0),
       documentsTotal: Number(row?.documentsTotal ?? 0),
       applicationsStarted: appRows.length,
@@ -278,15 +291,27 @@ export async function GET(req: Request) {
           .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
           .limit(1)
       : [];
-    const strength = profile
-      ? profileStrength(await chancingProfileWithActivities(profile), {
+    const strength = chancingProfile
+      ? profileStrength(chancingProfile, {
           essayScore: latestEssay?.rubricTotal ?? null,
         })
       : null;
     const readiness = {
       ...checklist,
       /** Shared profile readiness (the Readiness pane's number). */
-      profile: strength ? { overall: strength.overall, completeness: strength.completeness } : null,
+      // `overall` is the display integer; `overallPrecise` is the unrounded
+      // average so the dashboard tile can print the same precise value the
+      // Readiness pane prints. `measured`/`total` say how much evidence the
+      // number stands on (shown under the tile).
+      profile: strength
+        ? {
+            overall: strength.overall,
+            overallPrecise: strength.overallPrecise,
+            completeness: strength.completeness,
+            measured: strength.scoredSections,
+            total: strength.totalSections,
+          }
+        : null,
     };
 
     // ---- Test gaps against the student's own target universities -----------

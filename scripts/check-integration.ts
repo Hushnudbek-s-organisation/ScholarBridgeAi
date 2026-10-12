@@ -997,7 +997,28 @@ async function main() {
   const { GET: strengthGet } = await import("../src/app/api/profile-strength/route");
   const ps = await call(strengthGet as any, "/api/profile-strength");
   check("responds 200", ps.status === 200, `got ${ps.status} ${JSON.stringify(ps.body)?.slice(0, 200)}`);
-  check("reports 7 sections", Array.isArray(ps.body?.strength?.sections) && ps.body.strength.sections.length === 7);
+  check("reports 8 sections", Array.isArray(ps.body?.strength?.sections) && ps.body.strength.sections.length === 8);
+  check(
+    "every section states its evidence coverage and what is missing",
+    ps.body?.strength?.sections?.every(
+      (s: any) =>
+        typeof s.coverage === "number" &&
+        s.coverage >= 0 &&
+        s.coverage <= 1 &&
+        Array.isArray(s.missing) &&
+        typeof s.scorePrecise === "number"
+    )
+  );
+  check(
+    "the overall ships with its unrounded value and its basis",
+    typeof ps.body?.strength?.overallPrecise === "number" &&
+      typeof ps.body?.strength?.basis === "string" &&
+      ps.body.strength.basis.length > 10
+  );
+  check(
+    "the extracurricular analysis exposes precise values",
+    typeof ps.body?.extracurriculars?.precise?.impact === "number"
+  );
   check(
     "all section scores stay in 0–100",
     ps.body?.strength?.sections?.every((s: any) => typeof s.score === "number" && s.score >= 0 && s.score <= 100)

@@ -300,7 +300,14 @@
     "streakLastSeven": "Activity during the last seven days",
     "streakActiveDay": "Active on {date}",
     "streakMilestone": "{days} more active days to reach the {milestone}-day milestone.",
-    "streakHonestNote": "A day counts after a real rewarded action, such as completing a lesson, quiz, referral, or community contribution. Opening the app alone does not count."
+    "streakHonestNote": "A day counts after a real rewarded action, such as completing a lesson, quiz, referral, or community contribution. Opening the app alone does not count.",
+    "streakCounted": "rewards activity counted",
+    "streakNotCounted": "no rewarded activity",
+    "streakToday": "today",
+    "streakLastCounted": "Last counted day: {date}",
+    "streakStart": "Nothing counted yet — finish a lesson, quiz or community answer to start day 1.",
+    "streakMilestoneShort": "{days} more to {milestone}",
+    "streakMilestoneProgress": "{current} of {milestone} days towards the {milestone}-day milestone"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI Counselor",
@@ -597,7 +604,8 @@
       "leadership": "Leadership",
       "awards": "Awards",
       "essays": "Essays",
-      "financial": "Financial"
+      "financial": "Financial",
+      "research": "Research"
     },
     "extraTitle": "Extracurricular analysis",
     "extraLeadership": "Leadership",
@@ -606,7 +614,9 @@
     "academicFit": "Academic fit",
     "suggestions": "What to do in the next 3 months",
     "loading": "Loading readiness…",
-    "notProvided": "Not provided yet — add it to make this score real."
+    "notProvided": "Not provided yet — add it to make this score real.",
+    "missing": "Add",
+    "basisLine": "Average of {measured} of {total} profile dimensions — a dimension without data is left out, not scored as zero."
   },
   "recLetter": {
     "title": "Recommendation letter helper",
@@ -1379,7 +1389,8 @@
     "careerTitleEnergy": "Energy / power / renewables",
     "careerBlurbEnergy": "Generate and deliver power — from oil and gas to wind, solar and smart grids.",
     "careerTitleTourism": "Tourism / hospitality / events",
-    "careerBlurbTourism": "Design experiences people remember — hotels, travel, events and guest services."
+    "careerBlurbTourism": "Design experiences people remember — hotels, travel, events and guest services.",
+    "ccReadinessMeasured": "Measured on {measured} of {total} profile dimensions — dimensions without data are excluded, not scored as zero."
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -2439,7 +2450,28 @@
     "satNotApplicable": "Not applicable to graduate admission",
     "reqVariesByProgram": "Ranges span this university’s catalogued programmes — the programme you apply to sets its own minimums (see each programme below).",
     "fitBadge": "Profile fit: {score}% • {category}",
-    "fitNotChance": "Fit compares your profile with published requirements — it is not an admission chance."
+    "fitNotChance": "Fit compares your profile with published requirements — it is not an admission chance.",
+    "exScoreBreakdown": "Score breakdown",
+    "exDimensionsMeasured": "{measured} of {total} dimensions measured",
+    "exDimensionUnknown": "No data for this dimension yet — it scores 0 and is not counted as measured",
+    "dim": {
+      "base": "Base",
+      "gpa": "GPA",
+      "english": "English",
+      "standardised_test": "Standardised test",
+      "field": "Field",
+      "portfolio": "Activities",
+      "cost": "Cost vs budget",
+      "income": "Family income",
+      "funding_requirement": "Funding requirement",
+      "country": "Preferred country",
+      "experience": "Research / work",
+      "level": "Degree level",
+      "major_eligibility": "Eligible majors",
+      "need_basis": "Need basis",
+      "funding_coverage": "Funding coverage",
+      "merit": "Merit"
+    }
   },
   "recommend": {
     "title": "Program Recommender",
@@ -3059,9 +3091,11 @@
     "majorsLabel": "Related study directions",
     "unknownsLabel": "Still unknown about you:",
     "alternativesLabel": "Also worth exploring:",
-    "match.strong": "Strong match",
-    "match.moderate": "Moderate match",
-    "match.weak": "Weak match — explore broadly",
+    "match": {
+      "strong": "Strong match",
+      "moderate": "Moderate match",
+      "weak": "Weak match — explore broadly"
+    },
     "trialLabel": "Try it — a mini project",
     "trialTime": "About {minutes} minutes",
     "trialLiked": "I liked it",
@@ -3075,14 +3109,22 @@
     "pathTitle": "Where are you right now?",
     "pathSubtitle": "All three options are equally good starting points.",
     "pathPickHint": "Pick one of the three above to continue.",
-    "path.goal.title": "I know my career goal",
-    "path.goal.body": "I already know the career or field I want.",
-    "path.goal.hint": "Pick the field or specialization closest to your goal. You can add others too.",
-    "path.interests.title": "I have interests, not a specialty yet",
-    "path.interests.body": "I know what I enjoy — help me narrow it down.",
-    "path.interests.hint": "Choose the areas you enjoy. We will connect them to majors and programs.",
-    "path.undecided.title": "I don't know yet — help me find a direction",
-    "path.undecided.body": "A short guided discovery with honest options.",
+    "path": {
+      "goal": {
+        "title": "I know my career goal",
+        "body": "I already know the career or field I want.",
+        "hint": "Pick the field or specialization closest to your goal. You can add others too."
+      },
+      "interests": {
+        "title": "I have interests, not a specialty yet",
+        "body": "I know what I enjoy — help me narrow it down.",
+        "hint": "Choose the areas you enjoy. We will connect them to majors and programs."
+      },
+      "undecided": {
+        "title": "I don't know yet — help me find a direction",
+        "body": "A short guided discovery with honest options."
+      }
+    },
     "modeSwitchAria": "Career panel mode",
     "modeDiscover": "Find my direction",
     "modeCatalog": "Browse career catalog",

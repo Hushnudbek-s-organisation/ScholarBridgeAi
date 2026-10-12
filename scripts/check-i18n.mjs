@@ -32,12 +32,28 @@ function flatten(obj, prefix = "", out = new Map()) {
   return out;
 }
 
+/**
+ * next-intl forbids a "." INSIDE a message key — the dot is the nesting
+ * separator, so a flat `"match.strong"` key makes `useTranslations("ns")`
+ * throw `INVALID_KEY` at render time (that is how the career-discovery panel
+ * broke in production while every static check stayed green). Nest them
+ * instead: `"match": { "strong": … }`; lookups like `t("match.strong")` keep
+ * working, because that is exactly the path next-intl already resolves.
+ */
+function assertNoDottedKeys(obj, path = "") {
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.includes(".")) fail(`[${path || "root"}] key "${k}" contains a "." — nest it instead`);
+    if (v && typeof v === "object") assertNoDottedKeys(v, path ? `${path}.${k}` : k);
+  }
+}
+
 // ---- 1 & 2: ICU validity + parity -------------------------------------------
 const flat = {};
 let keyCount = 0;
 for (const loc of LOCALES) {
   const raw = readFileSync(join(MESSAGES_DIR, `${loc}.json`), "utf8");
   const parsed = JSON.parse(raw);
+  assertNoDottedKeys(parsed, loc);
   const map = flatten(parsed);
   flat[loc] = map;
   if (loc === "en") keyCount = map.size;

@@ -6,6 +6,8 @@ import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
+import type { MatchBreakdown } from "@/lib/matching";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
@@ -58,6 +60,14 @@ export interface University {
   matchCategory?: "Reach" | "Match" | "Safety" | null;
   matchReasons?: string[];
   matchIssues?: string[];
+  /** Unclamped total before the display clamp (one decimal). */
+  matchRawScore?: number | null;
+  /**
+   * The exact arithmetic behind the score: the unrounded total, one component
+   * per scoring dimension (2-dp points), and how many dimensions had data.
+   * Null for anonymous visitors (there is no profile to compare against).
+   */
+  matchBreakdown?: MatchBreakdown | null;
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   sourceLastVerifiedAt?: string | null;
@@ -549,6 +559,11 @@ export function UniversityExplorer({
                         ))}
                       </div>
                     )}
+
+                    {/* Exact arithmetic: every scoring dimension with the
+                        points it contributed. Nothing here is rounded into
+                        vagueness — the components add up to the score above. */}
+                    <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
                   </div>
 
                   {/* Post-study Work Permit Banner (NULL = not specified) */}
