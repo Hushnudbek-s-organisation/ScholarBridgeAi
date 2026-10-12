@@ -39,8 +39,8 @@ export interface ScholarshipInput {
   amountUsd: number;
   /** What it actually covers — a stipend does not pay tuition. */
   covers: "tuition" | "living" | "both" | "other";
-  /** Probability the student wins it, 0–1. */
-  probability: number;
+  /** Probability the student wins it, 0–1; null when no validated estimate exists. */
+  probability: number | null;
   deadlineDays?: number | null;
 }
 
@@ -61,7 +61,9 @@ export interface CostBreakdown {
   unknowns: string[];
   scholarship: {
     guaranteedAnnualUsd: number;
-    expectedAnnualUsd: number;
+    /** Null unless every included award has an evidence-based probability. */
+    expectedAnnualUsd: number | null;
+    probabilityDataAvailable: boolean;
     bestCaseAnnualUsd: number;
     coveragePct: number;
     /** Scholarships that pay for something other than the shortfall. */
@@ -71,6 +73,7 @@ export interface CostBreakdown {
     annualAfterScholarshipUsd: number;
     totalAfterScholarshipUsd: number;
     familyContributionUsd: number;
+    familyContributionKnown: boolean;
     /** What is still unaccounted for. */
     gapAnnualUsd: number;
     gapTotalUsd: number;
@@ -209,7 +212,11 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   const otherAid = scholarships.filter((s) => s.covers === "other");
 
   const guaranteedAnnual = 0; // nothing is guaranteed until an award letter exists
-  const expectedAnnual = scholarships.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability), 0);
+  const probabilityDataAvailable =
+    scholarships.length > 0 && scholarships.every((s) => typeof s.probability === "number" && Number.isFinite(s.probability));
+  const expectedAnnual = probabilityDataAvailable
+    ? scholarships.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability as number), 0)
+    : null;
   const bestCaseAnnual =
     (tuitionAid.length > 0 ? Math.max(...tuitionAid.map((s) => s.amountUsd)) : 0) +
     livingAid.reduce((sum, s) => sum + s.amountUsd, 0) +
@@ -226,7 +233,9 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   }
 
   // --- Net -----------------------------------------------------------------
-  const family = Number(input.familyContributionUsd) > 0 ? Number(input.familyContributionUsd) : 0;
+  const familyContributionKnown =
+    typeof input.familyContributionUsd === "number" && Number.isFinite(input.familyContributionUsd) && input.familyContributionUsd >= 0;
+  const family = familyContributionKnown ? Number(input.familyContributionUsd) : 0;
   const afterScholarshipAnnual = Math.max(0, annualTotal - bestCaseAnnual);
   const gapAnnual = Math.max(0, afterScholarshipAnnual - family);
 
@@ -237,6 +246,8 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   if (tuitionEstimated) {
     verdict =
       "Tuition is not published, so this total is a floor, not a quote. Verify the fee on the programme page before planning around it.";
+  } else if (!familyContributionKnown) {
+    verdict = `The current best-case amount still needing a funding source is ${afterScholarshipAnnual.toLocaleString("en-US")} USD/year. Add the amount your family has explicitly confirmed before treating this as an affordability result.`;
   } else if (gapAnnual <= 0) {
     verdict = `On paper this is affordable: your family's ${family.toLocaleString("en-US")} USD/year covers the ${afterScholarshipAnnual.toLocaleString("en-US")} USD remaining after scholarships. That assumes every scholarship lands.`;
   } else if (coveragePct >= 70) {
@@ -252,7 +263,8 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     unknowns,
     scholarship: {
       guaranteedAnnualUsd: money(guaranteedAnnual),
-      expectedAnnualUsd: money(expectedAnnual),
+      expectedAnnualUsd: expectedAnnual == null ? null : money(expectedAnnual),
+      probabilityDataAvailable,
       bestCaseAnnualUsd: money(bestCaseAnnual),
       coveragePct,
       misaligned,
@@ -261,6 +273,7 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
       annualAfterScholarshipUsd: money(afterScholarshipAnnual),
       totalAfterScholarshipUsd: money(totalAfterScholarship),
       familyContributionUsd: money(family),
+      familyContributionKnown,
       gapAnnualUsd: money(gapAnnual),
       gapTotalUsd: money(gapTotal),
       affordable: gapAnnual <= 0,
@@ -287,23 +300,30 @@ export interface PortfolioInputs {
 
 export interface PortfolioAdvice {
   count: number;
-  expectedAnnualUsd: number;
-  expectedCoveragePct: number;
-  /** P(at least one award), treating entries as independent. */
-  chanceOfAnyAwardPct: number;
+  expectedAnnualUsd: number | null;
+  expectedCoveragePct: number | null;
+  /** P(at least one award), only when every input has validated probability data. */
+  chanceOfAnyAwardPct: number | null;
+  probabilityDataAvailable: boolean;
   diversification: "good" | "thin" | "risky";
   advice: string[];
 }
 
 export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
   const list = input.scholarships.filter((s) => Number(s.amountUsd) > 0);
-  const expectedAnnual = list.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability), 0);
-  const chanceOfNone = list.reduce((acc, s) => acc * (1 - clamp01(s.probability)), 1);
-  const chanceOfAny = list.length === 0 ? 0 : Math.round((1 - chanceOfNone) * 100);
+  const probabilityDataAvailable =
+    list.length > 0 && list.every((s) => typeof s.probability === "number" && Number.isFinite(s.probability));
+  const expectedAnnual = probabilityDataAvailable
+    ? list.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability as number), 0)
+    : null;
+  const chanceOfNone = probabilityDataAvailable
+    ? list.reduce((acc, s) => acc * (1 - clamp01(s.probability as number)), 1)
+    : null;
+  const chanceOfAny = chanceOfNone == null ? null : Math.round((1 - chanceOfNone) * 100);
   const shortfall = Math.max(0, input.annualCostUsd - input.familyContributionUsd);
-  const coverage = shortfall > 0 ? Math.round(Math.min(100, (expectedAnnual / shortfall) * 100)) : 100;
+  const coverage = expectedAnnual == null ? null : shortfall > 0 ? Math.round(Math.min(100, (expectedAnnual / shortfall) * 100)) : 100;
 
-  const bigOnly = list.length > 0 && list.every((s) => s.probability <= 0.1);
+  const bigOnly = probabilityDataAvailable && list.every((s) => (s.probability as number) <= 0.1);
   const diversification: PortfolioAdvice["diversification"] =
     list.length >= 8 ? "good" : list.length >= 4 ? "thin" : "risky";
 
@@ -318,10 +338,13 @@ export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
       "Every entry on your list is a low-probability flagship award. Add smaller departmental or country-specific ones — a 4,000 USD award you actually win beats a 40,000 USD one you probably will not."
     );
   }
-  if (expectedAnnual < shortfall && list.length > 0) {
+  if (expectedAnnual != null && expectedAnnual < shortfall && list.length > 0) {
     advice.push(
-      `Expected funding is ${Math.round(expectedAnnual).toLocaleString("en-US")} USD/year against a ${shortfall.toLocaleString("en-US")} USD shortfall. The gap is real even if everything goes well.`
+      `Expected funding is ${Math.round(expectedAnnual).toLocaleString("en-US")} USD/year against a ${shortfall.toLocaleString("en-US")} USD shortfall.`
     );
+  }
+  if (list.length > 0 && !probabilityDataAvailable) {
+    advice.push("Award probabilities are not available, so expected funding and chance-of-award percentages are not calculated. Use confirmed awards and the best-case total separately.");
   }
   if (list.length === 0) {
     advice.push("No scholarships yet. Start with the ones your target universities offer automatically on admission.");
@@ -333,9 +356,10 @@ export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
 
   return {
     count: list.length,
-    expectedAnnualUsd: Math.round(expectedAnnual),
+    expectedAnnualUsd: expectedAnnual == null ? null : Math.round(expectedAnnual),
     expectedCoveragePct: coverage,
     chanceOfAnyAwardPct: chanceOfAny,
+    probabilityDataAvailable,
     diversification,
     advice,
   };

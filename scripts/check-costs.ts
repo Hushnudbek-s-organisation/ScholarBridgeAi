@@ -166,8 +166,8 @@ const portfolio = assessPortfolio({
 check("the portfolio counts entries", portfolio.count === 9);
 check("a diversified portfolio is rated good", portfolio.diversification === "good");
 check("expected funding is probability-weighted", portfolio.expectedAnnualUsd === 11250);
-check("the chance of at least one award exceeds any single one", portfolio.chanceOfAnyAwardPct > 25);
-check("the chance of any award stays under 100", portfolio.chanceOfAnyAwardPct < 100);
+check("the chance of at least one award exceeds any single one", portfolio.chanceOfAnyAwardPct != null && portfolio.chanceOfAnyAwardPct > 25);
+check("the chance of any award stays under 100", portfolio.chanceOfAnyAwardPct != null && portfolio.chanceOfAnyAwardPct < 100);
 check("a healthy portfolio raises no advice", portfolio.advice.length === 0);
 
 const thin = assessPortfolio({
@@ -191,6 +191,18 @@ check(
   !imminent.advice.some((a) => /shortfall/i.test(a))
 );
 check("an empty portfolio says where to start", assessPortfolio({ scholarships: [], annualCostUsd: 20000, familyContributionUsd: 0 }).advice.some((a) => /No scholarships yet/i.test(a)));
+
+const unknownOdds = assessPortfolio({
+  scholarships: [sch({ name: "Unmodelled award", amountUsd: 10000, probability: null })],
+  annualCostUsd: 30000,
+  familyContributionUsd: 0,
+});
+check("unknown award probability stays unavailable", unknownOdds.chanceOfAnyAwardPct === null && unknownOdds.expectedAnnualUsd === null);
+check("unknown award probability is explained", unknownOdds.advice.some((a) => /not available/i.test(a)));
+
+const unknownFamily = calculateCosts({ annualTuitionUsd: 20000, annualLivingEstUsd: 10000, familyContributionUsd: null });
+check("missing family contribution stays explicitly unknown", unknownFamily.net.familyContributionKnown === false);
+check("missing contribution is not described as affordability", /Add the amount your family has explicitly confirmed/i.test(unknownFamily.verdict));
 
 section("7. Determinism");
 

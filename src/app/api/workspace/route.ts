@@ -16,6 +16,7 @@ import {
 import { dateOnly, guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { computeWorkspaceProgress, WORKSPACE_TABS } from "@/lib/journey/workspace";
 import { reversePlan } from "@/lib/journey/planning";
+import { summarizeStatuses } from "@/lib/calculations";
 
 export const dynamic = "force-dynamic";
 
@@ -67,14 +68,16 @@ export async function GET(req: Request) {
 
       const workspaces = rows.map((r) => {
         const mine = reqCounts.filter((x) => x.applicationId === r.id);
-        const total = mine.length;
-        const done = mine.filter((x) => x.done === "done" || x.done === "not_required").length;
+        const completion = summarizeStatuses(
+          mine,
+          (item) => item.done === "done" || item.done === "not_required"
+        );
         return {
           ...r,
           deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
-          progressPct: r.submittedAt ? 100 : total ? Math.round((done / total) * 100) : 0,
-          done,
-          total,
+          progressPct: r.submittedAt ? 100 : completion.pct,
+          done: completion.done,
+          total: completion.total,
         };
       });
       return NextResponse.json({ tabs: WORKSPACE_TABS, workspaces });

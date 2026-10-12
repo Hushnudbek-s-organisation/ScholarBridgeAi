@@ -28,6 +28,7 @@ import { TelegramSettings } from "@/components/telegram/TelegramSettings";
 import { SessionsPanel } from "@/components/SessionsPanel";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
+import { DailyStreakCard } from "@/components/DailyStreakCard";
 import {
   CommunityHub,
   FundingHub,
@@ -863,7 +864,7 @@ export function Home({
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
         {/* Sections swap with a short cross-fade + lift. Keyed on what is
             actually on screen so the wizard and every tab participate. */}
@@ -888,6 +889,7 @@ export function Home({
             <div className="space-y-4">
               {/* "Connect Telegram" nudge — only while not connected; dismissible */}
               <TelegramNudge profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
+              <DailyStreakCard profileId={activeProfile?.id ?? null} compact />
               {/* Spec §3 — the control center. Journey bar, next steps,
                   deadlines, application progress, readiness, recommendations
                   and the ten study-plan phases, in that order. */}

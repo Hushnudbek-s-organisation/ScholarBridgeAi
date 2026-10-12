@@ -95,7 +95,8 @@
     "accountCluster": "Hisob va sozlamalar",
     "newBadge": "Yangi",
     "proBadge": "Pro",
-    "skipToContent": "Asosiy qismga o‘tish"
+    "skipToContent": "Asosiy qismga o‘tish",
+    "searchLoading": "Qidirilmoqda…"
   },
   "language": {
     "label": "Til",
@@ -290,7 +291,16 @@
     "refStatusPending": "Profil to‘ldirilishi kutilmoqda",
     "refPointsEarn": "+{points} ball",
     "refActivationNote": "Referal faqat taklif qilingan profil {percent}% to‘liq bo‘lganda hisoblanadi.",
-    "refYourPoints": "Sizning ballaringiz"
+    "refYourPoints": "Sizning ballaringiz",
+    "streakTitle": "Kunlik o‘rganish seriyasi",
+    "streakDays": "{count} kun",
+    "streakBest": "Rekord: {count}",
+    "streakDoneToday": "Bugun bajarildi",
+    "streakContinueToday": "Bugun davom eting",
+    "streakLastSeven": "Oxirgi yetti kundagi faollik",
+    "streakActiveDay": "{date} kuni faol",
+    "streakMilestone": "{milestone} kunlik marraga yetish uchun yana {days} faol kun.",
+    "streakHonestNote": "Kun faqat dars, quiz, referral yoki hamjamiyat hissasi kabi haqiqiy mukofotlanadigan amal bajarilganda sanaladi. Ilovani ochishning o‘zi hisoblanmaydi."
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI maslahatchi",
@@ -328,7 +338,19 @@
     "advisorStrategy": "Strategiya",
     "advisorThisWeek": "Shu hafta",
     "advisorDisclaimer": "Moslik ballari profilingiz va har bir universitetning e'lon qilingan talablari asosida hisoblanadi. Qabul ehtimoli ko'rsatilmaydi — tasdiqlangan metodologiya va yetarli natija ma'lumotlari paydo bo'lmaguncha uni taqdim etmaymiz. Bu yerdagi hech narsa qabul kafolati emas.",
-    "advisorIdle": "Yuqorida savol bering yoki Enter bosing — arizalaringiz bo'yicha baholash olasiz."
+    "advisorIdle": "Yuqorida savol bering yoki Enter bosing — arizalaringiz bo'yicha baholash olasiz.",
+    "chatWelcomeNamed": "Salom, {name}! Men ScholarBridgeAI — ta’lim rejalashtirish yordamchisiman. ScholarBridge’dagi profilingiz va tasdiqlangan katalog ma’lumotlaridan foydalanaman. Bugun nima ustida ishlaymiz?",
+    "chatWelcome": "Salom! Men ScholarBridgeAI — ta’lim rejalashtirish yordamchisiman. Mavjud bo‘lsa, tasdiqlangan katalog ma’lumotlaridan foydalanaman va yetishmayotgan ma’lumotlarni aniq belgilayman. Bugun nima ustida ishlaymiz?",
+    "chatOfflineBadge": "Oflayn yo‘riqnoma · shaxsiy AI javobi emas",
+    "chatTypingAria": "ScholarBridgeAI yozmoqda",
+    "chatRateLimit": "Xabarlarni juda tez yuboryapsiz. {seconds} soniya kutib, qayta urinib ko‘ring.",
+    "chatSignIn": "Profilingiz bo‘yicha AI mentor bilan suhbatlashish uchun tizimga kiring.",
+    "chatError": "Xatolik yuz berdi. Qayta urinib ko‘ring.",
+    "chatNetworkError": "Tarmoq xatosi so‘rovni to‘xtatdi. Qayta urinib ko‘ring.",
+    "chatPrompt1": "O‘qishdan keyingi ishlashning amaldagi qoidalarini qayerdan tekshiraman?",
+    "chatPrompt2": "Professorimdan tavsiyanoma xatini qanday so‘rashim kerak?",
+    "chatPrompt3": "Saqlangan universitetlarimning tasdiqlangan kontrakt ma’lumotlarini solishtirishga yordam bering.",
+    "chatPrompt4": "Rasmiy talablar asosida talaba vizasi suhbatiga qanday tayyorlanaman?"
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -1370,7 +1392,7 @@
     "statMatches": "Mos",
     "statSoon": "Muddati yaqin",
     "statApplied": "Topshirilgan",
-    "statPotential": "Mumkin bo'lgan mablag'",
+    "statPotential": "Topshirilgan grantlar qiymati",
     "viewQueue": "Ko'rib chiqish",
     "viewApplied": "Topshirdim",
     "viewHidden": "Yashirilgan",

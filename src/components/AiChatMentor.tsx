@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
   Bot, 
@@ -13,7 +14,6 @@ import {
   Briefcase,
   Award
 } from "lucide-react";
-import { formatMoney } from "@/lib/format";
 import { AiFormattedText } from "./AiFormattedText";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppNote } from "@/components/AppNote";
@@ -33,15 +33,14 @@ interface Message {
 }
 
 export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
+  const t = useTranslations("ai");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       sender: "ai",
-      text: `Hello ${activeProfile?.name || "there"}! I'm **ScholarBridgeAI**, your global study counselor. 
-
-I'm aware of your profile (**${activeProfile?.degreeLevel} in ${activeProfile?.targetMajor}**, GPA ${activeProfile?.gpa}/${activeProfile?.gpaScale}, budget ${formatMoney(activeProfile?.budgetAnnualUsd, "USD", { suffix: "/yr", placeholder: "Not specified" })}).
-
-How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**, **scholarship strategy**, **SOP advice**, or **university selections**!`,
+      text: activeProfile?.name
+        ? t("chatWelcomeNamed", { name: activeProfile.name })
+        : t("chatWelcome"),
     },
   ]);
 
@@ -49,10 +48,10 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
   const [loading, setLoading] = useState(false);
 
   const samplePrompts = [
-    "Which countries offer 3-year post-graduation work permits?",
-    "How should I structure my request for an LOR from my professor?",
-    "What are the top low-tuition universities in Europe for Computer Science?",
-    "What documents do I need to prepare for my F-1 / Student Visa interview?",
+    t("chatPrompt1"),
+    t("chatPrompt2"),
+    t("chatPrompt3"),
+    t("chatPrompt4"),
   ];
 
   const handleSend = async (textToSend?: string) => {
@@ -60,7 +59,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
     if (!query.trim() || loading) return;
 
     const userMsg: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       sender: "user",
       text: query,
     };
@@ -85,7 +84,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
         setMessages((prev) => [
           ...prev,
           {
-            id: (Date.now() + 1).toString(),
+            id: crypto.randomUUID(),
             sender: "ai",
             text: data.reply,
             offline: Boolean(data.offline),
@@ -95,13 +94,13 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
         // Previously a 401/429 left the chat silently stuck with no answer.
         const text =
           res.status === 429
-            ? `You're sending messages too quickly. Please wait ${data.retryAfter ?? 60} seconds and try again.`
+            ? t("chatRateLimit", { seconds: data.retryAfter ?? 60 })
             : res.status === 401
-            ? "Please sign in to chat with the AI mentor about your profile."
-            : data.error || "Something went wrong. Please try again.";
+            ? t("chatSignIn")
+            : data.error || t("chatError");
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), sender: "ai", text, error: true },
+          { id: crypto.randomUUID(), sender: "ai", text, error: true },
         ]);
       }
     } catch (err) {
@@ -109,9 +108,9 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
       setMessages((prev) => [
         ...prev,
         {
-          id: (Date.now() + 1).toString(),
+          id: crypto.randomUUID(),
           sender: "ai",
-          text: "I encountered a brief network glitch. Please try asking again!",
+          text: t("chatNetworkError"),
         },
       ]);
     } finally {
@@ -179,7 +178,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
             >
               {m.offline && (
                 <span className="mb-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                  Offline guidance · not a personalised AI answer
+                  {t("chatOfflineBadge")}
                 </span>
               )}
               {m.sender === "ai" && !m.error ? <AiFormattedText text={m.text} /> : m.text}
@@ -197,7 +196,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
             aria-live="polite"
           >
             <Bot className="h-5 w-5 text-indigo-600" />
-            <span className="inline-flex gap-1" aria-label="ScholarBridgeAI is typing">
+            <span className="inline-flex gap-1" aria-label={t("chatTypingAria")}>
               {[0, 1, 2].map((i) => (
                 <motion.span
                   key={i}
@@ -234,7 +233,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
       >
         <input
           type="text"
-          placeholder="Ask anything about admissions, scholarships, SOP, or visa processes..."
+          placeholder={t("inputPlaceholder")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="flex-1 px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -245,7 +244,7 @@ How can I help you today? Ask me about **work visas (OPT/PGWP/Graduate Route)**,
           className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-50"
         >
           <Send className="h-4 w-4" />
-          Send
+          {t("send")}
         </button>
       </form>
     </div>

@@ -29,12 +29,22 @@ interface ArrivalItemView {
   completedAt: string | null;
 }
 
-interface ArrivalState {
-  unlocked: boolean;
-  windows: { window: ArrivalWindow; items: ArrivalItemView[] }[];
+interface CompletionView {
+  done: number;
+  total: number;
+  remaining: number;
+  pct: number;
+  complete: boolean;
 }
 
-const EMPTY: ArrivalState = { unlocked: false, windows: [] };
+interface ArrivalState {
+  unlocked: boolean;
+  progress: CompletionView;
+  windows: { window: ArrivalWindow; items: ArrivalItemView[]; progress: CompletionView }[];
+}
+
+const EMPTY_PROGRESS: CompletionView = { done: 0, total: 0, remaining: 0, pct: 0, complete: false };
+const EMPTY: ArrivalState = { unlocked: false, progress: EMPTY_PROGRESS, windows: [] };
 
 export function ArrivalPlanPanel({
   profileId,
@@ -69,15 +79,9 @@ export function ArrivalPlanPanel({
           },
           t("saveError")
         );
-        resource.setData((prev) => ({
-          ...prev,
-          windows: prev.windows.map((w) => ({
-            ...w,
-            items: w.items.map((i) =>
-              i.key === item.key ? { ...i, status: next as ArrivalItemView["status"] } : i
-            ),
-          })),
-        }));
+        // Re-read the server projection: status, per-window progress and total
+        // progress are one atomic backend calculation, never three client rules.
+        await resource.reload();
       } catch {
         /* keep the previous state — the item stays ticked exactly as before */
       } finally {
@@ -87,11 +91,7 @@ export function ArrivalPlanPanel({
     [profileId, resource, t]
   );
 
-  const total = resource.data.windows.reduce((n, w) => n + w.items.length, 0);
-  const done = resource.data.windows.reduce(
-    (n, w) => n + w.items.filter((i) => i.status === "done").length,
-    0
-  );
+  const { done, total, pct } = resource.data.progress;
 
   return (
     <div className="space-y-4">
@@ -125,7 +125,7 @@ export function ArrivalPlanPanel({
       ) : (
         <>
           <JourneyCard title={t("progressTitle")}>
-            <ProgressBar pct={total ? Math.round((done / total) * 100) : 0} tone="good" label={t("progressLabel", { done, total })} />
+            <ProgressBar pct={pct} tone="good" label={t("progressLabel", { done, total })} />
           </JourneyCard>
 
           {resource.data.windows.map((w) => (

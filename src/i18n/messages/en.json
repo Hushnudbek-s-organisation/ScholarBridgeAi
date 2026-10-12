@@ -95,7 +95,8 @@
     "accountCluster": "Account & settings",
     "newBadge": "New",
     "proBadge": "Pro",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "searchLoading": "Searching…"
   },
   "language": {
     "label": "Language",
@@ -290,7 +291,16 @@
     "refStatusPending": "Waiting for profile",
     "refPointsEarn": "+{points} points",
     "refActivationNote": "A referral counts once their profile reaches {percent}% completeness.",
-    "refYourPoints": "Your points"
+    "refYourPoints": "Your points",
+    "streakTitle": "Daily learning streak",
+    "streakDays": "{count, plural, one {# day} other {# days}}",
+    "streakBest": "Best: {count}",
+    "streakDoneToday": "Done today",
+    "streakContinueToday": "Continue today",
+    "streakLastSeven": "Activity during the last seven days",
+    "streakActiveDay": "Active on {date}",
+    "streakMilestone": "{days} more active days to reach the {milestone}-day milestone.",
+    "streakHonestNote": "A day counts after a real rewarded action, such as completing a lesson, quiz, referral, or community contribution. Opening the app alone does not count."
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI Counselor",
@@ -328,7 +338,19 @@
     "advisorStrategy": "Strategy",
     "advisorThisWeek": "This week",
     "advisorDisclaimer": "The fit scores are computed from your profile and each university's published requirements. Admission probabilities are not shown — we do not present them until a validated methodology and enough outcome data exist. Nothing here is a guarantee of admission.",
-    "advisorIdle": "Ask a question above, or press Enter, to get an assessment of your applications."
+    "advisorIdle": "Ask a question above, or press Enter, to get an assessment of your applications.",
+    "chatWelcomeNamed": "Hello {name}! I’m ScholarBridgeAI, your study-planning assistant. I use the profile and verified catalogue data available in ScholarBridge. What would you like to work on today?",
+    "chatWelcome": "Hello! I’m ScholarBridgeAI, your study-planning assistant. I use verified catalogue data when it is available and clearly label missing information. What would you like to work on today?",
+    "chatOfflineBadge": "Offline guidance · not a personalised AI answer",
+    "chatTypingAria": "ScholarBridgeAI is typing",
+    "chatRateLimit": "You’re sending messages too quickly. Please wait {seconds} seconds and try again.",
+    "chatSignIn": "Please sign in to chat with the AI mentor about your profile.",
+    "chatError": "Something went wrong. Please try again.",
+    "chatNetworkError": "A network error interrupted the request. Please try again.",
+    "chatPrompt1": "Where can I verify current post-study work rules?",
+    "chatPrompt2": "How should I request a recommendation letter from my professor?",
+    "chatPrompt3": "Help me compare verified tuition data for my saved universities.",
+    "chatPrompt4": "How can I prepare for a student visa interview using official requirements?"
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -1370,7 +1392,7 @@
     "statMatches": "Matches",
     "statSoon": "Closing soon",
     "statApplied": "Applied",
-    "statPotential": "Potential funding",
+    "statPotential": "Applied awards (nominal)",
     "viewQueue": "To review",
     "viewApplied": "Applied",
     "viewHidden": "Hidden",

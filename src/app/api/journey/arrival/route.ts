@@ -9,6 +9,7 @@ import {
   isKnownArrivalItem,
   type ArrivalItemStatus,
 } from "@/lib/journey/arrival";
+import { summarizeStatuses } from "@/lib/calculations";
 
 export const dynamic = "force-dynamic";
 
@@ -55,22 +56,30 @@ export async function GET(req: Request) {
       .where(eq(arrivalChecklistItems.profileId, profileId));
     const byKey = new Map(rows.map((r) => [r.itemKey, r]));
 
+    const windows = plan.windows.map((w) => {
+      const items = w.items.map((item) => {
+        const row = byKey.get(item.key);
+        return {
+          key: item.key,
+          tab: item.tab ?? null,
+          requires: item.requires ?? null,
+          guidanceOnly: item.guidanceOnly,
+          status: (row?.status as ArrivalItemStatus | undefined) ?? "pending",
+          completedAt: row?.completedAt ?? null,
+        };
+      });
+      return {
+        window: w.window,
+        items,
+        progress: summarizeStatuses(items, (item) => item.status === "done"),
+      };
+    });
+    const allItems = windows.flatMap((window) => window.items);
+
     return NextResponse.json({
       unlocked: plan.unlocked,
-      windows: plan.windows.map((w) => ({
-        window: w.window,
-        items: w.items.map((item) => {
-          const row = byKey.get(item.key);
-          return {
-            key: item.key,
-            tab: item.tab ?? null,
-            requires: item.requires ?? null,
-            guidanceOnly: item.guidanceOnly,
-            status: (row?.status as ArrivalItemStatus | undefined) ?? "pending",
-            completedAt: row?.completedAt ?? null,
-          };
-        }),
-      })),
+      progress: summarizeStatuses(allItems, (item) => item.status === "done"),
+      windows,
     });
   } catch (err) {
     return serverError("journey/arrival GET", err);

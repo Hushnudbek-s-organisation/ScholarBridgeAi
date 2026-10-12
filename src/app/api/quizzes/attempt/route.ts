@@ -6,6 +6,7 @@ import { quizzes, quizQuestions, quizAttempts, lessons, courseModules, courses }
 import { eq, asc } from "drizzle-orm";
 import { maybeIssueCertificate } from "@/lib/certificates";
 import { awardPoints } from "@/lib/gamification";
+import { percentage } from "@/lib/calculations";
 
 export async function POST(req: Request) {
   try {
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
       }
     });
 
-    const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
+    const score = percentage(correct, questions.length);
     const passed = score >= quiz.passThreshold;
 
     const [attempt] = await db

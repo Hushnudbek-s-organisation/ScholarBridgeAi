@@ -7,6 +7,24 @@ import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMap
 import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
 
+const SAVED_UNIVERSITY_STATUSES = new Set([
+  "Shortlisted",
+  "Preparing Application",
+  "Submitted",
+  "Accepted",
+  "Enrolled",
+  "Rejected",
+]);
+
+function positiveId(value: unknown): number | null {
+  const id = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function cleanNotes(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 4000) : "";
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -72,10 +90,16 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { profileId, universityId, status, notes } = body;
+    const profileId = positiveId(body.profileId);
+    const universityId = positiveId(body.universityId);
+    const status = body.status === undefined ? "Shortlisted" : body.status;
+    const notes = cleanNotes(body.notes);
 
     if (!profileId || !universityId) {
-      return NextResponse.json({ error: "profileId and universityId are required" }, { status: 400 });
+      return NextResponse.json({ error: "profileId and universityId must be positive integers" }, { status: 400 });
+    }
+    if (typeof status !== "string" || !SAVED_UNIVERSITY_STATUSES.has(status)) {
+      return NextResponse.json({ error: "Invalid saved university status" }, { status: 400 });
     }
 
     const access = await requireProfileAccess(req, profileId);
@@ -105,29 +129,31 @@ export async function POST(req: Request) {
     const capped = await enforceFreeCap(profileId, "saved_universities");
     if (capped) return capped;
 
-    // Get profile & university for match score calculation
+    // A saved fit snapshot must come from the canonical engine. Never insert
+    // an attractive fallback score/category when either source row is missing.
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
-    const [uni] = await db.select().from(universities).where(eq(universities.id, universityId));
-
-    let score = 80;
-    let cat: "Reach" | "Match" | "Safety" = "Match";
-
-    if (profile && uni) {
-      const match = calculateUniversityMatch(
-        await toMatchProfileWithActivities(profile),
-        toUniversityData(uni),
-      );
-      score = match.matchScore;
-      cat = match.matchCategory;
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found", code: "not_found" }, { status: 404 });
     }
+    const [uni] = await db.select().from(universities).where(eq(universities.id, universityId));
+    if (!uni) {
+      return NextResponse.json({ error: "University not found", code: "not_found" }, { status: 404 });
+    }
+
+    const match = calculateUniversityMatch(
+      await toMatchProfileWithActivities(profile),
+      toUniversityData(uni),
+    );
+    const score = match.matchScore;
+    const cat = match.matchCategory;
 
     const [newSaved] = await db.insert(savedUniversities).values({
       profileId,
       universityId,
       matchCategory: cat,
       matchScore: score,
-      status: status || "Shortlisted",
-      notes: notes || "",
+      status,
+      notes,
     }).returning();
 
     return NextResponse.json({ saved: newSaved });
@@ -140,12 +166,13 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, status, notes, matchCategory } = body;
+    const id = positiveId(body.id);
+    const status = body.status;
+    const notes = body.notes;
 
     if (!id) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
+      return NextResponse.json({ error: "id must be a positive integer" }, { status: 400 });
     }
-
     // Row ids are guessable — confirm the row belongs to the caller.
     const [target] = await db.select().from(savedUniversities).where(eq(savedUniversities.id, id));
     const rowAccess = await requireRowAccess(req, target);
@@ -156,12 +183,22 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // Validate mutable fields only after authorization, so a caller cannot
+    // use validation differences to probe another student's row.
+    if (status !== undefined && (typeof status !== "string" || !SAVED_UNIVERSITY_STATUSES.has(status))) {
+      return NextResponse.json({ error: "Invalid saved university status" }, { status: 400 });
+    }
+    if (notes !== undefined && typeof notes !== "string") {
+      return NextResponse.json({ error: "notes must be a string" }, { status: 400 });
+    }
+
     const [updated] = await db
       .update(savedUniversities)
       .set({
         status: status !== undefined ? status : undefined,
-        notes: notes !== undefined ? notes : undefined,
-        matchCategory: matchCategory !== undefined ? matchCategory : undefined,
+        notes: notes !== undefined ? cleanNotes(notes) : undefined,
+        // matchCategory/matchScore are engine-owned facts and cannot be
+        // overwritten by a client PATCH.
       })
       .where(eq(savedUniversities.id, id))
       .returning();

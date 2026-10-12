@@ -5,9 +5,10 @@
  *
  * One workspace per university with ten tabs, a progress bar that every
  * requirement feeds automatically, and a final submission checklist that
- * refuses to mark an application "Submitted" while required items are open.
+ * refuses to mark an application t("recStatusSubmitted") while required items are open.
  */
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, Check, ExternalLink, Lock, RefreshCw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { SectionTransition } from "@/components/motion";
@@ -89,6 +90,7 @@ export function ApplicationWorkspacePanel({
   onSelect: (id: number) => void;
   onNavigateTab: (tab: string) => void;
 }) {
+  const t = useTranslations("journey");
   const [data, setData] = useState<WorkspaceData | null>(null);
   const reduceMotion = useReducedMotion();
   const [tab, setTab] = useState("overview");
@@ -107,9 +109,9 @@ export function ApplicationWorkspacePanel({
     if (applicationId) qs.set("applicationId", String(applicationId));
     const res = await fetch(`/api/workspace?${qs}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || "Could not load the workspace");
+    if (!res.ok) throw new Error(json.error || t("awLoadError"));
     return json as WorkspaceData;
-  }, [profileId, applicationId]);
+  }, [profileId, applicationId, t]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -117,11 +119,11 @@ export function ApplicationWorkspacePanel({
       setData(await load());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the workspace");
+      setError(err instanceof Error ? err.message : t("awLoadError"));
     } finally {
       setLoading(false);
     }
-  }, [load]);
+  }, [load, t]);
 
   useEffect(() => {
     let live = true;
@@ -133,7 +135,7 @@ export function ApplicationWorkspacePanel({
         setError(null);
       } catch (err) {
         if (!live) return;
-        setError(err instanceof Error ? err.message : "Could not load the workspace");
+        setError(err instanceof Error ? err.message : t("awLoadError"));
       } finally {
         if (live) setLoading(false);
       }
@@ -141,7 +143,7 @@ export function ApplicationWorkspacePanel({
     return () => {
       live = false;
     };
-  }, [load]);
+  }, [load, t]);
 
   const patchRequirement = async (id: number, status: string) => {
     setBusy(true);
@@ -153,10 +155,10 @@ export function ApplicationWorkspacePanel({
         body: JSON.stringify({ profileId, id, status }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Could not update");
+      if (!res.ok) throw new Error(json.error || t("dvUpdateError"));
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update");
+      setError(err instanceof Error ? err.message : t("dvUpdateError"));
     } finally {
       setBusy(false);
     }
@@ -177,27 +179,27 @@ export function ApplicationWorkspacePanel({
         setError(
           json.code === "not_ready"
             ? `${json.error} ${(json.outstanding ?? []).map((o: { title: string }) => o.title).join(", ")}`
-            : json.error || "Could not submit"
+            : json.error || t("awSubmitError")
         );
         return;
       }
-      setMessage("Marked as submitted. Your dashboard and deadline list are updated.");
+      setMessage(t("awMarkedSubmitted"));
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit");
+      setError(err instanceof Error ? err.message : t("awSubmitError"));
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) return <Loading label="Opening your workspace…" />;
+  if (loading) return <Loading label={t("awLoading")} />;
   if (error && !data)
     return (
       <Empty
-        title="Workspace unavailable"
+        title={t("awUnavailable")}
         hint={error}
         action={
-          <Button onClick={() => void reload()}>Try again</Button>
+          <Button onClick={() => void reload()}>{t("awTryAgain")}</Button>
         }
       />
     );
@@ -207,14 +209,14 @@ export function ApplicationWorkspacePanel({
   if (!applicationId) {
     return (
       <JourneyCard
-        title="Application workspaces"
-        subtitle="Every university you are applying to, with its live progress. Adding a university is all it takes — we generate the checklist, the tasks and the deadline."
+        title={t("awListTitle")}
+        subtitle={t("awListSubtitle")}
       >
         {data.workspaces.length === 0 ? (
           <Empty
-            title="No workspaces yet"
-            hint="Start an application and ScholarBridge builds the requirements, essay tasks, recommendation tasks, deadline and funding plan for you."
-            action={<Button onClick={() => onNavigateTab("applications")}>Start an application</Button>}
+            title={t("awEmptyTitle")}
+            hint={t("awEmptyHint")}
+            action={<Button onClick={() => onNavigateTab("applications")}>{t("ceStartApplication")}</Button>}
           />
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -227,10 +229,10 @@ export function ApplicationWorkspacePanel({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                      {w.universityName || "University"}
+                      {w.universityName || t("awUniversityFallback")}
                     </span>
                     {w.submittedAt ? (
-                      <Pill tone="good">Submitted</Pill>
+                      <Pill tone="good">{t("recStatusSubmitted")}</Pill>
                     ) : w.deadline ? (
                       <Pill tone={toneForDays(daysTo(w.deadline))}>{daysTo(w.deadline)}d</Pill>
                     ) : null}
@@ -240,7 +242,7 @@ export function ApplicationWorkspacePanel({
                     <ProgressBar pct={w.progressPct} size="sm" tone={w.progressPct >= 100 ? "good" : "brand"} />
                   </div>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {w.submittedAt ? "Submitted" : `${w.done}/${w.total} requirements done`}
+                    {w.submittedAt ? t("recStatusSubmitted") : `${w.done}/${w.total} requirements done`}
                   </p>
                 </button>
               </li>
@@ -253,7 +255,7 @@ export function ApplicationWorkspacePanel({
 
   // ---- Single workspace --------------------------------------------------
   const app = data.application;
-  if (!app) return <Empty title="Application not found" />;
+  if (!app) return <Empty title={t("awNotFound")} />;
 
   const sections = SECTION_ORDER.map((key) => ({
     key,
@@ -271,8 +273,7 @@ export function ApplicationWorkspacePanel({
               onClick={() => onSelect(0)}
               className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
             >
-              <ArrowLeft className="h-3 w-3" /> All workspaces
-            </button>
+              <ArrowLeft className="h-3 w-3" />{t("awAllWorkspaces")}</button>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{app.universityName}</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {[app.programName, app.applicationRound, app.intakeTerm].filter(Boolean).join(" · ")}
@@ -285,7 +286,7 @@ export function ApplicationWorkspacePanel({
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-xs">
             <div className="flex items-baseline justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Application progress</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("awProgressLabel")}</span>
               <span className="text-lg font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</span>
             </div>
             <ProgressBar pct={data.progress.pct} size="lg" tone={data.progress.pct >= 100 ? "good" : "brand"} />
@@ -295,7 +296,7 @@ export function ApplicationWorkspacePanel({
           </div>
         </div>
 
-        <nav className="mt-4 flex flex-wrap gap-1.5" aria-label="Workspace tabs">
+        <nav className="mt-4 flex flex-wrap gap-1.5" aria-label={t("awTabsAria")}>
           {data.tabs.map((t) => {
             const sectionProgress = data.progress.sections.find((s) => s.key === t.id);
             const isActive = tab === t.id;
@@ -343,7 +344,7 @@ export function ApplicationWorkspacePanel({
       {/* ---- Overview ---------------------------------------------------- */}
       {tab === "overview" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <JourneyCard title="Where you stand" subtitle="Every requirement contributes to this automatically.">
+          <JourneyCard title={t("awStandTitle")} subtitle={t("awStandSubtitle")}>
             <ul className="space-y-2">
               {data.progress.sections.map((s) => (
                 <li key={s.key}>
@@ -358,9 +359,9 @@ export function ApplicationWorkspacePanel({
               ))}
             </ul>
           </JourneyCard>
-          <JourneyCard title="Still missing" subtitle="You never have to remember this — it is computed from your checklist.">
+          <JourneyCard title={t("awMissingTitle")} subtitle={t("awMissingSubtitle")}>
             {data.progress.missing.length === 0 ? (
-              <Empty title="Nothing missing" hint="Every requirement is marked done." />
+              <Empty title={t("awNothingMissing")} hint={t("awNothingMissingHint")} />
             ) : (
               <ul className="space-y-1.5">
                 {data.progress.missing.slice(0, 10).map((m) => (
@@ -379,8 +380,8 @@ export function ApplicationWorkspacePanel({
       {/* ---- Requirements / grouped sections ------------------------------ */}
       {["requirements", "documents", "essays", "recommendations", "tests", "finance"].includes(tab) && (
         <JourneyCard
-          title="Your application requirements"
-          subtitle="Generated from the university's published requirements. Every item shows its source and last verified date."
+          title={t("awReqsTabTitle")}
+          subtitle={t("awReqsTabSubtitle")}
           action={
             <Button
               size="sm"
@@ -400,8 +401,7 @@ export function ApplicationWorkspacePanel({
               }}
               disabled={busy}
             >
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
+              <RefreshCw className="h-3.5 w-3.5" />{t("awRefresh")}</Button>
           }
         >
           <div className="space-y-4">
@@ -439,7 +439,7 @@ export function ApplicationWorkspacePanel({
                           }`}
                         >
                           {r.title}
-                          {!r.isRequired && <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">(optional)</span>}
+                          {!r.isRequired && <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">{t("awOptional")}</span>}
                         </p>
                         {r.instructions && <p className="text-xs text-slate-500 dark:text-slate-400">{r.instructions}</p>}
                         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -456,14 +456,10 @@ export function ApplicationWorkspacePanel({
                       </div>
                       <div className="flex shrink-0 gap-1">
                         {r.status !== "done" && r.status !== "not_required" && (
-                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchRequirement(r.id, "in_progress")}>
-                            Start
-                          </Button>
+                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchRequirement(r.id, "in_progress")}>{t("start")}</Button>
                         )}
                         {r.status !== "not_required" && (
-                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchRequirement(r.id, "not_required")}>
-                            N/A
-                          </Button>
+                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchRequirement(r.id, "not_required")}>{t("awNA")}</Button>
                         )}
                       </div>
                     </li>
@@ -471,7 +467,7 @@ export function ApplicationWorkspacePanel({
                 </ul>
               </div>
             ))}
-            {sections.length === 0 && <Empty title="No requirements yet" hint="Refresh to generate them from the university's published data." />}
+            {sections.length === 0 && <Empty title={t("awNoReqs")} hint={t("awNoReqsHint")} />}
           </div>
         </JourneyCard>
       )}
@@ -479,15 +475,15 @@ export function ApplicationWorkspacePanel({
       {/* ---- Deadlines + reverse planning -------------------------------- */}
       {tab === "deadlines" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <JourneyCard title="Deadlines" subtitle="Tracked dates for this application.">
+          <JourneyCard title={t("tabDeadlines")} subtitle={t("awDeadlinesSubtitle")}>
             {data.deadlines.length === 0 && !app.deadline ? (
-              <Empty title="No dates yet" hint="Add an application deadline and we will plan backwards from it." />
+              <Empty title={t("awNoDates")} hint={t("awNoDatesHint")} />
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {app.deadline && (
                   <li className="flex items-center gap-2 py-2 text-sm">
                     <Pill tone={toneForDays(daysTo(app.deadline))}>{daysLabel(daysTo(app.deadline))}</Pill>
-                    <span className="flex-1 text-slate-700 dark:text-slate-200">Application deadline</span>
+                    <span className="flex-1 text-slate-700 dark:text-slate-200">{t("awAppDeadline")}</span>
                     <span className="text-xs text-slate-400">{app.deadline}</span>
                   </li>
                 )}
@@ -501,9 +497,9 @@ export function ApplicationWorkspacePanel({
               </ul>
             )}
           </JourneyCard>
-          <JourneyCard title="Reverse plan" subtitle="Working backwards from your real deadline. Nothing is ever scheduled after it.">
+          <JourneyCard title={t("awReverseTitle")} subtitle={t("awReverseSubtitle")}>
             {data.reversePlan.length === 0 ? (
-              <Empty title="Add a deadline first" hint="Once your university deadline is set, we build the preparation schedule automatically." />
+              <Empty title={t("awAddDeadlineFirst")} hint={t("awAddDeadlineHint")} />
             ) : (
               <ol className="space-y-2">
                 {data.reversePlan.map((s) => (
@@ -522,8 +518,8 @@ export function ApplicationWorkspacePanel({
       {/* ---- Submission (spec §22) --------------------------------------- */}
       {tab === "submission" && (
         <JourneyCard
-          title="Final submission checklist"
-          subtitle="We check every box before you can mark an application as submitted."
+          title={t("awSubmitTitle")}
+          subtitle={t("awSubmitSubtitle")}
         >
           <ul className="mb-4 space-y-2">
             {data.submissionChecklist.map((c) => (
@@ -547,9 +543,7 @@ export function ApplicationWorkspacePanel({
               <p className="font-bold text-emerald-700 dark:text-emerald-300">
                 Submitted {new Date(app.submittedAt).toLocaleDateString()}
               </p>
-              <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                Store your confirmation number in the notes so you can find it later.
-              </p>
+              <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">{t("awConfirmationNote")}</p>
             </div>
           ) : (
             <>
@@ -557,10 +551,9 @@ export function ApplicationWorkspacePanel({
                 variant="success"
                 disabled={busy || !data.readyToSubmit}
                 onClick={markSubmitted}
-                title={data.readyToSubmit ? "Mark as submitted" : "Finish the required items first"}
+                title={data.readyToSubmit ? t("awMarkSubmittedTitle") : t("awMarkSubmittedTitleBlocked")}
               >
-                <Lock className="h-3.5 w-3.5" /> Mark as Submitted
-              </Button>
+                <Lock className="h-3.5 w-3.5" />{t("awMarkSubmittedBtn")}</Button>
               {!data.readyToSubmit && (
                 <p className="mt-2 text-xs text-slate-500">
                   Still open: {data.progress.blockers.slice(0, 4).join(", ")}
@@ -577,33 +570,28 @@ export function ApplicationWorkspacePanel({
               rel="noopener noreferrer"
               className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
             >
-              <ExternalLink className="h-3 w-3" /> Open the official application portal
-            </a>
+              <ExternalLink className="h-3 w-3" />{t("awPortalLink")}</a>
           )}
         </JourneyCard>
       )}
 
       {/* ---- Decision (spec §23) ----------------------------------------- */}
       {tab === "decision" && (
-        <JourneyCard title="Decision" subtitle="Record the result and unlock the post-admission journey.">
+        <JourneyCard title={t("tabDecision")} subtitle={t("awDecisionSubtitle")}>
           {data.offer ? (
             <div className="space-y-2">
               <Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>
                 {data.offer.status}
               </Pill>
               {data.offer.status === "accepted" && (
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Your post-admission journey is active: funding, deposit, visa and departure steps are now on your dashboard.
-                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>
               )}
-              <Button className="mt-2" variant="outline" onClick={() => onNavigateTab("offers")}>
-                Open Offers & Decisions
-              </Button>
+              <Button className="mt-2" variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button>
             </div>
           ) : (
             <Empty
-              title="No decision yet"
-              hint="When a university replies, record the result here and ScholarBridge switches on the post-admission journey automatically."
+              title={t("awNoDecision")}
+              hint={t("awNoDecisionHint")}
             />
           )}
         </JourneyCard>

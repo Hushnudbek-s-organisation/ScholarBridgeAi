@@ -3,6 +3,7 @@ import { optionalProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
 import { courses, courseModules, lessons, lessonProgress } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { completionSummary } from "@/lib/calculations";
 
 /**
  * Course catalogue listing.
@@ -104,8 +105,14 @@ export async function GET(req: Request) {
         lessonCount += courseLessons.length;
         completedLessons += courseLessons.filter((l) => completedLessonIds.has(l.id)).length;
       }
-      const progressPct = lessonCount > 0 ? Math.round((completedLessons / lessonCount) * 100) : 0;
-      return { ...course, lessonCount, completedLessons, progressPct };
+      const progress = completionSummary(completedLessons, lessonCount);
+      return {
+        ...course,
+        lessonCount: progress.total,
+        completedLessons: progress.done,
+        progressPct: progress.pct,
+        progress,
+      };
     });
 
     return NextResponse.json({ courses: results });

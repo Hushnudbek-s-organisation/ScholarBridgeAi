@@ -194,5 +194,8 @@ async function attachEvidence(profileId: number, activityId: number, raw: unknow
 function numberOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
-  return Number.isFinite(n) ? Math.round(n) : null;
+  if (!Number.isFinite(n)) return null;
+  // Lifetime activity hours cannot be negative; cap corrupt/hostile input while
+  // leaving enough room for multi-year full-time work records.
+  return Math.max(0, Math.min(100_000, Math.round(n)));
 }

@@ -66,9 +66,9 @@ export async function GET(req: Request) {
           : /stipend|living/i.test(s.coverageType || "")
             ? "living"
             : "other",
-      // We do not know the student's odds, and inventing them would be worse
-      // than useless — 0.2 is a neutral prior and the UI says so.
-      probability: 0.2,
+      // No validated award probability exists. Unknown stays null: expected
+      // funding and chance-of-award are therefore unavailable, not a guessed %.
+      probability: null,
       deadlineDays: s.deadlineDate
         ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
         : null,
@@ -89,7 +89,9 @@ export async function GET(req: Request) {
       city: target?.city,
       years: profile.degreeLevel === "Master" ? 2 : profile.degreeLevel === "PhD" ? 4 : 4,
       scholarships: scholarshipInputs,
-      familyContributionUsd: profile.familyIncomeUsd ? Math.round(profile.familyIncomeUsd * 0.25) : null,
+      // Income is not a contribution commitment. The profile currently has no
+      // explicit confirmed-contribution field, so do not invent 25% of income.
+      familyContributionUsd: null,
     });
 
     const portfolio = assessPortfolio({

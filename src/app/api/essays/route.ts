@@ -4,7 +4,7 @@ import { essayVersions } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
-import { readJsonBody, clampString } from "@/lib/request";
+import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 
 /**
@@ -21,6 +21,11 @@ const MAX_CHARS = 60_000; // ~9k words, far above any real limit
 
 function parseType(value: unknown): EssayType {
   return ESSAY_TYPES.includes(String(value)) ? (String(value) as EssayType) : "sop";
+}
+
+function parseWordLimit(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  return optionalNumber(value, { min: 1, max: 5000, integer: true }) ?? null;
 }
 
 export async function GET(req: Request) {
@@ -64,9 +69,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
-    const profileId = Number(body.profileId);
+    const profileId = positiveInt(body.profileId);
     if (!profileId) {
-      return NextResponse.json({ error: "profileId is required" }, { status: 400 });
+      return NextResponse.json({ error: "profileId must be a positive integer" }, { status: 400 });
     }
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
     }
 
     const essayType = parseType(body.essayType);
-    const wordLimit = body.wordLimit ? Math.min(Number(body.wordLimit) || 0, 5000) : null;
+    const wordLimit = parseWordLimit(body.wordLimit);
     const targetName = clampString(body.targetName, 200) || null;
 
     // Score the text server-side. A client-supplied score would be worthless —
@@ -105,7 +110,7 @@ export async function POST(req: Request) {
       .insert(essayVersions)
       .values({
         profileId,
-        universityId: body.universityId ? Number(body.universityId) : null,
+        universityId: positiveInt(body.universityId),
         essayType,
         title: clampString(body.title, 200) || `${essayType.replace(/_/g, " ")} v${versionNumber}`,
         content,
@@ -157,7 +162,7 @@ export async function PUT(req: Request) {
 
     const feedback = analyzeEssay(content, {
       type: parseType(body.essayType),
-      wordLimit: body.wordLimit ? Math.min(Number(body.wordLimit) || 0, 5000) : null,
+      wordLimit: parseWordLimit(body.wordLimit),
       targetName: clampString(body.targetName, 200) || null,
     });
 
