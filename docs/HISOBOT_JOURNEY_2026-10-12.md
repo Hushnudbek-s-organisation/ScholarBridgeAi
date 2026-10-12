@@ -156,8 +156,15 @@ Quyidagi tayyor tizimlar **qayta yaratilmadi**, qayta ishlatildi:
 | `npm run test:payments` | **PASS** | 82 / 0 |
 | `npm run test:growth` | **PASS** | 33 assertions |
 | `npm run build` (DATABASE_URL bilan) | **PASS** | barcha sahifalar/131+ route kompilyatsiya qilindi |
+| `npm audit --omit=dev --audit-level=high` | **PASS** | production bog‘liqliklarida 0 zaiflik |
 
 **Baseline holatlar:** `lint:baseline` dagi 50 ta eski lint muammosi avvaldan mavjud va o‘zgartirilmagan. `test:provenance` va `test:api-security` tashqi muhit talab qiladi (DB + dev server) — ular alohida ishga tushirilib, natija yuqorida.
+
+**CI `Dependency audit (high+)` qadami — avvaldan mavjud baseline muammo (bu PR’ga tegishli emas):**
+* `npm audit --audit-level=high` CI’da **qizil**, chunki dev-toolchain transitive zanjirida (`eslint-config-next → fast-glob → micromatch → braces`) `braces <=3.0.3` uchun yangi advisory chiqqan, **lekin upstreamda tuzatilgan versiya hali yo‘q** (registrydagi oxirgi versiya ham 3.0.3). npm’ning o‘zi yagona “yechim” sifatida `eslint-config-next` ni 14.x ga **semver-major downgrade** taklif qiladi — bu esa buzuvchi o‘zgarish va rad etildi.
+* **Production bog‘liqliklarida 0 ta zaiflik:** `npm audit --omit=dev --audit-level=high` → `found 0 vulnerabilities`.
+* Bu PR hech qanday yangi dependency qo‘shmagan (faqat 2 ta test script). `npm audit fix` bilan xavfsiz, buzuvchi bo‘lmagan `brace-expansion` yangilanishi lockfile’ga qabul qilindi (10 → 9 ta advisory).
+* Xavfsizlik gate’i **qasdan o‘zgartirilmadi** — u shu holicha qoladi va upstream `braces` chiqqach avtomatik yashil bo‘ladi.
 
 ### D.2 Runtime dalillari (haqiqiy stack: embedded PostgreSQL :5433 + `next dev` :3000)
 
