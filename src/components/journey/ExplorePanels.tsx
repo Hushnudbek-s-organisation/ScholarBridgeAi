@@ -16,6 +16,7 @@ import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, GraduationCap, Search } from "lucide-react";
 import { CAREER_PATHS } from "@/lib/journey/careers";
+import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
@@ -61,8 +62,20 @@ function universityOffersMajor(u: any, major: string): boolean {
   return majorAffinityScore(u, major) > 0;
 }
 
-export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: string) => void }) {
+export function CareerExplorerPanel({
+  onNavigateTab,
+  profileId,
+}: {
+  onNavigateTab: (t: string) => void;
+  /** Session profile — powers the career-discovery quiz (optional: catalog still works signed-out). */
+  profileId?: number | null;
+}) {
   const t = useTranslations("journey");
+  const tDisc = useTranslations("careerDiscovery");
+  // ONE panel, TWO modes: the guided "find my direction" quiz and the catalog
+  // explorer. A discovery pick hands over to the catalog below — never a
+  // second, parallel explorer.
+  const [mode, setMode] = useState<"discover" | "catalog">("discover");
   const [career, setCareer] = useState<string>(CAREER_PATHS[0].id);
   const [major, setMajor] = useState<string>(CAREER_PATHS[0].majors[0]);
   const [unis, setUnis] = useState<any[]>([]);
@@ -178,6 +191,49 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
 
   return (
     <div className="space-y-4">
+      {/* Mode switch — discovery first for the undecided, catalog for everyone. */}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={tDisc("modeSwitchAria")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "discover"}
+          onClick={() => setMode("discover")}
+          className={`rounded-xl border-2 px-4 py-2 text-sm font-bold transition ${
+            mode === "discover"
+              ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-200"
+              : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
+          }`}
+        >
+          {tDisc("modeDiscover")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "catalog"}
+          onClick={() => setMode("catalog")}
+          className={`rounded-xl border-2 px-4 py-2 text-sm font-bold transition ${
+            mode === "catalog"
+              ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-200"
+              : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
+          }`}
+        >
+          {tDisc("modeCatalog")}
+        </button>
+      </div>
+
+      {mode === "discover" && (
+        <CareerDiscoveryFlow
+          profileId={profileId ?? null}
+          mode="panel"
+          onSelected={(careerId) => {
+            pickCareer(careerId);
+            setMode("catalog");
+          }}
+        />
+      )}
+
+      {mode === "catalog" && (
+      <>
       <JourneyCard
         title="Career & major explorer"
         subtitle="Start from the job you want. We show the majors that lead there, the countries that offer them, and the universities that publish them."
@@ -290,6 +346,8 @@ export function CareerExplorerPanel({ onNavigateTab }: { onNavigateTab: (t: stri
       </JourneyCard>
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="catalogue" className="mt-2" />
+      </>
+      )}
     </div>
   );
 }

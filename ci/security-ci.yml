@@ -67,6 +67,12 @@ jobs:
       - name: Recommender tests — engine + API (embedded Postgres)
         run: npm run test:recommend
 
+      - name: Career discovery tests — quiz engine + honesty rules
+        run: npm run test:career-discovery
+
+      - name: Arrival plan tests — 7/30/90 days + first year
+        run: npm run test:arrival
+
       - name: Opportunities feed tests (embedded Postgres)
         run: npm run test:opportunities
 

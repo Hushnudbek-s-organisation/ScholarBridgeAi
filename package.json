@@ -15,7 +15,7 @@
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
     "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:groq": "tsx scripts/check-groq.ts",
-    "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
+    "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
     "test:schema": "tsx scripts/check-supabase-schema.ts",
     "db:verify": "tsx scripts/check-supabase-schema.ts --live",
     "db:gen:full-schema": "tsx scripts/gen-full-schema-sql.ts",
@@ -57,7 +57,9 @@
     "test:recommend": "tsx scripts/check-recommend.ts",
     "test:study-interests": "tsx scripts/check-study-interests.ts",
     "test:referral": "tsx scripts/check-referral.ts",
-    "test:payments": "tsx scripts/check-payments.ts"
+    "test:payments": "tsx scripts/check-payments.ts",
+    "test:career-discovery": "tsx scripts/check-career-discovery.ts",
+    "test:arrival": "tsx scripts/check-arrival.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
