@@ -164,15 +164,15 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             </p>
           </div>
 
+          {/* Prices come only from /api/premium/status (app_config). No fallback
+              prices are shown: if the server gives none, nothing can be bought. */}
+          {packages.length === 0 && (
+            <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              Narxlar hozir yuklanmadi yoki mavjud emas. Keyinroq qayta urinib ko&apos;ring.
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-3">
-            {(packages.length
-              ? packages
-              : [
-                  { id: "monthly" as const, label: "Monthly", labelUz: "Oylik", priceUzs: 59000, days: 30, currency: "UZS" },
-                  { id: "season" as const, label: "Season", labelUz: "Ariza mavsumi", priceUzs: 149000, days: 90, currency: "UZS", badge: "Best" },
-                  { id: "yearly" as const, label: "Yearly", labelUz: "Yillik", priceUzs: 499000, days: 365, currency: "UZS" },
-                ]
-            ).map((pack) => {
+            {packages.map((pack) => {
               const active = selectedPackage === pack.id;
               return (
                 <button
@@ -212,7 +212,8 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             </div>
             <button
               onClick={() => setShowCheckout(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white sb-ink-on-warm font-bold rounded-xl text-xs shadow-md transition-colors"
+              disabled={!selected}
+              className="px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white sb-ink-on-warm font-bold rounded-xl text-xs shadow-md transition-colors"
             >
               {t("upgrade")}
             </button>

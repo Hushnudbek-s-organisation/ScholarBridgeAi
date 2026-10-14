@@ -2,13 +2,18 @@ import { createHash, timingSafeEqual } from "crypto";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, subscriptions, studentProfiles } from "@/db/schema";
-import { getConfigNumber } from "@/lib/config";
+import { CONFIG_DEFAULTS, getConfigNumber } from "@/lib/config";
 
-// Sync fallbacks (kept for backward compatibility) — the real values come
-// from app_config (spec §3: no hardcoded business values).
-export const PREMIUM_PRICE_UZS = 59000;
+// Fallbacks ONLY for when app_config is unreadable. They are read from the one
+// defaults table (CONFIG_DEFAULTS), never typed twice. The real values are the
+// admin-saved app_config rows (spec §3: no hardcoded business values).
+export const PREMIUM_PRICE_UZS = Number(CONFIG_DEFAULTS.payment_premium_price_uzs);
 export const PREMIUM_CURRENCY = "UZS";
-export const PREMIUM_PERIOD_DAYS = 30;
+export const PREMIUM_PERIOD_DAYS = Number(CONFIG_DEFAULTS.payment_premium_days);
+const PREMIUM_SEASON_PRICE_UZS = Number(CONFIG_DEFAULTS.payment_premium_season_price_uzs);
+const PREMIUM_SEASON_DAYS = Number(CONFIG_DEFAULTS.payment_premium_season_days);
+const PREMIUM_YEARLY_PRICE_UZS = Number(CONFIG_DEFAULTS.payment_premium_yearly_price_uzs);
+const PREMIUM_YEARLY_DAYS = Number(CONFIG_DEFAULTS.payment_premium_yearly_days);
 
 /** Config-driven premium price (UZS). */
 export async function getPremiumPriceUzs(): Promise<number> {
@@ -30,16 +35,16 @@ export async function resolvePremiumPackage(
   if (id === "season") {
     return {
       id,
-      priceUzs: await getConfigNumber("payment_premium_season_price_uzs", 149000),
-      days: await getConfigNumber("payment_premium_season_days", 90),
+      priceUzs: await getConfigNumber("payment_premium_season_price_uzs", PREMIUM_SEASON_PRICE_UZS),
+      days: await getConfigNumber("payment_premium_season_days", PREMIUM_SEASON_DAYS),
       purpose: "premium_season",
     };
   }
   if (id === "yearly") {
     return {
       id,
-      priceUzs: await getConfigNumber("payment_premium_yearly_price_uzs", 499000),
-      days: await getConfigNumber("payment_premium_yearly_days", 365),
+      priceUzs: await getConfigNumber("payment_premium_yearly_price_uzs", PREMIUM_YEARLY_PRICE_UZS),
+      days: await getConfigNumber("payment_premium_yearly_days", PREMIUM_YEARLY_DAYS),
       purpose: "premium_yearly",
     };
   }
@@ -53,8 +58,8 @@ export async function resolvePremiumPackage(
 
 /** Days granted for a paid payment purpose (gift routes pass days explicitly). */
 export async function periodDaysForPurpose(purpose: string | null | undefined): Promise<number> {
-  if (purpose === "premium_season") return getConfigNumber("payment_premium_season_days", 90);
-  if (purpose === "premium_yearly") return getConfigNumber("payment_premium_yearly_days", 365);
+  if (purpose === "premium_season") return getConfigNumber("payment_premium_season_days", PREMIUM_SEASON_DAYS);
+  if (purpose === "premium_yearly") return getConfigNumber("payment_premium_yearly_days", PREMIUM_YEARLY_DAYS);
   return getPremiumPeriodDays();
 }
 
