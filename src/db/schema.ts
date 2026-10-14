@@ -83,7 +83,7 @@ export const studentProfiles = pgTable("student_profiles", {
   // Goals
   targetUniversities: text("target_universities"),
   careerGoal: text("career_goal"),
-  // Anonymous outcomes dataset consent
+  // Legacy profile-level record of outcome-sharing consent; each outcome row also stores its own consent.
   dataShareConsent: boolean("data_share_consent").notNull().default(false),
   dataShareConsentAt: timestamp("data_share_consent_at"),
   // --- Onboarding wizard progress ---
@@ -219,8 +219,6 @@ export const savedUniversities = pgTable("saved_universities", {
   id: serial("id").primaryKey(),
   profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
   universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }).notNull(),
-  matchCategory: text("match_category").notNull().default("Match"),
-  matchScore: integer("match_score").notNull().default(85),
   status: text("status").notNull().default("Shortlisted"),
   notes: text("notes").default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -949,12 +947,12 @@ export const applications = pgTable(
 );
 
 /**
- * Application outcomes — ScholarBridge's OWN admissions dataset.
+ * Application outcomes — private result history for each application owner.
  *
- * Every result is stored, rejections included: a model trained only on
- * acceptances learns "every strong student gets in". Rows with
- * `shareConsent = true` may be used (anonymously) to improve the chancing
- * engine; rows without consent are never used outside the owner's account.
+ * A row is eligible for the opt-in Shared Outcomes examples only when its own
+ * `shareConsent` is true. That view omits names and raw profile values. These
+ * records are not used to calculate profile-to-catalogue fit or admission
+ * probability; rows without consent remain in the owner's account only.
  */
 export const applicationOutcomes = pgTable(
   "application_outcomes",
@@ -968,7 +966,7 @@ export const applicationOutcomes = pgTable(
     scholarshipAmountUsd: integer("scholarship_amount_usd"),
     scholarshipName: text("scholarship_name"),
     notes: text("notes"),
-    // Profile snapshot at decision time — the training row for the model.
+    // Decision-time profile snapshot used only to select comparable historical examples.
     snapshotGpa: doublePrecision("snapshot_gpa"),
     snapshotGpaScale: doublePrecision("snapshot_gpa_scale"),
     snapshotIelts: doublePrecision("snapshot_ielts"),

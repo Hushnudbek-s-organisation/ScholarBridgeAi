@@ -44,7 +44,7 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
     icon: "🔎",
     group: "discover",
     tab: "universities",
-    doneWhen: "Your profile is filled in, so results are personalised.",
+    doneWhen: "You have recorded some profile context. Add only details you choose to share; verify programme rules separately.",
   },
   {
     id: "match",
@@ -52,7 +52,7 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
     icon: "🎯",
     group: "journey",
     tab: "chancing",
-    doneWhen: "You have shortlisted universities and know which ones fit.",
+    doneWhen: "You have saved universities and can review the available profile-to-catalogue comparisons.",
   },
   {
     id: "prepare",
@@ -60,7 +60,7 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
     icon: "📋",
     group: "prepare",
     tab: "documents",
-    doneWhen: "Documents, tests and finances are in place.",
+    doneWhen: "You have started a programme application and saved a programme to compare; check official requirements separately.",
   },
   {
     id: "apply",
@@ -84,7 +84,7 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
     icon: "💰",
     group: "after",
     tab: "funding",
-    doneWhen: "Your funding plan covers the offer, or the gap is known.",
+    doneWhen: "You have recorded funding information and reviewed any remaining estimate with its source.",
   },
   {
     id: "visa",
@@ -92,7 +92,7 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
     icon: "🛂",
     group: "after",
     tab: "visa",
-    doneWhen: "Your visa is issued.",
+    doneWhen: "You have recorded a visa decision if one applies to your destination; this app does not verify immigration status.",
   },
   {
     id: "depart",
@@ -109,9 +109,9 @@ export const JOURNEY_STAGES: readonly JourneyStage[] = [
  * account (all zeros) still produces a sensible stage: `discover`.
  */
 export interface JourneyCounts {
-  profileComplete: boolean;
+  /** Some voluntary profile context is recorded; not a completeness or quality score. */
+  profileHasContext: boolean;
   savedUniversities: number;
-  shortlistMatches: number;
   applications: number;
   submittedApplications: number;
   offersRecorded: number;
@@ -124,9 +124,8 @@ export interface JourneyCounts {
 }
 
 export const EMPTY_JOURNEY_COUNTS: JourneyCounts = {
-  profileComplete: false,
+  profileHasContext: false,
   savedUniversities: 0,
-  shortlistMatches: 0,
   applications: 0,
   submittedApplications: 0,
   offersRecorded: 0,
@@ -157,12 +156,11 @@ export interface JourneyStageResult {
 /** Per-stage completion, 0–1. A stage is only "done" at 1. */
 export function stageCompletion(c: JourneyCounts): Record<JourneyStageId, number> {
   return {
-    discover: c.profileComplete ? 1 : 0,
-    match: c.savedUniversities > 0 ? 0.6 + (c.shortlistMatches > 0 ? 0.4 : 0) : 0,
+    discover: c.profileHasContext ? 1 : 0,
+    match: c.savedUniversities > 0 ? 1 : 0,
     prepare:
-      (c.applications > 0 ? 0.5 : 0) +
-      (c.savedUniversities > 0 ? 0.25 : 0) +
-      (c.fundingPlanTotal > 0 ? 0.25 : 0),
+      (c.applications > 0 ? 0.65 : 0) +
+      (c.savedUniversities > 0 ? 0.35 : 0),
     apply: c.submittedApplications > 0 ? 1 : c.applications > 0 ? 0.6 : 0,
     accepted: c.acceptedOffers > 0 ? 1 : c.offersRecorded > 0 ? 0.6 : 0,
     fund: c.fundingPlanTotal > 0 ? (c.fundingGapClosed ? 1 : 0.5) : 0,
@@ -191,23 +189,21 @@ export function currentStage(c: JourneyCounts): JourneyStageId {
 export function stageStillNeeded(stage: JourneyStageId, c: JourneyCounts): { text: string; tab: string }[] {
   switch (stage) {
     case "discover":
-      return c.profileComplete ? [] : [{ text: "Complete your profile so matches are personalised", tab: "profile/details" }];
+      return c.profileHasContext ? [] : [{ text: "Add any profile context you choose to record for more specific programme comparisons", tab: "profile/details" }];
     case "match":
-      return [
-        ...(c.savedUniversities === 0 ? [{ text: "Save universities you are considering", tab: "universities" }] : []),
-        ...(c.shortlistMatches === 0 ? [{ text: "Check which of them fit your profile", tab: "chancing" }] : []),
-      ];
+      return c.savedUniversities === 0
+        ? [{ text: "Save a programme you are considering, then verify its details on the official page", tab: "universities" }]
+        : [];
     case "prepare":
       return [
-        ...(c.applications === 0 ? [{ text: "Start an application to generate your checklist", tab: "applications" }] : []),
-        ...(c.savedUniversities === 0 ? [{ text: "Add universities to research", tab: "universities" }] : []),
-        ...(c.fundingPlanTotal === 0 ? [{ text: "Build your funding plan", tab: "funding" }] : []),
+        ...(c.applications === 0 ? [{ text: "Add an application to track when you are ready", tab: "applications" }] : []),
+        ...(c.savedUniversities === 0 ? [{ text: "Save a programme you want to compare", tab: "universities" }] : []),
       ];
     case "apply":
       return c.applications === 0
-        ? [{ text: "Start your first application", tab: "applications" }]
+        ? [{ text: "Add an application when you are ready to track one", tab: "applications" }]
         : c.submittedApplications === 0
-          ? [{ text: "Finish and submit your application", tab: "workspace" }]
+          ? [{ text: "Review the official checklist and submission steps for your tracked application", tab: "workspace" }]
           : [];
     case "accepted":
       return c.offersRecorded === 0
@@ -217,16 +213,16 @@ export function stageStillNeeded(stage: JourneyStageId, c: JourneyCounts): { tex
           : [];
     case "fund":
       return c.fundingPlanTotal === 0
-        ? [{ text: "Add your scholarship and family budget", tab: "funding" }]
+        ? [{ text: "Record how you plan to cover study costs, if relevant", tab: "funding" }]
         : c.fundingGapClosed
           ? []
-          : [{ text: "Close the funding gap for your offer", tab: "funding" }];
+          : [{ text: "Review recorded amounts, conditions and any estimated funding gap", tab: "funding" }];
     case "visa":
       return c.visaApproved
         ? []
         : c.visaCaseStarted
-          ? [{ text: "Finish your visa case", tab: "visa" }]
-          : [{ text: "Start your visa case", tab: "visa" }];
+          ? [{ text: "Check current official immigration instructions for your destination", tab: "visa" }]
+          : [{ text: "Review official immigration guidance when you know your destination and institution", tab: "visa" }];
     case "depart":
       return c.departureReady ? [] : [{ text: "Complete the departure checklist", tab: "departure" }];
   }

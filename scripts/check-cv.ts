@@ -1,15 +1,16 @@
 /**
  * Deterministic checks for the CV builder (Phase 3).
  *
- * An admissions CV is not a job CV: academics, evidence and impact, one page,
- * and no photograph or date of birth. Above all it must never invent an award,
- * a date or a number — an empty field is omitted, not filled with plausible
- * sounding text.
+ * CV structure and length vary by country, institution, programme and
+ * application. The builder must not invent an award, date or number, and its
+ * advice must not imply universal GPA, test, leadership or page-count rules.
  *
  * Run: npm run test:cv
  */
 
 import { buildCv, parseList, renderCvText, FORBIDDEN_ON_CV, type CvProfile } from "../src/lib/cv";
+import { localizeCv } from "../src/lib/cvI18n";
+import { readFileSync } from "node:fs";
 
 let passed = 0;
 let failed = 0;
@@ -68,6 +69,7 @@ section("2. Sections follow the admissions order");
 
 const cv = buildCv(full);
 const headings = cv.sections.map((s) => s.heading);
+const cvGuidance = cv.guidance.map((item) => item.key);
 check("Education comes first", headings[0] === "Education");
 check(
   "Research & Projects precede Honours",
@@ -79,7 +81,12 @@ check(
   headings.indexOf("Leadership & Activities") < headings.indexOf("Objective")
 );
 check("a test section exists", headings.includes("Standardized Tests"));
+check("activities are grouped without a leadership-first label", headings.includes("Activities & Leadership"));
 check("an objective is included only when written", headings.includes("Objective"));
+check("CV guidance uses the student's intended major", cvGuidance.includes("targetMajor") && cv.guidance.find((item) => item.key === "targetMajor")?.values?.major === "Computer Science");
+check("CV guidance reacts to the profile's project and leadership evidence", cvGuidance.includes("evidence") && cvGuidance.includes("leadership"));
+check("CV guidance reviews present academic records and test scores", cvGuidance.includes("academicComplete") && cvGuidance.includes("testScoresPresent"));
+check("CV guidance is separate from the copied CV text", !renderCvText(cv).includes("Profile-specific CV revision guidance"));
 
 section("3. Real data appears, invented data never does");
 
@@ -102,22 +109,33 @@ check("the GPA scale defaults to 4 when missing", buildCv({ gpa: 3.2 }).sections
 section("4. Gaps are reported, not papered over");
 
 const emptyCv = buildCv(empty);
+const emptyGuidance = emptyCv.guidance.map((item) => item.key);
 check("a fully filled profile reports nothing missing", cv.missing.length === 0);
+check("empty-profile advice asks for a real target major and evidence", emptyGuidance.includes("targetMajorMissing") && emptyGuidance.includes("evidenceMissing"));
+check("empty-profile advice stays specific about leadership and academics", emptyGuidance.includes("leadershipMissing") && emptyGuidance.includes("academicIncomplete") && emptyGuidance.includes("testScoresMissing"));
 check("an empty profile lists the gaps", emptyCv.missing.length >= 4, `got ${emptyCv.missing.length}`);
-check("the name gap is named", emptyCv.missing.some((m) => /name/i.test(m)));
-check("the email gap is named", emptyCv.missing.some((m) => /email/i.test(m)));
-check("the GPA gap is named", emptyCv.missing.some((m) => /GPA/i.test(m)));
-check("a missing major is named", emptyCv.missing.some((m) => /major/i.test(m)));
+check("the name gap is keyed", emptyCv.missing.some((m) => m.key === "fullName"));
+check("the email gap is keyed", emptyCv.missing.some((m) => m.key === "email"));
+check("the GPA gap is keyed without claiming it is required", emptyCv.missing.some((m) => m.key === "gpa"));
+check("a missing major is keyed without claiming it is required", emptyCv.missing.some((m) => m.key === "targetMajor"));
+check("a missing test score is optional, not a universal requirement", emptyCv.missing.some((m) => m.key === "testScores"));
 check("a placeholder name is used, never a fabricated one", emptyCv.name === "Your Name");
 
 section("5. Structural advice");
 
-check("an empty CV warns that it is empty", buildCv(empty).warnings.some((w) => /CV is empty/i.test(w)));
+check("an empty CV warns with a stable issue key", buildCv(empty).warnings.some((w) => w.key === "empty"));
 check(
-  "a profile with no evidence is warned",
-  buildCv({ name: "X", gpa: 3.5, gpaScale: 4 }).warnings.some((w) => /No evidence section/i.test(w))
+  "a profile with no evidence gets a neutral, localized review key",
+  buildCv({ name: "X", gpa: 3.5, gpaScale: 4 }).warnings.some((w) => w.key === "noEvidence")
 );
-check("a profile with no leadership is warned", buildCv({ ...full, leadership: null }).warnings.some((w) => /No leadership role/i.test(w)));
+check(
+  "a profile with other activities is not warned for lacking a leadership title",
+  !buildCv({ ...full, leadership: null }).warnings.some((w) => w.key === "noActivities")
+);
+check(
+  "a profile with no activities gets a neutral prompt, not a leadership ranking",
+  buildCv({ name: "X", gpa: 3.5, gpaScale: 4 }).warnings.some((w) => w.key === "noActivities")
+);
 check("a full profile raises no warnings", cv.warnings.length === 0);
 
 // 30 extra projects = 44 entries. That still fits two pages, so the right
@@ -128,8 +146,8 @@ const bloated = buildCv({
 });
 check(
   "a list-like CV is warned about by volume",
-  bloated.warnings.some((w) => /is a list, not a CV/i.test(w)),
-  bloated.warnings.join(" | ")
+  bloated.warnings.some((w) => w.key === "manyEntries"),
+  bloated.warnings.map((w) => w.key).join(" | ")
 );
 check("the page estimate grows with content", bloated.estimatedPages > cv.estimatedPages);
 check("a normal CV is one page", cv.estimatedPages === 1, `got ${cv.estimatedPages}`);
@@ -141,10 +159,39 @@ const huge = buildCv({
   projects: JSON.stringify(Array.from({ length: 60 }, (_, i) => `Project ${i}`)),
   awards: JSON.stringify(Array.from({ length: 40 }, (_, i) => `Award ${i}`)),
 });
-check("a three-page CV is told to cut back", huge.warnings.some((w) => /cut to the strongest/i.test(w)));
+check("a long draft gets a target-specific length review prompt", huge.warnings.some((w) => w.key === "length"));
 check("and its page estimate says so", huge.estimatedPages > 2, `got ${huge.estimatedPages}`);
 
-section("6. Discrimination-risk fields");
+section("6. Localized and conditional guidance");
+
+const localizedByLocale = Object.fromEntries(
+  (["en", "uz", "ru"] as const).map((locale) => [locale, localizeCv(locale, emptyCv)])
+);
+check("English CV gaps are rendered from message keys", localizedByLocale.en.missing.includes("Full name"));
+check("Uzbek CV gaps are translated", localizedByLocale.uz.missing.includes("To‘liq ism-familiya"));
+check("Russian CV gaps are translated", localizedByLocale.ru.missing.includes("Полное имя"));
+check(
+  "test-score gaps say requirements vary instead of requiring every test",
+  localizedByLocale.en.missing.some((message) => /only if relevant or requested; requirements vary/i.test(message))
+);
+check(
+  "warning parameters are interpolated in the requested locale",
+  localizeCv("en", huge).warnings.some((message) => message.includes(String(huge.estimatedPages)))
+);
+const cvMessageFiles = Object.fromEntries(
+  (["en", "uz", "ru"] as const).map((locale) => [
+    locale,
+    JSON.parse(readFileSync(`src/i18n/messages/${locale}.json`, "utf8")).cvBuilder,
+  ])
+);
+check(
+  "CV copy avoids unsupported blanket claims about counts, leadership, page length and reader time",
+  !/two or three strongest|prioritize sustained responsibility over|usually easiest to scan|under two minutes per file|first thing a reader looks for|strongest two pages/i.test(
+    JSON.stringify(cvMessageFiles.en)
+  )
+);
+
+section("7. Discrimination-risk fields");
 
 check("the forbidden list is published", FORBIDDEN_ON_CV.length >= 5);
 check(
@@ -156,7 +203,7 @@ check(
   !/\bage\b|\bDOB\b/i.test(renderCvText(buildCv({ ...full })))
 );
 
-section("7. Determinism");
+section("8. Determinism");
 
 check("the same profile builds the same CV", JSON.stringify(buildCv(full)) === JSON.stringify(buildCv(full)));
 check("item count matches the sections", cv.totalItems === cv.sections.reduce((n, s) => n + s.items.length, 0));

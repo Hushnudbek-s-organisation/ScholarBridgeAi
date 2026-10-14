@@ -61,7 +61,9 @@
     "test:career-discovery": "tsx scripts/check-career-discovery.ts",
     "test:arrival": "tsx scripts/check-arrival.ts",
     "test:calculations": "tsx scripts/check-calculations.ts",
-    "test:streak": "tsx scripts/check-streak.ts"
+    "test:streak": "tsx scripts/check-streak.ts",
+    "test:responsive": "node scripts/check-responsive.mjs",
+    "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

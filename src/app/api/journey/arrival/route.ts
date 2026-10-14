@@ -32,7 +32,10 @@ export async function GET(req: Request) {
   const { profileId } = g.value;
   try {
     const [profile] = await db
-      .select({ needScholarship: studentProfiles.needScholarship })
+      .select({
+        needScholarship: studentProfiles.needScholarship,
+        needsFinancialAid: studentProfiles.needsFinancialAid,
+      })
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId))
       .limit(1);
@@ -47,7 +50,12 @@ export async function GET(req: Request) {
     const stage = Number(accepted?.n ?? 0) > 0 ? "accepted" : "apply";
     const plan = buildArrivalPlan({
       stage,
-      needScholarship: profile?.needScholarship ?? null,
+      needScholarship:
+        profile?.needsFinancialAid === true || profile?.needScholarship === true
+          ? true
+          : profile?.needsFinancialAid === false
+            ? false
+            : null,
     });
 
     const rows = await db

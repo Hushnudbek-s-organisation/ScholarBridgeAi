@@ -2,12 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useTheme, type ThemeChoice } from "@/components/ThemeProvider";
 
-const OPTIONS: { value: ThemeChoice; label: string; Icon: typeof Sun }[] = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "system", label: "System", Icon: Monitor },
-  { value: "dark", label: "Dark", Icon: Moon },
+const OPTIONS: { value: ThemeChoice; Icon: typeof Sun }[] = [
+  { value: "light", Icon: Sun },
+  { value: "system", Icon: Monitor },
+  { value: "dark", Icon: Moon },
 ];
 
 /**
@@ -19,14 +20,15 @@ const OPTIONS: { value: ThemeChoice; label: string; Icon: typeof Sun }[] = [
  */
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const { theme, setTheme } = useTheme();
+  const t = useTranslations("theme");
 
   return (
     <div
       className={`inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-100 p-0.5 ${className}`}
       role="radiogroup"
-      aria-label="Colour theme"
+      aria-label={t("label")}
     >
-      {OPTIONS.map(({ value, label, Icon }) => {
+      {OPTIONS.map(({ value, Icon }) => {
         const active = theme === value;
         return (
           <button
@@ -34,10 +36,10 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             type="button"
             role="radio"
             aria-checked={active}
-            aria-label={label}
-            title={label}
+            aria-label={t(value)}
+            title={t(value)}
             onClick={() => setTheme(value)}
-            className="relative grid h-7 w-7 place-items-center rounded-full text-slate-500 transition-colors hover:text-slate-900"
+            className="relative grid min-h-11 min-w-11 place-items-center rounded-full text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {active && (
               <motion.span
@@ -60,15 +62,17 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
  */
 export function ThemeSwitch({ className = "" }: { className?: string }) {
   const { resolvedTheme, toggleTheme } = useTheme();
+  const t = useTranslations("theme");
   const isDark = resolvedTheme === "dark";
+  const targetModeLabel = t(isDark ? "switchToLight" : "switchToDark");
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Light mode" : "Dark mode"}
-      className={`relative grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 ${className}`}
+      aria-label={targetModeLabel}
+      title={targetModeLabel}
+      className={`relative grid min-h-11 min-w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${className}`}
     >
       <AnimatePresence initial={false} mode="wait">
         <motion.span

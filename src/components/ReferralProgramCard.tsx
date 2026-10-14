@@ -174,16 +174,16 @@ export function ReferralProgramCard({ activeProfile }: ReferralProgramCardProps)
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1.5">
             {t("refYourLink")}
           </p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <Link2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span className="truncate font-mono text-[11px] font-bold text-slate-700">
+              <span className="min-w-0 break-all font-mono text-[11px] font-bold text-slate-700">
                 {status.link}
               </span>
             </div>
             <button
               onClick={copy}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-indigo-700"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? t("copied") : t("copy")}
@@ -214,8 +214,8 @@ export function ReferralProgramCard({ activeProfile }: ReferralProgramCardProps)
                   className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-700">{u.name}</p>
-                    <p className="truncate text-[10px] text-slate-400">{u.email}</p>
+                    <p className="break-words text-xs font-bold text-slate-700">{u.name}</p>
+                    <p className="break-all text-[10px] text-slate-400">{u.email}</p>
                   </div>
                   {u.isActive ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">

@@ -1,15 +1,15 @@
 /**
  * Personalized Roadmap — the "What should I do next?" brain (#4).
  *
- * The dashboard centrepiece is three actions, not a to-do list of forty. Picking
- * the right three is a deterministic decision: an overdue application deadline
- * always outranks "join a club", and a missing IELTS blocks everything else for
- * a student who needs an English test.
+ * The dashboard centrepiece is a short list of evidence-based next actions.
+ * Overdue tracked dates outrank routine planning. Test score gaps alone never
+ * create a recommendation: testing needs are programme-specific and may include
+ * alternatives or waivers.
  *
  * This module is pure — no DB, no AI, no clock reads — so the ordering can be
  * asserted in `scripts/check-roadmap.ts` and so the dashboard still gives real
  * advice when no AI provider is configured. The LLM only ever writes prose
- * around these three actions; it never decides them.
+ * around these grounded actions; it never decides them.
  */
 
 export type ActionUrgency = "critical" | "high" | "medium" | "low";
@@ -42,24 +42,16 @@ export interface ApplicationLike {
 }
 
 export interface NextActionsContext {
-  /** Injected so tests are deterministic. */
-  today: Date;
-  completeness: number; // 0–1
   deadlines: DeadlineLike[];
   applications: ApplicationLike[];
-  hasEnglishTest: boolean;
-  needsEnglishTest: boolean;
-  hasStandardizedTest: boolean;
-  requiresStandardizedTest: boolean;
-  hasEssay: boolean;
-  recommendationsRequested: boolean;
+  /** Application ids with an explicit recommender record. */
+  recommendationApplicationIds: number[];
   savedUniversityCount: number;
   savedScholarshipCount: number;
   openTaskCount: number;
   requiresFullScholarship: boolean;
   /** Submitted applications with no decision recorded yet. */
   submittedWithoutOutcome: number;
-  graduationYear?: number | null;
 }
 
 const urgencyFromScore = (score: number): ActionUrgency => {
@@ -68,14 +60,6 @@ const urgencyFromScore = (score: number): ActionUrgency => {
   if (score >= 30) return "medium";
   return "low";
 };
-
-/** Days until 1 June of the admission cycle before graduation. */
-function cycleStart(ctx: NextActionsContext): number | null {
-  if (!ctx.graduationYear) return null;
-  // Applications for a Fall intake open ~18 months before graduation.
-  const target = new Date(Date.UTC(ctx.graduationYear - 1, 8, 1)); // 1 Sep
-  return Math.round((target.getTime() - ctx.today.getTime()) / 86400000);
-}
 
 /**
  * Build every candidate action with a score. Sorted by score, ties broken by
@@ -89,105 +73,47 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
     actions.push({ ...a, urgency: a.urgency ?? urgencyFromScore(a.score) });
   };
 
-  // --- 1. Anything overdue or due within two weeks -----------------------
-  for (const d of ctx.deadlines) {
-    if (d.daysRemaining === null) continue;
-    if (d.daysRemaining > 14) continue;
-    const overdue = d.daysRemaining < 0;
+  // --- 1. Student-entered deadlines -------------------------------------
+  // Use the exact tracked dates, without generic preparation windows.
+  for (const deadline of ctx.deadlines) {
+    if (deadline.daysRemaining == null) continue;
+    const overdue = deadline.daysRemaining < 0;
+    const dueToday = deadline.daysRemaining === 0;
     push({
-      id: `deadline-${d.id}`,
+      id: `deadline-${deadline.id}`,
       title: overdue
-        ? `Overdue: ${d.title}`
-        : d.daysRemaining === 0
-          ? `Due today: ${d.title}`
-          : `Due in ${d.daysRemaining} day${d.daysRemaining === 1 ? "" : "s"}: ${d.title}`,
+        ? `Past tracked deadline: ${deadline.title}`
+        : dueToday
+          ? `Tracked deadline today: ${deadline.title}`
+          : `Tracked deadline: ${deadline.title}`,
       why: overdue
-        ? "This date has already passed — check whether a late or rolling option still exists, otherwise drop it and move on."
-        : d.daysRemaining === 0
-          ? "Due today. Nothing else on this list matters more."
-          : "Less than two weeks left. This is the only thing that should matter today.",
-      urgency: "critical",
-      target: d.type === "scholarship" ? "scholarships" : "deadlines",
-      score: overdue ? 100 : 98,
-      dueInDays: d.daysRemaining,
+        ? "This date in your tracker has passed. Check the official source to confirm whether submission is still possible, then update your record."
+        : dueToday
+          ? "Check the official portal’s cutoff time and time zone. If you have already submitted, update your tracker."
+          : "Confirm the cutoff, time zone, required materials and submission route with the official source; set any personal reminders that suit your situation.",
+      urgency: overdue || dueToday ? "critical" : "medium",
+      target: deadline.type === "scholarship" ? "scholarships" : "deadlines",
+      score: overdue ? 100 : dueToday ? 95 : 70,
+      dueInDays: deadline.daysRemaining,
     });
   }
 
-  // --- 2. Deadlines in the 15–45 day window ------------------------------
-  for (const d of ctx.deadlines) {
-    if (d.daysRemaining === null || d.daysRemaining <= 14 || d.daysRemaining > 45) continue;
-    push({
-      id: `deadline-${d.id}`,
-      title: `Prepare: ${d.title}`,
-      why: `${d.daysRemaining} days left — enough time, but recommendation letters and transcripts are the slow parts.`,
-      urgency: "high",
-      target: d.type === "scholarship" ? "scholarships" : "deadlines",
-      score: 70 - (d.daysRemaining - 15) * 0.3,
-      dueInDays: d.daysRemaining,
-    });
-  }
+  // --- 2. Programme requirement checks -----------------------------------
+  // Do not infer that English or standardized tests apply without programme-
+  // level requirement data. The Test Planner handles qualified catalogue clues.
 
-  // --- 3. Blockers: a missing required test stops every application ------
-  if (ctx.needsEnglishTest && !ctx.hasEnglishTest) {
-    push({
-      id: "book-english-test",
-      title: "Book your IELTS / TOEFL / Duolingo test",
-      why: "No English score on file. Test centres fill up and results take 2–3 weeks, so this blocks every application you plan to submit.",
-      target: "profile",
-      score: 88,
-      dueInDays: 21,
-    });
-  }
-  if (ctx.requiresStandardizedTest && !ctx.hasStandardizedTest) {
-    push({
-      id: "book-standardized-test",
-      title: "Register for the SAT / ACT / GRE",
-      why: "Some of your target programmes expect a standardized score. Registration closes weeks before the test date.",
-      target: "profile",
-      score: 74,
-      dueInDays: 45,
-    });
-  }
-
-  // --- 4. Profile too thin to advise on ---------------------------------
-  if (ctx.completeness < 0.5) {
-    push({
-      id: "complete-profile",
-      title: "Finish your profile",
-      why: `Only ${Math.round(ctx.completeness * 100)}% complete. Every estimate and recommendation gets sharper with each field you fill in.`,
-      target: "profile",
-      score: 84,
-      dueInDays: 7,
-    });
-  } else if (ctx.completeness < 0.8) {
-    push({
-      id: "complete-profile",
-      title: "Add the missing profile details",
-      why: `${Math.round(ctx.completeness * 100)}% complete — awards, leadership and a career goal are what separate a strong file from an average one.`,
-      target: "profile",
-      score: 45,
-      dueInDays: 14,
-    });
-  }
+  // --- 3. Profile information --------------------------------------------
+  // Optional profile fields are not treated as a completeness target.
 
   // --- 5. No shortlist yet ----------------------------------------------
   if (ctx.savedUniversityCount === 0 && ctx.applications.length === 0) {
     push({
       id: "build-shortlist",
-      title: "Build a balanced shortlist",
-      why: "No universities saved yet. Aim for 8–12: 2–3 reach, 4–5 target, 2–3 safety.",
+      title: "Start a programme shortlist",
+      why: "No universities are saved yet. Add options you would genuinely consider, then compare subject, current entry requirements, total cost, funding and deadlines. This tool cannot label admission odds.",
       target: "chancing",
       score: 80,
-      dueInDays: 14,
-    });
-  } else if (ctx.savedUniversityCount + ctx.applications.length < 6) {
-    push({
-      id: "balance-shortlist",
-      title: "Widen your shortlist",
-      why: `Only ${ctx.savedUniversityCount + ctx.applications.length} on your list. Six to twelve applications is what makes an offer likely.`,
-      target: "chancing",
-      score: 55,
-      dueInDays: 30,
+      dueInDays: null,
     });
   }
 
@@ -195,27 +121,32 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
   const inFlight = ctx.applications.filter(
     (a) => !["decision", "withdrawn"].includes(a.status)
   );
-  const needsEssay = inFlight.filter((a) => ["not_started", "preparing", "essay"].includes(a.status));
-  if (needsEssay.length > 0 && !ctx.hasEssay) {
-    const a = needsEssay[0];
+  const essayStage = inFlight.find((a) => a.status === "essay");
+  if (essayStage) {
     push({
-      id: `essay-${a.id}`,
-      title: `Draft your essay for ${a.universityName}`,
-      why: "The essay is the part of the application you fully control — and the part committees actually read. Start early; version 3 is the good one.",
+      id: `essay-${essayStage.id}`,
+      title: `Review the essay task for ${essayStage.universityName}`,
+      why: "Your tracker marks this application at the essay stage. Reopen the official prompt and word limit, then use your own verified experiences; requirements differ by programme.",
       target: "sop",
-      score: 78,
-      dueInDays: a.deadlineDaysRemaining ?? 30,
+      score: 68,
+      dueInDays: essayStage.deadlineDaysRemaining ?? null,
     });
   }
 
-  if (!ctx.recommendationsRequested && inFlight.length > 0) {
+  const recommendationsToVerify = inFlight.filter(
+    (application) => !ctx.recommendationApplicationIds.includes(application.id)
+  );
+  if (recommendationsToVerify.length > 0) {
+    const names = recommendationsToVerify.slice(0, 3).map((application) => application.universityName);
+    const more = recommendationsToVerify.length - names.length;
+    const namedApplications = `${names.join(", ")}${more > 0 ? `, and ${more} more` : ""}`;
     push({
-      id: "request-recommendations",
-      title: "Ask your recommenders now",
-      why: `${inFlight.length} application${inFlight.length === 1 ? "" : "s"} in progress with no recommendation letters requested. Teachers need 3–4 weeks minimum.`,
+      id: "check-recommendations",
+      title: "Check whether recommendations are requested",
+      why: `No recommender record is on file for ${namedApplications}. Review each official checklist; only if a letter is required, confirm submission instructions and the date with the recommender. Timing varies.`,
       target: "tasks",
-      score: 76,
-      dueInDays: 30,
+      score: 56,
+      dueInDays: null,
     });
   }
 
@@ -225,46 +156,34 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
     push({
       id: `start-${a.id}`,
       title: `Start your ${a.universityName} application`,
-      why: "Still not started. Open the portal, fill in the biographical sections and see the exact document list — that turns a vague task into small ones.",
+      why: "Your tracker marks this application as not started. Open the official portal to confirm the programme, current deadline and required materials, then record the next verified task.",
       target: "applications",
       score: 68,
-      dueInDays: a.deadlineDaysRemaining ?? 30,
+      dueInDays: a.deadlineDaysRemaining ?? null,
     });
   }
 
   // --- 7. Money ----------------------------------------------------------
-  if (ctx.requiresFullScholarship && ctx.savedScholarshipCount < 3) {
+  if (ctx.requiresFullScholarship && ctx.savedScholarshipCount === 0) {
     push({
       id: "scholarship-portfolio",
-      title: "Build a scholarship portfolio",
-      why: "You need a full scholarship but have under 3 saved. Apply to 10+ — scholarship deadlines are earlier than admission deadlines.",
+      title: "Review funding options against your need",
+      why: `A full-scholarship need is recorded, with ${ctx.savedScholarshipCount} option(s) saved. Compare eligibility, confirmed coverage, remaining costs and official deadlines; the number saved does not show whether funding is sufficient.`,
       target: "scholarships",
       score: 72,
-      dueInDays: 30,
+      dueInDays: null,
     });
   }
 
   // --- 8. Momentum / polish ---------------------------------------------
-  if (ctx.openTaskCount > 8) {
+  if (ctx.openTaskCount > 0) {
     push({
-      id: "clear-tasks",
-      title: "Clear your oldest open tasks",
-      why: `${ctx.openTaskCount} open milestones. Finishing three small ones this week beats staring at a long list.`,
+      id: "review-open-tasks",
+      title: `Review ${ctx.openTaskCount} open tracker task${ctx.openTaskCount === 1 ? "" : "s"}`,
+      why: "Check which tasks are still relevant, update stale entries and use verified due dates when deciding what to do next.",
       target: "tasks",
       score: 40,
-      dueInDays: 7,
-    });
-  }
-
-  const cycle = cycleStart(ctx);
-  if (cycle !== null && cycle > 240 && ctx.completeness >= 0.8 && ctx.applications.length === 0) {
-    push({
-      id: "build-profile-depth",
-      title: "Deepen your extracurriculars",
-      why: "Applications are far off — this is the cheapest time to build depth. One sustained leadership role beats five one-week activities.",
-      target: "profile",
-      score: 35,
-      dueInDays: 90,
+      dueInDays: null,
     });
   }
 
@@ -273,52 +192,31 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
     push({
       id: "report-outcomes",
       title: `Record the decision${ctx.submittedWithoutOutcome === 1 ? "" : "s"} for ${ctx.submittedWithoutOutcome} application${ctx.submittedWithoutOutcome === 1 ? "" : "s"}`,
-      why: "Your results are missing from the tracker. Recording them — including rejections — is what sharpens the estimates for you and for every student after you.",
+      why: "A decision is not recorded for these tracked applications. Recording the outcome keeps your own history accurate; any use of shared data is governed separately by your consent settings.",
       target: "applications",
       score: 58,
-      dueInDays: 7,
+      dueInDays: null,
     });
   }
 
-  // --- 10. Timing-dependent prep ----------------------------------------
-  const cycle2 = cycleStart(ctx);
-  if (cycle2 !== null && cycle2 > 0 && cycle2 <= 180 && ctx.applications.length === 0) {
+  // --- 10. Verified planning facts --------------------------------------
+  if (ctx.savedUniversityCount > 0 && ctx.applications.length === 0 && ctx.deadlines.length === 0) {
     push({
-      id: "visa-financial-prep",
-      title: "Start your visa and financial documents",
-      why: `Applications open in about ${Math.round(cycle2 / 30)} months. Translated transcripts, bank statements and the blocked-account paperwork are the slowest items on the list.`,
-      target: "tasks",
-      score: 48,
-      dueInDays: cycle2,
-    });
-  }
-  if (cycle2 !== null && cycle2 > 180 && ctx.applications.length === 0) {
-    push({
-      id: "plan-calendar",
-      title: "Plan your application calendar",
-      why: "You have time, which is exactly when deadlines get missed. Write down each programme's round and deadline now, while it costs nothing.",
+      id: "confirm-programme-deadlines",
+      title: "Confirm programme deadlines from official sources",
+      why: "No application or task deadline is recorded. For each saved programme, confirm the intake, application round and deadline on its official page for your applicant type, then add only verified dates.",
       target: "deadlines",
       score: 32,
-      dueInDays: 60,
+      dueInDays: null,
     });
   }
-
-  // --- 11. Standing maintenance -----------------------------------------
-  push({
-    id: "review-chances",
-    title: "Re-check your admission estimates",
-    why: "Estimates move as your profile changes and as other students apply. A five-minute review keeps your reach/target/safety split honest.",
-    target: "chancing",
-    score: 20,
-    dueInDays: null,
-  });
 
   // Safety net: the panel must never render empty.
   if (actions.length === 0) {
     push({
       id: "keep-going",
-      title: "Keep your profile current",
-      why: "Nothing is urgent right now. Add any new award, course or activity as it happens — admissions files are judged on the whole arc.",
+      title: "Review your saved programme information",
+      why: "No specific task is identified from the records currently available. If your plans change, update only verifiable details and confirm current programme information with official sources.",
       target: "profile",
       score: 10,
       dueInDays: null,
@@ -336,50 +234,41 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
 
 export interface NextActionsResult {
   actions: NextAction[];
-  /** Everything that did not make the top three, for the "show all" view. */
+  /** Everything that did not make the visible action limit, for the "show all" view. */
   rest: NextAction[];
   /** One-line framing sentence for the dashboard header. */
   headline: string;
   criticalCount: number;
 }
 
-/** The dashboard centrepiece: exactly three actions, in priority order. */
+/** The dashboard centrepiece: up to three supported actions, in priority order. */
 export function buildNextActions(ctx: NextActionsContext, limit = 3): NextActionsResult {
   const all = buildCandidateActions(ctx);
   const actions = all.slice(0, limit);
-  const criticalCount = all.filter((a) => a.urgency === "critical").length;
+  const criticalCount = all.filter((a) => a.dueInDays != null && a.dueInDays <= 0).length;
 
-  // "Needs you today" is only true for a date that has NOT passed. An overdue
-  // item is critical too, but calling it "today" hides the fact that the date
-  // is already gone — the headline must say which of the two it means.
-  const datedActions = all.filter((a) => typeof a.dueInDays === "number");
-  const overdueCount = datedActions.filter((a) => (a.dueInDays as number) < 0).length;
-  const dueNowCount = datedActions.filter((a) => {
-    const d = a.dueInDays as number;
-    return d >= 0 && d <= 14;
-  }).length;
+  const overdueCount = all.filter((action) => action.dueInDays != null && action.dueInDays < 0).length;
+  const dueTodayCount = all.filter((action) => action.dueInDays === 0).length;
+  const dated = all.filter((action) => action.dueInDays != null && action.dueInDays >= 0);
+  const nearest = dated.sort((a, b) => (a.dueInDays ?? Number.MAX_SAFE_INTEGER) - (b.dueInDays ?? Number.MAX_SAFE_INTEGER))[0];
 
   let headline: string;
-  if (overdueCount > 0 && dueNowCount > 0) {
-    headline = `${overdueCount} deadline${overdueCount === 1 ? "" : "s"} already passed and ${dueNowCount} ${
-      dueNowCount === 1 ? "needs" : "need"
-    } you within two weeks — clear the passed ones first.`;
+  if (overdueCount > 0 && dueTodayCount > 0) {
+    headline = `${overdueCount} tracked date${overdueCount === 1 ? " has" : "s have"} passed; ${dueTodayCount} ${dueTodayCount === 1 ? "is" : "are"} due today. Check the official sources and update your tracker.`;
   } else if (overdueCount > 0) {
-    headline =
-      overdueCount === 1
-        ? "One deadline has already passed — clear it or drop it first."
-        : `${overdueCount} deadlines have already passed — clear or drop them first.`;
-  } else if (criticalCount > 0) {
-    headline =
-      criticalCount === 1
-        ? "One deadline needs you today."
-        : `${criticalCount} deadlines need you today.`;
-  } else if (ctx.completeness < 0.5) {
-    headline = "Your profile is still thin — fill it in first, everything else gets better after.";
+    headline = overdueCount === 1
+      ? "One tracked date has passed. Confirm its current status with the official source."
+      : `${overdueCount} tracked dates have passed. Confirm their current status with the official sources.`;
+  } else if (dueTodayCount > 0) {
+    headline = dueTodayCount === 1
+      ? "One tracked date is due today. Check the official portal’s cutoff and time zone."
+      : `${dueTodayCount} tracked dates are due today. Check each official cutoff and time zone.`;
+  } else if (nearest) {
+    headline = `Your nearest tracked date is in ${nearest.dueInDays} day${nearest.dueInDays === 1 ? "" : "s"}. Verify its instructions with the official source.`;
   } else if (ctx.applications.length === 0) {
-    headline = "Nothing submitted yet. Here is the order that works.";
+    headline = "No applications are tracked yet. Add one when you choose a programme and want to track its instructions and dates.";
   } else {
-    headline = "You are on track. These three move you furthest this week.";
+    headline = "Review tracked applications and tasks against your current plans; requirements and dates vary by programme.";
   }
 
   return { actions, rest: all.slice(limit), headline, criticalCount };

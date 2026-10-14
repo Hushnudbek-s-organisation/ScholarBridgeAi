@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
+import { NAV_GROUP_I18N, type NavGroupId } from "@/lib/navSections";
 import {
   Award,
   BookOpen,
@@ -24,6 +25,8 @@ export interface PaletteItem {
   label: string;
   hint?: string;
   group?: string;
+  /** Hidden search synonyms; unlike hint/group, these are never rendered. */
+  searchTerms?: string;
   icon: React.ComponentType<{ className?: string }>;
   isNew?: boolean;
   premium?: boolean;
@@ -101,7 +104,7 @@ export function CommandPalette({
     const words = q.split(/\s+/);
     return all
       .map((it) => {
-        const hay = fold(`${it.label} ${it.hint ?? ""} ${it.id} ${it.group ?? ""}`);
+        const hay = fold(`${it.label} ${it.hint ?? ""} ${it.searchTerms ?? ""} ${it.id} ${it.group ?? ""}`);
         if (!words.every((w) => hay.includes(w))) return null;
         const score = it.entity ? -1 : fold(it.label).startsWith(q) ? 0 : fold(it.label).includes(q) ? 1 : 2;
         return { it, score };
@@ -135,7 +138,9 @@ export function CommandPalette({
                 id: `${r.kind}-${r.id}`,
                 label: r.title,
                 hint: r.subtitle,
-                group: r.group,
+                group: r.group && NAV_GROUP_I18N[r.group as NavGroupId]
+                  ? t(NAV_GROUP_I18N[r.group as NavGroupId] as never)
+                  : undefined,
                 icon: ENTITY_ICONS[r.kind] ?? Search,
                 entity: { kind: r.kind, tab: r.tab, id: r.id },
               }))
@@ -148,7 +153,7 @@ export function CommandPalette({
       }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [query, open, profileId]);
+  }, [query, open, profileId, t]);
 
   // Focus the input when opened. The parent remounts this component on every
   // open (key), so the query/cursor state always starts fresh.
@@ -171,7 +176,9 @@ export function CommandPalette({
   const chooseItem = (it: PaletteItem) => {
     if (it.entity) {
       window.dispatchEvent(
-        new CustomEvent("scholarbridge:focus-record", { detail: { kind: it.entity.kind, id: it.entity.id } })
+        new CustomEvent("scholarbridge:focus-record", {
+          detail: { kind: it.entity.kind, id: it.entity.id, title: it.label },
+        })
       );
     }
     onSelect(it.entity?.tab ?? it.id);

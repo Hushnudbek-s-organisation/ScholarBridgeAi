@@ -83,6 +83,8 @@ export interface HubProps {
   onSaveScholarship?: (scholarshipId: number) => Promise<void>;
   onUnsaveScholarship?: (scholarshipId: number) => Promise<void>;
   autoOpenUniversityId?: number | null;
+  /** Record selected in global search; the catalogue applies its own title filter. */
+  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
   onProfileSaved?: (profile: StudentProfile) => void;
   onOpenProfileModal?: (isNew?: boolean) => void;
 }
@@ -213,6 +215,7 @@ export function ScholarshipsHub({
   savedScholarshipIds,
   onSaveScholarship,
   onUnsaveScholarship,
+  autoFocusScholarship,
 }: HubProps) {
   const t = useTranslations("hubs");
   const td = useTranslations("disclaimers");
@@ -237,6 +240,7 @@ export function ScholarshipsHub({
           savedScholarshipIds={savedScholarshipIds ?? new Set<number>()}
           onSaveScholarship={onSaveScholarship ?? (async () => undefined)}
           onUnsaveScholarship={onUnsaveScholarship ?? (async () => undefined)}
+          autoFocusScholarship={autoFocusScholarship ?? null}
         />
       )}
       {active === "recommended" && (
@@ -297,7 +301,7 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
-      {active === "deadlines" && <DeadlineCenter profileId={profile.id} />}
+      {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} />}
     </HubPage>
   );
 }
@@ -517,8 +521,8 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
           <Gated
             profileId={profile.id}
             feature="ai_essay"
-            title="AI SOP & Essays is Premium"
-            description="Generate, evaluate and review your Statement of Purpose with AI — an exclusive Premium feature."
+            title={t("essayPremiumTitle")}
+            description={t("essayPremiumDescription")}
             onUpgrade={() => navigate("payments")}
           >
             <div className="space-y-4">
@@ -646,8 +650,8 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
       )}
       {active === "consulting" && (
         <div className="space-y-4">
-          <ConsultingSection activeProfile={profile} />
-          <MentorMarketplace activeProfile={profile} />
+          <ConsultingSection key={profile.id} activeProfile={profile} />
+          <MentorMarketplace key={profile.id} activeProfile={profile} />
         </div>
       )}
       {active === "faq" && <FaqSection />}

@@ -211,12 +211,12 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       </div>
 
       {/* Prompt Suggestions */}
-      <div className="p-3 bg-white border-t border-slate-100 flex overflow-x-auto gap-2 no-scrollbar">
+      <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-white p-3">
         {samplePrompts.map((prompt, i) => (
           <button
             key={i}
             onClick={() => handleSend(prompt)}
-            className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 text-xs text-slate-600 whitespace-nowrap transition-colors"
+            className="min-h-11 max-w-full rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
           >
             💡 {prompt}
           </button>

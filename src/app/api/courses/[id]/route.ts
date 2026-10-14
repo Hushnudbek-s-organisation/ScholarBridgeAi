@@ -33,7 +33,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     const fullAccess = await hasFeature(access.session.profile.id, "courses_full");
 
-    const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
+    const [course] = await db
+      .select()
+      .from(courses)
+      .where(and(eq(courses.id, courseId), eq(courses.isPublished, true)));
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }

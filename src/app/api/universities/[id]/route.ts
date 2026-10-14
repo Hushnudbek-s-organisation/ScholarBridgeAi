@@ -142,7 +142,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // public payload stays unpersonalised, exactly like GET /api/universities.
     let match: {
       score: number;
-      category: "Reach" | "Match" | "Safety";
       reasons: string[];
       issues: string[];
     } | null = null;
@@ -160,7 +159,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
             match = {
               score: result.matchScore,
-              category: result.matchCategory,
               reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
               issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
             };

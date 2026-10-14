@@ -14,12 +14,13 @@ import { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
 
 /**
- * Universal application tracker (#12) + the outcomes flywheel.
+ * Universal application tracker (#12) and private outcome history.
  *
  * Each row walks the real lifecycle (not started → preparing → essay →
  * documents → submitted → decision) and, once a decision arrives, the student
- * reports the result. Every result is stored — rejections included — and with
- * consent it also improves the chancing engine for everyone.
+ * may record the result. Sharing is unchecked by default and requires an
+ * explicit choice for each result; shared examples do not change fit scores or
+ * estimate admission chances.
  */
 
 const STATUSES: { value: string; chip: string }[] = [
@@ -88,7 +89,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
   const [reporting, setReporting] = useState<number | null>(null);
   const [result, setResult] = useState("accepted");
   const [scholarship, setScholarship] = useState("");
-  const [consent, setConsent] = useState(true);
+  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   // Analytics extras (spec §33): upcoming deadlines + scholarship matches.
   // Fetched, never hardcoded — null until the response arrives.
@@ -210,6 +211,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       if (!res.ok) throw new Error(data.error || t("resultError"));
       setReporting(null);
       setScholarship("");
+      setConsent(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("resultError"));
@@ -373,7 +375,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                         RESULT_STYLE[row.outcome.result] ?? "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {row.outcome.result}
+                      {t(`result.${row.outcome.result}`)}
                     </span>
                   )}
                 </div>
@@ -407,6 +409,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                     onClick={() => {
                       setReporting(row.id);
                       setResult("accepted");
+                      setConsent(false);
                     }}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                   >
@@ -457,12 +460,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             onChange={(e) => setScholarship(e.target.value)}
           />
 
-          <label className="mt-3 flex items-start gap-2 text-xs text-slate-600">
+          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2 text-xs leading-relaxed text-slate-700">
             <input
               type="checkbox"
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 h-4 w-4"
+              className="mt-0.5 h-6 w-6 shrink-0 accent-indigo-600"
             />
             <span>{t("consent")}</span>
           </label>
@@ -471,14 +474,14 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             <button
               onClick={() => void reportResult()}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {t("saveResult")}
             </button>
             <button
               onClick={() => setReporting(null)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+              className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
             >
               {t("cancel")}
             </button>

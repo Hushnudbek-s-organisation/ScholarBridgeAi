@@ -31,7 +31,6 @@ function section(title: string) {
 const sch = (over: Partial<ScholarshipInput> & { name: string }): ScholarshipInput => ({
   amountUsd: 10000,
   covers: "tuition",
-  probability: 0.5,
   deadlineDays: 60,
   ...over,
 });
@@ -46,12 +45,13 @@ const full = calculateCosts({
   booksPerYearUsd: 1000,
   flightsPerYearUsd: 1600,
   visaFeeUsd: 400,
+  applicationFeeUsd: 80,
   years: 4,
 });
 check("the annual total is the sum of the parts", full.annualTotalUsd === 30000 + 15000 + 1500 + 1000 + 1600);
 check(
   "the multi-year total adds the one-off visa fee once, not per year",
-  full.totalUsd === (30000 + 15000 + 1500 + 1000 + 1600) * 4 + 400,
+  full.totalUsd === (30000 + 15000 + 1500 + 1000 + 1600) * 4 + 480,
   `got ${full.totalUsd}`
 );
 check("every line is itemised", full.lines.length >= 5);
@@ -100,7 +100,8 @@ check(
   "accommodation IS added when no living figure exists",
   calculateCosts({ accommodationCostUsd: 8000, country: "Germany" }).lines.some((l) => l.key === "accommodation")
 );
-check("Germany's estimate mentions the blocked account", germany.unknowns.some((u) => /blocked account/i.test(u)));
+check("the estimate does not present destination-specific visa paperwork as universal", !germany.unknowns.some((u) => /blocked account/i.test(u)));
+check("unentered visa fees are excluded and flagged for official verification", germany.unknowns.some((u) => /Visa or residence-permit fees are not included.*official government guidance/i.test(u)));
 
 section("4. Year count is bounded");
 
@@ -113,12 +114,11 @@ const funded = calculateCosts({
   annualTuitionUsd: 30000,
   annualLivingEstUsd: 15000,
   years: 4,
-  scholarships: [sch({ name: "Full Ride", amountUsd: 45000, covers: "both", probability: 0.3 })],
+  scholarships: [sch({ name: "Full Ride", amountUsd: 45000, covers: "both" })],
   familyContributionUsd: 5000,
 });
 check("best-case aid is reported", funded.scholarship.bestCaseAnnualUsd === 45000);
-check("expected aid weights by probability", funded.scholarship.expectedAnnualUsd === 13500);
-check("nothing is called guaranteed", funded.scholarship.guaranteedAnnualUsd === 0);
+check("award totals are shown only as best-case values, not expectations", funded.scholarship.bestCaseAnnualUsd === 45000);
 check("coverage is a percentage of the annual cost", funded.scholarship.coveragePct > 0 && funded.scholarship.coveragePct <= 100);
 check("the net gap accounts for the family contribution", funded.net.gapAnnualUsd === Math.max(0, funded.net.annualAfterScholarshipUsd - 5000));
 
@@ -144,7 +144,7 @@ check("the verdict names the gap", unfunded.verdict.includes(unfunded.net.gapAnn
 const misaligned = calculateCosts({
   annualTuitionUsd: 40000,
   annualLivingEstUsd: 15000,
-  scholarships: [sch({ name: "Living Stipend", amountUsd: 12000, covers: "living", probability: 0.8 })],
+  scholarships: [sch({ name: "Living Stipend", amountUsd: 12000, covers: "living" })],
 });
 check(
   "a living stipend that cannot pay tuition is called out",
@@ -152,53 +152,28 @@ check(
   misaligned.scholarship.misaligned.join("|")
 );
 
-section("6. Scholarship portfolio");
+section("6. Scholarship review avoids unsupported counts and odds");
 
 const portfolio = assessPortfolio({
   scholarships: Array.from({ length: 9 }, (_, i) =>
-    sch({ name: `Award ${i}`, amountUsd: 5000, covers: "tuition", probability: 0.25, deadlineDays: 90 })
+    sch({ name: `Award ${i}`, amountUsd: 5000, covers: "tuition", deadlineDays: 90 })
   ),
-  // Shortfall is 8,000 against 11,250 expected, so this portfolio is genuinely
-  // healthy and should raise no advice at all.
-  annualCostUsd: 20000,
-  familyContributionUsd: 12000,
 });
-check("the portfolio counts entries", portfolio.count === 9);
-check("a diversified portfolio is rated good", portfolio.diversification === "good");
-check("expected funding is probability-weighted", portfolio.expectedAnnualUsd === 11250);
-check("the chance of at least one award exceeds any single one", portfolio.chanceOfAnyAwardPct != null && portfolio.chanceOfAnyAwardPct > 25);
-check("the chance of any award stays under 100", portfolio.chanceOfAnyAwardPct != null && portfolio.chanceOfAnyAwardPct < 100);
-check("a healthy portfolio raises no advice", portfolio.advice.length === 0);
+check("the portfolio counts saved records", portfolio.count === 9);
+check("saved awards are not treated as secured funding", portfolio.advice.some((item) => item.key === "unconfirmedAwards"));
+check("advice uses only evidence-based review items", portfolio.advice.every((item) => ["unconfirmedAwards", "missingAmounts", "deadlinesPassed", "deadlinesUpcoming", "noSavedAwards"].includes(item.key)));
 
-const thin = assessPortfolio({
-  scholarships: [sch({ name: "Fulbright", amountUsd: 40000, covers: "both", probability: 0.05 })],
-  annualCostUsd: 30000,
-  familyContributionUsd: 0,
-});
-check("one entry is rated risky", thin.diversification === "risky");
-check("a single flagship award is warned about", thin.advice.some((a) => /at least 8 scholarships/i.test(a)));
-check("an all-low-probability list is warned about", thin.advice.some((a) => /low-probability flagship/i.test(a)));
-check("a real shortfall is named", thin.advice.some((a) => /shortfall/i.test(a)));
+const oneSaved = assessPortfolio({ scholarships: [sch({ name: "Award", amountUsd: 40000, covers: "both" })] });
+check("a single saved award receives the same non-count-based guidance", JSON.stringify(portfolio.advice.map((item) => item.key)) === JSON.stringify(oneSaved.advice.map((item) => item.key)));
+check("no outcome probability is exposed", !("chanceOfAnyAwardPct" in portfolio) && !("expectedAnnualUsd" in portfolio));
 
-const imminent = assessPortfolio({
-  scholarships: [sch({ name: "Soon", deadlineDays: 10 }), sch({ name: "Later", deadlineDays: 200 })],
-  annualCostUsd: 20000,
-  familyContributionUsd: 20000,
+const deadlineReview = assessPortfolio({
+  scholarships: [sch({ name: "Soon", deadlineDays: 10 }), sch({ name: "Past", deadlineDays: -2 })],
 });
-check("an imminent deadline is surfaced", imminent.advice.some((a) => /inside 30 days/i.test(a)));
-check(
-  "no shortfall advice when the family covers everything",
-  !imminent.advice.some((a) => /shortfall/i.test(a))
-);
-check("an empty portfolio says where to start", assessPortfolio({ scholarships: [], annualCostUsd: 20000, familyContributionUsd: 0 }).advice.some((a) => /No scholarships yet/i.test(a)));
-
-const unknownOdds = assessPortfolio({
-  scholarships: [sch({ name: "Unmodelled award", amountUsd: 10000, probability: null })],
-  annualCostUsd: 30000,
-  familyContributionUsd: 0,
-});
-check("unknown award probability stays unavailable", unknownOdds.chanceOfAnyAwardPct === null && unknownOdds.expectedAnnualUsd === null);
-check("unknown award probability is explained", unknownOdds.advice.some((a) => /not available/i.test(a)));
+check("upcoming listed deadlines are surfaced for verification", deadlineReview.advice.some((item) => item.key === "deadlinesUpcoming" && item.count === 1));
+check("past listed deadlines prompt an official status check", deadlineReview.advice.some((item) => item.key === "deadlinesPassed" && item.count === 1));
+check("missing award amounts prompt provider verification", assessPortfolio({ scholarships: [sch({ name: "Unknown amount", amountUsd: 0 })] }).advice.some((item) => item.key === "missingAmounts"));
+check("an empty portfolio points to official catalogue information", assessPortfolio({ scholarships: [] }).advice.some((item) => item.key === "noSavedAwards"));
 
 const unknownFamily = calculateCosts({ annualTuitionUsd: 20000, annualLivingEstUsd: 10000, familyContributionUsd: null });
 check("missing family contribution stays explicitly unknown", unknownFamily.net.familyContributionKnown === false);

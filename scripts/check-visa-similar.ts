@@ -1,12 +1,12 @@
 /**
  * Deterministic checks for:
  *   #9  AI Visa Interview scoring (src/lib/visaScoring.ts)
- *   #10 Accepted-student / similar-profile matching (src/lib/similarProfiles.ts)
+ *   #10 Opt-in outcome examples (src/lib/similarProfiles.ts)
  *
  * The visa rubric must be computed from what the applicant actually said, and
  * the model's `estimated_visa_chance` must stay labelled as an opinion.
- * The matcher must never surface a row without consent, and must never present
- * a 2-row sample as a rate.
+ * Outcome examples must require explicit consent, ignore unknown values rather
+ * than treating them as negative, and never expose probability-like metrics.
  *
  * Run: npm run test:visa
  */
@@ -23,12 +23,11 @@ import {
 } from "../src/lib/visa-mic";
 import { readFileSync } from "node:fs";
 import {
-  englishToIelts,
   findSimilarProfiles,
   gpaTo4,
+  hasExplicitOutcomeShareConsent,
+  normalizeOutcomeResult,
   similarityScore,
-  stdToSat,
-  MIN_SAMPLE_FOR_SHARE,
   type OutcomeRecord,
   type ProfileVector,
 } from "../src/lib/similarProfiles";
@@ -156,42 +155,47 @@ const me: ProfileVector = {
   major: "Computer Science",
   country: "Uzbekistan",
   degreeLevel: "Bachelor",
-  activityCount: 6,
-  leadershipCount: 2,
-  awardCount: 2,
+
 };
 
 const outcome = (over: Partial<OutcomeRecord> & { universityName: string }): OutcomeRecord => ({
-  profile: { gpa4: 3.8, ielts: 7.5, sat: 1500, major: "Computer Science", country: "Uzbekistan", degreeLevel: "Bachelor", activityCount: 6 },
+  profile: { gpa4: 3.8, ielts: 7.5, sat: 1500, major: "Computer Science", country: "Uzbekistan", degreeLevel: "Bachelor" },
   result: "accepted",
   shareConsent: true,
   ...over,
 });
 
-section("#10.1 Consent is enforced");
+section("#10.1 Explicit consent and outcome validation");
+
+check("literal boolean true is explicit sharing consent", hasExplicitOutcomeShareConsent(true));
+check("the string true is not sharing consent", !hasExplicitOutcomeShareConsent("true"));
+check("false remains private", !hasExplicitOutcomeShareConsent(false));
+check("recognized outcome labels are normalized", normalizeOutcomeResult(" Accepted ") === "accepted");
+check("unknown or pending outcomes stay unknown", normalizeOutcomeResult("pending") === null);
+check("null outcomes stay unknown", normalizeOutcomeResult(null) === null);
 
 const noConsent = findSimilarProfiles(me, [
   outcome({ universityName: "Purdue", shareConsent: false }),
   outcome({ universityName: "TUM", shareConsent: false }),
 ]);
-check("rows without consent are never returned", noConsent.total === 0);
-check("and no percentage is computed from them", noConsent.acceptanceShare === null);
-check(
-  "the empty state explains how the data is built",
-  /opt in to share/i.test(noConsent.sampleNote)
-);
+check("rows without consent are never returned", noConsent.total === 0 && noConsent.matches.length === 0);
 
 const mixed = findSimilarProfiles(me, [
   outcome({ universityName: "Purdue", shareConsent: true, result: "accepted" }),
   outcome({ universityName: "Hidden", shareConsent: false, result: "accepted" }),
 ]);
 check("consented rows pass through", mixed.total === 1);
-check("non-consented rows are dropped", !mixed.matches.some((m) => m.universityName === "Hidden"));
+check("non-consented rows are dropped", !mixed.matches.some((match) => match.universityName === "Hidden"));
+check(
+  "unknown decisions are not fabricated as rejections",
+  findSimilarProfiles(me, [outcome({ universityName: "Pending", result: "pending" as OutcomeRecord["result"] })]).total === 0
+);
 
-section("#10.2 Similarity behaves");
+section("#10.2 Similarity uses only known, comparable fields");
 
 const identical = similarityScore(me, me);
-check("an identical profile scores 100", identical.score === 100, `got ${identical.score}`);
+check("an identical profile has full internal overlap", identical.score === 100, `got ${identical.score}`);
+check("the compared-field list is descriptive", identical.comparedFields.includes("major"));
 
 const distant = similarityScore(me, {
   gpa4: 2.4,
@@ -202,34 +206,55 @@ const distant = similarityScore(me, {
   degreeLevel: "Master",
 });
 check(
-  "a distant profile scores much lower",
+  "a distant profile ranks below an identical profile",
   distant.score < identical.score - 40,
   `${distant.score} vs ${identical.score}`
 );
-check("a close match explains why", identical.matchedOn.length >= 3);
-check("a match names the shared dimension", identical.matchedOn.some((m) => /same field of study/.test(m)));
+
+const sparse = similarityScore(me, { gpa4: 3.8, country: "Uzbekistan" });
+check(
+  "missing fields do not lower the score or appear as comparisons",
+  sparse.score === 100 && sparse.comparedFields.sort().join(",") === "country,gpa",
+  `${sparse.score}: ${sparse.comparedFields.join(",")}`
+);
+check(
+  "a single known field is not enough to label an outcome similar",
+  findSimilarProfiles(me, [outcome({ universityName: "One field", profile: { gpa4: 3.8 } })]).total === 0
+);
+check(
+  "zero GPA remains a comparable value when its scale was normalized",
+  similarityScore({ gpa4: 0, country: "Uzbekistan" }, { gpa4: 0, country: "Uzbekistan" }).score === 100
+);
+
+const unlikeTests = similarityScore(
+  { ielts: 7.5, sat: 1500 },
+  { toefl: 100, act: 32 }
+);
+check(
+  "different English or standardized tests are not cross-converted",
+  !unlikeTests.comparedFields.includes("englishTest") &&
+    !unlikeTests.comparedFields.includes("standardizedTest")
+);
 
 check(
-  "a closer profile outranks a farther one",
+  "a closer profile ranks above a farther profile",
   similarityScore(me, { gpa4: 3.75, major: "Computer Science", country: "Uzbekistan" }).score >
     similarityScore(me, { gpa4: 2.6, major: "Nursing", country: "Brazil" }).score
 );
-check(
-  "a missing value costs less than a wrong one",
-  similarityScore(me, { gpa4: 3.8, major: "Computer Science", country: "Uzbekistan" }).score >
-    similarityScore(me, { gpa4: 2.2, major: "Computer Science", country: "Uzbekistan" }).score
-);
 
-section("#10.3 Small samples never render as a rate");
+section("#10.3 Shared examples expose no probability-like aggregate");
 
 const tiny = findSimilarProfiles(me, [
   outcome({ universityName: "Purdue", result: "accepted" }),
-  outcome({ universityName: "TUM", result: "accepted" }),
+  outcome({ universityName: "TUM", result: "rejected" }),
 ]);
-check("two outcomes produce no percentage", tiny.acceptanceShare === null);
-check("two outcomes say so explicitly", /too few for a percentage/i.test(tiny.sampleNote));
-check("individual cases are still shown", tiny.matches.length === 2);
-check("accepts and rejects are both counted", tiny.accepted === 2 && tiny.rejected === 0);
+check("individual consented examples remain visible", tiny.total === 2 && tiny.matches.length === 2);
+check("each example retains its recorded decision", tiny.matches.map((match) => match.result).sort().join(",") === "accepted,rejected");
+check(
+  "no acceptance share, sample note, GPA position note, or public similarity score is returned",
+  Object.keys(tiny).sort().join(",") === "matches,total" &&
+    Object.keys(tiny.matches[0] ?? {}).sort().join(",") === "comparedFields,result,universityName"
+);
 
 const big = findSimilarProfiles(
   me,
@@ -240,40 +265,30 @@ const big = findSimilarProfiles(
     })
   )
 );
-check("12 outcomes produce a percentage", big.acceptanceShare === 67, `got ${big.acceptanceShare}`);
-check("the sample size is stated", /12 shared ScholarBridge outcomes/.test(big.sampleNote));
-check("rejections are included in the denominator", big.rejected === 4);
-check("the threshold is exported and used", MIN_SAMPLE_FOR_SHARE === 5);
+check("the full count is separate from the displayed page limit", big.total === 12 && big.matches.length === 10);
+check("the response returns examples rather than an outcome percentage", big.matches.every((match) => !("similarity" in match)));
+check("rejections remain visible among the historical examples", big.matches.some((match) => match.result === "rejected"));
 
-section("#10.4 Anonymity");
+section("#10.4 GPA normalization keeps unknown scale unknown");
 
-check(
-  "a summary shows a GPA band, never the exact GPA",
-  findSimilarProfiles(me, [outcome({ universityName: "Purdue", profile: { ...me, gpa4: 3.83 } })]).matches[0]
-    .summary.includes("3.7–4.0") &&
-    !findSimilarProfiles(me, [outcome({ universityName: "Purdue", profile: { ...me, gpa4: 3.83 } })]).matches[0]
-      .summary.includes("3.83")
-);
-check(
-  "a summary with no data does not fabricate any",
-  findSimilarProfiles(me, [outcome({ universityName: "X", profile: {} })]).matches.length === 0 ||
-    /not shared/i.test(
-      findSimilarProfiles(me, [outcome({ universityName: "X", profile: {}, shareConsent: true })]).matches[0]
-        ?.summary ?? ""
-    )
-);
-check("the position note compares to the group average", findSimilarProfiles(me, [outcome({ universityName: "A" }), outcome({ universityName: "B", profile: { gpa4: 3.4 } })]).positionNote.length > 10);
-
-section("#10.5 Normalisation");
-
-check("a 5.0-scale GPA converts to 4.0", Math.abs((gpaTo4(4.75, 5) ?? 0) - 3.8) < 0.01);
+check("a 5.0-scale GPA converts with its explicit scale", Math.abs((gpaTo4(4.75, 5) ?? 0) - 3.8) < 0.01);
 check("a 4.0-scale GPA passes through", gpaTo4(3.6, 4) === 3.6);
-check("a missing scale defaults to 4.0", gpaTo4(3.2, null) === 3.2);
-check("TOEFL converts to an IELTS band", Math.abs((englishToIelts({ toefl: 100 }) ?? 0) - 5) < 0.01);
-check("ACT converts to an SAT band", stdToSat({ act: 32 }) === 1460);
-check("missing scores return null", englishToIelts({}) === null && stdToSat({}) === null);
+check("a missing scale stays unknown", gpaTo4(3.2, null) === null);
+check("an invalid GPA above its stated scale stays unknown", gpaTo4(4.2, 4) === null);
+check("invalid or negative grading scales stay unknown", gpaTo4(3.2, 0) === null && gpaTo4(3.2, -5) === null);
 
-// ---------------------------------------------------------------------------
+const applicationCenterSource = readFileSync("src/components/ApplicationCenter.tsx", "utf8");
+const outcomeRouteSource = readFileSync("src/app/api/applications/outcome/route.ts", "utf8");
+const englishMessages = JSON.parse(readFileSync("src/i18n/messages/en.json", "utf8"));
+check("the result-sharing checkbox defaults unchecked", /const \[consent, setConsent\] = useState\(false\)/.test(applicationCenterSource));
+check("sharing is reset to opt-out for each newly reported result", /setConsent\(false\)/.test(applicationCenterSource));
+check("the write API requires literal boolean consent", /hasExplicitOutcomeShareConsent\(body\.shareConsent\)/.test(outcomeRouteSource));
+check(
+  "consent copy does not promise improved admission predictions",
+  !/improve ScholarBridge's admission predictions/i.test(englishMessages.applications.consent) &&
+    /do not change programme-fit scores/i.test(englishMessages.applications.consent)
+);
+
 section("#11 The interview microphone is never a dead end");
 
 // A browser that never fires onend on a SpeechSynthesisUtterance used to leave

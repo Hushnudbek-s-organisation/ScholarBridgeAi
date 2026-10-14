@@ -11,7 +11,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { studentActivities, type studentProfiles, type universities } from "@/db/schema";
-import type { ChancingProfile, ChancingUniversity } from "@/lib/chancing";
+import type { ChancingProfile } from "@/lib/chancing";
 import type { StudentProfileData, UniversityData } from "@/lib/matching";
 
 type ProfileRow = typeof studentProfiles.$inferSelect;
@@ -191,24 +191,5 @@ export function toUniversityData(row: UniversityMappingRow): UniversityData {
     highlights: row.highlights,
     websiteUrl: row.websiteUrl,
     imageUrl: row.imageUrl,
-  };
-}
-
-/** `universities` → the chancing engine's university shape. */
-export function toChancingUniversity(row: UniversityRow): ChancingUniversity {
-  return {
-    id: row.id,
-    name: row.name,
-    country: row.country,
-    worldRanking: row.worldRanking,
-    minGpa: row.minGpa,
-    minIelts: row.minIelts,
-    minSat: row.minSat,
-    degreeLevel: row.degreeLevel,
-    acceptanceRate: row.acceptanceRate,
-    programMajor: row.programMajor,
-    annualTuitionUsd: row.annualTuitionUsd,
-    annualLivingEstUsd: row.annualLivingEstUsd,
-    internationalStudentsPercentage: row.internationalStudentsPercentage,
   };
 }

@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { BadgeCheck, HeartHandshake, Info, Loader2, Minus, Plus, Search, Send, ShieldAlert, Sparkles } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 
-/**
- * Mentor Marketplace (Phase 4).
- *
- * A mentor is worth talking to because they walked the same path. So every card
- * states the concrete reasons it was suggested AND the ways it does not match —
- * a student who cannot see why a mentor appeared will not trust the
- * introduction, and a student who only sees the good match will be misled.
- */
+interface MentorMessage {
+  key: string;
+  values?: Record<string, string | number>;
+}
 
 interface MentorMatch {
   id: number;
@@ -28,6 +25,8 @@ interface MentorMatch {
   score: number;
   reasons: string[];
   gaps: string[];
+  reasonMessages: MentorMessage[];
+  gapMessages: MentorMessage[];
   verified: boolean;
   price: "free" | "paid" | "unknown";
 }
@@ -36,54 +35,66 @@ interface MentorResult {
   matches: MentorMatch[];
   filtered: { inactive: number; overBudget: number };
   note: string;
+  noteMessage: MentorMessage;
 }
 
-const PRICE_LABEL: Record<MentorMatch["price"], string> = {
-  free: "Free",
-  paid: "$/hr",
-  unknown: "Rate not set",
-};
-
 export function MentorMarketplace({ activeProfile }: { activeProfile: StudentProfile | null }) {
+  const t = useTranslations("mentorMarketplace");
+  const locale = useLocale();
   const [data, setData] = useState<MentorResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [maxRate, setMaxRate] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const [topic, setTopic] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<number[]>([]);
-  const [error, setError] = useState("");
+  const [requestError, setRequestError] = useState("");
+  const requestSequence = useRef(0);
+  const profileId = activeProfile?.id;
+
+  const text = (key: string, values?: Record<string, string | number>) => t(key as never, values as never);
+  const translateMessage = (message: MentorMessage | undefined) =>
+    message ? text(message.key, message.values) : t("explanationUnavailable");
 
   const load = useCallback(async () => {
-    if (!activeProfile?.id) {
+    const sequence = ++requestSequence.current;
+    if (!profileId) {
+      setData(null);
+      setLoadFailed(false);
       setLoading(false);
       return;
     }
     setLoading(true);
-    setError("");
+    setLoadFailed(false);
+    setData(null);
     try {
-      const params = new URLSearchParams({ profileId: String(activeProfile.id) });
-      if (maxRate) params.set("maxRate", maxRate);
+      const params = new URLSearchParams({ profileId: String(profileId) });
+      if (maxRate !== "") params.set("maxRate", maxRate);
       const res = await fetch(`/api/mentors?${params.toString()}`, { credentials: "include" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Could not load mentors");
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load mentors");
+      if (!res.ok || !Array.isArray(json.matches)) throw new Error("mentor-load");
+      if (requestSequence.current === sequence) setData(json as MentorResult);
+    } catch {
+      if (requestSequence.current === sequence) setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (requestSequence.current === sequence) setLoading(false);
     }
-  }, [activeProfile?.id, maxRate]);
+  }, [profileId, maxRate]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      requestSequence.current += 1;
+    };
   }, [load]);
 
   const request = async (mentorId: number) => {
     if (!activeProfile?.id || !topic.trim()) return;
     setSending(true);
-    setError("");
+    setRequestError("");
     try {
       const res = await fetch("/api/mentors", {
         method: "POST",
@@ -91,14 +102,16 @@ export function MentorMarketplace({ activeProfile }: { activeProfile: StudentPro
         credentials: "include",
         body: JSON.stringify({ profileId: activeProfile.id, mentorId, topic: topic.trim(), message }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Could not send the request");
-      setSent((s) => [...s, mentorId]);
+      if (!res.ok) {
+        setRequestError(res.status === 409 ? t("requestAlreadyPending") : t("requestError"));
+        return;
+      }
+      setSent((current) => current.includes(mentorId) ? current : [...current, mentorId]);
       setOpenId(null);
       setTopic("");
       setMessage("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send the request");
+    } catch {
+      setRequestError(t("requestError"));
     } finally {
       setSending(false);
     }
@@ -106,187 +119,196 @@ export function MentorMarketplace({ activeProfile }: { activeProfile: StudentPro
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
         <div className="flex items-start gap-3">
-          <HeartHandshake className="mt-0.5 h-5 w-5 text-indigo-600" />
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Mentor marketplace</h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              Sorted by how closely each mentor&apos;s path matches yours — the same university, the same
-              scholarship, the same country. Not by price, and not by who paid to be listed.
-            </p>
+          <HeartHandshake className="mt-0.5 h-5 w-5 shrink-0 text-indigo-700" aria-hidden="true" />
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-slate-900">{t("title")}</h2>
+            <p className="mt-1 max-w-3xl break-words text-sm text-slate-700">{t("intro")}</p>
+            <p className="mt-1 max-w-3xl break-words text-xs text-slate-600">{t("pathScoreNote")}</p>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-600">Max hourly rate (USD)</span>
+        <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="min-w-0 text-xs sm:w-48">
+            <span className="mb-1 block font-medium text-slate-700">{t("maxRate")}</span>
             <input
               type="number"
+              inputMode="decimal"
               min={0}
+              step="any"
               value={maxRate}
               onChange={(e) => setMaxRate(e.target.value)}
-              placeholder="Any"
-              className="w-32 rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+              placeholder={t("anyRate")}
+              className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600"
             />
           </label>
           <button
+            type="button"
             onClick={() => void load()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
+            disabled={!activeProfile}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
-            <Search className="h-3.5 w-3.5" /> Search
+            <Search className="h-4 w-4" aria-hidden="true" /> {t("search")}
           </button>
-          {maxRate && (
-            <p className="text-xs text-slate-500">
-              Free sessions always stay visible, whatever ceiling you set.
-            </p>
+          {maxRate !== "" && (
+            <p className="break-words text-xs text-slate-700 sm:flex-1">{t("freeVisible")}</p>
           )}
         </div>
 
-        {error && <p className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-800">{error}</p>}
-        {data && (
-          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">{data.note}</p>
+        {data && data.matches.length > 0 && (
+          <p className="mt-3 break-words rounded-lg bg-slate-50 p-3 text-sm text-slate-700" role="status">
+            {translateMessage(data.noteMessage)}
+          </p>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Finding mentors who walked your path…
+      {!activeProfile ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-700">{t("noProfile")}</div>
+      ) : loading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-700" role="status" aria-live="polite">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> {t("loading")}
         </div>
-      ) : !activeProfile ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          Select a profile to see mentors matched to it.
-        </div>
+      ) : loadFailed ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-700">{t("loadError")}</div>
       ) : data && data.matches.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          No mentors match this profile yet. The marketplace grows as students who have been
-          through it sign up — your own profile can become a listing once you enrol.
-        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-700">{t("noMatches")}</div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {data?.matches.map((m) => {
             const isOpen = openId === m.id;
             const alreadySent = sent.includes(m.id);
+            const rate = m.hourlyRateUsd == null ? null : Number(m.hourlyRateUsd);
+            const price = m.price === "free"
+              ? t("free")
+              : m.price === "paid" && rate !== null
+                ? t("hourlyRate", { amount: rate.toLocaleString(locale, { maximumFractionDigits: 2 }) })
+                : t("unknownRate");
             return (
-              <div
+              <article
                 key={m.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-200"
+                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 sm:p-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-base font-semibold text-slate-900">{m.displayName}</span>
+                      <span className="break-words text-base font-semibold text-slate-900">{m.displayName}</span>
                       {m.verified ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          <BadgeCheck className="h-3.5 w-3.5" /> Verified
+                        <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-emerald-50 px-2 text-xs font-medium text-emerald-800">
+                          <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> {t("verified")}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          <ShieldAlert className="h-3.5 w-3.5" /> Not verified
+                        <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-amber-50 px-2 text-xs font-medium text-amber-900">
+                          <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" /> {t("notVerified")}
                         </span>
                       )}
                     </div>
-                    {m.headline && <p className="mt-0.5 text-sm text-slate-600">{m.headline}</p>}
-                    <p className="mt-1 text-xs text-slate-500">
-                      {[m.university, m.program, m.country].filter(Boolean).join(" · ")}
-                    </p>
+                    {m.headline && <p className="mt-0.5 break-words text-sm text-slate-700">{m.headline}</p>}
+                    {[m.university, m.program, m.country].some(Boolean) && (
+                      <p className="mt-1 break-words text-xs text-slate-600">
+                        {[m.university, m.program, m.country].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-sm font-semibold text-indigo-800">
-                      <Sparkles className="h-3.5 w-3.5" /> {m.score}%
+                  <div className="shrink-0 text-right">
+                    <div
+                      className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-sm font-semibold text-indigo-900"
+                      aria-label={t("pathOverlap", { score: m.score })}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> {t("pathOverlap", { score: m.score })}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {m.price === "paid"
-                        ? `$${m.hourlyRateUsd}/hr`
-                        : PRICE_LABEL[m.price]}
-                    </p>
+                    <p className="mt-1 text-xs text-slate-700">{price}</p>
                   </div>
                 </div>
 
                 <div className="mt-3 space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Why this mentor
-                  </p>
-                  {m.reasons.map((r, i) => (
-                    <p key={i} className="flex gap-1.5 text-xs text-emerald-800">
-                      <Plus className="mt-0.5 h-3 w-3 shrink-0 text-emerald-600" /> {r}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("why")}</p>
+                  {(m.reasonMessages ?? []).map((reason, i) => (
+                    <p key={`${reason.key}-${i}`} className="flex gap-1.5 break-words text-xs text-emerald-900">
+                      <Plus className="mt-0.5 h-3 w-3 shrink-0 text-emerald-700" aria-hidden="true" />
+                      <span>{translateMessage(reason)}</span>
                     </p>
                   ))}
                 </div>
 
-                {m.gaps.length > 0 && (
+                {(m.gapMessages ?? []).length > 0 && (
                   <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Where it does not match
-                    </p>
-                    {m.gaps.map((g, i) => (
-                      <p key={i} className="flex gap-1.5 text-xs text-amber-800">
-                        <Minus className="mt-0.5 h-3 w-3 shrink-0 text-amber-600" /> {g}
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("gaps")}</p>
+                    {m.gapMessages.map((gap, i) => (
+                      <p key={`${gap.key}-${i}`} className="flex gap-1.5 break-words text-xs text-amber-900">
+                        <Minus className="mt-0.5 h-3 w-3 shrink-0 text-amber-700" aria-hidden="true" />
+                        <span>{translateMessage(gap)}</span>
                       </p>
                     ))}
                   </div>
                 )}
 
                 {alreadySent ? (
-                  <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">
-                    Request sent. The mentor will reply through ScholarBridge — no contact details are
-                    exchanged until they accept.
+                  <p className="mt-4 break-words rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status" aria-live="polite">
+                    {t("requestSaved")}
                   </p>
                 ) : isOpen ? (
-                  <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+                  <form
+                    onSubmit={(event) => { event.preventDefault(); void request(m.id); }}
+                    className="mt-4 space-y-2 border-t border-slate-100 pt-3"
+                  >
+                    {requestError && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800" role="alert">{requestError}</p>}
+                    <label className="sr-only" htmlFor={`mentor-topic-${m.id}`}>{t("topicPlaceholder")}</label>
                     <input
+                      id={`mentor-topic-${m.id}`}
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
-                      placeholder="What do you want to ask about?"
+                      placeholder={t("topicPlaceholder")}
                       maxLength={200}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                      required
+                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600"
                     />
+                    <label className="sr-only" htmlFor={`mentor-message-${m.id}`}>{t("messagePlaceholder")}</label>
                     <textarea
+                      id={`mentor-message-${m.id}`}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="One or two sentences of context (optional)"
+                      placeholder={t("messagePlaceholder")}
                       maxLength={2000}
                       rows={3}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <button
-                        onClick={() => void request(m.id)}
+                        type="submit"
                         disabled={!topic.trim() || sending}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                       >
-                        {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                        Request an introduction
+                        {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+                        {sending ? t("sending") : t("requestIntroduction")}
                       </button>
                       <button
-                        onClick={() => setOpenId(null)}
-                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600"
+                        type="button"
+                        onClick={() => { setOpenId(null); setRequestError(""); }}
+                        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 sm:w-auto"
                       >
-                        Cancel
+                        {t("cancel")}
                       </button>
                     </div>
-                  </div>
+                  </form>
                 ) : (
                   <button
-                    onClick={() => setOpenId(m.id)}
-                    className="mt-4 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-indigo-200"
+                    type="button"
+                    onClick={() => { setOpenId(m.id); setRequestError(""); }}
+                    className="mt-4 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700 sm:w-auto"
                   >
-                    Ask this mentor something
+                    {t("ask")}
                   </button>
                 )}
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-      <div className="flex gap-2 rounded-xl border border-sky-100 bg-sky-50/60 p-4 text-xs text-sky-900">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
-        <p>
-          A mentor is a person, not an authority. Verified means ScholarBridge confirmed they study
-          where they say they do — it does not mean their advice is right for you. Take it as
-          experience, and check anything factual against the university&apos;s own page.
-        </p>
+      <div className="flex gap-2 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-800" aria-hidden="true" />
+        <p className="break-words">{t("adviceCaveat")}</p>
       </div>
     </div>
   );

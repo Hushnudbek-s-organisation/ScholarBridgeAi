@@ -104,8 +104,9 @@ In the **Render dashboard** (not in this repository) verify:
 
 ## 4. Activate the gate (exact first-run steps)
 
-1. Push the branch: `git push origin <branch>` and open the PR (this session
-   is fixed to `arena/01a0f72c-scholarbridgeai`).
+1. Push the session branch only after authorization:
+   `git push origin arena/fbee4986-scholarbridgeai`, then open a PR from that
+   branch. The branch name is fixed by the Arena session.
 2. Watch the first Actions run for the PR — it must not have run before, so
    this is the genuine first signal. If a step fails for environmental
    reasons (e.g. `npm ci` network), re-run from the failed step; if it fails

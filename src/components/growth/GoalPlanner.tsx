@@ -233,7 +233,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                     <Icon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-slate-500">{pillarLabel(p)}</p>
+                    <p className="break-words text-[11px] font-bold text-slate-500">{pillarLabel(p)}</p>
                     <p className="text-lg font-black leading-none text-slate-900">{n}</p>
                   </div>
                 </div>

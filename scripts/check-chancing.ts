@@ -1,408 +1,132 @@
 /**
- * Deterministic checks for the chancing engine (src/lib/chancing.ts).
- *
- * The engine must stay pure — no DB, no network — so this runs anywhere and
- * pins the behaviour the product promises:
- *   1. Fit score and admission estimate stay SEPARATE numbers.
- *   2. Estimates are bounded, monotonic in profile strength, and always ship
- *      sub-scores + a "Why?" list + a disclaimer.
- *   3. ScholarBridge's own consented outcomes move the estimate (accepted up,
- *      rejected down) and flip the reported data basis.
- *   4. Missing data lowers confidence and says so, instead of inventing scores.
+ * Regression checks for profile-data handling and student-facing probability
+ * policy. Programme fit and admission probability are deliberately separate:
+ * there is no validated admission-probability methodology in ScholarBridge.
  *
  * Run: npm run test:chancing
  */
 
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
+  ADMISSION_PROBABILITY,
   analyzeExtracurriculars,
-  bandFor,
-  baselineProbability,
-  estimateAdmissionChance,
-  majorSimilarity,
+  countActivities,
   normalizedGpa,
   parseListColumn,
-  profileCompletenessRatio,
   profileStrength,
-  rangeFor,
   type ChancingProfile,
-  type ChancingUniversity,
 } from "../src/lib/chancing";
+import { ADVISOR_SYSTEM_PROMPT } from "../src/lib/advisor";
 
 let passed = 0;
-let failed = 0;
-
-function check(name: string, condition: boolean, detail = "") {
-  if (condition) {
+const failures: string[] = [];
+function check(name: string, fn: () => void) {
+  try {
+    fn();
     passed++;
     console.log(`  ✓ ${name}`);
-  } else {
-    failed++;
-    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
+  } catch (error) {
+    failures.push(`${name} — ${(error as Error).message}`);
+    console.log(`  ✗ ${name} — ${(error as Error).message}`);
   }
 }
 
-function section(title: string) {
-  console.log(`\n${title}`);
-}
+const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-const strongProfile: ChancingProfile = {
-  gpa: 3.9,
-  gpaScale: 4.0,
-  ieltsScore: 7.5,
-  satScore: 1520,
-  country: "Uzbekistan",
-  targetMajor: "Computer Science",
+const profile: ChancingProfile = {
+  gpa: 3.8,
+  gpaScale: 4,
   degreeLevel: "Bachelor",
-  leadership: '["Student Council Vice President", "Robotics Club President"]',
-  volunteering: '["Red Crescent volunteer, 3 years"]',
-  clubs: '["Debate club", "Chess club"]',
-  researchExperience: '["NLP research assistant, 1 year"]',
-  olympiads: '["National Math Olympiad — 2nd place"]',
-  awards: '["Presidential scholarship"]',
-  budgetAnnualUsd: 45000,
-  careerGoal: "ML engineer in healthcare",
-  graduationYear: 2027,
-};
-
-const weakProfile: ChancingProfile = {
-  gpa: 2.6,
-  gpaScale: 4.0,
+  targetMajor: "Computer Science",
   country: "Uzbekistan",
+  ieltsScore: 7.5,
+  projects: '["Course project"]',
+  leadership: '["Club coordinator"]',
+  researchExperience: '["Research assistant"]',
+  awards: '["Verified regional award"]',
+  savedActivities: [{ category: "competition", role: "Participant", achievements: "Finalist" }],
 };
 
-const ivy: ChancingUniversity = {
-  id: 1,
-  name: "Ivy Selective University",
-  country: "USA",
-  worldRanking: 5,
-  minGpa: 3.8,
-  minIelts: 7.5,
-  minSat: 1500,
-  acceptanceRate: 5,
-  programMajor: "Computer Science",
-  annualTuitionUsd: 60000,
-  internationalStudentsPercentage: 15,
-};
-
-const stateUni: ChancingUniversity = {
-  id: 2,
-  name: "Open State University",
-  country: "USA",
-  worldRanking: 400,
-  minGpa: 2.8,
-  minIelts: 6.0,
-  acceptanceRate: 82,
-  programMajor: "Computer Science",
-  annualTuitionUsd: 20000,
-  internationalStudentsPercentage: 12,
-};
-
-/** Mid-selective — the estimate lands mid-range, so outcomes can move it both ways. */
-const midUni: ChancingUniversity = {
-  id: 4,
-  name: "Mid Selective University",
-  country: "USA",
-  worldRanking: 120,
-  minGpa: 3.4,
-  minIelts: 6.5,
-  acceptanceRate: 22,
-  programMajor: "Computer Science",
-  annualTuitionUsd: 38000,
-  internationalStudentsPercentage: 18,
-};
-
-const noRateUni: ChancingUniversity = {
-  id: 3,
-  name: "Unranked Regional Institute",
-  country: "Poland",
-  worldRanking: null,
-  acceptanceRate: null,
-  programMajor: "Business Administration",
-};
-
-// ---------------------------------------------------------------------------
-section("1. Helpers");
-
-check("parseListColumn reads a JSON array", parseListColumn('["a","b"]').length === 2);
-check("parseListColumn reads comma-separated legacy text", parseListColumn("a, b").length === 2);
-check("parseListColumn tolerates null", parseListColumn(null).length === 0);
-check("normalizedGpa keeps a 4.0-scale GPA", normalizedGpa({ gpa: 3.9, gpaScale: 4.0 }) === 3.9);
-check(
-  "normalizedGpa converts a 5.0-scale GPA down",
-  Math.abs((normalizedGpa({ gpa: 4.75, gpaScale: 5.0 }) ?? 0) - 3.8) < 0.01,
-  `got ${normalizedGpa({ gpa: 4.75, gpaScale: 5.0 })}`
-);
-check("normalizedGpa returns null when no GPA", normalizedGpa({}) === null);
-check("majorSimilarity is 1 for identical majors", majorSimilarity("Computer Science", "Computer Science") === 1);
-check(
-  "majorSimilarity is lower for unrelated majors",
-  majorSimilarity("Computer Science", "Nursing") < majorSimilarity("Computer Science", "Computer Engineering")
-);
-
-section("2. Bands and ranges");
-
-check("bandFor: 70% is safety", bandFor(70).band === "safety");
-check("bandFor: 40% is target", bandFor(40).band === "target");
-check("bandFor: 20% is reach", bandFor(20).band === "reach");
-check("bandFor: 5% is long-reach", bandFor(5).band === "long-reach");
-
-const wide = rangeFor(30, 30);
-const narrow = rangeFor(30, 90);
-check("rangeFor brackets the point estimate", wide.low <= 30 && wide.high >= 30);
-check(
-  "rangeFor narrows as confidence rises",
-  narrow.high - narrow.low < wide.high - wide.low,
-  `narrow=${narrow.high - narrow.low} wide=${wide.high - wide.low}`
-);
-check("rangeFor stays inside 1–99", wide.low >= 1 && wide.high <= 99);
-
-section("3. Baseline probability");
-
-check("published acceptance rate wins", baselineProbability(ivy).source === "acceptance-rate");
-check("published rate maps to 0.05", baselineProbability(ivy).p === 0.05);
-check("missing rate falls back to the ranking tier", baselineProbability(noRateUni).source === "ranking-tier");
-check(
-  "a top-25 school is a harder baseline than a 400-ranked one",
-  baselineProbability(ivy).p < baselineProbability(stateUni).p
-);
-
-section("4. Fit and admission stay separate");
-
-const ivyStrong = estimateAdmissionChance(strongProfile, ivy, { fitScore: 78 });
-check("fit score is passed through untouched", ivyStrong.fitScore === 78);
-check(
-  "fit score is NOT reused as the admission estimate",
-  ivyStrong.admission.mid !== ivyStrong.fitScore,
-  `fit=${ivyStrong.fitScore} admission=${ivyStrong.admission.mid}`
-);
-check("estimate without a fit score still computes", estimateAdmissionChance(strongProfile, ivy).fitScore === null);
-
-section("5. Estimates behave sensibly");
-
-check("admission estimate is a percentage", ivyStrong.admission.mid >= 1 && ivyStrong.admission.mid <= 95);
-check(
-  "the range brackets the mid estimate",
-  ivyStrong.admission.low <= ivyStrong.admission.mid && ivyStrong.admission.mid <= ivyStrong.admission.high
-);
-check(
-  "a stronger profile beats a weaker one at the same university",
-  estimateAdmissionChance(strongProfile, stateUni).admission.mid >
-    estimateAdmissionChance(weakProfile, stateUni).admission.mid
-);
-check(
-  "the same strong profile scores lower at the Ivy than at the open state uni",
-  estimateAdmissionChance(strongProfile, ivy).admission.mid <
-    estimateAdmissionChance(strongProfile, stateUni).admission.mid
-);
-check("weak profile at an Ivy is a long reach", estimateAdmissionChance(weakProfile, ivy).admission.band === "long-reach");
-
-const subScores = Object.values(ivyStrong.subScores);
-check("all six sub-scores are returned", subScores.length === 6);
-check("sub-scores stay in 0–100", subScores.every((v) => v >= 0 && v <= 100));
-check("a 'Why?' list is produced", ivyStrong.positives.length + ivyStrong.negatives.length > 0);
-check("confidence is reported", ivyStrong.confidence >= 0 && ivyStrong.confidence <= 100);
-check("a disclaimer always ships", ivyStrong.disclaimer.length > 10);
-
-section("6. Missing data is honest, not invented");
-
-const sparse = estimateAdmissionChance({}, noRateUni);
-check("empty profile → low confidence", sparse.confidence < 40, `confidence=${sparse.confidence}`);
-check(
-  "empty profile warns that the baseline is a ranking-tier guess",
-  sparse.negatives.some((n) => /acceptance rate/i.test(n))
-);
-check("empty profile asks for the missing GPA", sparse.negatives.some((n) => /gpa/i.test(n)));
-check(
-  "a complete profile is more confident than an empty one",
-  estimateAdmissionChance(strongProfile, stateUni).confidence > sparse.confidence
-);
-
-section("7. ScholarBridge's own outcomes move the number");
-
-const withAccepts = estimateAdmissionChance(strongProfile, midUni, {
-  outcomes: { accepted: 18, rejected: 2, waitlisted: 0, deferred: 0 },
+console.log("\nProfile data helpers");
+check("parseListColumn reads JSON arrays", () => assert.equal(parseListColumn('["a","b"]').length, 2));
+check("parseListColumn reads legacy comma-separated text", () => assert.deepEqual(parseListColumn("a, b"), ["a", "b"]));
+check("parseListColumn treats null as no recorded items", () => assert.deepEqual(parseListColumn(null), []));
+check("normalizedGpa preserves a 4.0-scale value", () => assert.equal(normalizedGpa(profile), 3.8));
+check("normalizedGpa converts an explicitly scaled value", () => {
+  assert.ok(Math.abs((normalizedGpa({ gpa: 4.5, gpaScale: 5 }) ?? 0) - 3.6) < 0.01);
 });
-const withRejects = estimateAdmissionChance(strongProfile, midUni, {
-  outcomes: { accepted: 1, rejected: 19, waitlisted: 0, deferred: 0 },
+check("normalizedGpa does not guess an unscaled value above 4", () => assert.equal(normalizedGpa({ gpa: 85 }), null));
+check("countActivities counts recorded entries, not a merit score", () => {
+  const counts = countActivities(profile);
+  assert.equal(counts.activities, 2);
+  assert.equal(counts.leadership, 1);
+  assert.equal(counts.research, 1);
+  assert.equal(counts.awards, 2);
 });
-const noOutcomes = estimateAdmissionChance(strongProfile, midUni);
-
-check("mostly-accepted outcomes push the estimate up", withAccepts.admission.mid > noOutcomes.admission.mid);
-check("mostly-rejected outcomes push the estimate down", withRejects.admission.mid < noOutcomes.admission.mid);
-check("rejections are used, not discarded", withRejects.admission.mid < withAccepts.admission.mid);
-check("sample size is reported", withAccepts.sampleSize === 20);
-check("data basis flips away from public-only", withAccepts.dataBasis !== "public-estimate");
-check(
-  "more outcomes raise confidence",
-  withAccepts.confidence > noOutcomes.confidence,
-  `${withAccepts.confidence} vs ${noOutcomes.confidence}`
-);
-
-const tinySample = estimateAdmissionChance(strongProfile, midUni, {
-  outcomes: { accepted: 2, rejected: 1, waitlisted: 0, deferred: 0 },
+check("activity analysis exposes counts only", () => {
+  const result = analyzeExtracurriculars(profile);
+  assert.deepEqual(Object.keys(result).sort(), ["activities", "awards", "leadership", "research"]);
 });
-check(
-  "fewer than 5 outcomes are ignored (no wild swings)",
-  tinySample.dataBasis === "public-estimate" && tinySample.sampleSize === 0
-);
 
-section("8. Profile completeness and strength");
+console.log("\nProfile-information coverage");
+check("an empty profile marks every section unknown", () => {
+  const result = profileStrength({});
+  assert.equal(result.overall, 0);
+  assert.equal(result.scoredSections, 0);
+  assert.ok(result.sections.every((section) => section.unknown));
+});
+check("coverage reports how many sections contained data", () => {
+  const result = profileStrength({ gpa: 3.8, gpaScale: 4, degreeLevel: "Bachelor" });
+  assert.equal(result.scoredSections, 1);
+  assert.equal(result.totalSections, 8);
+  assert.equal(result.sections.find((section) => section.key === "academics")?.score, 100);
+});
+check("an absent test is unknown rather than a zero or requirement", () => {
+  const result = profileStrength({ gpa: 3.8, gpaScale: 4, degreeLevel: "Bachelor" });
+  const tests = result.sections.find((section) => section.key === "tests");
+  assert.equal(tests?.unknown, true);
+  assert.ok(tests?.missing?.includes("testPolicy"));
+});
+check("English-only and standardized-test-only records are both recorded without ranking them", () => {
+  const english = profileStrength({ ieltsScore: 8 }).sections.find((section) => section.key === "tests");
+  const standardized = profileStrength({ satScore: 1500 }).sections.find((section) => section.key === "tests");
+  assert.equal(english?.score, 100);
+  assert.equal(standardized?.score, 100);
+});
+check("coverage explains that it is not eligibility or admission likelihood", () => {
+  assert.match(profileStrength(profile).basis, /does not measure eligibility.*admission likelihood/i);
+});
 
-check("empty profile completeness is 0", profileCompletenessRatio({}) === 0);
-check("complete profile completeness is 1", profileCompletenessRatio(strongProfile) === 1);
-check(
-  "completeness is monotonic",
-  profileCompletenessRatio(strongProfile) > profileCompletenessRatio({ gpa: 3.9, gpaScale: 4 })
-);
+console.log("\nAdmission probability policy");
+check("admission probability is explicitly unavailable", () => {
+  assert.equal(ADMISSION_PROBABILITY.available, false);
+  assert.equal(ADMISSION_PROBABILITY.reason, "no-validated-methodology");
+});
+check("AI advisor permits fit percentages only and separates them from odds", () => {
+  assert.match(ADVISOR_SYSTEM_PROMPT, /only percentages.*university-fit/i);
+  assert.match(ADVISOR_SYSTEM_PROMPT, /FIT IS NOT ADMISSION PROBABILITY/);
+});
+const chancingRoute = read("src/app/api/chancing/route.ts");
+check("chancing API returns availability metadata without spreading an estimate", () => {
+  assert.match(chancingRoute, /probability: ADMISSION_PROBABILITY/);
+  assert.doesNotMatch(chancingRoute, /\.\.\.estimate/);
+  assert.doesNotMatch(chancingRoute, /admission:\s*estimate\.admission/);
+});
+const planningRoute = read("src/app/api/planning/route.ts");
+check("planning API does not return an admission estimate", () => {
+  assert.doesNotMatch(planningRoute, /admissionEstimate/);
+  assert.match(planningRoute, /probability: ADMISSION_PROBABILITY/);
+});
+const profileReport = read("src/lib/profileReportFallback.ts");
+check("fallback report has no readiness/completeness score logic", () => {
+  assert.doesNotMatch(profileReport, /facts\.readiness|f\.readiness|completeness:\s*\d/);
+});
+const evaluationRoute = read("src/app/api/ai/evaluate-profile/route.ts");
+check("profile evaluation does not inject a readiness score into the prompt", () => {
+  assert.doesNotMatch(evaluationRoute, /Readiness score|Profile completeness|strength\.completeness/);
+});
 
-const strength = profileStrength(strongProfile, { essayScore: 84 });
-check("strength reports 8 sections", strength.sections.length === 8);
-check("strength scores stay in 0–100", strength.sections.every((s) => s.score >= 0 && s.score <= 100));
-check("the essay score is reflected", strength.sections.find((s) => s.key === "essays")?.score === 84);
-check(
-  "a stronger profile has a higher overall score",
-  profileStrength(strongProfile).overall > profileStrength(weakProfile).overall
-);
-
-// Precision additions: every dimension carries the evidence behind it, and a
-// real zero is counted while "no data" is excluded from the average.
-check(
-  "every section reports how much evidence it stands on",
-  strength.sections.every((s) => typeof s.coverage === "number" && s.coverage >= 0 && s.coverage <= 1)
-);
-check(
-  "every section reports the unrounded value next to the rounded one",
-  strength.sections.every((s) => typeof s.scorePrecise === "number" && Math.abs(s.scorePrecise - s.score) < 1)
-);
-check(
-  "a profile with no data has every dimension unknown and no invented overall",
-  profileStrength({}).sections.every((s) => s.unknown === true) && profileStrength({}).overall === 0
-);
-check(
-  "the overall is the average of the measured dimensions only",
-  (() => {
-    const s = profileStrength(strongProfile);
-    const measured = s.sections.filter((x) => !x.unknown);
-    const expected = measured.reduce((sum, x) => sum + x.scorePrecise, 0) / measured.length;
-    return measured.length > 0 && Math.abs(s.overallPrecise - Math.round(expected * 10) / 10) < 0.11;
-  })(),
-  String(profileStrength(strongProfile).overallPrecise)
-);
-check(
-  "a recorded activity list with no awards scores awards 0 (a real zero, kept in the average)",
-  (() => {
-    const s = profileStrength({ ...strongProfile, awards: null, olympiads: null, certificates: null, competitions: null });
-    const awards = s.sections.find((x) => x.key === "awards");
-    return awards != null && awards.unknown === false && awards.score === 0;
-  })()
-);
-check(
-  "with no activity record at all the same dimensions are unknown, not zero",
-  (() => {
-    const s = profileStrength({ gpa: 3.9, gpaScale: 4, ieltsScore: 7.5 });
-    const awards = s.sections.find((x) => x.key === "awards");
-    const research = s.sections.find((x) => x.key === "research");
-    return awards?.unknown === true && research?.unknown === true;
-  })()
-);
-check(
-  "an unscaled GPA above 4 is unknown — never a clamped perfect 4.0",
-  (() => {
-    const s = profileStrength({ gpa: 85, gpaScale: null });
-    const academics = s.sections.find((x) => x.key === "academics");
-    return academics?.unknown === true && (academics?.missing.length ?? 0) > 0;
-  })()
-);
-check(
-  "English-only and SAT-only students are no longer both capped at 50/100",
-  (() => {
-    const englishOnly = profileStrength({ gpa: 3.8, gpaScale: 4, ieltsScore: 8 }).sections.find((s) => s.key === "tests");
-    const satOnly = profileStrength({ gpa: 3.8, gpaScale: 4, satScore: 1500 }).sections.find((s) => s.key === "tests");
-    return (englishOnly?.scorePrecise ?? 0) > 90 && (satOnly?.scorePrecise ?? 0) > 90;
-  })()
-);
-check(
-  "the strength payload states how the overall was built",
-  /Averaged over \d+ of \d+/.test(profileStrength(strongProfile).basis)
-);
-
-const analysis = analyzeExtracurriculars(weakProfile);
-check("extracurricular analysis returns suggestions for a thin profile", analysis.suggestions.length >= 3);
-check(
-  "a strong profile gets no remedial suggestions",
-  analyzeExtracurriculars(strongProfile).suggestions.length <= 1
-);
-check(
-  "extracurricular scores expose their unrounded values",
-  (() => {
-    const a = analyzeExtracurriculars(strongProfile);
-    return (
-      Math.abs(a.precise.leadership - a.leadership) < 1 &&
-      Math.abs(a.precise.impact - a.impact) < 1 &&
-      a.precise.impact >= a.impact - 0.5
-    );
-  })()
-);
-
-// ---------------------------------------------------------------------------
-// 6. Student-facing probability policy (2026-10)
-// ---------------------------------------------------------------------------
-// An admission probability may only be shown to students once the project
-// has a validated methodology AND sufficient outcome data. That does not
-// exist yet, so the student-facing surface must expose the dimension as
-// "unavailable" and never the numeric range. Static source checks (no server
-// required) pin that the routes/lib do not leak the engine's range.
-// ---------------------------------------------------------------------------
-
-section("6. Student-facing probability policy (2026-10)");
-
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-
-const chancingRoute = src("src/app/api/chancing/route.ts");
-check(
-  "GET /api/chancing returns the availability object",
-  chancingRoute.includes("probability: ADMISSION_PROBABILITY")
-);
-check(
-  "GET /api/chancing does not spread the engine result (no range leak)",
-  !chancingRoute.includes("...estimate")
-);
-check(
-  "GET /api/chancing never exposes estimate.admission",
-  !/\badmission:\s*estimate\.admission\b/.test(chancingRoute)
-);
-
-const planningRoute = src("src/app/api/planning/route.ts");
-check("planning comparison has no admission-estimate row", !planningRoute.includes("admissionEstimate"));
-check("planning response carries the availability object", planningRoute.includes("probability: ADMISSION_PROBABILITY"));
-
-const advisor = src("src/lib/advisor.ts");
-check("AI brief states admission probability is unavailable", advisor.includes("Admission probability: UNAVAILABLE"));
-check(
-  "AI brief no longer injects the numeric range",
-  !advisor.includes("admission estimate ${c.admission.low}")
-);
-check(
-  "reply guard rejects probability-framed percentages",
-  /framed a percentage as an admission probability/.test(advisor)
-);
-const promptMatch = advisor.match(/ADVISOR_SYSTEM_PROMPT = `([\s\S]*?)`;/);
-check(
-  "system prompt forbids stating/implying an admission probability",
-  Boolean(promptMatch && /never state or imply a\s+probability of admission/i.test(promptMatch[1]))
-);
-check("rules advice uses fit tiers, not reach/target/safety bands", !/admission\.band/.test(advisor));
-
-const advisorRoute = src("src/app/api/ai/admissions-advisor/route.ts");
-check("advisor response has no low/high/band fields", !/low:\s*c\.admission\.low/.test(advisorRoute));
-check("advisor response carries the availability object", advisorRoute.includes("probability: ADMISSION_PROBABILITY"));
-
-// ---------------------------------------------------------------------------
-console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
-process.exitCode = failed === 0 ? 0 : 1;
+console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);
+if (failures.length) process.exitCode = 1;

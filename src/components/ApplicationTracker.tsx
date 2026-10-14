@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import confetti from "canvas-confetti";
 import { StudentProfile } from "./Navbar";
 import { University } from "./UniversityExplorer";
@@ -23,7 +24,6 @@ export interface SavedUniversityItem {
   id: number;
   profileId: number;
   universityId: number;
-  matchCategory: string;
   matchScore: number;
   status: string;
   notes: string;
@@ -58,6 +58,7 @@ export function ApplicationTracker({
   onUpdateSavedScholarshipStatus,
   onRemoveSavedScholarship,
 }: ApplicationTrackerProps) {
+  const tUniversity = useTranslations("university");
   const [activeSubTab, setActiveTab] = useState<"universities" | "scholarships">("universities");
   const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
   const [tempNotes, setTempNotes] = useState("");
@@ -156,7 +157,7 @@ export function ApplicationTracker({
                         <span className="text-lg">{u.flagEmoji}</span>
                         <h3 className="font-bold text-base text-slate-900">{u.name}</h3>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          {item.matchScore}% Match ({item.matchCategory})
+                          {tUniversity("exMatchPct", { score: item.matchScore })}
                         </span>
                       </div>
 

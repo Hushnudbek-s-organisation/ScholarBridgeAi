@@ -57,7 +57,6 @@ export interface University {
   websiteUrl: string | null;
   imageUrl: string | null;
   matchScore?: number | null;
-  matchCategory?: "Reach" | "Match" | "Safety" | null;
   matchReasons?: string[];
   matchIssues?: string[];
   /** Unclamped total before the display clamp (one decimal). */
@@ -286,7 +285,7 @@ export function UniversityExplorer({
   return (
     <div className="space-y-6">
       {/* Search & Filter Header */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -301,7 +300,7 @@ export function UniversityExplorer({
           {compareIds.length > 0 && (
             <button
               onClick={openCompareModal}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-xl text-xs shadow-md hover:shadow-indigo-200 transition-all"
+              className="flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
             >
               <Columns className="h-4 w-4" />
               {t("exCompareSelected", { count: compareIds.length })}
@@ -319,7 +318,7 @@ export function UniversityExplorer({
               placeholder={t("exSearchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="min-h-11 w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
 
@@ -328,7 +327,8 @@ export function UniversityExplorer({
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+              aria-label={t("exCountryAll")}
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="All">{t("exCountryAll")}</option>
               {UNIVERSITY_FILTER_COUNTRIES.map((country) => {
@@ -350,7 +350,7 @@ export function UniversityExplorer({
               onChange={(e) => setSelectedLevel(e.target.value)}
               disabled={Boolean(lockedLevel)}
               aria-label={t("exLevelAria")}
-              className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 sm:text-sm"
             >
               {(!lockedLevel || lockedLevel === "All") && <option value="All">{t("exLevelAll")}</option>}
               <option value="Bachelor">🎓 <DegreeLevelLabel value="Bachelor" /></option>
@@ -368,7 +368,8 @@ export function UniversityExplorer({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+              aria-label={t("exSortRank")}
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="rank">{t("exSortRank")}</option>
               <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
@@ -380,10 +381,11 @@ export function UniversityExplorer({
           {/* Max Tuition Slider */}
           <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col justify-center">
             <div className="flex justify-between items-center text-[11px] font-semibold text-slate-700">
-              <span>{t("exMaxTuition")}</span>
+              <label htmlFor="university-max-tuition">{t("exMaxTuition")}</label>
               <span className="text-indigo-600 font-bold">${formatNumber(maxTuition, { placeholder: "0", suffix: "/yr" })}</span>
             </div>
             <input
+              id="university-max-tuition"
               type="range"
               min="5000"
               max="70000"
@@ -420,7 +422,7 @@ export function UniversityExplorer({
           <p className="text-[11px] text-slate-600 break-all">{fetchError}</p>
           <button
             onClick={fetchUniversities}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+            className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
           >
             {t("exTryAgain")}
           </button>
@@ -435,12 +437,7 @@ export function UniversityExplorer({
             const isSaved = savedUniIds.has(uni.id);
             const isCompared = compareIds.includes(uni.id);
 
-            let matchBadgeColor = "bg-blue-100 text-blue-800 border-blue-200";
-            if (uni.matchCategory === "Safety") {
-              matchBadgeColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
-            } else if (uni.matchCategory === "Reach") {
-              matchBadgeColor = "bg-purple-100 text-purple-800 border-purple-200";
-            }
+            const matchBadgeColor = "bg-blue-100 text-blue-800 border-blue-200";
 
             let highlightsList: string[] = [];
             try {
@@ -475,7 +472,7 @@ export function UniversityExplorer({
                   {/* Match Score Badge */}
                   <div className="absolute top-3 left-3 flex items-center gap-1.5">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
-                      {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")} • {uni.matchCategory ?? "—"}
+                      {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
                   </div>
 
@@ -491,7 +488,7 @@ export function UniversityExplorer({
                       <span>{uni.flagEmoji}</span>
                       <span>{uni.city}, {uni.country}</span>
                     </div>
-                    <h3 className="font-bold text-base leading-tight drop-shadow-xs line-clamp-1">{uni.name}</h3>
+                    <h3 className="break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
                   </div>
                 </div>
 
@@ -499,7 +496,7 @@ export function UniversityExplorer({
                 <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                   <div>
                     {/* Major & Program */}
-                    <div className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 mb-2 inline-block">
+                    <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
                       {uni.programMajor}
                     </div>
 
@@ -507,7 +504,7 @@ export function UniversityExplorer({
                       <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
                     </p>
 
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                    <p className="break-words text-xs leading-relaxed text-slate-600">
                       {uni.description}
                     </p>
 
@@ -582,7 +579,7 @@ export function UniversityExplorer({
                         href={uni.sourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
+                        className="inline-flex min-h-11 items-center gap-1 text-slate-500 transition-colors hover:text-indigo-600"
                       >
                         <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
                       </a>
@@ -599,8 +596,8 @@ export function UniversityExplorer({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between gap-2 pt-2">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                    <label className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 px-2 text-xs text-slate-600">
                       <input
                         type="checkbox"
                         checked={isCompared}
@@ -610,12 +607,12 @@ export function UniversityExplorer({
                       <span>{t("exCompare")}</span>
                     </label>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <a
                         href={uni.websiteUrl ?? undefined}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl transition-colors"
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
                         title={t("exVisitPortal")}
                       >
                         <ExternalLink className="h-4 w-4" />
@@ -623,7 +620,7 @@ export function UniversityExplorer({
 
                       <button
                         onClick={() => setSelectedUniId(uni.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors"
+                        className="flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         {t("exViewUniversity")}
@@ -632,7 +629,7 @@ export function UniversityExplorer({
                       {isSaved ? (
                         <button
                           onClick={() => onUnsaveUniversity(uni.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
+                          className="flex min-h-11 items-center gap-1 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
                         >
                           <Check className="h-3.5 w-3.5" />
                           {t("exSaved")}
@@ -640,7 +637,7 @@ export function UniversityExplorer({
                       ) : (
                         <button
                           onClick={() => onSaveUniversity(uni.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors"
+                          className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           {t("exShortlist")}
@@ -683,7 +680,7 @@ export function UniversityExplorer({
               </h3>
               <button
                 onClick={() => setShowCompareModal(false)}
-                className="p-1 hover:bg-white/10 rounded-lg text-white"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-white/10"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -719,7 +716,7 @@ export function UniversityExplorer({
                   <tr>
                     <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
-                      <td key={u.id} className="py-2.5 px-4 font-bold text-emerald-600">{u.matchScore != null ? `${u.matchScore}%` : "—"} ({u.matchCategory ?? "—"})</td>
+                      <td key={u.id} className="py-2.5 px-4 font-bold text-blue-700">{u.matchScore != null ? t("exMatchPct", { score: u.matchScore }) : t("exMatchUnavailable")}</td>
                     ))}
                   </tr>
                   <tr>

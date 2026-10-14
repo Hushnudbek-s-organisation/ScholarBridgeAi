@@ -62,7 +62,7 @@ export function ReferralShareCard({ code, link: rawLink, onApplyCode }: Referral
             </div>
             <button
               onClick={() => copy(code, "code")}
-              className="p-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white transition-colors hover:bg-indigo-700"
             >
               {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </button>
@@ -71,13 +71,13 @@ export function ReferralShareCard({ code, link: rawLink, onApplyCode }: Referral
 
         <div>
           <p className="text-[10px] text-slate-400 font-semibold uppercase mb-1">{t("referralLink")}</p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 truncate">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1 break-all rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-mono text-slate-600">
               {link}
             </div>
             <button
               onClick={() => copy(link, "link")}
-              className="p-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white transition-colors hover:bg-emerald-700"
             >
               {copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
             </button>

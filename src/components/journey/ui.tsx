@@ -386,7 +386,7 @@ export function StatTile({
     <>
       <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
         {icon}
-        <span className="truncate">{label}</span>
+        <span className="break-words whitespace-normal">{label}</span>
       </div>
       <p className={`mt-1 text-2xl font-extrabold tabular-nums ${valueTones[state]}`}>
         {typeof value === "number" ? (

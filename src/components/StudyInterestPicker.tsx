@@ -271,14 +271,14 @@ export function StudyInterestPicker({
                         : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
                   }`}
                 >
-                  <div className="flex items-start gap-1.5">
+                  <div className="flex min-w-0 items-start gap-1.5">
                     <button
                       type="button"
                       aria-pressed={selectedBroad}
                       aria-label={t(selectedBroad ? "deselectArea" : "selectArea", { area: areaLabel })}
                       disabled={areaDisabled}
                       onClick={() => toggleArea(area.id)}
-                      className={`${buttonBase} min-h-[46px] flex-1 border-0 bg-transparent px-2 py-2 font-semibold text-slate-800 hover:bg-white/70 enabled:active:bg-indigo-100 dark:text-slate-100 dark:hover:bg-slate-800/80 dark:enabled:active:bg-indigo-950`}
+                      className={`${buttonBase} min-h-[46px] min-w-0 flex-1 border-0 bg-transparent px-2 py-2 font-semibold text-slate-800 hover:bg-white/70 enabled:active:bg-indigo-100 dark:text-slate-100 dark:hover:bg-slate-800/80 dark:enabled:active:bg-indigo-950`}
                     >
                       <span className="flex items-start gap-2">
                         <span
@@ -427,14 +427,14 @@ export function StudyInterestPicker({
       {selectedLabels.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label={t("selectedLabel")}>
           {selectedLabels.map(({ selection, label }, index) => (
-            <li key={`${selection.kind}-${index}`} className="inline-flex max-w-full items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1.5 text-xs font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200">
-              <span className="max-w-[17rem] truncate">{label}</span>
+            <li key={`${selection.kind}-${index}`} className="flex min-h-11 max-w-full min-w-0 items-center gap-1 rounded-2xl border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1.5 text-xs font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200">
+              <span className="min-w-0 flex-1 break-words whitespace-normal leading-snug">{label}</span>
               <button
                 type="button"
                 onClick={() => removeSelection(selection)}
                 disabled={disabled}
                 aria-label={t("removeSelection", { label })}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-indigo-900"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-indigo-900"
               >
                 <X aria-hidden="true" className="h-3.5 w-3.5" />
               </button>

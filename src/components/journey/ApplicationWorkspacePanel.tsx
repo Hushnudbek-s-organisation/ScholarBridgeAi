@@ -74,7 +74,7 @@ interface WorkspaceData {
   offer: { status: string; decidedAt: string | null } | null;
   submissionChecklist: { key: string; label: string; ok: boolean }[];
   readyToSubmit: boolean;
-  reversePlan: { key: string; title: string; date: string; daysBefore: number; tab: string }[];
+  reversePlan: { key: string; title: string; date: null; daysBefore: null; tab: string }[];
 }
 
 const SECTION_ORDER = ["academic", "english", "testing", "documents", "essays", "recommendations", "finance", "application"];
@@ -228,7 +228,7 @@ export function ApplicationWorkspacePanel({
                   className="w-full rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:border-indigo-700"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    <span className="min-w-0 break-words text-sm font-semibold text-slate-900 dark:text-white">
                       {w.universityName || t("awUniversityFallback")}
                     </span>
                     {w.submittedAt ? (
@@ -237,12 +237,12 @@ export function ApplicationWorkspacePanel({
                       <Pill tone={toneForDays(daysTo(w.deadline))}>{daysTo(w.deadline)}d</Pill>
                     ) : null}
                   </div>
-                  {w.programName && <p className="text-[11px] text-slate-500">{w.programName}</p>}
+                  {w.programName && <p className="break-words text-[11px] text-slate-500">{w.programName}</p>}
                   <div className="mt-2">
                     <ProgressBar pct={w.progressPct} size="sm" tone={w.progressPct >= 100 ? "good" : "brand"} />
                   </div>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {w.submittedAt ? t("recStatusSubmitted") : `${w.done}/${w.total} requirements done`}
+                    {w.submittedAt ? t("recStatusSubmitted") : t("awReqsDone", { done: w.done, total: w.total })}
                   </p>
                 </button>
               </li>
@@ -274,24 +274,24 @@ export function ApplicationWorkspacePanel({
               className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-3 w-3" />{t("awAllWorkspaces")}</button>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{app.universityName}</h2>
+            <h2 className="break-words text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{app.universityName}</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {[app.programName, app.applicationRound, app.intakeTerm].filter(Boolean).join(" · ")}
             </p>
             {app.deadline && (
-              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                Deadline {app.deadline} · {daysLabel(daysTo(app.deadline))}
+              <p className="mt-1 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {t("awDeadlineLabel")} {app.deadline} · {daysLabel(daysTo(app.deadline))}
               </p>
             )}
           </div>
-          <div className="min-w-[180px] flex-1 sm:max-w-xs">
+          <div className="min-w-0 flex-1 sm:min-w-[180px] sm:max-w-xs">
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("awProgressLabel")}</span>
               <span className="text-lg font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</span>
             </div>
             <ProgressBar pct={data.progress.pct} size="lg" tone={data.progress.pct >= 100 ? "good" : "brand"} />
             <p className="mt-1 text-[11px] text-slate-500">
-              {data.progress.done}/{data.progress.total} requirements complete
+              {t("awReqsComplete", { done: data.progress.done, total: data.progress.total })}
             </p>
           </div>
         </div>
@@ -367,7 +367,7 @@ export function ApplicationWorkspacePanel({
                 {data.progress.missing.slice(0, 10).map((m) => (
                   <li key={`${m.section}-${m.key}`} className="flex items-center gap-2 text-sm">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${m.isRequired ? "bg-rose-400" : "bg-slate-300"}`} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">{m.title}</span>
+                    <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{m.title}</span>
                     <Pill tone="slate">{m.section}</Pill>
                   </li>
                 ))}
@@ -501,15 +501,16 @@ export function ApplicationWorkspacePanel({
             {data.reversePlan.length === 0 ? (
               <Empty title={t("awAddDeadlineFirst")} hint={t("awAddDeadlineHint")} />
             ) : (
-              <ol className="space-y-2">
-                {data.reversePlan.map((s) => (
-                  <li key={s.key} className="flex items-center gap-3 text-sm">
-                    <span className="w-24 shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">{s.date}</span>
-                    <span className="min-w-0 flex-1 text-slate-700 dark:text-slate-200">{s.title}</span>
-                    <Pill tone="slate">-{s.daysBefore}d</Pill>
+              <ul className="space-y-2">
+                {data.reversePlan.map((step) => (
+                  <li key={step.key} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-start">
+                    <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">
+                      {t(`awReverseStep.${step.key}` as never)}
+                    </span>
+                    <Pill tone="slate" className="max-w-full whitespace-normal">{t("awReverseUnscheduled")}</Pill>
                   </li>
                 ))}
-              </ol>
+              </ul>
             )}
           </JourneyCard>
         </div>

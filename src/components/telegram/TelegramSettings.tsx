@@ -159,7 +159,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                   <p className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
                     <CheckCircle2 className="h-4 w-4 text-emerald-600" /> {t("connected")}
                   </p>
-                  <p className="truncate text-[13px] text-slate-600">
+                  <p className="break-words text-[13px] text-slate-600">
                     {[link.firstName, link.username ? `@${link.username}` : null].filter(Boolean).join(" · ") || "Telegram"}
                   </p>
                   <p className="text-[11px] text-slate-400">{t("connectedSince", { date: new Date(link.linkedAt).toLocaleDateString() })}</p>

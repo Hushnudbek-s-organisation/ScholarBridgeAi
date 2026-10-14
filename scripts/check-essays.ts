@@ -87,12 +87,21 @@ check("clichés are listed", weakCodes.includes("cliches"));
 check("the cliché list names the phrase", w.cliches.some((c) => c.phrase === "passionate about"));
 check("the cliché list carries counts", w.cliches.every((c) => c.count > 0));
 check("unsupported adjectives are flagged", weakCodes.includes("unsupported_adjective"));
-check("missing evidence is a blocker", weakCodes.includes("no_evidence"));
+check(
+  "the numeric-evidence check is caveated rather than treated as proof no evidence exists",
+  w.issues.some((i) => i.code === "no_evidence" && i.severity === "warning" && /simple check did not detect/i.test(i.message))
+);
+check("feedback quotes the student's boilerplate opening", w.issues.some((i) => i.code === "opening_boilerplate" && i.excerpt?.includes("My name is Aziza Karimova")));
+check("unsupported self-description feedback quotes exact draft text", w.issues.some((i) => i.code === "unsupported_adjective" && i.excerpt?.includes("I am hardworking")));
 check(
   "an unnamed target university is a blocker",
   analyzeEssay(strong, { targetName: "MIT" }).issues.some(
     (i) => i.code === "target_not_named" && i.severity === "blocker"
   )
+);
+check(
+  "short target names are matched as whole words",
+  !analyzeEssay("MIT is the programme I am applying to.", { type: "supplemental", targetName: "MIT" }).issues.some((i) => i.code === "target_not_named")
 );
 check("the weak draft has at least one blocker", w.issues.some((i) => i.severity === "blocker"));
 
@@ -140,7 +149,11 @@ section("6. Degenerate input");
 const empty = analyzeEssay("");
 check("empty text scores 0", empty.scores.total === 0);
 check("empty text explains itself", empty.issues[0]?.code === "empty");
-check("a 40-word sketch is too short", analyzeEssay("Short. ".repeat(40)).issues.some((i) => i.code === "too_short"));
+check("a 40-word SOP sketch is flagged for review", analyzeEssay("Short. ".repeat(40), { type: "sop" }).issues.some((i) => i.code === "too_short"));
+check(
+  "short supplemental responses are not judged by an SOP-length threshold",
+  !analyzeEssay("Short. ".repeat(40), { type: "supplemental" }).issues.some((i) => i.code === "too_short")
+);
 
 section("7. Determinism");
 

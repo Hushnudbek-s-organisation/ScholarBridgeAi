@@ -66,7 +66,6 @@ interface UniversityDetailData {
   /** Profile fit from the shared matching engine (null when signed out). */
   match?: {
     score: number;
-    category: string;
     reasons: string[];
     issues: string[];
   } | null;
@@ -370,7 +369,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold text-red-700">{errorText}</p>
-        <button onClick={onBack} className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">
+        <button onClick={onBack} className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">
           <ArrowLeft className="h-3.5 w-3.5" /> {t("backToList")}
         </button>
       </div>
@@ -382,7 +381,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
       {/* Back */}
       <button
         onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+        className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> {t("backToUnis")}
       </button>
@@ -431,7 +430,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                   <div className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-emerald-400/15 backdrop-blur-md border border-emerald-300/30 px-3 py-1.5">
                     <Target className="h-4 w-4 text-emerald-300" />
                     <span className="text-xs font-bold">
-                      {t("fitBadge", { score: match.score, category: match.category })}
+                      {t("fitBadge", { score: match.score })}
                     </span>
                   </div>
                   <p className="max-w-xl text-[11px] leading-snug text-indigo-100/90">
@@ -457,7 +456,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                         href={site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50"
                       >
                         <Globe className="h-3.5 w-3.5" /> {t("officialWebsite")}
                       </a>
@@ -467,7 +466,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                         href={apply}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 sb-ink-on-warm px-5 py-2.5 text-xs font-bold shadow-lg hover:from-amber-300 hover:to-yellow-400"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 sb-ink-on-warm px-5 py-2.5 text-xs font-bold shadow-lg hover:from-amber-300 hover:to-yellow-400"
                       >
                         <ExternalLink className="h-3.5 w-3.5" /> {t("applyNow")}
                       </a>
@@ -498,7 +497,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={apply}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 sb-ink-on-warm px-4 py-2 text-xs font-bold hover:bg-amber-300"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 sb-ink-on-warm px-4 py-2 text-xs font-bold hover:bg-amber-300"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("applyNow")}
                     </a>
@@ -508,7 +507,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={uni.undergraduateAdmissionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("undergradAdmissions")}
                     </a>
@@ -518,7 +517,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={uni.admissionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("admissions")}
                     </a>
@@ -528,7 +527,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={site}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <Globe className="h-3.5 w-3.5" /> {t("officialWebsiteLower")}
                     </a>
@@ -588,7 +587,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                         href={c.applicationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3.5 py-2 text-[11px] font-bold hover:bg-slate-800"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 text-white px-3.5 py-2 text-[11px] font-bold hover:bg-slate-800"
                       >
                         {t("applyNow")} <ArrowRight className="h-3 w-3" />
                       </a>
@@ -606,7 +605,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={c.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 font-semibold text-violet-700 hover:underline"
+                      className="inline-flex min-h-11 items-center gap-1 font-semibold text-violet-700 hover:underline"
                     >
                       <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
                     </a>
@@ -683,6 +682,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
             differ per programme it shows a range (e.g. IELTS 7-7.5) — say so,
             otherwise a lower bound reads like the requirement for all of
             them. */}
+        <p className="mt-2 break-words text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t("catalogueRequirementsScope")}</p>
         {["ielts", "toefl", "duolingo", "gpa", "sat", "act", "pte", "cambridgeEnglish"].some(
           (key) => Array.isArray(universityRequirements?.[key]?.values) && universityRequirements[key].values.length > 1,
         ) && (
@@ -740,7 +740,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
               <button
                 type="button"
                 onClick={() => setReqsExpanded((v) => !v)}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                className="mt-2 inline-flex min-h-11 items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700"
                 aria-expanded={reqsExpanded}
               >
                 {reqsExpanded ? t("showLess") : t("showMore")}
@@ -804,7 +804,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                             type="button"
                             onClick={() => toggleSaveProgram(p.id)}
                             disabled={savingProgramId != null}
-                            className={`rounded-lg p-1.5 transition-colors ${
+                            className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                               savedProgramIds[p.id] != null
                                 ? "bg-violet-600 text-white hover:bg-violet-700"
                                 : "text-slate-400 hover:bg-violet-50 hover:text-violet-600"
@@ -858,7 +858,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                             href={p.sourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-semibold text-violet-700 hover:underline"
+                            className="inline-flex min-h-11 items-center gap-1 font-semibold text-violet-700 hover:underline"
                             aria-label={`${t("sourceLink")}: ${p.name}`}
                           >
                             <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
@@ -922,7 +922,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                           onClick={() =>
                             setExpandedProgramReqs((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
                           }
-                          className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-700"
+                          className="mt-1 inline-flex min-h-11 items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-700"
                           aria-expanded={reqsOpen}
                         >
                           {reqsOpen ? t("showLess") : t("showMore")}
@@ -935,7 +935,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                         href={p.applicationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 hover:underline"
+                        className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-violet-700 hover:underline"
                       >
                         <ExternalLink className="h-3 w-3" /> {t("applyForProgram")}
                       </a>
@@ -948,7 +948,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
               <button
                 type="button"
                 onClick={() => setShowAllPrograms((v) => !v)}
-                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
                 aria-expanded={showAllPrograms}
               >
                 {showAllPrograms ? t("showFewerPrograms") : t("viewAllPrograms", { count: programs.length })}
@@ -985,7 +985,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:underline"
+                      className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-amber-700 hover:underline"
                     >
                       <ExternalLink className="h-3 w-3" /> {t("officialScholarshipPage")}
                     </a>
@@ -1039,11 +1039,11 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
             const site = uni.officialWebsiteUrl || uni.websiteUrl;
             if (!site) return null;
             return (
-              <a href={site} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 hover:border-indigo-300 transition-colors">
+              <a href={site} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                 <Globe className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-extrabold text-slate-800">{t("officialUniWebsite")}</span>
-                  <span className="block text-[10px] text-slate-400 truncate">{site}</span>
+                  <span className="block break-all text-[10px] text-slate-400">{site}</span>
                 </span>
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
                   <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
@@ -1062,13 +1062,13 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
           ].map((link) => {
             if (!link.url) return null;
             return (
-              <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 hover:border-indigo-300 transition-colors">
+              <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                 <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
-                  <span className="block text-[10px] text-slate-400 truncate">{link.url}</span>
+                  <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
                 </span>
-                <span className="text-[10px] font-bold text-slate-500 capitalize shrink-0">{link.type.replace(/_/g, " ")}</span>
+                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
                 <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               </a>
             );
@@ -1080,11 +1080,11 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
             const title = s.source?.title || s.title || t("sourceFallback");
             const type = s.sourceType || s.source?.title ? "official" : "source";
             return (
-              <a key={s.id} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 hover:border-indigo-300 transition-colors">
+              <a key={s.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-extrabold text-slate-800">{title}</span>
-                  <span className="block text-[10px] text-slate-400 truncate">{url}</span>
+                  <span className="block break-all text-[10px] text-slate-400">{url}</span>
                   {s.source?.accessedAt && (
                     <span className="block text-[10px] text-slate-400">
                       {t("lastChecked")} {new Date(s.source.accessedAt).toLocaleDateString(locale)}
@@ -1092,7 +1092,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                     </span>
                   )}
                 </span>
-                <span className="text-[10px] font-bold text-slate-500 capitalize shrink-0">{type.replace(/_/g, " ")}</span>
+                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
                 {(s.source?.isOfficial || s.sourceType !== "ranking") && (
                   <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
                     <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}

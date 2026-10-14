@@ -198,6 +198,13 @@
 .dark :is(input, textarea, select)::placeholder { color: #a3b1c9; opacity: 1; }
 .dark :is(input, textarea, select) { color: #f5f8fc; }
 
+/* Some components intentionally add a dark slate panel at 60% opacity. The
+   generated dark utility still uses the pale inverted slate-800 token, so pin
+   its alpha variant to the dark panel ramp instead of washing the parent card. */
+.dark [class~="dark:bg-slate-800/60"] {
+  background-color: rgb(22 33 58 / 0.6);
+}
+
 /* The slate aliases are explicit as well, protecting against a component's
    dark variant winning the cascade with a low-contrast value. */
 .dark .text-slate-400 { color: #c3cede; }
@@ -334,7 +341,8 @@
   .dark .text-teal-900 { color: #5eead4; }
 
   .dark .bg-amber-50,
-  .dark .bg-amber-100 { background-color: rgba(245,158,11, 0.16); }
+  .dark .bg-amber-100,
+  .dark [class~="bg-amber-50/50"] { background-color: rgba(245,158,11, 0.16); }
   .dark .border-amber-100,
   .dark .border-amber-200,
   .dark .border-amber-300 { border-color: rgba(245,158,11, 0.38); }
@@ -733,4 +741,27 @@ html.theme-transition *::after {
 
 .sb-fade-in {
   animation: sb-fade-in 0.4s ease-out both;
+}
+
+/* Slate 400/500 are intentionally muted in Tailwind's default palette, but
+   they fall below 4.5:1 on the pale surfaces used throughout the student UI.
+   Use the existing slate-700 ink for body copy and labels in light mode; the
+   dedicated dark-theme mappings below remain unchanged. */
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-500 {
+  color: #475569;
+}
+
+/* Phone and tablet controls need a stable touch target even when a feature's
+   desktop utility classes are only 32–40px tall. Keep text and spacing intact;
+   these minimums let controls grow when translated labels wrap. */
+@media (max-width: 1023px) {
+  :is(button, [role="button"], [role="tab"], [role="radio"]):not([data-touch-size-exempt]) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea):not([data-touch-size-exempt]) {
+    min-height: 44px;
+  }
 }

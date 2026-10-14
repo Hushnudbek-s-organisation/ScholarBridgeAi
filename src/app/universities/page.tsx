@@ -1,17 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { dictionaries } from "@/i18n/messages";
+import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { formatMessage } from "@/i18n/formatMessage";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 
-export const metadata: Metadata = {
-  title: "Universities",
-  description: "Explore universities — 24 results per page.",
-};
+async function getPageLocale() {
+  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
+  return stored && isLocale(stored) ? stored : defaultLocale;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const copy = dictionaries[await getPageLocale()].publicCatalog;
+  return {
+    title: copy.universitiesMetaTitle,
+    description: copy.universitiesMetaDescription,
+  };
+}
 
 interface UniversityRow {
   id: number;
@@ -32,20 +45,23 @@ interface UniversitiesPageProps {
 export default async function UniversitiesPage({
   searchParams,
 }: UniversitiesPageProps) {
-  // 1. Page from URL: /universities?page=2
+  const locale = await getPageLocale();
+  const copy = dictionaries[locale].publicCatalog;
+
+  // Page from URL: /universities?page=2.
   const requestedPage = parsePage((await searchParams).page);
   const { from } = getRange(requestedPage);
 
-  // 2. Data comes from the app's OWN database (DATABASE_URL, Drizzle) — the
-  //    same source every API route reads. This page used to require the
-  //    optional Supabase env vars and rendered "Supabase is not configured"
-  //    on a perfectly valid PostgreSQL (Render/self-hosted) deployment.
+  // Read from the same PostgreSQL/Drizzle catalogue used by the API. Count
+  // only active rows, matching the page query, so pagination cannot point to
+  // pages containing only inactive universities.
   let rows: UniversityRow[];
   let totalItems: number;
   try {
     const [countRow] = await db
       .select({ n: sql<number>`count(*)::int` })
-      .from(universitiesTable);
+      .from(universitiesTable)
+      .where(eq(universitiesTable.isActive, true));
     totalItems = Number(countRow?.n ?? 0);
     const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
     if (requestedPage > lastPage) {
@@ -70,98 +86,103 @@ export default async function UniversitiesPage({
       .offset(from);
     // Nullable columns stay null (never "" or 0) — the card renders nothing
     // rather than pretending a ranking/focus exists.
-    rows = data.map((u) => ({
-      id: u.id,
-      name: u.name,
-      country: u.country,
-      city: u.city,
-      flag_emoji: u.flagEmoji,
-      world_ranking: u.worldRanking,
-      program_major: u.programMajor,
-      official_website_url: u.officialWebsiteUrl || u.websiteUrl,
+    rows = data.map((university) => ({
+      id: university.id,
+      name: university.name,
+      country: university.country,
+      city: university.city,
+      flag_emoji: university.flagEmoji,
+      world_ranking: university.worldRanking,
+      program_major: university.programMajor,
+      official_website_url: university.officialWebsiteUrl || university.websiteUrl,
     }));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
+  } catch (error) {
+    // Keep database/provider details out of the public response and logs.
+    console.error("University catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
-      <main className="mx-auto max-w-7xl px-4 py-16">
-        <p className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
-          Couldn&apos;t load universities: {message}
-        </p>
-      </main>
+      <LocaleProvider initialLocale={locale}>
+        <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+            {copy.universitiesLoadError}
+          </p>
+        </main>
+      </LocaleProvider>
     );
   }
 
   const universities = rows;
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
   const currentPage = Math.min(requestedPage, totalPages);
+  const number = new Intl.NumberFormat(locale);
+  const summary = formatMessage(copy.universitiesSummary, {
+    from: number.format(totalItems === 0 ? 0 : from + 1),
+    to: number.format(from + universities.length),
+    total: number.format(totalItems),
+    page: number.format(currentPage),
+    pages: number.format(totalPages),
+  });
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <GraduationCap className="h-6 w-6 text-blue-600" aria-hidden />
-          University Explorer
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Showing {totalItems === 0 ? 0 : from + 1}–{from + universities.length} of{" "}
-          {totalItems} · Page {currentPage} of {totalPages}
-        </p>
-      </header>
+    <LocaleProvider initialLocale={locale}>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <header className="mb-6">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <GraduationCap className="h-6 w-6 shrink-0 text-blue-600" aria-hidden />
+            {copy.universityHeading}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{summary}</p>
+        </header>
 
-      {universities.length === 0 ? (
-        <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
-          No universities found.
-        </p>
-      ) : (
-        // 2 cols on mobile, 3 cols from md → 24 items = exactly 8 rows.
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6">
-          {universities.map((u) => (
-            <article
-              key={u.id}
-              className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-2xl" aria-hidden>{u.flag_emoji}</span>
-                {u.world_ranking != null && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 ring-inset">
-                    <Trophy className="h-3 w-3" aria-hidden />#{u.world_ranking}
-                  </span>
+        {universities.length === 0 ? (
+          <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+            {copy.noUniversities}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6">
+            {universities.map((university) => (
+              <article
+                key={university.id}
+                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-2xl" aria-hidden>{university.flag_emoji}</span>
+                  {university.world_ranking != null && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 ring-inset">
+                      <Trophy className="h-3 w-3" aria-hidden />#{university.world_ranking}
+                    </span>
+                  )}
+                </div>
+                <h2 className="mt-2 break-words text-sm font-bold text-slate-900 sm:text-base">
+                  {university.name}
+                </h2>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                  <span className="break-words">{[university.city, university.country].filter(Boolean).join(", ")}</span>
+                </p>
+                {university.program_major && (
+                  <p className="mt-1 break-words text-xs text-slate-500">{university.program_major}</p>
                 )}
-              </div>
-              <h2 className="mt-2 line-clamp-2 text-sm font-bold text-slate-900 sm:text-base">
-                {u.name}
-              </h2>
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                <span className="truncate">{[u.city, u.country].filter(Boolean).join(", ")}</span>
-              </p>
-              {u.program_major && (
-                <p className="mt-1 truncate text-xs text-slate-500">{u.program_major}</p>
-              )}
-              {u.official_website_url && (
-                <Link
-                  href={u.official_website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-semibold text-blue-600 hover:text-blue-800 sm:text-sm"
-                >
-                  Website <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              )}
-            </article>
-          ))}
-        </div>
-      )}
+                {university.official_website_url && (
+                  <Link
+                    href={university.official_website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-auto inline-flex min-h-11 items-center gap-1 pt-4 text-xs font-semibold text-blue-700 hover:text-blue-900 sm:text-sm"
+                  >
+                    {copy.website} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
 
-      <Pagination currentPage={currentPage} totalPages={totalPages} />
+        <Pagination currentPage={currentPage} totalPages={totalPages} />
 
-      {/* Independent guide: the figures on these cards are compiled and can
-          age, so the list carries its own line — not only the Terms page. */}
-      <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-500">
-        ScholarBridgeAI is an independent guide, not affiliated with any university or provider.
-        Tuition, deadlines and requirement numbers are compiled from public sources and can be out of
-        date — always confirm them on the official page before you apply.
-      </p>
-    </main>
+        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+          {copy.independentGuide}
+        </p>
+      </main>
+    </LocaleProvider>
   );
 }

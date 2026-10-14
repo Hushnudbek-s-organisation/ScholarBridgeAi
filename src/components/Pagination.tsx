@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
@@ -52,7 +53,7 @@ function getPageItems(
 
 const numberButtonClass = (isActive: boolean) =>
   [
-    "inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
+    "inline-flex h-11 min-w-11 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
     isActive
       ? "border-blue-600 bg-blue-600 text-white shadow-xs"
       : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -112,6 +113,7 @@ function PaginationInner({
   siblingCount = 1,
   onPageChange,
 }: PaginationProps) {
+  const t = useTranslations("pagination");
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -134,7 +136,7 @@ function PaginationInner({
 
   const arrowClass = (enabled: boolean) =>
     [
-      "inline-flex h-10 items-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors",
+      "inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors",
       enabled
         ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
         : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
@@ -142,7 +144,7 @@ function PaginationInner({
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("aria")}
       className="mt-8 flex flex-wrap items-center justify-center gap-1.5"
     >
       {hasPrevious ? (
@@ -151,15 +153,15 @@ function PaginationInner({
           href={createPageHref(currentPage - 1)}
           onSelect={onPageChange}
           className={arrowClass(true)}
-          ariaLabel="Go to previous page"
+          ariaLabel={t("goPrevious")}
         >
           <ChevronLeft className="h-4 w-4" aria-hidden />
-          <span className="hidden sm:inline">Previous</span>
+          <span className="hidden sm:inline">{t("previous")}</span>
         </PageControl>
       ) : (
         <span className={arrowClass(false)} aria-disabled="true">
           <ChevronLeft className="h-4 w-4" aria-hidden />
-          <span className="hidden sm:inline">Previous</span>
+          <span className="hidden sm:inline">{t("previous")}</span>
         </span>
       )}
 
@@ -168,7 +170,7 @@ function PaginationInner({
           <span
             key={item}
             aria-hidden="true"
-            className="inline-flex h-10 min-w-10 items-center justify-center px-1 text-sm text-slate-400"
+            className="inline-flex h-11 min-w-11 items-center justify-center px-1 text-sm text-slate-400"
           >
             …
           </span>
@@ -178,7 +180,7 @@ function PaginationInner({
             page={item}
             href={createPageHref(item)}
             onSelect={onPageChange}
-            ariaLabel={`Go to page ${item}`}
+            ariaLabel={t("goToPage", { page: item })}
             ariaCurrent={item === currentPage ? "page" : undefined}
             className={numberButtonClass(item === currentPage)}
           >
@@ -193,14 +195,14 @@ function PaginationInner({
           href={createPageHref(currentPage + 1)}
           onSelect={onPageChange}
           className={arrowClass(true)}
-          ariaLabel="Go to next page"
+          ariaLabel={t("goNext")}
         >
-          <span className="hidden sm:inline">Next</span>
+          <span className="hidden sm:inline">{t("next")}</span>
           <ChevronRight className="h-4 w-4" aria-hidden />
         </PageControl>
       ) : (
         <span className={arrowClass(false)} aria-disabled="true">
-          <span className="hidden sm:inline">Next</span>
+          <span className="hidden sm:inline">{t("next")}</span>
           <ChevronRight className="h-4 w-4" aria-hidden />
         </span>
       )}
@@ -235,7 +237,7 @@ export function Pagination(props: PaginationProps) {
           {Array.from({ length: 5 }, (_, i) => (
             <div
               key={i}
-              className="h-10 w-10 animate-pulse rounded-lg bg-slate-100"
+              className="h-11 w-11 animate-pulse rounded-lg bg-slate-100"
             />
           ))}
         </div>

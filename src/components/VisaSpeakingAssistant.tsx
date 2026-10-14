@@ -1939,7 +1939,7 @@ export function VisaSpeakingAssistant({
                     )}
                     <div className="text-3xl leading-none">{c.flag}</div>
                     <div
-                      className={`mt-2 truncate text-xs font-bold ${
+                      className={`mt-2 break-words text-xs font-bold ${
                         selected ? "text-blue-900" : "text-slate-800"
                       }`}
                     >
@@ -2069,7 +2069,7 @@ export function VisaSpeakingAssistant({
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
             <span className="text-3xl leading-none">{country.flag}</span>
             <div className="min-w-0">
-              <div className="truncate text-sm font-bold text-slate-900">
+              <div className="break-words text-sm font-bold text-slate-900">
                 {localizedCountryName(country.name)}
               </div>
               <div className="flex items-center gap-1 text-[11px] text-slate-500">

@@ -112,6 +112,8 @@ export function safePromptFields(body: Record<string, any>, max = 8000) {
     sopText: clampPrompt(body?.sopText, 40_000),
     personalHook: clampPrompt(body?.personalHook, 2000),
     careerGoals: clampPrompt(body?.careerGoals, 2000),
+    programEvidence: clampPrompt(body?.programEvidence, 2000),
+    experienceExample: clampPrompt(body?.experienceExample, 3000),
     universityName: clampPrompt(body?.universityName, 200),
     programName: clampPrompt(body?.programName, 200),
     targetUniversity: clampPrompt(body?.targetUniversity, 200),

@@ -5,6 +5,8 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { calculateCosts, assessPortfolio, type ScholarshipInput } from "@/lib/costs";
 import { buildCv, renderCvText } from "@/lib/cv";
+import { localizeCv } from "@/lib/cvI18n";
+import { localeFromRequest } from "@/lib/engineText";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
 import { gpaTo4 } from "@/lib/similarProfiles";
 import { calculateUniversityMatch } from "@/lib/matching";
@@ -66,9 +68,6 @@ export async function GET(req: Request) {
           : /stipend|living/i.test(s.coverageType || "")
             ? "living"
             : "other",
-      // No validated award probability exists. Unknown stays null: expected
-      // funding and chance-of-award are therefore unavailable, not a guessed %.
-      probability: null,
       deadlineDays: s.deadlineDate
         ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
         : null,
@@ -94,14 +93,10 @@ export async function GET(req: Request) {
       familyContributionUsd: null,
     });
 
-    const portfolio = assessPortfolio({
-      scholarships: scholarshipInputs,
-      annualCostUsd: costs.annualTotalUsd,
-      familyContributionUsd: costs.net.familyContributionUsd,
-    });
+    const portfolio = assessPortfolio({ scholarships: scholarshipInputs });
 
     // --- CV ------------------------------------------------------------------
-    const cv = buildCv({
+    const cvDraft = buildCv({
       name: profile.name,
       email: profile.email,
       country: profile.country,
@@ -130,6 +125,7 @@ export async function GET(req: Request) {
       certificates: profile.certificates,
       careerGoal: profile.careerGoal,
     });
+    const cv = localizeCv(localeFromRequest(req), cvDraft);
 
     // --- Comparison ----------------------------------------------------------
     // How many open scholarships cover each country — factual counts, never
@@ -202,7 +198,7 @@ export async function GET(req: Request) {
       costTarget: target ? { id: target.id, name: target.name, country: target.country } : null,
       universities: uniRows.map((u) => ({ id: u.id, name: u.name, country: u.country })),
       cv,
-      cvText: renderCvText(cv),
+      cvText: renderCvText(cvDraft),
       comparison,
       // Probability policy (2026-10): the admission-probability dimension is
       // surfaced as "unavailable" — the planning comparison no longer shows a

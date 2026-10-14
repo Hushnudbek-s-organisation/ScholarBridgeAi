@@ -152,10 +152,10 @@ export function ArrivalPlanPanel({
                         <button
                           type="button"
                           aria-pressed={doneFlag}
-                          aria-label={t(doneFlag ? "markPending" : "markDone")}
+                          aria-label={t(doneFlag ? "markPendingItem" : "markDoneItem", { item: t(`items.${item.key}`) })}
                           onClick={() => toggle(item)}
                           disabled={busy === item.key}
-                          className="mt-0.5 shrink-0 text-slate-500 hover:text-emerald-600 disabled:opacity-50"
+                          className="mt-0.5 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:text-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
                         >
                           {doneFlag ? (
                             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -174,7 +174,8 @@ export function ArrivalPlanPanel({
                               <button
                                 type="button"
                                 onClick={() => onNavigateTab(item.tab!)}
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:underline"
+                                aria-label={t("openItemSection", { item: t(`items.${item.key}`) })}
+                                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-indigo-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                               >
                                 {t("openSection")} <ExternalLink className="h-3 w-3" />
                               </button>

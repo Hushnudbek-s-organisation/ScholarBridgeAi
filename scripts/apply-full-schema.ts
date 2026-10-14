@@ -5,15 +5,24 @@
  * this script is for owners who prefer `npm run db:apply-full-schema`
  * (e.g. against Render/Supabase via DATABASE_URL).
  *
- * SAFE: the file is additive and idempotent; re-running changes nothing.
- * The whole file runs in a single transaction, so either everything is
- * applied or nothing is (FK guards that skip violated constraints only
- * emit NOTICEs — they never fail).
+ * SAFETY: this script requires SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY=YES as
+ * an explicit operator acknowledgment. Part 5 changes RLS and anon/authenticated
+ * table grants; inspect the SQL, test in staging, and take a backup before a
+ * live apply. The transaction protects atomicity, not application compatibility.
+ * FK/check guards may skip constraints that conflict with existing data.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 import "./lib/env";
+
+const applyAcknowledgment = process.env.SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY;
+if (applyAcknowledgment !== "YES") {
+  console.error(
+    "Refusing to apply full_schema.sql: it changes RLS/table grants. Review the SQL, test in staging, take a backup, then set SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY=YES to acknowledge the operator review. No database connection was opened."
+  );
+  process.exit(2);
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) {

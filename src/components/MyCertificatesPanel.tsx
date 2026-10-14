@@ -125,7 +125,7 @@ export function MyCertificatesPanel({ activeProfile }: { activeProfile: StudentP
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                  <span className="truncate">{c.courseTitle || t("unknownCourse")}</span>
+                  <span className="break-words">{c.courseTitle || t("unknownCourse")}</span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {t("issued", { when: fmt(c.issuedAt) })} · {t("codeLabel")}: <code className="font-mono">{c.certificateCode}</code>

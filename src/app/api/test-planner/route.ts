@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { applications, testAttempts, testPlans, testTasks, universities } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { testGap } from "@/lib/journey/readiness";
+import { hasUndergraduateAdmission } from "@/lib/degreeLevels";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +37,11 @@ const SCORE_COLUMN: Record<string, "minIelts" | "minSat" | null> = {
 /**
  * GET /api/test-planner?profileId=
  *
- * Test Planner (spec §8): current score, target, target date, next test date
- * and previous attempts — PLUS the comparison against the published minimums
- * of the universities the student actually applied to.
- *
- * SPEC §8: "Do not claim admission probability changes unless supported by the
- * model/data." `testGap()` therefore reports the difference and nothing else.
+ * Returns student-entered test plans plus university-level catalogue figures
+ * for context. These figures are not verified programme requirements; the
+ * student should confirm policies, alternatives and waivers on official pages.
+ * SAT figures are shown only for universities whose catalogue explicitly
+ * identifies undergraduate admission.
  */
 export async function GET(req: Request) {
   const g = await guardStudent(req, new URL(req.url).searchParams.get("profileId"));
@@ -67,16 +67,17 @@ export async function GET(req: Request) {
 
     const out = plans.map((p) => {
       const meta = TEST_TYPES.find((t) => t.key === p.testType);
-      const requiredBy = unis
+      const catalogueFigures = unis
+        .filter((u) => p.testType !== "sat" || hasUndergraduateAdmission(u.degreeLevel))
         .map((u) => {
           const col = SCORE_COLUMN[p.testType];
-          const required = col ? (u[col] as number | null) : null;
-          return required == null ? null : { university: u.name, required };
+          const catalogueFigure = col ? (u[col] as number | null) : null;
+          return catalogueFigure == null ? null : { university: u.name, catalogueFigure };
         })
-        .filter((x): x is { university: string; required: number } => x != null)
-        .sort((a, b) => b.required - a.required);
+        .filter((item): item is { university: string; catalogueFigure: number } => item != null)
+        .sort((a, b) => b.catalogueFigure - a.catalogueFigure);
 
-      const strictest = requiredBy[0] ?? null;
+      const highestCatalogueFigure = catalogueFigures[0] ?? null;
       return {
         id: p.id,
         testType: p.testType,
@@ -89,9 +90,9 @@ export async function GET(req: Request) {
         notes: p.notes,
         attempts: attempts.filter((a) => a.testPlanId === p.id).map((a) => ({ ...a, testDate: String(a.testDate).slice(0, 10) })),
         tasks: tasks.filter((t) => t.testPlanId === p.id).map((t) => ({ ...t, dueDate: t.dueDate ? String(t.dueDate).slice(0, 10) : null })),
-        requirements: requiredBy,
-        gap: strictest
-          ? testGap(p.testType, strictest.required, p.currentScore, meta?.label ?? p.testType)
+        catalogueFigures,
+        gap: highestCatalogueFigure
+          ? testGap(p.testType, highestCatalogueFigure.catalogueFigure, p.currentScore, meta?.label ?? p.testType)
           : testGap(p.testType, null, p.currentScore, meta?.label ?? p.testType),
       };
     });
@@ -99,8 +100,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       testTypes: TEST_TYPES,
       plans: out,
-      /** What the student's own applications demand, even with no plan set. */
-      demanded: demandedBy(unis),
+      /** University-level catalogue figures for context, even with no plan set. */
+      catalogueSignals: catalogueFiguresBy(unis),
     });
   } catch (err) {
     return serverError("test-planner GET", err);
@@ -252,18 +253,19 @@ export async function DELETE(req: Request) {
 
 // ---------------------------------------------------------------------------
 
-function demandedBy(unis: (typeof universities.$inferSelect)[]) {
-  const demanded: { testType: string; required: number; universities: string[] }[] = [];
+function catalogueFiguresBy(unis: (typeof universities.$inferSelect)[]) {
+  const signals: { testType: string; catalogueFigure: number; universities: string[] }[] = [];
   for (const [type, col] of Object.entries(SCORE_COLUMN)) {
     if (!col) continue;
-    const hits = unis
-      .map((u) => ({ name: u.name, required: u[col] as number | null }))
-      .filter((x): x is { name: string; required: number } => x.required != null);
+    const applicable = type === "sat" ? unis.filter((u) => hasUndergraduateAdmission(u.degreeLevel)) : unis;
+    const hits = applicable
+      .map((u) => ({ name: u.name, catalogueFigure: u[col] as number | null }))
+      .filter((item): item is { name: string; catalogueFigure: number } => item.catalogueFigure != null);
     if (!hits.length) continue;
-    hits.sort((a, b) => b.required - a.required);
-    demanded.push({ testType: type, required: hits[0].required, universities: hits.map((h) => h.name) });
+    hits.sort((a, b) => b.catalogueFigure - a.catalogueFigure);
+    signals.push({ testType: type, catalogueFigure: hits[0].catalogueFigure, universities: hits.map((item) => item.name) });
   }
-  return demanded;
+  return signals;
 }
 
 function numberOr(v: unknown, fallback: number | null): number | null {

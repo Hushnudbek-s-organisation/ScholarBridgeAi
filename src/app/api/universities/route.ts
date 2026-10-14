@@ -245,14 +245,13 @@ export async function GET(req: Request) {
     const results = allUnis.map((uni) => {
       let matchInfo: {
         matchScore: number | null;
-        matchCategory: "Reach" | "Match" | "Safety" | null;
         reasons?: string[];
         potentialIssues?: string[];
         reasonDetails?: ReasonDetail[];
         issueDetails?: ReasonDetail[];
         rawScore?: number;
         breakdown?: MatchBreakdown;
-      } = { matchScore: null, matchCategory: null, reasons: [], potentialIssues: [] };
+      } = { matchScore: null, reasons: [], potentialIssues: [] };
       if (matchProfile) {
         matchInfo = calculateUniversityMatch(matchProfile, toUniversityData(uni));
       }
@@ -262,7 +261,6 @@ export async function GET(req: Request) {
         ...uni,
         programFields: progFields,
         matchScore: matchInfo.matchScore,
-        matchCategory: matchInfo.matchCategory,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         // The exact arithmetic behind the score (two-decimal points per

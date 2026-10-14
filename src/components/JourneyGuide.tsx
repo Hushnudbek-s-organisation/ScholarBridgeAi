@@ -192,7 +192,7 @@ export function JourneyGuide({ profileId, onNavigate }: { profileId: number | nu
                       >
                         {s.done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800">{stepTitle(s)}</span>
+                      <span className="min-w-0 flex-1 break-words text-xs font-semibold text-slate-800">{stepTitle(s)}</span>
                       <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
                     </button>
                   </li>

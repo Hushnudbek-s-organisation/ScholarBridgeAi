@@ -67,7 +67,7 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
 
             <div className="p-4 flex flex-col flex-1">
               <h3 className="font-bold text-slate-900 text-sm leading-snug">{course.title}</h3>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{course.description}</p>
+              <p className="mt-1 break-words text-[11px] text-slate-400">{course.description}</p>
 
               <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-3">
                 <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {course.lessonCount} {t("lessons")}</span>

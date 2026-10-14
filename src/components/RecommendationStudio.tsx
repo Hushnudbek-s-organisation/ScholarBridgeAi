@@ -892,7 +892,7 @@ export function RecommendationStudio({
                           <div className="min-w-0">
                             <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                               <GraduationCap className="h-4 w-4 shrink-0 text-indigo-500" />
-                              <span className="truncate">{r.program.name}</span>
+                              <span className="min-w-0 break-words">{r.program.name}</span>
                               {r.program.degreeLevel ? <Badge tone="slate">{normalizeDegreeLevel(r.program.degreeLevel) ? <DegreeLevelLabel value={r.program.degreeLevel} /> : r.program.degreeLevel}</Badge> : null}
                               {r.program.language ? (
                                 <Badge tone="slate">

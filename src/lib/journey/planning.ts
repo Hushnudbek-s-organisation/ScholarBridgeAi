@@ -1,14 +1,10 @@
 /**
- * My Study Plan phases (spec §12) and Reverse Planning (spec §21).
+ * Study-plan phase summaries and deadline-aware review checklists.
  *
- * TWO IDEAS, ONE FILE — both are "work backwards from a date", and both are
- * pure so they can be asserted without a database.
- *
- *   • PLAN PHASES   — the ten phases every student passes through, from
- *                     "build profile" to "departure".
- *   • REVERSE PLAN  — given a real deadline, produce the preparation dates that
- *                     must happen BEFORE it. It can never schedule work after
- *                     the deadline itself.
+ * No phase assumes a test, essay, recommender, document, scholarship count or
+ * fixed preparation window applies to every student. Completion reflects only
+ * records the app can observe; official programme and destination instructions
+ * remain the source of truth.
  */
 
 export type PlanPhaseKey =
@@ -33,16 +29,16 @@ export interface PlanPhase {
 }
 
 export const PLAN_PHASES: readonly PlanPhase[] = [
-  { key: "profile", title: "Build profile", description: "Grades, activities, awards and a complete profile.", icon: "🧱", tab: "profile/details" },
-  { key: "tests", title: "Tests", description: "English test and any standardized test, with a target date.", icon: "📝", tab: "tests" },
-  { key: "university_research", title: "University research", description: "Shortlist, compare programmes, check requirements.", icon: "🔎", tab: "universities" },
-  { key: "scholarship_research", title: "Scholarship research", description: "Find funding that matches your profile and budget.", icon: "💰", tab: "scholarships" },
-  { key: "documents", title: "Documents", description: "Passport, transcript, certificates, financial proof.", icon: "📄", tab: "documents" },
-  { key: "applications", title: "Applications", description: "Essays, recommendations and submission.", icon: "📝", tab: "applications" },
-  { key: "interviews", title: "Interviews", description: "University interviews and visa interview practice.", icon: "🎤", tab: "interviews" },
-  { key: "admission", title: "Admission", description: "Offers, decisions and deposits.", icon: "🎓", tab: "offers" },
-  { key: "visa", title: "Visa", description: "Visa documents, appointment, fees and interview.", icon: "🛂", tab: "visa" },
-  { key: "departure", title: "Departure", description: "Flight, housing, insurance, packing, arrival.", icon: "✈️", tab: "departure" },
+  { key: "profile", title: "Profile details", description: "Record only information you choose to use for programme comparisons.", icon: "🧱", tab: "profile/details" },
+  { key: "tests", title: "Test policy and tracking", description: "Check programme-specific rules; track a test only if it is relevant to your plans.", icon: "📝", tab: "tests" },
+  { key: "university_research", title: "Programme research", description: "Compare available catalogue information with official programme pages.", icon: "🔎", tab: "universities" },
+  { key: "scholarship_research", title: "Funding research", description: "Review funding options if relevant; eligibility and coverage vary.", icon: "💰", tab: "scholarships" },
+  { key: "documents", title: "Application documents", description: "Use each programme’s current official checklist; documents differ.", icon: "📄", tab: "documents" },
+  { key: "applications", title: "Applications", description: "Track requested materials, submission steps and decisions.", icon: "📝", tab: "applications" },
+  { key: "interviews", title: "Interviews", description: "Prepare if a programme or official process schedules an interview.", icon: "🎤", tab: "interviews" },
+  { key: "admission", title: "Admission decisions", description: "Record decisions when you receive them.", icon: "🎓", tab: "offers" },
+  { key: "visa", title: "Immigration guidance", description: "Follow current official instructions for your destination and institution.", icon: "🛂", tab: "visa" },
+  { key: "departure", title: "Departure planning", description: "Review logistics that apply to your institution and destination.", icon: "✈️", tab: "departure" },
 ] as const;
 
 export type PhaseStatus = "pending" | "in_progress" | "done";
@@ -54,24 +50,22 @@ export interface PhaseProgress {
   icon: string;
   tab: string;
   status: PhaseStatus;
-  /** 0–100 for this phase, derived from the student's real data. */
+  /** 0–100 based only on tracked records; not eligibility or readiness. */
   pct: number;
-  /** What is still missing in this phase. */
+  /** Stable message keys localized by the UI. */
   missing: string[];
 }
 
 /**
- * Build the live plan: the ten phases, each with a completion number derived
- * from the student's real data. `counts` mirrors the stage engine so the plan
- * and the journey bar can never disagree.
+ * Build a live summary from records in the app. Thresholds are only used when
+ * the underlying fact itself is binary (for example, an application submitted
+ * or a document marked uploaded); there are no target counts for activities,
+ * universities, scholarships or tests.
  */
 export function buildPhaseProgress(counts: {
-  profileComplete: boolean;
-  /** Real completeness percentage; overrides the legacy boolean when provided. */
-  profileCompletenessPct?: number;
-  /** Required application checklist items still open. */
+  /** Whether the student has recorded any profile context they chose to share. */
+  profileHasContext: boolean;
   openApplicationRequirements?: number;
-  ieltsScore?: number | null;
   testPlanCount: number;
   savedUniversities: number;
   savedScholarships: number;
@@ -85,138 +79,109 @@ export function buildPhaseProgress(counts: {
   visaApproved: boolean;
   departureReady: boolean;
 }): PhaseProgress[] {
-  const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : a > 0 ? 100 : 0);
-  const docPct = counts.documentsTotal > 0 ? pct(counts.documentsReady, counts.documentsTotal) : counts.documentsReady > 0 ? 70 : 0;
+  const ratio = (ready: number, total: number) =>
+    total > 0 ? Math.round((Math.max(0, Math.min(total, ready)) / total) * 100) : 0;
+  const documentsPct = ratio(counts.documentsReady, counts.documentsTotal);
+  const applicationRequirements = Math.max(0, counts.openApplicationRequirements ?? 0);
 
   const raw: Record<PlanPhaseKey, { p: number; missing: string[] }> = {
     profile: {
-      p: counts.profileCompletenessPct == null
-        ? (counts.profileComplete ? 100 : 30)
-        : Math.max(0, Math.min(100, Math.round(counts.profileCompletenessPct))),
-      missing: (counts.profileCompletenessPct == null
-        ? (counts.profileComplete ? 100 : 30)
-        : Math.max(0, Math.min(100, Math.round(counts.profileCompletenessPct)))) >= 100
-        ? []
-        : ["Complete the remaining profile fields and activity details"],
+      p: counts.profileHasContext ? 100 : 0,
+      missing: counts.profileHasContext ? [] : ["profileContext"],
     },
     tests: {
-      p: counts.ieltsScore != null ? (counts.testPlanCount > 0 ? 100 : 70) : counts.testPlanCount > 0 ? 40 : 0,
-      missing:
-        counts.ieltsScore != null
-          ? counts.testPlanCount > 0
-            ? []
-            : ["Set a target date in the Test Planner"]
-          : ["Take an English test"],
+      p: counts.testPlanCount > 0 ? 100 : 0,
+      missing: counts.testPlanCount > 0 ? [] : ["testPolicy"],
     },
     university_research: {
-      p: counts.savedUniversities >= 6 ? 100 : counts.savedUniversities > 0 ? 50 : 0,
-      missing: counts.savedUniversities > 0 ? (counts.savedUniversities >= 6 ? [] : ["Shortlist 6+ universities"]) : ["Shortlist universities"],
+      p: counts.savedUniversities > 0 ? 100 : 0,
+      missing: counts.savedUniversities > 0 ? [] : ["programmeResearch"],
     },
     scholarship_research: {
-      p: counts.savedScholarships >= 3 ? 100 : counts.savedScholarships > 0 ? 50 : 0,
-      missing: counts.savedScholarships > 0 ? (counts.savedScholarships >= 3 ? [] : ["Save 3+ scholarships"]) : ["Find scholarships"],
+      p: counts.savedScholarships > 0 ? 100 : 0,
+      missing: counts.savedScholarships > 0 ? [] : ["fundingResearchOptional"],
     },
     documents: {
-      p: docPct,
-      missing: docPct >= 100 ? [] : counts.documentsTotal > 0 ? ["Finish your document checklist"] : ["Upload your passport and transcript"],
+      p: documentsPct,
+      missing: documentsPct >= 100 ? [] : [counts.documentsTotal > 0 ? "documentsPending" : "documentsOfficialChecklist"],
     },
     applications: {
       p: counts.submittedApplications > 0
-        ? (counts.openApplicationRequirements ?? 0) === 0 ? 100 : 80
+        ? applicationRequirements === 0 ? 100 : 80
         : counts.applications > 0 ? 50 : 0,
       missing: counts.submittedApplications > 0
-        ? (counts.openApplicationRequirements ?? 0) > 0
-          ? [`${counts.openApplicationRequirements} required item(s) still missing`]
-          : []
-        : counts.applications > 0 ? ["Submit your application"] : ["Start an application"],
+        ? applicationRequirements > 0 ? ["applicationRequirementsOpen"] : []
+        : counts.applications > 0 ? ["applicationSubmit"] : ["applicationOptional"],
     },
     interviews: {
       p: counts.interviewSessions > 0 ? 100 : 0,
-      missing: counts.interviewSessions > 0 ? [] : ["Practise at least one interview"],
+      missing: counts.interviewSessions > 0 ? [] : ["interviewConditional"],
     },
     admission: {
       p: counts.offersRecorded > 0 ? 100 : 0,
-      missing: counts.offersRecorded > 0 ? [] : ["Waiting for decisions"],
+      missing: counts.offersRecorded > 0 ? [] : ["recordDecisionWhenReceived"],
     },
     visa: {
       p: counts.visaApproved ? 100 : counts.visaCaseStarted ? 50 : 0,
-      missing: counts.visaApproved ? [] : counts.visaCaseStarted ? ["Finish your visa case"] : ["Start your visa case"],
+      missing: counts.visaApproved ? [] : ["officialImmigrationGuidance"],
     },
     departure: {
       p: counts.departureReady ? 100 : 0,
-      missing: counts.departureReady ? [] : ["Complete the departure checklist"],
+      missing: counts.departureReady ? [] : ["departureChecklist"],
     },
   };
 
   return PLAN_PHASES.map((phase) => {
-    const r = raw[phase.key];
-    const status: PhaseStatus = r.p >= 100 ? "done" : r.p > 0 ? "in_progress" : "pending";
-    return { ...phase, status, pct: r.p, missing: r.missing };
+    const progress = raw[phase.key];
+    const status: PhaseStatus = progress.p >= 100 ? "done" : progress.p > 0 ? "in_progress" : "pending";
+    return { ...phase, status, pct: progress.p, missing: progress.missing };
   });
 }
 
 // ---------------------------------------------------------------------------
-// Reverse planning (spec §21)
+// Deadline-aware review checklist (not a fixed timetable)
 // ---------------------------------------------------------------------------
 
 export interface ReverseStep {
   key: string;
+  /** Stable fallback text; the UI localizes by key. */
   title: string;
-  /** ISO date (YYYY-MM-DD), always strictly BEFORE `deadline`. */
-  date: string;
-  /** How many days before the deadline this step is. */
-  daysBefore: number;
+  /** We do not invent dates or preparation windows. */
+  date: null;
+  daysBefore: null;
   tab: string;
 }
 
 /**
- * Build the preparation schedule that leads to a real deadline.
- *
- * `deadline` is the truth. Every generated step is clamped to be strictly
- * earlier — a plan that schedules work on or after the deadline is useless, so
- * `clampBefore` drops any step that would land too late rather than lying about
- * the date. This is asserted in `scripts/check-journey.ts`.
+ * Return a checklist only when the student has provided a valid deadline.
+ * Items are intentionally unscheduled: official requirements, portals and
+ * recommender availability determine timing, not a generic countdown model.
  */
-export function reversePlan(deadline: string, kind: "application" | "scholarship" | "visa" = "application"): ReverseStep[] {
-  const end = new Date(`${deadline}T00:00:00Z`);
-  if (Number.isNaN(end.getTime())) return [];
+export function reversePlan(
+  deadline: string,
+  kind: "application" | "scholarship" | "visa" = "application",
+): ReverseStep[] {
+  const parsed = new Date(`${deadline}T00:00:00Z`);
+  if (!deadline || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== deadline) return [];
 
-  const base: { key: string; title: string; daysBefore: number; tab: string }[] =
-    kind === "visa"
-      ? [
-          { key: "documents", title: "Gather visa documents", daysBefore: 45, tab: "visa" },
-          { key: "financial", title: "Prepare financial proof", daysBefore: 35, tab: "funding" },
-          { key: "form", title: "Complete the visa application form", daysBefore: 21, tab: "visa" },
-          { key: "appointment", title: "Book the embassy appointment", daysBefore: 14, tab: "visa" },
-          { key: "interview", title: "Visa interview practice", daysBefore: 7, tab: "interviews" },
-          { key: "submit", title: "Attend the appointment and submit", daysBefore: 1, tab: "visa" },
-        ]
-      : kind === "scholarship"
-        ? [
-            { key: "documents", title: "Collect every required document", daysBefore: 30, tab: "documents" },
-            { key: "essays", title: "Draft the scholarship essay", daysBefore: 24, tab: "sop" },
-            { key: "recommendation", title: "Request recommendation letters", daysBefore: 21, tab: "recommendations" },
-            { key: "review", title: "Review every document and answer", daysBefore: 10, tab: "workspace" },
-            { key: "submit", title: "Submit before the deadline", daysBefore: 2, tab: "workspace" },
-          ]
-        : [
-            { key: "requirements", title: "Review the full requirements checklist", daysBefore: 60, tab: "workspace" },
-            { key: "essay_draft", title: "Essay first draft", daysBefore: 40, tab: "sop" },
-            { key: "essay_review", title: "Essay review and rewrite", daysBefore: 33, tab: "sop" },
-            { key: "recommendation", title: "Recommendation letters requested", daysBefore: 28, tab: "recommendations" },
-            { key: "documents", title: "All documents uploaded", daysBefore: 21, tab: "documents" },
-            { key: "final_check", title: "Final review of every item", daysBefore: 7, tab: "workspace" },
-            { key: "submit", title: "Submit the application", daysBefore: 2, tab: "workspace" },
-          ];
+  const checklist: Record<typeof kind, Omit<ReverseStep, "date" | "daysBefore">[]> = {
+    application: [
+      { key: "confirm_requirements", title: "Confirm programme requirements, deadline and submission route from the official source.", tab: "workspace" },
+      { key: "requested_materials", title: "List only the documents, essays and other materials the official checklist requests.", tab: "workspace" },
+      { key: "recommendation_if_needed", title: "If recommendations are required, confirm instructions and ask each writer about availability in time for the official deadline.", tab: "recommendations" },
+      { key: "submission_review", title: "Review the portal instructions and allow time for the provider’s submission process.", tab: "workspace" },
+    ],
+    scholarship: [
+      { key: "confirm_award", title: "Confirm current eligibility, coverage, materials and deadline with the official award provider.", tab: "scholarships" },
+      { key: "requested_materials", title: "Prepare only the materials the award’s official checklist requests.", tab: "workspace" },
+      { key: "recommendation_if_needed", title: "If a recommendation is required, confirm the provider’s instructions and the writer’s availability.", tab: "recommendations" },
+      { key: "submission_review", title: "Review the award portal instructions and allow time for its submission process.", tab: "workspace" },
+    ],
+    visa: [
+      { key: "official_immigration_guidance", title: "Check current official immigration guidance for your destination and institution.", tab: "visa" },
+      { key: "visa_process_timing", title: "Use the official appointment and processing information to set your own dates; procedures vary.", tab: "visa" },
+    ],
+  };
 
-  const steps: ReverseStep[] = [];
-  for (const s of base) {
-    const d = new Date(end.getTime());
-    d.setUTCDate(d.getUTCDate() - s.daysBefore);
-    const iso = d.toISOString().slice(0, 10);
-    // Never schedule on or after the real deadline.
-    if (iso >= deadline) continue;
-    steps.push({ key: s.key, title: s.title, date: iso, daysBefore: s.daysBefore, tab: s.tab });
-  }
-  return steps;
+  return checklist[kind].map((item) => ({ ...item, date: null, daysBefore: null }));
 }

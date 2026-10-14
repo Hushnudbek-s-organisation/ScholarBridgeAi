@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
   Calculator,
@@ -12,6 +13,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import type { CvGuidance } from "@/lib/cv";
+import type { PortfolioAdviceKey } from "@/lib/costs";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "@/components/AppNote";
 
@@ -39,9 +42,6 @@ interface CostBreakdown {
   totalUsd: number;
   unknowns: string[];
   scholarship: {
-    guaranteedAnnualUsd: number;
-    expectedAnnualUsd: number | null;
-    probabilityDataAvailable: boolean;
     bestCaseAnnualUsd: number;
     coveragePct: number;
     misaligned: string[];
@@ -60,12 +60,7 @@ interface CostBreakdown {
 
 interface Portfolio {
   count: number;
-  expectedAnnualUsd: number | null;
-  expectedCoveragePct: number | null;
-  chanceOfAnyAwardPct: number | null;
-  probabilityDataAvailable: boolean;
-  diversification: "good" | "thin" | "risky";
-  advice: string[];
+  advice: { key: PortfolioAdviceKey; count?: number }[];
 }
 
 interface CvSection {
@@ -79,6 +74,7 @@ interface Cv {
   contact: string[];
   sections: CvSection[];
   missing: string[];
+  guidance: CvGuidance[];
   warnings: string[];
   estimatedPages: number;
   totalItems: number;
@@ -110,7 +106,6 @@ interface PlanningData {
 }
 
 const money = (v: number | null) => v == null ? "Unknown" : `$${Math.round(v).toLocaleString("en-US")}`;
-const pct = (v: number | null) => v == null ? "Unknown" : `${v}%`;
 
 const TABS = [
   { id: "cost", label: "Cost calculator", icon: Calculator },
@@ -124,37 +119,45 @@ interface PlanningStudioProps {
 }
 
 export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
-  const [data, setData] = useState<PlanningData | null>(null);
+  const tCv = useTranslations("cvBuilder");
+  const tPortfolio = useTranslations("costPlanner");
+  const profileId = activeProfile?.id ?? null;
+  const [result, setResult] = useState<{ requestKey: string; data: PlanningData } | null>(null);
+  const [errorResult, setErrorResult] = useState<{ requestKey: string; message: string } | null>(null);
   const [universityId, setUniversityId] = useState<number | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("cost");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!activeProfile?.id) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({ profileId: String(activeProfile.id) });
-      if (universityId) params.set("universityId", String(universityId));
-      const res = await fetch(`/api/planning?${params.toString()}`);
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Failed to build your plan");
-      setData(payload);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to build your plan");
-    } finally {
-      setLoading(false);
-    }
-  }, [activeProfile?.id, universityId]);
+  const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}`;
+  const data = result?.requestKey === requestKey ? result.data : null;
+  const error = errorResult?.requestKey === requestKey ? errorResult.message : "";
+  const loading = profileId !== null && data === null && error === "";
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (profileId === null) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ profileId: String(profileId) });
+    if (universityId) params.set("universityId", String(universityId));
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/planning?${params.toString()}`);
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error || "Failed to build your plan");
+        if (!cancelled) setResult({ requestKey, data: payload });
+      } catch (err) {
+        if (!cancelled) {
+          setErrorResult({
+            requestKey,
+            message: err instanceof Error ? err.message : "Failed to build your plan",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, requestKey, universityId]);
 
   if (!activeProfile) {
     return (
@@ -171,7 +174,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("Could not copy — select the text manually.");
+      setErrorResult({ requestKey, message: "Could not copy — select the text manually." });
     }
   };
 
@@ -319,49 +322,24 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* --------------------- SCHOLARSHIPS --------------------- */}
           {tab === "scholarship" && (
             <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-4">
-                {[
-                  { label: "Saved", value: String(data.portfolio.count) },
-                  { label: "Expected /yr", value: money(data.portfolio.expectedAnnualUsd) },
-                  { label: "Expected coverage", value: pct(data.portfolio.expectedCoveragePct) },
-                  { label: "Chance of ≥1 award", value: pct(data.portfolio.chanceOfAnyAwardPct) },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
-                    <div className="text-xl font-extrabold text-slate-900">{s.value}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{s.label}</div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <span className="text-xs font-bold text-slate-600">{tPortfolio("savedCount")}</span>
+                <span className="text-xl font-extrabold text-slate-900">{data.portfolio.count}</span>
               </div>
 
-              <div
-                className={`rounded-2xl border p-4 ${
-                  data.portfolio.diversification === "good"
-                    ? "border-emerald-200 bg-emerald-50"
-                    : data.portfolio.diversification === "thin"
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-rose-200 bg-rose-50"
-                }`}
-              >
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
                 <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                  Portfolio: {data.portfolio.diversification}
+                  {tPortfolio("reviewHeading")}
                 </h3>
-                <ul className="mt-2 space-y-1.5">
-                  {data.portfolio.advice.map((a, i) => (
-                    <li key={i} className="flex gap-1.5 text-xs text-slate-700">
+                <ul className="mt-2 space-y-2">
+                  {data.portfolio.advice.map((item, i) => (
+                    <li key={`${item.key}-${i}`} className="flex gap-1.5 text-xs text-slate-700">
                       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
-                      <span>{a}</span>
+                      <span>{item.count == null ? tPortfolio(item.key) : tPortfolio(item.key, { count: item.count })}</span>
                     </li>
                   ))}
-                  {data.portfolio.advice.length === 0 && (
-                    <li className="text-xs text-slate-600">
-                      A well-balanced portfolio. Keep the deadlines in the calendar.
-                    </li>
-                  )}
                 </ul>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  Win probabilities are a neutral 20% prior — we do not know your odds, and inventing
-                  them would be worse than useless. Replace them with your own read.
-                </p>
+                <p className="mt-2 text-[11px] text-slate-500">{tPortfolio("probabilityUnavailable")}</p>
               </div>
 
               {data.costs.scholarship.misaligned.map((m, i) => (
@@ -381,10 +359,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Application CV</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{tCv("cvTitle")}</h3>
                   <p className="text-[11px] text-slate-500">
-                    {data.cv.totalItems} entries · about {data.cv.estimatedPages} page
-                    {data.cv.estimatedPages === 1 ? "" : "s"}
+                    {tCv("cvMeta", { items: data.cv.totalItems, pages: data.cv.estimatedPages })}
                   </p>
                 </div>
                 <button
@@ -392,7 +369,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  {copied ? "Copied" : "Copy as text"}
+                  {copied ? tCv("copied") : tCv("copy")}
                 </button>
               </div>
 
@@ -412,10 +389,10 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               {data.cv.missing.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                    Missing from your profile
+                    {tCv("missingTitle")}
                   </h4>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    These are left out of the CV rather than invented. Fill them in and the CV grows.
+                    {tCv("missingNote")}
                   </p>
                   <ul className="mt-2 grid gap-1 sm:grid-cols-2">
                     {data.cv.missing.map((m, i) => (
@@ -425,6 +402,32 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {data.cv.guidance.length > 0 && (
+                <section
+                  aria-labelledby="cv-revision-guidance-title"
+                  className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20 sm:p-5"
+                >
+                  <h4 id="cv-revision-guidance-title" className="text-sm font-bold text-indigo-950 dark:text-indigo-100">
+                    {tCv("adviceTitle")}
+                  </h4>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    {tCv("adviceSubtitle")}
+                  </p>
+                  <ol className="mt-4 space-y-3">
+                    {data.cv.guidance.map((tip, index) => (
+                      <li key={`${tip.key}-${index}`} className="flex items-start gap-3">
+                        <span aria-hidden="true" className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900 dark:text-indigo-200 dark:ring-indigo-800">
+                          {index + 1}
+                        </span>
+                        <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200 sm:text-sm">
+                          {tCv(`advice.${tip.key}` as never, tip.values as never)}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
               )}
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5">

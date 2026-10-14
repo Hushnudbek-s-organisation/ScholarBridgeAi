@@ -144,24 +144,21 @@ const readiness = (over: Partial<ReadinessInput> = {}): ReadinessInput => ({
   documentsTotal: 4,
   applicationsStarted: 1,
   applicationsSubmitted: 0,
-  fundingItems: 1,
+  familyBudget: 30000,
+  fundingPreference: true,
   ...over,
 });
 
 const nextInput = (over: Partial<NextStepsInput> = {}): NextStepsInput => ({
   journey: { current: "prepare", stillNeeded: [] },
-  readiness: { weakest: [] },
   appRows: [],
   openRequirements: 0,
   deadlines: [],
   gaps: [],
   recommendations: { submitted: 0, outstanding: 0 },
   documents: { ready: 0, total: 0, expiring: 0 },
-  tests: { ielts: 6.5, target: 7.5, belowTarget: true },
+  tests: { ielts: 6.5, target: 7.5 },
   funding: null,
-  profileComplete: true,
-  savedUniversities: 3,
-  visaStage: false,
   ...over,
 });
 
@@ -210,15 +207,15 @@ check("stages only ever advance in order", () => {
   const order = JOURNEY_STAGES.map((s) => s.id);
   let prev = -1;
   for (const c of [
-    counts({ profileComplete: true }),
-    counts({ profileComplete: true, savedUniversities: 4 }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1 }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1 }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1 }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1 }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true, visaCaseStarted: true, visaApproved: true }),
-    counts({ profileComplete: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true, visaCaseStarted: true, visaApproved: true, departureReady: true }),
+    counts({ profileHasContext: true }),
+    counts({ profileHasContext: true, savedUniversities: 4 }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1 }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1 }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1 }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1 }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true, visaCaseStarted: true, visaApproved: true }),
+    counts({ profileHasContext: true, savedUniversities: 4, applications: 1, submittedApplications: 1, offersRecorded: 1, acceptedOffers: 1, fundingPlanTotal: 2, fundingGapClosed: true, visaCaseStarted: true, visaApproved: true, departureReady: true }),
   ]) {
     const idx = order.indexOf(currentStage(c));
     assert.ok(idx >= prev, `stage went backwards to ${currentStage(c)}`);
@@ -228,7 +225,7 @@ check("stages only ever advance in order", () => {
 
 check("journey progress only ever moves forward and stays in 0–100", () => {
   let prev = -1;
-  for (const c of [EMPTY_JOURNEY_COUNTS, counts({ profileComplete: true }), counts({ profileComplete: true, departureReady: true })]) {
+  for (const c of [EMPTY_JOURNEY_COUNTS, counts({ profileHasContext: true }), counts({ profileHasContext: true, departureReady: true })]) {
     const p = journeyProgress(c);
     assert.ok(p >= prev && p >= 0 && p <= 100, `progress ${p} (previous ${prev})`);
     prev = p;
@@ -236,7 +233,7 @@ check("journey progress only ever moves forward and stays in 0–100", () => {
 });
 
 check("stage completion is a bounded 0–1 table with explicit partial credit", () => {
-  const done = stageCompletion(counts({ profileComplete: true, applications: 3, savedUniversities: 2 }));
+  const done = stageCompletion(counts({ profileHasContext: true, applications: 3, savedUniversities: 2 }));
   for (const s of JOURNEY_STAGES) {
     assert.ok(done[s.id] >= 0 && done[s.id] <= 1, `${s.id} = ${done[s.id]}`);
   }
@@ -247,7 +244,7 @@ check("stage completion is a bounded 0–1 table with explicit partial credit", 
 });
 
 check("'still needed' always points at a real section", () => {
-  for (const c of [EMPTY_JOURNEY_COUNTS, counts({ profileComplete: true }), counts({ profileComplete: true, savedUniversities: 4, applications: 2 })]) {
+  for (const c of [EMPTY_JOURNEY_COUNTS, counts({ profileHasContext: true }), counts({ profileHasContext: true, savedUniversities: 4, applications: 2 })]) {
     for (const s of stageStillNeeded(currentStage(c), c)) {
       assert.ok(s.text, "a step needs a sentence");
       assert.ok(isNavigable(s.tab), `unknown tab ${s.tab}`);
@@ -562,91 +559,110 @@ check("a submitted application is locked at 100", () => {
 });
 
 // ---------------------------------------------------------------------------
-section("Reverse-planned deadlines");
+section("Deadline review checklists");
 // ---------------------------------------------------------------------------
 
-check("every reverse step lands strictly BEFORE the deadline", () => {
+check("deadline review items are unscheduled and contain no invented lead times", () => {
   for (const kind of ["application", "scholarship", "visa"] as const) {
-    for (const step of reversePlan("2026-12-01", kind)) {
-      assert.ok(step.date < "2026-12-01", `${kind}/${step.key} = ${step.date} is not before the deadline`);
-      assert.ok(step.daysBefore > 0, `${kind}/${step.key} must be a positive lead time`);
+    const plan = reversePlan("2026-12-01", kind);
+    assert.ok(plan.length > 0, `${kind} should have a verification checklist`);
+    for (const step of plan) {
+      assert.equal(step.date, null, `${kind}/${step.key} must not invent a date`);
+      assert.equal(step.daysBefore, null, `${kind}/${step.key} must not invent lead time`);
       assert.ok(isNavigable(step.tab), `${kind}/${step.key} → unknown tab ${step.tab}`);
     }
   }
+  const visa = reversePlan("2026-12-01", "visa");
+  assert.ok(visa.every((step) => !/passport|bank statement|transcript/i.test(step.title)), "visa checklist must not invent universal paperwork");
+  assert.ok(!reversePlan("2026-12-01", "application").some((step) => /21|28 days|three weeks/i.test(step.title)));
 });
 
-check("a deadline in the past never produces a plan dated in the future", () => {
-  for (const kind of ["application", "scholarship", "visa"] as const) {
-    for (const step of reversePlan("2020-01-01", kind)) assert.ok(step.date < "2020-01-01", `${kind}/${step.key}`);
-  }
-});
-
-check("an unparseable deadline produces no plan at all", () => {
+check("invalid deadlines produce no review checklist", () => {
   assert.deepEqual(reversePlan("not-a-date", "application"), []);
   assert.deepEqual(reversePlan("", "application"), []);
-});
-
-check("the plan is ordered and ends with the submission itself", () => {
-  const plan = reversePlan("2026-12-01", "application");
-  assert.ok(plan.length >= 5);
-  for (let i = 1; i < plan.length; i++) assert.ok(plan[i - 1].date <= plan[i].date, "steps must be chronological");
-  assert.equal(plan[plan.length - 1].key, "submit");
+  assert.deepEqual(reversePlan("2026-02-30", "application"), []);
 });
 
 // ---------------------------------------------------------------------------
-section("Profile readiness + test gap");
+section("Profile information coverage + test comparison");
 // ---------------------------------------------------------------------------
 
-check("readiness is a 0–100 breakdown with explainable gaps", () => {
-  const r = profileReadiness(readiness());
-  assert.ok(r.categories.length >= 6);
-  for (const c of r.categories) {
-    assert.ok(c.pct >= 0 && c.pct <= 100, c.key);
-    assert.ok(c.gaps.length > 0, `${c.key} has no explanation`);
+check("profile coverage has seven explainable information areas", () => {
+  const result = profileReadiness(readiness());
+  assert.equal(result.categories.length, 7);
+  for (const category of result.categories) {
+    assert.ok(category.pct >= 0 && category.pct <= 100, category.key);
+    assert.ok(["complete", "partial", "not_recorded", "unknown"].includes(category.state), category.key);
+    if (category.state !== "complete") assert.ok(category.gaps.length > 0, `${category.key} needs an explanation`);
   }
-  assert.ok(r.weakest.length > 0);
-  for (let i = 1; i < r.weakest.length; i++) assert.ok(r.weakest[i - 1].pct <= r.weakest[i].pct, "weakest must be sorted");
+  assert.ok(result.overall >= 0 && result.overall <= 100);
+  assert.ok(result.weakest.length > 0);
 });
 
-check("an empty profile is weak everywhere and says why", () => {
-  const r = profileReadiness({
+check("an absent test score is unknown rather than a readiness penalty", () => {
+  const withOptionalFields = profileReadiness(readiness({ ieltsScore: null, toeflScore: null, duolingoScore: null, satScore: null, actScore: null, greScore: null }));
+  const english = withOptionalFields.categories.find((category) => category.key === "english")!;
+  const standardized = withOptionalFields.categories.find((category) => category.key === "testing")!;
+  assert.equal(english.state, "unknown");
+  assert.equal(standardized.state, "unknown");
+  assert.equal(english.pct, 0);
+  assert.equal(standardized.pct, 0);
+  assert.ok(withOptionalFields.overall > 0, "recorded information remains measurable without a test");
+});
+
+check("empty optional sections are excluded and do not create weakest categories", () => {
+  const result = profileReadiness({
     activitiesCount: 0,
     documentsReady: 0,
     documentsTotal: 0,
     applicationsStarted: 0,
     applicationsSubmitted: 0,
-    fundingItems: 0,
   });
-  assert.ok(r.overall < 40, `expected a weak overall score, got ${r.overall}`);
-  const docs = r.categories.find((c) => c.key === "documents");
-  assert.equal(docs!.pct, 0);
-  assert.ok(docs!.gaps.length > 0);
+  assert.equal(result.overall, 0);
+  assert.deepEqual(result.weakest, []);
+  assert.ok(result.categories.every((category) => category.unknown), "empty categories should be unknown, not poor");
 });
 
-check("adding real data strictly improves readiness", () => {
-  const weak = profileReadiness(readiness({ ieltsScore: null, activitiesCount: 0 }));
-  const strong = profileReadiness(readiness({ ieltsScore: 7.5, activitiesCount: 8, documentsReady: 4, documentsTotal: 4, applicationsSubmitted: 1 }));
-  assert.ok(strong.overall > weak.overall, `${strong.overall} should beat ${weak.overall}`);
+check("document percentages only compare an existing checklist", () => {
+  const empty = profileReadiness({ activitiesCount: 0, documentsReady: 0, documentsTotal: 0, applicationsStarted: 0, applicationsSubmitted: 0 });
+  const docs = empty.categories.find((category) => category.key === "documents")!;
+  assert.equal(docs.state, "unknown");
+  const tracked = profileReadiness(readiness({ documentsReady: 2, documentsTotal: 4 })).categories.find((category) => category.key === "documents")!;
+  assert.equal(tracked.pct, 50);
+  assert.equal(tracked.state, "partial");
 });
 
-check("the test gap is a fact, never an admission probability", () => {
-  const met = testGap("ielts", 7, 7.5, "IELTS");
-  assert.equal(met.state, "met");
-  assert.ok(!/\d+%/i.test(met.message), "no percentages, no probabilities");
+check("test comparison describes catalogue figures, not admissions outcomes", () => {
+  const atOrAbove = testGap("ielts", 7, 7.5, "IELTS");
+  assert.equal(atOrAbove.state, "at_or_above_figure");
+  assert.equal(atOrAbove.delta, 0.5);
+  assert.equal(atOrAbove.messageKey, "atOrAboveCatalogueFigure");
   const below = testGap("ielts", 7.5, 6.5, "IELTS");
-  assert.equal(below.state, "below");
+  assert.equal(below.state, "below_figure");
   assert.equal(below.delta, -1);
-  assert.ok(!/chance|likel|probab/i.test(below.message), below.message);
+  assert.equal(below.catalogueFigure, 7.5);
   const none = testGap("ielts", null, 6.5, "IELTS");
-  assert.equal(none.state, "no_requirement");
+  assert.equal(none.state, "no_figure");
   const noScore = testGap("ielts", 7.5, null, "IELTS");
   assert.equal(noScore.state, "no_score");
   assert.equal(noScore.delta, null);
+  assert.equal(noScore.catalogueFigure, 7.5);
 });
 
 // ---------------------------------------------------------------------------
 section("Next actions");
 // ---------------------------------------------------------------------------
+
+check("saved universities without a stored date are not reported as OPEN", () => {
+  const source = readFileSync("src/app/api/deadlines/route.ts", "utf8");
+  const start = source.indexOf("for (const u of uniRows)");
+  const end = source.indexOf("// --- User milestones", start);
+  const savedUniversityItem = source.slice(start, end);
+  assert.ok(start >= 0 && end > start, "saved-university deadline block exists");
+  assert.match(savedUniversityItem, /date:\s*null/);
+  assert.match(savedUniversityItem, /status:\s*"NO DEADLINE ON FILE"/);
+  assert.doesNotMatch(savedUniversityItem, /status:\s*"OPEN"/);
+});
 
 check("the nearest deadline always leads the list", () => {
   const steps = computeNextActions(
@@ -660,13 +676,28 @@ check("the nearest deadline always leads the list", () => {
     })
   );
   assert.equal(steps[0].id, "deadline-near");
-  assert.equal(steps[0].urgency, "critical");
+  assert.equal(steps[0].urgency, "medium", "a future date is not assigned an arbitrary urgency window");
+});
+
+check("a distant tracked date remains visible without a fixed preparation window", () => {
+  const steps = computeNextActions(nextInput({ deadlines: [{ id: "distant", title: "Future application", daysRemaining: 200 }] }));
+  assert.equal(steps[0]?.id, "deadline-distant");
+  assert.equal(steps[0]?.dueInDays, 200);
+});
+
+check("recommendation records use no fabricated lead time", () => {
+  const steps = computeNextActions(nextInput({ recommendations: { submitted: 0, outstanding: 1 } }));
+  const step = steps.find((action) => action.id === "recommendations");
+  assert.ok(step);
+  assert.equal(step!.dueInDays, null);
+  assert.equal(step!.urgency, "low");
 });
 
 check("an overdue date is critical and says so in words", () => {
   const [s] = computeNextActions(nextInput({ deadlines: [{ id: "past", title: "Scholarship", daysRemaining: -4 }] }));
   assert.equal(s.urgency, "critical");
-  assert.ok(/passed 4 day/.test(s.detail), s.detail);
+  assert.equal(s.detailKey, "deadlinePassed");
+  assert.equal(s.values?.days, 4);
 });
 
 check("an undated deadline is surfaced but never given a fake urgency", () => {
@@ -675,7 +706,7 @@ check("an undated deadline is surfaced but never given a fake urgency", () => {
   assert.ok(s, "the undated deadline must still be shown");
   assert.equal(s!.urgency, "low");
   assert.equal(s!.dueInDays, null);
-  assert.ok(/no date recorded/i.test(s!.detail), s!.detail);
+  assert.equal(s!.detailKey, "deadlineNoDate");
 });
 
 check("every action has a title, a sentence and a tab that exists", () => {
@@ -683,37 +714,34 @@ check("every action has a title, a sentence and a tab that exists", () => {
     nextInput({
       openRequirements: 2,
       deadlines: [{ id: "d", title: "MIT deadline", daysRemaining: 10, tab: "applications" }],
-      gaps: [{ testType: "ielts", state: "below", current: 6.5, required: 7.5, message: "1.0 to go" }],
+      gaps: [{ testType: "ielts", state: "below_figure", current: 6.5, catalogueFigure: 7.5, messageKey: "belowCatalogueFigure" }],
       recommendations: { submitted: 0, outstanding: 2 },
       documents: { ready: 1, total: 4, expiring: 1 },
       funding: { gap: 5000, covered: false },
-      visaStage: true,
-      readiness: { weakest: [{ key: "activities", label: "Activities", pct: 20, gaps: ["Add 3 more"], tab: "activities" }] },
     }),
     10
   );
   assert.ok(steps.length > 3, "the dashboard must have real next actions");
   for (const s of steps) {
-    assert.ok(s.title && s.detail, s.id);
+    assert.ok((s.titleKey || s.rawTitle) && s.detailKey, s.id);
     assert.ok(s.tab, s.id);
   }
 });
 
-check("nothing is scheduled once there is nothing to do", () => {
+check("an empty action list gets a neutral study-plan entry point", () => {
   const steps = computeNextActions(
     nextInput({
       journey: { current: "depart", stillNeeded: [] },
       openRequirements: 0,
       documents: { ready: 4, total: 4, expiring: 0 },
-      tests: { ielts: 7.5, target: 7.5, belowTarget: false },
+      tests: { ielts: 7.5, target: 7.5 },
       funding: { gap: 0, covered: true },
       recommendations: { submitted: 2, outstanding: 0 },
-      savedUniversities: 12,
-      profileComplete: true,
-      visaStage: false,
     })
   );
-  for (const s of steps) assert.ok(!/still missing|still open|not started/i.test(s.title), s.title);
+  assert.equal(steps.length, 1);
+  assert.equal(steps[0].titleKey, "studyPlanStart");
+  assert.equal(steps[0].detailKey, "studyPlanStartDetail");
 });
 
 // ---------------------------------------------------------------------------
@@ -735,10 +763,9 @@ check("every phase opens a real section", () => {
   }
 });
 
-check("phase progress is derived from real counts, not stored by hand", () => {
+check("phase summaries describe tracked records without universal targets", () => {
   const zero = buildPhaseProgress({
-    profileComplete: false,
-    ieltsScore: null,
+    profileHasContext: false,
     testPlanCount: 0,
     savedUniversities: 0,
     savedScholarships: 0,
@@ -753,20 +780,20 @@ check("phase progress is derived from real counts, not stored by hand", () => {
     departureReady: false,
   });
   assert.equal(zero.length, PLAN_PHASES.length);
-  for (const p of zero) {
-    assert.ok(p.pct >= 0 && p.pct < 100, `${p.key} must not be complete on an empty account (got ${p.pct})`);
-    assert.ok(p.missing.length > 0, `${p.key} must say what is missing`);
+  for (const phase of zero) {
+    assert.ok(phase.pct >= 0 && phase.pct < 100, `${phase.key} should not be complete without a tracked record`);
+    assert.ok(phase.missing.length > 0, `${phase.key} should explain its unknown or pending state`);
   }
-  assert.equal(zero.find((p) => p.key === "visa")!.pct, 0);
-  assert.equal(zero.find((p) => p.key === "departure")!.pct, 0);
+  assert.equal(zero.find((phase) => phase.key === "tests")!.missing[0], "testPolicy");
+  assert.equal(zero.find((phase) => phase.key === "documents")!.missing[0], "documentsOfficialChecklist");
+  assert.equal(zero.find((phase) => phase.key === "visa")!.missing[0], "officialImmigrationGuidance");
 });
 
 const fullCounts = {
-  profileComplete: true,
-  ieltsScore: 7.5,
+  profileHasContext: true,
   testPlanCount: 1,
-  savedUniversities: 8,
-  savedScholarships: 5,
+  savedUniversities: 1,
+  savedScholarships: 1,
   documentsReady: 4,
   documentsTotal: 4,
   applications: 2,
@@ -778,40 +805,41 @@ const fullCounts = {
   departureReady: true,
 };
 
-check("profile completeness and open required items prevent false completion", () => {
-  const profileAt55 = buildPhaseProgress({ ...fullCounts, profileCompletenessPct: 55 });
-  assert.equal(profileAt55.find((p) => p.key === "profile")!.pct, 55);
-  assert.equal(profileAt55.find((p) => p.key === "profile")!.status, "in_progress");
+check("phase completion uses recorded choices, not GPA, test, activity or count thresholds", () => {
+  const oneEach = buildPhaseProgress(fullCounts);
+  for (const key of ["profile", "tests", "university_research", "scholarship_research"] as const) {
+    assert.equal(oneEach.find((phase) => phase.key === key)!.pct, 100, `${key} should not require an invented count threshold`);
+  }
+  const noTestPlan = buildPhaseProgress({ ...fullCounts, testPlanCount: 0 });
+  assert.equal(noTestPlan.find((phase) => phase.key === "tests")!.pct, 0);
+  assert.equal(noTestPlan.find((phase) => phase.key === "tests")!.missing[0], "testPolicy");
+  const oneProfileDetail = buildPhaseProgress({ ...fullCounts, profileHasContext: true });
+  assert.equal(oneProfileDetail.find((phase) => phase.key === "profile")!.pct, 100, "profile data is a record, not a universal completeness threshold");
+});
 
+check("open application-specific requirements remain visible", () => {
   const submittedWithOpenItems = buildPhaseProgress({ ...fullCounts, openApplicationRequirements: 2 });
-  const applicationPhase = submittedWithOpenItems.find((p) => p.key === "applications")!;
+  const applicationPhase = submittedWithOpenItems.find((phase) => phase.key === "applications")!;
   assert.equal(applicationPhase.pct, 80);
   assert.equal(applicationPhase.status, "in_progress");
-  assert.deepEqual(applicationPhase.missing, ["2 required item(s) still missing"]);
-
+  assert.deepEqual(applicationPhase.missing, ["applicationRequirementsOpen"]);
   const submittedComplete = buildPhaseProgress({ ...fullCounts, openApplicationRequirements: 0 });
-  assert.equal(submittedComplete.find((p) => p.key === "applications")!.pct, 100);
+  assert.equal(submittedComplete.find((phase) => phase.key === "applications")!.pct, 100);
 });
 
-check("progress only grows as the student actually does things", () => {
-  for (const p of buildPhaseProgress(fullCounts)) {
-    assert.equal(p.pct, 100, `${p.key} should be complete`);
-    assert.equal(p.status, "done", p.key);
-    assert.deepEqual(p.missing, [], p.key);
-  }
+check("recording one of several documents shows checklist coverage, not a universal document list", () => {
   const half = buildPhaseProgress({ ...fullCounts, documentsReady: 2, documentsTotal: 4 });
-  const docs = half.find((p) => p.key === "documents")!;
-  assert.ok(docs.pct > 0 && docs.pct < 100);
-  assert.equal(docs.status, "in_progress");
-  assert.ok(docs.missing.length > 0);
+  const documents = half.find((phase) => phase.key === "documents")!;
+  assert.equal(documents.pct, 50);
+  assert.equal(documents.status, "in_progress");
+  assert.deepEqual(documents.missing, ["documentsPending"]);
 });
 
-check("no phase ever regresses as the student does more", () => {
-  const before = buildPhaseProgress({ ...fullCounts, documentsReady: 0, savedUniversities: 0, applications: 0 });
-  const after = buildPhaseProgress(fullCounts);
-  for (let i = 0; i < before.length; i++) {
-    assert.ok(after[i].pct >= before[i].pct, `${before[i].key} went backwards: ${before[i].pct} → ${after[i].pct}`);
-  }
+check("interview practice and departure records never imply visa approval", () => {
+  const result = buildPhaseProgress({ ...fullCounts, visaCaseStarted: false, visaApproved: false, interviewSessions: 1, departureReady: true });
+  const visa = result.find((phase) => phase.key === "visa")!;
+  assert.equal(visa.pct, 0);
+  assert.equal(visa.status, "pending");
 });
 
 // ---------------------------------------------------------------------------
@@ -1048,6 +1076,29 @@ check("the dashboard is locked visible and in HOME", () => {
   assert.equal(d!.locked, true);
 });
 
+check("free task and deadline workflows are not labelled as Pro", () => {
+  const tasks = NAV_SECTIONS.find((s) => s.id === "tasks");
+  assert.ok(tasks, "Tasks & Timeline must exist");
+  assert.notEqual(tasks!.premium, true, "the basic task/deadline destination must not show a Pro badge");
+  assert.ok(tasks!.panes.some((p) => p.id === "deadlines"), "the existing Deadlines pane must remain in Tasks & Timeline");
+  assert.notEqual(tasks!.panes.find((p) => p.id === "deadlines")?.premium, true, "the free deadline pane must not show a Pro badge");
+  const deadlinesRoute = readFileSync("src/app/api/deadlines/route.ts", "utf8");
+  assert.doesNotMatch(deadlinesRoute, /premiumGate|requireFeatureSession/);
+  const hubs = readFileSync("src/components/hubs/index.tsx", "utf8");
+  assert.match(hubs, /DeadlineCenter key=\{profile\.id\}/, "deadline state must not leak across active profile changes");
+  assert.match(hubs, /ConsultingSection key=\{profile\.id\}/, "consulting form state must be profile-scoped");
+  assert.match(hubs, /MentorMarketplace key=\{profile\.id\}/, "mentor results and sent-state must be profile-scoped");
+});
+
+check("profile changes remount the active workspace", () => {
+  const home = readFileSync("src/app/HomeClient.tsx", "utf8");
+  assert.match(
+    home,
+    /<PageTransition\s+key=\{activeProfile\?\.id \?\? "none"\}/,
+    "all profile-scoped panel state must reset immediately when the active identity changes",
+  );
+});
+
 check("the whole journey is reachable from the new destinations", () => {
   const ids = new Set(NAV_SECTIONS.map((s) => s.id));
   for (const id of [
@@ -1065,6 +1116,30 @@ check("every feature that used to be its own section still resolves", () => {
     assert.ok(target, `${oldId} no longer resolves`);
     assert.ok(NAV_SECTIONS.some((s) => s.id === target!.section), `${oldId} → unknown section ${target!.section}`);
   }
+});
+
+check("global scholarship search opens the catalogue and passes the selected record into its title filter", () => {
+  const searchApi = readFileSync("src/app/api/search/route.ts", "utf8");
+  const palette = readFileSync("src/components/CommandPalette.tsx", "utf8");
+  const home = readFileSync("src/app/HomeClient.tsx", "utf8");
+  const hubs = readFileSync("src/components/hubs/index.tsx", "utf8");
+  const scholarshipHub = readFileSync("src/components/ScholarshipHub.tsx", "utf8");
+  assert.match(searchApi, /kind: "scholarship"[^\n]*tab: "scholarships\/browse"/);
+  assert.match(palette, /title: it\.label/);
+  assert.match(home, /detail\.kind === "scholarship"/);
+  assert.match(home, /autoFocusScholarship=\{focusScholarship\}/);
+  assert.match(hubs, /autoFocusScholarship=\{autoFocusScholarship \?\? null\}/);
+  assert.match(scholarshipHub, /setSearch\(autoFocusScholarship\.title\)/);
+  assert.match(scholarshipHub, /params\.set\("search", search\.trim\(\)\)/);
+  assert.match(scholarshipHub, /params\.set\("focusId", String\(autoFocusScholarship\.id\)\)/);
+  assert.match(scholarshipHub, /data-focused-record=\{isFocused \? "true" : undefined\}/);
+});
+
+check("global search returns only published course records and student routes reject draft ids", () => {
+  const searchApi = readFileSync("src/app/api/search/route.ts", "utf8");
+  const courseDetail = readFileSync("src/app/api/courses/[id]/route.ts", "utf8");
+  assert.match(searchApi, /eq\(courses\.isPublished, true\)/);
+  assert.match(courseDetail, /eq\(courses\.isPublished, true\)/);
 });
 
 check("no destination nests more than one level of navigation", () => {
@@ -1207,6 +1282,23 @@ check("premium is enforced on the server, never in the client components", () =>
     const src = readFileSync(p, "utf8");
     assert.ok(!/isPremium\s*\?|premiumUntil/.test(src), `${p} must not branch on premium in the browser`);
   }
+});
+
+check("the generated parent bearer link has a localized, non-indexed page", () => {
+  const page = readFileSync("src/app/parent/[token]/page.tsx", "utf8");
+  const view = readFileSync("src/components/ParentShareView.tsx", "utf8");
+  assert.ok(page.includes("ParentShareView"), "the route must render its human-facing viewer");
+  assert.ok(/index:\s*false/.test(page) && /noarchive:\s*true/.test(page), "bearer pages must not be indexed or archived");
+  assert.ok(/referrer:\s*\"no-referrer\"/.test(page) && /referrerPolicy:\s*\"no-referrer\"/.test(view), "the token must not be sent as a referrer");
+  assert.ok(view.includes("credentials: \"omit\"") && view.includes("cache: \"no-store\""), "public summary fetch must omit credentials and caching");
+});
+
+check("parent-share API uses canonical-origin links and a narrow non-cacheable projection", () => {
+  const route = readFileSync("src/app/api/parent-share/route.ts", "utf8");
+  assert.ok(route.includes("configuredAppUrl()"), "share links must not trust Host from req.url");
+  assert.ok(route.includes("private, no-store"), "bearer JSON must not be cached");
+  assert.ok(route.includes("applicationOutcomes.result") && route.includes("applications.status"), "only aggregate tracker facts are read");
+  assert.ok(!route.includes("computeProfileCompleteness") && !route.includes(".select().from(studentProfiles)"), "no profile score or full profile row is loaded");
 });
 
 check("no journey client component reaches an AI provider directly", () => {

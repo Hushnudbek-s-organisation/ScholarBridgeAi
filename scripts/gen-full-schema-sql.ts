@@ -8,19 +8,23 @@
  *
  *   npm run db:gen:full-schema
  *
- * The generated file is strictly ADDITIVE and idempotent:
- *   Part 1  CREATE TABLE IF NOT EXISTS  (fresh databases — full definition
- *           including PKs, NOT NULL, DEFAULTs, inline FKs and CHECKs)
- *   Part 2  ADD COLUMN IF NOT EXISTS    (old databases that lost columns)
- *   Part 3  CREATE [UNIQUE] INDEX IF NOT EXISTS
- *   Part 4  missing FK constraints, added only when safe (DO $$ guard)
- *   Part 5  RLS lockdown (same logic as supabase/enable_rls.sql)
+ * Parts 1–4 create/add structural objects idempotently. Part 5 is a
+ * security-sensitive access-control change, not an additive no-op:
+ * it enables RLS on public tables owned by the executing role, revokes all
+ * table privileges from anon/authenticated, then grants read-only catalog
+ * access to universities and scholarships. It also replaces the named
+ * public_catalog_read policy on those two tables. Review the effect on the
+ * target project's direct-client grants/policies before any live apply.
  *
- * No DROP, no RENAME, no type change — re-running changes nothing.
+ * No DROP TABLE/COLUMN, rename, type change, or row-data mutation is emitted.
+ * Re-running is structurally idempotent, but can still change effective
+ * access and is not proof of production safety. FK/check constraints may be
+ * skipped with NOTICE when existing rows violate them.
  *
- * After writing, the generator re-parses its own output and asserts that
- * every table/column/type the app needs is present. A generator bug can
- * therefore never ship a broken schema file.
+ * After writing, the generator re-parses its output and checks tables,
+ * columns, types, and default presence (except SERIAL's implicit sequence
+ * default). This guards generation drift; it does not validate live database
+ * permissions, existing data, or end-to-end application behavior.
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -78,10 +82,14 @@ function quoteIdent(s: string): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-function defaultOf(col: { hasDefault: boolean; raw?: { default?: unknown } }): string | null {
+function defaultOf(col: { hasDefault: boolean; type: string; raw?: { default?: unknown } }): string | null {
   if (!col.hasDefault) return null;
   const d = col.raw?.default;
   if (typeof d === "string") return `'${d.replace(/'/g, "''")}'`;
+  if (col.type === "jsonb" && d !== null && typeof d === "object" && !("queryChunks" in d)) {
+    const serialized = JSON.stringify(d);
+    if (typeof serialized === "string") return `'${serialized.replace(/'/g, "''")}'::jsonb`;
+  }
   if (typeof d === "number") return String(d);
   if (typeof d === "boolean") return d ? "TRUE" : "FALSE";
   const chunks = (d as { queryChunks?: unknown[] } | null)?.queryChunks;
@@ -173,31 +181,32 @@ function main() {
 -- NIMA BU:
 --   src/db/schema.ts (Drizzle) — ilova o'qiydigan/yozadigan BARCHA jadval
 --   va ustunlarning yagona manbai. Bu fayl aynan shu manbadan yaratilgan:
---   har bir jadval, har bir ustun, har bir indeks ilovadan kerak bo'lgani
---   bilan to'liq muvofiq.
+--   fresh baza uchun kerakli schema obyektlarini shu manbadan yaratadi;
+--   mavjud bazada faqat yetishmayotganlarini qo'shadi va eski ustunlarni
+--   avtomatik olib tashlamaydi.
 --
--- QANDAY ISHLATISH:
---   1. Supabase Dashboard -> SQL Editor -> New query
---   2. Bu faylni butunlay nusxalab qo'ying va "Run" bosing.
---   3. Tekshiring:  DATABASE_URL=postgresql://... npm run db:verify
+-- ISHLATISHDAN OLDIN:
+--   Live/production bazada bu skriptni qo'llashdan avval SQL'ni ko'rib chiqing,
+--   staging'da tekshiring, backup oling va RLS/grant ta'sirini tasdiqlating.
+--   db:verify faqat table/column/type shaklini tekshiradi.
 --
--- XAVFSIZLIK:
---   * Faqat QO'SHADI (ADDITIVE): CREATE TABLE IF NOT EXISTS,
---     ADD COLUMN IF NOT EXISTS, CREATE INDEX IF NOT EXISTS.
---   * Hech qanday jadval/ustun o'chirilmaydi, nom o'zgartirilmaydi,
---     ma'lumot o'zgartirilmaydi. Necha marta ishlasangiz ham — xuddi
---     shu natija.
---   * Yangi loyihada: butun schemani bir bosishda yaratadi.
---   * Eski loyihada: yo'qolgan jadval/ustunlarni to'ldiradi ("bazi joylar
---     Supabaseda to'g'ri kelmayapti" — mana shu joylar avtomatik tuzatiladi).
+-- STRUKTURA VA XAVFSIZLIK:
+--   * Part 1-4: CREATE TABLE / ADD COLUMN / CREATE INDEX IF NOT EXISTS va
+--     ehtiyotkor FK/check qo'shish; row data o'zgartirilmaydi.
+--   * Part 5 PURELY ADDITIVE EMAS: owned public jadvallarda RLS yoqadi,
+--     anon/authenticated huquqlarini olib tashlaydi, universities/scholarships
+--     uchun SELECT beradi va public_catalog_read siyosatini qayta yaratadi.
+--   * Jadval/ustun o'chirilmaydi, rename/type change yo'q. Ammo direct-Supabase
+--     client access o'zgarishi mumkin; idempotentlik production xavfsizligini
+--     anglatmaydi. Ziddiyatli mavjud qatorlarda FK/check qo'shilmay NOTICE beradi.
 --
 -- QISM TASHKILI:
 --   Part 1: CREATE TABLE IF NOT EXISTS   — yangi bazalar uchun to'liq ta'rif
 --   Part 2: ADD COLUMN IF NOT EXISTS     — eski bazalarda yo'q ustunlar
 --   Part 3: CREATE [UNIQUE] INDEX IF NOT EXISTS
---   Part 4: FK qoidalar — mavjud bazada yo'q bo'lsa, xavfsiz qo'shiladi
---   Part 5: RLS qulflash (anon/authenticated rollarga ruxsat olib qo'yish)
---   Part 6: Tekshiruv so'rovi
+--   Part 4: FK/check qoidalar — mavjud bazada yo'q bo'lsa, guard bilan qo'shiladi
+--   Part 5: RLS/grants — anon/authenticated huquqlarini o'zgartiradi; review shart
+--   Part 6: izohli RLS-diagnostic SELECT (alohida qo'lda bajariladi)
 -- ============================================================================
 
 BEGIN;
@@ -441,8 +450,12 @@ BEGIN;
   // ---------------------------------------------------------------- Part 5
   parts.push(`
 -- ============================================================================
--- PART 5 — RLS (same logic as supabase/enable_rls.sql: anon/authenticated
--- lose access to everything except read-only universities + scholarships)
+-- PART 5 — ACCESS-CONTROL CHANGE (review before live apply)
+-- Enables RLS on public tables owned by current_user, revokes ALL table
+-- privileges from anon/authenticated, then grants SELECT only on universities
+-- and scholarships. Replaces public_catalog_read on those two catalog tables.
+-- This may change existing direct-Supabase clients/custom grants; no live state
+-- is inferred by this generated file.
 -- ============================================================================
 DO $$
 DECLARE
@@ -481,7 +494,7 @@ END $$;
 COMMIT;
 
 -- ============================================================================
--- PART 6 — TEKSHIRUV: barcha jadvalda rls_enabled = true bo'lishi kerak
+-- PART 6 — RLS DIAGNOSTIC (commented; run separately if needed)
 -- ============================================================================
 -- SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled
 -- FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -497,18 +510,26 @@ COMMIT;
   // — timestamptz/serial-equivalent pairs are treated as equal.)
   const parsed = parseDdl(out);
   const cmp = compareSchemas(tables, parsed);
-  if (cmp.missingTables.length || cmp.columnIssues.length || cmp.typeMismatches.length) {
-    const bad = [
-      ...cmp.missingTables.map((t) => `table ${t.name}`),
-      ...cmp.columnIssues.map((c) => `${c.table}.${c.column}`),
-      ...cmp.typeMismatches.map((c) => `${c.table}.${c.column} (expected ${c.expected}, got ${c.found})`),
-    ];
-    throw new Error(`Round-trip validation FAILED — generated file lacks: ${bad.join(", ")}`);
+  const defaultIssues = tables.flatMap((table) => {
+    const generated = parsed.get(table.name);
+    if (!generated) return [];
+    return table.columns.flatMap((column) => {
+      // SERIAL's sequence default is implicit in the type and is not emitted
+      // as a DEFAULT clause in PostgreSQL DDL.
+      if (column.type === "serial") return [];
+      const actual = generated.columns.get(column.name);
+      return actual && actual.hasDefault !== column.hasDefault
+        ? [`${table.name}.${column.name} (expected default=${column.hasDefault}, generated default=${actual.hasDefault})`]
+        : [];
+    });
+  });
+  if (defaultIssues.length) {
+    throw new Error(`Round-trip validation FAILED — generated defaults differ: ${defaultIssues.join(", ")}`);
   }
 
   console.log(`wrote supabase/full_schema.sql`);
   console.log(`  tables: ${tables.length}, columns: ${tables.reduce((s, t) => s + t.columns.length, 0)}, FKs: ${fks.length}, indexes: ${tables.reduce((s, t) => s + t.indexes.length, 0)}`);
-  console.log(`round-trip validation: OK (parsed output contains every table/column/type the app needs)`);
+  console.log(`round-trip validation: OK (all tables, columns, types, and default presence match the Drizzle source)`);
 }
 
 main();

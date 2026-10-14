@@ -128,7 +128,7 @@ export function SessionsPanel() {
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {s.scope === "telegram" ? <Send className="h-4 w-4 text-sky-500" aria-hidden="true" /> : <Globe2 className="h-4 w-4 text-slate-400" aria-hidden="true" />}
-                  <span className="truncate">{describe(s)}</span>
+                  <span className="break-words">{describe(s)}</span>
                   {s.current && (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
                       {t("thisDevice")}

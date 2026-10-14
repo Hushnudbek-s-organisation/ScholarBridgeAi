@@ -141,7 +141,7 @@
       <a href="#" title="My Chances"
          class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 hover:bg-gray-800 hover:text-white md:justify-center lg:justify-start">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0 text-gray-500 transition-colors group-hover:text-indigo-400"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        <span class="text-sm font-medium md:hidden lg:inline">My Chances</span>
+        <span class="text-sm font-medium md:hidden lg:inline">Profile Fit</span>
       </a>
 
       <!-- SMART TOOLS -->
@@ -288,13 +288,12 @@
           <div class="max-w-2xl">
             <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Welcome back, Demo student! 👋</h1>
             <p class="mt-2 text-sm leading-relaxed text-indigo-100 sm:text-base">
-              You are on track for the <span class="font-semibold text-white" id="cycleLabel">this</span> admissions cycle.
-              3 applications are in progress and 1 deadline is approaching — keep the momentum going.
+              Static sample only. Counts and dates below are placeholders—not your current application status or confirmed deadlines.
             </p>
             <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/90">Sample data — static prototype</p>
           </div>
-          <button class="shrink-0 rounded-xl bg-white px-6 py-3 text-sm font-bold text-brand-600 shadow-md transition-all duration-300 ease-in-out hover:scale-105 hover:bg-indigo-50 hover:shadow-xl active:scale-95">
-            Resume Application
+          <button disabled aria-disabled="true" class="shrink-0 cursor-not-allowed rounded-xl bg-white/70 px-6 py-3 text-sm font-bold text-brand-600 shadow-md opacity-80">
+            Example action · prototype only
           </button>
         </div>
       </section>
@@ -308,16 +307,13 @@
             <div class="icon-chip bg-indigo-50 text-brand-500 transition-transform duration-300 group-hover:scale-110">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
-            <span class="badge bg-emerald-50 text-emerald-600">▲ +5%</span>
+            <span class="badge bg-slate-100 text-slate-600">Prototype</span>
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Profile Strength</p>
           <p class="mt-1 flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-gray-900"><span class="count" data-count="85">0</span>%</span>
-            <span class="text-sm font-semibold text-emerald-500">Excellent</span>
+            <span class="text-2xl font-bold text-gray-900">Not calculated</span>
+            <span class="text-sm font-semibold text-gray-500">No profile data</span>
           </p>
-          <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
-            <div class="progress-fill h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" data-progress="85%" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
-          </div>
         </article>
 
         <!-- Saved Universities -->
@@ -328,8 +324,8 @@
             </div>
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Saved Universities</p>
-          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="12">0</span></p>
-          <p class="mt-1 text-xs text-gray-500">Across 3 countries</p>
+          <p class="mt-1 text-2xl font-bold text-gray-900">—</p>
+          <p class="mt-1 text-xs text-gray-500">No connected student data</p>
         </article>
 
         <!-- Active Applications -->
@@ -340,8 +336,8 @@
             </div>
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Active Applications</p>
-          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="3">0</span></p>
-          <p class="mt-1 text-xs text-gray-500">2 in drafting, 1 submitted</p>
+          <p class="mt-1 text-2xl font-bold text-gray-900">—</p>
+          <p class="mt-1 text-xs text-gray-500">No connected application data</p>
         </article>
 
         <!-- Upcoming Deadlines -->
@@ -350,11 +346,11 @@
             <div class="icon-chip bg-red-50 text-red-500 transition-transform duration-300 group-hover:scale-110">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
-            <span class="badge animate-pulse bg-red-50 text-red-600">Urgent</span>
+            <span class="badge bg-slate-100 text-slate-600">Dates unverified</span>
           </div>
           <p class="mt-4 text-sm font-medium text-gray-500">Upcoming Deadlines</p>
-          <p class="mt-1 text-2xl font-bold text-gray-900"><span class="count" data-count="1">0</span></p>
-          <p class="mt-1 text-xs font-medium text-red-400">MEXT Scholarship · <span data-sample-due="5">due soon</span></p>
+          <p class="mt-1 text-2xl font-bold text-gray-900">—</p>
+          <p class="mt-1 text-xs font-medium text-gray-500">No verified deadline data</p>
         </article>
       </section>
 
@@ -383,54 +379,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50">
-                <tr class="transition-colors duration-200 hover:bg-slate-50/80">
-                  <td class="px-5 py-4 sm:px-6">
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[10px] font-bold text-blue-600">TUM</div>
-                      <div class="min-w-0">
-                        <p class="truncate font-semibold text-gray-900">Technical University of Munich</p>
-                        <p class="text-xs text-gray-500">MSc Computer Science</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-4">
-                    <div class="flex items-center gap-2">
-                      <div class="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100 sm:w-24">
-                        <div class="progress-fill h-full rounded-full bg-brand-500" data-progress="65%"></div>
-                      </div>
-                      <span class="text-xs font-semibold text-gray-500">65%</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-4"><span class="badge bg-blue-50 text-blue-600">Drafting</span></td>
-                  <td class="px-5 py-4 text-right sm:px-6">
-                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                    </button>
-                  </td>
-                </tr>
-                <tr class="transition-colors duration-200 hover:bg-slate-50/80">
-                  <td class="px-5 py-4 sm:px-6">
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[10px] font-bold text-sky-600">YU</div>
-                      <div class="min-w-0">
-                        <p class="truncate font-semibold text-gray-900">Yonsei University</p>
-                        <p class="text-xs text-gray-500">Global MBA</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-4">
-                    <div class="flex items-center gap-2">
-                      <div class="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100 sm:w-24">
-                        <div class="progress-fill h-full rounded-full bg-brand-500" data-progress="20%"></div>
-                      </div>
-                      <span class="text-xs font-semibold text-gray-500">20%</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-4"><span class="badge bg-gray-100 text-gray-600">Gathering Docs</span></td>
-                  <td class="px-5 py-4 text-right sm:px-6">
-                    <button class="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all duration-300 ease-in-out hover:scale-105 hover:border-brand-500 hover:bg-brand-500 hover:text-white" aria-label="Open application">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                    </button>
+                <tr>
+                  <td colspan="4" class="px-5 py-8 text-center text-sm text-gray-500">
+                    No live application records are included in this static prototype.
                   </td>
                 </tr>
               </tbody>
@@ -442,7 +393,7 @@
         <article class="fade-up flex flex-col rounded-2xl border border-gray-100 bg-white shadow-card transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-card-hover" style="--d:.4s">
           <div class="flex items-center justify-between px-5 pt-5 sm:px-6">
             <h2 class="text-base font-bold text-gray-900 sm:text-lg">What should I do next?</h2>
-            <span class="badge bg-indigo-50 text-brand-600">2 tasks</span>
+            <span class="badge bg-indigo-50 text-brand-600">Prototype</span>
           </div>
 
           <div class="flex-1 space-y-3 p-4 sm:p-5">
@@ -453,10 +404,10 @@
               </button>
               <div class="task-body min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Prepare MEXT Japanese Gov Scholarship</p>
-                  <span class="badge bg-red-100 text-red-600">Overdue</span>
+                  <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Example task — no live account data</p>
+                  <span class="badge bg-slate-100 text-slate-600">Prototype</span>
                 </div>
-                <p class="mt-1 text-xs leading-relaxed text-gray-500"><span data-sample-due="5">Due soon</span>. You have missing info.</p>
+                <p class="mt-1 text-xs leading-relaxed text-gray-500">No verified deadline or student data is included.</p>
               </div>
             </div>
 
@@ -466,7 +417,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3"><polyline points="20 6 9 17 4 12"/></svg>
               </button>
               <div class="task-body min-w-0">
-                <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Finalize Statement of Purpose (TUM)</p>
+                <p class="task-title text-sm font-semibold text-gray-800 transition-all duration-300">Example document task</p>
                 <a href="#" class="group mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand-500 transition-colors hover:text-brand-700">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-12"><path d="M12 3l1.9 5.7a2 2 0 0 0 1.3 1.3L21 12l-5.7 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.7a2 2 0 0 0-1.3-1.3L3 12l5.7-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
                   Open AI Tool
@@ -673,24 +624,6 @@
         document.documentElement.lang = lang;
       }
       renderNotice((navigator.language || 'en').slice(0, 2).toLowerCase());
-
-      /* Dates are computed from the real "today", so the prototype never shows
-         a fixed year or a stale countdown again. */
-      (function () {
-        var now = new Date();
-        var cycleStart = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
-        var label = document.getElementById('cycleLabel');
-        if (label) label.textContent = 'Fall ' + cycleStart;
-        // ISO-style date: readable and identical in en/uz/ru (ICU month
-        // abbreviations in uz rendered as "2026 M10 8").
-        var fmt = function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-        document.querySelectorAll('[data-sample-due]').forEach(function (el) {
-          var days = parseInt(el.dataset.sampleDue, 10) || 0;
-          var due = new Date(now.getTime() + days * 86400000);
-          var text = fmt(due) + ' (in ' + days + ' days)';
-          el.textContent = el.textContent.indexOf('Due soon') === 0 ? 'Due ' + text : text;
-        });
-      })();
 
       /* Escape -> close everything */
       document.addEventListener('keydown', function (e) {

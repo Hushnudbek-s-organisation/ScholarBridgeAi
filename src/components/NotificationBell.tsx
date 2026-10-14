@@ -121,7 +121,7 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
     <div className="relative" ref={ref}>
       <button
         onClick={toggle}
-        className="relative p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+        className="relative grid min-h-11 min-w-11 place-items-center text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
         title={t("title")}
         aria-label={t("title")}
       >

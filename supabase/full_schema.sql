@@ -6,31 +6,32 @@
 -- NIMA BU:
 --   src/db/schema.ts (Drizzle) — ilova o'qiydigan/yozadigan BARCHA jadval
 --   va ustunlarning yagona manbai. Bu fayl aynan shu manbadan yaratilgan:
---   har bir jadval, har bir ustun, har bir indeks ilovadan kerak bo'lgani
---   bilan to'liq muvofiq.
+--   fresh baza uchun kerakli schema obyektlarini shu manbadan yaratadi;
+--   mavjud bazada faqat yetishmayotganlarini qo'shadi va eski ustunlarni
+--   avtomatik olib tashlamaydi.
 --
--- QANDAY ISHLATISH:
---   1. Supabase Dashboard -> SQL Editor -> New query
---   2. Bu faylni butunlay nusxalab qo'ying va "Run" bosing.
---   3. Tekshiring:  DATABASE_URL=postgresql://... npm run db:verify
+-- ISHLATISHDAN OLDIN:
+--   Live/production bazada bu skriptni qo'llashdan avval SQL'ni ko'rib chiqing,
+--   staging'da tekshiring, backup oling va RLS/grant ta'sirini tasdiqlating.
+--   db:verify faqat table/column/type shaklini tekshiradi.
 --
--- XAVFSIZLIK:
---   * Faqat QO'SHADI (ADDITIVE): CREATE TABLE IF NOT EXISTS,
---     ADD COLUMN IF NOT EXISTS, CREATE INDEX IF NOT EXISTS.
---   * Hech qanday jadval/ustun o'chirilmaydi, nom o'zgartirilmaydi,
---     ma'lumot o'zgartirilmaydi. Necha marta ishlasangiz ham — xuddi
---     shu natija.
---   * Yangi loyihada: butun schemani bir bosishda yaratadi.
---   * Eski loyihada: yo'qolgan jadval/ustunlarni to'ldiradi ("bazi joylar
---     Supabaseda to'g'ri kelmayapti" — mana shu joylar avtomatik tuzatiladi).
+-- STRUKTURA VA XAVFSIZLIK:
+--   * Part 1-4: CREATE TABLE / ADD COLUMN / CREATE INDEX IF NOT EXISTS va
+--     ehtiyotkor FK/check qo'shish; row data o'zgartirilmaydi.
+--   * Part 5 PURELY ADDITIVE EMAS: owned public jadvallarda RLS yoqadi,
+--     anon/authenticated huquqlarini olib tashlaydi, universities/scholarships
+--     uchun SELECT beradi va public_catalog_read siyosatini qayta yaratadi.
+--   * Jadval/ustun o'chirilmaydi, rename/type change yo'q. Ammo direct-Supabase
+--     client access o'zgarishi mumkin; idempotentlik production xavfsizligini
+--     anglatmaydi. Ziddiyatli mavjud qatorlarda FK/check qo'shilmay NOTICE beradi.
 --
 -- QISM TASHKILI:
 --   Part 1: CREATE TABLE IF NOT EXISTS   — yangi bazalar uchun to'liq ta'rif
 --   Part 2: ADD COLUMN IF NOT EXISTS     — eski bazalarda yo'q ustunlar
 --   Part 3: CREATE [UNIQUE] INDEX IF NOT EXISTS
---   Part 4: FK qoidalar — mavjud bazada yo'q bo'lsa, xavfsiz qo'shiladi
---   Part 5: RLS qulflash (anon/authenticated rollarga ruxsat olib qo'yish)
---   Part 6: Tekshiruv so'rovi
+--   Part 4: FK/check qoidalar — mavjud bazada yo'q bo'lsa, guard bilan qo'shiladi
+--   Part 5: RLS/grants — anon/authenticated huquqlarini o'zgartiradi; review shart
+--   Part 6: izohli RLS-diagnostic SELECT (alohida qo'lda bajariladi)
 -- ============================================================================
 
 BEGIN;
@@ -418,6 +419,16 @@ CREATE TABLE IF NOT EXISTS "application_tasks" (
   "priority" text NOT NULL DEFAULT 'Medium',
   "created_at" timestamp NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS "arrival_checklist_items" (
+  "id" serial PRIMARY KEY,
+  "profile_id" integer NOT NULL CONSTRAINT "arrival_checklist_items_profile_id_fkey" REFERENCES "student_profiles" ("id") ON DELETE CASCADE,
+  "item_key" text NOT NULL,
+  "item_window" text NOT NULL DEFAULT 'd7',
+  "status" text NOT NULL DEFAULT 'pending',
+  "completed_at" timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS "audit_logs" (
   "id" serial PRIMARY KEY,
   "entity_type" text NOT NULL,
@@ -436,6 +447,16 @@ CREATE TABLE IF NOT EXISTS "badges" (
   "description" text NOT NULL DEFAULT '',
   "icon_url" text NOT NULL DEFAULT '🎖️',
   "criteria" text NOT NULL DEFAULT 'points'
+);
+CREATE TABLE IF NOT EXISTS "career_discoveries" (
+  "id" serial PRIMARY KEY,
+  "profile_id" integer NOT NULL CONSTRAINT "career_discoveries_profile_id_fkey" REFERENCES "student_profiles" ("id") ON DELETE CASCADE,
+  "answers" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "trial_feedback" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "recommendations" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "selected_career_id" text,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS "course_categories" (
   "id" serial PRIMARY KEY,
@@ -978,8 +999,6 @@ CREATE TABLE IF NOT EXISTS "saved_universities" (
   "id" serial PRIMARY KEY,
   "profile_id" integer NOT NULL CONSTRAINT "saved_universities_profile_id_fkey" REFERENCES "student_profiles" ("id") ON DELETE CASCADE,
   "university_id" integer NOT NULL CONSTRAINT "saved_universities_university_id_fkey" REFERENCES "universities" ("id") ON DELETE CASCADE,
-  "match_category" text NOT NULL DEFAULT 'Match',
-  "match_score" integer NOT NULL DEFAULT 85,
   "status" text NOT NULL DEFAULT 'Shortlisted',
   "notes" text DEFAULT '',
   "created_at" timestamp NOT NULL DEFAULT now()
@@ -1597,6 +1616,14 @@ ALTER TABLE "application_tasks" ADD COLUMN IF NOT EXISTS "due_date" text;
 ALTER TABLE "application_tasks" ADD COLUMN IF NOT EXISTS "is_completed" boolean NOT NULL DEFAULT FALSE;
 ALTER TABLE "application_tasks" ADD COLUMN IF NOT EXISTS "priority" text NOT NULL DEFAULT 'Medium';
 ALTER TABLE "application_tasks" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- arrival_checklist_items ----------
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "profile_id" integer;
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "item_key" text;
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "item_window" text NOT NULL DEFAULT 'd7';
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'pending';
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "completed_at" timestamp;
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "arrival_checklist_items" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 -- ---------- audit_logs ----------
 ALTER TABLE "audit_logs" ADD COLUMN IF NOT EXISTS "entity_type" text;
 ALTER TABLE "audit_logs" ADD COLUMN IF NOT EXISTS "entity_id" integer;
@@ -1612,6 +1639,14 @@ ALTER TABLE "badges" ADD COLUMN IF NOT EXISTS "name" text;
 ALTER TABLE "badges" ADD COLUMN IF NOT EXISTS "description" text NOT NULL DEFAULT '';
 ALTER TABLE "badges" ADD COLUMN IF NOT EXISTS "icon_url" text NOT NULL DEFAULT '🎖️';
 ALTER TABLE "badges" ADD COLUMN IF NOT EXISTS "criteria" text NOT NULL DEFAULT 'points';
+-- ---------- career_discoveries ----------
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "profile_id" integer;
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "answers" jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "trial_feedback" jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "recommendations" jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "selected_career_id" text;
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "career_discoveries" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 -- ---------- course_categories ----------
 ALTER TABLE "course_categories" ADD COLUMN IF NOT EXISTS "name" text;
 ALTER TABLE "course_categories" ADD COLUMN IF NOT EXISTS "slug" text;
@@ -2058,8 +2093,6 @@ ALTER TABLE "saved_scholarships" ADD COLUMN IF NOT EXISTS "created_at" timestamp
 -- ---------- saved_universities ----------
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "university_id" integer;
-ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "match_category" text NOT NULL DEFAULT 'Match';
-ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "match_score" integer NOT NULL DEFAULT 85;
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'Shortlisted';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "notes" text DEFAULT '';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
@@ -2321,6 +2354,9 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_outcomes_consent') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_outcomes_consent" ON "application_outcomes" ("share_consent"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_outcomes_consent skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_outcomes_consent skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_app_requirements_application') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_app_requirements_application" ON "application_requirements" ("application_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_app_requirements_application skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_app_requirements_application skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_app_requirements_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_app_requirements_key" ON "application_requirements" ("application_id", "item_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_app_requirements_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_app_requirements_key skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_arrival_items_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_arrival_items_profile" ON "arrival_checklist_items" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_arrival_items_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_arrival_items_profile skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_arrival_items_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_arrival_items_key" ON "arrival_checklist_items" ("profile_id", "item_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_arrival_items_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_arrival_items_key skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_career_discoveries_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_career_discoveries_profile" ON "career_discoveries" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_career_discoveries_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_career_discoveries_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_versions_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile" ON "essay_versions" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_versions_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_versions_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_versions_profile_type') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile_type" ON "essay_versions" ("profile_id", "essay_type", "version_number"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_versions_profile_type skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_versions_profile_type skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_reviews_version') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_reviews_version" ON "essay_reviews" ("essay_version_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_reviews_version skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_reviews_version skipped: column missing'; END; END IF; END $$;
@@ -2416,6 +2452,8 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'pub
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.application_tasks'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.application_tasks'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "application_tasks" ADD CONSTRAINT "application_tasks_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK application_tasks_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.applications'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.applications'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "applications" ADD CONSTRAINT "applications_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK applications_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.applications'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.applications'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "applications" ADD CONSTRAINT "applications_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK applications_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.arrival_checklist_items'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.arrival_checklist_items'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "arrival_checklist_items" ADD CONSTRAINT "arrival_checklist_items_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK arrival_checklist_items_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.career_discoveries'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.career_discoveries'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "career_discoveries" ADD CONSTRAINT "career_discoveries_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK career_discoveries_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.certificates'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.certificates'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "certificates" ADD CONSTRAINT "certificates_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK certificates_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.certificates'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.certificates'::regclass AND attname = 'course_id')::smallint] AND c.confrelid = 'public.courses'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.courses'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "certificates" ADD CONSTRAINT "certificates_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK certificates_course_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.consulting_requests'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.consulting_requests'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "consulting_requests" ADD CONSTRAINT "consulting_requests_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK consulting_requests_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
@@ -2513,8 +2551,12 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oi
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid WHERE t.relname = 'platform_ownership' AND c.conname = 'platform_ownership_id_check') THEN BEGIN ALTER TABLE "platform_ownership" ADD CONSTRAINT "platform_ownership_id_check" CHECK (id = 1); EXCEPTION WHEN check_violation THEN RAISE NOTICE 'check platform_ownership_id_check skipped: existing rows violate it'; END; END IF; END $$;
 
 -- ============================================================================
--- PART 5 — RLS (same logic as supabase/enable_rls.sql: anon/authenticated
--- lose access to everything except read-only universities + scholarships)
+-- PART 5 — ACCESS-CONTROL CHANGE (review before live apply)
+-- Enables RLS on public tables owned by current_user, revokes ALL table
+-- privileges from anon/authenticated, then grants SELECT only on universities
+-- and scholarships. Replaces public_catalog_read on those two catalog tables.
+-- This may change existing direct-Supabase clients/custom grants; no live state
+-- is inferred by this generated file.
 -- ============================================================================
 DO $$
 DECLARE
@@ -2553,7 +2595,7 @@ END $$;
 COMMIT;
 
 -- ============================================================================
--- PART 6 — TEKSHIRUV: barcha jadvalda rls_enabled = true bo'lishi kerak
+-- PART 6 — RLS DIAGNOSTIC (commented; run separately if needed)
 -- ============================================================================
 -- SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled
 -- FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace

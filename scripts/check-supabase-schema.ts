@@ -1,27 +1,27 @@
 /**
  * Schema accuracy check — answers the question:
  *
- *   "Supabaseda nima column'lar bo'lishi kerak, hammasi aniq ishlashi kerak?"
+ *   "Ilova schema'siga kerakli jadval/ustun/turlar repo DDL va hujjatda bormi?"
  *
  * Compares what the APP expects (every table/column in `src/db/schema.ts` —
  * the Drizzle source of truth behind all db.select()/db.insert() calls) with
  * what the DATABASE provides:
  *
- *   --live    check against the REAL database (DATABASE_URL) via
- *             information_schema. This is the definitive answer for your
- *             Supabase project. Exit code 1 if anything the app needs is
- *             missing or has the wrong type.
+ *   --live    check expected tables/columns/types against the REAL database
+ *             (DATABASE_URL) via information_schema. This does not verify RLS,
+ *             grants, indexes, row data, catalog freshness, or full workflows.
  *
  *   (default) offline check against the DDL shipped in this repo
  *             (supabase/*.sql + the lazy DDL the app runs at startup).
- *             Catches drift before you ever touch Supabase: if a column the
- *             app needs is in NO DDL source, a fresh Supabase project breaks.
+ *             Catches drift before you touch a live database and checks that
+ *             every Drizzle table has a section in docs/SUPABASE_SCHEMA.md.
  *
  * Usage:
  *   npm run test:schema          # offline
  *   DATABASE_URL=… npm run db:verify   # live (Supabase: Project → Settings → Database)
  */
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import "./lib/env";
 import {
   collectDrizzleTables,
@@ -79,6 +79,63 @@ async function main() {
 
   if (!live) {
     console.log("\nLive check skipped (no --live flag or no DATABASE_URL). Run:  DATABASE_URL=postgresql://… npm run db:verify");
+
+    const fullSchemaFile = sqlFiles.find((file) => file.file === "supabase/full_schema.sql");
+    const generatedFullSchema = fullSchemaFile ? parseDdl(fullSchemaFile.sql) : new Map();
+    const generatedDefaultIssues = expected.flatMap((table) => {
+      const generated = generatedFullSchema.get(table.name);
+      if (!generated) return [`${table.name} (missing from full_schema.sql)`];
+      return table.columns.flatMap((column) => {
+        // SERIAL's sequence default is implicit in the type, not a DEFAULT clause.
+        if (column.type === "serial") return [];
+        const actual = generated.columns.get(column.name);
+        return actual && actual.hasDefault !== column.hasDefault
+          ? [`${table.name}.${column.name} (expected default=${column.hasDefault}, generated default=${actual.hasDefault})`]
+          : [];
+      });
+    });
+    if (generatedDefaultIssues.length) {
+      console.error(`\nGenerated-schema default mismatch: ${generatedDefaultIssues.join(", ")}`);
+    }
+
+    const schemaDoc = readFileSync(join(__dirname, "..", "docs", "SUPABASE_SCHEMA.md"), "utf8");
+    const headingCounts = new Map<string, number>();
+    const documentedColumns = new Map<string, Set<string>>();
+    let currentDocTable: string | null = null;
+    for (const line of schemaDoc.split(/\r?\n/)) {
+      const tableHeading = line.match(/^### `([^`]+)`\s*$/);
+      if (tableHeading) {
+        currentDocTable = tableHeading[1];
+        headingCounts.set(currentDocTable, (headingCounts.get(currentDocTable) ?? 0) + 1);
+        if (!documentedColumns.has(currentDocTable)) documentedColumns.set(currentDocTable, new Set());
+        continue;
+      }
+      if (/^##\s/.test(line)) currentDocTable = null;
+      const column = line.match(/^\|\s*`([^`]+)`\s*\|/);
+      if (currentDocTable && column) documentedColumns.get(currentDocTable)?.add(column[1]);
+    }
+    const documentedTables = new Set(headingCounts.keys());
+    const missingDocTables = expected.map((table) => table.name).filter((name) => !documentedTables.has(name));
+    const extraDocTables = [...documentedTables].filter((name) => !expected.some((table) => table.name === name));
+    const duplicateDocTables = [...headingCounts].filter(([, count]) => count !== 1).map(([name]) => name);
+    const docColumnIssues = expected.flatMap((table) => {
+      if (!documentedColumns.has(table.name)) return [];
+      const expectedColumns = new Set(table.columns.map((column) => column.name));
+      const docColumns = documentedColumns.get(table.name)!;
+      const missing = [...expectedColumns].filter((name) => !docColumns.has(name)).map((name) => `${table.name}.${name} missing`);
+      const extra = [...docColumns].filter((name) => !expectedColumns.has(name)).map((name) => `${table.name}.${name} stale`);
+      return [...missing, ...extra];
+    });
+    heading("DOCUMENTATION COVERAGE — docs/SUPABASE_SCHEMA.md");
+    if (!missingDocTables.length && !extraDocTables.length && !duplicateDocTables.length && !docColumnIssues.length) {
+      console.log(`  ✓ All ${documentedTables.size} Drizzle tables and ${expected.reduce((count, table) => count + table.columns.length, 0)} column names are documented exactly once.`);
+    } else {
+      if (missingDocTables.length) console.log(`  ✗ Missing table sections: ${missingDocTables.join(", ")}`);
+      if (extraDocTables.length) console.log(`  ✗ Stale table sections: ${extraDocTables.join(", ")}`);
+      if (duplicateDocTables.length) console.log(`  ✗ Duplicate table sections: ${duplicateDocTables.join(", ")}`);
+      if (docColumnIssues.length) console.log(`  ✗ Column documentation mismatch: ${docColumnIssues.join(", ")}`);
+    }
+
     // Offline drift is a warning, not a failure: the lazy-DDL app repairs
     // most of it at runtime. Hard-fail only when a NON-self-healing gap
     // exists (that is exactly "bazi joylar Supabaseda to'g'ri kelmayapti").
@@ -86,9 +143,14 @@ async function main() {
       ...offline.missingTables.filter((t) => !t.selfHealed),
       ...offline.columnIssues.filter((c) => !c.selfHealed),
       ...offline.typeMismatches,
+      ...generatedDefaultIssues,
+      ...missingDocTables,
+      ...extraDocTables,
+      ...duplicateDocTables,
+      ...docColumnIssues,
     ];
     if (critical.length) {
-      console.error("\nFAILED: there is drift that the app CANNOT repair by itself.");
+      console.error("\nFAILED: there is non-self-healing schema drift or schema-documentation coverage mismatch.");
       process.exit(1);
     }
     console.log("\nPASSED (offline).");
@@ -164,10 +226,11 @@ async function main() {
   await pool.end();
 
   if (problems > 0) {
-    console.error(`\nFAILED: ${problems} problem(s) in the live database. Fix: run supabase/full_schema.sql in the Supabase SQL Editor, then re-run this check.`);
+    console.error(`\nFAILED: ${problems} table/column/type issue(s) in the live database. Do not apply full_schema.sql blindly: it changes RLS and anon/authenticated grants. Review its SQL, back up, test in staging, obtain operator approval, then re-run this check if an apply is authorized.`);
     process.exit(1);
   }
-  console.log("\nPASSED: the live database has every table and column the app needs. Hammasi aniq ishlaydi.");
+  console.log("\nPASSED: the live database has every expected table, column, and compatible type.");
+  console.log("This structural check does not verify RLS/grants, constraints/indexes, row integrity, catalog facts, or end-to-end product workflows.");
 }
 
 main().catch((err) => {

@@ -28,12 +28,11 @@ import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { supportsDegreeLevel } from "@/lib/degreeLevels";
+import { hasUndergraduateAdmission, supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
 import { buildFundingPlan } from "@/lib/journey/funding";
-import { profileCompleteness } from "@/lib/growth/logic";
 import { calculateCosts } from "@/lib/costs";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
@@ -69,9 +68,7 @@ export async function GET(req: Request) {
     // ---- A single query for the counters the rest of the page needs --------
     const [row] = await db
       .select({
-        profileComplete: sql<boolean>`(COALESCE(${studentProfiles.name},'') <> '' AND ${studentProfiles.targetMajor} IS NOT NULL AND ${studentProfiles.gpa} > 0)`,
         savedUniversities: sql<number>`(SELECT COUNT(*)::int FROM saved_universities su WHERE su.profile_id = ${profileId})`,
-        shortlistMatches: sql<number>`(SELECT COUNT(*)::int FROM saved_universities su WHERE su.profile_id = ${profileId} AND su.match_category = 'Match')`,
         applications: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId})`,
         submittedApplications: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId} AND a.submitted_at IS NOT NULL)`,
         offersRecorded: sql<number>`(SELECT COUNT(*)::int FROM admission_offers ao WHERE ao.profile_id = ${profileId})`,
@@ -87,15 +84,22 @@ export async function GET(req: Request) {
         interviewSessions: sql<number>`(SELECT COUNT(*)::int FROM ai_evaluations ae WHERE ae.profile_id = ${profileId} AND ae.evaluation_type = 'Visa Practice')`,
         departureDone: sql<number>`(SELECT COUNT(*)::int FROM student_checklist sc JOIN checklist_items ci ON ci.id = sc.item_id WHERE sc.profile_id = ${profileId} AND ci.is_active)`,
         departureTotal: sql<number>`(SELECT COUNT(*)::int FROM checklist_items ci WHERE ci.is_active)`,
-        profileTotal: sql<number>`(SELECT COUNT(*)::int FROM saved_scholarships ss WHERE ss.profile_id = ${profileId})`,
       })
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId))
       .limit(1);
 
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
-    const profileCompletionPct = profileCompleteness(profile ?? null);
-    const profileIsComplete = profileCompletionPct >= 100;
+    const profileHasContext = Boolean(
+      profile && (
+        profile.degreeLevel?.trim() ||
+        profile.targetMajor?.trim() ||
+        profile.country?.trim() ||
+        profile.preferredCountries?.trim() ||
+        profile.studyInterests?.trim() ||
+        Number(profile.gpa) > 0
+      ),
+    );
 
     // ---- Applications for the progress summary + the next deadline ---------
     const appRows = await db
@@ -128,10 +132,8 @@ export async function GET(req: Request) {
       Number(row?.departureTotal ?? 0) > 0 && Number(row?.departureDone ?? 0) >= Number(row?.departureTotal ?? 0);
 
     const phases = buildPhaseProgress({
-      profileComplete: profileIsComplete,
-      profileCompletenessPct: profileCompletionPct,
+      profileHasContext,
       openApplicationRequirements: Number(row?.openRequirements ?? 0),
-      ieltsScore: profile?.ieltsScore ?? null,
       testPlanCount: Number(row?.testPlanCount ?? 0),
       savedUniversities: Number(row?.savedUniversities ?? 0),
       savedScholarships: Number(row?.savedScholarships ?? 0),
@@ -141,8 +143,11 @@ export async function GET(req: Request) {
       submittedApplications: appProgress.submitted,
       interviewSessions: Number(row?.interviewSessions ?? 0),
       offersRecorded: Number(row?.offersRecorded ?? 0),
-      visaCaseStarted: Number(row?.interviewSessions ?? 0) > 0 || departureReady,
-      visaApproved: departureReady,
+      // The database has no verified visa-case or visa-approval record. An
+      // interview-practice session and a departure checklist must not be
+      // presented as visa progress or approval.
+      visaCaseStarted: false,
+      visaApproved: false,
       departureReady,
     });
 
@@ -194,17 +199,16 @@ export async function GET(req: Request) {
 
     const journeyCounts: JourneyCounts = {
       ...EMPTY_JOURNEY_COUNTS,
-      profileComplete: profileIsComplete,
+      profileHasContext: profileHasContext,
       savedUniversities: Number(row?.savedUniversities ?? 0),
-      shortlistMatches: Number(row?.shortlistMatches ?? 0),
       applications: appRows.length,
       submittedApplications: appProgress.submitted,
       offersRecorded: Number(row?.offersRecorded ?? 0),
       acceptedOffers: Number(row?.acceptedOffers ?? 0),
       fundingPlanTotal: fundingRows.length,
       fundingGapClosed,
-      visaCaseStarted: phases.find((p) => p.key === "visa")!.pct > 0,
-      visaApproved: phases.find((p) => p.key === "visa")!.status === "done",
+      visaCaseStarted: false,
+      visaApproved: false,
       departureReady,
     };
     const journey = resolveJourney(journeyCounts);
@@ -221,8 +225,8 @@ export async function GET(req: Request) {
       .filter((a) => a.deadline && !a.submittedAt)
       .map((a) => ({
         id: `app-${a.id}`,
-        kind: "university" as const,
-        title: `${a.universityName || "Application"} — application deadline`,
+        kind: "application" as const,
+        title: a.universityName || "",
         dueDate: String(a.deadline).slice(0, 10),
         daysRemaining: daysUntil(today, String(a.deadline).slice(0, 10)),
         tab: "workspace",
@@ -259,11 +263,8 @@ export async function GET(req: Request) {
       satScore: profile?.satScore ?? null,
       actScore: profile?.actScore ?? null,
       greScore: profile?.greScore ?? null,
-      researchPublications: profile?.researchPublications ?? null,
-      workExperienceYears: profile?.workExperienceYears ?? null,
-      // Counted by the shared activity reader (profile text columns + the
-      // structured Activities pane), not by a second SQL tally that could
-      // disagree with the match engine.
+      // Counts indicate only whether an entry is recorded; they are not
+      // treated as quality or a required number of activities.
       leadershipCount: activityFacts?.leadership ?? 0,
       awardsCount: activityFacts?.awards ?? 0,
       researchCount: activityFacts?.research ?? 0,
@@ -272,8 +273,8 @@ export async function GET(req: Request) {
       documentsTotal: Number(row?.documentsTotal ?? 0),
       applicationsStarted: appRows.length,
       applicationsSubmitted: appProgress.submitted,
-      fundingItems: fundingRows.length,
-      familyBudget: profile?.familyIncomeUsd ?? null,
+      familyBudget: profile?.budgetAnnualUsd ?? null,
+      fundingPreference: profile?.needsFinancialAid ?? profile?.requiresFullScholarship ?? null,
     };
     const checklist = profileReadiness(readinessInput);
 
@@ -307,7 +308,6 @@ export async function GET(req: Request) {
         ? {
             overall: strength.overall,
             overallPrecise: strength.overallPrecise,
-            completeness: strength.completeness,
             measured: strength.scoredSections,
             total: strength.totalSections,
           }
@@ -342,7 +342,6 @@ export async function GET(req: Request) {
     // ---- Next steps (spec §3) ---------------------------------------------
     const nextSteps = computeNextActions({
       journey,
-      readiness,
       appRows: appRows.map((a) => ({
         id: a.id,
         universityName: a.universityName,
@@ -365,12 +364,8 @@ export async function GET(req: Request) {
       tests: {
         ielts: profile?.ieltsScore ?? null,
         target: (await highestTestTarget(profileId, "ielts")) ?? null,
-        belowTarget: gaps.some((x) => x.state === "below"),
       },
       funding: fundingSummary ? { gap: fundingSummary.fundingGap, covered: fundingSummary.isCovered } : null,
-      profileComplete: profileIsComplete,
-      savedUniversities: Number(row?.savedUniversities ?? 0),
-      visaStage: journeyCounts.visaCaseStarted,
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
@@ -400,10 +395,6 @@ export async function GET(req: Request) {
         id: profileId,
         name: profile?.name ?? "",
         plan: profilePlan({ isAdmin: !!profile?.isAdmin, isPremium: !!profile?.isPremium, premiumUntil: profile?.premiumUntil ?? null }),
-        // Same completeness number the Readiness pane shows (shared engine).
-        // The old growth-logic percentage was a second, slightly different
-        // count and could appear next to the shared one on one screen.
-        completeness: strength?.completeness ?? Math.round(profileCompleteness(profile ?? null)),
       },
       journey,
       nextSteps,
@@ -488,9 +479,9 @@ function tabForKind(kind: string): string {
 }
 
 /**
- * Compare the student's own recorded scores against the published minimums of
- * the universities they actually applied to. This reports the gap and does NOT
- * touch the chancing model (spec §8).
+ * Compare saved scores with university-level catalogue figures for context.
+ * Figures are not programme-specific requirements; SAT is shown only when the
+ * university catalogue explicitly identifies undergraduate admission.
  */
 async function testGapsFor(profileId: number, profile: typeof studentProfiles.$inferSelect | undefined) {
   const apps = await db
@@ -508,15 +499,20 @@ async function testGapsFor(profileId: number, profile: typeof studentProfiles.$i
   const out: ReturnType<typeof testGap>[] = [];
   for (const u of unis) {
     if (u.minIelts != null) out.push(testGap("ielts", u.minIelts, profile?.ieltsScore ?? planned("ielts"), "IELTS"));
-    if (u.minSat != null) out.push(testGap("sat", u.minSat, profile?.satScore ?? planned("sat"), "SAT"));
+    if (u.minSat != null && hasUndergraduateAdmission(u.degreeLevel)) {
+      out.push(testGap("sat", u.minSat, profile?.satScore ?? planned("sat"), "SAT"));
+    }
   }
-  // Deduplicate: one entry per test type, keeping the strictest requirement.
-  const best = new Map<string, ReturnType<typeof testGap>>();
-  for (const t of out) {
-    const prev = best.get(t.testType);
-    if (!prev || t.required > prev.required) best.set(t.testType, t);
+  // Keep the highest university-level catalogue reference per test type; it
+  // is a prompt to verify policy, not a strictest requirement.
+  const highest = new Map<string, ReturnType<typeof testGap>>();
+  for (const comparison of out) {
+    const previous = highest.get(comparison.testType);
+    if (!previous || comparison.catalogueFigure! > previous.catalogueFigure!) {
+      highest.set(comparison.testType, comparison);
+    }
   }
-  return [...best.values()];
+  return [...highest.values()];
 }
 
 async function highestTestTarget(profileId: number, testType: string): Promise<number | null> {
@@ -645,7 +641,6 @@ async function recommendedFor(
       sourceUrl: u.sourceUrl,
       saved: savedIds.has(u.id),
       matchScore: match.matchScore,
-      matchCategory: match.matchCategory,
       matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
   }));

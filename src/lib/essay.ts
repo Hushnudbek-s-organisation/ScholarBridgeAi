@@ -16,7 +16,7 @@ export interface RubricScores {
   hook: number;
   /** Paragraphs, progression, a clear ending. */
   structure: number;
-  /** Concrete nouns, numbers and names vs. generic claims. */
+  /** Numeric and other detectable evidence cues vs. generic claims (not full semantic review). */
   specificity: number;
   /** Sentence variety, passive voice, cliché density, typos. */
   language: number;
@@ -29,7 +29,7 @@ export interface EssayFeedback {
   scores: RubricScores;
   wordCount: number;
   /** Each item is something the student can act on. */
-  issues: { code: string; message: string; severity: "blocker" | "warning" | "info" }[];
+  issues: { code: string; message: string; severity: "blocker" | "warning" | "info"; excerpt?: string }[];
   /** Words that weaken the essay — with where they appear. */
   cliches: { phrase: string; count: number }[];
   readingTimeSec: number;
@@ -62,6 +62,13 @@ export function paragraphs(text: string): string[] {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
+}
+
+/** A short passage copied from the submitted draft for grounded feedback. */
+function issueExcerpt(text: string, max = 180): string {
+  const trimmed = text.trim();
+  const excerpt = trimmed.slice(0, max).replace(/\s+/g, " ");
+  return trimmed.length > max ? `${excerpt}…` : excerpt;
 }
 
 /** Words that make an essay sound like everyone else's. */
@@ -110,27 +117,30 @@ function hookScore(text: string): { score: number; issues: EssayFeedback["issues
     score -= 30;
     issues.push({
       code: "opening_boilerplate",
-      message: "Do not open with your name or \"I am writing to apply\" — the reader already knows. Open with a moment only you can describe.",
+      message: "The opening uses application boilerplate. Consider replacing it with a concise, truthful moment or question that is relevant to this prompt.",
       severity: "blocker",
+      excerpt: issueExcerpt(firstSentence),
     });
   }
   if (firstSentence.length > 45) {
     score -= 10;
     issues.push({
       code: "long_first_sentence",
-      message: `Your first sentence is ${firstSentence.split(/\s+/).length} words. Cut it under 25 — the first line decides whether the rest gets read.`,
+      message: `Your first sentence is ${firstSentence.split(/\s+/).length} words. Consider splitting or shortening it while preserving the original meaning.`,
       severity: "warning",
+      excerpt: issueExcerpt(firstSentence),
     });
   }
   if (/\?/.test(first)) score += 8;
   if (/\b\d+\b/.test(first)) score += 12; // a number in the opening is concrete
   if (first.length < 400) score += 10; // a tight opening paragraph
-  if (CLICHE_PATTERNS.some((c) => c.re.test(first))) {
+  if (CLICHE_PATTERNS.some((c) => new RegExp(c.re.source, "i").test(first))) {
     score -= 15;
     issues.push({
       code: "cliche_opening",
-      message: "Your opening uses a phrase admissions officers read hundreds of times. Replace it with the specific thing that happened to you.",
+      message: "The opening contains a common phrase. Replace it only with a specific experience that actually happened to you.",
       severity: "warning",
+      excerpt: issueExcerpt(firstSentence),
     });
   }
 
@@ -141,39 +151,49 @@ function structureScore(text: string, wordCount: number): { score: number; issue
   const issues: EssayFeedback["issues"] = [];
   const paras = paragraphs(text);
   const ss = sentences(text);
+  const shortResponse = wordCount < 300;
   let score = 40;
 
-  if (paras.length >= 4 && paras.length <= 9) score += 25;
-  else if (paras.length >= 3) score += 15;
-  else {
+  // Short supplements may be one or two paragraphs; a longer statement needs
+  // clearer paragraph breaks. Do not penalize a concise response by default.
+  if ((shortResponse && paras.length >= 1 && paras.length <= 5) || (paras.length >= 3 && paras.length <= 9)) {
+    score += 25;
+  } else if (paras.length >= 2 && paras.length <= 10) {
+    score += 15;
+  } else if (paras.length === 0) {
+    score = 0;
+  } else {
     issues.push({
       code: "too_few_paragraphs",
-      message: `Only ${paras.length} paragraph${paras.length === 1 ? "" : "s"}. Split the essay so each paragraph makes one point.`,
+      message: `The draft has ${paras.length} paragraph${paras.length === 1 ? "" : "s"}. Separate distinct ideas where the prompt and response length call for it.`,
       severity: "blocker",
     });
   }
 
-  // Paragraphs should be roughly even — one 600-word block is a red flag.
+  // A long block can make a change in subject or main point harder to follow.
   const lengths = paras.map((p) => countWords(p));
   const longest = Math.max(...lengths, 1);
   if (longest > 250) {
     score -= 12;
     issues.push({
       code: "paragraph_too_long",
-      message: `One paragraph runs ${longest} words. Break it in two at the point where the idea shifts.`,
+      message: `One paragraph runs ${longest} words. Consider splitting it where the subject or main idea changes.`,
       severity: "warning",
+      excerpt: issueExcerpt(paras[lengths.indexOf(longest)] ?? ""),
     });
   }
 
-  // A conclusion should exist and should not introduce a new claim.
+  // A closing line is not required for every short response.
   const last = paras[paras.length - 1] || "";
-  if (/\b(?:in conclusion|to sum up|overall|looking ahead|ultimately)\b/i.test(last) || paras.length >= 4) {
+  const hasClosingCue = /\b(?:in conclusion|to sum up|overall|looking ahead|ultimately)\b/i.test(last);
+  if (hasClosingCue || paras.length >= 4 || wordCount < 250) {
     score += 12;
   } else {
     issues.push({
       code: "no_conclusion",
-      message: "The essay stops rather than ends. Close by connecting your goal back to what this programme makes possible.",
+      message: "The ending may need a clearer close. Respond to the prompt without adding a new, unsupported claim.",
       severity: "warning",
+      excerpt: issueExcerpt(sentences(last).slice(-1)[0] ?? last),
     });
   }
 
@@ -181,8 +201,9 @@ function structureScore(text: string, wordCount: number): { score: number; issue
     score -= 8;
     issues.push({
       code: "run_on_sentences",
-      message: `Average sentence length is ${Math.round(wordCount / ss.length)} words. Vary the rhythm — a short sentence after a long one keeps the reader awake.`,
+      message: `Average sentence length is ${Math.round(wordCount / ss.length)} words. Review sentence boundaries and vary length where it improves clarity.`,
       severity: "info",
+      excerpt: issueExcerpt(ss[0] ?? ""),
     });
   }
 
@@ -199,27 +220,29 @@ function specificityScore(text: string): { score: number; issues: EssayFeedback[
   let score = clamp(25 + density * 9, 0, 100);
 
   if (concrete === 0) {
-    score = Math.min(score, 35);
+    score = Math.min(score, 45);
     issues.push({
       code: "no_evidence",
-      message: "Not one number, award, project name or measurable result in the whole essay. Committees believe evidence, not adjectives.",
-      severity: "blocker",
+      message: "This simple check did not detect a numeric detail. It may miss named evidence; if relevant, clarify a real example and your role without inventing numbers.",
+      severity: "warning",
     });
   } else if (density < 1.5) {
     issues.push({
       code: "thin_evidence",
-      message: `Only ${concrete} concrete detail${concrete === 1 ? "" : "s"} per essay. Turn two of your claims into numbers — how many people, how long, what result?`,
+      message: `The check detected ${concrete} numeric detail${concrete === 1 ? "" : "s"}. Named examples may not be detected; review whether your role and evidence are clear, and add numbers only when you can verify them.`,
       severity: "warning",
     });
   }
 
-  const vague = VAGUE_CLAIMS.reduce((n, re) => n + (text.match(re)?.length ?? 0), 0);
+  const vagueMatches = VAGUE_CLAIMS.flatMap((re) => text.match(re) ?? []);
+  const vague = vagueMatches.length;
   if (vague > 0) {
     score = clamp(score - vague * 8, 0, 100);
     issues.push({
       code: "unsupported_adjective",
-      message: `${vague} unsupported self-description${vague === 1 ? "" : "s"} ("I am hardworking…"). Show it through what you did instead of stating it.`,
+      message: `${vague} self-description phrase${vague === 1 ? "" : "s"} detected. Consider showing the quality through an action you actually took rather than relying on the label alone.`,
       severity: "warning",
+      excerpt: issueExcerpt(vagueMatches[0]),
     });
   }
 
@@ -243,8 +266,9 @@ function languageScore(text: string): { score: number; issues: EssayFeedback["is
     score -= Math.min(30, clicheCount * 7);
     issues.push({
       code: "cliches",
-      message: `${clicheCount} cliché${clicheCount === 1 ? "" : "s"}: ${clicheHits.map((c) => `"${c.phrase}"`).join(", ")}. These are the phrases readers skim past.`,
+      message: `${clicheCount} common application phrase${clicheCount === 1 ? "" : "s"} detected: ${clicheHits.map((c) => `"${c.phrase}"`).join(", ")}. Replace only those that do not express your specific experience.`,
       severity: clicheCount >= 3 ? "blocker" : "warning",
+      excerpt: issueExcerpt(CLICHE_PATTERNS.map((c) => text.match(c.re)?.[0]).find(Boolean) ?? ""),
     });
   }
 
@@ -253,8 +277,9 @@ function languageScore(text: string): { score: number; issues: EssayFeedback["is
     score -= 8;
     issues.push({
       code: "passive_voice",
-      message: `${passive} passive constructions. "The project was led by me" hides the subject — write "I led the project".`,
+      message: `${passive} passive construction${passive === 1 ? "" : "s"} detected. Where accurate, state who performed the action; keep passive voice when the actor is unknown or less relevant.`,
       severity: "info",
+      excerpt: issueExcerpt(ss.find((sentence) => new RegExp(PASSIVE_RE.source, "i").test(sentence)) ?? ""),
     });
   }
 
@@ -266,8 +291,9 @@ function languageScore(text: string): { score: number; issues: EssayFeedback["is
       score -= 8;
       issues.push({
         code: "monotone_rhythm",
-        message: "Most sentences are the same length. Vary it — mix a 6-word sentence into a 25-word one.",
+        message: "Sentence lengths are similar. Consider varying them where doing so would make the passage easier to follow.",
         severity: "info",
+        excerpt: issueExcerpt(ss.slice(0, 2).join(" ")),
       });
     }
   }
@@ -278,8 +304,9 @@ function languageScore(text: string): { score: number; issues: EssayFeedback["is
     score -= Math.min(12, doubled * 4);
     issues.push({
       code: "repeated_word",
-      message: `${doubled} repeated word${doubled === 1 ? "" : "s"} ("the the"). A five-minute proofread catches these.`,
+      message: `${doubled} repeated word${doubled === 1 ? "" : "s"} detected. Review the quoted passage for an accidental duplicate.`,
       severity: "warning",
+      excerpt: issueExcerpt(text.match(/\b(\w+)\s+\1\b/gi)?.[0] ?? ""),
     });
   }
 
@@ -293,14 +320,17 @@ function fitScore(text: string, opts: EssayOptions): { score: number; issues: Es
 
   const target = (opts.targetName || "").trim();
   if (target) {
-    const nameWords = target.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-    const mentioned = nameWords.some((w) => text.toLowerCase().includes(w));
+    const genericNameWords = new Set(["the", "and", "for", "university", "college", "institute", "school", "of"]);
+    const targetWords = target.toLowerCase().match(/[a-z\u0400-\u04ff0-9]+/gi) ?? [];
+    const essayWords = new Set(text.toLowerCase().match(/[a-z\u0400-\u04ff0-9]+/gi) ?? []);
+    const nameWords = targetWords.filter((word) => !genericNameWords.has(word));
+    const mentioned = nameWords.some((word) => essayWords.has(word));
     if (mentioned) score += 20;
     else {
       score -= 25;
       issues.push({
         code: "target_not_named",
-        message: `"${target}" never appears in the essay. Committees can tell a recycled draft — name the programme and one thing specific about it.`,
+        message: `The supplied target name "${target}" was not detected as a whole word. Check whether this prompt asks you to name the university or programme.`,
         severity: "blocker",
       });
     }
@@ -311,7 +341,7 @@ function fitScore(text: string, opts: EssayOptions): { score: number; issues: Es
       score -= 15;
       issues.push({
         code: "why_us_generic",
-        message: "A \"why us\" essay needs specifics: a professor, a lab, a course. Nothing in the text points to this university in particular.",
+        message: "The check did not detect a specific programme feature. Add one only if it answers the prompt and you have verified it on an official source.",
         severity: "warning",
       });
     } else {
@@ -324,14 +354,14 @@ function fitScore(text: string, opts: EssayOptions): { score: number; issues: Es
       score -= 20;
       issues.push({
         code: "over_limit",
-        message: `${words} words against a ${opts.wordLimit}-word limit. Many portals cut the text off mid-sentence — get under the limit.`,
+        message: `${words} words against the ${opts.wordLimit}-word limit you entered. Trim the draft to meet the prompt's stated limit.`,
         severity: "blocker",
       });
     } else if (words < opts.wordLimit * 0.6) {
       score -= 12;
       issues.push({
         code: "under_limit",
-        message: `${words} of ${opts.wordLimit} allowed words used. You are leaving a third of your argument unwritten.`,
+        message: `${words} of ${opts.wordLimit} allowed words used (${Math.round((words / opts.wordLimit) * 100)}%). Check whether the prompt calls for more development before adding text.`,
         severity: "warning",
       });
     } else {
@@ -339,11 +369,11 @@ function fitScore(text: string, opts: EssayOptions): { score: number; issues: Es
     }
   }
 
-  if (!/\b(?:goal|career|after gradua|professionally|aim to|plan to)\b/i.test(text)) {
+  if (["sop", "personal_statement"].includes(opts.type ?? "sop") && !/\b(?:goal|career|after gradua|professionally|aim to|plan to)\b/i.test(text)) {
     score -= 10;
     issues.push({
       code: "no_forward_look",
-      message: "The essay never says what comes next. Committees fund a trajectory, not a hobby.",
+      message: "A future goal was not detected. Include one only if it is relevant to the prompt, and describe it in your own terms.",
       severity: "info",
     });
   }
@@ -375,15 +405,16 @@ export function analyzeEssay(text: string, opts: EssayOptions = {}): EssayFeedba
     };
   }
 
-  if (wordCount < 150) {
+  const longFormType = ["sop", "personal_statement"].includes(opts.type ?? "sop");
+  if (longFormType && wordCount < 150 && (!opts.wordLimit || opts.wordLimit >= 250)) {
     issues.push({
       code: "too_short",
-      message: `${wordCount} words is a sketch, not an essay. Most programmes expect 500–1000.`,
+      message: `This draft has ${wordCount} words. Check the prompt's required length and develop the response with relevant, verified detail if needed.`,
       severity: "blocker",
     });
   }
 
-  // Weighted total — specificity and fit decide admissions more than style.
+  // Weighted writing rubric — prompt fit and evidence carry more weight than style.
   const total = clamp(
     hook.score * 0.15 + structure.score * 0.2 + specificity.score * 0.3 + language.score * 0.15 + fit.score * 0.2,
     0,

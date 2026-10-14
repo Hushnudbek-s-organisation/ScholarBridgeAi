@@ -126,7 +126,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
                 >
                   <Icon className={`h-4 w-4 ${complete ? "text-emerald-600" : "text-slate-400"}`} />
                   <span className="min-w-0">
-                    <span className="block truncate text-[11px] font-bold text-slate-800">{knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}</span>
+                    <span className="block break-words text-[11px] font-bold text-slate-800">{knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}</span>
                     <span className="text-[10px] text-slate-500">
                       {p.done}/{p.total}
                     </span>

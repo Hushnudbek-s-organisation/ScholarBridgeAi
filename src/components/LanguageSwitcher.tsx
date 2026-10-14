@@ -25,12 +25,12 @@ export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSw
 
   if (compact) {
     return (
-      <div className="relative flex items-center rounded-lg border border-slate-200 bg-slate-100 pl-1.5">
+      <div className="relative flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-100 pl-1.5">
         <Globe className="h-3.5 w-3.5 shrink-0 text-slate-500" />
         <select
           value={locale}
           onChange={(e) => handleChange(e.target.value)}
-          className="cursor-pointer bg-transparent py-1.5 pl-1 pr-1 text-[11px] font-bold uppercase text-slate-800 focus:outline-none"
+          className="min-h-11 cursor-pointer bg-transparent py-2 pl-1 pr-1 text-[11px] font-bold uppercase text-slate-800 focus:outline-none"
           aria-label={t("label")}
         >
           {locales.map((l) => (

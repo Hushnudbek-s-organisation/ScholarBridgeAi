@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { studentProfiles, studyPlanPhases, studyPlans } from "@/db/schema";
 import { guardStudent, idParam, jsonError, readBody, serverError, text } from "@/lib/journey/api";
 import { buildPhaseProgress, PLAN_PHASES } from "@/lib/journey/planning";
-import { profileCompleteness } from "@/lib/growth/logic";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +28,27 @@ export async function GET(req: Request) {
       .limit(1);
 
     const live = await phaseProgress(profileId);
+    const storedPhases = plan
+      ? await db.select().from(studyPlanPhases).where(eq(studyPlanPhases.planId, plan.id))
+      : [];
+    const phases = live.map((phase) => {
+      const stored = storedPhases.find((item) => item.phaseKey === phase.key);
+      // A timestamp distinguishes an explicit student choice from the default
+      // pending row created with the plan. This lets students mark a conditional
+      // phase as not applicable without inventing a requirement.
+      if (!stored?.startedAt) return phase;
+      const done = stored.status === "done";
+      return {
+        ...phase,
+        status: done ? "done" as const : "in_progress" as const,
+        pct: done ? 100 : Math.max(1, phase.pct),
+        missing: done ? [] : phase.missing,
+      };
+    });
 
     return NextResponse.json({
       plan: plan ?? null,
-      phases: live,
+      phases,
       phaseDefinitions: PLAN_PHASES.map((p) => ({ key: p.key, title: p.title, description: p.description, icon: p.icon, tab: p.tab })),
     });
   } catch (err) {
@@ -170,7 +186,6 @@ export async function DELETE(req: Request) {
 export async function phaseProgress(profileId: number) {
   const [row] = await db
     .select({
-      ielts: sql<number | null>`${studentProfiles.ieltsScore}`,
       testPlans: sql<number>`(SELECT COUNT(*)::int FROM test_plans tp WHERE tp.profile_id = ${profileId})`,
       savedUniversities: sql<number>`(SELECT COUNT(*)::int FROM saved_universities su WHERE su.profile_id = ${profileId})`,
       savedScholarships: sql<number>`(SELECT COUNT(*)::int FROM saved_scholarships ss WHERE ss.profile_id = ${profileId})`,
@@ -187,13 +202,20 @@ export async function phaseProgress(profileId: number) {
     .limit(1);
 
   const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
-  const completenessPct = profileCompleteness(profile ?? null);
+  const profileHasContext = Boolean(
+    profile && (
+      profile.degreeLevel?.trim() ||
+      profile.targetMajor?.trim() ||
+      profile.country?.trim() ||
+      profile.preferredCountries?.trim() ||
+      profile.studyInterests?.trim() ||
+      Number(profile.gpa) > 0
+    ),
+  );
 
   return buildPhaseProgress({
-    profileComplete: completenessPct >= 100,
-    profileCompletenessPct: completenessPct,
+    profileHasContext,
     openApplicationRequirements: row?.openApplicationRequirements ?? 0,
-    ieltsScore: row?.ielts ?? null,
     testPlanCount: row?.testPlans ?? 0,
     savedUniversities: row?.savedUniversities ?? 0,
     savedScholarships: row?.savedScholarships ?? 0,
@@ -203,7 +225,7 @@ export async function phaseProgress(profileId: number) {
     submittedApplications: row?.submitted ?? 0,
     interviewSessions: row?.interviews ?? 0,
     offersRecorded: row?.offers ?? 0,
-    visaCaseStarted: (row?.interviews ?? 0) > 0,
+    visaCaseStarted: false,
     visaApproved: false,
     departureReady: false,
   });

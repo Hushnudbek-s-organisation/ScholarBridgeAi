@@ -16,9 +16,14 @@ export type StepUrgency = "critical" | "high" | "medium" | "low";
 
 export interface NextStep {
   id: string;
-  title: string;
-  /** One sentence the student can act on right now. */
-  detail: string;
+  /** Translation key in journey.nextStepTitle, unless rawTitleKind is set. */
+  titleKey: string;
+  /** Translation key in journey.nextStepDetail. */
+  detailKey: string;
+  values?: Record<string, string | number>;
+  /** Student-entered deadline or a stage need that the UI localizes by key. */
+  rawTitle?: string;
+  rawTitleKind?: "deadline" | "journey";
   urgency: StepUrgency;
   /** 🔴 / 🟡 / 🟢 / ⚪ — what the dashboard shows in front of the title. */
   dot: string;
@@ -38,216 +43,183 @@ export interface DeadlineInput {
 
 export interface NextStepsInput {
   journey: { current: string; stillNeeded: { text: string; tab: string }[] };
-  readiness: { weakest: { key: string; label: string; pct: number; gaps: string[]; tab: string }[] };
   appRows: { id: number; universityName: string; deadline: string | null; submitted: boolean; status: string }[];
   openRequirements: number;
   deadlines: DeadlineInput[];
-  gaps: { testType: string; state: string; current: number | null; required: number; message: string }[];
+  gaps: { testType: string; state: string; current: number | null; catalogueFigure: number | null; messageKey: string }[];
   recommendations: { submitted: number; outstanding: number };
   documents: { ready: number; total: number; expiring: number };
-  tests: { ielts: number | null; target: number | null; belowTarget: boolean };
+  tests: { ielts: number | null; target: number | null };
   funding: { gap: number; covered: boolean } | null;
-  profileComplete: boolean;
-  savedUniversities: number;
-  visaStage: boolean;
 }
 
 function urgencyOf(days: number | null): { urgency: StepUrgency; dot: string } {
   if (days == null) return { urgency: "low", dot: "⚪" };
-  if (days < 0) return { urgency: "critical", dot: "🔴" };
-  if (days <= 7) return { urgency: "critical", dot: "🔴" };
-  if (days <= 21) return { urgency: "high", dot: "🟡" };
+  if (days <= 0) return { urgency: "critical", dot: "🔴" };
   return { urgency: "medium", dot: "🟢" };
 }
 
 /**
- * Base score for a step, before the deadline modifier.
- * Overdue work is worth 100; a week is worth 80; a month is worth 55.
+ * A tracked date changes ordering only by being past, today, or in the future.
+ * The exact calendar-day difference breaks ties; no generic preparation window
+ * is assumed for every programme or document.
  */
 function baseScore(days: number | null): number {
   if (days == null) return 30;
-  if (days < 0) return 100 + Math.min(40, Math.abs(days));
+  if (days < 0) return 100;
   if (days === 0) return 95;
-  if (days <= 7) return 80;
-  if (days <= 14) return 65;
-  if (days <= 30) return 55;
-  if (days <= 60) return 40;
-  return 25;
+  return 75;
 }
 
 export function computeNextActions(input: NextStepsInput, limit = 5): NextStep[] {
   const steps: NextStep[] = [];
-  const add = (s: Omit<NextStep, "urgency" | "dot"> & { urgency?: StepUrgency; dot?: string }) => {
-    const { urgency, dot } = urgencyOf(s.dueInDays);
-    steps.push({ ...s, urgency: s.urgency ?? urgency, dot: s.dot ?? dot });
+  const add = (step: Omit<NextStep, "urgency" | "dot"> & { urgency?: StepUrgency; dot?: string }) => {
+    const defaults = urgencyOf(step.dueInDays);
+    steps.push({ ...step, urgency: step.urgency ?? defaults.urgency, dot: step.dot ?? defaults.dot });
   };
 
-  // ---- 1. Deadlines. The nearest one always leads. -----------------------
-  const soonest = input.deadlines
-    .filter((d) => d.daysRemaining == null || d.daysRemaining <= 60)
-    .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999))[0];
+  // ---- 1. Student-entered deadlines --------------------------------------
+  const datedDeadlines = input.deadlines
+    .filter((deadline) => deadline.daysRemaining != null)
+    .sort((a, b) => (a.daysRemaining ?? Number.MAX_SAFE_INTEGER) - (b.daysRemaining ?? Number.MAX_SAFE_INTEGER));
+  const soonest = datedDeadlines[0] ?? input.deadlines[0];
   if (soonest) {
     const days = soonest.daysRemaining;
+    const detailKey = days == null
+      ? "deadlineNoDate"
+      : days < 0
+        ? "deadlinePassed"
+        : days === 0
+          ? "deadlineToday"
+          : "deadlineDays";
     add({
       id: `deadline-${soonest.id}`,
-      title: soonest.title,
-      detail:
-        days == null
-          ? "No date recorded yet — confirm the real deadline on the official site."
-          : days < 0
-            ? `This deadline passed ${Math.abs(days)} day(s) ago.`
-            : days === 0
-              ? "Due today."
-              : `${days} day${days === 1 ? "" : "s"} left.`,
+      titleKey: "",
+      rawTitle: soonest.title,
+      rawTitleKind: "deadline",
+      detailKey,
+      values: days == null ? undefined : { days: Math.abs(days) },
       dueInDays: days,
       tab: soonest.tab ?? "deadlines",
-      score: baseScore(days) + 25, // a hard date outranks every soft task
+      score: baseScore(days) + 25,
     });
   }
 
-  // ---- 2. Unfinished application requirements ----------------------------
+  // ---- 2. Application-specific checklist rows ----------------------------
   if (input.openRequirements > 0) {
-    const firstOpen = input.appRows.find((a) => !a.submitted);
+    const firstOpen = input.appRows.find((application) => !application.submitted);
     const days = soonest?.daysRemaining ?? null;
     add({
       id: "requirements-open",
-      title: `${input.openRequirements} required item${input.openRequirements === 1 ? "" : "s"} still missing`,
-      detail: firstOpen
-        ? `Open the workspace for ${firstOpen.universityName || "your application"} to see exactly what is left.`
-        : "Open any application workspace to see what is left.",
+      titleKey: "applicationRequirements",
+      detailKey: firstOpen?.universityName ? "applicationRequirementsSpecific" : "applicationRequirementsGeneral",
+      values: { count: input.openRequirements, application: firstOpen?.universityName ?? "" },
       dueInDays: days,
       tab: "workspace",
       score: baseScore(days) + 15,
     });
   }
 
-  // ---- 3. Recommendations ------------------------------------------------
+  // ---- 3. Recommender requests already in the tracker --------------------
   if (input.recommendations.outstanding > 0) {
     const days = soonest?.daysRemaining ?? null;
     add({
       id: "recommendations",
-      title:
-        input.recommendations.outstanding === 1
-          ? "Recommendation letter not requested"
-          : `${input.recommendations.outstanding} recommendation letters not requested`,
-      detail: "Teachers need time — a letter requested today still takes a week.",
-      dueInDays: days == null ? 14 : Math.min(days, 14),
+      titleKey: "recommendationsOutstanding",
+      detailKey: "recommendationsReview",
+      values: { count: input.recommendations.outstanding },
+      dueInDays: days,
       tab: "recommendations",
-      score: baseScore(days == null ? 14 : days) + 10,
+      score: baseScore(days) + 10,
     });
   }
 
-  // ---- 4. English / standardized test gap --------------------------------
-  const below = input.gaps.find((g) => g.state === "below");
-  const noScore = input.gaps.find((g) => g.state === "no_score");
-  if (below) {
+  // ---- 4. University-level test figure: verify before acting -------------
+  const catalogueSignal = input.gaps.find(
+    (gap) => gap.catalogueFigure != null && (gap.state === "below_figure" || gap.state === "no_score"),
+  );
+  if (catalogueSignal) {
     add({
-      id: `test-${below.testType}`,
-      title: `${labelFor(below.testType)} target not reached`,
-      detail: `${below.message} Set a target date in the Test Planner.`,
-      dueInDays: null,
-      tab: "tests",
-      score: 62,
-    });
-  } else if (noScore) {
-    add({
-      id: `test-${noScore.testType}`,
-      title: `No ${labelFor(noScore.testType)} score recorded`,
-      detail: noScore.message,
-      dueInDays: null,
-      tab: "tests",
-      score: 58,
-    });
-  } else if (input.tests.target != null && input.tests.ielts != null && input.tests.ielts < input.tests.target) {
-    add({
-      id: "test-personal-target",
-      title: `${labelFor("ielts")} target not reached`,
-      detail: `Current ${input.tests.ielts}, your own target ${input.tests.target}.`,
+      id: `test-policy-${catalogueSignal.testType}`,
+      titleKey: "testPolicyVerify",
+      detailKey: catalogueSignal.current == null ? "testPolicyNoScore" : "testPolicyCompare",
+      values: {
+        test: catalogueSignal.testType,
+        ...(catalogueSignal.current == null ? {} : { current: catalogueSignal.current }),
+        figure: catalogueSignal.catalogueFigure!,
+      },
       dueInDays: null,
       tab: "tests",
       score: 56,
     });
+  } else if (input.tests.target != null && input.tests.ielts != null && input.tests.ielts < input.tests.target) {
+    add({
+      id: "test-personal-target",
+      titleKey: "personalTestTarget",
+      detailKey: "personalTestTargetReview",
+      values: { current: input.tests.ielts, target: input.tests.target },
+      dueInDays: null,
+      tab: "tests",
+      score: 46,
+    });
   }
 
-  // ---- 5. Documents that expire ------------------------------------------
+  // ---- 5. Documents in the student's vault -------------------------------
   if (input.documents.expiring > 0) {
     add({
       id: "documents-expiring",
-      title:
-        input.documents.expiring === 1
-          ? "1 document expires soon"
-          : `${input.documents.expiring} documents expire soon`,
-      detail: "A passport or test certificate that expires can fail a whole application.",
+      titleKey: "documentsExpiring",
+      detailKey: "documentsValidity",
+      values: { count: input.documents.expiring },
       dueInDays: null,
       tab: "documents",
       score: 54,
     });
   } else if (input.documents.total > 0 && input.documents.ready < input.documents.total) {
     add({
-      id: "documents-missing",
-      title: `${input.documents.total - input.documents.ready} document(s) missing from your vault`,
-      detail: "Upload once, reuse across every application.",
+      id: "documents-review",
+      titleKey: "documentsNeedReview",
+      detailKey: "documentsOfficialChecklist",
+      values: { count: input.documents.total - input.documents.ready },
       dueInDays: null,
       tab: "documents",
       score: 44,
     });
   }
 
-  // ---- 6. Funding gap ----------------------------------------------------
+  // ---- 6. Cost estimate and recorded funding -----------------------------
   if (input.funding && !input.funding.covered && input.funding.gap > 0) {
     add({
       id: "funding-gap",
-      title: `Funding gap: $${input.funding.gap.toLocaleString()}`,
-      detail: "Find scholarships that close the remaining gap.",
+      titleKey: "fundingGap",
+      detailKey: "fundingGapReview",
+      values: { amount: input.funding.gap },
       dueInDays: null,
-      tab: "scholarships",
+      tab: "funding",
       score: 60,
     });
   }
 
-  // ---- 7. Profile completeness -------------------------------------------
-  if (!input.profileComplete) {
-    add({
-      id: "profile",
-      title: "Finish your profile",
-      detail: "Everything personalised — matches, requirements, funding — depends on it.",
-      dueInDays: null,
-      tab: "profile/details",
-      score: 48,
-    });
-  }
-
-  // ---- 8. Weakest readiness area -----------------------------------------
-  const weakest = input.readiness.weakest.find((w) => w.pct < 70);
-  if (weakest) {
-    add({
-      id: `readiness-${weakest.key}`,
-      title: `${weakest.label} readiness ${weakest.pct}%`,
-      detail: weakest.gaps[0] ?? `Strengthen your ${weakest.label.toLowerCase()} profile.`,
-      dueInDays: null,
-      tab: weakest.tab,
-      score: 34 + weakest.pct / 10,
-    });
-  }
-
-  // ---- 9. Journey-specific step for the current stage --------------------
+  // ---- 7. Journey-specific context ---------------------------------------
   for (const need of input.journey.stillNeeded) {
     add({
-      id: `stage-${input.journey.current}-${need.text.slice(0, 24)}`,
-      title: need.text,
-      detail: `Next step in your ${labelFor(input.journey.current)} stage.`,
+      id: `stage-${input.journey.current}-${need.tab}`,
+      titleKey: "",
+      rawTitle: need.text,
+      rawTitleKind: "journey",
+      detailKey: "journeyStageStep",
       dueInDays: null,
       tab: need.tab || stageTab(input.journey.current),
       score: 40,
     });
   }
 
-  // ---- 10. Nothing at all → give a first action --------------------------
+  // ---- 8. A neutral entry point when no tracked work is due ---------------
   if (steps.length === 0) {
     add({
       id: "start",
-      title: "Start your study plan",
-      detail: "Tell us the major, the country and the year — we build the ten phases for you.",
+      titleKey: "studyPlanStart",
+      detailKey: "studyPlanStartDetail",
       dueInDays: null,
       tab: "study-plan",
       score: 20,
@@ -256,11 +228,16 @@ export function computeNextActions(input: NextStepsInput, limit = 5): NextStep[]
 
   const seen = new Set<string>();
   return steps
-    .sort((a, b) => b.score - a.score)
-    .filter((s) => {
-      const key = s.title.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aDue = a.dueInDays ?? Number.MAX_SAFE_INTEGER;
+      const bDue = b.dueInDays ?? Number.MAX_SAFE_INTEGER;
+      return aDue - bDue || a.id.localeCompare(b.id);
+    })
+    .filter((step) => {
+      const key = step.rawTitle ?? `${step.titleKey}:${JSON.stringify(step.values ?? {})}`;
+      if (seen.has(key.toLowerCase())) return false;
+      seen.add(key.toLowerCase());
       return true;
     })
     .slice(0, limit);

@@ -80,6 +80,9 @@ export async function GET(req: Request) {
       {
         universityTitle,
         deadline: url.searchParams.get("deadline") || null,
+        relationshipContext: url.searchParams.get("relationshipContext") || null,
+        requestedFocus: url.searchParams.get("requestedFocus") || null,
+        supportingExample: url.searchParams.get("supportingExample") || null,
       }
     );
 

@@ -95,7 +95,7 @@ export function Segmented<T extends string>({
   ariaLabel?: string;
 }) {
   return (
-    <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1" role="tablist" aria-label={ariaLabel}>
+    <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={ariaLabel}>
       {options.map((o) => {
         const active = o.id === value;
         return (
@@ -104,7 +104,7 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.id)}
-            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition-colors ${
+            className={`inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-xl px-3.5 py-2 text-left text-xs font-bold transition-colors ${
               active ? "bg-slate-900 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
