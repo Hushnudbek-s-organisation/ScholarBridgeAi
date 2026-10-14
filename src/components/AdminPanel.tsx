@@ -13,6 +13,7 @@ import { PremiumManager } from "./admin/PremiumManager";
 import { AuditLogViewer } from "./admin/AuditLogViewer";
 import { ConfigManager } from "./admin/ConfigManager";
 import { AiSettingsManager } from "./admin/AiSettingsManager";
+import { AiCostPanel, PremiumPricePanel } from "./admin/AiCostPanel";
 import { OwnershipManager } from "./admin/OwnershipManager";
 import { RefreshCenter } from "./admin/RefreshCenter";
 import { VerificationManager } from "./admin/VerificationManager";
@@ -202,7 +203,12 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       case "opportunities":
         return <OpportunitiesManager adminProfileId={id} />;
       case "premium":
-        return <PremiumManager adminProfileId={id} />;
+        return (
+          <div className="space-y-6">
+            <PremiumPricePanel />
+            <PremiumManager adminProfileId={id} />
+          </div>
+        );
       case "audit":
         return <AuditLogViewer adminProfileId={id} />;
       case "refresh":
@@ -212,7 +218,12 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       case "config":
         return <ConfigManager adminProfileId={id} />;
       case "ai":
-        return <AiSettingsManager adminProfileId={id} />;
+        return (
+          <div className="space-y-6">
+            <AiSettingsManager adminProfileId={id} />
+            <AiCostPanel />
+          </div>
+        );
       case "verify":
         return <VerificationManager adminProfileId={id} />;
       case "reports":
