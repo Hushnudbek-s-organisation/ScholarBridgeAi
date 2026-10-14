@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
-import { logAIUsage } from "@/lib/ai/usage";
 import {
   buildAnalysisPrompt,
   getVisaCountry,
@@ -8,11 +7,12 @@ import {
   sanitizeHistory,
 } from "@/lib/visa-interview";
 import { scoreVisaInterview, visaChanceDisclaimer } from "@/lib/visaScoring";
-import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import { db } from "@/db";
 import { aiEvaluations } from "@/db/schema";
-import { authenticate, requireProfileAccess } from "@/lib/auth";
+import { authenticate } from "@/lib/auth";
 import { enforceFreeCap } from "@/lib/planLimits";
 
 /**
@@ -30,11 +30,14 @@ import { enforceFreeCap } from "@/lib/planLimits";
  *     disclaimer, because a consular decision depends on the officer, the post
  *     and documents this endpoint never sees.
  *
- * Metering (audit A21): a successful model analysis is recorded in
- * `ai_usage` against the signed-in caller (null for anonymous) so admin
- * statistics are complete. The daily AI request quota is intentionally NOT
- * applied (multi-step practice; see /api/visa/chat) — the per-minute limits
- * and the free practice-session cap remain the abuse controls.
+ * Metering: the router records every model call in `ai_usage` against the
+ * signed-in caller (null for anonymous). The daily AI request quota is
+ * intentionally NOT applied (multi-step practice; see /api/visa/chat) — the
+ * per-minute limits, the free practice-session cap and the platform budget
+ * remain the controls.
+ *
+ * Practice sessions are owned by the SESSION, never by a body field: a free
+ * account cannot skip its daily cap by leaving `profileId` out.
  */
 export async function POST(req: Request) {
   try {
@@ -45,8 +48,8 @@ export async function POST(req: Request) {
     const session = auth.ok ? auth.session : null;
 
     const limit = session
-      ? checkRateLimit(`visa:analyze:${session.profile.id}`, LIMITS.ai)
-      : checkRateLimit(`visa:analyze:${clientIp(req)}`, LIMITS.aiAnonymous);
+      ? await checkSharedRateLimit(`visa:analyze:${session.profile.id}`, LIMITS.ai)
+      : await checkSharedRateLimit(`visa:analyze:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     const parsed = await readJsonBody<Record<string, any>>(req, 256 * 1024);
@@ -67,36 +70,33 @@ export async function POST(req: Request) {
       destination: country.name,
     });
 
-    // Practice history (spec §13): when a signed-in profile is passed, persist
-    // the rubric so the student can watch scores rise across sessions.
-    // Free plan: limited practice sessions/day; Pro is unlimited.
-    const profileId = Number(body?.profileId) || null;
-    if (profileId) {
-      const access = await requireProfileAccess(req, profileId);
-      if (access.ok) {
-        const capped = await enforceFreeCap(profileId, "visa_practice");
-        if (capped) return capped;
-        try {
-          await db.insert(aiEvaluations).values({
-            profileId,
-            evaluationType: "Visa Practice",
-            content: JSON.stringify({
-              total: rubric.scores.total,
-              purposeOfStudy: rubric.scores.purposeOfStudy,
-              funding: rubric.scores.funding,
-              homeTies: rubric.scores.homeTies,
-              nonImmigrantIntent: rubric.scores.nonImmigrantIntent,
-              specificity: rubric.scores.specificity,
-              languageClarity: rubric.scores.languageClarity,
-              country: country.name,
-              homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
-              answerCount: rubric.answerCount,
-            }),
-          });
-        } catch (persistErr) {
-          // History is a nice-to-have — never fail the analysis for it.
-          console.error("Visa history persist error:", persistErr);
-        }
+    // Practice history (spec §13) and the free practice cap are both keyed on
+    // the signed-in account. Free plan: limited practice sessions/day; Pro is
+    // unlimited. Anonymous practice is unaffected by the cap (no account).
+    const ownerId = session?.profile.id ?? null;
+    if (ownerId) {
+      const capped = await enforceFreeCap(ownerId, "visa_practice");
+      if (capped) return capped;
+      try {
+        await db.insert(aiEvaluations).values({
+          profileId: ownerId,
+          evaluationType: "Visa Practice",
+          content: JSON.stringify({
+            total: rubric.scores.total,
+            purposeOfStudy: rubric.scores.purposeOfStudy,
+            funding: rubric.scores.funding,
+            homeTies: rubric.scores.homeTies,
+            nonImmigrantIntent: rubric.scores.nonImmigrantIntent,
+            specificity: rubric.scores.specificity,
+            languageClarity: rubric.scores.languageClarity,
+            country: country.name,
+            homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
+            answerCount: rubric.answerCount,
+          }),
+        });
+      } catch (persistErr) {
+        // History is a nice-to-have — never fail the analysis for it.
+        console.error("Visa history persist error:", persistErr);
       }
     }
 
@@ -122,6 +122,7 @@ export async function POST(req: Request) {
     const result = await aiChat(
       {
         taskType: "visa",
+        profileId: ownerId,
         prompt: buildAnalysisPrompt(country, history, uiLanguage),
         temperature: 0.3,
         maxTokens: 2048,
@@ -150,24 +151,6 @@ export async function POST(req: Request) {
         { error: "Could not parse the AI analysis. Please try again." },
         { status: 502 },
       );
-    }
-
-    // Record the model spend against the caller (audit A21). Awaited so the
-    // row exists before the response is sent; a storage blip never fails the
-    // analysis (the deterministic rubric already shipped with it).
-    try {
-      await logAIUsage({
-        profileId: session?.profile.id ?? null,
-        taskType: "visa",
-        provider: result.response.provider,
-        model: result.response.model,
-        promptTokens: result.response.promptTokens,
-        completionTokens: result.response.completionTokens,
-        costEstimate: result.response.costEstimate,
-        status: "success",
-      });
-    } catch (err) {
-      console.error("Visa analyze usage log failed:", err);
     }
 
     return NextResponse.json({

@@ -95,7 +95,9 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   anthropic: {
     id: "anthropic",
     label: "Anthropic",
-    defaultModel: "claude-3-5-sonnet-latest",
+    // claude-3-5-sonnet-* was retired by Anthropic on 2025-10-28; Sonnet 4.6 is the
+    // active replacement in the official deprecation table (same tier as before).
+    defaultModel: "claude-sonnet-4-6",
     keyEnvVar: "ANTHROPIC_API_KEY",
     modelEnvVar: "ANTHROPIC_MODEL",
     keyShape: "sk-ant-…",

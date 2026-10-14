@@ -5,10 +5,19 @@
  *   ai_free_tokens_per_day   / ai_premium_tokens_per_day
  *
  * Window: the last 24 hours (rolling — independent of the server timezone).
- * Admins are not limited. Signed-in accounts are counted from `ai_usage`
- * (one row per successful AI reply, logged against the caller). Anonymous
- * callers get the free request allowance per IP, counted in memory (like
- * every other rate limit here — see SECURITY.md about multi-instance limits).
+ * Admins are not limited.
+ *
+ * Request count — RACE-SAFE and EXACT. Committed usage (logged AI calls) is
+ * checked read-only first; then one admitted slot is reserved with
+ * reserveSharedSlot (per-key advisory lock: at most `limit` admissions per
+ * window, however many requests race). A REJECTED attempt is not recorded, and
+ * an attempt that fails before the provider is called (validation, 400s) still
+ * uses its slot — it is an admitted request.
+ *
+ * Token count — committed usage from `ai_usage` (tokens of finished requests).
+ * A burst of concurrent requests can overshoot the token limit by at most the
+ * tokens of the requests in flight; the platform budget (lib/ai/budget-gate)
+ * is the hard cost ceiling. See docs/AI_COST_AUDIT_2026-10-14.md.
  *
  * A value of 0 means "no AI requests on this plan"; a missing or invalid
  * value falls back to the default in CONFIG_DEFAULTS.
@@ -18,7 +27,7 @@ import type { Session } from "@/lib/auth";
 import { CONFIG_DEFAULTS, getConfig } from "@/lib/config";
 import { getPremiumStatus } from "@/lib/premium";
 import { clientIp } from "@/lib/rate-limit";
-import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
+import { reserveSharedSlot } from "@/lib/rate-limit-shared";
 import { aiUsageSince } from "@/lib/ai/usage";
 
 export const AI_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -83,21 +92,35 @@ export async function checkAiQuota(
   if (!session) {
     const { requests } = await quotaLimits("free");
     if (requests === 0) return { ok: false, response: exceeded("free", 0, AI_QUOTA_WINDOW_MS / 1000, "requests") };
-    const r = await checkSharedRateLimit(`ai:quota:ip:${clientIp(req)}`, { limit: requests, windowMs: AI_QUOTA_WINDOW_MS });
+    const r = await reserveSharedSlot(`ai:quota:ip:${clientIp(req)}`, { limit: requests, windowMs: AI_QUOTA_WINDOW_MS });
     return r.ok ? { ok: true } : { ok: false, response: exceeded("free", requests, r.retryAfterSec, "requests") };
   }
 
   const profileId = session.profile.id;
   const plan: AiQuotaPlan = (await getPremiumStatus(profileId)).isPremium ? "premium" : "free";
   const limits = await quotaLimits(plan);
+  if (limits.requests === 0) return { ok: false, response: exceeded(plan, 0, AI_QUOTA_WINDOW_MS / 1000, "requests") };
+
+  // 1. Committed usage first (read-only): logged requests and tokens of the
+  //    window. Denied here = no reservation and no provider call.
   const now = Date.now();
   const usage = await aiUsageSince(profileId, new Date(now - AI_QUOTA_WINDOW_MS));
-  const decision = quotaDecision(usage, limits);
-  if (decision.ok) return { ok: true };
-  // The allowance frees up when the oldest counted request leaves the window.
-  const retryAfterSec = usage.oldest
-    ? (usage.oldest.getTime() + AI_QUOTA_WINDOW_MS - now) / 1000
-    : AI_QUOTA_WINDOW_MS / 1000;
-  const limit = decision.reason === "requests" ? limits.requests : limits.tokens;
-  return { ok: false, response: exceeded(plan, limit, retryAfterSec, decision.reason) };
+  const before = quotaDecision({ requests: usage.requests, tokens: usage.tokens }, limits);
+  if (!before.ok) {
+    const retryAfterSec = usage.oldest
+      ? (usage.oldest.getTime() + AI_QUOTA_WINDOW_MS - now) / 1000
+      : AI_QUOTA_WINDOW_MS / 1000;
+    const limit = before.reason === "requests" ? limits.requests : limits.tokens;
+    return { ok: false, response: exceeded(plan, limit, retryAfterSec, before.reason) };
+  }
+
+  // 2. Reserve one admitted slot — EXACT under concurrency (see
+  //    reserveSharedSlot). A rejected attempt is not recorded.
+  const slot = await reserveSharedSlot(`ai:quota:profile:${profileId}`, {
+    limit: limits.requests,
+    windowMs: AI_QUOTA_WINDOW_MS,
+  });
+  if (!slot.ok) return { ok: false, response: exceeded(plan, limits.requests, slot.retryAfterSec, "requests") };
+  return { ok: true };
 }
+

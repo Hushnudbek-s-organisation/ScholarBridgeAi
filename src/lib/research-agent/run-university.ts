@@ -38,7 +38,7 @@ import { logRunStart, logRunFinish, buildReport } from "./audit";
 import { normalizeNameKey, normalizeUrl, toNumber, normalizeCurrency, toIsoDate } from "./normalize";
 import { isResearchSourceUrl, rejectSourceReason } from "./urlFilter";
 import { NullAIProvider, createAIProvider } from "./ai/openrouter";
-import { resolveRuntimeProvider } from "@/lib/ai/index";
+import { aiChat, resolveRuntimeProvider } from "@/lib/ai/index";
 import { AI_PROVIDERS, providerBaseUrl } from "@/lib/ai/settings";
 import { validateAIEvidence, aiEvidenceToSourceEvidence } from "./ai/validate";
 import { decideFinalClassification } from "./ai/decide";
@@ -1368,20 +1368,36 @@ export function programKey(name: string): string {
   return normalizeNameKey(name);
 }
 
-/** AI assist for the research agent, per the admin's "document" task mapping. */
+/**
+ * AI assist for the research agent, per the admin's "document" task mapping.
+ * Calls go through the central AI router (not a private HTTP client), so the
+ * platform budget, per-model prices and ai_usage rows apply to them too.
+ */
 async function researchAIProvider(): Promise<AIProvider> {
   const runtime = await resolveRuntimeProvider("document").catch(() => null);
   if (!runtime || runtime.disabled || !runtime.apiKey) return new NullAIProvider();
   const meta = AI_PROVIDERS[runtime.name];
-  const base = providerBaseUrl(runtime.name);
-  if (meta.protocol !== "openai" || !base) {
+  if (meta.protocol !== "openai" || !providerBaseUrl(runtime.name)) {
     console.warn(`[research-agent] ${meta.label} has no OpenAI-compatible chat API — using deterministic rules only`);
     return new NullAIProvider();
   }
   return createAIProvider({
-    apiKey: runtime.apiKey,
-    model: runtime.model,
-    endpoint: `${base}/chat/completions`,
     providerName: meta.label,
+    complete: async (system, user, maxTokens) => {
+      const result = await aiChat(
+        {
+          taskType: "document",
+          prompt: "", // unused: `messages` is sent instead
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: 0,
+          maxTokens,
+        },
+        { maxAttempts: 2 },
+      );
+      return result.ok ? result.response.text : null;
+    },
   });
 }

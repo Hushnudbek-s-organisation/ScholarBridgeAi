@@ -565,13 +565,30 @@ export const aiUsage = pgTable("ai_usage", {
   model: text("model").notNull(),
   promptTokens: integer("prompt_tokens").notNull().default(0),
   completionTokens: integer("completion_tokens").notNull().default(0),
+  /** USD. Meaningful only when costStatus is provider_reported or estimated (see lib/ai/pricing). */
   costEstimate: doublePrecision("cost_estimate").notNull().default(0),
+  /**
+   * How costEstimate was obtained: provider_reported | estimated |
+   * unknown_pricing | usage_unreported (lib/ai/pricing). "unknown" = the row
+   * was written before cost accounting existed — its 0 is NOT a measured zero.
+   */
+  costStatus: text("cost_status").notNull().default("unknown"),
+  /** Tokens served from the provider's prompt cache (a subset of promptTokens). */
+  cachedPromptTokens: integer("cached_prompt_tokens").notNull().default(0),
+  /** Provider calls made for this one logical request (retries included). */
+  attempts: integer("attempts").notNull().default(1),
+  /** True when the explicit admin fallback provider produced the reply. */
+  fallbackUsed: boolean("fallback_used").notNull().default(false),
+  /** Failure category for status = error (no prompt, no key, no provider payload). */
+  errorCategory: text("error_category"),
   status: text("status").notNull().default("success"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   // The daily AI quota counts one profile's requests in the last 24 hours on
   // every AI call — without this index that is a full scan of ai_usage.
   index("idx_ai_usage_profile_created").on(table.profileId, table.createdAt),
+  // Platform budgets sum spend across ALL profiles for the current day/month.
+  index("idx_ai_usage_created").on(table.createdAt),
 ]);
 
 // ---------------------------------------------------------------------------

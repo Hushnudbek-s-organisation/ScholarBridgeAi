@@ -18,6 +18,8 @@ import {
   taskProviderConfigKey,
   type AIProviderId,
 } from "@/lib/ai/settings";
+import { AI_PRICING_CONFIG_KEY, parsePricingJson } from "@/lib/ai/pricing";
+import { AI_BUDGET_KEYS, validateProviderBudgetJson } from "@/lib/ai/budget";
 import { CONFIG_DEFAULTS } from "@/lib/config";
 
 export const CONFIG_EXPORT_FORMAT = "scholarbridge-config";
@@ -36,6 +38,21 @@ const EXTRA_PORTABLE_KEYS = new Set<string>([
 /** Defense in depth: never treat anything secret-looking as portable. */
 const SECRET_KEY_RE = /(secret|token|password|passwd|api_?key|credential|_enc$|private)/i;
 
+/** Premium prices and durations: must be positive (a 0-UZS or 0-day plan is never valid). */
+const PAYMENT_PRICE_KEYS = new Set([
+  "payment_premium_price_uzs",
+  "payment_premium_season_price_uzs",
+  "payment_premium_yearly_price_uzs",
+]);
+const PAYMENT_DAY_KEYS = new Set([
+  "payment_premium_days",
+  "payment_premium_season_days",
+  "payment_premium_yearly_days",
+]);
+/** Sanity bounds — catches a typo (an extra zero) before it reaches a checkout. */
+const MAX_PAYMENT_PRICE_UZS = 100_000_000;
+const MAX_PAYMENT_DAYS = 3650;
+
 const INTEGER_KEYS = new Set([
   "payment_premium_price_uzs",
   "payment_premium_days",
@@ -47,6 +64,9 @@ const INTEGER_KEYS = new Set([
   "ai_premium_requests_per_day",
   "ai_free_tokens_per_day",
   "ai_premium_tokens_per_day",
+  "ai_free_live_sessions_per_day",
+  "ai_premium_live_sessions_per_day",
+  "ai_live_global_sessions_per_day",
   "free_saved_universities",
   "free_saved_scholarships",
   "free_application_workspaces",
@@ -69,6 +89,10 @@ export function isPortableConfigKey(key: string): boolean {
 }
 
 /** Null when valid, otherwise a human-readable reason. */
+function isChatProviderId(id: string): boolean {
+  return isAIProviderId(id) && isChatProvider(id);
+}
+
 export function validateConfigValue(key: string, value: unknown): string | null {
   if (!isPortableConfigKey(key)) return "not an editable setting";
   if (typeof value !== "string") return "value must be a string";
@@ -87,8 +111,45 @@ export function validateConfigValue(key: string, value: unknown): string | null 
       return "must be a JSON array of provider ids";
     }
   }
+  if (PAYMENT_PRICE_KEYS.has(key)) {
+    if (!/^\d{1,12}$/.test(value)) return "must be a whole number of UZS";
+    const n = Number(value);
+    if (n < 1 || n > MAX_PAYMENT_PRICE_UZS) return `must be between 1 and ${MAX_PAYMENT_PRICE_UZS.toLocaleString("en-US")} UZS`;
+    return null;
+  }
+  if (PAYMENT_DAY_KEYS.has(key)) {
+    if (!/^\d{1,12}$/.test(value)) return "must be a whole number of days";
+    const n = Number(value);
+    if (n < 1 || n > MAX_PAYMENT_DAYS) return `must be between 1 and ${MAX_PAYMENT_DAYS} days`;
+    return null;
+  }
+  if (key === "ai_live_session_max_minutes") {
+    const n = Number(value);
+    return /^\d{1,3}$/.test(value) && n >= 1 && n <= 120 ? null : "must be between 1 and 120 minutes";
+  }
+  if (key === "ai_budget_warn_percent") {
+    const n = Number(value);
+    return /^\d{1,3}$/.test(value) && n >= 1 && n <= 100 ? null : "must be a whole percentage from 1 to 100";
+  }
+  if (key === "ai_live_voice_enabled") return value === "true" || value === "false" ? null : "must be true or false";
+  if (key === AI_BUDGET_KEYS.daily || key === AI_BUDGET_KEYS.monthly) {
+    // "" = no limit; otherwise USD with up to 4 decimals (0 = block paid AI in that scope).
+    if (value.trim() === "") return null;
+    return /^\d{1,7}(\.\d{1,4})?$/.test(value.trim()) && Number(value) <= 1_000_000
+      ? null
+      : "must be a USD amount (0 blocks paid AI, empty = no limit)";
+  }
+  if (key === AI_BUDGET_KEYS.providerDaily) {
+    return validateProviderBudgetJson(value, isChatProviderId);
+  }
+  if (key === AI_PRICING_CONFIG_KEY) {
+    const parsed = parsePricingJson(value, isChatProviderId);
+    return parsed.ok ? null : parsed.error;
+  }
   if (INTEGER_KEYS.has(key)) return /^\d{1,12}$/.test(value) ? null : "must be a non-negative integer";
-  if (key === "payment_currency") return /^[A-Z]{3}$/.test(value) ? null : "must be a 3-letter currency code";
+  // Premium is priced and settled in UZS (Payme/Click); the checkout code is
+  // UZS-only, so any other currency here would be a setting that does nothing.
+  if (key === "payment_currency") return value === "UZS" ? null : "must be UZS (Payme and Click settle in UZS only)";
   if (key === "refresh_default_scope") return ["all", "scholarships", "universities"].includes(value) ? null : "must be all | scholarships | universities";
   if (JSON_KEYS.has(key)) {
     try {
