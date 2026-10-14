@@ -152,7 +152,7 @@ export function ApplicationWorkspacePanel({
       const res = await fetch("/api/requirements", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, id, status }),
+        body: JSON.stringify({ profileId, applicationId: data?.application?.id ?? applicationId, id, status }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || t("dvUpdateError"));

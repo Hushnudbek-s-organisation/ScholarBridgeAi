@@ -29,19 +29,20 @@ interface GamificationData {
 
 export function RewardsSection({ activeProfile }: RewardsSectionProps) {
   const t = useTranslations("rewards");
+  const profileId = activeProfile?.id;
   const [gamification, setGamification] = useState<GamificationData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [referral, setReferral] = useState<{ code: string; link: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadAll = useCallback(async () => {
-    if (!activeProfile) return;
+    if (!profileId) return;
     setLoading(true);
     try {
       const [gamRes, lbRes, refRes] = await Promise.all([
-        fetch(`/api/gamification?profileId=${activeProfile.id}`),
+        fetch(`/api/gamification?profileId=${profileId}`),
         fetch("/api/gamification/leaderboard"),
-        fetch(`/api/referrals?profileId=${activeProfile.id}`),
+        fetch(`/api/referrals?profileId=${profileId}`),
       ]);
       const gam = await gamRes.json();
       const lb = await lbRes.json();
@@ -54,10 +55,10 @@ export function RewardsSection({ activeProfile }: RewardsSectionProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile]);
+  }, [profileId]);
 
   useEffect(() => {
-    loadAll();
+    void Promise.resolve().then(loadAll);
   }, [loadAll]);
 
   const handleApplyCode = async (code: string): Promise<boolean> => {

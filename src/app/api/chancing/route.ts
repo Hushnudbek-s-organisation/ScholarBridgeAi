@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { applications, savedUniversities, studentProfiles, universities } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { applyMatchScenario, calculateUniversityMatch, type MatchScenario } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
@@ -39,7 +39,42 @@ export async function GET(req: Request) {
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
     const locale = localeFromRequest(req);
-    const matchProfile = await toMatchProfileWithActivities(profile);
+    let matchProfile = await toMatchProfileWithActivities(profile);
+    const scenarioEnabled = searchParams.get("scenario") === "1";
+    if (scenarioEnabled) {
+      const scenario: MatchScenario = {};
+      const parseScenarioNumber = (key: string, min: number, max: number): number | null | undefined => {
+        const raw = searchParams.get(key);
+        if (raw == null) return undefined;
+        if (raw === "null") return null;
+        const value = Number(raw);
+        return Number.isFinite(value) && value >= min && value <= max ? value : undefined;
+      };
+      for (const [key, field, min, max] of [
+        ["scenarioGpa4", "gpa4", 0, 4],
+        ["scenarioIelts", "ieltsScore", 0, 9],
+        ["scenarioBudgetUsd", "budgetAnnualUsd", 0, 100_000_000],
+      ] as const) {
+        if (!searchParams.has(key)) continue;
+        const raw = searchParams.get(key)!;
+        const value = parseScenarioNumber(key, min, max);
+        if (value === undefined) {
+          return NextResponse.json({ error: `Invalid ${key} scenario value` }, { status: 400 });
+        }
+        (scenario as Record<string, number | null>)[field] = value;
+        // Empty/invalid strings are never allowed to sneak into a scoring run.
+        if (raw.trim() === "") return NextResponse.json({ error: `Invalid ${key} scenario value` }, { status: 400 });
+      }
+      if (searchParams.has("scenarioMajor")) {
+        const rawMajor = searchParams.get("scenarioMajor") ?? "";
+        if (rawMajor !== "null" && rawMajor.length > 120) {
+          return NextResponse.json({ error: "scenarioMajor must be at most 120 characters" }, { status: 400 });
+        }
+        scenario.targetMajor = rawMajor === "null" ? null : rawMajor.trim() || null;
+      }
+      // The shared scorer receives a copy. Nothing in the profile row is updated.
+      matchProfile = applyMatchScenario(matchProfile, scenario);
+    }
     const singleId = Number(searchParams.get("universityId"));
     let universityIds: number[] = [];
 
@@ -66,7 +101,7 @@ export async function GET(req: Request) {
     }
 
     if (!universityIds.length) {
-      return NextResponse.json({ results: [], probability: ADMISSION_PROBABILITY });
+      return NextResponse.json({ results: [], probability: ADMISSION_PROBABILITY, scenario: scenarioEnabled });
     }
 
     const unis = await db
@@ -84,11 +119,14 @@ export async function GET(req: Request) {
         fitIssues: translateReasons(locale, "university", fit.issueDetails, fit.potentialIssues),
         comparedDimensions: fit.breakdown.comparedDimensions,
         totalDimensions: fit.breakdown.totalDimensions,
+        evidenceCoveragePct: fit.breakdown.evidenceCoveragePct,
+        evidenceLevel: fit.breakdown.evidenceLevel,
+        matchBreakdown: fit.breakdown,
         probability: ADMISSION_PROBABILITY,
       };
     });
 
-    return NextResponse.json({ results, probability: ADMISSION_PROBABILITY });
+    return NextResponse.json({ results, probability: ADMISSION_PROBABILITY, scenario: scenarioEnabled });
   } catch (error) {
     console.error("GET /api/chancing error:", error);
     return NextResponse.json({ error: "Failed to calculate profile fit" }, { status: 500 });

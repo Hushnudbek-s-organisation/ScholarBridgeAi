@@ -16,7 +16,9 @@ import { useTranslations } from "next-intl";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
-import { ArrowRight, CalendarClock, ChevronDown, Compass, RefreshCw, Sparkles } from "lucide-react";
+import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
+import type { MatchBreakdown } from "@/lib/matching";
+import { ArrowRight, CalendarClock, ChevronDown, Compass, Printer, RefreshCw, Sparkles } from "lucide-react";
 import { AnimatedNumber as CountUp, RevealGroup, RevealItem, SectionTransition } from "@/components/motion";
 import {
   Button,
@@ -78,7 +80,7 @@ export interface JourneyDashboard {
   };
   phases: { key: string; title: string; icon: string; tab: string; status: string; pct: number; missing: string[] }[];
   testGaps: { testType: string; state: string; current: number | null; catalogueFigure: number | null; messageKey: string }[];
-  funding: { annualCost: number; isCovered: boolean; fundingGap: number; securedGap: number; items: number; calculated: boolean; estimated: boolean };
+  funding: { annualCost: number | null; isCovered: boolean | null; fundingGap: number | null; securedGap: number | null; items: number; calculated: boolean; estimated: boolean };
   expiringDocuments: { id: number; title: string; docType: string; expiresAt: string | null; daysRemaining: number | null }[];
   recommended: {
     /** False = the profile has no basis yet, so nothing is personalised. */
@@ -99,7 +101,14 @@ export interface JourneyDashboard {
       minGpa: number | null;
       minIelts: number | null;
       annualTuition: string | number | null;
+      tuitionCurrency: string | null;
+      tuitionPeriod: string | null;
       annualTuitionUsd: number | null;
+      annualLivingEst: string | number | null;
+      livingCostCurrency: string | null;
+      livingCostPeriod: string | null;
+      annualLivingEstUsd: number | null;
+      postStudyWorkVisaYears: number | null;
       verificationStatus: string;
       lastVerifiedAt: string | null;
       saved: boolean;
@@ -107,6 +116,7 @@ export interface JourneyDashboard {
       matchScore: number;
       matchReasons: string[];
       matchIssues: string[];
+      matchBreakdown: MatchBreakdown;
     }[];
     scholarships: {
       id: number;
@@ -130,6 +140,7 @@ export interface JourneyDashboard {
       matchScore: number;
       matchReasons: string[];
       matchIssues: string[];
+      matchBreakdown: MatchBreakdown;
       /** What we can honestly say about the citizenship rule. */
       countryEligibility: "open-to-all" | "citizenship-match" | "unknown";
     }[];
@@ -264,6 +275,12 @@ export function RecommendedPanel({
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                       {t("ccRecFitChip", { score: u.matchScore })}
                     </span>
+                    <MatchEvidenceBadge
+                      comparedDimensions={u.matchBreakdown.comparedDimensions}
+                      totalDimensions={u.matchBreakdown.totalDimensions}
+                      evidenceCoveragePct={u.matchBreakdown.evidenceCoveragePct}
+                      evidenceLevel={u.matchBreakdown.evidenceLevel}
+                    />
                     {u.saved && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                         {t("ccRecSaved")}
@@ -307,6 +324,17 @@ export function RecommendedPanel({
                   <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">
                     {awardLabel(s)}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+                      {t("ccRecFitChip", { score: s.matchScore })}
+                    </span>
+                    <MatchEvidenceBadge
+                      comparedDimensions={s.matchBreakdown.comparedDimensions}
+                      totalDimensions={s.matchBreakdown.totalDimensions}
+                      evidenceCoveragePct={s.matchBreakdown.evidenceCoveragePct}
+                      evidenceLevel={s.matchBreakdown.evidenceLevel}
+                    />
+                  </div>
                   {s.deadlineDate && (
                     <p className="text-xs text-slate-600 dark:text-slate-300">
                       {t("ccScholarshipDeadline", { date: new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString() })}
@@ -563,6 +591,16 @@ export function JourneyControlCenter({
           >
             {t("ccSeeStudyPlan")}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="print:hidden min-h-11 w-full px-4 py-2.5 sm:w-auto"
+            onClick={() => window.print()}
+            aria-label={t("printSummaryHint")}
+          >
+            <Printer className="h-4 w-4" aria-hidden />
+            {t("printSummary")}
+          </Button>
         </div>
 
         <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={t("ccStagesAria")}>
@@ -675,8 +713,8 @@ export function JourneyControlCenter({
         <RevealItem>
           <StatTile
             label={t("ccFinancialGap")}
-            value={data.funding.calculated ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
-            prefix={data.funding.calculated ? "$" : ""}
+            value={data.funding.calculated && data.funding.fundingGap != null ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
+            prefix={data.funding.calculated && data.funding.fundingGap != null ? "$" : ""}
             hint={
               data.funding.calculated
                 ? `${data.funding.isCovered ? t("ccCovered") : t("ccStillToFind")}${
@@ -935,17 +973,17 @@ export function JourneyControlCenter({
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedAnnualCost") : t("ccAnnualCost")}</p>
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">
-                {data.funding.calculated ? formatMoney(data.funding.annualCost, "USD") : t("ccNotCalculatedShort")}
+                {data.funding.calculated && data.funding.annualCost != null ? formatMoney(data.funding.annualCost, "USD") : t("ccNotCalculatedShort")}
               </p>
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedGap") : t("ccRemainingGap")}</p>
               <p
                 className={`text-xl font-extrabold ${
-                  !data.funding.calculated ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
+                  !data.funding.calculated || data.funding.fundingGap == null ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
                 }`}
               >
-                {data.funding.calculated ? formatMoney(data.funding.fundingGap, "USD") : t("ccUnavailable")}
+                {data.funding.calculated && data.funding.fundingGap != null ? formatMoney(data.funding.fundingGap, "USD") : t("ccUnavailable")}
               </p>
             </div>
             {!data.funding.calculated ? (

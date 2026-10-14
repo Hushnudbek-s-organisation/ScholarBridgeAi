@@ -10,6 +10,8 @@ import {
   Check, 
   Bot, 
   Send, 
+  Save,
+  Loader2,
   Award, 
   HelpCircle,
   Zap,
@@ -21,29 +23,35 @@ import { AppNote } from "@/components/AppNote";
 
 interface AiSopStudioProps {
   activeProfile: StudentProfile | null;
+  applicationId?: number | null;
+  universityId?: number | null;
+  universityName?: string | null;
+  programName?: string | null;
 }
 
-export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
+export function AiSopStudio({ activeProfile, applicationId, universityId, universityName, programName }: AiSopStudioProps) {
   const t = useTranslations("ai");
   const [activeTab, setActiveTab] = useState<"drafter" | "reviewer">("drafter");
 
-  // Drafter State
-  const [targetUni, setTargetUni] = useState("");
-  // An empty field is honest: the SOP prompt must not be written for a major
-  // the student never named. The placeholder suggests, the value does not lie.
-  const [targetProgram, setTargetProgram] = useState(activeProfile?.targetMajor || "");
+  // Drafter State. The selected application supplies context, not an inferred
+  // programme fact; the student can still edit both fields before generating.
+  const [targetUni, setTargetUni] = useState(universityName || "");
+  const [targetProgram, setTargetProgram] = useState(programName || activeProfile?.targetMajor || "");
   const [personalHook, setPersonalHook] = useState("");
   const [careerGoals, setCareerGoals] = useState("");
   const [programEvidence, setProgramEvidence] = useState("");
   const [experienceExample, setExperienceExample] = useState("");
   const [generatedSop, setGeneratedSop] = useState<string | null>(null);
+  const [savingVersion, setSavingVersion] = useState(false);
+  const [versionSaved, setVersionSaved] = useState(false);
+  const [versionSaveError, setVersionSaveError] = useState("");
   const [draftUsedAi, setDraftUsedAi] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
 
   // Reviewer State
   const [existingDraft, setExistingDraft] = useState("");
-  const [reviewUni, setReviewUni] = useState("");
+  const [reviewUni, setReviewUni] = useState(universityName || "");
   const [sopReview, setSopReview] = useState<string | null>(null);
   const [reviewUsedAi, setReviewUsedAi] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
@@ -57,6 +65,8 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
     if (!activeProfile) return;
     setIsDrafting(true);
     setDraftError("");
+    setVersionSaveError("");
+    setVersionSaved(false);
     setGeneratedSop(null);
 
     try {
@@ -83,6 +93,34 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
       setDraftError(err instanceof Error ? err.message : t("sopRequestError"));
     } finally {
       setIsDrafting(false);
+    }
+  };
+
+  const saveGeneratedDraft = async () => {
+    if (!activeProfile || !generatedSop) return;
+    setSavingVersion(true);
+    setVersionSaveError("");
+    try {
+      const res = await fetch("/api/essays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          applicationId: applicationId ?? undefined,
+          universityId: universityId ?? undefined,
+          essayType: "sop",
+          title: universityName ? `SOP — ${universityName}` : "Statement of Purpose",
+          targetName: targetUni || targetProgram || undefined,
+          content: toPlainText(generatedSop),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || t("sopSaveVersionError"));
+      setVersionSaved(true);
+    } catch (err) {
+      setVersionSaveError(err instanceof Error ? err.message : t("sopSaveVersionError"));
+    } finally {
+      setSavingVersion(false);
     }
   };
 
@@ -283,17 +321,31 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 </h3>
 
                 {generatedSop && (
-                  <button
-                    onClick={() => copyToClipboard(toPlainText(generatedSop))}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors"
-                  >
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? "Copied!" : "Copy Text"}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(toPlainText(generatedSop))}
+                      className="flex min-h-9 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? t("sopCopied") : t("sopCopyText")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveGeneratedDraft()}
+                      disabled={savingVersion || versionSaved || !activeProfile}
+                      className="flex min-h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {savingVersion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      {versionSaved ? t("sopVersionSaved") : savingVersion ? t("sopSavingVersion") : t("sopSaveToVersions")}
+                    </button>
+                  </div>
                 )}
               </div>
 
               {draftError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{draftError}</p>}
+              {versionSaveError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{versionSaveError}</p>}
+              {versionSaved && <p role="status" className="mb-3 text-xs font-semibold text-emerald-700">{t("sopVersionSaved")}</p>}
               {generatedSop ? (
                 <>
                   <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">

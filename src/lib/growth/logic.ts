@@ -4,6 +4,8 @@
  */
 import type { JourneyCheck } from "./defaults";
 import { profileCompletenessRatio, type ChancingProfile } from "../chancing";
+import { gpaTo40Scale } from "../gpa";
+import { normalizeScholarshipAwardPeriod } from "../usdCosts";
 
 // ---------------------------------------------------------------------------
 // Small parsing helpers
@@ -205,10 +207,9 @@ function tokenOverlap(a: string | null | undefined, b: string | null | undefined
   return hit / Math.min(ta.size, tb.size);
 }
 
+/** Compatibility alias: GPA conversion is defined only in src/lib/gpa.ts. */
 export function gpaTo4(gpa: number | null | undefined, scale: number | null | undefined): number | null {
-  if (gpa == null || !Number.isFinite(gpa) || gpa <= 0) return null;
-  const s = scale && Number.isFinite(scale) && scale > 0 ? scale : 4;
-  return Math.max(0, Math.min(4, (gpa / s) * 4));
+  return gpaTo40Scale(gpa, scale);
 }
 
 /**
@@ -284,6 +285,7 @@ export interface AutopilotScholarship {
   country: string;
   coverageType: string;
   amountUsdValue: number | null;
+  awardPeriod?: string | null;
   deadlineDate: string | null;
   degreeLevels: string;
   eligibleMajors: string;
@@ -292,6 +294,28 @@ export interface AutopilotScholarship {
   recurrence: string | null;
   computedStatus?: string | null;
   matchScore: number | null;
+}
+
+/** A shared award period can be labelled without converting durations. */
+export function commonScholarshipAwardPeriod(
+  awards: Pick<AutopilotScholarship, "awardPeriod">[]
+) {
+  if (awards.length === 0) return null;
+  const periods = awards.map((award) => normalizeScholarshipAwardPeriod(award.awardPeriod));
+  if (periods.some((period) => period == null) || new Set(periods).size !== 1) return null;
+  return periods[0];
+}
+
+/** Sum only when every award is known in USD and shares a recorded period. */
+export function totalComparableAwardValue(
+  awards: Pick<AutopilotScholarship, "amountUsdValue" | "awardPeriod">[]
+): number | null {
+  if (awards.length === 0) return 0;
+  if (commonScholarshipAwardPeriod(awards) == null) return null;
+  if (awards.some(({ amountUsdValue }) =>
+    amountUsdValue == null || !Number.isFinite(amountUsdValue) || amountUsdValue < 0
+  )) return null;
+  return awards.reduce((total, award) => total + (award.amountUsdValue ?? 0), 0);
 }
 
 const ESSAY_RE = /\b(essay|personal statement|statement of purpose|sop|motivation letter|motivational letter|cover letter|research proposal|study plan)\b/i;

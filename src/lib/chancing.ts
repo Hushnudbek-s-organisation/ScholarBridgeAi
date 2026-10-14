@@ -143,8 +143,9 @@ export function countActivities(profile: ChancingProfile): {
     ...parseListColumn(profile.projects),
   ].length;
   const leadership = parseListColumn(profile.leadership).length;
-  const research =
-    parseListColumn(profile.researchExperience).length + Number(profile.researchPublications ?? 0);
+  const rawPublications = Number(profile.researchPublications ?? 0);
+  const researchPublications = Number.isFinite(rawPublications) ? Math.max(0, Math.floor(rawPublications)) : 0;
+  const research = parseListColumn(profile.researchExperience).length + researchPublications;
   const saved = profile.savedActivities ?? [];
   const savedLeadership = saved.filter(
     (a) =>
@@ -175,6 +176,7 @@ export function countActivities(profile: ChancingProfile): {
 
 /** 0–1: how much relevant profile information the student has recorded. */
 export function profileCompletenessRatio(profile: ChancingProfile): number {
+  const activityCounts = countActivities(profile);
   const checks = [
     Number(profile.gpa) > 0,
     Number(profile.gpaScale) > 0,
@@ -182,10 +184,11 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
     Number(profile.satScore) > 0 || Number(profile.actScore) > 0 || Number(profile.greScore) > 0,
     Boolean(profile.country),
     Boolean(profile.targetMajor),
-    Number(profile.budgetAnnualUsd) > 0 || Number(profile.familyIncomeUsd) > 0 || profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true,
-    countActivities(profile).activities > 0,
-    parseListColumn(profile.leadership).length > 0,
-    parseListColumn(profile.awards).length + parseListColumn(profile.olympiads).length > 0,
+    Number(profile.budgetAnnualUsd) > 0 || profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true,
+    activityCounts.activities > 0,
+    activityCounts.research > 0,
+    activityCounts.leadership > 0,
+    activityCounts.awards > 0,
     Boolean(profile.careerGoal),
     Number(profile.graduationYear) > 0,
   ];
@@ -203,7 +206,7 @@ export interface StrengthSection {
   score: number;
   /** Precise form of the displayed coverage percentage. */
   scorePrecise: number;
-  /** No details recorded; optional sections are excluded from the overall. */
+  /** No details recorded; shown as unknown and excluded from weakest-area hints. */
   unknown?: boolean;
   /** 0–1 share of the section's relevant information that is on file. */
   coverage: number;
@@ -239,9 +242,11 @@ export function profileStrength(
     missing: string[],
     optional = true
   ): StrengthSection => {
-    const present = Math.max(0, Math.min(total, recorded));
+    const safeTotal = Number.isFinite(total) ? Math.max(0, total) : 0;
+    const safeRecorded = Number.isFinite(recorded) ? Math.max(0, recorded) : 0;
+    const present = Math.min(safeTotal, safeRecorded);
     const unknown = optional && present === 0;
-    const coverage = total > 0 ? present / total : 0;
+    const coverage = safeTotal > 0 ? present / safeTotal : 0;
     return {
       key,
       label,
@@ -249,7 +254,7 @@ export function profileStrength(
       scorePrecise: roundTo(unknown ? 0 : coverage * 100, 1),
       unknown,
       coverage: unknown ? 0 : coverage,
-      missing: present < total ? missing : [],
+      missing: present < safeTotal ? missing : [],
     };
   };
 
@@ -265,12 +270,10 @@ export function profileStrength(
   const hasAnyTest = [profile.ieltsScore, profile.toeflScore, profile.duolingoScore, profile.satScore, profile.actScore, profile.greScore]
     .some((value) => Number(value) > 0);
   const hasBudget = Number(profile.budgetAnnualUsd) > 0;
-  const hasIncome = Number(profile.familyIncomeUsd) > 0;
   const hasFundingNeed =
     profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship != null;
   const financeMissing = [
     ...(!hasBudget ? ["budgetPlan"] : []),
-    ...(!hasIncome ? ["incomeDetail"] : []),
     ...(!hasFundingNeed ? ["fundingPreference"] : []),
   ];
   const essayRecorded = typeof opts.essayScore === "number" && Number.isFinite(opts.essayScore);
@@ -283,16 +286,14 @@ export function profileStrength(
     makeSection("awards", "Awards and results", Number(activity.awards > 0), 1, ["awardsOptional"]),
     makeSection("research", "Research records", Number(activity.research > 0), 1, ["researchOptional"]),
     makeSection("essays", "Essay review on file", Number(essayRecorded), 1, ["essayOptional"]),
-    makeSection("financial", "Funding-plan details", Number(hasBudget) + Number(hasIncome) + Number(hasFundingNeed), 3, financeMissing),
+    makeSection("financial", "Funding-plan details", Number(hasBudget) + Number(hasFundingNeed), 2, financeMissing),
   ];
 
   const measuredSections = sections.filter((item) => !item.unknown);
   const scoredSections = measuredSections.length;
-  const overallPrecise = measuredSections.length
-    ? roundTo(measuredSections.reduce((sum, item) => sum + item.scorePrecise, 0) / measuredSections.length, 1)
-    : 0;
+  const overallPrecise = roundTo(sections.reduce((sum, item) => sum + item.scorePrecise, 0) / sections.length, 1);
   const overall = Math.round(overallPrecise);
-  const basis = "This percentage is average information coverage across sections with at least one recorded detail. Empty optional sections are excluded. It does not measure eligibility, application quality, or admission likelihood.";
+  const basis = "This percentage is information coverage across a fixed set of sections. Unrecorded optional areas remain marked unknown and are not used as weakest-area hints; the percentage is not an eligibility, quality, or admission-likelihood score.";
   return {
     overall,
     overallPrecise,
@@ -316,7 +317,7 @@ export function analyzeExtracurriculars(profile: ChancingProfile): Extracurricul
   return {
     activities: counts.activities,
     leadership: counts.leadership,
-    research: counts.research + Math.max(0, Number(profile.researchPublications ?? 0)),
+    research: counts.research,
     awards: counts.awards,
   };
 }

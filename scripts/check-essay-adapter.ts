@@ -15,6 +15,7 @@ import {
   parseWordLimit,
   rankScholarships,
   scoreEssayFit,
+  toeflToApproxIelts,
   scholarshipThemes,
   themeCounts,
   type AdapterProfile,
@@ -147,10 +148,15 @@ check("GPA 3.2 vs 3.5 minimum → gpa_below_min", lowGpa.codes.includes("gpa_bel
 const noEnglish = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null });
 check("no English score on file → english_missing", noEnglish.codes.includes("english_missing"));
 
-const toeflHigh = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 130 });
-check("TOEFL 130 ≈ IELTS 7.5 passes a 7.0 minimum", !toeflHigh.codes.some((c) => c.startsWith("english_")), toeflHigh.codes.join(","));
-const toeflLow = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 108 });
-check("TOEFL 108 ≈ IELTS 5.7 fails a 7.0 minimum", toeflLow.codes.includes("english_below_min"));
+const toefl100 = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 100 });
+check("TOEFL 100 is approximately IELTS 7.0 and reaches that comparison figure", !toefl100.codes.some((c) => c.startsWith("english_")) && toefl100.matched.some((m) => /approximate concordance.*TOEFL 100.*IELTS 7\.0.*verify/i.test(m)));
+const toefl108 = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 108 });
+check("TOEFL 108 is approximately IELTS 7.5, with a verification note", toefl108.matched.some((m) => /TOEFL 108.*IELTS 7\.5.*verify/i.test(m)));
+const toeflLow = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 79 });
+check("TOEFL 79 is approximately IELTS 6.5 and falls below a 7.0 figure", toeflLow.codes.includes("english_below_min") && toeflLow.gaps.some((gap) => /approximate concordance.*verify/i.test(gap)));
+const invalidToefl = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 121 });
+check("out-of-range TOEFL is not treated as a high IELTS score", invalidToefl.codes.includes("english_unrecognized"));
+check("TOEFL concordance uses bounded score ranges", toeflToApproxIelts(94) === 7 && toeflToApproxIelts(102) === 7.5 && toeflToApproxIelts(118) === 9 && toeflToApproxIelts(0) === null);
 
 const noLimit = scoreEssayFit(essay, { ...fullMatch, requirements: "Describe your goals." }, strongProfile);
 check("no published limit → neutral, not a failure", noLimit.matched.some((m) => m.includes("no word limit published")), noLimit.matched.join(" | "));

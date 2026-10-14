@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, Loader2, RefreshCw, ExternalLink, CheckCircle2 } from "lucide-react";
 
 interface VerificationManagerProps {
@@ -25,10 +25,10 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
   const [status, setStatus] = useState("unverified");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = async (st = status) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/verify?adminProfileId=${adminProfileId}&status=${st}`);
+      const res = await fetch(`/api/admin/verify?adminProfileId=${adminProfileId}&status=${status}`);
       const data = await res.json();
       if (res.ok) {
         setScholarships(data.scholarships || []);
@@ -39,12 +39,11 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId, status]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminProfileId]);
+    void Promise.resolve().then(load);
+  }, [load]);
 
   const verify = async (entityType: "scholarship" | "university", id: number, sourceUrl: string) => {
     setBusyId(`${entityType}-${id}`);
@@ -120,10 +119,7 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
         <div className="ml-auto flex items-center gap-2">
           <select
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              load(e.target.value);
-            }}
+            onChange={(e) => setStatus(e.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
           >
             <option value="unverified">Unverified ({total})</option>
@@ -132,7 +128,7 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
             <option value="recently_verified">Recently verified</option>
           </select>
           <button
-            onClick={() => load()}
+            onClick={load}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh

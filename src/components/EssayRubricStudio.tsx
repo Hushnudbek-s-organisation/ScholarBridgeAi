@@ -30,8 +30,10 @@ import { AppNote } from "@/components/AppNote";
 interface Scores {
   hook: number;
   structure: number;
+  flow: number;
   specificity: number;
   language: number;
+  agency: number;
   fit: number;
   total: number;
 }
@@ -41,6 +43,7 @@ interface Issue {
   message: string;
   severity: "blocker" | "warning" | "info";
   excerpt?: string;
+  params?: Record<string, string | number>;
 }
 
 interface Feedback {
@@ -48,6 +51,15 @@ interface Feedback {
   wordCount: number;
   issues: Issue[];
   cliches: { phrase: string; count: number }[];
+  flowAnalysis: { linkedParagraphs: number; paragraphTransitions: number; transitionExamples: string[]; stageSequence: string[]; backwardJumps: number };
+  actionVerbs: {
+    activeCount: number;
+    weakCount: number;
+    ratioPct: number | null;
+    activeExcerpts: { verb: string; excerpt: string }[];
+    weakExcerpts: { phrase: string; excerpt: string }[];
+  };
+  promptCoverage: { source: "custom_prompt" | "essay_type"; covered: string[]; missing: string[]; questions: string[] };
   readingTimeSec: number;
 }
 
@@ -68,6 +80,10 @@ interface Version {
   rubricTotal: number | null;
   createdAt: string;
   content: string;
+  universityId: number | null;
+  prompt: string | null;
+  targetName: string | null;
+  wordLimit: number | null;
 }
 
 const ESSAY_TYPES = [
@@ -81,8 +97,10 @@ const ESSAY_TYPES = [
 const SUBSCORES: { key: keyof Scores; labelKey: string }[] = [
   { key: "hook", labelKey: "essaySubscoreHook" },
   { key: "structure", labelKey: "essaySubscoreStructure" },
+  { key: "flow", labelKey: "essaySubscoreFlow" },
   { key: "specificity", labelKey: "essaySubscoreSpecificity" },
   { key: "language", labelKey: "essaySubscoreLanguage" },
+  { key: "agency", labelKey: "essaySubscoreAgency" },
   { key: "fit", labelKey: "essaySubscoreFit" },
 ];
 
@@ -91,6 +109,7 @@ const ESSAY_ISSUE_CODES = new Set([
   "paragraph_too_long", "no_conclusion", "run_on_sentences", "no_evidence", "thin_evidence",
   "unsupported_adjective", "cliches", "passive_voice", "monotone_rhythm", "repeated_word",
   "target_not_named", "why_us_generic", "over_limit", "under_limit", "no_forward_look", "too_short",
+  "abrupt_paragraph_flow", "repeated_transition", "action_verb_balance", "prompt_coverage_missing",
 ]);
 
 const SEVERITY_STYLE: Record<Issue["severity"], string> = {
@@ -107,14 +126,26 @@ const SEVERITY_LABEL_KEY: Record<Issue["severity"], string> = {
 
 interface EssayRubricStudioProps {
   activeProfile: StudentProfile | null;
+  applicationId?: number | null;
+  universityId?: number | null;
+  universityName?: string | null;
+  programName?: string | null;
 }
 
-export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
+export function EssayRubricStudio({
+  activeProfile,
+  applicationId,
+  universityId,
+  universityName,
+  programName,
+}: EssayRubricStudioProps) {
   const t = useTranslations("ai");
+  const activeProfileId = activeProfile?.id;
   const [text, setText] = useState("");
   const [essayType, setEssayType] = useState("sop");
-  const [targetName, setTargetName] = useState("");
+  const [targetName, setTargetName] = useState(universityName || programName || "");
   const [wordLimit, setWordLimit] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -178,18 +209,21 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   };
 
   const loadVersions = useCallback(async () => {
-    if (!activeProfile?.id) return;
+    if (!activeProfileId) return;
     try {
-      const res = await fetch(`/api/essays?profileId=${activeProfile.id}&essayType=${essayType}`);
+      const params = new URLSearchParams({ profileId: String(activeProfileId), essayType });
+      if (applicationId != null) params.set("applicationId", String(applicationId));
+      else if (universityId != null) params.set("universityId", String(universityId));
+      const res = await fetch(`/api/essays?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setVersions(data.versions ?? []);
     } catch {
       // Version history is a convenience — never block the editor.
     }
-  }, [activeProfile?.id, essayType]);
+  }, [activeProfileId, essayType, applicationId, universityId]);
 
   useEffect(() => {
-    void loadVersions();
+    void Promise.resolve().then(loadVersions);
   }, [loadVersions]);
 
   if (!activeProfile) {
@@ -213,6 +247,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           essayType,
           targetName: targetName || undefined,
           wordLimit: wordLimit ? Number(wordLimit) : undefined,
+          prompt: prompt || undefined,
         }),
       });
       const data = await res.json();
@@ -236,10 +271,13 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profileId: activeProfile.id,
+          applicationId: applicationId ?? undefined,
+          universityId: universityId ?? undefined,
           content: text,
           essayType,
           targetName: targetName || undefined,
           wordLimit: wordLimit ? Number(wordLimit) : undefined,
+          prompt: prompt || undefined,
         }),
       });
       const data = await res.json();
@@ -259,6 +297,11 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   const overLimit = limit !== null && wordCount > limit;
   const localizeIssue = (issue: Issue) => {
     if (!ESSAY_ISSUE_CODES.has(issue.code)) return issue.message;
+    if (issue.code === "prompt_coverage_missing") {
+      const elementKey = String(issue.params?.element ?? "direct_response");
+      const element = t(`essayPromptElements.${elementKey}` as never) as string;
+      return t("essayIssues.prompt_coverage_missing" as never, { element } as never) as string;
+    }
     const values =
       issue.code === "over_limit" || issue.code === "under_limit"
         ? { words: feedback?.wordCount ?? wordCount, limit: limit ?? 0 }
@@ -267,8 +310,13 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           : undefined;
     return t(`essayIssues.${issue.code}` as never, values as never) as string;
   };
-  const localizeIssueCode = (code: string) =>
-    ESSAY_ISSUE_CODES.has(code) ? (t(`essayIssues.${code}` as never) as string) : code;
+  const localizeIssueCode = (code: string) => {
+    if (!ESSAY_ISSUE_CODES.has(code)) return code;
+    if (code === "prompt_coverage_missing") {
+      return t("essayIssues.prompt_coverage_missing" as never, { element: t("essayPromptElements.direct_response") } as never) as string;
+    }
+    return t(`essayIssues.${code}` as never) as string;
+  };
 
   return (
     <div className="space-y-4">
@@ -310,7 +358,19 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           </div>
         </div>
 
+        <label className="mt-3 block text-xs font-semibold text-slate-700">
+          {t("essayPromptLabel")}
+          <textarea
+            maxLength={2000}
+            className="mt-1 min-h-[72px] w-full rounded-xl border border-slate-200 p-3 text-xs leading-relaxed text-slate-700 focus:border-indigo-400 focus:outline-none"
+            placeholder={t("essayPromptPlaceholder")}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        </label>
+
         <textarea
+          aria-label={t("essayTextPlaceholder")}
           className="mt-3 min-h-[280px] w-full rounded-xl border border-slate-200 p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none"
           placeholder={t("essayTextPlaceholder")}
           value={text}
@@ -395,6 +455,75 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <h4 className="text-xs font-bold text-slate-800">{t("essayPromptCoverageTitle")}</h4>
+              <p className="mt-0.5 text-[10px] text-slate-500">{t(`essayPromptCoverageType.${feedback.promptCoverage.source}` as never)}</p>
+              {feedback.promptCoverage.covered.length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-1">
+                  {feedback.promptCoverage.covered.map((key) => <li key={key} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{t(`essayPromptElements.${key}` as never)}</li>)}
+                </ul>
+              )}
+              {feedback.promptCoverage.questions.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-amber-800">
+                  {feedback.promptCoverage.questions.map((key) => <li key={key}>• {t(`essayPromptQuestions.${key}` as never)}</li>)}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[11px] text-emerald-700">{t("essayPromptCoverageComplete")}</p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <h4 className="text-xs font-bold text-slate-800">{t("essayFlowTitle")}</h4>
+              <p className="mt-1 text-[11px] text-slate-600">
+                {t("essayFlowSummary", { linked: feedback.flowAnalysis.linkedParagraphs, total: feedback.flowAnalysis.paragraphTransitions })}
+              </p>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                <span className="font-semibold">{t("essayFlowSequenceLabel")}: </span>
+                {feedback.flowAnalysis.stageSequence.length > 0
+                  ? feedback.flowAnalysis.stageSequence.map((stage, i) => (
+                      <React.Fragment key={`${stage}-${i}`}>
+                        {i > 0 ? " → " : ""}{t(`essayFlowStages.${stage}` as never)}
+                      </React.Fragment>
+                    ))
+                  : t("essayFlowSequenceUnknown")}
+              </p>
+              {feedback.flowAnalysis.backwardJumps > 0 && (
+                <p className="mt-1 text-[10px] font-semibold text-amber-700">{t("essayFlowBacktracking", { count: feedback.flowAnalysis.backwardJumps })}</p>
+              )}
+              {feedback.flowAnalysis.transitionExamples.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {feedback.flowAnalysis.transitionExamples.map((excerpt, i) => <li key={i} className="break-words rounded-md bg-white px-2 py-1 text-[10px] leading-relaxed text-slate-600">“{excerpt}”</li>)}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[10px] text-slate-500">{t("essayFlowNoTransitions")}</p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <h4 className="text-xs font-bold text-slate-800">{t("essayAgencyTitle")}</h4>
+              <p className="mt-1 text-[11px] text-slate-600">
+                {t("essayActionVerbSummary", { active: feedback.actionVerbs.activeCount, weak: feedback.actionVerbs.weakCount, ratio: feedback.actionVerbs.ratioPct == null ? "—" : `${feedback.actionVerbs.ratioPct}%` })}
+              </p>
+              {feedback.actionVerbs.activeExcerpts.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-bold text-emerald-700">{t("essayActionVerbExamples")}</p>
+                  <ul className="mt-1 space-y-1">
+                    {feedback.actionVerbs.activeExcerpts.slice(0, 3).map((item, i) => <li key={`active-${i}`} className="break-words rounded-md bg-white px-2 py-1 text-[10px] leading-relaxed text-slate-600"><b>{item.verb}</b>: “{item.excerpt}”</li>)}
+                  </ul>
+                </div>
+              )}
+              {feedback.actionVerbs.weakExcerpts.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-bold text-amber-700">{t("essayWeakVerbExamples")}</p>
+                  <ul className="mt-1 space-y-1">
+                    {feedback.actionVerbs.weakExcerpts.slice(0, 3).map((item, i) => <li key={`weak-${i}`} className="break-words rounded-md bg-white px-2 py-1 text-[10px] leading-relaxed text-slate-600"><b>{item.phrase}</b>: “{item.excerpt}”</li>)}
+                  </ul>
+                </div>
+              )}
+            </section>
           </div>
 
           {feedback.issues.length > 0 && (
@@ -553,7 +682,16 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 <span className="text-[11px] text-slate-400">{v.wordCount} words</span>
                 <span className="text-xs font-extrabold text-indigo-700">{v.rubricTotal ?? "—"}</span>
                 <button
-                  onClick={() => setText(v.content)}
+                  type="button"
+                  onClick={() => {
+                    setText(v.content);
+                    setPrompt(v.prompt ?? "");
+                    setTargetName(v.targetName ?? "");
+                    setWordLimit(v.wordLimit == null ? "" : String(v.wordLimit));
+                    setEssayType(v.essayType);
+                    setFeedback(null);
+                    setComparison(null);
+                  }}
                   className="min-h-11 shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
                 >
                   Load
@@ -643,8 +781,13 @@ const PEER_DIMS = [
 function PeerReviewSection({ profileId }: { profileId: number }) {
   const [myVersions, setMyVersions] = useState<PeerVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
-  const [reviews, setReviews] = useState<PeerReviewRow[]>([]);
-  const [agg, setAgg] = useState<PeerAggregate | null>(null);
+  const [reviewResult, setReviewResult] = useState<{
+    versionId: number;
+    reviews: PeerReviewRow[];
+    aggregate: PeerAggregate | null;
+  } | null>(null);
+  const reviews = reviewResult?.versionId === selectedVersion ? reviewResult.reviews : [];
+  const agg = reviewResult?.versionId === selectedVersion ? reviewResult.aggregate : null;
   const [openEssays, setOpenEssays] = useState<OpenEssay[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -687,20 +830,20 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
     };
   }, [profileId]);
 
-  // Reviews + averages for the selected version.
+  // Reviews + averages for the selected version. Key the result by version so
+  // stale data is never shown while the next selection is loading.
   useEffect(() => {
-    if (selectedVersion == null) {
-      setReviews([]);
-      setAgg(null);
-      return;
-    }
+    if (selectedVersion == null) return;
     let live = true;
     fetch(`/api/essays/reviews?essayVersionId=${selectedVersion}`, { cache: "no-store" })
       .then((r) => r.json().then((b) => (r.ok ? b : Promise.reject(new Error(b?.error ?? `HTTP ${r.status}`)))))
       .then((b) => {
         if (!live) return;
-        setReviews(b.reviews ?? []);
-        setAgg(b.aggregate ?? null);
+        setReviewResult({
+          versionId: selectedVersion,
+          reviews: b.reviews ?? [],
+          aggregate: b.aggregate ?? null,
+        });
       })
       .catch(() => {});
     return () => {

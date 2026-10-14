@@ -18,7 +18,7 @@ isbotlamaydi.
 > sinang, backup oling va alohida operator tasdig'ini oling. `db:verify` bu
 > ruxsatlarni tekshirmaydi.
 
-> **Audit holati — 2026-10-14:** Drizzle manbasida 95 jadval va 1,041 ustun bor.
+> **Audit holati — 2026-10-14:** Drizzle manbasida 95 jadval va 1,050 ustun bor.
 > `npm run test:schema` repodagi DDL bilan offline tekshiruv; live Supabase yoki
 > production bazaga ulanilmadi va hech narsa o'zgartirilmadi. Shuning uchun
 > production schema **UNVERIFIED**. `supabase/remove_profile_match_tiers.sql`
@@ -832,8 +832,21 @@ Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes insid
 | `status` | text |  | yes |  |
 | `purpose` | text |  | yes |  |
 | `related_entity_id` | integer | yes | — |  |
+| `provider_created_at` | timestamp | yes | — | Payme's provider-side `time` (milliseconds when serialized); used for its 12-hour timeout and GetStatement reconciliation. |
+| `performed_at` | timestamp | yes | — | Persisted provider completion time; Payme Merchant API lifecycle timestamp. |
+| `cancelled_at` | timestamp | yes | — | Persisted cancellation/refund time. |
+| `cancel_reason` | integer | yes | — | Payme cancellation reason code (timeout is 4). |
 | `created_at` | timestamp |  | yes |  |
 | `updated_at` | timestamp |  | yes |  |
+
+**Payment integrity indexes:** the generated canonical schema also creates a
+partial unique index on `(provider, provider_transaction_id)` for non-empty
+provider IDs and a partial unique index on `subscriptions.payment_id` when it is
+non-null. Before applying the updated schema to a populated database, check for
+existing duplicates; the generator reports a NOTICE and skips a conflicting
+unique index rather than deleting or rewriting rows. A skipped index means the
+new DB-level duplicate guard is not active until the conflict is investigated
+and the migration is safely retried.
 
 ### `platform_ownership`
 

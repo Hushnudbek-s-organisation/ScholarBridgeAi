@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Award,
   Plus,
@@ -133,7 +133,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fetchScholarships = async () => {
+  const fetchScholarships = useCallback(async () => {
     try {
       const res = await fetch("/api/scholarships");
       const data = await res.json();
@@ -144,11 +144,11 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchScholarships();
-  }, []);
+    void Promise.resolve().then(fetchScholarships);
+  }, [fetchScholarships]);
 
   const setField = <K extends keyof ScholarshipForm>(key: K, value: ScholarshipForm[K]) => {
     setForm((f) => ({ ...f, [key]: value }));

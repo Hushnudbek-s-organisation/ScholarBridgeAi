@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
 import {
   buildAnalysisPrompt,
@@ -11,7 +12,7 @@ import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import { db } from "@/db";
-import { aiEvaluations } from "@/db/schema";
+import { aiEvaluations, fundingItems, studentProfiles } from "@/db/schema";
 import { authenticate } from "@/lib/auth";
 import { enforceFreeCap } from "@/lib/planLimits";
 
@@ -63,17 +64,46 @@ export async function POST(req: Request) {
     }
 
     const history = sanitizeHistory(body?.messages, 40, 2000);
+    // Profile context is read only from the authenticated session; a body
+    // profileId can never select another student's academic or funding data.
+    const ownerId = session?.profile.id ?? null;
+    let profileContext: {
+      targetMajor: string | null;
+      degreeLevel: string | null;
+      budgetAnnualUsd: number | null;
+      fundingSources: { name: string; kind: string; amountUsd: number; status: string }[];
+    } | null = null;
+    if (ownerId) {
+      const [[savedProfile], savedFunding] = await Promise.all([
+        db.select({
+          targetMajor: studentProfiles.targetMajor,
+          degreeLevel: studentProfiles.degreeLevel,
+          budgetAnnualUsd: studentProfiles.budgetAnnualUsd,
+        }).from(studentProfiles).where(eq(studentProfiles.id, ownerId)).limit(1),
+        // Only profile-wide, already-awarded/confirmed funding is a safe
+        // reference for a general visa-practice session. Do not silently pick
+        // a different/latest application plan.
+        db.select({ name: fundingItems.name, kind: fundingItems.kind, amountUsd: fundingItems.amountUsd, status: fundingItems.status })
+          .from(fundingItems)
+          .where(and(
+            eq(fundingItems.profileId, ownerId),
+            isNull(fundingItems.applicationId),
+            inArray(fundingItems.status, ["confirmed", "awarded"]),
+          )),
+      ]);
+      if (savedProfile) profileContext = { ...savedProfile, fundingSources: savedFunding };
+    }
 
     // Deterministic rubric — always computed, model or not.
     const rubric = scoreVisaInterview(history, {
       homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
       destination: country.name,
+      profile: profileContext,
     });
 
     // Practice history (spec §13) and the free practice cap are both keyed on
     // the signed-in account. Free plan: limited practice sessions/day; Pro is
     // unlimited. Anonymous practice is unaffected by the cap (no account).
-    const ownerId = session?.profile.id ?? null;
     if (ownerId) {
       const capped = await enforceFreeCap(ownerId, "visa_practice");
       if (capped) return capped;

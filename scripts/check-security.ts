@@ -525,12 +525,12 @@ async function main() {
     const secret = "click-secret";
     const sign = payments.clickSignString({
       clickTransId: "t1",
-      clickPaydocId: "p1",
       serviceId: "s1",
       secretKey: secret,
       merchantTransId: "12",
-      amount: 59000,
+      amount: "59000",
       action: 0,
+      signTime: "2026-10-14 12:00:00",
     });
     const expected = payments.md5Hex(sign);
     assert.equal(payments.verifyClickSignature(expected, expected), true);
@@ -541,12 +541,12 @@ async function main() {
     const other = payments.md5Hex(
       payments.clickSignString({
         clickTransId: "t1",
-        clickPaydocId: "p1",
         serviceId: "s1",
         secretKey: "wrong-secret",
         merchantTransId: "12",
-        amount: 59000,
+        amount: "59000",
         action: 0,
+        signTime: "2026-10-14 12:00:00",
       })
     );
     assert.equal(payments.verifyClickSignature(other, expected), false);
@@ -555,6 +555,7 @@ async function main() {
   check("Payme credentials have no demo fallback (fail closed)", () => {
     const saved = { ...process.env };
     delete process.env.PAYME_MERCHANT_ID;
+    delete process.env.PAYME_LOGIN;
     delete process.env.PAYME_KEY;
     delete process.env.PAYME_PASSWORD;
     assert.equal(payments.isPaymeConfigured(), false);
@@ -563,17 +564,30 @@ async function main() {
     process.env = saved;
   });
 
-  check("verifyPaymeAuth accepts the merchant Basic auth and rejects others", () => {
-    process.env.PAYME_MERCHANT_ID = "m-123";
+  check("Payme auth rejects a login without a secret", () => {
+    const saved = { ...process.env };
+    process.env.PAYME_MERCHANT_ID = "checkout-merchant";
+    process.env.PAYME_LOGIN = "payme-login";
+    delete process.env.PAYME_KEY;
+    delete process.env.PAYME_PASSWORD;
+    assert.equal(payments.isPaymeConfigured(), false);
+    assert.equal(payments.verifyPaymeAuth("Basic " + Buffer.from("payme-login:").toString("base64")), false);
+    process.env = saved;
+  });
+
+  check("verifyPaymeAuth uses the separate Payme Basic login and rejects others", () => {
+    process.env.PAYME_MERCHANT_ID = "checkout-merchant";
+    process.env.PAYME_LOGIN = "payme-login";
     process.env.PAYME_KEY = "key-abc";
     assert.equal(payments.isPaymeConfigured(), true);
-    const good = "Basic " + Buffer.from("m-123:key-abc").toString("base64");
+    const good = "Basic " + Buffer.from("payme-login:key-abc").toString("base64");
     assert.equal(payments.verifyPaymeAuth(good), true);
     assert.equal(payments.verifyPaymeAuth(null), false);
     assert.equal(payments.verifyPaymeAuth("Bearer abc"), false);
-    assert.equal(payments.verifyPaymeAuth("Basic " + Buffer.from("m-123:wrong").toString("base64")), false);
-    assert.equal(payments.verifyPaymeAuth("Basic " + Buffer.from("other:key-abc").toString("base64")), false);
+    assert.equal(payments.verifyPaymeAuth("Basic " + Buffer.from("payme-login:wrong").toString("base64")), false);
+    assert.equal(payments.verifyPaymeAuth("Basic " + Buffer.from("checkout-merchant:key-abc").toString("base64")), false);
     delete process.env.PAYME_MERCHANT_ID;
+    delete process.env.PAYME_LOGIN;
     delete process.env.PAYME_KEY;
   });
 

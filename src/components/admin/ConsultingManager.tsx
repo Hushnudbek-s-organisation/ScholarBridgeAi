@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Headset, Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
 
 interface ConsultingManagerProps {
@@ -32,7 +32,7 @@ export function ConsultingManager({ adminProfileId }: ConsultingManagerProps) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/consulting?adminProfileId=${adminProfileId}`);
@@ -43,12 +43,11 @@ export function ConsultingManager({ adminProfileId }: ConsultingManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminProfileId]);
+    void Promise.resolve().then(load);
+  }, [load]);
 
   const setStatus = async (id: number, status: string) => {
     setBusyId(id);

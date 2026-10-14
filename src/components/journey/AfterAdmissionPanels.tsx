@@ -15,7 +15,7 @@
  */
 import React, { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Copy, Mail, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Check, Copy, Mail, Plus, Printer, ShieldCheck, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import {
   Button,
@@ -30,18 +30,20 @@ import {
   inputClass,
 } from "./ui";
 import { AppNote } from "@/components/AppNote";
+import { formatMoney, formatNumber } from "@/lib/format";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
 // ===========================================================================
 
 interface OfferFunding {
-  tuition: number;
+  tuition: number | null;
   scholarship: number;
   aid: number;
-  deposit: number;
+  otherConfirmed: number;
+  deposit: number | null;
   depositDueDate: string | null;
-  payableNow: { amount: number; dueDate: string | null; payee: string };
+  payableNow: { amount: number | null; dueDate: string | null; payee: string };
   explanation: string[];
 }
 interface OfferRow {
@@ -57,7 +59,13 @@ interface OfferRow {
   depositDueDate: string | null;
   tuitionCommitment: number | null;
   notes: string | null;
-  application: { id: number; universityName: string; programName: string; intakeTerm: string | null } | null;
+  application: {
+    id: number;
+    universityName: string;
+    programName: string;
+    intakeTerm: string | null;
+    postStudyWorkVisaYears: number | null;
+  } | null;
   funding: OfferFunding;
 }
 interface OffersData {
@@ -159,16 +167,20 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                     <input
                       type="number"
                       className={inputClass}
+                      min={0}
+                      step={1}
                       defaultValue={o.depositAmount ?? ""}
-                      onBlur={(e) => void patch({ id: o.id, depositAmount: e.target.value === "" ? 0 : Number(e.target.value) })}
+                      onBlur={(e) => void patch({ id: o.id, depositAmount: e.target.value === "" ? null : Number(e.target.value) })}
                     />
                   </Field>
                   <Field label={t("opTuitionCommitment")} hint={t("opTuitionHint")}>
                     <input
                       type="number"
                       className={inputClass}
+                      min={0}
+                      step={1}
                       defaultValue={o.tuitionCommitment ?? ""}
-                      onBlur={(e) => void patch({ id: o.id, tuitionCommitment: e.target.value === "" ? 0 : Number(e.target.value) })}
+                      onBlur={(e) => void patch({ id: o.id, tuitionCommitment: e.target.value === "" ? null : Number(e.target.value) })}
                     />
                   </Field>
                 </div>
@@ -199,6 +211,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                   <Line label={t("lineTuition")} value={o.funding.tuition} />
                   <Line label={t("fundScholarship")} value={o.funding.scholarship} tone="good" />
                   <Line label={t("fundAid")} value={o.funding.aid} tone="good" />
+                  <Line label={t("opOtherConfirmed")} value={o.funding.otherConfirmed} tone="good" />
                   <Line label={t("lineDepositNow")} value={o.funding.payableNow.amount} tone="warn" />
                 </dl>
                 {o.funding.payableNow.dueDate && <p className="mt-1 text-xs text-slate-500">Due {o.funding.payableNow.dueDate} to {o.funding.payableNow.payee}.</p>}
@@ -226,7 +239,8 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
   );
 }
 
-function Line({ label, value, tone = "slate" }: { label: string; value: number; tone?: "slate" | "good" | "warn" }) {
+function Line({ label, value, tone = "slate" }: { label: string; value: number | null; tone?: "slate" | "good" | "warn" }) {
+  const t = useTranslations("journey");
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="text-slate-600 dark:text-slate-300">{label}</dt>
@@ -235,9 +249,121 @@ function Line({ label, value, tone = "slate" }: { label: string; value: number; 
           tone === "good" ? "text-emerald-600 dark:text-emerald-400" : tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"
         }`}
       >
-        ${Number(value ?? 0).toLocaleString()}
+        {value == null ? t("opAmountUnknown") : `$${value.toLocaleString()}`}
       </dd>
     </div>
+  );
+}
+
+// ===========================================================================
+// POST-ADMISSION OFFER COMPARISON (spec §24)
+// ===========================================================================
+export function PostAdmissionOfferMatrix({
+  profileId,
+  onNavigateTab,
+}: {
+  profileId: number;
+  onNavigateTab: (tab: string) => void;
+}) {
+  const t = useTranslations("journey");
+  const { data, loading, error, reload } = useResource<OffersData>(
+    useCallback(() => getJson<OffersData>(`/api/offers?profileId=${profileId}`, t("opLoadError")), [profileId, t]),
+    [profileId],
+    { initial: { offers: [], summary: { total: 0, pending: 0, accepted: 0, rejected: 0 } }, errorFallback: t("opLoadError") }
+  );
+
+  if (loading && data.offers.length === 0) return <Loading label={t("pamLoading")} />;
+  const amount = (value: number | null) => formatMoney(value, "USD", { placeholder: t("opAmountUnknown") });
+  const visaYears = (value: number | null | undefined) =>
+    value == null ? t("opAmountUnknown") : `${formatNumber(value, { placeholder: t("opAmountUnknown") })} ${t(value === 1 ? "pamYear" : "pamYears")}`;
+
+  return (
+    <div className="space-y-4">
+      <JourneyCard
+        title={t("pamTitle")}
+        subtitle={t("pamSubtitle")}
+        action={<Pill tone="slate">{data.offers.length}</Pill>}
+      >
+        {error && <ErrorNote message={error} />}
+        {data.offers.length === 0 ? (
+          <Empty
+            title={t("pamEmptyTitle")}
+            hint={t("pamEmptyHint")}
+            action={<Button size="sm" onClick={() => onNavigateTab("offers")}>{t("pamAddOffer")}</Button>}
+          />
+        ) : (
+          <>
+            <p className="mb-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">{t("pamMethodNote")}</p>
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="min-w-[920px] w-full border-collapse text-left text-xs">
+                <caption className="sr-only">{t("pamCaption")}</caption>
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th scope="col" className="sticky left-0 z-10 min-w-44 bg-slate-50 px-3 py-3 font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{t("pamField")}</th>
+                    {data.offers.map((offer) => (
+                      <th key={offer.id} scope="col" className="min-w-44 px-3 py-3 align-top font-bold text-slate-800 dark:text-slate-100">
+                        <span className="block break-words">{offer.application?.universityName ?? t("opOfferFallback")}</span>
+                        {offer.application?.programName && <span className="mt-1 block break-words font-normal text-slate-500 dark:text-slate-400">{offer.application.programName}</span>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  <MatrixRow label={t("pamStatus")} offers={data.offers} value={(offer) => offer.status} />
+                  <MatrixRow label={t("pamTuition")} offers={data.offers} value={(offer) => amount(offer.funding.tuition)} numeric />
+                  <MatrixRow
+                    label={t("pamConfirmedAwards")}
+                    offers={data.offers}
+                    numeric
+                    value={(offer) => amount(offer.funding.scholarship + offer.funding.aid)}
+                  />
+                  <MatrixRow
+                    label={t("pamNetAnnualCost")}
+                    offers={data.offers}
+                    numeric
+                    value={(offer) => offer.funding.tuition == null
+                      ? t("opAmountUnknown")
+                      : amount(Math.max(0, offer.funding.tuition - offer.funding.scholarship - offer.funding.aid))}
+                  />
+                  <MatrixRow label={t("pamDeposit")} offers={data.offers} value={(offer) => amount(offer.funding.deposit)} numeric />
+                  <MatrixRow label={t("pamDepositDue")} offers={data.offers} value={(offer) => offer.funding.depositDueDate ?? t("opAmountUnknown")} />
+                  <MatrixRow label={t("pamResponseDeadline")} offers={data.offers} value={(offer) => offer.responseDeadline ?? t("opAmountUnknown")} />
+                  <MatrixRow label={t("pamPostStudyWork")} offers={data.offers} value={(offer) => visaYears(offer.application?.postStudyWorkVisaYears)} />
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => onNavigateTab("offers")}>{t("pamManageOffers")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => void reload()}>{t("pamRefresh")}</Button>
+        </div>
+      </JourneyCard>
+      <AppNote kind="money" />
+    </div>
+  );
+}
+
+function MatrixRow({
+  label,
+  offers,
+  value,
+  numeric = false,
+}: {
+  label: string;
+  offers: OfferRow[];
+  value: (offer: OfferRow) => string;
+  numeric?: boolean;
+}) {
+  return (
+    <tr>
+      <th scope="row" className="sticky left-0 z-[1] min-w-44 bg-white px-3 py-3 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">{label}</th>
+      {offers.map((offer) => (
+        <td key={offer.id} className={`min-w-44 break-words px-3 py-3 text-slate-800 dark:text-slate-100 ${numeric ? "tabular-nums font-semibold" : ""}`}>
+          {value(offer)}
+        </td>
+      ))}
+    </tr>
   );
 }
 
@@ -268,7 +394,7 @@ interface RecData {
 
 const REC_STATUSES = ["not_requested", "requested", "opened", "submitted"];
 
-export function RecommendationManagerPanel({ profileId }: { profileId: number }) {
+export function RecommendationManagerPanel({ profileId, applicationId, universityName }: { profileId: number; applicationId?: number | null; universityName?: string | null }) {
   const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<RecData>(
     useCallback(() => getJson<RecData>(`/api/recommendations?profileId=${profileId}`, t("rmLoadError")), [profileId, t]),
@@ -278,11 +404,16 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ applicationId: "", recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
+  const [form, setForm] = useState(() => ({ applicationId: applicationId == null ? "" : String(applicationId), recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" }));
 
-  const applications = [...new Map(data.requests.map((r) => [r.applicationId, r.application])).entries()].filter(
-    (e): e is [number, NonNullable<RecRow["application"]>] => e[1] != null
+  const applications = new Map(
+    [...new Map(data.requests.map((r) => [r.applicationId, r.application])).entries()].filter(
+      (e): e is [number, NonNullable<RecRow["application"]>] => e[1] != null
+    )
   );
+  if (applicationId != null && universityName && !applications.has(applicationId)) {
+    applications.set(applicationId, { id: applicationId, universityName, programName: "", deadline: null });
+  }
 
   const add = async () => {
     if (!form.applicationId || !form.recommenderName.trim()) return;
@@ -293,7 +424,7 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
         { method: "POST", body: JSON.stringify({ profileId, ...form, applicationId: Number(form.applicationId) }) },
         t("rmAddError")
       );
-      setForm({ applicationId: "", recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
+      setForm({ applicationId: applicationId == null ? "" : String(applicationId), recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
       setAdding(false);
       await reload();
     } catch (e) {
@@ -337,7 +468,7 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
             <Field label={t("secApplication")}>
               <select className={inputClass} value={form.applicationId} onChange={(e) => setForm({ ...form, applicationId: e.target.value })}>
                 <option value="">{t("rmChoose")}</option>
-                {applications.map(([id, a]) => (
+                {[...applications.entries()].map(([id, a]) => (
                   <option key={id} value={id}>
                     {a.universityName}
                   </option>
@@ -454,65 +585,71 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
 interface FundingLine {
   key: string;
   label: string;
-  cost: number;
-  covered: number;
-  gap: number;
+  cost: number | null;
+  covered: number | null;
+  gap: number | null;
 }
 interface FundingData {
   costLines: { key: string; label: string }[];
   kindLabels: Record<string, string>;
   application: { id: number; universityName: string; programName: string } | null;
   university: { id: number; name: string; country: string; city: string; sourceUrl: string | null; lastVerifiedAt: string | null } | null;
-  annualCost: number;
+  annualCost: number | null;
   estimatedLines: string[];
+  unknownLines: string[];
   plan: {
-    annualCost: number;
+    annualCost: number | null;
     currency: string;
     scholarshipTotal: number;
     ownContributionTotal: number;
     securedTotal: number;
     projectedTotal: number;
-    fundingGap: number;
-    securedGap: number;
-    isCovered: boolean;
+    fundingGap: number | null;
+    securedGap: number | null;
+    isCovered: boolean | null;
     byLine: FundingLine[];
     openActions: { name: string; kind: string; amountUsd: number; status: string }[];
   };
   items: { id: number; kind: string; kindLabel: string; name: string; amountUsd: number; status: string; covers: string | null; notes: string | null }[];
-  gapActions: { gap: number; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null }[]; tab: string; cta: string };
+  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null }[]; tab: string; cta: string };
 }
 
 const FUNDING_KINDS = ["scholarship", "aid", "family", "savings", "loan", "other"];
 const FUNDING_STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"];
 
-export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<FundingData>(
-    useCallback(() => getJson<FundingData>(`/api/funding?profileId=${profileId}`, t("fpLoadError")), [profileId, t]),
-    [profileId],
+    useCallback(() => {
+      const params = new URLSearchParams({ profileId: String(profileId) });
+      if (applicationId != null) params.set("applicationId", String(applicationId));
+      return getJson<FundingData>(`/api/funding?${params.toString()}`, t("fpLoadError"));
+    }, [profileId, applicationId, t]),
+    [profileId, applicationId],
     {
       initial: {
         costLines: [],
         kindLabels: {},
         application: null,
         university: null,
-        annualCost: 0,
+        annualCost: null,
         estimatedLines: [],
+        unknownLines: [],
         plan: {
-          annualCost: 0,
+          annualCost: null,
           currency: "USD",
           scholarshipTotal: 0,
           ownContributionTotal: 0,
           securedTotal: 0,
           projectedTotal: 0,
-          fundingGap: 0,
-          securedGap: 0,
-          isCovered: false,
+          fundingGap: null,
+          securedGap: null,
+          isCovered: null,
           byLine: [],
           openActions: [],
         },
         items: [],
-        gapActions: { gap: 0, scholarships: [], tab: "scholarships", cta: "" },
+        gapActions: { gap: null, scholarships: [], tab: "scholarships", cta: "" },
       },
       errorFallback: t("fpLoadError"),
     }
@@ -526,7 +663,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
     try {
       await sendJson(
         "/api/funding",
-        { method: "POST", body: JSON.stringify({ profileId, ...form, amountUsd: Number(form.amountUsd), applicationId: data.application?.id ?? null }) },
+        { method: "POST", body: JSON.stringify({ profileId, ...form, amountUsd: Number(form.amountUsd), applicationId: applicationId ?? null }) },
         t("tpSaveError")
       );
       setForm({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [], notes: "" });
@@ -539,18 +676,24 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
   };
 
   const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("dvUpdateError"));
+    await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, ...payload }) }, t("dvUpdateError"));
     await reload();
   };
 
   const remove = async (id: number) => {
-    await fetch(`/api/funding?profileId=${profileId}&id=${id}`, { method: "DELETE" });
+    const params = new URLSearchParams({ profileId: String(profileId), id: String(id) });
+    if (applicationId != null) params.set("applicationId", String(applicationId));
+    await fetch(`/api/funding?${params.toString()}`, { method: "DELETE" });
     await reload();
   };
 
   if (loading) return <Loading label={t("fpLoading")} />;
 
-  const pct = data.annualCost > 0 ? Math.round((data.plan.securedTotal / data.annualCost) * 100) : 0;
+  const pct = data.annualCost == null
+    ? null
+    : data.annualCost > 0
+      ? Math.round((data.plan.securedTotal / data.annualCost) * 100)
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -558,9 +701,23 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         title={t("fpTitle")}
         subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : t("fpNoApplication")}
         action={
-          <div className="text-right">
-            <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">${data.annualCost.toLocaleString()}</p>
-            <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="text-right">
+              <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">
+                {data.annualCost == null ? t("fpAmountUnknown") : `$${data.annualCost.toLocaleString()}`}
+              </p>
+              <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="print:hidden min-h-11"
+              onClick={() => window.print()}
+              title={t("fpPrintSummaryHint")}
+            >
+              <Printer className="h-3.5 w-3.5" aria-hidden />
+              {t("fpPrintSummary")}
+            </Button>
           </div>
         }
       >
@@ -574,20 +731,41 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         )}
         {data.estimatedLines.length > 0 && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-            These lines are our standard estimates, not published figures: {data.estimatedLines.join(", ")}. Replace them with the real
-            number when your university publishes one.
+            These lines are estimates, not published figures: {data.estimatedLines.join(", ")}. Verify them with the university before using them in a budget.
+          </p>
+        )}
+        {data.unknownLines.length > 0 && (
+          <p className="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {t("fpUnknownCostsMessage", { lines: data.unknownLines.join(", ") })}
           </p>
         )}
 
         <div className="mb-3">
-          <ProgressBar pct={pct} size="lg" tone={data.plan.isCovered ? "good" : "warn"} label={`${pct}% of the yearly cost is secured`} />
+          {pct == null ? (
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t("fpGapUnavailable")}</p>
+          ) : (
+            <ProgressBar
+              pct={pct}
+              size="lg"
+              tone={data.plan.isCovered ? "good" : "warn"}
+              label={t("fpSecuredPct", { pct })}
+            />
+          )}
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Metric label={t("fpSecured")} value={data.plan.securedTotal} tone="good" hint={t("fpSecuredHint")} />
           <Metric label={t("fpStillPossible")} value={data.plan.projectedTotal} tone="brand" hint={t("fpStillPossibleHint")} />
-          <Metric label={t("fpGapNothing")} value={data.plan.fundingGap} tone={data.plan.fundingGap > 0 ? "bad" : "good"} />
-          <Metric label={t("fpGapSecured")} value={data.plan.securedGap} tone={data.plan.securedGap > 0 ? "warn" : "good"} />
+          <Metric
+            label={t("fpGapNothing")}
+            value={data.plan.fundingGap == null ? t("fpAmountUnknown") : data.plan.fundingGap}
+            tone={data.plan.fundingGap == null ? "neutral" : data.plan.fundingGap > 0 ? "bad" : "good"}
+          />
+          <Metric
+            label={t("fpGapSecured")}
+            value={data.plan.securedGap == null ? t("fpAmountUnknown") : data.plan.securedGap}
+            tone={data.plan.securedGap == null ? "neutral" : data.plan.securedGap > 0 ? "warn" : "good"}
+          />
         </div>
       </JourneyCard>
 
@@ -601,12 +779,22 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
                   {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-400">{t("fpEstimated")}</span>}
                 </span>
                 <span className="tabular-nums text-slate-500">
-                  ${l.covered.toLocaleString()} / ${l.cost.toLocaleString()}
-                  {l.gap > 0 && <span className="ml-1 font-bold text-rose-500">−${l.gap.toLocaleString()}</span>}
+                  {l.covered == null ? t("fpAmountUnknown") : `$${l.covered.toLocaleString()}`}
+                  {" / "}
+                  {l.cost == null ? t("fpAmountUnknown") : `$${l.cost.toLocaleString()}`}
+                  {l.gap != null && l.gap > 0 && <span className="ml-1 font-bold text-rose-500">−${l.gap.toLocaleString()}</span>}
                 </span>
               </div>
               <div className="mt-1">
-                <ProgressBar pct={l.cost > 0 ? (l.covered / l.cost) * 100 : 0} size="sm" tone={l.gap === 0 ? "good" : "warn"} />
+                {l.cost == null || l.covered == null ? (
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("fpGapUnavailable")}</p>
+                ) : (
+                  <ProgressBar
+                    pct={l.cost > 0 ? (l.covered / l.cost) * 100 : 0}
+                    size="sm"
+                    tone={l.gap === 0 ? "good" : "warn"}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -685,7 +873,7 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
         </JourneyCard>
       )}
 
-      {data.gapActions.gap > 0 && (
+      {data.gapActions.gap != null && data.gapActions.gap > 0 && (
         <JourneyCard title={t("fpGapTitle")}>
           <p className="text-sm text-slate-700 dark:text-slate-200">
             You are short <strong className="tabular-nums">${data.gapActions.gap.toLocaleString()}</strong> for a year.
@@ -715,17 +903,19 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
   );
 }
 
-function Metric({ label, value, hint, tone }: { label: string; value: number; hint?: string; tone: "good" | "warn" | "bad" | "brand" }) {
+function Metric({ label, value, hint, tone }: { label: string; value: number | string; hint?: string; tone: "good" | "warn" | "bad" | "brand" | "neutral" }) {
   const tones = {
     good: "text-emerald-600 dark:text-emerald-400",
     warn: "text-amber-600 dark:text-amber-400",
     bad: "text-rose-600 dark:text-rose-400",
     brand: "text-indigo-600 dark:text-indigo-400",
+    neutral: "text-slate-600 dark:text-slate-300",
   } as const;
+  const formattedValue = typeof value === "number" ? `$${value.toLocaleString()}` : value;
   return (
     <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`text-lg font-extrabold tabular-nums ${tones[tone]}`}>${value.toLocaleString()}</p>
+      <p className={`text-lg font-extrabold tabular-nums ${tones[tone]}`}>{formattedValue}</p>
       {hint && <p className="text-[10px] text-slate-400">{hint}</p>}
     </div>
   );

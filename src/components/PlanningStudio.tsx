@@ -9,6 +9,7 @@ import {
   Copy,
   FileText,
   Loader2,
+  Printer,
   Table2,
   Wallet,
 } from "lucide-react";
@@ -22,38 +23,39 @@ import { AppNote } from "@/components/AppNote";
  * Planning Studio (Phase 3) — cost calculator, scholarship portfolio, CV
  * builder and comparison table.
  *
- * Every number here is derived from the student's own data. Where a university
- * has not published a figure the row is marked "estimated" and listed as
- * something to verify — an estimate that looks like a quote is how students end
- * up a year short of funding.
+ * Every number here is derived from verified USD values or explicit student
+ * entries. Missing or unsupported amounts stay unknown and make affected
+ * aggregates unknown — they are never filled with zeroes or generic estimates.
  */
 
 interface CostLine {
   key: string;
   label: string;
-  annualUsd: number;
-  totalUsd: number;
+  annualUsd: number | null;
+  totalUsd: number | null;
+  frequency: "annual" | "one_time";
   estimated: boolean;
 }
 
 interface CostBreakdown {
   lines: CostLine[];
-  annualTotalUsd: number;
-  totalUsd: number;
+  annualTotalUsd: number | null;
+  totalUsd: number | null;
   unknowns: string[];
   scholarship: {
-    bestCaseAnnualUsd: number;
-    coveragePct: number;
+    bestCaseAnnualUsd: number | null;
+    bestCaseOneTimeUsd: number | null;
+    coveragePct: number | null;
     misaligned: string[];
   };
   net: {
-    annualAfterScholarshipUsd: number;
-    totalAfterScholarshipUsd: number;
-    familyContributionUsd: number;
+    annualAfterScholarshipUsd: number | null;
+    totalAfterScholarshipUsd: number | null;
+    familyContributionUsd: number | null;
     familyContributionKnown: boolean;
-    gapAnnualUsd: number;
-    gapTotalUsd: number;
-    affordable: boolean;
+    gapAnnualUsd: number | null;
+    gapTotalUsd: number | null;
+    affordable: boolean | null;
   };
   verdict: string;
 }
@@ -245,7 +247,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
             <div className="space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-bold text-slate-900">
-                  {data.costTarget ? `${data.costTarget.name} — true annual cost` : "Annual cost"}
+                  {data.costTarget ? `${data.costTarget.name} — annual cost` : "Annual cost"}
                 </h3>
                 <ul className="mt-3 divide-y divide-slate-100">
                   {data.costs.lines.map((line) => (
@@ -259,8 +261,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                         )}
                       </span>
                       <span className="text-xs font-bold text-slate-900">
-                        {money(line.annualUsd)}
-                        <span className="ml-1 font-normal text-slate-400">/yr</span>
+                        {line.frequency === "one_time" ? money(line.totalUsd) : money(line.annualUsd)}
+                        <span className="ml-1 font-normal text-slate-400">{line.frequency === "one_time" ? "one time" : "/yr"}</span>
                       </span>
                     </li>
                   ))}
@@ -278,7 +280,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               {data.costs.unknowns.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">
-                    Verify these — they are estimates, not quotes
+                    Unknown inputs — excluded from totals
                   </h4>
                   <ul className="mt-1.5 space-y-1">
                     {data.costs.unknowns.map((u, i) => (
@@ -293,16 +295,18 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
               <div
                 className={`rounded-2xl border p-4 ${
-                  !data.costs.net.familyContributionKnown
-                    ? "border-slate-200 bg-slate-50"
-                    : data.costs.net.affordable
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-rose-200 bg-rose-50"
+                  data.costs.net.affordable === true
+                    ? "border-emerald-200 bg-emerald-50"
+                    : data.costs.net.affordable === false
+                      ? "border-rose-200 bg-rose-50"
+                      : "border-slate-200 bg-slate-50"
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                    Remaining gap after funding
+                    {data.costs.net.familyContributionKnown
+                      ? "Remaining gap after confirmed funding"
+                      : "Remaining need before any unconfirmed family contribution"}
                   </span>
                   <span className="text-xl font-extrabold text-slate-900">
                     {money(data.costs.net.gapAnnualUsd)}
@@ -311,8 +315,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-slate-700">{data.costs.verdict}</p>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Best-case scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · confirmed family{" "}
-                  {data.costs.net.familyContributionKnown ? `${money(data.costs.net.familyContributionUsd)}/yr` : "Unknown"} · total gap{" "}
+                  Best-case recurring scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · one-time awards{" "}
+                  {money(data.costs.scholarship.bestCaseOneTimeUsd)} · confirmed family support{" "}
+                  {data.costs.net.familyContributionKnown ? `${money(data.costs.net.familyContributionUsd)}/yr` : "Unknown"} · whole-programme gap{" "}
                   {money(data.costs.net.gapTotalUsd)}
                 </p>
               </div>
@@ -364,13 +369,25 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                     {tCv("cvMeta", { items: data.cv.totalItems, pages: data.cv.estimatedPages })}
                   </p>
                 </div>
-                <button
-                  onClick={() => void copyCv()}
-                  className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  {copied ? tCv("copied") : tCv("copy")}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void copyCv()}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden />
+                    {copied ? tCv("copied") : tCv("copy")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    aria-label={tCv("printSummaryHint")}
+                    className="print:hidden inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <Printer className="h-3.5 w-3.5" aria-hidden />
+                    {tCv("printSummary")}
+                  </button>
+                </div>
               </div>
 
               {data.cv.warnings.length > 0 && (

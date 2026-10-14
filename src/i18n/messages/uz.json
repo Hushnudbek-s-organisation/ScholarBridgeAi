@@ -11,14 +11,29 @@
     "scholarshipsMetaDescription": "Stipendiya e’lonlarini ko‘ring. Talablar, qamrov va amaldagi muddatlarni rasmiy tashkilotdan tasdiqlang.",
     "universityHeading": "Universitetlarni qidirish",
     "scholarshipHeading": "Stipendiyalar",
+    "catalogNavigation": "Katalog navigatsiyasi",
     "universitiesSummary": "{from}–{to} / {total} · {page}-sahifa / {pages}",
     "scholarshipsSummary": "{from}–{to} / {total} stipendiya · {page}-sahifa / {pages}",
     "noUniversities": "Universitetlar topilmadi.",
     "noScholarships": "Stipendiyalar topilmadi.",
     "website": "Veb-sayt",
+    "institutionType": "Muassasa turi",
+    "annualTuition": "Yillik kontrakt",
+    "annualLiving": "Yillik yashash xarajatlari",
+    "minIelts": "E'lon qilingan IELTS minimumi",
+    "postStudyWork": "O‘qishdan keyingi ish vizasi",
+    "perYear": "yiliga",
+    "year": "yil",
+    "years": "yil",
+    "notPublished": "E'lon qilinmagan",
     "deadline": "Muddat: {date}",
     "viewDetails": "Batafsil ko‘rish",
     "coverageNotSpecified": "Qamrovi ko‘rsatilmagan",
+    "scholarshipPeriodYear": "yiliga",
+    "scholarshipPeriodMonth": "oyiga",
+    "scholarshipPeriodOneTime": "bir martalik",
+    "scholarshipPeriodTotal": "jami stipendiya",
+    "scholarshipPeriodVariable": "o‘zgaruvchan",
     "universitiesLoadError": "Universitetlar hozircha mavjud emas. Keyinroq qayta urinib ko‘ring.",
     "scholarshipsLoadError": "Stipendiyalar hozircha mavjud emas. Keyinroq qayta urinib ko‘ring.",
     "independentGuide": "ScholarBridgeAI mustaqil ma’lumotnoma bo‘lib, hech bir universitet yoki stipendiya tashkilotiga aloqador emas. Ma’lumotlar ochiq manbalardan jamlangan, to‘liq bo‘lmasligi yoki eskirgan bo‘lishi mumkin. Ariza berishdan oldin talablar, xarajatlar va muddatlarni rasmiy manbalardan tasdiqlang."
@@ -460,7 +475,11 @@
       "over_limit": "Qoralamada {words} ta so‘z bor; kiritilgan {limit} so‘z chegarasidan oshgan. Savoldagi chegaraga moslab qisqartiring.",
       "under_limit": "Qoralamada {limit} ta so‘zdan {words} tasi ishlatilgan (chegaraning 60 foizidan kam). Qo‘shimcha yozishdan oldin savol batafsilroq javob talab qilishini tekshiring.",
       "no_forward_look": "Kelajak maqsadi aniqlanmadi. Uni faqat savolga tegishli bo‘lsa, o‘z rejangizga muvofiq kiriting.",
-      "too_short": "Bu {words} so‘zli qisqa qoralama. Savoldagi uzunlik talabini tekshiring; kerak bo‘lsa faqat tegishli, tasdiqlangan tafsilotni qo‘shing."
+      "too_short": "Bu {words} so‘zli qisqa qoralama. Savoldagi uzunlik talabini tekshiring; kerak bo‘lsa faqat tegishli, tasdiqlangan tafsilotni qo‘shing.",
+      "abrupt_paragraph_flow": "Ayrim paragraflar avvalgi fikr bilan aniq bog‘lanmaydi. Rivojlanish ketma-ketligini tekshiring; har bir paragrafga o‘tish so‘zi shart emas.",
+      "repeated_transition": "Paragraflar boshida bir xil o‘tish iborasi takrorlangan. Faqat bog‘lanishni ravshanlashtirsa, uni o‘zgartiring.",
+      "action_verb_balance": "Matn tekshiruvida aniq harakat fe’llaridan ko‘ra umumiyroq iboralar ko‘proq topildi. Rost bo‘lsa, aynan nima qilganingizni yozing; yumshoqroq ifoda haqiqatga mos bo‘lsa, uni saqlang.",
+      "prompt_coverage_missing": "Qoralamada {element} aniqlanmadi. Topshiriqni tekshiring; matn tekshiruvi o‘rinli javobni ham o‘tkazib yuborishi mumkin."
     },
     "advisorTitle": "AI qabul maslahatchisi",
     "advisorSubtitle": "Arizalaringiz haqida hamma narsani so'rang. Maslahatchi haqiqiy profilingizni o'qiydi va moslik ballarini ko'rsatadi — qabul ehtimolini emas.",
@@ -516,7 +535,64 @@
     "chatPrompt1": "O‘qishdan keyingi ishlashning amaldagi qoidalarini qayerdan tekshiraman?",
     "chatPrompt2": "Professorimdan tavsiyanoma xatini qanday so‘rashim kerak?",
     "chatPrompt3": "Saqlangan universitetlarimning tasdiqlangan kontrakt ma’lumotlarini solishtirishga yordam bering.",
-    "chatPrompt4": "Rasmiy talablar asosida talaba vizasi suhbatiga qanday tayyorlanaman?"
+    "chatPrompt4": "Rasmiy talablar asosida talaba vizasi suhbatiga qanday tayyorlanaman?",
+    "essayPromptLabel": "Insho topshirig‘i (ixtiyoriy)",
+    "essayPromptPlaceholder": "Topshiriq matnini aynan shu yerga joylang… Qamrov tekshiruvi taxminiy, shuning uchun asl ko‘rsatmalarni ham hisobga oling.",
+    "essaySubscoreFlow": "Paragraflar oqimi",
+    "essaySubscoreAgency": "Harakat va mualliflik",
+    "essayPromptCoverageTitle": "Topshiriq qamrovi",
+    "essayPromptCoverageType": {
+      "custom_prompt": "Kiritilgan topshiriq asosida",
+      "essay_type": "Tanlangan insho turi asosida"
+    },
+    "essayPromptElements": {
+      "motivation": "Motivatsiya",
+      "preparation": "Tayyorgarlik",
+      "programme_fit": "Dasturga moslik",
+      "future_goals": "Kelajak maqsadlari",
+      "challenge_growth": "Qiyinchilik va o‘sish",
+      "contribution": "Hissa",
+      "financial_need": "Moliyaviy ehtiyoj",
+      "leadership": "Yetakchilik",
+      "direct_response": "Bevosita javob",
+      "evidence": "Aniq dalil / tadqiqot",
+      "future_impact": "Kelajakdagi ta’sir"
+    },
+    "essayPromptQuestions": {
+      "motivation": "Ariza topshirish sababingiz aniq bayon qilinganmi?",
+      "preparation": "Tegishli tajriba yoki tayyorgarlik arizangiz bilan bog‘langanmi?",
+      "programme_fit": "Nega ushbu dastur yoki muassasa maqsadlaringizga mosligini tushuntirganmisiz?",
+      "future_goals": "Tegishli kelajak maqsadingizni tasvirlaganmisiz?",
+      "challenge_growth": "Qiyinchilik sizga nimani o‘rgatgani yoki qanday o‘sganingizni tushuntirganmisiz?",
+      "contribution": "Qanday hissa qo‘shish yoki xizmat qilishni xohlashingizni tasvirlaganmisiz?",
+      "financial_need": "Javobingiz moliyalashtirish yoki moliyaviy ehtiyoj haqidagi savolga javob beradimi?",
+      "leadership": "Yetakchilik tajribasi yoki mas’uliyatingizni ko‘rsatganmisiz?",
+      "direct_response": "Qoralama topshiriq savoliga bevosita javob beradimi?"
+    },
+    "essayPromptCoverageComplete": "Matn tekshiruvi yetishmayotgan elementlarni aniqlamadi.",
+    "essayFlowTitle": "Paragraflar oqimi",
+    "essayFlowSummary": "{total} ta paragraf o‘tishidan {linked} tasida bog‘lanish aniqlandi.",
+    "essayFlowNoTransitions": "O‘tish yoki oldingi fikrga havola aniqlanmadi; qisqa javobda bu tabiiy bo‘lishi mumkin.",
+    "essayAgencyTitle": "Harakat va mualliflik",
+    "essayActionVerbSummary": "{active} ta aniq harakat fe’li, {weak} ta umumiyroq ibora (aniqlangan iboralarning {ratio} qismi aniq).",
+    "essayActionVerbExamples": "Aniq harakatlardan parchalar",
+    "essayWeakVerbExamples": "Umumiyroq iboralardan parchalar",
+    "essayFlowSequenceLabel": "Aniqlangan hikoya ketma-ketligi",
+    "essayFlowSequenceUnknown": "Matn tekshiruvi aniq bosqichlarni topmadi",
+    "essayFlowBacktracking": "Aniqlangan ketma-ketlik {count} ta o‘tishda orqaga qaytadi.",
+    "essayFlowStages": {
+      "motivation": "Motivatsiya",
+      "preparation": "Akademik tayyorgarlik",
+      "evidence": "Aniq dalil / tadqiqot",
+      "programme_fit": "Dasturga moslik",
+      "future_impact": "Kelajakdagi ta’sir"
+    },
+    "sopCopied": "Nusxa olindi",
+    "sopCopyText": "Matnni nusxalash",
+    "sopSaveToVersions": "Insho versiyalariga saqlash",
+    "sopSavingVersion": "Saqlanmoqda…",
+    "sopVersionSaved": "Insho versiyalariga saqlandi",
+    "sopSaveVersionError": "Qoralamani versiya sifatida saqlab bo‘lmadi. Qayta urinib ko‘ring."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -773,7 +849,48 @@
     "interrupted": "Ijro to‘xtatildi. Javob berishda davom etishingiz mumkin.",
     "practiceHistory": "Amaliyot tarixi",
     "session": "Sessiya",
-    "trendUp": "{n} sessiya davomida {delta} ball oshdi"
+    "trendUp": "{n} sessiya davomida {delta} ball oshdi",
+    "answerRubric": "Javoblar tahlili",
+    "rubricComputed": "Suhbat yozuvidan deterministik hisoblanadi — bir xil javoblar doim bir xil ball oladi.",
+    "rubricOverallReadiness": "Suhbat mashqi mezoni",
+    "unansweredPrefix": "Mazmunli javob berilmagan:",
+    "turnFeedbackTitle": "Har bir javob bo‘yicha tavsiyalar",
+    "turnFeedbackIntro": "Bu deterministik belgilar har bir yozib olingan javobda nimalar borligini ko‘rsatadi. Bu mashq uchun fikr-mulohaza, viza qarori emas.",
+    "turnNumber": "{number}-javob",
+    "turnQuestion": "Xodim savoli",
+    "turnAnswer": "Sizning javobingiz",
+    "turnWordCount": "{count} ta so‘z",
+    "turnEvidenceTitle": "Aniqlangan dalillar",
+    "turnConcernTitle": "Tavsiyalar",
+    "turnNoConcerns": "Bu javobda alohida tavsiya aniqlanmadi.",
+    "turnEvidence": {
+      "purpose": "O‘qish maqsadi",
+      "funding": "Moliyalashtirish",
+      "home_ties": "Vatanga bog‘liqlik",
+      "specific_detail": "Aniq tafsilot"
+    },
+    "turnConcerns": {
+      "short_answer": "Javob qisqa; xodim so‘ragan bo‘lsa, tegishli tafsilot qo‘shing.",
+      "vague_answer": "Ikkilanish ifodasi aniqlandi. Bilganingizni ravshan ayting, noma’lum jihatlarni esa ochiq tan oling.",
+      "purpose_not_addressed": "Savol o‘qish maqsadiga oid ko‘rinadi; dastur va uni tanlash sababini ayting.",
+      "funding_not_addressed": "Savol moliyalashtirishga oid ko‘rinadi; manba va tasdiqlovchi hujjatni tushuntiring.",
+      "home_ties_not_addressed": "Savol vatanga qaytish rejalari yoki aloqalarga oid ko‘rinadi; unga to‘g‘ridan-to‘g‘ri va rost javob bering.",
+      "profile_major_conflict": "Javobda profildagi yo‘nalishdan boshqa yo‘nalish aytilgan. Qaysi biri hozirgi rejangiz ekanini tekshiring.",
+      "profile_degree_conflict": "Javobda profildagidan boshqa daraja aytilgan. Hozirgi rejangizni tekshiring.",
+      "profile_budget_conflict": "Javobdagi budjet profil qiymatidan farq qiladi. Hozirgi summani tasdiqlang.",
+      "primary_funding_omitted": "Profilingizdagi asosiy tasdiqlangan moliyalashtirish manbasi bu javobda aytilmadi."
+    },
+    "profileRisk": {
+      "profile_major_conflict": "Javobingizda {spoken}, saqlangan profilingizda esa {profile} ko‘rsatilgan. Qaysi biri joriy ekanini tekshiring; bu ma’lumotlar mustaqil tasdiqlanmagan.",
+      "profile_degree_conflict": "Javobingizda {spoken}, profilingizda esa {profile} darajasi ko‘rsatilgan. Mo‘ljallangan darajani tasdiqlang.",
+      "profile_budget_conflict": "Javobingizda yillik budjet {spoken}, profilingizda esa {profile}. Joriy summani tasdiqlang.",
+      "primary_funding_omitted": "Profilingizda {source} tasdiqlangan moliyalashtirish sifatida qayd etilgan, ammo javoblaringizda aytilmagan. Hali ham asosiy manba bo‘lsa, uni va tasdiqlovchi hujjatlarni tushuntiring."
+    },
+    "riskSeverity": {
+      "high": "Muhim",
+      "medium": "Tekshiring",
+      "low": "Izoh"
+    }
   },
   "strength": {
     "title": "Profil ma’lumotlari qamrovi",
@@ -848,6 +965,8 @@
     "cvMeta": "{items, plural, other {# ta band}} · taxminan {pages, plural, other {# bet}}",
     "copy": "Matn sifatida nusxalash",
     "copied": "Nusxalandi",
+    "printSummary": "Chop etish / PDF sifatida saqlash",
+    "printSummaryHint": "CV qisqa mazmunini chop etish yoki PDF sifatida saqlash",
     "missingTitle": "Profilingizda yo‘q",
     "missingNote": "Bu ma’lumotlar profilingizda bo‘lmagani uchun CVga kiritilmaydi. Faqat haqqoniy, tegishli va o‘zingiz tanlagan yoki so‘ralgan ma’lumotlarni qo‘shing; hech narsa o‘ylab topilmaydi.",
     "missing": {
@@ -961,9 +1080,17 @@
     "potentialFunding": "Potensial mablag'",
     "workRights": "Ish qilish huquqlari",
     "notPublished": "ma'lumotbazada nashr etilmagan",
-    "publishedNote": "Qavs ichidagi son = o'rtacha hisobga qancha nashr etilgan qiymat kiritilgan. Nashr etilmagan qiymatlar hech qachon nol deb hisoblanmaydi.",
+    "publishedNote": "O‘qish, yashash xarajati va IELTS o‘rtachalari yonidagi qavsda ma’lumotli universitetlar / jami universitetlar soni ko‘rsatiladi. Potensial mablag‘ faqat har bir stipendiyaning USD miqdori musbat va barcha stipendiya davrlari bir xil bo‘lsa ko‘rsatiladi; yetishmaydigan yoki davri aralash summalar noma’lum qoladi. E’lon qilinmagan qiymatlar nol deb olinmaydi.",
+    "usableAmounts": "{total} stipendiyadan {known} tasida USD miqdori va davri mos",
+    "awardPeriod": {
+      "year": "yiliga",
+      "month": "oyiga",
+      "one_time": "bir martalik",
+      "total": "jami stipendiya"
+    },
     "compare": "Taqqoslash",
-    "noResults": "Tanlangan mamlakatlar uchun ma'lumot yo'q — yuqoridagi ro'yxatdan tanlang."
+    "noResults": "Tanlangan mamlakatlar uchun ma'lumot yo'q — yuqoridagi ro'yxatdan tanlang.",
+    "workRightsAverage": "O‘rtacha {years} yil ({count} ta universitetda e’lon qilingan)"
   },
   "opportunities": {
     "title": "Siz uchun imkoniyatlar",
@@ -1394,7 +1521,9 @@
     "ccNeedVisaFinish": "Manzil va muassasani aniqlaganingizda rasmiy immigratsiya ko‘rsatmalarini ko‘rib chiqing.",
     "ccNeedDepart": "Jo‘nab ketish ro‘yxatini yakunlang.",
     "ccContinue": "{stage} ni davom ettirish",
-    "ccSeeStudyPlan": "O'qish rejami",
+    "ccSeeStudyPlan": "O‘qish rejam",
+    "printSummary": "Chop etish / PDF saqlash",
+    "printSummaryHint": "Ushbu yo‘l xaritasini chop eting yoki PDF sifatida saqlang",
     "ccApplications": "Arizalar",
     "ccAddFirstUni": "Birinchi universitetni qo'shish",
     "ccSubmittedHint": "{n} tasi topshirilgan",
@@ -1503,6 +1632,28 @@
     "opDepositAmount": "Depozit summasi (USD)",
     "opTuitionCommitment": "Ta'lim puli majburiyati (USD)",
     "opTuitionHint": "Universitetning e'lon qilingan raqamidan foydalanish uchun bo'sh qoldiring",
+    "opAmountUnknown": "Ko‘rsatilmagan",
+    "pamTitle": "Qabul takliflarini solishtirish",
+    "pamSubtitle": "Taklifda qayd etilgan shartlar va e'lon qilingan mamlakat ma'lumotlarining qisqa taqqoslanishi.",
+    "pamLoading": "Takliflar taqqoslanmoqda…",
+    "pamEmptyTitle": "Hali solishtirish uchun taklif yo‘q",
+    "pamEmptyHint": "Har bir qarorni Takliflar va qarorlar bo‘limida yozib boring. Ikki yoki undan ortiq taklif bu yerda yonma-yon ko‘rinadi.",
+    "pamAddOffer": "Takliflarni ochish",
+    "pamMethodNote": "Sof yillik kontrakt — qayd etilgan yoki e'lon qilingan yillik kontraktdan faqat tasdiqlangan stipendiya va moliyaviy yordamni ayirish orqali hisoblanadi. Oila daromadi, kredit va tasdiqlanmagan mukofotlar hisobga olinmaydi.",
+    "pamCaption": "Qabul takliflari taqqoslanishi, har bir universitet uchun alohida ustun",
+    "pamField": "Taklif tafsiloti",
+    "pamStatus": "Qaror holati",
+    "pamTuition": "Yillik kontrakt (USD)",
+    "pamConfirmedAwards": "Tasdiqlangan stipendiya va yordam",
+    "pamNetAnnualCost": "To‘lanadigan sof yillik kontrakt",
+    "pamDeposit": "Depozit summasi (USD)",
+    "pamDepositDue": "Depozit muddati",
+    "pamResponseDeadline": "Taklifga javob muddati",
+    "pamPostStudyWork": "E'lon qilingan o‘qishdan keyingi ish",
+    "pamYear": "yil",
+    "pamYears": "yil",
+    "pamManageOffers": "Taklif shartlarini boshqarish",
+    "pamRefresh": "Taqqoslashni yangilash",
     "opOfferLetter": "Qabul xati",
     "opOfferLetterPlaceholder": "Rasmiy xatga havolani qo'ying",
     "opConditions": "Shartlar",
@@ -1512,6 +1663,7 @@
     "lineTuition": "Ta'lim puli majburiyati",
     "lineScholarship": "Stipendiya",
     "lineAid": "Moliyaviy yordam",
+    "opOtherConfirmed": "Boshqa tasdiqlangan mablag‘",
     "lineDepositNow": "Hozir to'lanadigan depozit",
     "opDueTo": "{date} da {payee} ga to'lanadi.",
     "opManageFunding": "Moliya va depozitni boshqarish",
@@ -1551,8 +1703,13 @@
     "fpUpdateError": "Yangilab bo'lmadi",
     "fpLoading": "Yillik xarajatingiz hisoblanmoqda…",
     "fpTitle": "Mening moliya rejam",
+    "fpPrintSummary": "Chop etish / PDF sifatida saqlash",
+    "fpPrintSummaryHint": "Moliya rejangizni chop etish yoki PDF sifatida saqlash",
     "fpNoApplication": "E'lon qilingan xarajatlarini olish uchun ariza qo'shing.",
     "fpPerYear": "Yiliga",
+    "fpAmountUnknown": "Mavjud emas",
+    "fpGapUnavailable": "Barcha zarur yillik xarajatlar tasdiqlanmaguncha moliyaviy yetishmovchilik hisoblanmaydi.",
+    "fpUnknownCostsMessage": "Tasdiqlanmagan yillik xarajatlar: {lines}. Yetishmayotgan qiymatlar noma’lum qoladi va 0 deb olinmaydi.",
     "fpUnivSource": "Universitet manbasi",
     "fpPublishedFor": "{name}, {city}, {country} uchun e'lon qilingan xarajatlar",
     "fpEstimatedNote": "Bu qatorlar — standart baholarimiz, e'lon qilingan raqamlar emas: {lines}. Universitet haqiqiy raqamni e'lon qilganda almashtiring.",
@@ -1840,7 +1997,10 @@
       "other": "Boshqa"
     },
     "ccAddAnnualCostsToCalculateGap": "Farqni hisoblash uchun yillik o‘qish xarajatlarini kiriting. Nol qiymat tasdiqlangan xarajat deb olinmaydi.",
-    "ccEstimatedCostNote": "Ayrim xarajatlar taxminiy. Bu summaga tayanishdan oldin taxminlarni va universitetning amaldagi rasmiy xarajatlarini tekshiring."
+    "ccEstimatedCostNote": "Ayrim xarajatlar taxminiy. Bu summaga tayanishdan oldin taxminlarni va universitetning amaldagi rasmiy xarajatlarini tekshiring.",
+    "dvNewDocLinksToApplication": "Bu yerda yaratilgan yangi hujjatlar tanlangan arizaga bog‘lanadi.",
+    "dvLinkToApplication": "Arizaga bog‘lash",
+    "dvUnlinkFromApplication": "Arizadan uzish"
   },
   "autopilot": {
     "title": "Stipendiya avtopiloti",
@@ -1853,7 +2013,13 @@
     "statMatches": "Mos",
     "statSoon": "Muddati yaqin",
     "statApplied": "Topshirilgan",
-    "statPotential": "Topshirilgan grantlar qiymati",
+    "statPotential": "Davri bir xil topshirilgan stipendiyalar jami",
+    "awardPeriod": {
+      "year": "yiliga",
+      "month": "oyiga",
+      "one_time": "bir martalik",
+      "total": "jami stipendiya"
+    },
     "viewQueue": "Ko'rib chiqish",
     "viewApplied": "Topshirdim",
     "viewHidden": "Yashirilgan",
@@ -3015,7 +3181,17 @@
       "funding_coverage": "Funding coverage",
       "merit": "Merit"
     },
-    "catalogueRequirementsScope": "Bu katalog qiymatlari har bir ta’lim dasturi uchun universal qoida emas. Talablar, qabul qilinadigan testlar, muqobillar va imtiyozlar dasturga qarab farq qiladi; topshirmoqchi bo‘lgan dasturingizning amaldagi rasmiy sahifasidan tekshiring."
+    "catalogueRequirementsScope": "Bu katalog qiymatlari har bir ta’lim dasturi uchun universal qoida emas. Talablar, qabul qilinadigan testlar, muqobillar va imtiyozlar dasturga qarab farq qiladi; topshirmoqchi bo‘lgan dasturingizning amaldagi rasmiy sahifasidan tekshiring.",
+    "exTypeAll": "Barcha universitet turlari",
+    "exTypePublic": "Davlat universiteti",
+    "exTypePrivate": "Xususiy universitet",
+    "exEvidenceCoverage": "Dalil qamrovi {percent}% · {compared}/{total}",
+    "exEvidenceDisclaimer": "Bu profil va katalogdagi taqqoslash mumkin bo‘lgan ma’lumotlar qamrovini ko‘rsatadi; qabul ehtimoli yoki natija bashorati emas.",
+    "exEvidenceLevel": {
+      "limited": "Cheklangan qamrov",
+      "partial": "Qisman qamrov",
+      "broad": "Keng qamrov"
+    }
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -3165,6 +3341,7 @@
     "courses": "Kurslar"
   },
   "hubs": {
+    "breadcrumbLabel": "Sahifa yo‘li",
     "introUniversities": "Qayerda o‘qishingiz mumkinligini toping. Fan yoki kasbdan boshlang, yoki o‘zingiz bilgan universitetdan. Dastur mosligi, talablarga javob, to‘lov imkoniyati va qabul istiqboli har doim alohida ko‘rsatiladi — bitta ballga qo‘shilmaydi.",
     "introScholarships": "Moliyalashtirish uchun yagona joy. Katalogni ko‘ring yoki profilingizga mos navbatni oching — har bir tavsiyaning sababi, qaysi talabga javob berishingiz va nima noma’lumligi ko‘rsatiladi. Siz uchun hech narsa topshirilmaydi.",
     "introStudyPlan": "Reja va testlar bir joyda: test sanasi bilan unga tayyorlovchi vazifa bir-biridan uzilib qolmaydi.",
@@ -3174,7 +3351,7 @@
     "introApplications": "Har bir ariza uchun bitta kuzatuv va bitta ish maydoni: holat, jarayon, keyingi muddat va keyingi foydali qadam.",
     "introMaterials": "Har bir ariza uchun qayta ishlatiladigan materiallar: talablar, hujjatlar, tayyor javoblar, insholar, tavsiyanomalar va suhbatga tayyorgarlik.",
     "introOffers": "Har bir universitetning qarorini kiriting va qarorni ko‘rib chiqing — keyingi moliyalashtirish va viza ishlari yo‘qolmaydi.",
-    "introPostAdmissionFunding": "Taklifdan keyin to‘lashingiz kerak bo‘lgan narsalar — depozitlar va bo‘lib to‘lashlar — va ularni qoplaydigan moliyalashtirish. Moliyaviy rejangiz bilan bir xil budjetdan foydalanadi.",
+    "introPostAdmissionFunding": "Takliflaringizni yonma-yon solishtiring: kontrakt, tasdiqlangan stipendiya va yordam, sof yillik kontrakt, depozit sanalari, javob muddatlari hamda e'lon qilingan o‘qishdan keyingi ish ma’lumotlari.",
     "introVisa": "Avval viza ishi, keyin undan keyingi amaliy qadamlar: hujjatlar, suhbat, parvoz, uy-joy, sug‘urta va yetib borish.",
     "introGuidance": "AI yo‘l-yo‘riq va inson konsaltingi aniq ajratilgan. AI javoblari o‘quv yordamchisi — rasmiy qabul qarori emas va kafolat emas.",
     "introCommunity": "Hozir shu yo‘ldan o‘tayotgan talabalar bilan gaplashing va sertifikat bilan tugaydigan kurslarni o‘qing.",
@@ -3534,7 +3711,23 @@
     "signalsTitle": "Moslik signallari",
     "noSignals": "Hozircha ijobiy signalni solishtirib bo‘lmadi.",
     "verifyTitle": "Dasturdan aniqlang",
-    "noIssues": "Mavjud katalog ma’lumotlarida farq topilmadi. Bu to‘liq muvofiqlik tekshiruvi emas."
+    "noIssues": "Mavjud katalog ma’lumotlarida farq topilmadi. Bu to‘liq muvofiqlik tekshiruvi emas.",
+    "scenarioTitle": "“Agar shunday bo‘lsa” ssenariysi",
+    "scenarioDescription": "Taxminiy qiymatlarni o‘zgartirib, profil mosligini qayta hisoblang. Profilingiz o‘zgarmaydi va saqlanmaydi.",
+    "scenarioGpa": "Taxminiy GPA (4,0 shkala)",
+    "scenarioIelts": "Taxminiy IELTS bali",
+    "scenarioBudget": "Taxminiy yillik budjet (USD)",
+    "scenarioMajor": "Taxminiy maqsad yo‘nalishi",
+    "scenarioDisclaimer": "Amaldagi rasmiy dastur talablarini tekshiring. Muqobil testlar, muvofiqlik yoki qabul natijalari taxmin qilinmaydi.",
+    "scenarioRun": "Ssenariyni qayta hisoblash",
+    "scenarioRunning": "Qayta hisoblanmoqda…",
+    "scenarioReset": "Profil qiymatlariga qaytarish",
+    "scenarioError": "Ssenariyni hisoblab bo‘lmadi. Qiymatlarni tekshirib, qayta urinib ko‘ring.",
+    "scenarioResult": "Ssenariy mosligi: {score}",
+    "scenarioUnknown": "Taqqoslash uchun boshlang‘ich ball mavjud emas.",
+    "scenarioNoChange": "Ko‘rsatilgan shkala bo‘yicha ball o‘zgarmadi.",
+    "scenarioDelta": "Joriy moslikdan farq: {delta} ball.",
+    "scenarioBreakdownTitle": "Ssenariy dalillari taqsimoti"
   },
   "matchReasons": {
     "university": {
@@ -3561,7 +3754,8 @@
       "financial_plan_missing": "Moliyaviy yordam kerakligini ko‘rsatdingiz, ammo universitetning tasdiqlangan to‘liq xarajati yo‘q",
       "financial_budget_missing": "Yillik byudjetingizni kiriting, shunda uni moliyalashtirish rejangiz bilan solishtiramiz",
       "income_below_cost": "Ko‘rsatilgan oilaviy daromad ${income}/yil taxminiy yillik xarajat ${cost}dan past",
-      "income_supports_cost": "Ko‘rsatilgan oilaviy daromad ${income}/yil taxminiy yillik xarajatni qoplaydi"
+      "income_supports_cost": "Ko‘rsatilgan oilaviy daromad ${income}/yil taxminiy yillik xarajatni qoplaydi",
+      "english_alternative_recorded": "Profilingizda {test} {score} qayd etilgan; universitet katalogida IELTS {min} ko‘rsatilgan. Muqobil test yoki imtiyoz qabul qilinadi deb taxmin qilinmaydi — dastur sahifasidan tekshiring."
     },
     "scholarship": {
       "gpa_well_above": "Profilingizdagi GPA {gpa} ushbu stipendiya e’lonida ko‘rsatilgan {min} ko‘rsatkichidan yuqori; rasmiy shartlarni tekshiring",
@@ -3583,11 +3777,13 @@
       "financial_need_unknown": "Bu grant ehtiyojga asoslangan — moslikni baholash uchun moliyaviy yordam ehtiyojingizni kiriting",
       "full_funding_match": "Qoplama turi to‘liq stipendiya talabingizga mos kelishi mumkin",
       "full_funding_unclear": "Sizga to‘liq moliyalashtirish kerak — bu grant o‘qish va yashash xarajatlarini qoplashini tekshiring",
-      "merit_based": "Yutuqlarga asoslangan — kuchli akademik natija / nashrlar"
+      "merit_based": "Yutuqlarga asoslangan — kuchli akademik natija / nashrlar",
+      "english_alternative_recorded": "Profilingizda {test} {score} qayd etilgan; ushbu stipendiyada IELTS {min} ko‘rsatilgan. Muqobil test yoki imtiyoz qabul qilinadi deb taxmin qilinmaydi — tashkilotchidan tekshiring."
     }
   },
   "profile": {
     "budgetNotSet": "Budjet hali kiritilmagan — bilmasangiz bo'sh qoldiring.",
+    "familyIncomeNotBudget": "Oilaviy daromad o‘qish uchun mavjud mablag‘ hisoblanmaydi; yillik byudjetni alohida kiriting.",
     "close": "Yopish",
     "financialAidNeedQuestion": "Sizga moliyaviy yordam kerak bo‘ladimi?",
     "financialAidUnknown": "Hozircha bilmayman",
@@ -4360,6 +4556,8 @@
     "share": {
       "pageTitle": "Talaba ulashgan qisqa hisobot",
       "pageIntro": "Talaba ulashishni tanlagan, faqat o‘qish uchun mo‘ljallangan ma’lumot.",
+      "printSummary": "Chop etish / PDF sifatida saqlash",
+      "printSummaryHint": "Ulashilgan hisobotni chop etish yoki PDF sifatida saqlash",
       "loading": "Ulashilgan ma’lumot yuklanmoqda…",
       "loadErrorTitle": "Ulashilgan hisobot ochilmadi",
       "invalidLink": "Havola noto‘g‘ri, eskirgan yoki o‘chirilgan. Uni ulashgan talabadan kirish huquqini tekshirishni so‘rang.",

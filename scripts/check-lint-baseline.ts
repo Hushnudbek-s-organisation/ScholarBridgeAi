@@ -1,9 +1,8 @@
 /**
- * Lint baseline gate (2026-10 follow-up).
+ * Lint baseline gate.
  *
- * The repository carries pre-existing React-Compiler / react-hooks debt that
- * predates this work (see docs/LINT.md for the full list and why it is
- * baselined rather than fixed en masse). CI must still FAIL when:
+ * `lint-baseline.json` records the reviewed ESLint ceiling for the repository.
+ * CI must FAIL when:
  *
  *   - a NEW file gets any lint problem,
  *   - an existing file's count for a rule INCREASES (worsened debt),
@@ -89,7 +88,7 @@ if (UPDATE) {
     JSON.stringify(
       {
         _comment:
-          "Committed lint baseline — pre-existing debt only. CI (npm run lint:baseline) FAILS on any NEW or WORSENED issue. After fixing debt, re-run `npm run lint:baseline -- --update` to shrink this file. See docs/LINT.md.",
+          "Reviewed lint baseline. CI (npm run lint:baseline) FAILS on any NEW or WORSENED issue; keep the baseline at zero by fixing findings rather than suppressing rules. See docs/LINT.md.",
         total: totalNow,
         errors: errorsNow,
         warnings: warningsNow,
@@ -153,5 +152,5 @@ console.log("Remaining baselined debt (full list — nothing hidden):");
 for (const i of currentIssues) {
   console.log(`  ${i.file}:${i.line}  [${i.severity === 2 ? "error" : "warn"}] ${i.rule}  ${i.message}`);
 }
-console.log(`\nLint gate PASSED — no new or worsened problems. ${totalNow} pre-existing issues remain baselined (see docs/LINT.md).`);
+console.log(`\nLint gate PASSED — ${totalNow} findings remain within the reviewed baseline (see docs/LINT.md).`);
 process.exit(0);

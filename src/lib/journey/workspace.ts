@@ -41,6 +41,8 @@ export interface WorkspaceRow {
   isRequired: boolean;
   /** Stable key so the caller can map this row back to its own title. */
   key?: string;
+  /** Catalog linkage lets recommendation request placeholders be deduplicated. */
+  linkedType?: string | null;
 }
 
 /** Optional per-group extras the workspace can fold into the same maths. */
@@ -51,8 +53,10 @@ export interface WorkspaceExtras {
   /** Funding items for this application. */
   financeDone?: number;
   financeTotal?: number;
-  /** Submitted? Locks the bar at 100. */
+  /** Application record says submission has already happened. */
   submitted?: boolean;
+  /** Paid-fee fact for a required `application.fee` row. */
+  applicationFeePaid?: boolean;
 }
 
 export interface SectionProgress {
@@ -85,6 +89,17 @@ function blank(key: string, label: string): SectionProgress {
   return { key, label, done: 0, total: 0, pct: 0, missing: [] };
 }
 
+function safeCount(value: number | undefined): number {
+  return value != null && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+/** Placeholder checklist rows mirror recommendationRequests when real requests exist. */
+export function isRecommendationPlaceholder(row: Pick<WorkspaceRow, "section" | "key" | "linkedType">): boolean {
+  return row.section === "recommendations" && (
+    row.linkedType === "recommendation" || /^(recommendation|recommendations)\./i.test(row.key ?? "")
+  );
+}
+
 /**
  * Section weights. Documents and essays carry the most of an application in
  * practice; the fee and the final submission are quick wins at the end. The
@@ -108,13 +123,17 @@ export function computeWorkspaceProgress(
 ): WorkspaceProgress {
   const groups = new Map<string, SectionProgress>();
   const missing: WorkspaceProgress["missing"] = [];
+  const recommendationsTotal = safeCount(extras.recommendationsTotal);
+  const recommendationsSubmitted = Math.min(recommendationsTotal, safeCount(extras.recommendationsSubmitted));
+  const countedRows = rows.filter((row) => !(recommendationsTotal > 0 && isRecommendationPlaceholder(row)));
+  const isDone = (row: WorkspaceRow) => rowIsDone(row) || (row.key === "application.fee" && extras.applicationFeePaid === true);
 
-  for (const row of rows) {
+  for (const row of countedRows) {
     const label = row.section.charAt(0).toUpperCase() + row.section.slice(1);
     if (!groups.has(row.section)) groups.set(row.section, blank(row.section, label));
     const g = groups.get(row.section)!;
     g.total += 1;
-    if (rowIsDone(row)) {
+    if (isDone(row)) {
       g.done += 1;
     } else {
       const key = row.key ?? row.section;
@@ -129,19 +148,21 @@ export function computeWorkspaceProgress(
     }
   }
 
-  // Recommendations may exist as their own workflow even with no requirement row.
-  if (extras.recommendationsTotal != null && extras.recommendationsTotal > 0) {
-    const g = groups.get("recommendations") ?? blank("recommendations", "Recommendations");
-    g.done += Math.min(extras.recommendationsSubmitted ?? 0, extras.recommendationsTotal);
-    g.total = Math.max(g.total, extras.recommendationsTotal);
-    g.pct = g.total ? Math.round((g.done / g.total) * 100) : 0;
+  // Standalone request/funding records are added only when that category has
+  // no requirement rows. When both tables describe the same workflow, counting
+  // both sources would double-count items or let `done` exceed `total`.
+  if (recommendationsTotal > 0 && !groups.has("recommendations")) {
+    const g = blank("recommendations", "Recommendations");
+    g.done = recommendationsSubmitted;
+    g.total = recommendationsTotal;
     groups.set("recommendations", g);
   }
-  if (extras.financeTotal != null && extras.financeTotal > 0) {
-    const g = groups.get("finance") ?? blank("finance", "Finance");
-    g.done += Math.min(extras.financeDone ?? 0, extras.financeTotal);
-    g.total = Math.max(g.total, extras.financeTotal);
-    g.pct = g.total ? Math.round((g.done / g.total) * 100) : 0;
+  const financeTotal = safeCount(extras.financeTotal);
+  const financeDone = Math.min(financeTotal, safeCount(extras.financeDone));
+  if (financeTotal > 0 && !groups.has("finance")) {
+    const g = blank("finance", "Finance");
+    g.done = financeDone;
+    g.total = financeTotal;
     groups.set("finance", g);
   }
 
@@ -162,7 +183,14 @@ export function computeWorkspaceProgress(
 
   const done = sections.reduce((s, g) => s + g.done, 0);
   const total = sections.reduce((s, g) => s + g.total, 0);
-  const blockers = missing.filter((m) => m.isRequired).map((m) => m.title);
+  const requiredFeeRows = rows.filter((row) => row.key === "application.fee" && row.isRequired);
+  const feeSatisfied = requiredFeeRows.every(isDone);
+  const requiredRows = countedRows.filter((row) => row.isRequired && row.key !== "application.fee");
+  const blockers = missing.filter((m) => m.isRequired && m.key !== "application.fee").map((m) => m.title);
+  const recommendationBlockers = Math.max(0, recommendationsTotal - recommendationsSubmitted);
+  if (recommendationBlockers > 0) blockers.push(`${recommendationBlockers} recommendation request(s) not submitted`);
+  if (!feeSatisfied) blockers.push("Application fee not paid or marked complete");
+  const requirementsSatisfied = rows.length > 0 && requiredRows.every(isDone);
 
   return {
     pct: Math.max(0, Math.min(100, pct)),
@@ -170,13 +198,10 @@ export function computeWorkspaceProgress(
     total,
     sections,
     missing,
-    // A required application.fee or application.final_submission row that is
-    // still open is what actually blocks submission — not the essay draft.
-    //
-    // An application with NO tracked rows is never "ready": a green submit
-    // button on a checklist that does not exist would be a lie. A submitted
-    // application is past the gate by definition.
-    readyToSubmit: extras.submitted === true || (total > 0 && blockers.length === 0),
+    // Submission requires a real tracked checklist, every required row closed,
+    // every tracked recommendation submitted and any required fee satisfied.
+    // `submitted` affects the progress bar above, never bypasses this gate.
+    readyToSubmit: requirementsSatisfied && recommendationBlockers === 0 && feeSatisfied,
     blockers,
   };
 }

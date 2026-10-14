@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { AlertCircle, Loader2, Printer, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import type { ParentSummary } from "@/lib/parentSummary";
@@ -104,14 +104,27 @@ export function ParentShareView({ token }: { token: string }) {
     <main className="min-h-screen bg-slate-50 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto w-full max-w-3xl space-y-5">
         <header className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-start gap-3">
-            <ShieldCheck aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">ScholarBridgeAI</p>
-              <h1 className="mt-1 break-words text-2xl font-bold tracking-tight sm:text-3xl">{t("pageTitle")}</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t("pageIntro")}</p>
-              {summary && <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-200">{t("sharedFor", { name: summary.studentFirstName ?? t("studentNameFallback") })}</p>}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <ShieldCheck aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">ScholarBridgeAI</p>
+                <h1 className="mt-1 break-words text-2xl font-bold tracking-tight sm:text-3xl">{t("pageTitle")}</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t("pageIntro")}</p>
+                {summary && <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-200">{t("sharedFor", { name: summary.studentFirstName ?? t("studentNameFallback") })}</p>}
+              </div>
             </div>
+            {summary && (
+              <button
+                type="button"
+                onClick={() => window.print()}
+                aria-label={t("printSummaryHint")}
+                className="print:hidden inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Printer aria-hidden="true" className="h-4 w-4" />
+                {t("printSummary")}
+              </button>
+            )}
           </div>
         </header>
 

@@ -1,8 +1,9 @@
 import { createHash, timingSafeEqual } from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, subscriptions, studentProfiles } from "@/db/schema";
 import { CONFIG_DEFAULTS, getConfigNumber } from "@/lib/config";
+import { readTextBody } from "@/lib/request";
 
 // Fallbacks ONLY for when app_config is unreadable. They are read from the one
 // defaults table (CONFIG_DEFAULTS), never typed twice. The real values are the
@@ -97,6 +98,8 @@ export async function packageForAmountUzs(amountUzs: number | null | undefined) 
 export function paymeConfig() {
   return {
     merchantId: process.env.PAYME_MERCHANT_ID || "",
+    // Payme's HTTP Basic login is issued separately from the checkout merchant id.
+    login: process.env.PAYME_LOGIN || "",
     key: process.env.PAYME_KEY || "",
     password: process.env.PAYME_PASSWORD || "",
   };
@@ -116,7 +119,7 @@ export function clickConfig() {
 /** True when real Payme merchant credentials are present. */
 export function isPaymeConfigured(): boolean {
   const cfg = paymeConfig();
-  return Boolean(cfg.merchantId && (cfg.key || cfg.password));
+  return Boolean(cfg.merchantId && cfg.login && (cfg.key || cfg.password));
 }
 
 /** True when real Click credentials are present. */
@@ -127,13 +130,13 @@ export function isClickConfigured(): boolean {
 
 /**
  * Verify the Payme merchant credentials sent by Payme on every callback.
- * Payme signs in with HTTP Basic auth (merchant id as the login and the
- * merchant key/password as the secret). Without this check the webhook is an
- * open endpoint that would happily mark any transaction as paid.
+ * Payme's HTTP Basic login is issued separately from the checkout merchant id;
+ * its merchant key/password is the secret. Without this check the webhook is
+ * an open endpoint that would happily mark any transaction as paid.
  */
 export function verifyPaymeAuth(authorizationHeader: string | null): boolean {
   const cfg = paymeConfig();
-  if (!cfg.merchantId) return false; // not configured → reject, never "allow all"
+  if (!cfg.login) return false; // not configured → reject, never "allow all"
   if (!authorizationHeader) return false;
 
   const match = /^Basic\s+(.+)$/i.exec(authorizationHeader.trim());
@@ -150,7 +153,8 @@ export function verifyPaymeAuth(authorizationHeader: string | null): boolean {
   const secret = decoded.slice(idx + 1);
 
   const expectedSecret = cfg.password || cfg.key;
-  return safeEqual(login, cfg.merchantId) && safeEqual(secret, expectedSecret);
+  if (!expectedSecret) return false;
+  return safeEqual(login, cfg.login) && safeEqual(secret, expectedSecret);
 }
 
 /** Constant-time string comparison (no early exit on the first wrong byte). */
@@ -164,6 +168,25 @@ export function safeEqual(a: string, b: string): boolean {
 export const ACCOUNT_KEY = "profile_id";
 /** `account.order_id` — the `payments.id` created by /api/payments/initiate. */
 export const ORDER_KEY = "order_id";
+
+/** Build the Payme GET checkout link using Payme's documented base64 payload. */
+export function buildPaymeCheckoutUrl(
+  merchantId: string,
+  amountTiyn: number,
+  account: Record<string, string | number>
+): string | null {
+  if (!merchantId || /[;=\u0000-\u0020\u007f]/.test(merchantId) || !Number.isSafeInteger(amountTiyn) || amountTiyn <= 0) return null;
+  const accountFields: string[] = [];
+  for (const [key, value] of Object.entries(account)) {
+    if (!/^[A-Za-z0-9_]+$/.test(key) || !["string", "number"].includes(typeof value)) return null;
+    const fieldValue = String(value);
+    if (!fieldValue || /[;=]/.test(fieldValue)) return null;
+    accountFields.push(`ac.${key}=${fieldValue}`);
+  }
+  const payload = [`m=${merchantId}`, ...accountFields, `a=${amountTiyn}`].join(";");
+  const encoded = encodeURIComponent(Buffer.from(payload, "utf8").toString("base64"));
+  return `https://checkout.paycom.uz/${encoded}`;
+}
 
 /**
  * The pending row `/api/payments/initiate` created for this checkout, matched by
@@ -184,7 +207,7 @@ export async function findPendingInitiatedPayment(
   amountUzs: number
 ) {
   const id = Number(orderId);
-  if (!Number.isInteger(id) || id <= 0) return null;
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
   const [row] = await db
     .select()
     .from(payments)
@@ -192,9 +215,11 @@ export async function findPendingInitiatedPayment(
       and(
         eq(payments.id, id),
         eq(payments.provider, "payme"),
-        eq(payments.status, "pending")
+        eq(payments.status, "pending"),
+        eq(payments.providerTransactionId, "")
       )
-    );
+    )
+    .limit(1);
   if (!row) return null;
   if (profileId != null && row.profileId !== Number(profileId)) return null;
   if (Number(row.amount) !== amountUzs) return null;
@@ -204,12 +229,23 @@ export async function findPendingInitiatedPayment(
 // ---------------------------------------------------------------------------
 // Payment row helpers
 // ---------------------------------------------------------------------------
-export async function findPaymentByProviderId(providerTransactionId: string) {
-  const rows = await db
+
+/** Payme automatically cancels unperformed transactions after 12 hours. */
+export const PAYME_TRANSACTION_TTL_MS = 12 * 60 * 60 * 1000;
+
+function paymeTransactionExpired(payment: typeof payments.$inferSelect, nowMs = Date.now()): boolean {
+  const providerCreatedAt = payment.providerCreatedAt ?? payment.createdAt;
+  return payment.status === "pending" && nowMs - providerCreatedAt.getTime() >= PAYME_TRANSACTION_TTL_MS;
+}
+
+export async function findPaymentByProviderId(providerTransactionId: string, provider = "payme") {
+  if (!providerTransactionId) return null;
+  const [row] = await db
     .select()
     .from(payments)
-    .where(eq(payments.providerTransactionId, providerTransactionId));
-  return rows[0] ?? null;
+    .where(and(eq(payments.providerTransactionId, providerTransactionId), eq(payments.provider, provider)))
+    .limit(1);
+  return row ?? null;
 }
 
 export async function findPaymentById(id: number) {
@@ -217,62 +253,112 @@ export async function findPaymentById(id: number) {
   return rows[0] ?? null;
 }
 
-/** Activate a subscription (idempotent — never double-credits). */
-export async function activateSubscription(paymentId: number, profileId: number | null, plan = "premium") {
-  const [payment] = await db
-    .select()
+/**
+ * Activate a subscription exactly once and atomically with its payment state.
+ *
+ * Locking the payment row serializes duplicate/concurrent provider callbacks.
+ * The subscription row and denormalized profile entitlement are committed in
+ * the same transaction as `payments.status = 'paid'`; a failure at any point
+ * rolls all three changes back so a retry can safely recover.
+ */
+export async function activateSubscriptionWithResult(
+  paymentId: number,
+  profileId: number | null,
+  plan = "premium"
+): Promise<{ subscription: typeof subscriptions.$inferSelect; alreadyActive: boolean } | null> {
+  // Read the immutable package purpose outside the transaction because config
+  // reads may use their own pooled connection. The locked row is rechecked below.
+  const [snapshot] = await db
+    .select({ purpose: payments.purpose })
     .from(payments)
-    .where(eq(payments.id, paymentId));
+    .where(eq(payments.id, paymentId))
+    .limit(1);
+  if (!snapshot) return null;
+  const periodDays = await periodDaysForPurpose(snapshot.purpose);
+  if (!Number.isFinite(periodDays) || periodDays <= 0) return null;
 
-  if (!payment) return null;
-  // Already credited — do nothing.
-  if (payment.status === "paid") {
-    return findActiveSubscription(profileId);
-  }
+  return db.transaction(async (tx) => {
+    const [payment] = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, paymentId))
+      .for("update");
+    if (!payment || payment.profileId == null) return null;
+    if (profileId != null && Number(profileId) !== payment.profileId) return null;
+    // A provider cannot reactivate a transaction that was cancelled/refunded,
+    // or complete a Payme transaction after its documented 12-hour timeout.
+    if (payment.status === "cancelled" || payment.status === "refunded") return null;
+    if (payment.status !== "pending" && payment.status !== "paid") return null;
+    if (payment.provider === "payme" && paymeTransactionExpired(payment)) {
+      const expiredAt = new Date();
+      await tx
+        .update(payments)
+        .set({ status: "cancelled", cancelledAt: expiredAt, cancelReason: 4, updatedAt: expiredAt })
+        .where(and(eq(payments.id, paymentId), eq(payments.status, "pending")));
+      return null;
+    }
 
-  const now = new Date();
-  // Package length comes from the payment purpose (monthly / season / yearly).
-  const periodDays = await periodDaysForPurpose(payment.purpose);
-  const periodEnd = new Date(now.getTime() + periodDays * 86400000);
+    const targetProfileId = payment.profileId;
+    const [current] = await tx
+      .select({ premiumUntil: studentProfiles.premiumUntil })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, targetProfileId))
+      .for("update");
+    if (!current) return null;
 
-  await db
-    .update(payments)
-    .set({ status: "paid", updatedAt: now })
-    .where(eq(payments.id, paymentId));
+    const [existingSubscription] = await tx
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.paymentId, paymentId))
+      .limit(1);
 
-  const targetProfileId = profileId ?? payment.profileId;
-  if (targetProfileId == null) {
-    return findActiveSubscription(null);
-  }
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
-      profileId: targetProfileId,
-      plan,
-      status: "active",
-      currentPeriodEnd: periodEnd,
-      paymentId: paymentId,
-    })
-    .returning();
+    if (existingSubscription && existingSubscription.status !== "active") return null;
+    const alreadyActive = payment.status === "paid" && Boolean(existingSubscription);
+    const now = new Date();
+    let subscription = existingSubscription;
+    if (!subscription) {
+      // Repair a legacy paid row whose earlier non-transactional activation was
+      // interrupted after setting the payment paid. The original `updatedAt`
+      // is the closest available activation time for those older rows.
+      const activatedAt = payment.status === "paid" ? payment.performedAt ?? payment.updatedAt : now;
+      const periodEnd = new Date(activatedAt.getTime() + periodDays * 86_400_000);
+      [subscription] = await tx
+        .insert(subscriptions)
+        .values({
+          profileId: targetProfileId,
+          plan,
+          status: "active",
+          currentPeriodEnd: periodEnd,
+          paymentId,
+        })
+        .returning();
+    }
 
-  // Mirror the paid period onto the profile columns. They are the denormalised
-  // "is this student premium" flag the dashboard badge, the readiness gates and
-  // the admin list read — without this, a student who PAID showed as free on
-  // their own dashboard while /api/premium/status (subscription-aware) said
-  // Premium. The window is the UNION of paid and referral grants: paying must
-  // never shorten a referral window the student already earned.
-  const [current] = await db
-    .select({ premiumUntil: studentProfiles.premiumUntil })
-    .from(studentProfiles)
-    .where(eq(studentProfiles.id, targetProfileId));
-  const existing = current?.premiumUntil ? new Date(current.premiumUntil).getTime() : 0;
-  const mergedUntil = new Date(Math.max(existing, periodEnd.getTime()));
-  await db
-    .update(studentProfiles)
-    .set({ isPremium: true, premiumUntil: mergedUntil, updatedAt: now })
-    .where(eq(studentProfiles.id, targetProfileId));
+    if (payment.status !== "paid") {
+      await tx
+        .update(payments)
+        .set({ status: "paid", performedAt: now, updatedAt: now })
+        .where(eq(payments.id, paymentId));
+    }
 
-  return subscription;
+    // The profile row is locked before insertion/update: different payments
+    // cannot race their Math.max merge and shorten a longer entitlement.
+    const existingUntil = current.premiumUntil ? new Date(current.premiumUntil).getTime() : 0;
+    const paidUntil = new Date(subscription.currentPeriodEnd).getTime();
+    const mergedUntil = new Date(Math.max(existingUntil, paidUntil));
+    await tx
+      .update(studentProfiles)
+      .set({ isPremium: mergedUntil.getTime() > Date.now(), premiumUntil: mergedUntil, updatedAt: now })
+      .where(eq(studentProfiles.id, targetProfileId));
+
+    return { subscription, alreadyActive };
+  });
+}
+
+/** Activate a payment and return just the subscription row for existing callers. */
+export async function activateSubscription(paymentId: number, profileId: number | null, plan = "premium") {
+  const result = await activateSubscriptionWithResult(paymentId, profileId, plan);
+  return result?.subscription ?? null;
 }
 
 /**
@@ -333,18 +419,94 @@ export function subscriptionIsActive(sub: { status: string; currentPeriodEnd: Da
 }
 
 // ---------------------------------------------------------------------------
-// Click — MD5 signature verification (two-step callback flow)
+// Click — provider-specific MD5 signature verification (two-step callback)
 // ---------------------------------------------------------------------------
-export function clickSignString(input: {
+export const CLICK_PREPARE_ACTION = 0;
+export const CLICK_COMPLETE_ACTION = 1;
+
+export interface ClickSignatureInput {
   clickTransId: string;
-  clickPaydocId: string;
   serviceId: string;
   secretKey: string;
   merchantTransId: string;
-  amount: number;
+  /** Keep the provider's original decimal spelling when building the signature. */
+  amount: string | number;
   action: number;
-}): string {
-  return `${input.clickTransId}${input.clickPaydocId}${input.serviceId}${input.secretKey}${input.merchantTransId}${input.amount}${input.action}`;
+  signTime: string;
+  /** Included by Click for action=1, omitted from action=0 signature. */
+  merchantPrepareId?: string;
+}
+
+/**
+ * Click Merchant API v2 signature order.
+ * Prepare (action=0): click_trans_id + service_id + secret_key +
+ * merchant_trans_id + amount + action + sign_time.
+ * Complete (action=1): the same sequence with merchant_prepare_id between
+ * merchant_trans_id and amount. `click_paydoc_id` is a request field but is NOT
+ * part of Click's signature formula.
+ */
+export function clickSignString(input: ClickSignatureInput): string {
+  const prefix = `${input.clickTransId}${input.serviceId}${input.secretKey}${input.merchantTransId}`;
+  const prepared = input.action === CLICK_COMPLETE_ACTION ? `${input.merchantPrepareId ?? ""}` : "";
+  return `${prefix}${prepared}${input.amount}${input.action}${input.signTime}`;
+}
+
+/** Validate Click's UZS amount while preserving its original signature spelling. */
+export function parseClickAmount(value: unknown): { raw: string; amountUzs: number } | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const raw = String(value);
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null;
+  const amountUzs = Number(raw);
+  if (!Number.isSafeInteger(amountUzs) || amountUzs <= 0) return null;
+  return { raw, amountUzs };
+}
+
+export function buildClickCheckoutUrl(input: {
+  serviceId: string;
+  merchantId: string;
+  merchantUserId?: string;
+  amountUzs: number;
+  paymentId: number;
+}): { checkoutUrl: string; params: Record<string, string> } | null {
+  if (
+    !input.serviceId || !input.merchantId || !Number.isSafeInteger(input.paymentId) || input.paymentId <= 0 ||
+    !Number.isFinite(input.amountUzs) || input.amountUzs <= 0 ||
+    !Number.isSafeInteger(Math.round(input.amountUzs * 100))
+  ) return null;
+  const params: Record<string, string> = {
+    service_id: input.serviceId,
+    merchant_id: input.merchantId,
+    amount: input.amountUzs.toFixed(2),
+    transaction_param: String(input.paymentId),
+  };
+  if (input.merchantUserId) params.merchant_user_id = input.merchantUserId;
+  return {
+    checkoutUrl: `https://my.click.uz/services/pay?${new URLSearchParams(params).toString()}`,
+    params,
+  };
+}
+
+/** Click SHOP API sends URL-encoded form data (JSON remains useful for tests). */
+export async function readClickCallbackBody(req: Request): Promise<Record<string, unknown> | null> {
+  const read = await readTextBody(req, 64 * 1024);
+  if (!read.ok || !read.body.trim()) return null;
+  const mediaType = (req.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (mediaType === "application/json") {
+    try {
+      const body: unknown = JSON.parse(read.body);
+      return isRecord(body) ? body : null;
+    } catch {
+      return null;
+    }
+  }
+  if (mediaType !== "application/x-www-form-urlencoded") return null;
+  const params = new URLSearchParams(read.body);
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of params) {
+    if (Object.hasOwn(body, key)) return null;
+    body[key] = value;
+  }
+  return Object.keys(body).length ? body : null;
 }
 
 export function md5Hex(value: string): string {
@@ -363,224 +525,429 @@ export function verifyClickSignature(signString: string, expected: string): bool
 export interface PaymeRequest {
   jsonrpc?: string;
   method: string;
-  params: Record<string, any>;
-  id?: number;
+  params: Record<string, unknown>;
+  id?: number | string | null;
 }
 
 function paymeError(code: number, message: string, data: unknown = null) {
   return { error: { code, message, data } };
 }
 
+function paymeAccountError(message: { en: string; ru: string; uz: string }, field: string) {
+  return { error: { code: -31050, message, data: field } };
+}
+
+function paymeProfileNotFound() {
+  return paymeAccountError(
+    { en: "The specified profile was not found", ru: "Указанный профиль не найден", uz: "Ko'rsatilgan profil topilmadi" },
+    ACCOUNT_KEY
+  );
+}
+
+function paymeProfileMismatch() {
+  return paymeAccountError(
+    {
+      en: "The transaction does not belong to the specified profile",
+      ru: "Транзакция не принадлежит указанному профилю",
+      uz: "Tranzaksiya ko'rsatilgan profilga tegishli emas",
+    },
+    ACCOUNT_KEY
+  );
+}
+
+function paymeOrderNotAvailable() {
+  return paymeAccountError(
+    { en: "The specified order is unavailable", ru: "Указанный заказ недоступен", uz: "Ko'rsatilgan buyurtma mavjud emas" },
+    ORDER_KEY
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function positiveInteger(value: unknown): number | null {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : null;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function paymeState(status: string): number {
+  if (status === "paid") return 2;
+  if (status === "cancelled") return -1;
+  if (status === "refunded") return -2;
+  return 1;
+}
+
+function paymeTransactionResult(payment: typeof payments.$inferSelect) {
+  return {
+    create_time: payment.createdAt.getTime(),
+    perform_time: payment.performedAt?.getTime() ?? 0,
+    cancel_time: payment.cancelledAt?.getTime() ?? 0,
+    // `id` in GetStatement is Payme's id; `transaction` is our merchant id.
+    transaction: String(payment.id),
+    state: paymeState(payment.status),
+    reason: payment.cancelReason ?? null,
+  };
+}
+
 /**
- * Handle a Payme JSON-RPC request body. Returns the response object to send back.
- * Implements CheckPerformTransaction, CreateTransaction, PerformTransaction,
- * CancelTransaction, CheckTransaction and GetStatement.
+ * Handle Payme's JSON-RPC merchant methods. Payme timestamps are Unix
+ * milliseconds; payment state changes and entitlement activation are guarded
+ * by DB row locks so provider retries/concurrent callbacks are idempotent.
  */
 export async function handlePaymeRequest(body: PaymeRequest) {
-  const { method, params, id } = body;
+  const id = body?.id;
+  const method = typeof body?.method === "string" ? body.method : "";
+  const params = isRecord(body?.params) ? body.params : {};
+  const account = isRecord(params.account) ? params.account : {};
+  const profileId = positiveInteger(account[ACCOUNT_KEY]);
 
-  const account = params?.account || {};
-  const profileId = account[ACCOUNT_KEY];
+  if (!method || (body.jsonrpc !== undefined && body.jsonrpc !== "2.0")) {
+    return { id, ...paymeError(-32600, "Invalid request") };
+  }
 
   if (method === "CheckPerformTransaction") {
     const amount = params.amount;
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0) {
       return { id, ...paymeError(-31001, "Invalid amount") };
     }
-    if (profileId == null) {
-      return { id, ...paymeError(-31003, "Profile not found") };
-    }
-    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, Number(profileId)));
-    if (!profile) {
-      return { id, ...paymeError(-31003, "Profile not found") };
-    }
+    if (!profileId) return { id, ...paymeProfileNotFound() };
+    const [profile] = await db
+      .select({ id: studentProfiles.id })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, profileId))
+      .limit(1);
+    if (!profile) return { id, ...paymeProfileNotFound() };
+
     const amountUzs = amount / 100;
-    // The student may have picked monthly, season or yearly at checkout — the
-    // amount identifies which. Checking only the monthly price rejected every
-    // season/yearly purchase before Payme would even open the payment page.
-    const initiated = await findPendingInitiatedPayment(account[ORDER_KEY], profileId, amountUzs);
-    const pack = initiated ? null : await packageForAmountUzs(amountUzs);
-    if (!initiated && !pack) {
-      return { id, ...paymeError(-31001, "Invalid amount") };
+    const orderValue = account[ORDER_KEY];
+    const hasOrderId = orderValue !== undefined && orderValue !== null && orderValue !== "";
+    if (hasOrderId) {
+      const orderId = positiveInteger(orderValue);
+      if (!orderId) return { id, ...paymeOrderNotAvailable() };
+      const [initiated] = await db
+        .select()
+        .from(payments)
+        .where(and(
+          eq(payments.id, orderId),
+          eq(payments.profileId, profileId),
+          eq(payments.provider, "payme")
+        ))
+        .limit(1);
+      if (!initiated || initiated.status !== "pending" || initiated.providerTransactionId !== "") {
+        return { id, ...paymeOrderNotAvailable() };
+      }
+      if (initiated.currency !== PREMIUM_CURRENCY || Number(initiated.amount) !== amountUzs) {
+        return { id, ...paymeError(-31001, "Invalid amount") };
+      }
+      return {
+        id,
+        result: {
+          allow: true,
+          additional: { profile_id: profileId, purpose: initiated.purpose, [ORDER_KEY]: initiated.id },
+        },
+      };
     }
+
+    const pack = await packageForAmountUzs(amountUzs);
+    if (!pack) return { id, ...paymeError(-31001, "Invalid amount") };
     return {
       id,
-      result: {
-        allow: true,
-        additional: {
-          profile_id: Number(profileId),
-          purpose: initiated?.purpose ?? pack!.purpose,
-          // Echoed back to us on CreateTransaction so the purchase is linked
-          // to the row /api/payments/initiate already created.
-          [ORDER_KEY]: initiated?.id ?? undefined,
-        },
-      },
+      result: { allow: true, additional: { profile_id: profileId, purpose: pack.purpose } },
     };
   }
 
   if (method === "CreateTransaction") {
-    const txnId = String(params.id);
+    const rawTxnId = params.id;
+    const txnId = typeof rawTxnId === "string" || typeof rawTxnId === "number" ? String(rawTxnId) : "";
     const amount = params.amount;
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (!txnId || txnId.length > 128) return { id, ...paymeError(-32600, "Invalid request") };
+    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0) {
       return { id, ...paymeError(-31001, "Invalid amount") };
     }
-    const existing = await findPaymentByProviderId(txnId);
-    if (existing) {
-      // Idempotent: return the existing transaction.
-      return {
-        id,
-        result: {
-          create_time: Math.floor(existing.createdAt.getTime() / 1000),
-          transaction: String(txnId),
-          state: existing.status === "paid" ? 2 : 1,
-        },
-      };
+    const providerTime = params.time;
+    if (
+      typeof providerTime !== "number" || !Number.isSafeInteger(providerTime) || providerTime <= 0 ||
+      !Number.isFinite(new Date(providerTime).getTime())
+    ) {
+      return { id, ...paymeError(-32600, "Invalid request") };
     }
-    if (profileId == null) {
-      return { id, ...paymeError(-31003, "Profile not found") };
-    }
+    const providerCreatedAt = new Date(providerTime);
+    if (!profileId) return { id, ...paymeProfileNotFound() };
 
     const amountUzs = amount / 100;
-    // Prefer the row /api/payments/initiate already created for this checkout:
-    // it carries the package the student chose, so the subscription gets the
-    // right length (30 / 90 / 365 days) instead of always 30.
-    const initiated = await findPendingInitiatedPayment(account[ORDER_KEY], profileId, amountUzs);
-    let payment;
-    if (initiated) {
-      const [linked] = await db
-        .update(payments)
-        .set({ providerTransactionId: txnId, updatedAt: new Date() })
-        .where(
-          and(eq(payments.id, initiated.id), eq(payments.status, "pending"))
-        )
-        .returning();
-      payment = linked ?? initiated;
-    } else {
-      const pack = await packageForAmountUzs(amountUzs);
-      [payment] = await db
-        .insert(payments)
-        .values({
-          profileId: Number(profileId),
-          provider: "payme",
-          providerTransactionId: txnId,
-          amount: amountUzs,
-          currency: "UZS",
-          status: "pending",
-          purpose: pack?.purpose ?? "premium",
-        })
-        .returning();
+    const orderValue = account[ORDER_KEY];
+    const hasOrderId = orderValue !== undefined && orderValue !== null && orderValue !== "";
+    const orderId = hasOrderId ? positiveInteger(orderValue) : null;
+    const packageForLegacyOrder = hasOrderId ? null : await packageForAmountUzs(amountUzs);
+    if (!hasOrderId && !packageForLegacyOrder) {
+      return { id, ...paymeError(-31001, "Invalid amount") };
     }
+    if (hasOrderId && !orderId) return { id, ...paymeOrderNotAvailable() };
 
-    const createTime = Math.floor(payment.createdAt.getTime() / 1000);
-    return {
-      id,
-      result: {
-        create_time: createTime,
-        transaction: txnId,
-        state: 1,
-      },
-    };
+    return db.transaction(async (tx) => {
+      // Serialize duplicate create calls across all application instances.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`payme:${txnId}`}))`);
+
+      const [existing] = await tx
+        .select()
+        .from(payments)
+        .where(and(eq(payments.provider, "payme"), eq(payments.providerTransactionId, txnId)))
+        .limit(1)
+        .for("update");
+      if (existing) {
+        if (existing.profileId !== profileId) return { id, ...paymeProfileMismatch() };
+        if (hasOrderId && orderId !== existing.id) return { id, ...paymeOrderNotAvailable() };
+        if (existing.currency !== PREMIUM_CURRENCY || Number(existing.amount) !== amountUzs) {
+          return { id, ...paymeError(-31001, "Invalid amount") };
+        }
+        if (existing.providerCreatedAt && existing.providerCreatedAt.getTime() !== providerTime) {
+          return { id, ...paymeError(-31008, "Transaction parameters do not match") };
+        }
+        let current = existing;
+        const now = new Date();
+        if (paymeTransactionExpired(current, now.getTime())) {
+          const [expired] = await tx
+            .update(payments)
+            .set({ status: "cancelled", cancelledAt: now, cancelReason: 4, updatedAt: now })
+            .where(and(eq(payments.id, current.id), eq(payments.status, "pending")))
+            .returning();
+          current = expired ?? current;
+        } else if (!current.providerCreatedAt) {
+          const [backfilled] = await tx
+            .update(payments)
+            .set({ providerCreatedAt, updatedAt: now })
+            .where(eq(payments.id, current.id))
+            .returning();
+          current = backfilled ?? current;
+        }
+        return { id, result: paymeTransactionResult(current) };
+      }
+
+      const [profile] = await tx
+        .select({ id: studentProfiles.id })
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId))
+        .limit(1);
+      if (!profile) return { id, ...paymeProfileNotFound() };
+
+      const now = new Date();
+      const expiredAtCreate = now.getTime() - providerTime >= PAYME_TRANSACTION_TTL_MS;
+      let payment: typeof payments.$inferSelect | undefined;
+      if (hasOrderId && orderId) {
+        const [initiated] = await tx
+          .select()
+          .from(payments)
+          .where(
+            and(
+              eq(payments.id, orderId),
+              eq(payments.profileId, profileId),
+              eq(payments.provider, "payme"),
+              eq(payments.status, "pending"),
+              eq(payments.providerTransactionId, "")
+            )
+          )
+          .limit(1)
+          .for("update");
+        if (!initiated) return { id, ...paymeOrderNotAvailable() };
+        if (Number(initiated.amount) !== amountUzs || initiated.currency !== PREMIUM_CURRENCY) {
+          return { id, ...paymeError(-31001, "Invalid amount") };
+        }
+        const [linked] = await tx
+          .update(payments)
+          .set({
+            providerTransactionId: txnId,
+            providerCreatedAt,
+            createdAt: now,
+            status: expiredAtCreate ? "cancelled" : "pending",
+            cancelledAt: expiredAtCreate ? now : null,
+            cancelReason: expiredAtCreate ? 4 : null,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(payments.id, initiated.id),
+              eq(payments.status, "pending"),
+              eq(payments.providerTransactionId, "")
+            )
+          )
+          .returning();
+        if (!linked) return { id, ...paymeOrderNotAvailable() };
+        payment = linked;
+      } else {
+        const [created] = await tx
+          .insert(payments)
+          .values({
+            profileId,
+            provider: "payme",
+            providerTransactionId: txnId,
+            providerCreatedAt,
+            amount: amountUzs,
+            currency: PREMIUM_CURRENCY,
+            status: expiredAtCreate ? "cancelled" : "pending",
+            cancelledAt: expiredAtCreate ? now : null,
+            cancelReason: expiredAtCreate ? 4 : null,
+            purpose: packageForLegacyOrder!.purpose,
+          })
+          .returning();
+        payment = created;
+      }
+      return { id, result: paymeTransactionResult(payment) };
+    });
   }
 
   if (method === "PerformTransaction") {
-    const txnId = String(params.id);
-    const payment = await findPaymentByProviderId(txnId);
-    if (!payment) {
-      return { id, ...paymeError(-31003, "Transaction not found") };
+    const rawTxnId = params.id;
+    const txnId = typeof rawTxnId === "string" || typeof rawTxnId === "number" ? String(rawTxnId) : "";
+    if (!txnId || txnId.length > 128) return { id, ...paymeError(-31008, "Invalid transaction") };
+    const payment = await findPaymentByProviderId(txnId, "payme");
+    if (!payment) return { id, ...paymeError(-31003, "Transaction not found") };
+    if (payment.status === "cancelled" || payment.status === "refunded") {
+      return { id, ...paymeError(-31008, "Transaction cannot be performed") };
     }
-    const now = new Date();
-    // Idempotent: if already paid, return paid state without double-crediting.
-    if (payment.status === "paid") {
-      return {
-        id,
-        result: {
-          perform_time: Math.floor(now.getTime() / 1000),
-          transaction: txnId,
-          state: 2,
-        },
-      };
+    if (payment.status !== "paid") {
+      const subscription = await activateSubscription(payment.id, payment.profileId);
+      if (!subscription) return { id, ...paymeError(-31008, "Transaction cannot be performed") };
     }
-    // activateSubscription marks the payment as paid and provisions the
-    // subscription exactly once (idempotent for repeated callbacks).
-    await activateSubscription(payment.id, payment.profileId);
+    const updated = await findPaymentByProviderId(txnId, "payme");
+    const now = Date.now();
     return {
       id,
       result: {
-        perform_time: Math.floor(now.getTime() / 1000),
-        transaction: txnId,
+        perform_time: updated?.performedAt?.getTime() ?? now,
+        transaction: String(updated?.id ?? payment.id),
         state: 2,
       },
     };
   }
 
   if (method === "CancelTransaction") {
-    const txnId = String(params.id);
-    const payment = await findPaymentByProviderId(txnId);
-    if (!payment) {
-      return { id, ...paymeError(-31003, "Transaction not found") };
-    }
-    if (payment.status === "paid") {
-      await db
+    const rawTxnId = params.id;
+    const txnId = typeof rawTxnId === "string" || typeof rawTxnId === "number" ? String(rawTxnId) : "";
+    if (!txnId || txnId.length > 128) return { id, ...paymeError(-31008, "Invalid transaction") };
+
+    return db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select()
+        .from(payments)
+        .where(and(eq(payments.provider, "payme"), eq(payments.providerTransactionId, txnId)))
+        .limit(1)
+        .for("update");
+      if (!payment) return { id, ...paymeError(-31003, "Transaction not found") };
+
+      const state = paymeState(payment.status);
+      if (state === -1 || state === -2) {
+        return {
+          id,
+          result: {
+            cancel_time: payment.cancelledAt?.getTime() ?? 0,
+            transaction: String(payment.id),
+            state,
+          },
+        };
+      }
+      if (payment.status !== "pending" && payment.status !== "paid") {
+        return { id, ...paymeError(-31008, "Transaction cannot be cancelled") };
+      }
+
+      const reasonValue = params.reason;
+      const validReasons = new Set([1, 2, 3, 4, 5, 10]);
+      const requestedReason = typeof reasonValue === "number" && Number.isSafeInteger(reasonValue) &&
+        validReasons.has(reasonValue) ? reasonValue : null;
+      if (reasonValue !== undefined && reasonValue !== null && requestedReason === null) {
+        return { id, ...paymeError(-32602, "Invalid params") };
+      }
+      const now = new Date();
+      const reason = paymeTransactionExpired(payment, now.getTime()) ? 4 : requestedReason;
+      if (reason === null) return { id, ...paymeError(-32602, "Invalid params") };
+      const status = payment.status === "paid" ? "refunded" : "cancelled";
+      const [cancelled] = await tx
         .update(payments)
-        .set({ status: "refunded", updatedAt: new Date() })
-        .where(eq(payments.id, payment.id));
-    } else {
-      await db
-        .update(payments)
-        .set({ status: "cancelled", updatedAt: new Date() })
-        .where(eq(payments.id, payment.id));
-    }
-    const now = new Date();
-    return {
-      id,
-      result: {
-        cancel_time: Math.floor(now.getTime() / 1000),
-        transaction: txnId,
-        state: -1,
-      },
-    };
+        .set({ status, cancelledAt: now, cancelReason: reason, updatedAt: now })
+        .where(eq(payments.id, payment.id))
+        .returning();
+      return {
+        id,
+        result: {
+          cancel_time: cancelled?.cancelledAt?.getTime() ?? now.getTime(),
+          transaction: String(cancelled?.id ?? payment.id),
+          state: paymeState(status),
+        },
+      };
+    });
   }
 
   if (method === "CheckTransaction") {
-    const txnId = String(params.id);
-    const payment = await findPaymentByProviderId(txnId);
-    if (!payment) {
-      return { id, ...paymeError(-31003, "Transaction not found") };
-    }
-    const state = payment.status === "paid" ? 2 : payment.status === "cancelled" ? -1 : payment.status === "refunded" ? -2 : 1;
-    return {
-      id,
-      result: {
-        create_time: Math.floor(payment.createdAt.getTime() / 1000),
-        perform_time: 0,
-        cancel_time: 0,
-        transaction: txnId,
-        state,
-        reason: null,
-      },
-    };
+    const rawTxnId = params.id;
+    const txnId = typeof rawTxnId === "string" || typeof rawTxnId === "number" ? String(rawTxnId) : "";
+    if (!txnId || txnId.length > 128) return { id, ...paymeError(-32602, "Invalid params") };
+    return db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select()
+        .from(payments)
+        .where(and(eq(payments.provider, "payme"), eq(payments.providerTransactionId, txnId)))
+        .limit(1)
+        .for("update");
+      if (!payment) return { id, ...paymeError(-31003, "Transaction not found") };
+      if (paymeTransactionExpired(payment)) {
+        const now = new Date();
+        const [expired] = await tx
+          .update(payments)
+          .set({ status: "cancelled", cancelledAt: now, cancelReason: 4, updatedAt: now })
+          .where(and(eq(payments.id, payment.id), eq(payments.status, "pending")))
+          .returning();
+        return { id, result: paymeTransactionResult(expired ?? payment) };
+      }
+      return { id, result: paymeTransactionResult(payment) };
+    });
   }
 
   if (method === "GetStatement") {
-    const { from, to } = params;
-    const fromDate = new Date(from * 1000);
-    const toDate = new Date(to * 1000);
-    const all = await db.select().from(payments).where(eq(payments.provider, "payme"));
-    const transactions = all
-      .filter((p) => p.createdAt >= fromDate && p.createdAt <= toDate)
-      .map((p) => ({
-        id: p.providerTransactionId,
-        time: Math.floor(p.createdAt.getTime() / 1000),
-        amount: Math.round(p.amount * 100),
-        account: { profile_id: p.profileId },
-        create_time: Math.floor(p.createdAt.getTime() / 1000),
-        perform_time: 0,
-        cancel_time: 0,
-        transaction: p.providerTransactionId,
-        state: p.status === "paid" ? 2 : p.status === "cancelled" ? -1 : 1,
-        reason: null,
-      }));
-    return { id, result: { transactions } };
+    const from = params.from;
+    const to = params.to;
+    if (
+      typeof from !== "number" || !Number.isSafeInteger(from) ||
+      typeof to !== "number" || !Number.isSafeInteger(to) ||
+      from < 0 || to < from || to > 8_640_000_000_000_000 || to - from > 366 * 86_400_000
+    ) {
+      return { id, ...paymeError(-32602, "Invalid statement interval") };
+    }
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    const now = new Date();
+    const expiredBefore = new Date(now.getTime() - PAYME_TRANSACTION_TTL_MS);
+    await db
+      .update(payments)
+      .set({ status: "cancelled", cancelledAt: now, cancelReason: 4, updatedAt: now })
+      .where(and(
+        eq(payments.provider, "payme"),
+        eq(payments.status, "pending"),
+        sql`COALESCE(${payments.providerCreatedAt}, ${payments.createdAt}) <= ${expiredBefore}`
+      ));
+    const providerTime = sql`COALESCE(${payments.providerCreatedAt}, ${payments.createdAt})`;
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(and(
+        eq(payments.provider, "payme"),
+        sql`${payments.providerTransactionId} <> ''`,
+        sql`${providerTime} BETWEEN ${fromDate} AND ${toDate}`
+      ))
+      .orderBy(asc(providerTime), asc(payments.id));
+    return {
+      id,
+      result: {
+        transactions: rows.map((payment) => ({
+          id: payment.providerTransactionId,
+          time: (payment.providerCreatedAt ?? payment.createdAt).getTime(),
+          amount: Math.round(payment.amount * 100),
+          account: { profile_id: payment.profileId, [ORDER_KEY]: payment.id },
+          ...paymeTransactionResult(payment),
+        })),
+      },
+    };
   }
 
   return { id, ...paymeError(-32601, "Method not found") };

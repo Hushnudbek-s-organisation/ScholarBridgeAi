@@ -1,5 +1,6 @@
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
 import { gpaTo40Scale } from "./gpa";
+import { resolvedUsdUniversityCosts } from "./usdCosts";
 import { clamp, interpolate, meets, ratio, roundTo, saturatingCurve, shortfall } from "./scoring";
 import { canonicalSubjectTokens, subjectAffinity, subjectTokens } from "./subjectAffinity";
 
@@ -84,6 +85,41 @@ export interface StudentProfileData {
   researchPublications?: number | null;
 }
 
+export interface MatchScenario {
+  /** Hypothetical GPA already normalized to the canonical 4.0 scale. */
+  gpa4?: number | null;
+  ieltsScore?: number | null;
+  budgetAnnualUsd?: number | null;
+  targetMajor?: string | null;
+}
+
+/** Return an in-memory profile copy with validated scenario values; never persists. */
+export function applyMatchScenario(profile: StudentProfileData, scenario: MatchScenario): StudentProfileData {
+  const next = { ...profile };
+  if (Object.prototype.hasOwnProperty.call(scenario, "gpa4")) {
+    const value = scenario.gpa4;
+    if (value == null) {
+      next.gpa = null;
+      next.gpaScale = null;
+    } else if (Number.isFinite(value) && value >= 0 && value <= 4) {
+      next.gpa = value;
+      next.gpaScale = 4;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(scenario, "ieltsScore")) {
+    const value = scenario.ieltsScore;
+    next.ieltsScore = value == null ? null : Number.isFinite(value) && value >= 0 && value <= 9 ? value : profile.ieltsScore;
+  }
+  if (Object.prototype.hasOwnProperty.call(scenario, "budgetAnnualUsd")) {
+    const value = scenario.budgetAnnualUsd;
+    next.budgetAnnualUsd = value == null ? null : Number.isFinite(value) && value >= 0 ? value : profile.budgetAnnualUsd;
+  }
+  if (Object.prototype.hasOwnProperty.call(scenario, "targetMajor")) {
+    next.targetMajor = scenario.targetMajor == null ? null : scenario.targetMajor.trim().slice(0, 120) || null;
+  }
+  return next;
+}
+
 export interface UniversityData {
   id: number;
   name: string;
@@ -98,8 +134,16 @@ export interface UniversityData {
   /** Verified generic-cost columns, used when the legacy USD mirror is empty. */
   annualTuition?: number | null;
   tuitionCurrency?: string | null;
+  tuitionPeriod?: string | null;
   annualLivingEst?: number | null;
   livingCostCurrency?: string | null;
+  livingCostPeriod?: string | null;
+  accommodationCostUsd?: number | null;
+  accommodationCost?: number | null;
+  accommodationCostCurrency?: string | null;
+  accommodationCostPeriod?: string | null;
+  applicationFee?: number | null;
+  applicationFeeCurrency?: string | null;
   minGpa?: number | null;
   minIelts?: number | null;
   minSat?: number | null;
@@ -240,12 +284,6 @@ function activityFacts(profile: StudentProfileData) {
   return { activities, leadership, research, awards };
 }
 
-function usdCost(value: number | null | undefined, currency: string | null | undefined): number | null {
-  if (currency && currency.toUpperCase() !== "USD") return null;
-  if (value != null && Number.isFinite(Number(value)) && Number(value) > 0) return Number(value);
-  return null;
-}
-
 /**
  * Fit scoring — a comparison of recorded profile details with available
  * catalogue fields (including academic, subject, location, and cost data).
@@ -276,7 +314,6 @@ export type MatchDimension =
   | "standardised_test"
   | "field"
   | "cost"
-  | "income"
   | "funding_requirement"
   | "country"
   | "level"
@@ -303,6 +340,8 @@ export interface MatchComponent {
   compared: boolean;
 }
 
+export type MatchEvidenceLevel = "limited" | "partial" | "broad";
+
 export interface MatchBreakdown {
   rawScore: number;
   components: MatchComponent[];
@@ -314,6 +353,22 @@ export interface MatchBreakdown {
    */
   comparedDimensions: number;
   totalDimensions: number;
+  /** Percentage of comparable scoring dimensions backed by recorded data. */
+  evidenceCoveragePct: number;
+  /** Describes data coverage only — it is not a chance or outcome prediction. */
+  evidenceLevel: MatchEvidenceLevel;
+}
+
+export function summarizeMatchEvidence(comparedDimensions: number, totalDimensions: number): Pick<MatchBreakdown, "evidenceCoveragePct" | "evidenceLevel"> {
+  const safeTotal = Number.isFinite(totalDimensions) ? Math.max(0, totalDimensions) : 0;
+  const safeCompared = Number.isFinite(comparedDimensions) ? Math.max(0, Math.min(safeTotal, comparedDimensions)) : 0;
+  const evidenceCoveragePct = safeTotal > 0 ? Math.round((safeCompared / safeTotal) * 100) : 0;
+  const evidenceLevel: MatchEvidenceLevel = evidenceCoveragePct >= 70
+    ? "broad"
+    : evidenceCoveragePct >= 40
+      ? "partial"
+      : "limited";
+  return { evidenceCoveragePct, evidenceLevel };
 }
 
 function component(
@@ -328,11 +383,14 @@ function component(
 /** `comparedDimensions` / `totalDimensions` never count the neutral base. */
 function breakdownOf(rawScore: number, components: MatchComponent[]): MatchBreakdown {
   const evidence = components.filter((c) => c.key !== "base");
+  const comparedDimensions = evidence.filter((c) => c.compared).length;
+  const totalDimensions = evidence.length;
   return {
     rawScore,
     components,
-    comparedDimensions: evidence.filter((c) => c.compared).length,
-    totalDimensions: evidence.length,
+    comparedDimensions,
+    totalDimensions,
+    ...summarizeMatchEvidence(comparedDimensions, totalDimensions),
   };
 }
 
@@ -390,7 +448,21 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   if (uni.minIelts != null) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      components.push(component("english", 0, null, false));
+      const alternative = typeof profile.toeflScore === "number" && Number.isFinite(profile.toeflScore) && profile.toeflScore > 0
+        ? { test: "TOEFL", score: profile.toeflScore }
+        : typeof profile.duolingoScore === "number" && Number.isFinite(profile.duolingoScore) && profile.duolingoScore > 0
+          ? { test: "Duolingo English Test", score: profile.duolingoScore }
+          : null;
+      if (alternative) {
+        potentialIssues.push({
+          code: "english_alternative_recorded",
+          params: { test: alternative.test, score: alternative.score, min: uni.minIelts },
+          text: `Your profile records ${alternative.test} ${alternative.score}; the university catalogue lists IELTS ${uni.minIelts}. Accepted alternatives or waivers are not inferred — check the programme page`,
+          weight: 0,
+          points: 0,
+        });
+      }
+      components.push(component("english", 0, alternative ? "english_alternative_recorded" : null, false));
     } else {
       // 0.5 above the bar earns the full +8; each 0.5 band is worth the same
       // step, so a 7.5 against a 6.5 bar is worth strictly more than a 7.0.
@@ -477,24 +549,16 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     components.push(component("field", 0, null, false));
   }
 
-  // Financial fit — compare the full verified annual cost, not tuition alone.
-  // Generic cost columns are used only when they are explicitly in USD; a
-  // cross-currency numeric comparison would be misleading.
-  const tuition = usdCost(uni.annualTuitionUsd, "USD") ?? usdCost(uni.annualTuition, uni.tuitionCurrency);
-  const rawLiving = uni.annualLivingEstUsd ?? uni.annualLivingEst;
-  const living = usdCost(uni.annualLivingEstUsd, "USD") ?? usdCost(uni.annualLivingEst, uni.livingCostCurrency);
-  const livingCostIsKnownButNotUsd = rawLiving != null && Number(rawLiving) > 0 && living == null;
-  const totalUniCost = tuition != null && !livingCostIsKnownButNotUsd ? tuition + (living ?? 0) : null;
+  // Financial fit compares only a fully comparable published annual cost in
+  // USD. Missing or non-USD living data is unknown, never silently added as $0.
+  const { annualTuitionUsd: tuition, annualLivingEstUsd: living } = resolvedUsdUniversityCosts(uni);
+  const totalUniCost = tuition != null && living != null ? tuition + living : null;
   const budget = profile.budgetAnnualUsd != null && Number.isFinite(Number(profile.budgetAnnualUsd)) && Number(profile.budgetAnnualUsd) > 0
     ? Number(profile.budgetAnnualUsd)
     : null;
   const needsAid = profile.needScholarship === true || profile.needsFinancialAid === true || profile.requiresFullScholarship === true;
-  const familyIncome = profile.familyIncomeUsd != null && Number.isFinite(Number(profile.familyIncomeUsd)) && Number(profile.familyIncomeUsd) > 0
-    ? Number(profile.familyIncomeUsd)
-    : null;
-
   if (totalUniCost != null && budget != null) {
-    const coverage = ratio(budget, totalUniCost) ?? 0;
+    const coverage = totalUniCost === 0 ? 1 : ratio(budget, totalUniCost) ?? 0;
     if (coverage >= 1) {
       // Meeting the budget exactly is worth +8; a 40% cushion earns the full
       // +10. Everything in between is proportional.
@@ -529,39 +593,6 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     }
   } else {
     components.push(component("cost", 0, null, false));
-  }
-
-  // Family income is supporting evidence, not a replacement for the student's
-  // stated budget. When budget is absent, it still prevents the financial
-  // profile from being silently ignored: how far the recorded income covers
-  // the cost decides how many of the 6 points are lost.
-  if (totalUniCost != null && budget == null && familyIncome != null) {
-    const incomeRatio = ratio(familyIncome, totalUniCost) ?? 0;
-    if (incomeRatio >= 1) {
-      score += 3;
-      reasons.push({
-        code: "income_supports_cost",
-        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
-        text: `Recorded family income $${familyIncome.toLocaleString()}/yr covers the estimated annual cost`,
-        weight: 3,
-      });
-      components.push(component("income", 3, "income_supports_cost"));
-    } else {
-      const points = interpolate(incomeRatio, [
-        { x: 0, y: -10 },
-        { x: 1, y: -3 },
-      ]);
-      score += points;
-      potentialIssues.push({
-        code: "income_below_cost",
-        params: { income: familyIncome.toLocaleString(), cost: totalUniCost.toLocaleString() },
-        text: `Recorded family income $${familyIncome.toLocaleString()}/yr is below the estimated $${totalUniCost.toLocaleString()} annual cost`,
-        weight: Math.abs(points),
-      });
-      components.push(component("income", points, "income_below_cost"));
-    }
-  } else {
-    components.push(component("income", 0, null, false));
   }
 
   // A funding flag is a real profile constraint, not a decorative field. If
@@ -686,7 +717,21 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   if (scholarship.minIelts && scholarship.minIelts > 0) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      components.push(component("english", 0, null, false));
+      const alternative = typeof profile.toeflScore === "number" && Number.isFinite(profile.toeflScore) && profile.toeflScore > 0
+        ? { test: "TOEFL", score: profile.toeflScore }
+        : typeof profile.duolingoScore === "number" && Number.isFinite(profile.duolingoScore) && profile.duolingoScore > 0
+          ? { test: "Duolingo English Test", score: profile.duolingoScore }
+          : null;
+      if (alternative) {
+        potentialIssues.push({
+          code: "english_alternative_recorded",
+          params: { test: alternative.test, score: alternative.score, min: scholarship.minIelts },
+          text: `Your profile records ${alternative.test} ${alternative.score}; this scholarship lists IELTS ${scholarship.minIelts}. Accepted alternatives or waivers are not inferred — check the award provider`,
+          weight: 0,
+          points: 0,
+        });
+      }
+      components.push(component("english", 0, alternative ? "english_alternative_recorded" : null, false));
     } else {
       const ieltsDiff = profile.ieltsScore! - scholarship.minIelts;
       const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 10, 0) : shortfall(ieltsDiff, 0, 1.5, 20);

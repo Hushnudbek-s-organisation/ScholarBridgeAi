@@ -4,10 +4,23 @@ import { db } from "@/db";
 import { admissionOffers, applications, fundingItems, journeyDeadlines, universities } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { postAdmissionFunding } from "@/lib/journey/funding";
+import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 export const dynamic = "force-dynamic";
 
 const OFFER_STATUSES = ["pending", "accepted", "rejected", "waitlisted", "deferred"] as const;
+
+function parseOptionalUsdInteger(value: unknown): { valid: true; value: number | null } | { valid: false } {
+  if (value == null || (typeof value === "string" && value.trim() === "")) {
+    return { valid: true, value: null };
+  }
+  if (typeof value !== "number" && typeof value !== "string") return { valid: false };
+  const amount = Number(value);
+  // Database columns are integer USD values. Keep explicit zero, preserve
+  // blank as unknown, and reject malformed/out-of-range numbers.
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > 2_147_483_647) return { valid: false };
+  return { valid: true, value: amount };
+}
 
 /**
  * GET /api/offers?profileId= — Offers & Decisions (spec §23) and the
@@ -64,14 +77,23 @@ export async function GET(req: Request) {
             status: f.status as "planned" | "applied" | "awarded" | "confirmed" | "declined",
             covers: f.covers,
           }));
-        const tuition = Number(o.tuitionCommitment ?? uni?.annualTuition ?? uni?.annualTuitionUsd ?? 0);
+        const publishedTuitionUsd = uni ? resolvedUsdUniversityCosts(uni).annualTuitionUsd : null;
+        const recordedOfferTuition = o.tuitionCommitment != null && Number.isFinite(o.tuitionCommitment) && o.tuitionCommitment >= 0
+          ? o.tuitionCommitment
+          : null;
+        const tuition = recordedOfferTuition ?? publishedTuitionUsd;
         return {
           ...o,
           decidedAt: o.decidedAt ? String(o.decidedAt).slice(0, 10) : null,
           responseDeadline: o.responseDeadline ? String(o.responseDeadline).slice(0, 10) : null,
           depositDueDate: o.depositDueDate ? String(o.depositDueDate).slice(0, 10) : null,
           application: app
-            ? { ...app, deadline: app.deadline ? String(app.deadline).slice(0, 10) : null, submittedAt: app.submittedAt }
+            ? {
+                ...app,
+                deadline: app.deadline ? String(app.deadline).slice(0, 10) : null,
+                submittedAt: app.submittedAt,
+                postStudyWorkVisaYears: uni?.postStudyWorkVisaYears ?? null,
+              }
             : null,
           funding: postAdmissionFunding({
             tuition,
@@ -105,6 +127,11 @@ export async function POST(req: Request) {
   if (!Number.isInteger(applicationId) || applicationId <= 0) {
     return jsonError(400, "applicationId is required", "bad_request");
   }
+  const deposit = parseOptionalUsdInteger(b.value.depositAmount);
+  const tuition = parseOptionalUsdInteger(b.value.tuitionCommitment);
+  if (!deposit.valid || !tuition.valid) {
+    return jsonError(400, "Amounts must be non-negative whole USD values", "bad_request");
+  }
   try {
     const [app] = await db
       .select()
@@ -124,9 +151,9 @@ export async function POST(req: Request) {
         offerLetterUrl: text(b.value.offerLetterUrl, 800),
         offerLetterName: text(b.value.offerLetterName, 240),
         conditions: text(b.value.conditions, 2000),
-        depositAmount: Number(b.value.depositAmount) || null,
+        depositAmount: deposit.value,
         depositDueDate: isoDate(dateOnly(b.value.depositDueDate)),
-        tuitionCommitment: Number(b.value.tuitionCommitment) || null,
+        tuitionCommitment: tuition.value,
         notes: text(b.value.notes, 2000),
       })
       .onConflictDoUpdate({
@@ -136,9 +163,9 @@ export async function POST(req: Request) {
           decidedAt: isoDate(dateOnly(b.value.decidedAt)),
           responseDeadline: isoDate(dateOnly(b.value.responseDeadline)),
           conditions: text(b.value.conditions, 2000),
-          depositAmount: Number(b.value.depositAmount) || null,
+          depositAmount: deposit.value,
           depositDueDate: isoDate(dateOnly(b.value.depositDueDate)),
-          tuitionCommitment: Number(b.value.tuitionCommitment) || null,
+          tuitionCommitment: tuition.value,
           updatedAt: new Date(),
         },
       })
@@ -168,6 +195,16 @@ export async function PATCH(req: Request) {
       .limit(1);
     if (!offer) return jsonError(404, "Offer not found", "not_found");
 
+    const deposit = b.value.depositAmount === undefined
+      ? { valid: true as const, value: offer.depositAmount }
+      : parseOptionalUsdInteger(b.value.depositAmount);
+    const tuition = b.value.tuitionCommitment === undefined
+      ? { valid: true as const, value: offer.tuitionCommitment }
+      : parseOptionalUsdInteger(b.value.tuitionCommitment);
+    if (!deposit.valid || !tuition.valid) {
+      return jsonError(400, "Amounts must be non-negative whole USD values", "bad_request");
+    }
+
     const status = b.value.status == null ? offer.status : oneOf(b.value.status, OFFER_STATUSES, offer.status);
     const responseDeadline =
       b.value.responseDeadline === undefined
@@ -183,9 +220,9 @@ export async function PATCH(req: Request) {
         offerLetterUrl: b.value.offerLetterUrl === undefined ? offer.offerLetterUrl : text(b.value.offerLetterUrl, 800),
         offerLetterName: b.value.offerLetterName === undefined ? offer.offerLetterName : text(b.value.offerLetterName, 240),
         conditions: b.value.conditions === undefined ? offer.conditions : text(b.value.conditions, 2000),
-        depositAmount: b.value.depositAmount === undefined ? offer.depositAmount : Number(b.value.depositAmount) || null,
+        depositAmount: deposit.value,
         depositDueDate: b.value.depositDueDate === undefined ? offer.depositDueDate : isoDate(dateOnly(b.value.depositDueDate)),
-        tuitionCommitment: b.value.tuitionCommitment === undefined ? offer.tuitionCommitment : Number(b.value.tuitionCommitment) || null,
+        tuitionCommitment: tuition.value,
         notes: b.value.notes === undefined ? offer.notes : text(b.value.notes, 2000),
         updatedAt: new Date(),
       })

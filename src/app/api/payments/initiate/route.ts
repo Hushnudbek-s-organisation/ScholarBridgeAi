@@ -4,8 +4,12 @@ import { payments } from "@/db/schema";
 import {
   ORDER_KEY,
   PREMIUM_CURRENCY,
+  buildClickCheckoutUrl,
+  buildPaymeCheckoutUrl,
   paymeConfig,
   clickConfig,
+  isClickConfigured,
+  isPaymeConfigured,
   resolvePremiumPackage,
 } from "@/lib/payments";
 import { requireProfileAccess } from "@/lib/auth";
@@ -32,12 +36,30 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
+    const providerConfig = provider === "click" ? clickConfig() : paymeConfig();
+    const providerReady = provider === "click"
+      ? isClickConfigured() && Boolean(providerConfig.merchantId)
+      : isPaymeConfigured();
+    if (!providerReady) {
+      return NextResponse.json(
+        { error: `${provider} payments are not configured`, code: "payment_provider_not_configured" },
+        { status: 503 }
+      );
+    }
+
     const limit = await checkSharedRateLimit(`payments:${access.session.profile.id}`, LIMITS.payment);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     // Package + price from app_config (monthly / season / yearly).
     const pack = await resolvePremiumPackage(packageId);
     const priceUzs = pack.priceUzs;
+    const amountTiyn = priceUzs * 100;
+    if (!Number.isFinite(priceUzs) || priceUzs <= 0 || !Number.isSafeInteger(amountTiyn)) {
+      return NextResponse.json(
+        { error: "Configured payment package has an invalid amount", code: "invalid_payment_package" },
+        { status: 503 }
+      );
+    }
 
     const [payment] = await db
       .insert(payments)
@@ -53,29 +75,33 @@ export async function POST(req: Request) {
       .returning();
 
     let checkoutUrl = "";
-    let params: Record<string, any> = {};
+    let params: Record<string, unknown> = {};
 
     if (provider === "click") {
       const cfg = clickConfig();
-      params = {
-        service_id: cfg.serviceId,
-        merchant_id: cfg.merchantId,
-        merchant_user_id: cfg.merchantUserId,
-        amount: priceUzs,
-        transaction_param: payment.id,
-      };
-      checkoutUrl = `https://my.click.uz/services/pay?service_id=${cfg.serviceId}&merchant_id=${cfg.merchantId}&amount=${priceUzs}&transaction_param=${payment.id}&merchant_user_id=${cfg.merchantUserId}`;
+      const clickCheckout = buildClickCheckoutUrl({
+        serviceId: cfg.serviceId,
+        merchantId: cfg.merchantId,
+        merchantUserId: cfg.merchantUserId,
+        amountUzs: priceUzs,
+        paymentId: payment.id,
+      });
+      if (!clickCheckout) throw new Error("Configured Click checkout parameters are invalid");
+      params = clickCheckout.params;
+      checkoutUrl = clickCheckout.checkoutUrl;
     } else {
       const cfg = paymeConfig();
+      const account = { profile_id: Number(profileId), [ORDER_KEY]: payment.id };
       params = {
         merchant: cfg.merchantId,
-        amount: priceUzs * 100, // tiyn
-        // `profile_id` identifies the account; `order_id` lets the Payme
-        // merchant callback find THIS payment row, so the package the student
-        // chose (and its subscription length) survives the round trip.
-        account: { profile_id: payment.profileId, [ORDER_KEY]: payment.id },
+        amount: amountTiyn, // tiyn
+        account,
       };
-      checkoutUrl = `https://checkout.payme.uz/${cfg.merchantId}`;
+      // Payme requires the merchant, account and amount inside its documented
+      // base64 GET payload; opening only the merchant home page loses this order.
+      const paymeCheckout = buildPaymeCheckoutUrl(cfg.merchantId, amountTiyn, account);
+      if (!paymeCheckout) throw new Error("Configured Payme checkout parameters are invalid");
+      checkoutUrl = paymeCheckout;
     }
 
     return NextResponse.json({

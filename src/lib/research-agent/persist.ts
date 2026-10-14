@@ -18,7 +18,7 @@ import {
   scholarshipSources,
 } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { normalizeNameKey, normalizeUrl, toIsoDate, toNumber } from "./normalize";
+import { normalizeNameKey, normalizeUrl, normalizedScholarshipAmounts, toIsoDate, toNumber } from "./normalize";
 import { canMarkVerified } from "./validate";
 import { compareAndDecide } from "./compare";
 import { rejectSourceReason, isResearchSourceUrl } from "./urlFilter";
@@ -456,14 +456,19 @@ export async function upsertScholarship(
     // Preserve only a source-denominated USD value in the legacy USD field.
     const scholarshipSourceUrl = normalizeUrl(s.websiteUrl ?? sourceUrl);
     const [scholarshipSource] = await db.select().from(sources).where(eq(sources.url, scholarshipSourceUrl));
+    const scholarshipAmounts = normalizedScholarshipAmounts({
+      amountUsd: s.amountUsd,
+      amountOriginal: s.amountOriginal,
+      currency: s.currency,
+    });
     const [insertedScholarship] = await db.insert(scholarships).values({
       title: s.title,
       provider: s.provider ?? "Unspecified",
       country: s.country ?? "Unspecified",
       coverageType: s.coverageType ?? "Unspecified",
-      amountUsdValue: s.amountUsd ?? null,
-      awardAmount: s.amountOriginal ?? s.amountUsd ?? null,
-      awardCurrency: s.currency ?? (s.amountUsd != null ? "USD" : null),
+      amountUsdValue: scholarshipAmounts.amountUsdValue,
+      awardAmount: scholarshipAmounts.awardAmount,
+      awardCurrency: scholarshipAmounts.awardCurrency,
       awardPeriod: null,
       awardBasis: s.financialNeedBased ? "need_based" : null,
       deadline: s.deadline ?? null,

@@ -235,13 +235,16 @@ export function compareUniversities(
   if (ctx.budgetAnnualUsd != null && ctx.budgetAnnualUsd > 0) {
     const values: Record<number, string | null> = {};
     for (const u of list) {
-      const total = (u.annualTuitionUsd ?? 0) + (u.annualLivingEstUsd ?? 0);
-      values[u.id] =
-        total === 0
-          ? null
-          : total <= ctx.budgetAnnualUsd
-            ? `Within budget (${usd(ctx.budgetAnnualUsd - total)} spare)`
-            : `${usd(total - ctx.budgetAnnualUsd)} over budget`;
+      // A budget comparison requires both annual tuition and living cost in
+      // USD. One known line is not the whole budget, and NULL is not $0.
+      if (u.annualTuitionUsd == null || u.annualLivingEstUsd == null) {
+        values[u.id] = null;
+        continue;
+      }
+      const total = u.annualTuitionUsd + u.annualLivingEstUsd;
+      values[u.id] = total <= ctx.budgetAnnualUsd
+        ? `Within budget (${usd(ctx.budgetAnnualUsd - total)} spare)`
+        : `${usd(total - ctx.budgetAnnualUsd)} over budget`;
     }
     rows.push({
       key: "budgetFit",
@@ -292,5 +295,8 @@ export function compareUniversities(
     verdict = `${top.u.name} wins ${top.wins} of the ${rows.filter((r) => r.winner !== null).length} comparable measures.`;
   }
 
-  return { rows: rows.filter((r) => !r.allUnknown), scores, verdict, dataGaps };
+  // Keep the student's requested budget row even when every cost comparison
+  // is unknown; it is important to show that no complete USD totals were
+  // available rather than making the comparison silently disappear.
+  return { rows: rows.filter((r) => !r.allUnknown || r.key === "budgetFit"), scores, verdict, dataGaps };
 }

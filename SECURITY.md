@@ -44,15 +44,15 @@ Rules:
 | `SESSION_SECRET` | Signs the session cookie. **Set in production** (>= 32 chars). Generate: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `AI_KEYS_ENCRYPTION_SECRET` | AES-256-GCM key for API keys stored from the admin panel |
 | `ADMIN_PASSWORD` | Bootstrap password for the seeded admin account (>= 8 chars) |
-| `PAYME_MERCHANT_ID` + `PAYME_KEY`/`PAYME_PASSWORD` | Without them the Payme webhook answers `503` (fail closed) |
-| `CLICK_SERVICE_ID` + `CLICK_SECRET_KEY` | Without them Click callbacks are rejected (fail closed) |
+| `PAYME_MERCHANT_ID`, `PAYME_LOGIN`, and `PAYME_KEY` or `PAYME_PASSWORD` | Checkout and Payme Merchant API auth; Payme issues the Basic-auth login separately from the checkout merchant id |
+| `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`, `CLICK_SECRET_KEY` | Click SHOP API callbacks and hosted checkout; `CLICK_MERCHANT_USER_ID` is optional |
 
 Rotating `SESSION_SECRET` signs everybody out — that is the intended emergency
 lever if the secret ever leaks.
 
 ## 3. Transport & browser hardening
 
-* `src/middleware.ts` sends a **nonce-based CSP** on every HTML response
+* `src/proxy.ts` sends a **nonce-based CSP** on every HTML response
   (`script-src 'self' 'nonce-…' 'strict-dynamic'`, `object-src 'none'`,
   `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`,
   `upgrade-insecure-requests`). The nonce is generated per request and handed to
@@ -194,8 +194,9 @@ by `npm run test:security`).
   derived from `DATABASE_URL`.
 - The rate limiter is in-process memory: correct for one instance, but limits
   are per-instance if you scale horizontally (move to Redis/Postgres then).
-- Next 16 renamed `middleware.ts` → `proxy.ts`; the old name still works but
-  is deprecated (`npx @next/codemod@canary middleware-to-proxy .`).
+- The request security layer lives in `src/proxy.ts` (Next.js 16 proxy entry
+  point). Keep CSP, CSRF, size-cap and locale-routing behavior covered when
+  changing it; `npm run test:security` exercises these controls.
 
 ## 11. 2026-09 portability, ownership and AI audit
 
@@ -269,3 +270,22 @@ Result after the fixes: `OK — every non-public route refused an anonymous
 caller (401/403)` across 232 handlers, and 48 protected routes still answer a
 validation error before their auth check (not a data leak — they authorize the
 claimed id against the session — but listed by the probe for review).
+
+## 14. 2026-10 payment and dependency audit
+
+- Payme Basic authentication uses the separate `PAYME_LOGIN`; missing login or
+  secret means Payme is unconfigured. JSON-RPC callbacks, including protocol
+  errors, return HTTP 200, and account-input failures use localized Payme
+  errors. Click SHOP API callbacks accept bounded form-urlencoded bodies and
+  validate signatures before changing a payment.
+- `npm audit --omit=dev` reports **0 production vulnerabilities**. The full
+  audit reports **9 development-only findings** (4 moderate, 5 high): vulnerable
+  `braces` through the Next ESLint globbing chain and vulnerable `esbuild` from
+  Drizzle Kit's legacy `@esbuild-kit` dependency. npm currently suggests major
+  downgrades (`eslint-config-next` 14 and `drizzle-kit` 0.18); do not force those
+  incompatible downgrades. Track upstream fixes and re-run the audit after safe
+  toolchain updates.
+- The additive payment lifecycle migration is
+  `supabase/add_payment_provider_lifecycle.sql`. It has been tested only against
+  an isolated embedded database; **no live or production schema was checked or
+  changed**. Follow `DEPLOYMENT.md`'s duplicate preflight and approval steps.

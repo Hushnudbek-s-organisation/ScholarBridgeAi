@@ -47,6 +47,7 @@ import {
   FinancialPlanPanel,
   LearningProvidersPanel,
   OffersPanel,
+  PostAdmissionOfferMatrix,
   RecommendationManagerPanel,
 } from "@/components/journey/AfterAdmissionPanels";
 import {
@@ -417,7 +418,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
 
   // The list of applications the student can attach materials to. Local state
   // only — it is a view filter, never a second source of truth.
-  const [applications, setApplications] = useState<{ id: number; universityName: string; programName: string | null }[]>([]);
+  const [applications, setApplications] = useState<{ id: number; universityId: number | null; universityName: string; programName: string | null }[]>([]);
   useEffect(() => {
     if (!profileId) return;
     let live = true;
@@ -427,8 +428,9 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
         if (!live) return;
         setApplications(
           Array.isArray(d.applications)
-            ? d.applications.map((a: { id: number; universityName: string; programName: string | null }) => ({
+            ? d.applications.map((a: { id: number; universityId: number | null; universityName: string; programName: string | null }) => ({
                 id: a.id,
+                universityId: a.universityId,
                 universityName: a.universityName,
                 programName: a.programName,
               }))
@@ -443,7 +445,8 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
     };
   }, [profileId]);
 
-  const effectiveId = workspaceId ?? applications[0]?.id ?? null;
+  const effectiveId = workspaceId !== undefined ? workspaceId : applications[0]?.id ?? null;
+  const selectedApplication = applications.find((application) => application.id === effectiveId) ?? null;
   const selectApplication = useCallback(
     (id: number | null) => {
       setWorkspaceId?.(id);
@@ -512,7 +515,12 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
       )}
       {active === "documents" && (
         <div className="space-y-4">
-          <DocumentVaultPanel profileId={profile.id} onNavigateTab={navigate} />
+          <DocumentVaultPanel
+            key={`vault-${profile.id}-${effectiveId ?? "none"}`}
+            profileId={profile.id}
+            applicationId={effectiveId}
+            onNavigateTab={navigate}
+          />
           <AnswerVault activeProfile={profile} />
         </div>
       )}
@@ -526,11 +534,30 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
             onUpgrade={() => navigate("payments")}
           >
             <div className="space-y-4">
-              <AiSopStudio activeProfile={profile} />
-              <EssayRubricStudio activeProfile={profile} />
+              <AiSopStudio
+                key={`sop-${profile.id}-${effectiveId ?? "none"}`}
+                activeProfile={profile}
+                applicationId={effectiveId}
+                universityId={selectedApplication?.universityId ?? null}
+                universityName={selectedApplication?.universityName ?? null}
+                programName={selectedApplication?.programName ?? null}
+              />
+              <EssayRubricStudio
+                key={`essay-${profile.id}-${effectiveId ?? "none"}`}
+                activeProfile={profile}
+                applicationId={effectiveId}
+                universityId={selectedApplication?.universityId ?? null}
+                universityName={selectedApplication?.universityName ?? null}
+                programName={selectedApplication?.programName ?? null}
+              />
             </div>
           </Gated>
-          <RecommendationManagerPanel profileId={profile.id} />
+          <RecommendationManagerPanel
+            key={`recommendations-${profile.id}-${effectiveId ?? "none"}`}
+            profileId={profile.id}
+            applicationId={effectiveId}
+            universityName={selectedApplication?.universityName ?? null}
+          />
         </div>
       )}
       {active === "interviews" && <InterviewCenterPanel onNavigateTab={navigate} />}
@@ -564,7 +591,7 @@ export function OffersHub({ profile, pane, setPane, navigate, hidden }: HubProps
 /* =========================================================================
  * AFTER ADMISSION → Funding & Deposits
  * ====================================================================== */
-export function PostAdmissionFundingHub({ profile, navigate }: HubProps) {
+export function PostAdmissionFundingHub({ profile, navigate, workspaceId }: HubProps) {
   const t = useTranslations("hubs");
   const { label } = usePanes("post-admission-funding");
   if (!profile) return <MissingProfile />;
@@ -576,7 +603,19 @@ export function PostAdmissionFundingHub({ profile, navigate }: HubProps) {
       onPrimary={() => navigate("funding")}
       note={{ tone: "info", text: t("afterAdmissionNote") }}
     >
-      <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+      <PostAdmissionOfferMatrix
+        key={`post-admission-funding-${profile.id}-${workspaceId ?? "profile"}`}
+        profileId={profile.id}
+        onNavigateTab={navigate}
+      />
+      {workspaceId != null && (
+        <FinancialPlanPanel
+          key={`application-funding-${profile.id}-${workspaceId}`}
+          profileId={profile.id}
+          applicationId={workspaceId ?? null}
+          onNavigateTab={navigate}
+        />
+      )}
     </HubPage>
   );
 }
@@ -645,13 +684,13 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
       {active === "mentor" && (
         <div className="space-y-4">
           <AiChatMentor activeProfile={profile} />
-          <AdmissionsAdvisor activeProfile={profile} />
+          {!hidden.includes("advisor") && <AdmissionsAdvisor activeProfile={profile} />}
         </div>
       )}
       {active === "consulting" && (
         <div className="space-y-4">
           <ConsultingSection key={profile.id} activeProfile={profile} />
-          <MentorMarketplace key={profile.id} activeProfile={profile} />
+          {!hidden.includes("mentors") && <MentorMarketplace key={profile.id} activeProfile={profile} />}
         </div>
       )}
       {active === "faq" && <FaqSection />}

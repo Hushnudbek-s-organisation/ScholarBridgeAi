@@ -11,14 +11,29 @@
     "scholarshipsMetaDescription": "Browse scholarship listings. Confirm eligibility, coverage, and current deadlines with the official provider.",
     "universityHeading": "University Explorer",
     "scholarshipHeading": "Scholarships",
+    "catalogNavigation": "Catalogue navigation",
     "universitiesSummary": "Showing {from}–{to} of {total} · Page {page} of {pages}",
     "scholarshipsSummary": "Showing {from}–{to} of {total} scholarships · Page {page} of {pages}",
     "noUniversities": "No universities found.",
     "noScholarships": "No scholarships found.",
     "website": "Website",
+    "institutionType": "Institution type",
+    "annualTuition": "Annual tuition",
+    "annualLiving": "Annual living costs",
+    "minIelts": "Published IELTS minimum",
+    "postStudyWork": "Post-study work visa",
+    "perYear": "per year",
+    "year": "year",
+    "years": "years",
+    "notPublished": "Not published",
     "deadline": "Deadline: {date}",
     "viewDetails": "View details",
     "coverageNotSpecified": "Coverage not specified",
+    "scholarshipPeriodYear": "per year",
+    "scholarshipPeriodMonth": "per month",
+    "scholarshipPeriodOneTime": "one-time",
+    "scholarshipPeriodTotal": "total award",
+    "scholarshipPeriodVariable": "variable",
     "universitiesLoadError": "Universities are temporarily unavailable. Please try again later.",
     "scholarshipsLoadError": "Scholarships are temporarily unavailable. Please try again later.",
     "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying."
@@ -460,7 +475,11 @@
       "over_limit": "The draft has {words} words, above the entered limit of {limit}. Trim it to meet the prompt's stated limit.",
       "under_limit": "The draft has {words} of {limit} words (under 60% of the limit). Check whether the prompt asks for more before adding text.",
       "no_forward_look": "A future goal was not detected. Include one only if it is relevant to the prompt, and describe it in your own terms.",
-      "too_short": "This is a short draft ({words} words). Check the prompt's required length and add relevant, verified detail only if needed."
+      "too_short": "This is a short draft ({words} words). Check the prompt's required length and add relevant, verified detail only if needed.",
+      "abrupt_paragraph_flow": "Some paragraph openings do not show a detectable link to the previous idea. Check the progression; not every paragraph needs a transition word.",
+      "repeated_transition": "The same transition appears repeatedly at paragraph openings. Vary it only where that makes the connection clearer.",
+      "action_verb_balance": "The text check found more broad or weaker phrases than specific action verbs. Name what you did when accurate; keep softer wording when it is more truthful.",
+      "prompt_coverage_missing": "{element} was not detected in the draft. Check the exact prompt; this text check may miss a valid response."
     },
     "advisorTitle": "AI Admissions Advisor",
     "advisorSubtitle": "Ask anything about your applications. The advisor reads your real profile and shows fit scores — not admission probabilities.",
@@ -516,7 +535,64 @@
     "chatPrompt1": "Where can I verify current post-study work rules?",
     "chatPrompt2": "How should I request a recommendation letter from my professor?",
     "chatPrompt3": "Help me compare verified tuition data for my saved universities.",
-    "chatPrompt4": "How can I prepare for a student visa interview using official requirements?"
+    "chatPrompt4": "How can I prepare for a student visa interview using official requirements?",
+    "essayPromptLabel": "Official essay prompt (optional)",
+    "essayPromptPlaceholder": "Paste the exact prompt here… The coverage check is heuristic, so keep the original instructions in mind.",
+    "essaySubscoreFlow": "Paragraph flow",
+    "essaySubscoreAgency": "Action and ownership",
+    "essayPromptCoverageTitle": "Prompt coverage",
+    "essayPromptCoverageType": {
+      "custom_prompt": "Based on the prompt you entered",
+      "essay_type": "Based on the selected essay type"
+    },
+    "essayPromptElements": {
+      "motivation": "Motivation",
+      "preparation": "Preparation",
+      "programme_fit": "Programme fit",
+      "future_goals": "Future goals",
+      "challenge_growth": "Challenge and growth",
+      "contribution": "Contribution",
+      "financial_need": "Financial need",
+      "leadership": "Leadership",
+      "direct_response": "Direct response",
+      "evidence": "Concrete evidence / research",
+      "future_impact": "Future impact"
+    },
+    "essayPromptQuestions": {
+      "motivation": "Is your reason for applying clear?",
+      "preparation": "Do you connect relevant experience or preparation to your application?",
+      "programme_fit": "Do you explain why this programme or institution fits your goals?",
+      "future_goals": "Do you describe a relevant future goal?",
+      "challenge_growth": "Do you explain what a challenge taught you or how you grew?",
+      "contribution": "Do you describe how you hope to contribute or serve?",
+      "financial_need": "Does your response address the stated funding or financial-need question?",
+      "leadership": "Do you show a leadership example or responsibility?",
+      "direct_response": "Does the draft answer the prompt directly?"
+    },
+    "essayPromptCoverageComplete": "No missing elements were detected by this text check.",
+    "essayFlowTitle": "Paragraph flow",
+    "essayFlowSummary": "{linked} of {total} paragraph transitions have a detectable link.",
+    "essayFlowNoTransitions": "No transition or backward reference was detected; this may be fine for a short response.",
+    "essayAgencyTitle": "Action and ownership",
+    "essayActionVerbSummary": "{active} specific action verbs; {weak} broader phrases ({ratio} of detected phrases are specific).",
+    "essayActionVerbExamples": "Specific-action excerpts",
+    "essayWeakVerbExamples": "Broader-phrase excerpts",
+    "essayFlowSequenceLabel": "Detected story sequence",
+    "essayFlowSequenceUnknown": "No clear stages detected by this text check",
+    "essayFlowBacktracking": "The detected sequence moves backwards at {count} transition(s).",
+    "essayFlowStages": {
+      "motivation": "Motivation",
+      "preparation": "Academic preparation",
+      "evidence": "Concrete evidence / research",
+      "programme_fit": "Programme fit",
+      "future_impact": "Future impact"
+    },
+    "sopCopied": "Copied",
+    "sopCopyText": "Copy text",
+    "sopSaveToVersions": "Save to essay versions",
+    "sopSavingVersion": "Saving…",
+    "sopVersionSaved": "Saved to essay versions",
+    "sopSaveVersionError": "Could not save this draft as a version. Please try again."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -773,7 +849,48 @@
     "interrupted": "Playback stopped. You can continue answering.",
     "practiceHistory": "Practice history",
     "session": "Session",
-    "trendUp": "Up {delta} points over {n} sessions"
+    "trendUp": "Up {delta} points over {n} sessions",
+    "answerRubric": "Answer rubric",
+    "rubricComputed": "Computed from your transcript — the same answers always receive the same score.",
+    "rubricOverallReadiness": "Interview practice rubric",
+    "unansweredPrefix": "Not substantively answered:",
+    "turnFeedbackTitle": "Turn-by-turn coaching",
+    "turnFeedbackIntro": "These deterministic cues point to what was present in each recorded answer. They are practice feedback, not a visa decision.",
+    "turnNumber": "Answer {number}",
+    "turnQuestion": "Officer question",
+    "turnAnswer": "Your answer",
+    "turnWordCount": "{count} words",
+    "turnEvidenceTitle": "Detected evidence",
+    "turnConcernTitle": "Coaching cues",
+    "turnNoConcerns": "No specific cue detected in this answer.",
+    "turnEvidence": {
+      "purpose": "Study purpose",
+      "funding": "Funding",
+      "home_ties": "Home-country ties",
+      "specific_detail": "Specific detail"
+    },
+    "turnConcerns": {
+      "short_answer": "This answer is short; add a relevant detail if the officer asked for one.",
+      "vague_answer": "A hedging phrase was detected. State what you know clearly and acknowledge what is still unknown.",
+      "purpose_not_addressed": "The question appears to ask about study purpose; name the programme and your reason for choosing it.",
+      "funding_not_addressed": "The question appears to ask about funding; explain the source and the supporting document.",
+      "home_ties_not_addressed": "The question appears to ask about home-country plans or ties; answer it directly and truthfully.",
+      "profile_major_conflict": "This answer names a different field from the saved profile. Confirm which is current.",
+      "profile_degree_conflict": "This answer names a different degree level from the saved profile. Confirm which is current.",
+      "profile_budget_conflict": "This answer gives a budget that differs from the saved profile. Confirm the current figure.",
+      "primary_funding_omitted": "The main confirmed funding source in your profile was not identified in this answer."
+    },
+    "profileRisk": {
+      "profile_major_conflict": "Your answer names {spoken}, while your saved profile lists {profile}. Confirm which is current; these self-reported records are not verified.",
+      "profile_degree_conflict": "Your answer describes {spoken}, while your saved profile lists {profile}. Confirm the intended degree level.",
+      "profile_budget_conflict": "Your answer gives an annual budget of {spoken}, while your profile records {profile}. Confirm which figure is current.",
+      "primary_funding_omitted": "Your profile lists {source} as confirmed funding, but it was not identified in your answers. If it is still your main source, explain it and the supporting documents."
+    },
+    "riskSeverity": {
+      "high": "Priority",
+      "medium": "Review",
+      "low": "Note"
+    }
   },
   "strength": {
     "title": "Profile information coverage",
@@ -848,6 +965,8 @@
     "cvMeta": "{items, plural, one {# entry} other {# entries}} · about {pages, plural, one {# page} other {# pages}}",
     "copy": "Copy as text",
     "copied": "Copied",
+    "printSummary": "Print / save PDF",
+    "printSummaryHint": "Print your CV summary or save it as a PDF",
     "missingTitle": "Not in your profile",
     "missingNote": "These details are omitted when they are not in your profile. Add only accurate information that is relevant and that you choose or are asked to share; nothing is invented.",
     "missing": {
@@ -961,9 +1080,17 @@
     "potentialFunding": "Potential funding",
     "workRights": "Work rights",
     "notPublished": "not published in the database",
-    "publishedNote": "The number in parentheses = how many published values were used for the average. Unpublished values are never counted as zero.",
+    "publishedNote": "For tuition, living-cost, and IELTS averages, parentheses show known values / universities. Potential funding is shown only when every scholarship has a positive USD amount and the same supported award period; missing or mixed-period totals stay unknown. Unpublished values are never counted as zero.",
+    "usableAmounts": "{known}/{total} awards with a usable USD amount and period",
+    "awardPeriod": {
+      "year": "per year",
+      "month": "per month",
+      "one_time": "one-time",
+      "total": "total award"
+    },
     "compare": "Compare",
-    "noResults": "No data for the selected countries — pick from the list above."
+    "noResults": "No data for the selected countries — pick from the list above.",
+    "workRightsAverage": "Average {years} years ({count} universities published)"
   },
   "opportunities": {
     "title": "Opportunities for You",
@@ -1395,6 +1522,8 @@
     "ccNeedDepart": "Complete the departure checklist.",
     "ccContinue": "Continue {stage}",
     "ccSeeStudyPlan": "See my study plan",
+    "printSummary": "Print / save PDF",
+    "printSummaryHint": "Print this journey summary or save it as a PDF",
     "ccApplications": "Applications",
     "ccAddFirstUni": "Add your first university",
     "ccSubmittedHint": "{n} submitted",
@@ -1503,6 +1632,28 @@
     "opDepositAmount": "Deposit amount (USD)",
     "opTuitionCommitment": "Tuition commitment (USD)",
     "opTuitionHint": "Leave empty to use the university's published figure",
+    "opAmountUnknown": "Not specified",
+    "pamTitle": "Compare admission offers",
+    "pamSubtitle": "An at-a-glance comparison of recorded offer terms and published destination data.",
+    "pamLoading": "Preparing your offer comparison…",
+    "pamEmptyTitle": "No offer to compare yet",
+    "pamEmptyHint": "Record each decision in Offers & decisions. Two or more offers will appear side by side here.",
+    "pamAddOffer": "Open offers",
+    "pamMethodNote": "Net annual tuition subtracts only confirmed scholarships and financial aid from the recorded or published annual tuition. Family income, loans and unconfirmed awards are not assumed.",
+    "pamCaption": "Admission offer comparison, with one column per university",
+    "pamField": "Offer detail",
+    "pamStatus": "Decision status",
+    "pamTuition": "Annual tuition (USD)",
+    "pamConfirmedAwards": "Confirmed scholarship + aid",
+    "pamNetAnnualCost": "Net annual tuition payable",
+    "pamDeposit": "Deposit amount (USD)",
+    "pamDepositDue": "Deposit due date",
+    "pamResponseDeadline": "Offer response deadline",
+    "pamPostStudyWork": "Published post-study work",
+    "pamYear": "year",
+    "pamYears": "years",
+    "pamManageOffers": "Manage offer terms",
+    "pamRefresh": "Refresh comparison",
     "opOfferLetter": "Offer letter",
     "opOfferLetterPlaceholder": "Paste a link to the official letter",
     "opConditions": "Conditions",
@@ -1512,6 +1663,7 @@
     "lineTuition": "Tuition commitment",
     "lineScholarship": "Scholarship",
     "lineAid": "Financial aid",
+    "opOtherConfirmed": "Other confirmed funding",
     "lineDepositNow": "Deposit payable now",
     "opDueTo": "Due {date} to {payee}.",
     "opManageFunding": "Manage funding & deposit",
@@ -1551,8 +1703,13 @@
     "fpUpdateError": "Could not update",
     "fpLoading": "Working out your yearly cost…",
     "fpTitle": "My funding plan",
+    "fpPrintSummary": "Print / save PDF",
+    "fpPrintSummaryHint": "Print your financial plan or save it as a PDF",
     "fpNoApplication": "Add an application to get its published costs.",
     "fpPerYear": "Per year",
+    "fpAmountUnknown": "Not available",
+    "fpGapUnavailable": "A funding gap cannot be calculated until all required annual costs are verified.",
+    "fpUnknownCostsMessage": "Annual costs not verified: {lines}. Missing values remain unknown; they are not treated as $0.",
     "fpUnivSource": "University source",
     "fpPublishedFor": "Published costs for {name}, {city}, {country}",
     "fpEstimatedNote": "These lines are our standard estimates, not published figures: {lines}. Replace them with the real number when your university publishes one.",
@@ -1840,7 +1997,10 @@
       "other": "Other"
     },
     "ccAddAnnualCostsToCalculateGap": "Add annual study costs to calculate the gap. A zero value is not treated as a verified cost.",
-    "ccEstimatedCostNote": "Some cost lines are estimates. Review the assumptions and the university’s current official costs before relying on this figure."
+    "ccEstimatedCostNote": "Some cost lines are estimates. Review the assumptions and the university’s current official costs before relying on this figure.",
+    "dvNewDocLinksToApplication": "New documents created here will be linked to the selected application.",
+    "dvLinkToApplication": "Link to application",
+    "dvUnlinkFromApplication": "Unlink from application"
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -1853,7 +2013,13 @@
     "statMatches": "Matches",
     "statSoon": "Closing soon",
     "statApplied": "Applied",
-    "statPotential": "Applied awards (nominal)",
+    "statPotential": "Comparable applied-award total",
+    "awardPeriod": {
+      "year": "per year",
+      "month": "per month",
+      "one_time": "one-time",
+      "total": "total award"
+    },
     "viewQueue": "To review",
     "viewApplied": "Applied",
     "viewHidden": "Hidden",
@@ -3015,7 +3181,17 @@
       "funding_coverage": "Funding coverage",
       "merit": "Merit"
     },
-    "catalogueRequirementsScope": "These catalogue-level figures are not universal rules for every degree. Requirements, accepted tests, alternatives and waivers vary by programme; verify the current official page for the programme you plan to apply to."
+    "catalogueRequirementsScope": "These catalogue-level figures are not universal rules for every degree. Requirements, accepted tests, alternatives and waivers vary by programme; verify the current official page for the programme you plan to apply to.",
+    "exTypeAll": "All university types",
+    "exTypePublic": "Public university",
+    "exTypePrivate": "Private university",
+    "exEvidenceCoverage": "Evidence {percent}% · {compared}/{total}",
+    "exEvidenceDisclaimer": "Coverage of profile and catalogue dimensions with comparable recorded data. It is not admission odds or an outcome prediction.",
+    "exEvidenceLevel": {
+      "limited": "Limited coverage",
+      "partial": "Partial coverage",
+      "broad": "Broad coverage"
+    }
   },
   "recommend": {
     "title": "Program Recommender",
@@ -3165,6 +3341,7 @@
     "courses": "Courses"
   },
   "hubs": {
+    "breadcrumbLabel": "Breadcrumb",
     "introUniversities": "Find where you could study. Start from a subject or a career, or from a university you already have in mind. Program fit, eligibility, affordability and admission outlook are always shown separately — never merged into one score.",
     "introScholarships": "One place for funding. Browse the catalog or open the queue matched to your profile — every recommendation says why it matched, what you meet and what is unknown. Nothing is submitted for you.",
     "introStudyPlan": "Your plan and your tests together, so a test date and the task that prepares for it can never drift apart.",
@@ -3174,7 +3351,7 @@
     "introApplications": "One tracker and one workspace per application: status, progress, next deadline and the next useful action.",
     "introMaterials": "The reusable material behind every application: requirements, documents, saved answers, essays, recommendations and interview practice.",
     "introOffers": "Record what each university decided and work through the decision, without losing the funding or visa work that follows it.",
-    "introPostAdmissionFunding": "What you must pay after an offer — deposits and instalments — and the funding that covers them. It reuses the same budget as your Financial Plan.",
+    "introPostAdmissionFunding": "Compare your offers side by side: tuition, confirmed scholarships and aid, net annual tuition, deposit dates, response deadlines and published post-study work data.",
     "introVisa": "The visa case first, then the practical steps after it: documents, interview, flight, housing, insurance and arrival.",
     "introGuidance": "AI guidance and human consulting, kept clearly apart. AI answers are a study aid — not an official admissions decision, and never a guarantee.",
     "introCommunity": "Talk to other students who are doing this now, and take structured courses that end with a certificate.",
@@ -3534,7 +3711,23 @@
     "signalsTitle": "Positive signals",
     "noSignals": "No positive signals can be compared yet.",
     "verifyTitle": "Check with the programme",
-    "noIssues": "No mismatches found in the available catalogue fields. This is not a full eligibility check."
+    "noIssues": "No mismatches found in the available catalogue fields. This is not a full eligibility check.",
+    "scenarioTitle": "Try a what-if scenario",
+    "scenarioDescription": "Adjust hypothetical values and recalculate deterministic profile fit. This does not change or save your profile.",
+    "scenarioGpa": "Hypothetical GPA (4.0 scale)",
+    "scenarioIelts": "Hypothetical IELTS score",
+    "scenarioBudget": "Hypothetical annual budget (USD)",
+    "scenarioMajor": "Hypothetical target major",
+    "scenarioDisclaimer": "Use current official programme requirements. Accepted alternatives, eligibility, and admission outcomes are not inferred.",
+    "scenarioRun": "Recalculate scenario",
+    "scenarioRunning": "Recalculating…",
+    "scenarioReset": "Reset to profile values",
+    "scenarioError": "Could not calculate this scenario. Check the values and try again.",
+    "scenarioResult": "Scenario fit: {score}",
+    "scenarioUnknown": "A baseline score is not available for comparison.",
+    "scenarioNoChange": "No score change on the displayed scale.",
+    "scenarioDelta": "Change from current fit: {delta} points.",
+    "scenarioBreakdownTitle": "Scenario evidence breakdown"
   },
   "matchReasons": {
     "university": {
@@ -3561,7 +3754,8 @@
       "financial_plan_missing": "You marked financial aid as needed, but this university has no verified full-cost figure",
       "financial_budget_missing": "Add your annual budget so we can compare this cost with your funding plan",
       "income_below_cost": "Recorded family income ${income}/yr is below the estimated ${cost} annual cost",
-      "income_supports_cost": "Recorded family income ${income}/yr covers the estimated annual cost"
+      "income_supports_cost": "Recorded family income ${income}/yr covers the estimated annual cost",
+      "english_alternative_recorded": "Your profile records {test} {score}; the university catalogue lists IELTS {min}. Accepted alternatives or waivers are not inferred — check the programme page."
     },
     "scholarship": {
       "gpa_well_above": "Your profile GPA {gpa} is above this scholarship’s listed figure {min}; verify the award’s official conditions",
@@ -3583,11 +3777,13 @@
       "financial_need_unknown": "This award is need-based — add your financial-aid need to assess the fit",
       "full_funding_match": "Coverage appears compatible with your full-scholarship requirement",
       "full_funding_unclear": "You require full funding — this award's coverage may not cover tuition and living costs",
-      "merit_based": "Merit-based — strong academic record / publications"
+      "merit_based": "Merit-based — strong academic record / publications",
+      "english_alternative_recorded": "Your profile records {test} {score}; this scholarship lists IELTS {min}. Accepted alternatives or waivers are not inferred — check the award provider."
     }
   },
   "profile": {
     "budgetNotSet": "No budget set yet — leave empty if you do not know.",
+    "familyIncomeNotBudget": "Family income is not treated as money available for study; set an annual budget separately.",
     "close": "Close",
     "financialAidNeedQuestion": "Will you need financial aid?",
     "financialAidUnknown": "Not sure yet",
@@ -4360,6 +4556,8 @@
     "share": {
       "pageTitle": "Shared student summary",
       "pageIntro": "Read-only information the student chose to share.",
+      "printSummary": "Print / save PDF",
+      "printSummaryHint": "Print this shared summary or save it as a PDF",
       "loading": "Loading shared summary…",
       "loadErrorTitle": "Shared summary unavailable",
       "invalidLink": "This link is invalid, expired or has been turned off. Ask the student who shared it to check access.",

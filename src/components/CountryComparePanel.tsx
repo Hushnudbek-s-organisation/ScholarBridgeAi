@@ -13,8 +13,14 @@ interface Comparison {
   tuition: { avgUsd: number | null; published: number };
   living: { avgUsd: number | null; published: number };
   minIelts: { avg: number | null; published: number };
-  scholarships: { count: number; avgUsd: number | null; totalUsd: number | null };
-  workRights: null;
+  scholarships: {
+    count: number;
+    amountsPublished: number;
+    awardPeriod: "year" | "month" | "one_time" | "total" | null;
+    avgUsd: number | null;
+    totalUsd: number | null;
+  };
+  workRights: { avgYears: number; published: number } | null;
 }
 
 interface CompareData {
@@ -154,17 +160,33 @@ export function CountryComparePanel() {
                     <td className="py-2 pr-3 font-bold text-slate-800">{countryKey ? tCountry(countryKey) : c.country}</td>
                       <td className="py-2 pr-3">{c.universities}</td>
                     <td className="py-2 pr-3">
-                      {money(c.tuition.avgUsd)} <span className="text-[9px] text-slate-400">({c.tuition.published})</span>
+                      {money(c.tuition.avgUsd)} <span className="text-[9px] text-slate-400">({c.tuition.published}/{c.universities})</span>
                     </td>
                     <td className="py-2 pr-3">
-                      {money(c.living.avgUsd)} <span className="text-[9px] text-slate-400">({c.living.published})</span>
+                      {money(c.living.avgUsd)} <span className="text-[9px] text-slate-400">({c.living.published}/{c.universities})</span>
                     </td>
                     <td className="py-2 pr-3">
-                      {c.minIelts.avg ?? "—"} <span className="text-[9px] text-slate-400">({c.minIelts.published})</span>
+                      {c.minIelts.avg ?? "—"} <span className="text-[9px] text-slate-400">({c.minIelts.published}/{c.universities})</span>
                     </td>
                     <td className="py-2 pr-3">{c.scholarships.count}</td>
-                    <td className="py-2 pr-3 font-semibold text-indigo-700">{money(c.scholarships.totalUsd)}</td>
-                    <td className="py-2 text-slate-400">{t("notPublished")}</td>
+                    <td className="py-2 pr-3 font-semibold text-indigo-700">
+                      {money(c.scholarships.totalUsd)}
+                      {c.scholarships.awardPeriod && (
+                        <span className="ml-1 text-[9px] font-normal text-slate-500">
+                          / {t(`awardPeriod.${c.scholarships.awardPeriod}`)}
+                        </span>
+                      )}
+                      {c.scholarships.count > 0 && (
+                        <span className="ml-1 text-[9px] font-normal text-slate-400">
+                          ({t("usableAmounts", { known: c.scholarships.amountsPublished, total: c.scholarships.count })})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-slate-600">
+                      {c.workRights
+                        ? t("workRightsAverage", { years: c.workRights.avgYears, count: c.workRights.published })
+                        : t("notPublished")}
+                    </td>
                   </tr>
                 );
               })}

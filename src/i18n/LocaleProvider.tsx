@@ -46,10 +46,16 @@ export function LocaleProvider({
 
   // Read the persisted choice on mount (no-op when the server already did).
   useEffect(() => {
-    const stored = getLocaleCookie();
-    if (isLocale(stored) && stored !== initialLocale) {
-      setLocaleState(stored);
-    }
+    let live = true;
+    void Promise.resolve().then(() => {
+      const stored = getLocaleCookie();
+      if (live && isLocale(stored) && stored !== initialLocale) {
+        setLocaleState(stored);
+      }
+    });
+    return () => {
+      live = false;
+    };
   }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {

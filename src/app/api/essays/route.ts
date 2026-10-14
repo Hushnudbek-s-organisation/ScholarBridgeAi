@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { essayVersions } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { applications, essayVersions } from "@/db/schema";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
@@ -43,14 +43,29 @@ export async function GET(req: Request) {
     if (locked) return locked;
 
     const type = searchParams.get("essayType");
+    const applicationId = positiveInt(searchParams.get("applicationId"));
+    let universityId = positiveInt(searchParams.get("universityId"));
+    if (applicationId) {
+      const [application] = await db
+        .select({ universityId: applications.universityId })
+        .from(applications)
+        .where(and(eq(applications.id, applicationId), eq(applications.profileId, profileId)))
+        .limit(1);
+      if (!application) return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      // The owned application row, never a caller-provided ID, is authoritative.
+      universityId = application.universityId;
+    }
+    const contextFilter = universityId != null
+      ? or(eq(essayVersions.universityId, universityId), isNull(essayVersions.universityId))
+      : isNull(essayVersions.universityId);
     const rows = await db
       .select()
       .from(essayVersions)
-      .where(
-        type
-          ? and(eq(essayVersions.profileId, profileId), eq(essayVersions.essayType, parseType(type)))
-          : eq(essayVersions.profileId, profileId)
-      )
+      .where(and(
+        eq(essayVersions.profileId, profileId),
+        type ? eq(essayVersions.essayType, parseType(type)) : undefined,
+        contextFilter,
+      ))
       .orderBy(desc(essayVersions.versionNumber))
       .limit(50);
 
@@ -80,6 +95,19 @@ export async function POST(req: Request) {
     const locked = await premiumGate(access.session.profile.id, "ai_essay");
     if (locked) return locked;
 
+    const applicationId = positiveInt(body.applicationId);
+    let universityId = positiveInt(body.universityId);
+    if (applicationId) {
+      const [application] = await db
+        .select({ universityId: applications.universityId })
+        .from(applications)
+        .where(and(eq(applications.id, applicationId), eq(applications.profileId, access.targetId!)))
+        .limit(1);
+      if (!application) return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      // Resolve association from the profile-owned application, not from client input.
+      universityId = application.universityId;
+    }
+
     const content = clampString(body.content, MAX_CHARS);
     if (!content || !content.trim()) {
       return NextResponse.json({ error: "Essay text is required" }, { status: 400 });
@@ -88,6 +116,7 @@ export async function POST(req: Request) {
     const essayType = parseType(body.essayType);
     const wordLimit = parseWordLimit(body.wordLimit);
     const targetName = clampString(body.targetName, 200) || null;
+    const prompt = clampString(body.prompt, 2000) || null;
 
     // Score the text server-side. A client-supplied score would be worthless —
     // the whole point is that the rubric cannot be talked into a number.
@@ -95,12 +124,17 @@ export async function POST(req: Request) {
       type: essayType,
       wordLimit,
       targetName,
+      prompt,
     });
 
     const [last] = await db
       .select()
       .from(essayVersions)
-      .where(and(eq(essayVersions.profileId, profileId), eq(essayVersions.essayType, essayType)))
+      .where(and(
+        eq(essayVersions.profileId, profileId),
+        eq(essayVersions.essayType, essayType),
+        universityId != null ? eq(essayVersions.universityId, universityId) : isNull(essayVersions.universityId),
+      ))
       .orderBy(desc(essayVersions.versionNumber))
       .limit(1);
 
@@ -110,10 +144,13 @@ export async function POST(req: Request) {
       .insert(essayVersions)
       .values({
         profileId,
-        universityId: positiveInt(body.universityId),
+        universityId,
         essayType,
         title: clampString(body.title, 200) || `${essayType.replace(/_/g, " ")} v${versionNumber}`,
         content,
+        prompt,
+        targetName,
+        wordLimit,
         wordCount: feedback.wordCount,
         charCount: content.length,
         versionNumber,
@@ -131,7 +168,17 @@ export async function POST(req: Request) {
       version: row,
       feedback,
       // What changed against the previous draft, so the history is readable.
-      comparison: last ? compareVersions(last.content, content) : null,
+      comparison: last
+        ? compareVersions(last.content, content, {
+            previous: {
+              type: parseType(last.essayType),
+              wordLimit: last.wordLimit,
+              targetName: last.targetName,
+              prompt: last.prompt,
+            },
+            current: { type: essayType, wordLimit, targetName, prompt },
+          })
+        : null,
     });
   } catch (error) {
     console.error("POST /api/essays error:", error);
@@ -164,6 +211,7 @@ export async function PUT(req: Request) {
       type: parseType(body.essayType),
       wordLimit: parseWordLimit(body.wordLimit),
       targetName: clampString(body.targetName, 200) || null,
+      prompt: clampString(body.prompt, 2000) || null,
     });
 
     return NextResponse.json({ feedback, wordCount: countWords(content) });

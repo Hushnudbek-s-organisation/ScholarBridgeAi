@@ -36,7 +36,7 @@ interface VaultData {
   summary: { total: number; verified: number; expiring: number; expired: number };
 }
 
-export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
   const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<VaultData>(
@@ -51,7 +51,11 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
     if (!form.title.trim()) return;
     setBusy(true);
     try {
-      await sendJson("/api/vault/documents", { method: "POST", body: JSON.stringify({ profileId, ...form }) }, t("dvAddError"));
+      await sendJson(
+        "/api/vault/documents",
+        { method: "POST", body: JSON.stringify({ profileId, ...form, applicationIds: applicationId == null ? [] : [applicationId] }) },
+        t("dvAddError")
+      );
       setForm({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
       await reload();
     } catch (e) {
@@ -64,6 +68,16 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
   const patchDoc = async (body: Record<string, unknown>) => {
     await sendJson("/api/vault/documents", { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
     await reload();
+  };
+
+  const toggleApplicationLink = (doc: VaultDoc) => {
+    if (applicationId == null) return;
+    const currentIds = doc.usedBy.map((link) => link.applicationId);
+    const isLinked = currentIds.includes(applicationId);
+    const applicationIds = isLinked
+      ? currentIds.filter((id) => id !== applicationId)
+      : [...currentIds, applicationId];
+    void patchDoc({ profileId, id: doc.id, applicationIds });
   };
 
   const remove = async (id: number) => {
@@ -108,6 +122,9 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
             <input type="date" className={inputClass} value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
           </Field>
         </div>
+        {applicationId != null && (
+          <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("dvNewDocLinksToApplication")}</p>
+        )}
         <Button onClick={add} disabled={busy || !form.title.trim()}>
           <Plus className="h-3.5 w-3.5" /> {t("dvAdd")}
         </Button>
@@ -146,6 +163,19 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-1">
+                    {applicationId != null && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleApplicationLink(d)}
+                        aria-pressed={d.usedBy.some((link) => link.applicationId === applicationId)}
+                      >
+                        <Link2 className="h-3 w-3" />
+                        {d.usedBy.some((link) => link.applicationId === applicationId)
+                          ? t("dvUnlinkFromApplication")
+                          : t("dvLinkToApplication")}
+                      </Button>
+                    )}
                     {d.status !== "verified" ? (
                       <Button size="sm" variant="outline" onClick={() => void patchDoc({ profileId, id: d.id, status: "verified" })}>
                         <Check className="h-3 w-3" /> {t("dvVerify")}

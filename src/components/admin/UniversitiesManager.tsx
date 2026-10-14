@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Building2,
   Plus,
@@ -93,7 +93,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fetchUniversities = async () => {
+  const fetchUniversities = useCallback(async () => {
     try {
       const res = await fetch("/api/universities");
       const data = await res.json();
@@ -104,11 +104,11 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchUniversities();
-  }, []);
+    void Promise.resolve().then(fetchUniversities);
+  }, [fetchUniversities]);
 
   const setField = (key: keyof UniversityForm, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));

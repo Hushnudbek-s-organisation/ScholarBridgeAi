@@ -126,19 +126,22 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
   useEffect(() => {
     if (!activeProfile?.id) return;
     let live = true;
-    setLoading(true);
-    setError(null);
-    fetch("/api/profile-strength", { cache: "no-store" })
-      .then((r) => r.json().then((b) => (r.ok ? b : Promise.reject(new Error(b?.error ?? `HTTP ${r.status}`)))))
-      .then((b) => {
-        if (live) setData(b);
-      })
-      .catch((e) => {
-        if (live) setError(e.message);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
+    void Promise.resolve().then(() => {
+      if (!live) return;
+      setLoading(true);
+      setError(null);
+      return fetch("/api/profile-strength", { cache: "no-store" })
+        .then((r) => r.json().then((b) => (r.ok ? b : Promise.reject(new Error(b?.error ?? `HTTP ${r.status}`)))))
+        .then((b) => {
+          if (live) setData(b);
+        })
+        .catch((e) => {
+          if (live) setError(e.message);
+        })
+        .finally(() => {
+          if (live) setLoading(false);
+        });
+    });
     return () => {
       live = false;
     };

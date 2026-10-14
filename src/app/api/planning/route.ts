@@ -8,7 +8,8 @@ import { buildCv, renderCvText } from "@/lib/cv";
 import { localizeCv } from "@/lib/cvI18n";
 import { localeFromRequest } from "@/lib/engineText";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
-import { gpaTo4 } from "@/lib/similarProfiles";
+import { gpaTo40Scale } from "@/lib/gpa";
+import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
@@ -18,8 +19,8 @@ import { ADMISSION_PROBABILITY } from "@/lib/chancing";
  * builder and comparison table — all derived from the student's own profile
  * and saved universities.
  *
- * Nothing here is invented: an unpublished tuition stays flagged as an
- * estimate, an empty CV field is reported as missing rather than filled with
+ * Nothing here is invented: unpublished or unsupported cost amounts stay
+ * unknown, an empty CV field is reported as missing rather than filled with
  * plausible text, and a tie in the comparison declares no winner.
  */
 export async function GET(req: Request) {
@@ -60,7 +61,10 @@ export async function GET(req: Request) {
     // --- Scholarships the student has actually saved ------------------------
     const scholarshipInputs: ScholarshipInput[] = schRows.map((s) => ({
       name: s.title,
-      amountUsd: Number(s.amountUsdValue) || 0,
+      // Keep unresolved/non-USD amounts visible as unknown rather than silently
+      // dropping the saved award from the portfolio or treating it as $0.
+      amountUsd: resolvedUsdScholarshipAmount(s),
+      awardPeriod: s.awardPeriod,
       covers: /full/i.test(s.coverageType || "")
         ? "both"
         : /tuition/i.test(s.coverageType || "")
@@ -77,16 +81,20 @@ export async function GET(req: Request) {
     const target = universityId
       ? uniRows.find((u) => u.id === universityId) ?? uniRows[0]
       : uniRows[0];
+    const targetUsdCosts = target ? resolvedUsdUniversityCosts(target) : null;
     const matchProfile = await toMatchProfileWithActivities(profile);
 
     const costs = calculateCosts({
-      annualTuitionUsd: target?.annualTuitionUsd,
-      annualLivingEstUsd: target?.annualLivingEstUsd,
-      accommodationCostUsd: target?.accommodationCostUsd,
-      applicationFeeUsd: target?.applicationFee,
+      annualTuitionUsd: targetUsdCosts?.annualTuitionUsd,
+      annualLivingEstUsd: targetUsdCosts?.annualLivingEstUsd,
+      accommodationCostUsd: targetUsdCosts?.accommodationCostUsd,
+      applicationFeeUsd: targetUsdCosts?.applicationFeeUsd,
       country: target?.country,
       city: target?.city,
-      years: profile.degreeLevel === "Master" ? 2 : profile.degreeLevel === "PhD" ? 4 : 4,
+      // The selected university record has no programme-duration source in this
+      // planning flow, so keep whole-programme totals unknown instead of using
+      // a degree-level guess.
+      years: null,
       scholarships: scholarshipInputs,
       // Income is not a contribution commitment. The profile currently has no
       // explicit confirmed-contribution field, so do not invent 25% of income.
@@ -136,23 +144,26 @@ export async function GET(req: Request) {
       .groupBy(scholarships.country);
     const schCountByCountry = new Map(countryCounts.map((r) => [r.country, r.n]));
 
-    const compareList: CompareUniversity[] = uniRows.map((u) => ({
-      id: u.id,
-      name: u.name,
-      country: u.country,
-      city: u.city,
-      worldRanking: u.worldRanking,
-      acceptanceRate: u.acceptanceRate,
-      annualTuitionUsd: u.annualTuitionUsd,
-      annualLivingEstUsd: u.annualLivingEstUsd,
-      minGpa: u.minGpa,
-      minIelts: u.minIelts,
-      minSat: u.minSat,
-      postStudyWorkVisaYears: u.postStudyWorkVisaYears,
-      internationalStudentsPercentage: u.internationalStudentsPercentage,
-      programMajor: u.programMajor,
-      scholarshipCount: schCountByCountry.get(u.country) ?? 0,
-    }));
+    const compareList: CompareUniversity[] = uniRows.map((u) => {
+      const costsUsd = resolvedUsdUniversityCosts(u);
+      return {
+        id: u.id,
+        name: u.name,
+        country: u.country,
+        city: u.city,
+        worldRanking: u.worldRanking,
+        acceptanceRate: u.acceptanceRate,
+        annualTuitionUsd: costsUsd.annualTuitionUsd,
+        annualLivingEstUsd: costsUsd.annualLivingEstUsd,
+        minGpa: u.minGpa,
+        minIelts: u.minIelts,
+        minSat: u.minSat,
+        postStudyWorkVisaYears: u.postStudyWorkVisaYears,
+        internationalStudentsPercentage: u.internationalStudentsPercentage,
+        programMajor: u.programMajor,
+        scholarshipCount: schCountByCountry.get(u.country) ?? 0,
+      };
+    });
 
     // Personalized headline rows (spec §23): how THIS student fits each
     // university — profile match % and the admission estimate stay two
@@ -184,7 +195,7 @@ export async function GET(req: Request) {
     const comparison = compareUniversities(
       compareList,
       {
-        gpa4: gpaTo4(profile.gpa, profile.gpaScale),
+        gpa4: gpaTo40Scale(profile.gpa, profile.gpaScale),
         ielts: profile.ieltsScore,
         sat: profile.satScore,
         budgetAnnualUsd: profile.budgetAnnualUsd,

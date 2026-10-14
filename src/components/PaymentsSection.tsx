@@ -52,6 +52,7 @@ function formatUzs(n: number) {
 
 export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
   const t = useTranslations("payments");
+  const profileId = activeProfile?.id;
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [isPremium, setIsPremium] = useState(false);
   const [packages, setPackages] = useState<PlanPackage[]>([]);
@@ -60,12 +61,12 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
-    if (!activeProfile) return;
+    if (!profileId) return;
     setLoading(true);
     try {
       const [payRes, statusRes] = await Promise.all([
-        fetch(`/api/payments?profileId=${activeProfile.id}`),
-        fetch(`/api/premium/status?profileId=${activeProfile.id}`),
+        fetch(`/api/payments?profileId=${profileId}`),
+        fetch(`/api/premium/status?profileId=${profileId}`),
       ]);
       const payData = await payRes.json();
       const statusData = await statusRes.json();
@@ -83,10 +84,10 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile]);
+  }, [profileId]);
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(loadData);
   }, [loadData]);
 
   if (!activeProfile) {

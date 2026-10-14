@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   admissionOffers,
@@ -14,7 +14,7 @@ import {
   applicationDocumentLinks,
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
-import { computeWorkspaceProgress, WORKSPACE_TABS } from "@/lib/journey/workspace";
+import { computeWorkspaceProgress, isRecommendationPlaceholder, WORKSPACE_TABS } from "@/lib/journey/workspace";
 import { reversePlan } from "@/lib/journey/planning";
 import { summarizeStatuses } from "@/lib/calculations";
 
@@ -33,12 +33,16 @@ export async function GET(req: Request) {
   const g = await guardStudent(req, searchParams.get("profileId"));
   if (!g.ok) return g.response;
   const { profileId } = g.value;
-  const applicationId = Number(searchParams.get("applicationId"));
+  const rawApplicationId = searchParams.get("applicationId");
+  const applicationId = rawApplicationId == null ? null : Number(rawApplicationId);
+  if (rawApplicationId != null && (!Number.isInteger(applicationId) || applicationId! <= 0)) {
+    return jsonError(400, "applicationId must be a positive integer", "bad_request");
+  }
 
   try {
     const owned = and(eq(applications.profileId, profileId));
 
-    if (!Number.isInteger(applicationId) || applicationId <= 0) {
+    if (applicationId == null) {
       const rows = await db
         .select({
           id: applications.id,
@@ -63,7 +67,7 @@ export async function GET(req: Request) {
               done: applicationRequirements.status,
             })
             .from(applicationRequirements)
-            .where(inArray(applicationRequirements.applicationId, ids))
+            .where(and(eq(applicationRequirements.profileId, profileId), inArray(applicationRequirements.applicationId, ids)))
         : [];
 
       const workspaces = rows.map((r) => {
@@ -95,41 +99,63 @@ export async function GET(req: Request) {
       db
         .select()
         .from(applicationRequirements)
-        .where(eq(applicationRequirements.applicationId, applicationId))
+        .where(and(eq(applicationRequirements.profileId, profileId), eq(applicationRequirements.applicationId, applicationId)))
         .orderBy(asc(applicationRequirements.sortOrder), asc(applicationRequirements.id)),
-      db.select().from(admissionOffers).where(eq(admissionOffers.applicationId, applicationId)).limit(1),
-      db.select().from(recommendationRequests).where(eq(recommendationRequests.applicationId, applicationId)),
+      db.select().from(admissionOffers).where(and(eq(admissionOffers.profileId, profileId), eq(admissionOffers.applicationId, applicationId))).limit(1),
+      db.select().from(recommendationRequests).where(and(eq(recommendationRequests.profileId, profileId), eq(recommendationRequests.applicationId, applicationId))),
       db
         .select()
         .from(userDocuments)
         .innerJoin(applicationDocumentLinks, eq(applicationDocumentLinks.documentId, userDocuments.id))
-        .where(eq(applicationDocumentLinks.applicationId, applicationId)),
-      db.select().from(essayVersions).where(eq(essayVersions.profileId, profileId)),
-      db.select().from(fundingItems).where(eq(fundingItems.profileId, profileId)),
+        .where(and(eq(userDocuments.profileId, profileId), eq(applicationDocumentLinks.applicationId, applicationId))),
+      db.select().from(essayVersions).where(and(
+        eq(essayVersions.profileId, profileId),
+        app.universityId != null
+          ? or(eq(essayVersions.universityId, app.universityId), isNull(essayVersions.universityId))
+          : isNull(essayVersions.universityId),
+      )),
+      db.select().from(fundingItems).where(and(eq(fundingItems.profileId, profileId), eq(fundingItems.applicationId, applicationId))),
       db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
-      db.select().from(journeyDeadlines).where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false))),
+      db.select().from(journeyDeadlines).where(and(
+        eq(journeyDeadlines.profileId, profileId),
+        eq(journeyDeadlines.entityType, "application"),
+        eq(journeyDeadlines.entityId, applicationId),
+        eq(journeyDeadlines.isCompleted, false),
+      )),
     ]);
 
     const progress = computeWorkspaceProgress(
-      requirements.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired })),
+      requirements.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired, linkedType: r.linkedType })),
       Object.fromEntries(requirements.map((r) => [r.itemKey, r.title])),
       {
         recommendationsSubmitted: recs.filter((r) => r.status === "submitted").length,
         recommendationsTotal: recs.length,
+        applicationFeePaid: app.applicationFeePaid,
         submitted: !!app.submittedAt,
       }
     );
 
     // ---- Final submission checklist (spec §22) -----------------------------
-    const feeItem = requirements.find((r) => r.itemKey === "application.fee");
+    const feeItem = requirements.find((r) => r.itemKey === "application.fee" && r.isRequired);
+    const requiredRows = requirements.filter((r) => r.isRequired);
+    const isDone = (r: (typeof requirements)[number]) => r.status === "done" || r.status === "not_required";
+    const isTrackedRecommendationPlaceholder = (r: (typeof requirements)[number]) => isRecommendationPlaceholder({
+      key: r.itemKey,
+      section: r.section,
+      linkedType: r.linkedType,
+    });
+    const countedRequiredRows = requiredRows.filter((r) => !(recs.length > 0 && isTrackedRecommendationPlaceholder(r)));
+    const feeDone = !feeItem || app.applicationFeePaid || isDone(feeItem);
+    const recommendationRowsDone = countedRequiredRows.filter((r) => r.section === "recommendations").every(isDone);
+    const recommendationsSubmitted = recs.every((r) => r.status === "submitted");
     const submissionChecklist = [
-      { key: "documents", label: "Required documents", ok: requirements.filter((r) => r.section === "documents" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "essays", label: "Required essays", ok: requirements.filter((r) => r.section === "essays" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "recommendations", label: "Recommendations", ok: recs.length === 0 || recs.every((r) => r.status === "submitted") },
-      { key: "tests", label: "Tests", ok: requirements.filter((r) => r.section === "testing" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "finance", label: "Financial forms", ok: requirements.filter((r) => r.section === "finance" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "fee", label: "Application fee", ok: app.applicationFeePaid || !feeItem },
-      { key: "final", label: "Final review", ok: progress.pct >= 100 },
+      { key: "documents", label: "Required documents", ok: requiredRows.filter((r) => r.section === "documents").every(isDone) },
+      { key: "essays", label: "Required essays", ok: requiredRows.filter((r) => r.section === "essays").every(isDone) },
+      { key: "recommendations", label: "Recommendations", ok: recommendationsSubmitted && recommendationRowsDone },
+      { key: "tests", label: "Tests", ok: requiredRows.filter((r) => r.section === "testing" || r.section === "english").every(isDone) },
+      { key: "finance", label: "Financial forms", ok: requiredRows.filter((r) => r.section === "finance").every(isDone) },
+      { key: "fee", label: "Application fee", ok: feeDone },
+      { key: "requirements", label: "Required checklist tracked and complete", ok: requirements.length > 0 && countedRequiredRows.filter((r) => r.itemKey !== "application.fee").every(isDone) },
     ];
 
     const deadline = app.deadline ? String(app.deadline).slice(0, 10) : null;
@@ -186,7 +212,7 @@ export async function GET(req: Request) {
         .map((d) => ({ id: d.id, title: d.title, dueDate: String(d.dueDate).slice(0, 10), kind: d.kind })),
       offer: offers[0] ?? null,
       submissionChecklist,
-      readyToSubmit: submissionChecklist.every((c) => c.ok),
+      readyToSubmit: progress.readyToSubmit,
       reversePlan: deadline ? reversePlan(deadline, "application") : [],
     });
   } catch (err) {
@@ -216,17 +242,48 @@ export async function PATCH(req: Request) {
 
     // ---- Mark as submitted (spec §22) ------------------------------------
     if (b.value.markSubmitted) {
-      const open = await db
-        .select()
-        .from(applicationRequirements)
-        .where(and(eq(applicationRequirements.applicationId, id), eq(applicationRequirements.isRequired, true)));
-      const outstanding = open.filter((r) => r.status !== "done" && r.status !== "not_required");
-      if (outstanding.length > 0) {
+      const [requirements, recs] = await Promise.all([
+        db.select().from(applicationRequirements).where(and(
+          eq(applicationRequirements.profileId, profileId),
+          eq(applicationRequirements.applicationId, id),
+        )),
+        db.select().from(recommendationRequests).where(and(
+          eq(recommendationRequests.profileId, profileId),
+          eq(recommendationRequests.applicationId, id),
+        )),
+      ]);
+      const gate = computeWorkspaceProgress(
+        requirements.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired, linkedType: r.linkedType })),
+        {},
+        {
+          recommendationsTotal: recs.length,
+          recommendationsSubmitted: recs.filter((r) => r.status === "submitted").length,
+          applicationFeePaid: app.applicationFeePaid,
+        },
+      );
+      if (!gate.readyToSubmit) {
+        const feeItem = requirements.find((r) => r.itemKey === "application.fee" && r.isRequired);
+        const outstanding = [
+          ...requirements
+            .filter((r) => r.isRequired && r.itemKey !== "application.fee" && !(recs.length > 0 && isRecommendationPlaceholder({
+              key: r.itemKey,
+              section: r.section,
+              linkedType: r.linkedType,
+            })) && r.status !== "done" && r.status !== "not_required")
+            .map((r) => ({ id: r.id, title: r.title, section: r.section })),
+          ...recs
+            .filter((r) => r.status !== "submitted")
+            .map((r) => ({ id: r.id, title: `Recommendation from ${r.recommenderName}`, section: "recommendations" })),
+          ...(feeItem && !app.applicationFeePaid && feeItem.status !== "done" && feeItem.status !== "not_required"
+            ? [{ id: feeItem.id, title: feeItem.title, section: feeItem.section }]
+            : []),
+          ...(requirements.length === 0 ? [{ id: 0, title: "No tracked requirements exist for this application", section: "requirements" }] : []),
+        ];
         return NextResponse.json(
           {
-            error: `${outstanding.length} required item(s) are still open.`,
+            error: gate.blockers.join("; ") || "The application is not ready to submit.",
             code: "not_ready",
-            outstanding: outstanding.map((r) => ({ id: r.id, title: r.title, section: r.section })),
+            outstanding,
           },
           { status: 409 }
         );

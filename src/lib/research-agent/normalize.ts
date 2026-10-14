@@ -28,6 +28,34 @@ export function normalizeCurrency(c: string | undefined | null): string | null {
   return /^(USD|GBP|EUR|CHF|CAD|AUD|HKD|SGD|JPY|KRW|UZS|NZD|CNY|INR)$/.test(up) ? up : null;
 }
 
+export interface NormalizedScholarshipAmounts {
+  amountUsdValue: number | null;
+  awardAmount: number | null;
+  awardCurrency: string | null;
+}
+
+/** Normalize extracted scholarship amounts without inventing a conversion. */
+export function normalizedScholarshipAmounts(input: {
+  amountUsd?: unknown;
+  amountOriginal?: unknown;
+  currency?: string | null;
+}): NormalizedScholarshipAmounts {
+  const amountUsd = toNumber(input.amountUsd);
+  const amountOriginal = toNumber(input.amountOriginal);
+  const sourceUsdAmount = amountUsd != null && amountUsd >= 0 ? amountUsd : null;
+  const originalAmount = amountOriginal != null && amountOriginal >= 0 ? amountOriginal : null;
+  const amountIsSourceUsd = input.currency == null || normalizeCurrency(input.currency) === "USD";
+  const usableUsdAmount = amountIsSourceUsd ? sourceUsdAmount : null;
+  const awardAmount = originalAmount ?? usableUsdAmount;
+  const awardCurrency = originalAmount != null
+    ? input.currency ?? null
+    : usableUsdAmount != null
+      ? "USD"
+      : input.currency ?? null;
+  const amountUsdValue = normalizeCurrency(awardCurrency) === "USD" ? awardAmount : null;
+  return { amountUsdValue, awardAmount, awardCurrency };
+}
+
 export function toNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {

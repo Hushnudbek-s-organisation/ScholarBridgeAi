@@ -120,6 +120,10 @@ const CURATED_INDEXES: Record<string, string> = {
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_program_requirements_program_year ON program_requirements (program_id, academic_year) WHERE academic_year IS NOT NULL",
   ownership_transfers_one_open:
     "CREATE UNIQUE INDEX IF NOT EXISTS ownership_transfers_one_open ON ownership_transfers ((true)) WHERE status IN ('pending', 'accepted')",
+  uq_payments_provider_transaction:
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_provider_transaction ON payments (provider, provider_transaction_id) WHERE provider_transaction_id <> ''",
+  uq_subscriptions_payment_id:
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_payment_id ON subscriptions (payment_id) WHERE payment_id IS NOT NULL",
 };
 
 // CHECK constraints by table (drizzle exposes them only as opaque chunks in

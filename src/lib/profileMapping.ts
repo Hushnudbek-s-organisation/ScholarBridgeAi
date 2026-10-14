@@ -41,7 +41,13 @@ type UniversityMappingRow = Pick<
   | "websiteUrl"
   | "imageUrl"
 > &
-  Partial<Pick<UniversityRow, "annualTuition" | "tuitionCurrency" | "annualLivingEst" | "livingCostCurrency">>;
+  Partial<Pick<
+    UniversityRow,
+    | "annualTuition" | "tuitionCurrency" | "tuitionPeriod"
+    | "annualLivingEst" | "livingCostCurrency" | "livingCostPeriod"
+    | "accommodationCostUsd" | "accommodationCost" | "accommodationCostCurrency" | "accommodationCostPeriod"
+    | "applicationFee" | "applicationFeeCurrency"
+  >>;
 
 /**
  * `student_profiles` → chancing profile.
@@ -180,8 +186,16 @@ export function toUniversityData(row: UniversityMappingRow): UniversityData {
     annualLivingEstUsd: row.annualLivingEstUsd,
     annualTuition: row.annualTuition != null ? Number(row.annualTuition) : null,
     tuitionCurrency: row.tuitionCurrency,
+    tuitionPeriod: row.tuitionPeriod,
     annualLivingEst: row.annualLivingEst != null ? Number(row.annualLivingEst) : null,
     livingCostCurrency: row.livingCostCurrency,
+    livingCostPeriod: row.livingCostPeriod,
+    accommodationCostUsd: row.accommodationCostUsd,
+    accommodationCost: row.accommodationCost != null ? Number(row.accommodationCost) : null,
+    accommodationCostCurrency: row.accommodationCostCurrency,
+    accommodationCostPeriod: row.accommodationCostPeriod,
+    applicationFee: row.applicationFee,
+    applicationFeeCurrency: row.applicationFeeCurrency,
     minGpa: row.minGpa,
     minIelts: row.minIelts,
     minSat: row.minSat,

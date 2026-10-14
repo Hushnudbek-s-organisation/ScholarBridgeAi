@@ -6,11 +6,14 @@ import { calculateScholarshipMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
+import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { guardStudent, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
 import {
   autopilotPriority,
   autopilotTags,
+  commonScholarshipAwardPeriod,
   similarScholarships,
+  totalComparableAwardValue,
   type AutopilotScholarship,
 } from "@/lib/growth/logic";
 
@@ -35,7 +38,7 @@ export async function GET(req: Request) {
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
     if (!profile) return jsonError(404, "Profile not found", "not_found");
     const [rows, decisions, saved] = await Promise.all([
-      db.select().from(scholarships),
+      db.select().from(scholarships).where(eq(scholarships.isActive, true)),
       db.select().from(scholarshipDecisions).where(eq(scholarshipDecisions.profileId, profileId)),
       db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
     ]);
@@ -53,7 +56,8 @@ export async function GET(req: Request) {
         provider: s.provider,
         country: s.country,
         coverageType: s.coverageType,
-        amountUsdValue: s.amountUsdValue,
+        amountUsdValue: resolvedUsdScholarshipAmount(s),
+        awardPeriod: s.awardPeriod,
         deadlineDate: s.deadlineDate || null,
         degreeLevels: s.degreeLevels,
         eligibleMajors: s.eligibleMajors,
@@ -89,6 +93,9 @@ export async function GET(req: Request) {
       similarity: x.similarity,
     }));
 
+    const potentialUsd = totalComparableAwardValue(applied);
+    const potentialPeriod = commonScholarshipAwardPeriod(applied);
+
     return NextResponse.json(
       {
         queue,
@@ -101,7 +108,8 @@ export async function GET(req: Request) {
           hidden: hidden.length,
           closingSoon: queue.filter((s) => s.tags.closingSoon).length,
           reopening: queue.filter((s) => s.tags.reopens).length,
-          potentialUsd: applied.reduce((sum, s) => sum + (s.amountUsdValue ?? 0), 0),
+          potentialUsd,
+          potentialPeriod,
         },
       },
       { headers: { "Cache-Control": "no-store" } }

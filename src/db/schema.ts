@@ -398,29 +398,48 @@ export const certificates = pgTable("certificates", {
 // ---------------------------------------------------------------------------
 // 3. PAYMENTS (Payme + Click) & SUBSCRIPTIONS
 // ---------------------------------------------------------------------------
-export const payments = pgTable("payments", {
-  id: serial("id").primaryKey(),
-  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
-  provider: text("provider").notNull(),
-  providerTransactionId: text("provider_transaction_id").notNull().default(""),
-  amount: doublePrecision("amount").notNull(),
-  currency: text("currency").notNull().default("UZS"),
-  status: text("status").notNull().default("pending"),
-  purpose: text("purpose").notNull().default("subscription"),
-  relatedEntityId: integer("related_entity_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const payments = pgTable(
+  "payments",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "set null" }),
+    provider: text("provider").notNull(),
+    providerTransactionId: text("provider_transaction_id").notNull().default(""),
+    amount: doublePrecision("amount").notNull(),
+    currency: text("currency").notNull().default("UZS"),
+    status: text("status").notNull().default("pending"),
+    purpose: text("purpose").notNull().default("subscription"),
+    relatedEntityId: integer("related_entity_id"),
+    // Payme's own `time` value (milliseconds) for Merchant API timeout and GetStatement reconciliation.
+    providerCreatedAt: timestamp("provider_created_at"),
+    performedAt: timestamp("performed_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: integer("cancel_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_payments_provider_transaction").on(table.provider, table.providerTransactionId)
+      .where(sql`${table.providerTransactionId} <> ''`),
+  ]
+);
 
-export const subscriptions = pgTable("subscriptions", {
-  id: serial("id").primaryKey(),
-  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
-  plan: text("plan").notNull().default("premium"),
-  status: text("status").notNull().default("active"),
-  currentPeriodEnd: timestamp("current_period_end").notNull(),
-  paymentId: integer("payment_id").references(() => payments.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+    plan: text("plan").notNull().default("premium"),
+    status: text("status").notNull().default("active"),
+    currentPeriodEnd: timestamp("current_period_end").notNull(),
+    paymentId: integer("payment_id").references(() => payments.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_subscriptions_payment_id").on(table.paymentId)
+      .where(sql`${table.paymentId} IS NOT NULL`),
+  ]
+);
 
 // ---------------------------------------------------------------------------
 // 4. REFERRALS & GAMIFICATION
@@ -632,6 +651,10 @@ export const essayVersions = pgTable(
     essayType: text("essay_type").notNull().default("sop"), // sop | personal_statement | why_us | supplemental | scholarship
     title: text("title").notNull().default(""),
     content: text("content").notNull().default(""),
+    /** The original prompt and scoring context used for this deterministic version. */
+    prompt: text("prompt"),
+    targetName: text("target_name"),
+    wordLimit: integer("word_limit"),
     wordCount: integer("word_count").notNull().default(0),
     charCount: integer("char_count").notNull().default(0),
     versionNumber: integer("version_number").notNull().default(1),

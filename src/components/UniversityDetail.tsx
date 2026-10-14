@@ -29,6 +29,8 @@ import { formatMoney, formatCount, formatNumber } from "@/lib/format";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { isStaleVerified } from "@/lib/provenance";
 import { AppNote } from "@/components/AppNote";
+import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
+import type { MatchBreakdown } from "@/lib/matching";
 
 interface UniversityDetailData {
   id: number;
@@ -68,6 +70,7 @@ interface UniversityDetailData {
     score: number;
     reasons: string[];
     issues: string[];
+    breakdown: MatchBreakdown;
   } | null;
 }
 
@@ -437,6 +440,12 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                     {t("fitNotChance")}
                     {match.reasons[0] ? ` ${match.reasons[0]}` : ""}
                   </p>
+                  <MatchEvidenceBadge
+                    comparedDimensions={match.breakdown.comparedDimensions}
+                    totalDimensions={match.breakdown.totalDimensions}
+                    evidenceCoveragePct={match.breakdown.evidenceCoveragePct}
+                    evidenceLevel={match.breakdown.evidenceLevel}
+                  />
                 </div>
               )}
               <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">

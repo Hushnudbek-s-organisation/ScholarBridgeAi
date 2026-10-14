@@ -69,7 +69,7 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
   }, [courseId, profileId]);
 
   useEffect(() => {
-    loadDetail();
+    void Promise.resolve().then(loadDetail);
   }, [loadDetail]);
 
   const selectedLesson =

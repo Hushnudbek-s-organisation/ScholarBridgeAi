@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { applicationOutcomes, applications, studentProfiles, universities } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
+import { gpaTo40Scale } from "@/lib/gpa";
 import {
   findSimilarProfiles,
   gpaTo4,
@@ -37,7 +38,11 @@ export async function GET(req: Request) {
     }
 
     const me: ProfileVector = {
-      gpa4: gpaTo4(profile.gpa, profile.gpaScale),
+      // The current profile follows the app-wide canonical policy: scale-less
+      // values at or below 4.0 can be compared; larger unscaled values stay
+      // unknown. Historical snapshots remain stricter and require an explicit
+      // valid scale so imported records cannot inherit today's assumptions.
+      gpa4: gpaTo40Scale(profile.gpa, profile.gpaScale),
       ielts: profile.ieltsScore,
       toefl: profile.toeflScore,
       sat: profile.satScore,

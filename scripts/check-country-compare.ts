@@ -31,18 +31,18 @@ function section(title: string) {
 
 // ---------------------------------------------------------------------------
 const unis: UniInput[] = [
-  { country: "Germany", annualTuitionUsd: 1500, annualLivingEstUsd: 11000, minIelts: 6.5 },
-  { country: "Germany", annualTuitionUsd: 0, annualLivingEstUsd: 10000, minIelts: 7.0 },
+  { country: "Germany", annualTuitionUsd: 1500, annualLivingEstUsd: 11000, minIelts: 6.5, postStudyWorkVisaYears: 18 },
+  { country: "Germany", annualTuitionUsd: 0, annualLivingEstUsd: 10000, minIelts: 7.0, postStudyWorkVisaYears: null },
   { country: "Germany", annualTuitionUsd: null, annualLivingEstUsd: null, minIelts: null },
   { country: "USA", annualTuitionUsd: 35000, annualLivingEstUsd: 15000, minIelts: 6.5 },
   { country: "Hungary", annualTuitionUsd: 4000, annualLivingEstUsd: null, minIelts: 5.5 },
 ];
 
 const schs: SchInput[] = [
-  { country: "Germany", amountUsdValue: 12000 },
-  { country: "Germany", amountUsdValue: 9000 },
-  { country: "USA", amountUsdValue: 30000 },
-  { country: "Hungary", amountUsdValue: 0 },
+  { country: "Germany", amountUsdValue: 12000, awardPeriod: "total" },
+  { country: "Germany", amountUsdValue: 9000, awardPeriod: "total" },
+  { country: "USA", amountUsdValue: 30000, awardPeriod: "year" },
+  { country: "Hungary", amountUsdValue: 0, awardPeriod: "total" },
 ];
 
 section("1. Averages use only published values");
@@ -55,6 +55,16 @@ check("living average", de.living.avgUsd === 10500, `got ${de.living.avgUsd}`);
 check("IELTS average keeps one decimal", de.minIelts.avg === 6.8, `got ${de.minIelts.avg}`);
 check("scholarship total", de.scholarships.totalUsd === 21000, `got ${de.scholarships.totalUsd}`);
 check("scholarship average", de.scholarships.avgUsd === 10500, `got ${de.scholarships.avgUsd}`);
+check("known award amount count is reported", de.scholarships.amountsPublished === 2);
+check("scholarship comparison preserves its common award period", de.scholarships.awardPeriod === "total");
+const mixedPeriods = compareCountries("Germany", unis, [
+  { country: "Germany", amountUsdValue: 12000, awardPeriod: "year" },
+  { country: "Germany", amountUsdValue: 9000, awardPeriod: "month" },
+]);
+check("mixed scholarship periods are not summed or averaged", mixedPeriods.scholarships.totalUsd === null && mixedPeriods.scholarships.avgUsd === null && mixedPeriods.scholarships.awardPeriod === null);
+const partialAwards = compareCountries("Germany", unis, [...schs, { country: "Germany", amountUsdValue: null, awardPeriod: "total" }]);
+check("partial scholarship amounts do not masquerade as a country total", partialAwards.scholarships.totalUsd === null);
+check("partial scholarship comparison discloses known and total counts", partialAwards.scholarships.amountsPublished === 2 && partialAwards.scholarships.count === 3);
 check("zero-amount scholarship is not funded money", compareCountries("Hungary", unis, schs).scholarships.totalUsd === null);
 
 section("2. Unknown and empty countries are safe, not invented");
@@ -69,9 +79,13 @@ section("3. Case-insensitive matching");
 
 check("germany matches Germany", compareCountries("germany", unis, schs).universities === 3);
 
-section("4. Work rights are never invented");
+section("4. Post-study work data uses published values only");
 
-check("workRights is always null", de.workRights === null && unknown.workRights === null);
+check("published work-visa years are averaged and counted", de.workRights?.avgYears === 18 && de.workRights.published === 1);
+check("countries without published work-visa years remain unknown", unknown.workRights === null);
+check("a zero-year published value is still a known value", compareCountries("Zero Country", [
+  { country: "Zero Country", postStudyWorkVisaYears: 0 },
+], []).workRights?.avgYears === 0);
 
 section("5. Country list for the picker");
 
