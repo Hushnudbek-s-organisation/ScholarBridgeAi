@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { dictionaries } from "@/i18n/messages";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
@@ -11,6 +12,7 @@ import { formatMessage } from "@/i18n/formatMessage";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { scholarships as scholarshipsTable } from "@/db/schema";
+import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -38,6 +40,7 @@ interface ScholarshipRow {
   country: string;
   coverage_type: string;
   amount_usd_value: number | null;
+  award_period: string | null;
   deadline: string | null;
   website_url: string | null;
 }
@@ -51,6 +54,17 @@ function formatDate(value: string, locale: string): string {
   const parsed = new Date(`${value}T12:00:00Z`);
   if (!Number.isFinite(parsed.getTime())) return value;
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
+}
+
+function awardPeriodLabel(period: string | null, copy: typeof dictionaries.en.publicCatalog): string | null {
+  switch (period) {
+    case "year": return copy.scholarshipPeriodYear;
+    case "month": return copy.scholarshipPeriodMonth;
+    case "one_time": return copy.scholarshipPeriodOneTime;
+    case "total": return copy.scholarshipPeriodTotal;
+    case "variable": return copy.scholarshipPeriodVariable;
+    default: return null;
+  }
 }
 
 export default async function ScholarshipsPage({
@@ -85,6 +99,9 @@ export default async function ScholarshipsPage({
         country: scholarshipsTable.country,
         coverageType: scholarshipsTable.coverageType,
         amountUsdValue: scholarshipsTable.amountUsdValue,
+        awardAmount: scholarshipsTable.awardAmount,
+        awardCurrency: scholarshipsTable.awardCurrency,
+        awardPeriod: scholarshipsTable.awardPeriod,
         deadline: scholarshipsTable.deadline,
         websiteUrl: scholarshipsTable.websiteUrl,
       })
@@ -99,7 +116,8 @@ export default async function ScholarshipsPage({
       provider: scholarship.provider,
       country: scholarship.country,
       coverage_type: scholarship.coverageType,
-      amount_usd_value: scholarship.amountUsdValue,
+      amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
+      award_period: scholarship.awardPeriod,
       deadline: scholarship.deadline,
       website_url: scholarship.websiteUrl,
     }));
@@ -108,7 +126,8 @@ export default async function ScholarshipsPage({
     console.error("Scholarship catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
       <LocaleProvider initialLocale={locale}>
-        <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <PublicCatalogHeader />
+        <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
             <h1 className="text-lg font-bold text-red-900">{copy.scholarshipHeading}</h1>
             <p className="mt-2 text-sm text-red-700">{copy.scholarshipsLoadError}</p>
@@ -140,7 +159,8 @@ export default async function ScholarshipsPage({
 
   return (
     <LocaleProvider initialLocale={locale}>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <PublicCatalogHeader />
+      <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <header className="mb-6">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             <Award className="h-6 w-6 shrink-0 text-amber-500" aria-hidden />
@@ -187,6 +207,11 @@ export default async function ScholarshipsPage({
                   {typeof scholarship.amount_usd_value === "number" && (
                     <p className="break-words font-semibold text-emerald-800">
                       {amount.format(scholarship.amount_usd_value)}
+                      {awardPeriodLabel(scholarship.award_period, copy) && (
+                        <span className="font-normal text-emerald-700">
+                          {" · "}{awardPeriodLabel(scholarship.award_period, copy)}
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>

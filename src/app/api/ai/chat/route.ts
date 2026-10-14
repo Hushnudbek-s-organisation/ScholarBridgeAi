@@ -44,7 +44,6 @@ export async function POST(req: Request) {
 - GPA: ${profile.gpa}/${profile.gpaScale}
 - IELTS/TOEFL: ${profile.ieltsScore || profile.toeflScore || "Not set"}
 - Budget: ${profile.budgetAnnualUsd == null ? "Not set" : "$" + profile.budgetAnnualUsd.toLocaleString("en-US") + "/year"}
-- Family income: ${profile.familyIncomeUsd == null ? "Not set" : "$" + profile.familyIncomeUsd.toLocaleString("en-US") + "/year"}
 - Financial aid needed: ${profile.needsFinancialAid === true || profile.needScholarship === true ? "Yes" : profile.needsFinancialAid === false ? "No (explicitly stated)" : "Not recorded"}
 - Full scholarship required: ${profile.requiresFullScholarship === true ? "Yes" : profile.requiresFullScholarship === false ? "No (explicitly stated)" : "Not recorded"}
 - Countries: ${profile.preferredCountries}
@@ -54,7 +53,7 @@ export async function POST(req: Request) {
 
     const systemInstruction = `${languageInstruction}You are ScholarBridgeAI, an expert, encouraging, and knowledgeable study-abroad counselor.
 You guide students on international university selection, scholarships (Fulbright, Chevening, DAAD, Erasmus, etc.), SOP writing, LOR requests, IELTS/GRE strategy, post-study work visas (OPT, PGWP, UK Graduate Visa, Germany Job Seeker), and financial proof.
-Be concise and practical.
+Be concise and practical. For affordability, use only an explicitly recorded annual budget or confirmed funding items; never treat household/family income as an available contribution or a substitute budget. Missing costs, unsupported currencies, eligibility facts, and deadlines must remain unknown rather than being guessed.
 FORMAT RULES (follow exactly):
 - Plain markdown only: one short heading (## or ###), bold for key terms, short bullet points.
 - NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences.

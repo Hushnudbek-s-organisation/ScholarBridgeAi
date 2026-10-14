@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { AppNote } from "@/components/AppNote";
+import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
+import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
+import type { MatchBreakdown } from "@/lib/matching";
 
 export interface Scholarship {
   id: number;
@@ -45,6 +48,7 @@ export interface Scholarship {
   requirements: string;
   websiteUrl: string;
   matchScore?: number;
+  matchBreakdown?: MatchBreakdown | null;
   isEligible?: boolean;
   // Why this match (spec §22)
   matchReasons?: string[];
@@ -325,12 +329,22 @@ export function ScholarshipHub({
                       // This number is a FIT/match score (requirements + field +
                       // funding) — labelling it "Eligibility" implied more than the
                       // score means. The hint says what it is, and what it is not.
-                      <span
-                        className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0"
-                        title={t("matchHint")}
-                      >
-                        {t("matchBadge", { score })}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span
+                          className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          title={t("matchHint")}
+                        >
+                          {t("matchBadge", { score })}
+                        </span>
+                        {s.matchBreakdown && (
+                          <MatchEvidenceBadge
+                            comparedDimensions={s.matchBreakdown.comparedDimensions}
+                            totalDimensions={s.matchBreakdown.totalDimensions}
+                            evidenceCoveragePct={s.matchBreakdown.evidenceCoveragePct}
+                            evidenceLevel={s.matchBreakdown.evidenceLevel}
+                          />
+                        )}
+                      </div>
                     ) : (
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
                         {t("selectProfile")}
@@ -355,6 +369,7 @@ export function ScholarshipHub({
                       ))}
                     </div>
                   )}
+                  <MatchBreakdownStrip breakdown={s.matchBreakdown} />
 
                   {/* Computed application status (spec §6) */}
                   {s.computedStatus && (

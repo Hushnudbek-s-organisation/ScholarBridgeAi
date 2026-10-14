@@ -7,7 +7,7 @@ import {
   scholarshipSources,
   sources,
 } from "@/db/schema";
-import { calculateScholarshipMatch, type ReasonDetail } from "@/lib/matching";
+import { calculateScholarshipMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { eq, inArray } from "drizzle-orm";
@@ -16,6 +16,7 @@ import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
 import { pickBestSource } from "@/lib/sourcePick";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 
 export async function GET(req: Request) {
   try {
@@ -136,6 +137,7 @@ export async function GET(req: Request) {
         potentialIssues?: string[];
         reasonDetails?: ReasonDetail[];
         issueDetails?: ReasonDetail[];
+        breakdown?: MatchBreakdown;
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
       if (matchProfile) {
         matchInfo = calculateScholarshipMatch(matchProfile, s);
@@ -145,10 +147,14 @@ export async function GET(req: Request) {
       const src = sourceMap.get(s.id) || null;
       return {
         ...s,
+        // Keep canonical awardAmount/awardCurrency intact, but make the
+        // compatibility field explicitly USD-safe for existing displays.
+        amountUsdValue: resolvedUsdScholarshipAmount(s),
         matchScore: matchInfo.matchScore,
         isEligible: matchInfo.isEligible,
         matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "scholarship", matchInfo.issueDetails, matchInfo.potentialIssues),
+        matchBreakdown: matchInfo.breakdown ?? null,
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,

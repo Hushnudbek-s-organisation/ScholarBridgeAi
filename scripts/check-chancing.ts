@@ -15,6 +15,7 @@ import {
   countActivities,
   normalizedGpa,
   parseListColumn,
+  profileCompletenessRatio,
   profileStrength,
   type ChancingProfile,
 } from "../src/lib/chancing";
@@ -69,6 +70,24 @@ check("activity analysis exposes counts only", () => {
   const result = analyzeExtracurriculars(profile);
   assert.deepEqual(Object.keys(result).sort(), ["activities", "awards", "leadership", "research"]);
 });
+check("research publications are counted once and zero is not a recorded achievement", () => {
+  assert.equal(countActivities({ researchPublications: 0 }).research, 0);
+  assert.equal(analyzeExtracurriculars({ researchPublications: 0 }).research, 0);
+  assert.equal(countActivities({ researchPublications: 2 }).research, 2);
+  assert.equal(analyzeExtracurriculars({ researchPublications: 2 }).research, 2);
+});
+check("gamification completeness uses the same validated coverage helper", () => {
+  const source = read("src/lib/gamification.ts");
+  assert.match(source, /profileCompletenessRatio\(profile\)/);
+  assert.equal(profileCompletenessRatio({ researchPublications: 0 }), profileCompletenessRatio({}));
+  assert.ok(profileCompletenessRatio({ researchPublications: 1 }) > profileCompletenessRatio({}));
+});
+check("family income alone is not budget coverage or an explicit contribution", () => {
+  assert.equal(profileCompletenessRatio({ familyIncomeUsd: 500000 }), profileCompletenessRatio({}));
+  const finance = profileStrength({ familyIncomeUsd: 500000 }).sections.find((section) => section.key === "financial");
+  assert.equal(finance?.unknown, true);
+  assert.deepEqual(finance?.missing, ["budgetPlan", "fundingPreference"]);
+});
 
 console.log("\nProfile-information coverage");
 check("an empty profile marks every section unknown", () => {
@@ -77,11 +96,13 @@ check("an empty profile marks every section unknown", () => {
   assert.equal(result.scoredSections, 0);
   assert.ok(result.sections.every((section) => section.unknown));
 });
-check("coverage reports how many sections contained data", () => {
+check("coverage reports how many sections contained data against a fixed denominator", () => {
   const result = profileStrength({ gpa: 3.8, gpaScale: 4, degreeLevel: "Bachelor" });
   assert.equal(result.scoredSections, 1);
   assert.equal(result.totalSections, 8);
   assert.equal(result.sections.find((section) => section.key === "academics")?.score, 100);
+  assert.equal(result.overall, 13);
+  assert.match(result.basis, /fixed set of sections/i);
 });
 check("an absent test is unknown rather than a zero or requirement", () => {
   const result = profileStrength({ gpa: 3.8, gpaScale: 4, degreeLevel: "Bachelor" });
@@ -96,7 +117,7 @@ check("English-only and standardized-test-only records are both recorded without
   assert.equal(standardized?.score, 100);
 });
 check("coverage explains that it is not eligibility or admission likelihood", () => {
-  assert.match(profileStrength(profile).basis, /does not measure eligibility.*admission likelihood/i);
+  assert.match(profileStrength(profile).basis, /not an eligibility, quality, or admission-likelihood score/i);
 });
 
 console.log("\nAdmission probability policy");
@@ -126,6 +147,11 @@ check("fallback report has no readiness/completeness score logic", () => {
 const evaluationRoute = read("src/app/api/ai/evaluate-profile/route.ts");
 check("profile evaluation does not inject a readiness score into the prompt", () => {
   assert.doesNotMatch(evaluationRoute, /Readiness score|Profile completeness|strength\.completeness/);
+});
+const aiChatRoute = read("src/app/api/ai/chat/route.ts");
+check("AI chat does not receive family income as an available contribution", () => {
+  assert.doesNotMatch(aiChatRoute, /Family income:/);
+  assert.match(aiChatRoute, /never treat household\/family income as an available contribution or a substitute budget/);
 });
 
 console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);

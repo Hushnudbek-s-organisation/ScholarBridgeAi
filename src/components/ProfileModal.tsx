@@ -18,6 +18,7 @@ import {
 } from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -57,7 +58,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const t = useTranslations("profile");
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const studyInterestsTouched = useRef(false);
+  useDialogFocusTrap({ open: isOpen, dialogRef, onEscape: onClose });
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
@@ -154,137 +157,138 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
 
   useEffect(() => {
-    studyInterestsTouched.current = false;
-    if (profile && !isNew) {
-      // No invented fallback: an empty list means "no preference chosen yet".
-      let countries: string[] = [];
-      try {
-        if (typeof profile.preferredCountries === "string") {
-          countries = JSON.parse(profile.preferredCountries);
-        } else if (Array.isArray(profile.preferredCountries)) {
-          countries = profile.preferredCountries;
+    let live = true;
+    void Promise.resolve().then(() => {
+      if (!live) return;
+      studyInterestsTouched.current = false;
+      if (profile && !isNew) {
+        // No invented fallback: an empty list means "no preference chosen yet".
+        let countries: string[] = [];
+        try {
+          if (typeof profile.preferredCountries === "string") {
+            countries = JSON.parse(profile.preferredCountries);
+          } else if (Array.isArray(profile.preferredCountries)) {
+            countries = profile.preferredCountries;
+          }
+        } catch {
+          // fallback
         }
-      } catch {
-        // fallback
-      }
 
-      setFormData({
-        name: profile.name || "",
-        // Telegram-only accounts have a technical email — show an empty field.
-        email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
-        degreeLevel: profile.degreeLevel || "",
-        targetMajor: profile.targetMajor || "",
-        studyInterests: selectionsFromProfile(profile.studyInterests, profile.targetMajor),
-        // NEVER fabricate values: empty fields stay empty instead of being
-        // saved as fake defaults (7.0/95/1350/315) when a profile has no
-        // test scores yet.
-        gpa: profile.gpa ?? "",
-        gpaScale: profile.gpaScale ?? "",
-        ieltsScore: profile.ieltsScore ?? "",
-        toeflScore: profile.toeflScore ?? "",
-        satScore: profile.satScore ?? "",
-        greScore: profile.greScore ?? "",
-        actScore: profile.actScore ?? "",
-        duolingoScore: profile.duolingoScore ?? "",
-        budgetAnnualUsd: profile.budgetAnnualUsd ?? "",
-        familyIncomeUsd: profile.familyIncomeUsd ?? "",
-        preferredCountries: countries,
-        targetUniversities: toList(profile.targetUniversities),
-        careerGoal: profile.careerGoal || "",
-        needScholarship: profile.needScholarship ?? false,
-        needsFinancialAid: typeof profile.needsFinancialAid === "boolean"
-          ? profile.needsFinancialAid
-          : profile.needScholarship === true ? true : null,
-        requiresFullScholarship: profile.requiresFullScholarship ?? false,
-        country: profile.country || "",
-        age: profile.age ?? "",
-        graduationYear: profile.graduationYear ?? "",
-        extracurriculars: profile.extracurriculars || "",
-        workExperienceYears: profile.workExperienceYears || 0,
-        researchPublications: profile.researchPublications || 0,
-        apCourses: toList(profile.apCourses),
-        ibCourses: toList(profile.ibCourses),
-        aLevelSubjects: toList(profile.aLevelSubjects),
-        leadership: toList(profile.leadership),
-        volunteering: toList(profile.volunteering),
-        sports: toList(profile.sports),
-        clubs: toList(profile.clubs),
-        researchExperience: toList(profile.researchExperience),
-        projects: toList(profile.projects),
-        olympiads: toList(profile.olympiads),
-        awards: toList(profile.awards),
-        competitions: toList(profile.competitions),
-        certificates: toList(profile.certificates),
-        password: "", // never pre-filled — a new value only on change
-      });
-    } else if (isNew) {
-      setFormData({
-        name: "",
-        email: "",
-        degreeLevel: "",
-        targetMajor: "",
-        studyInterests: [],
-        // Never pre-fill fabricated academic data — the student enters
-        // their real GPA/test scores (NULL-safe, spec §19).
-        gpa: "",
-        gpaScale: "",
-        ieltsScore: "",
-        toeflScore: "",
-        satScore: "",
-        greScore: "",
-        actScore: "",
-        duolingoScore: "",
-        budgetAnnualUsd: "",
-        familyIncomeUsd: "",
-        preferredCountries: [],
-        targetUniversities: "",
-        careerGoal: "",
-        needScholarship: false,
-        needsFinancialAid: null,
-        requiresFullScholarship: false,
-        country: "",
-        age: "",
-        graduationYear: "",
-        extracurriculars: "",
-        workExperienceYears: 0,
-        researchPublications: 0,
-        apCourses: "",
-        ibCourses: "",
-        aLevelSubjects: "",
-        leadership: "",
-        volunteering: "",
-        sports: "",
-        clubs: "",
-        researchExperience: "",
-        projects: "",
-        olympiads: "",
-        awards: "",
-        competitions: "",
-        certificates: "",
-        password: "",
-      });
-    }
+        setFormData({
+          name: profile.name || "",
+          // Telegram-only accounts have a technical email — show an empty field.
+          email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
+          degreeLevel: profile.degreeLevel || "",
+          targetMajor: profile.targetMajor || "",
+          studyInterests: selectionsFromProfile(profile.studyInterests, profile.targetMajor),
+          // NEVER fabricate values: empty fields stay empty instead of being
+          // saved as fake defaults (7.0/95/1350/315) when a profile has no
+          // test scores yet.
+          gpa: profile.gpa ?? "",
+          gpaScale: profile.gpaScale ?? "",
+          ieltsScore: profile.ieltsScore ?? "",
+          toeflScore: profile.toeflScore ?? "",
+          satScore: profile.satScore ?? "",
+          greScore: profile.greScore ?? "",
+          actScore: profile.actScore ?? "",
+          duolingoScore: profile.duolingoScore ?? "",
+          budgetAnnualUsd: profile.budgetAnnualUsd ?? "",
+          familyIncomeUsd: profile.familyIncomeUsd ?? "",
+          preferredCountries: countries,
+          targetUniversities: toList(profile.targetUniversities),
+          careerGoal: profile.careerGoal || "",
+          needScholarship: profile.needScholarship ?? false,
+          needsFinancialAid: typeof profile.needsFinancialAid === "boolean"
+            ? profile.needsFinancialAid
+            : profile.needScholarship === true ? true : null,
+          requiresFullScholarship: profile.requiresFullScholarship ?? false,
+          country: profile.country || "",
+          age: profile.age ?? "",
+          graduationYear: profile.graduationYear ?? "",
+          extracurriculars: profile.extracurriculars || "",
+          workExperienceYears: profile.workExperienceYears || 0,
+          researchPublications: profile.researchPublications || 0,
+          apCourses: toList(profile.apCourses),
+          ibCourses: toList(profile.ibCourses),
+          aLevelSubjects: toList(profile.aLevelSubjects),
+          leadership: toList(profile.leadership),
+          volunteering: toList(profile.volunteering),
+          sports: toList(profile.sports),
+          clubs: toList(profile.clubs),
+          researchExperience: toList(profile.researchExperience),
+          projects: toList(profile.projects),
+          olympiads: toList(profile.olympiads),
+          awards: toList(profile.awards),
+          competitions: toList(profile.competitions),
+          certificates: toList(profile.certificates),
+          password: "", // never pre-filled — a new value only on change
+        });
+      } else if (isNew) {
+        setFormData({
+          name: "",
+          email: "",
+          degreeLevel: "",
+          targetMajor: "",
+          studyInterests: [],
+          // Never pre-fill fabricated academic data — the student enters
+          // their real GPA/test scores (NULL-safe, spec §19).
+          gpa: "",
+          gpaScale: "",
+          ieltsScore: "",
+          toeflScore: "",
+          satScore: "",
+          greScore: "",
+          actScore: "",
+          duolingoScore: "",
+          budgetAnnualUsd: "",
+          familyIncomeUsd: "",
+          preferredCountries: [],
+          targetUniversities: "",
+          careerGoal: "",
+          needScholarship: false,
+          needsFinancialAid: null,
+          requiresFullScholarship: false,
+          country: "",
+          age: "",
+          graduationYear: "",
+          extracurriculars: "",
+          workExperienceYears: 0,
+          researchPublications: 0,
+          apCourses: "",
+          ibCourses: "",
+          aLevelSubjects: "",
+          leadership: "",
+          volunteering: "",
+          sports: "",
+          clubs: "",
+          researchExperience: "",
+          projects: "",
+          olympiads: "",
+          awards: "",
+          competitions: "",
+          certificates: "",
+          password: "",
+        });
+      }
+    });
+    return () => {
+      live = false;
+    };
   }, [profile, isNew, isOpen]);
 
   // Clear any previous error each time the modal opens.
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    let live = true;
+    void Promise.resolve().then(() => {
+      if (!live) return;
       setErrorMsg("");
       setStudyInterestAttempted(false);
-    }
-  }, [isOpen]);
-
-  // Escape closes the dialog — a keyboard user otherwise has to tab through
-  // the whole form to reach the × button. A half-filled form is discarded
-  // either way (the × does the same), so the behaviour is consistent.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    });
+    return () => {
+      live = false;
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -380,7 +384,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="profile-modal-title"
         className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
@@ -775,6 +781,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     placeholder="12000"
                   />
                 </div>
+                <p className="mt-1 text-[11px] text-slate-500">{t("familyIncomeNotBudget")}</p>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">

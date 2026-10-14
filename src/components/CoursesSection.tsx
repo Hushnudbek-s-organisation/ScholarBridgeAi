@@ -32,7 +32,7 @@ export function CoursesSection({ activeProfile }: CoursesSectionProps) {
   }, [activeProfile]);
 
   useEffect(() => {
-    loadCourses();
+    void Promise.resolve().then(loadCourses);
   }, [loadCourses]);
 
   return (

@@ -22,6 +22,7 @@ import {
   speakWatchdogMs,
 } from "../src/lib/visa-mic";
 import { readFileSync } from "node:fs";
+import { gpaTo40Scale } from "../src/lib/gpa";
 import {
   findSimilarProfiles,
   gpaTo4,
@@ -276,6 +277,9 @@ check("a 4.0-scale GPA passes through", gpaTo4(3.6, 4) === 3.6);
 check("a missing scale stays unknown", gpaTo4(3.2, null) === null);
 check("an invalid GPA above its stated scale stays unknown", gpaTo4(4.2, 4) === null);
 check("invalid or negative grading scales stay unknown", gpaTo4(3.2, 0) === null && gpaTo4(3.2, -5) === null);
+check("canonical profile GPA uses the shared scale-less normalization policy", gpaTo40Scale(3.2, null) === 3.2 && gpaTo40Scale(85, null) === null);
+const similarProfilesRoute = readFileSync("src/app/api/similar-profiles/route.ts", "utf8");
+check("the live profile uses canonical GPA normalization while snapshots stay strict", /gpa4: gpaTo40Scale\(profile\.gpa, profile\.gpaScale\)/.test(similarProfilesRoute) && /gpa4: gpaTo4\(row\.snapshotGpa, row\.snapshotGpaScale\)/.test(similarProfilesRoute));
 
 const applicationCenterSource = readFileSync("src/components/ApplicationCenter.tsx", "utf8");
 const outcomeRouteSource = readFileSync("src/app/api/applications/outcome/route.ts", "utf8");

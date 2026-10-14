@@ -36,7 +36,8 @@
 import { ADMISSION_PROBABILITY } from "./chancing";
 import { gpaTo40Scale } from "./gpa";
 import { isStaleVerified } from "./provenance";
-import { undergraduateTestApplies } from "./degreeLevels";
+import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
+import { annualUsdAmount } from "./usdCosts";
 
 /** Re-exported for callers/tests that import from the recommender. */
 export { gpaTo40Scale };
@@ -72,6 +73,8 @@ export interface RecommendationInput {
   /** Preferred teaching language, e.g. "English". Absent = no preference. */
   languagePref?: string | null;
   startYear?: number | null; // e.g. 2027
+  /** Caller-supplied date keeps cycle selection pure and deterministic. */
+  asOfDate?: string | null;
 }
 
 export interface RecommendProgram {
@@ -112,6 +115,7 @@ export interface RecommendUniversity {
   /** NULL = not verified (spec §14) — never shown as a cost. */
   annualLivingEst: number | null;
   livingCostCurrency: string;
+  livingCostPeriod?: string | null;
 }
 
 export interface RecommendRequirement {
@@ -301,6 +305,49 @@ function parseJsonArray(raw: string | null | undefined): string[] {
   }
 }
 
+function dateOnlyTimestamp(value: string | null | undefined): number | null {
+  const date = value?.slice(0, 10);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const timestamp = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date ? timestamp : null;
+}
+
+function academicYearRank(value: string | null): number | null {
+  const year = value?.match(/\b(20\d{2})\b/);
+  return year ? Number(year[1]) : null;
+}
+
+function verifiedFirst(a: RecommendCycle, b: RecommendCycle): number {
+  return Number(b.verificationStatus === "verified") - Number(a.verificationStatus === "verified");
+}
+
+/** Select the nearest future deadline; when none is dated in the future, show
+ * the most recent catalogue cycle instead of trusting insertion order. */
+export function selectNextCycle(cycles: RecommendCycle[], asOfDate?: string | null): RecommendCycle | null {
+  if (!cycles.length) return null;
+  const asOf = dateOnlyTimestamp(asOfDate);
+  const upcoming = asOf == null
+    ? []
+    : cycles
+        .map((cycle) => ({ cycle, deadline: dateOnlyTimestamp(cycle.deadline) }))
+        .filter((entry): entry is { cycle: RecommendCycle; deadline: number } => entry.deadline != null && entry.deadline >= asOf)
+        .sort((a, b) => a.deadline - b.deadline || verifiedFirst(a.cycle, b.cycle));
+  if (upcoming.length) return upcoming[0].cycle;
+
+  return [...cycles].sort((a, b) => {
+    const yearA = academicYearRank(a.academicYear);
+    const yearB = academicYearRank(b.academicYear);
+    if (yearA != null || yearB != null) {
+      if (yearA == null) return 1;
+      if (yearB == null) return -1;
+      if (yearA !== yearB) return yearB - yearA;
+    }
+    const deadlineA = dateOnlyTimestamp(a.deadline) ?? Number.NEGATIVE_INFINITY;
+    const deadlineB = dateOnlyTimestamp(b.deadline) ?? Number.NEGATIVE_INFINITY;
+    return deadlineB - deadlineA || verifiedFirst(a, b);
+  })[0];
+}
+
 export function assessAffordability(
   input: RecommendationInput,
   program: RecommendProgram,
@@ -313,33 +360,33 @@ export function assessAffordability(
       ? Number(input.budgetUsd)
       : null;
   const tuition =
-    program.annualTuition != null && Number.isFinite(Number(program.annualTuition)) && Number(program.annualTuition) > 0
+    program.annualTuition != null && Number.isFinite(Number(program.annualTuition)) && Number(program.annualTuition) >= 0
       ? Number(program.annualTuition)
       : null;
-  // NOTE: the catalog stores tuition in the program's own currency. The
-  // budget is USD. A naive numeric compare across currencies would be
-  // fabrication-adjacent, so the budget comparison only runs when the
-  // tuition currency is USD; otherwise it stays "unknown" with an explanation.
-  const tuitionCurrency = (program.tuitionCurrency || "USD").toUpperCase();
-  const living =
-    uni?.annualLivingEst != null && Number.isFinite(Number(uni.annualLivingEst)) && Number(uni.annualLivingEst) > 0
-      ? Number(uni.annualLivingEst)
-      : null;
-  const livingCurrency = (uni?.livingCostCurrency || "USD").toUpperCase();
-  const comparableCurrency = tuitionCurrency === "USD" && (living == null || livingCurrency === "USD");
-  const annualCostUsd = tuition != null && comparableCurrency ? tuition + (living ?? 0) : tuition;
+  const tuitionCurrency = program.tuitionCurrency || "USD";
+  const tuitionUsd = annualUsdAmount({
+    value: program.annualTuition,
+    currency: program.tuitionCurrency,
+    period: program.tuitionPeriod,
+  });
+  const livingUsd = uni
+    ? annualUsdAmount({
+        value: uni.annualLivingEst,
+        currency: uni.livingCostCurrency,
+        period: uni.livingCostPeriod,
+      })
+    : null;
+  // A full annual budget comparison requires both annual amounts in USD. Do
+  // not treat missing living costs as zero or expose foreign-currency tuition
+  // as though it were USD.
+  const annualCostUsd = tuitionUsd != null && livingUsd != null ? tuitionUsd + livingUsd : null;
   const withinBudget: Affordability["withinBudget"] =
-    budget == null || annualCostUsd == null || !comparableCurrency ? "unknown" : annualCostUsd <= budget ? "yes" : "no";
-  const familyIncome =
-    input.familyIncomeUsd != null && Number.isFinite(Number(input.familyIncomeUsd)) && Number(input.familyIncomeUsd) > 0
-      ? Number(input.familyIncomeUsd)
-      : null;
-  const incomeVsAnnualCost: Affordability["incomeVsAnnualCost"] =
-    familyIncome == null || annualCostUsd == null || !comparableCurrency
-      ? "unknown"
-      : annualCostUsd <= familyIncome
-        ? "yes"
-        : "no";
+    budget == null || annualCostUsd == null ? "unknown" : annualCostUsd <= budget ? "yes" : "no";
+  // Family income is neither an annual budget nor a confirmed contribution.
+  // Keep the legacy response fields for compatibility, but do not compare or
+  // expose income as available funding.
+  const familyIncome = null;
+  const incomeVsAnnualCost: Affordability["incomeVsAnnualCost"] = "unknown";
 
   // Scholarship plausibility — every condition must be known to pass;
   // unknown eligibility is never assumed.
@@ -354,10 +401,9 @@ export function assessAffordability(
     // Degree level: unknown scholarship level → never claim a match (unknown
     // ≠ match). "All" always passes; otherwise the student's level must be
     // known AND listed.
-    let levelOk: boolean;
-    if (s.degreeLevels.length === 0) levelOk = false;
-    else if (s.degreeLevels.includes("All")) levelOk = true;
-    else levelOk = input.degreeLevel != null && s.degreeLevels.some((l) => l.toLowerCase() === input.degreeLevel!.toLowerCase());
+    const levelOk =
+      s.degreeLevels.length > 0 &&
+      compareDegreeLevels(input.degreeLevel, JSON.stringify(s.degreeLevels)) === "match";
     const majorOk =
       !s.eligibleMajors.length ||
       s.eligibleMajors.includes("All") ||
@@ -380,7 +426,7 @@ export function assessAffordability(
     annualTuition: tuition,
     tuitionCurrency: program.tuitionCurrency || "USD",
     tuitionPeriod: program.tuitionPeriod || "year",
-    livingEstUsd: living,
+    livingEstUsd: livingUsd,
     withinBudget,
     budgetUsd: budget,
     familyIncomeUsd: familyIncome,
@@ -465,13 +511,8 @@ export function recommend(
     }
     if (affordability.withinBudget === "yes") score += 5;
     else if (affordability.withinBudget === "no") score -= 4;
-    // Family income is a supporting signal only when no budget was supplied;
-    // it never replaces the stated budget or crosses currencies.
-    if (affordability.withinBudget === "unknown") {
-      if (affordability.incomeVsAnnualCost === "yes") score += 2;
-      else if (affordability.incomeVsAnnualCost === "no") score -= 2;
-    }
-    // No budget / unknown: no further change.
+    // Family income is not a contribution or budget. Unknown affordability
+    // remains neutral and never changes the fit score.
     if (input.countries?.length && input.countries.some((c) => c.trim().toLowerCase() === university.country.trim().toLowerCase())) {
       score += 4; // preferred location
     }
@@ -483,25 +524,17 @@ export function recommend(
     // only worth -4 on the score, so it could still be ranked FIRST when its
     // subject fit was good. It now carries an explicit relation, is pushed below
     // every matching/unknown programme, and says so in the considerations.
-    const degreeLevelMatch: "match" | "mismatch" | "unknown" =
-      !input.degreeLevel || !program.degreeLevel
-        ? "unknown"
-        : input.degreeLevel.trim().toLowerCase() === program.degreeLevel.trim().toLowerCase()
-          ? "match"
-          : "mismatch";
+    const degreeLevelMatch = compareDegreeLevels(input.degreeLevel, program.degreeLevel);
     if (degreeLevelMatch === "match") {
       score += 4;
     }
     const matchScore = Math.max(0, Math.min(100, Math.round(score)));
 
     // ---- Next cycle (only real rows; verified vs unverified) -------------
-    const nextCycle =
-      cycles.length > 0
-        ? (() => {
-            const c = cycles[cycles.length - 1];
-            return { ...c, isEstimated: c.verificationStatus !== "verified" };
-          })()
-        : null;
+    const selectedCycle = selectNextCycle(cycles, input.asOfDate);
+    const nextCycle = selectedCycle
+      ? { ...selectedCycle, isEstimated: selectedCycle.verificationStatus !== "verified" }
+      : null;
 
     // ---- Missing inputs (what would improve THIS assessment) -------------
     const missing: string[] = [];
@@ -513,6 +546,7 @@ export function recommend(
     if (affordability.withinBudget === "unknown" && input.budgetUsd == null && affordability.annualTuition != null) {
       missing.push("budget");
     }
+    if (input.budgetUsd != null && affordability.annualCostUsd == null) missing.push("comparableCost");
     if (input.fundingNeed == null) missing.push("fundingNeed");
     if (input.startYear == null) missing.push("startYear");
     if (input.degreeLevel == null) missing.push("degreeLevel");
@@ -538,7 +572,7 @@ export function recommend(
     }
     if (affordability.withinBudget === "yes") factors.push("Cost: within your budget");
     else if (affordability.withinBudget === "no") factors.push("Cost: above your budget");
-    else if (affordability.annualTuition != null) factors.push("Cost: listed — compare it with your budget");
+    else if (affordability.annualTuition != null) factors.push("Cost: tuition is listed, but a comparable full annual USD cost is unavailable");
     if (affordability.scholarshipMatches.length) {
       factors.push(`Funding: ${affordability.scholarshipMatches.length} potentially matching scholarship${affordability.scholarshipMatches.length === 1 ? "" : "s"}`);
     }

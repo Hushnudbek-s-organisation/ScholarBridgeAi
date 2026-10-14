@@ -71,7 +71,7 @@ Hosting assumptions (all portable):
    (Supabase: *Project settings → Database*; add `?sslmode=require` if the
    host requires SSL).
 2. **Run the canonical schema once** — one file covers everything the app
-   reads or writes (93 tables, every column, indexes, FKs, RLS lockdown):
+   reads or writes (95 tables, 1,050 columns, 77 indexes, 117 FKs, RLS lockdown):
    paste [`supabase/full_schema.sql`](./supabase/full_schema.sql) into the
    Supabase SQL Editor and Run. It is **additive and idempotent** — safe on a
    fresh database and safe to re-run on an existing one (it only creates
@@ -198,13 +198,46 @@ password, never commit.
 | `SUPABASE_BRANDING_BUCKET` | no | server | no | Bucket name, default `LOGO` |
 | `SUPABASE_ANON_KEY` | no | server | no | SSR catalogue pages when no service key |
 | `GOOGLE_SITE_VERIFICATION` | no | public | no | Search Console meta-tag token |
-| `PAYME_*` / `CLICK_*` | for real payments | server | yes | Merchant credentials (webhooks fail closed without them) |
+| `PAYME_MERCHANT_ID` | for Payme checkout | server | no | Payme checkout merchant id |
+| `PAYME_LOGIN` | for Payme webhooks | server | yes | Separate Basic-auth login issued by Payme Business (not the checkout merchant id) |
+| `PAYME_KEY` or `PAYME_PASSWORD` | for Payme webhooks | server | yes | Merchant API password/key |
+| `CLICK_SERVICE_ID` / `CLICK_MERCHANT_ID` | for Click checkout | server | no | Click service and merchant ids |
+| `CLICK_SECRET_KEY` | for Click callbacks | server | yes | Click SHOP API signing secret |
+| `CLICK_MERCHANT_USER_ID` | optional | server | no | Optional user id passed on the hosted Click payment link |
 | `CRON_SECRET` | serverless/multi-instance | server | yes | Bearer token for `/api/cron/*` |
 | `REMINDER_TIMEZONE` | no | server | no | e.g. `Asia/Tashkent` (default UTC) |
 | `NOTIFICATION_SCHEDULER` / `NOTIFICATION_SWEEP_HOURS` | no | server | no | In-process reminders on/off, interval |
 | `TRUSTED_PROXY_HOPS` / `CLIENT_IP_HEADER` | no | server | no | Real client IP behind proxies |
 | `CSP_REPORT_ONLY` | no | server | no | `1` = CSP report-only |
 | `RESEARCH_SEARCH_ENDPOINT` / `RESEARCH_SEARCH_API_KEY` | no | server | key: yes | Research agent web-search fallback |
+
+### Payment provider setup
+
+- Payme checkout uses `PAYME_MERCHANT_ID`. The Merchant API HTTP Basic login is
+  the separate `PAYME_LOGIN` value issued by Payme Business; do not assume it is
+  the checkout merchant id. Set `PAYME_KEY` or `PAYME_PASSWORD` as the matching
+  secret. Without the complete configuration, initiation and callbacks fail
+  closed. Configure Payme's Merchant API webhook to the full URL
+  `${APP_URL}/api/payments/payme/webhook` and enable the `profile_id` and
+  `order_id` account fields in the cash-register settings. Checkout URLs contain Payme's
+  documented base64 payload (`m`, `ac.*`, and `a`). JSON-RPC responses,
+  including protocol errors, use HTTP 200 as required by its Merchant API.
+- Click hosted checkout requires `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`, and
+  `CLICK_SECRET_KEY`; `CLICK_MERCHANT_USER_ID` is optional. Configure the Click
+  Prepare and Complete callback URLs as
+  `${APP_URL}/api/payments/click/prepare` and
+  `${APP_URL}/api/payments/click/complete`.
+  Hosted links send amount as `N.NN` and may omit `merchant_user_id`. Click
+  SHOP API callbacks are `application/x-www-form-urlencoded`; both routes parse
+  them with a strict size cap and validate the documented MD5 signature and
+  amount before changing a payment.
+- Before releasing the payment lifecycle code, review and apply
+  `supabase/add_payment_provider_lifecycle.sql` to staging first, then the
+  intended environment after backup and operator approval. Its duplicate
+  preflight reports must be reviewed before the unique indexes are created. Run
+  `npm run db:verify` against the target after an authorized migration. The
+  migration is additive and does not change RLS/grants. This audit did not
+  connect to or modify any live database; production schema remains unverified.
 
 ## Security checklist (once per environment)
 
@@ -213,9 +246,10 @@ password, never commit.
 - [ ] Supabase: `supabase/enable_rls.sql` executed (all tables `rls_enabled = true`).
 - [ ] `supabase/add_ai_usage_quota_index.sql` executed; daily AI limits reviewed in Admin → Settings.
 - [ ] `APP_URL` set; Telegram webhook registered against it.
-- [ ] `PAYME_*` / `CLICK_*` set **or** payments knowingly disabled.
+- [ ] Payme: `PAYME_MERCHANT_ID`, `PAYME_LOGIN`, and `PAYME_KEY` or `PAYME_PASSWORD` set **or** Payme knowingly disabled.
+- [ ] Click: `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`, and `CLICK_SECRET_KEY` set **or** Click knowingly disabled; `CLICK_MERCHANT_USER_ID` is optional.
 - [ ] `CRON_SECRET` set if an external scheduler is used.
-- [ ] `npm run test:security` and `npm audit --audit-level=high` green.
+- [ ] `npm run test:security` and `npm audit --omit=dev --audit-level=high` pass; review the full development-dependency audit findings in `SECURITY.md`.
 
 ## Admin → Analytics
 

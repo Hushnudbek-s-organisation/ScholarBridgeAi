@@ -258,6 +258,11 @@ CREATE TABLE IF NOT EXISTS "ai_usage" (
   "prompt_tokens" integer NOT NULL DEFAULT 0,
   "completion_tokens" integer NOT NULL DEFAULT 0,
   "cost_estimate" double precision NOT NULL DEFAULT 0,
+  "cost_status" text NOT NULL DEFAULT 'unknown',
+  "cached_prompt_tokens" integer NOT NULL DEFAULT 0,
+  "attempts" integer NOT NULL DEFAULT 1,
+  "fallback_used" boolean NOT NULL DEFAULT FALSE,
+  "error_category" text,
   "status" text NOT NULL DEFAULT 'success',
   "created_at" timestamp NOT NULL DEFAULT now()
 );
@@ -800,6 +805,10 @@ CREATE TABLE IF NOT EXISTS "payments" (
   "status" text NOT NULL DEFAULT 'pending',
   "purpose" text NOT NULL DEFAULT 'subscription',
   "related_entity_id" integer,
+  "provider_created_at" timestamp,
+  "performed_at" timestamp,
+  "cancelled_at" timestamp,
+  "cancel_reason" integer,
   "created_at" timestamp NOT NULL DEFAULT now(),
   "updated_at" timestamp NOT NULL DEFAULT now()
 );
@@ -1479,6 +1488,11 @@ ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "model" text;
 ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "prompt_tokens" integer NOT NULL DEFAULT 0;
 ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "completion_tokens" integer NOT NULL DEFAULT 0;
 ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "cost_estimate" double precision NOT NULL DEFAULT 0;
+ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "cost_status" text NOT NULL DEFAULT 'unknown';
+ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "cached_prompt_tokens" integer NOT NULL DEFAULT 0;
+ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "attempts" integer NOT NULL DEFAULT 1;
+ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "fallback_used" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "error_category" text;
 ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'success';
 ALTER TABLE "ai_usage" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 -- ---------- answer_prompts ----------
@@ -1926,6 +1940,10 @@ ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "currency" text NOT NULL DEFAULT
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'pending';
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "purpose" text NOT NULL DEFAULT 'subscription';
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "related_entity_id" integer;
+ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "provider_created_at" timestamp;
+ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "performed_at" timestamp;
+ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "cancelled_at" timestamp;
+ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "cancel_reason" integer;
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 -- ---------- platform_ownership ----------
@@ -2341,6 +2359,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_applications_deadline') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_applications_deadline" ON "applications" ("deadline"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_applications_deadline skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_applications_deadline skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_admission_offer_application') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_admission_offer_application" ON "admission_offers" ("application_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_admission_offer_application skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_admission_offer_application skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_ai_usage_profile_created') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_ai_usage_profile_created" ON "ai_usage" ("profile_id", "created_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_ai_usage_profile_created skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_ai_usage_profile_created skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_ai_usage_created') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_ai_usage_created" ON "ai_usage" ("created_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_ai_usage_created skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_ai_usage_created skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_answer_vault_profile_prompt') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_answer_vault_profile_prompt" ON "answer_vault" ("profile_id", "prompt_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_answer_vault_profile_prompt skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_answer_vault_profile_prompt skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_sources_url') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_sources_url" ON "sources" ("url"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_sources_url skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_sources_url skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_programs_university') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_programs_university" ON "programs" ("university_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_programs_university skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_programs_university skipped: column missing'; END; END IF; END $$;
@@ -2373,6 +2392,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_opportunities_deadline') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_opportunities_deadline" ON "opportunities" ("deadline_date"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_opportunities_deadline skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_opportunities_deadline skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ownership_transfers_one_open') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS ownership_transfers_one_open ON ownership_transfers ((true)) WHERE status IN ('pending', 'accepted'); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index ownership_transfers_one_open skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index ownership_transfers_one_open skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ownership_transfers_to_idx') THEN BEGIN CREATE INDEX IF NOT EXISTS "ownership_transfers_to_idx" ON "ownership_transfers" ("to_profile_id", "status"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index ownership_transfers_to_idx skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index ownership_transfers_to_idx skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_payments_provider_transaction') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_provider_transaction ON payments (provider, provider_transaction_id) WHERE provider_transaction_id <> ''; EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_payments_provider_transaction skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_payments_provider_transaction skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_program_requirements_program') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_program_requirements_program" ON "program_requirements" ("program_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_program_requirements_program skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_program_requirements_program skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_program_requirements_program_year') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS uq_program_requirements_program_year ON program_requirements (program_id, academic_year) WHERE academic_year IS NOT NULL; EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_program_requirements_program_year skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_program_requirements_program_year skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_rate_limit_hits_key_at') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_rate_limit_hits_key_at" ON "rate_limit_hits" ("key", "hit_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_rate_limit_hits_key_at skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_rate_limit_hits_key_at skipped: column missing'; END; END IF; END $$;
@@ -2392,6 +2412,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_study_plans_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_study_plans_profile" ON "study_plans" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_study_plans_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_study_plans_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_study_plan_phases_plan') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_study_plan_phases_plan" ON "study_plan_phases" ("plan_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_study_plan_phases_plan skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_study_plan_phases_plan skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_study_plan_phases_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_study_plan_phases_key" ON "study_plan_phases" ("plan_id", "phase_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_study_plan_phases_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_study_plan_phases_key skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_subscriptions_payment_id') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_payment_id ON subscriptions (payment_id) WHERE payment_id IS NOT NULL; EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_subscriptions_payment_id skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_subscriptions_payment_id skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_success_stories_status') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_success_stories_status" ON "success_stories" ("status"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_success_stories_status skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_success_stories_status skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_success_stories_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_success_stories_profile" ON "success_stories" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_success_stories_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_success_stories_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_telegram_messages_created') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_telegram_messages_created" ON "telegram_messages" ("created_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_telegram_messages_created skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_telegram_messages_created skipped: column missing'; END; END IF; END $$;

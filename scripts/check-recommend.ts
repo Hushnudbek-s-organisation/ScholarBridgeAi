@@ -25,9 +25,11 @@ import {
   assessAffordability,
   gpaTo40Scale,
   recommend,
+  selectNextCycle,
   normalizeSubject,
   type RecommendationCatalog,
   type RecommendationInput,
+  type RecommendCycle,
   type RecommendProgram,
   type RecommendUniversity,
   type RecommendScholarship,
@@ -241,7 +243,7 @@ section("6. Affordability and funding");
 
 {
   const p = program({ id: 1, universityId: 1, name: "RECOMMEND-FIXTURE: CS", annualTuition: 8000 });
-  const u = uni({ id: 1, name: "Fixture University", country: "Germany" });
+  const u = uni({ id: 1, name: "Fixture University", country: "Germany", annualLivingEst: 2000 });
   const sch: RecommendScholarship[] = [
     { id: 1, title: "RECOMMEND-FIXTURE: DAAD-like", country: "Germany", degreeLevels: ["Bachelor"], coverageType: "tuition", minGpa: 3.0, minIelts: 6.0, financialNeedBased: false, meritBased: true, eligibleMajors: ["Computer Science"] },
     { id: 2, title: "RECOMMEND-FIXTURE: Need-based", country: "Germany", degreeLevels: ["All"], coverageType: "full", minGpa: null, minIelts: null, financialNeedBased: true, meritBased: false, eligibleMajors: ["All"] },
@@ -258,15 +260,26 @@ section("6. Affordability and funding");
   const noBudget = assessAffordability({ interests: ["Computer Science"], degreeLevel: "Bachelor" }, p, u, sch, "Germany");
   const noFunding = assessAffordability({ interests: ["Computer Science"], budgetUsd: 10000 }, p, u, sch, "Germany");
 
-  check("within budget when budget ≥ tuition (USD)", withBudget.withinBudget === "yes");
-  check("over budget when budget < tuition", assessAffordability({ interests: ["Computer Science"], budgetUsd: 5000 }, p, u, sch, "Germany").withinBudget === "no");
+  check("within budget when the full annual USD cost fits", withBudget.withinBudget === "yes" && withBudget.annualCostUsd === 10000);
+  check("over budget when the full annual USD cost exceeds the budget", assessAffordability({ interests: ["Computer Science"], budgetUsd: 5000 }, p, u, sch, "Germany").withinBudget === "no");
   check("no budget → unknown, not 'no'", noBudget.withinBudget === "unknown");
+  check("missing living cost keeps the full annual cost unknown rather than treating it as zero", (() => {
+    const noLiving = uni({ id: 1, name: "No published living cost", annualLivingEst: null });
+    const result = assessAffordability({ interests: ["Computer Science"], budgetUsd: 50000 }, p, noLiving, [], "Germany");
+    return result.withinBudget === "unknown" && result.annualCostUsd === null;
+  })());
+  check("family income is not returned or used as budget/contribution", (() => {
+    const result = assessAffordability({ interests: ["Computer Science"], familyIncomeUsd: 500000 }, p, u, [], "Germany");
+    return result.withinBudget === "unknown" && result.familyIncomeUsd === null && result.incomeVsAnnualCost === "unknown";
+  })());
   check("need-based scholarship matches only when funding need is known", (() => {
     const titles = withBudget.scholarshipMatches.map((s) => s.title);
     return titles.includes("RECOMMEND-FIXTURE: Need-based") && !noFunding.scholarshipMatches.some((s) => s.title === "RECOMMEND-FIXTURE: Need-based");
   })(), JSON.stringify(noFunding.scholarshipMatches.map((s) => s.title)));
   check("country mismatch excluded", withBudget.scholarshipMatches.every((s) => s.title !== "RECOMMEND-FIXTURE: US-only"));
   check("degree-level match honoured", withBudget.scholarshipMatches.some((s) => s.title === "RECOMMEND-FIXTURE: DAAD-like"));
+  const aliasAward: RecommendScholarship = { ...sch[0], degreeLevels: ["MSc"] };
+  check("scholarship degree aliases compare canonically", assessAffordability({ interests: ["Computer Science"], degreeLevel: "Master's" }, p, u, [aliasAward], "Germany").scholarshipMatches.length === 1);
   check("non-USD tuition → unknown (no cross-currency fabrication)", (() => {
     const eur = program({ id: 1, universityId: 1, name: "x", annualTuition: 6000, tuitionCurrency: "EUR" });
     return assessAffordability({ interests: ["Computer Science"], budgetUsd: 50000 }, eur, u, [], "Germany").withinBudget === "unknown";
@@ -360,6 +373,36 @@ section("7b. Degree level is the hard constraint");
     "an unstated level adds no level penalty",
     !noLevel[0].considerations.some((c) => /while your profile says/.test(c))
   );
+  const aliasMaster = program({ id: 4, universityId: 1, name: "RECOMMEND-FIXTURE: MSc Alias", degreeLevel: "MSc" });
+  const aliasResult = recommend({ interests: ["Robotics"], degreeLevel: "Master's" }, makeCatalog([aliasMaster], new Map()));
+  check("degree aliases compare through the shared canonical helper", aliasResult[0].degreeLevelMatch === "match");
+}
+
+section("7c. Application cycle selection is date-aware and order-independent");
+{
+  const cycle = (over: Partial<RecommendCycle>): RecommendCycle => ({
+    programId: 1,
+    intake: null,
+    academicYear: null,
+    openingDate: null,
+    deadline: null,
+    applicationUrl: null,
+    sourceUrl: null,
+    lastVerifiedAt: null,
+    verificationStatus: "unverified",
+    ...over,
+  });
+  const past = cycle({ academicYear: "2025/2026", deadline: "2026-09-30" });
+  const nearest = cycle({ academicYear: "2027/2028", deadline: "2026-11-01", verificationStatus: "verified" });
+  const later = cycle({ academicYear: "2027/2028", deadline: "2027-02-01" });
+  check("nearest upcoming deadline is selected from unsorted input", selectNextCycle([later, past, nearest], "2026-10-14") === nearest);
+  const oldCycles = [
+    cycle({ academicYear: "2024/2025", deadline: "2025-05-01" }),
+    cycle({ academicYear: "2026/2027", deadline: "2026-03-01" }),
+  ];
+  check("when every dated cycle has passed, the most recent academic year is selected", selectNextCycle(oldCycles, "2026-10-14") === oldCycles[1]);
+  const undatedCycles = [cycle({ academicYear: "2027/2028" }), cycle({ academicYear: "2029/2030" })];
+  check("when deadlines are absent, the newest academic year is selected", selectNextCycle(undatedCycles, "2026-10-14") === undatedCycles[1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,6 +518,8 @@ async function apiPart() {
     country: "Germany",
     city: "Testville",
     description: "Deterministic recommender test fixture (NOT a real university).",
+    annualLivingEst: 8000,
+    livingCostCurrency: "USD",
     websiteUrl: "https://recommendfixture.example.edu",
     officialWebsiteUrl: "https://recommendfixture.example.edu",
   }).returning();

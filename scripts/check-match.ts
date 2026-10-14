@@ -18,11 +18,13 @@
  */
 
 import {
+  applyMatchScenario,
   calculateUniversityMatch,
   calculateScholarshipMatch,
   subjectAlignment,
   majorOverlap,
   subjectTokens,
+  summarizeMatchEvidence,
   type UniversityData,
   type ScholarshipData,
   type StudentProfileData,
@@ -123,6 +125,17 @@ check(
 );
 check("field alignment is the top reason (weight 12)", /Offers your field: Computing/.test(noTests.reasons[0] ?? ""), noTests.reasons[0]);
 
+const scenarioInput = { ...baseProfile, ieltsScore: null, gpa: 3.2, budgetAnnualUsd: 30_000 } as StudentProfileData;
+const scenarioApplied = applyMatchScenario(scenarioInput, { gpa4: 3.9, ieltsScore: 7.5, budgetAnnualUsd: 50_000, targetMajor: "Computing" });
+check("what-if values recompute against an immutable in-memory profile copy", scenarioApplied !== scenarioInput && scenarioInput.gpa === 3.2 && scenarioInput.ieltsScore === null && calculateUniversityMatch(scenarioApplied, uni).matchScore >= calculateUniversityMatch(scenarioInput, uni).matchScore);
+const scenarioUnknown = applyMatchScenario(scenarioInput, { gpa4: null, ieltsScore: null, budgetAnnualUsd: null, targetMajor: null });
+check("what-if can explicitly return unknown values to null without writing the source profile", scenarioUnknown.gpa === null && scenarioUnknown.gpaScale === null && scenarioUnknown.ieltsScore === null && scenarioUnknown.budgetAnnualUsd === null && scenarioInput.gpa === 3.2);
+
+const noBudgetLowIncome = calculateUniversityMatch({ ...baseProfile, budgetAnnualUsd: null, familyIncomeUsd: 1000 }, uni);
+const noBudgetHighIncome = calculateUniversityMatch({ ...baseProfile, budgetAnnualUsd: null, familyIncomeUsd: 1_000_000 }, uni);
+check("family income does not replace a missing explicit annual budget", noBudgetLowIncome.rawScore === noBudgetHighIncome.rawScore);
+check("fit explanations never score household income as available funding", !/family income/i.test([...noBudgetLowIncome.reasons, ...noBudgetLowIncome.potentialIssues].join(" ")));
+
 const strong = calculateUniversityMatch({ ...baseProfile, ieltsScore: 7.5, satScore: 1500 }, uni);
 check("strong profile → high score", strong.matchScore >= 80, String(strong.matchScore));
 check("max 2 reasons", strong.reasons.length <= 2, String(strong.reasons.length));
@@ -159,10 +172,13 @@ check("no published minimums → high score", noReqs.matchScore >= 85, String(no
 // and accepted alternatives remain for the applicant to verify.
 const toeflOnly = calculateUniversityMatch({ ...baseProfile, toeflScore: 100 }, uni);
 check(
-  "TOEFL instead of IELTS does not lower fit or claim equivalence",
+  "TOEFL instead of IELTS adds an informational signal without changing fit or claiming equivalence",
   toeflOnly.matchScore === noTests.matchScore &&
-    !toeflOnly.potentialIssues.some((issue: string) => /IELTS|TOEFL/.test(issue))
+    toeflOnly.issueDetails.some((issue) => issue.code === "english_alternative_recorded" && issue.points === 0) &&
+    toeflOnly.breakdown.components.some((item) => item.key === "english" && !item.compared && item.points === 0)
 );
+const duolingoOnly = calculateUniversityMatch({ ...baseProfile, duolingoScore: 120 }, uni);
+check("Duolingo is surfaced as recorded context, never converted to IELTS", duolingoOnly.matchScore === noTests.matchScore && duolingoOnly.issueDetails.some((issue) => issue.code === "english_alternative_recorded" && issue.params.test === "Duolingo English Test"));
 
 // Field mismatch must lower the score, and it must be visible whenever the
 // hard requirements leave room in the top-2 issue list.
@@ -279,9 +295,10 @@ check(
 );
 const toeflScholarship = calculateScholarshipMatch({ ...masterProfile, ieltsScore: null, toeflScore: 100 } as StudentProfileData, scholarship);
 check(
-  "TOEFL instead of IELTS stays unscored until award acceptance is verified",
+  "TOEFL instead of IELTS adds a non-penalizing scholarship signal",
   toeflScholarship.matchScore === noEnglishAward.matchScore &&
-    !toeflScholarship.potentialIssues.some((issue: string) => /IELTS|TOEFL/.test(issue))
+    toeflScholarship.issueDetails.some((issue) => issue.code === "english_alternative_recorded" && issue.points === 0) &&
+    toeflScholarship.breakdown.components.some((item) => item.key === "english" && !item.compared && item.points === 0)
 );
 
 // Merit/need signals.
@@ -376,6 +393,14 @@ check(
     noTests.breakdown.comparedDimensions <= noTests.breakdown.totalDimensions,
   JSON.stringify(noTests.breakdown)
 );
+const evidence = summarizeMatchEvidence(noTests.breakdown.comparedDimensions, noTests.breakdown.totalDimensions);
+check(
+  "evidence coverage and level are derived from measured dimensions, not fit score",
+  noTests.breakdown.evidenceCoveragePct === evidence.evidenceCoveragePct &&
+    noTests.breakdown.evidenceLevel === evidence.evidenceLevel &&
+    evidence.evidenceCoveragePct <= 100
+);
+check("zero available dimensions stay limited evidence, never a probability", summarizeMatchEvidence(0, 0).evidenceLevel === "limited");
 check(
   "a dimension with no data contributes exactly 0",
   noTests.breakdown.components.every((c) => c.compared || c.points === 0)
@@ -430,6 +455,19 @@ for (let b = 10000; b <= 90000; b += 2500) {
   if (scoreForBudget(b) > scoreForBudget(b + 2500)) budgetMonotone = false;
 }
 check("a larger budget never scores lower", budgetMonotone);
+const foreignCurrencyMatch = calculateUniversityMatch({ ...baseProfile }, {
+  ...uni,
+  annualTuition: 40000,
+  tuitionCurrency: "GBP",
+  annualLivingEst: 15000,
+  livingCostCurrency: "GBP",
+} as UniversityData);
+check("non-USD canonical costs never fall back to stale USD mirrors", (() => {
+  const cost = foreignCurrencyMatch.breakdown.components.find((component) => component.key === "cost");
+  return cost?.compared === false && !foreignCurrencyMatch.reasons.some((reason) => /fits your budget/i.test(reason));
+})());
+const unknownLivingMatch = calculateUniversityMatch({ ...baseProfile }, { ...uni, annualLivingEstUsd: null } as UniversityData);
+check("missing living cost is unknown, not treated as zero", unknownLivingMatch.breakdown.components.find((component) => component.key === "cost")?.compared === false);
 
 // A shortfall is graded: being $100 short must cost (far) less than being
 // 60% short, instead of landing in the same penalty bucket.

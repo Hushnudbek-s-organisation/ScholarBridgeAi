@@ -35,13 +35,16 @@ import {
   autopilotPriority,
   autopilotTags,
   buildJourney,
+  commonScholarshipAwardPeriod,
   cleanList,
+  gpaTo4,
   essayListed,
   goalProgress,
   nextExpectedDeadline,
   parseSteps,
   profileCompleteness,
   similarScholarships,
+  totalComparableAwardValue,
   twinScore,
   type AutopilotScholarship,
   type JourneyCounts,
@@ -139,6 +142,7 @@ const base: AutopilotScholarship = {
   country: "Germany",
   coverageType: "Full funding",
   amountUsdValue: 20000,
+  awardPeriod: "total",
   deadlineDate: "2026-10-10",
   degreeLevels: '["Master"]',
   eligibleMajors: '["Computer Science"]',
@@ -147,6 +151,15 @@ const base: AutopilotScholarship = {
   recurrence: "annual",
   matchScore: 70,
 };
+check("autopilot funding totals require known USD amounts on a shared award period", () => {
+  assert.equal(commonScholarshipAwardPeriod([base, { ...base, id: 2 }]), "total");
+  assert.equal(commonScholarshipAwardPeriod([base, { ...base, id: 2, awardPeriod: "month" }]), null);
+  assert.equal(totalComparableAwardValue([base, { ...base, id: 2, amountUsdValue: 10000 }]), 30000);
+  assert.equal(totalComparableAwardValue([base, { ...base, id: 2, amountUsdValue: null }]), null);
+  assert.equal(totalComparableAwardValue([base, { ...base, id: 2, awardPeriod: "month" }]), null);
+  assert.equal(totalComparableAwardValue([{ ...base, awardPeriod: null }]), null);
+  assert.equal(totalComparableAwardValue([]), 0);
+});
 check("closing soon + full funding tags", () => {
   const t = autopilotTags(base, NOW);
   assert.equal(t.closingSoon, true);
@@ -198,6 +211,8 @@ check("unrelated profile scores low", () => {
 check("GPA on different scales is normalised", () => {
   const r = twinScore({ gpa: 90, gpaScale: 100 }, { gpa: 3.6, gpaScale: 4 });
   assert.ok(r.reasons.includes("similar_gpa"));
+  assert.equal(gpaTo4(85, null), null, "an unscaled 85 stays unknown, not 4.0");
+  assert.equal(gpaTo4(85, 100), 3.4, "explicit scales use the shared converter");
 });
 check("cleanList trims, dedupes empties and caps length", () => {
   const l = cleanList(["  a ", "", "b".repeat(500), 5, null], 12, 120);
@@ -310,6 +325,7 @@ const richProfile = {
   leadership: '["Robotics club captain"]',
   awards: '["National olympiad bronze"]',
   extracurriculars: '["Robotics"]',
+  researchExperience: '["Student research project"]',
 };
 const sparseProfile = { gpa: 3.2 };
 

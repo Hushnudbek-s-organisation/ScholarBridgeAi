@@ -703,8 +703,16 @@ export function VisaSpeakingAssistant({
         languageClarity: number;
         total: number;
       };
-      risks: { code: string; message: string; severity: "high" | "medium" | "low" }[];
+      risks: { code: string; message: string; severity: "high" | "medium" | "low"; params?: Record<string, string | number> }[];
       unanswered: string[];
+      turnFeedback: {
+        turnNumber: number;
+        question: string | null;
+        answerExcerpt: string;
+        answerWordCount: number;
+        evidence: ("purpose" | "funding" | "home_ties" | "specific_detail")[];
+        concerns: string[];
+      }[];
       answerCount: number;
       averageAnswerWords: number;
     };
@@ -2463,11 +2471,8 @@ export function VisaSpeakingAssistant({
               renders even when no AI provider is configured. */}
           {analysis.rubric && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-              <h3 className="text-sm font-extrabold text-slate-900">Answer rubric</h3>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Computed from your transcript — not from the model, so the same answers always
-                score the same.
-              </p>
+              <h3 className="text-sm font-extrabold text-slate-900">{t("answerRubric")}</h3>
+              <p className="mt-0.5 text-xs text-slate-500">{t("rubricComputed")}</p>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {(
@@ -2496,7 +2501,7 @@ export function VisaSpeakingAssistant({
               </div>
 
               <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                <span className="text-xs font-bold text-slate-600">Overall readiness</span>
+                <span className="text-xs font-bold text-slate-600">{t("rubricOverallReadiness")}</span>
                 <span className="text-lg font-extrabold text-slate-900">
                   {analysis.rubric.scores.total}
                   <span className="text-xs font-bold text-slate-400">/100</span>
@@ -2516,9 +2521,13 @@ export function VisaSpeakingAssistant({
                               : "border-slate-200 bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {risk.severity}
+                        {t(`riskSeverity.${risk.severity}` as never)}
                       </span>
-                      <span className="min-w-0 flex-1 text-xs text-slate-700">{risk.message}</span>
+                      <span className="min-w-0 flex-1 text-xs text-slate-700">
+                        {["profile_major_conflict", "profile_degree_conflict", "profile_budget_conflict", "primary_funding_omitted"].includes(risk.code)
+                          ? t(`profileRisk.${risk.code}` as never, risk.params as never)
+                          : risk.message}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -2526,8 +2535,53 @@ export function VisaSpeakingAssistant({
 
               {analysis.rubric.unanswered.length > 0 && (
                 <p className="mt-3 text-[11px] text-slate-500">
-                  Not substantively answered: {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
+                  {t("unansweredPrefix")} {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
                 </p>
+              )}
+
+              {analysis.rubric.turnFeedback.length > 0 && (
+                <section className="mt-4 border-t border-slate-100 pt-4">
+                  <h4 className="text-xs font-extrabold text-slate-800">{t("turnFeedbackTitle")}</h4>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t("turnFeedbackIntro")}</p>
+                  <div className="mt-2 space-y-2">
+                    {analysis.rubric.turnFeedback.map((turn) => (
+                      <article key={turn.turnNumber} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h5 className="text-[11px] font-bold text-slate-800">{t("turnNumber", { number: turn.turnNumber })}</h5>
+                          <span className="text-[10px] font-semibold tabular-nums text-slate-500">{t("turnWordCount", { count: turn.answerWordCount })}</span>
+                        </div>
+                        {turn.question && (
+                          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                            <span className="font-semibold">{t("turnQuestion")}:</span> {turn.question}
+                          </p>
+                        )}
+                        <blockquote className="mt-1 rounded-lg border-l-2 border-indigo-300 bg-white px-2 py-1 text-[11px] leading-relaxed text-slate-700">
+                          <span className="font-semibold">{t("turnAnswer")}:</span> “{turn.answerExcerpt}”
+                        </blockquote>
+                        {turn.evidence.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("turnEvidenceTitle")}</p>
+                            <ul className="mt-1 flex flex-wrap gap-1">
+                              {turn.evidence.map((kind) => (
+                                <li key={kind} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{t(`turnEvidence.${kind}` as never)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <div className="mt-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("turnConcernTitle")}</p>
+                          {turn.concerns.length > 0 ? (
+                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] leading-relaxed text-amber-800">
+                              {turn.concerns.map((code) => <li key={code}>{t(`turnConcerns.${code}` as never)}</li>)}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-[11px] text-slate-500">{t("turnNoConcerns")}</p>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
               )}
             </div>
           )}

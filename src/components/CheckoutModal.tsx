@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, CreditCard, ArrowRight } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -26,18 +27,8 @@ export function CheckoutModal({
   const t = useTranslations("payments");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Escape closes the dialog. Keyboard-only users had no way out except
-  // tabbing to the small × button, and assistive tech could not tell this was
-  // a dialog at all (no role/aria-modal).
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useDialogFocusTrap({ open: isOpen, dialogRef, onEscape: onClose });
 
   if (!isOpen) return null;
 
@@ -80,7 +71,9 @@ export function CheckoutModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
         className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4"

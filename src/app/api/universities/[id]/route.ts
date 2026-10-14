@@ -12,10 +12,11 @@ import {
 import { eq, asc, inArray } from "drizzle-orm";
 import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { authenticate } from "@/lib/auth";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { selectUniversities } from "@/lib/universities";
+import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import { studentProfiles } from "@/db/schema";
 
 /**
@@ -144,6 +145,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       score: number;
       reasons: string[];
       issues: string[];
+      breakdown: MatchBreakdown;
     } | null = null;
     const locale = localeFromRequest(req);
     const profileIdParam = new URL(req.url).searchParams.get("profileId");
@@ -161,6 +163,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               score: result.matchScore,
               reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
               issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
+              breakdown: result.breakdown,
             };
           }
         }
@@ -541,31 +544,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const uniScholarships: unknown[] = [];
 
     // ---------- Generic money fields (currency-aware, USD fallback) ----------
+    const tuitionIsCanonical = uni.annualTuition != null;
+    const livingIsCanonical = uni.annualLivingEst != null;
+    const accommodationIsCanonical = uni.accommodationCost != null;
     const money = {
-      annualTuition:
-        uni.annualTuition != null
-          ? Number(uni.annualTuition)
-          : uni.annualTuitionUsd ?? null,
-      tuitionCurrency: uni.tuitionCurrency ?? "USD",
-      tuitionPeriod: uni.tuitionPeriod ?? "year",
-      annualLivingEstimate:
-        uni.annualLivingEst != null
-          ? Number(uni.annualLivingEst)
-          : uni.annualLivingEstUsd ?? null,
-      livingCostCurrency: uni.livingCostCurrency ?? "USD",
-      livingCostPeriod: uni.livingCostPeriod ?? "year",
-      accommodationCost:
-        uni.accommodationCost != null
-          ? Number(uni.accommodationCost)
-          : uni.accommodationCostUsd ?? null,
-      accommodationCostCurrency: uni.accommodationCostCurrency ?? "USD",
-      accommodationCostPeriod: uni.accommodationCostPeriod ?? "year",
+      annualTuition: tuitionIsCanonical ? Number(uni.annualTuition) : uni.annualTuitionUsd ?? null,
+      tuitionCurrency: tuitionIsCanonical ? uni.tuitionCurrency ?? "USD" : "USD",
+      tuitionPeriod: tuitionIsCanonical ? uni.tuitionPeriod ?? "year" : "year",
+      annualLivingEstimate: livingIsCanonical ? Number(uni.annualLivingEst) : uni.annualLivingEstUsd ?? null,
+      livingCostCurrency: livingIsCanonical ? uni.livingCostCurrency ?? "USD" : "USD",
+      livingCostPeriod: livingIsCanonical ? uni.livingCostPeriod ?? "year" : "year",
+      accommodationCost: accommodationIsCanonical ? Number(uni.accommodationCost) : uni.accommodationCostUsd ?? null,
+      accommodationCostCurrency: accommodationIsCanonical ? uni.accommodationCostCurrency ?? "USD" : "USD",
+      accommodationCostPeriod: accommodationIsCanonical ? uni.accommodationCostPeriod ?? "year" : "year",
       applicationFee: uni.applicationFee != null ? Number(uni.applicationFee) : null,
       applicationFeeCurrency: uni.applicationFeeCurrency ?? "USD",
     };
+    const university = { ...uni, ...resolvedUsdUniversityCosts(uni) };
 
     return NextResponse.json({
-      university: uni,
+      university,
       money,
       universityRequirements,
       programs: programsWithReqs,

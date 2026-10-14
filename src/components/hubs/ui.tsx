@@ -16,9 +16,10 @@
  * The same markup is a `tablist` for assistive tech, with arrow-key support.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { ArrowRight, ChevronRight, TriangleAlert } from "lucide-react";
 import { isNewBadgeActive } from "@/lib/navSections";
 import { JourneyCard } from "@/components/journey/ui";
 
@@ -174,6 +175,7 @@ export function HubPage({
   children: React.ReactNode;
 }) {
   const t = useTranslations("hubs");
+  const nav = useTranslations("nav");
   const reduceMotion = useReducedMotion();
   const visibleTabPanes = panes?.filter((pane) => !hiddenPanes.includes(pane.id)) ?? [];
   const hasTabPanels = visibleTabPanes.length > 1 && Boolean(activePane);
@@ -190,6 +192,17 @@ export function HubPage({
   );
   return (
     <div className="space-y-4">
+      <nav aria-label={t("breadcrumbLabel")} className="print:hidden px-1">
+        <ol className="flex min-w-0 flex-wrap items-center gap-1 text-xs">
+          <li>
+            <Link href="/" className="rounded-md font-semibold text-slate-600 underline-offset-2 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:text-indigo-300">
+              {nav("dashboard")}
+            </Link>
+          </li>
+          <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5 text-slate-400" /></li>
+          <li aria-current="page" className="min-w-0 break-words font-bold text-slate-900 dark:text-white">{title}</li>
+        </ol>
+      </nav>
       <JourneyCard tone="hero">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">

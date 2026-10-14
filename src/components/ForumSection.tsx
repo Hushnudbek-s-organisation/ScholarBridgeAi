@@ -46,7 +46,8 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   const [showModeration, setShowModeration] = useState(false);
   const [showNewThread, setShowNewThread] = useState(false);
   /** Free can read; Pro (forum_write) can post/like/reply. */
-  const [canWrite, setCanWrite] = useState(false);
+  const [writeAccess, setWriteAccess] = useState<{ profileId: number; allowed: boolean } | null>(null);
+  const canWrite = userId != null && writeAccess?.profileId === userId && writeAccess.allowed;
   const [writeError, setWriteError] = useState<string | null>(null);
 
   // New thread form
@@ -106,27 +107,34 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   }, []);
 
   useEffect(() => {
-    loadCategories();
+    void Promise.resolve().then(loadCategories);
   }, [loadCategories]);
 
   useEffect(() => {
-    loadThreads();
+    void Promise.resolve().then(loadThreads);
   }, [loadThreads]);
 
   useEffect(() => {
-    if (!userId) {
-      setCanWrite(false);
-      return;
-    }
     let cancelled = false;
+    if (!userId) {
+      void Promise.resolve().then(() => {
+        if (!cancelled) setWriteAccess(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     fetch(`/api/premium/status?profileId=${userId}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        setCanWrite(!!data?.features?.forum_write || !!data?.isPremium);
+        setWriteAccess({
+          profileId: userId,
+          allowed: !!data?.features?.forum_write || !!data?.isPremium,
+        });
       })
       .catch(() => {
-        if (!cancelled) setCanWrite(false);
+        if (!cancelled) setWriteAccess({ profileId: userId, allowed: false });
       });
     return () => {
       cancelled = true;
@@ -134,7 +142,7 @@ export function ForumSection({ activeProfile, isModerator = false }: ForumSectio
   }, [userId]);
 
   useEffect(() => {
-    if (showModeration) loadReports();
+    if (showModeration) void Promise.resolve().then(loadReports);
   }, [showModeration, loadReports]);
 
   const handleCategoryChange = (categoryId: number | "all") => {

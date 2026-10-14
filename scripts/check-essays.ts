@@ -132,7 +132,33 @@ check(
   genericWhyUs.issues.some((i) => i.code === "why_us_generic")
 );
 
-section("5. Word limits are enforced");
+section("5. Flow, action, and prompt coverage stay deterministic and evidence-based");
+
+const stagedEssay = analyzeEssay(
+  "I chose this field because I want to solve a problem I saw at home.\n\nI studied statistics and completed relevant coursework at school.\n\nMy research project measured the result and I published the findings with my team.\n\nThis programme's curriculum and lab fit the work I want to continue.\n\nAfter graduation I plan to build tools that improve access to care.",
+  { type: "sop" },
+);
+check("paragraph analysis records a forward-moving narrative sequence", stagedEssay.flowAnalysis.stageSequence.join(",") === "motivation,preparation,evidence,programme_fit,future_impact");
+check("logical stage progression is not flagged as an abrupt jump", stagedEssay.flowAnalysis.backwardJumps === 0 && !stagedEssay.issues.some((issue) => issue.code === "abrupt_paragraph_flow"));
+const brokenFlow = analyzeEssay("First unrelated topic.\n\nSecond unrelated topic.\n\nThird unrelated topic.\n\nFourth unrelated topic.", { type: "supplemental" });
+check("unlinked paragraph flow is identified with a quoted excerpt", brokenFlow.issues.some((issue) => issue.code === "abrupt_paragraph_flow" && Boolean(issue.excerpt)));
+const repeatedTransition = analyzeEssay("Opening.\n\nHowever, point two.\n\nHowever, point three.\n\nHowever, point four.", { type: "supplemental" });
+check("repeated paragraph transitions are surfaced", repeatedTransition.issues.some((issue) => issue.code === "repeated_transition"));
+const agencyEssay = analyzeEssay("I helped with a survey. I participated in two meetings. I engineered the data pipeline and spearheaded the release.", { type: "supplemental" });
+check("specific action verbs and weaker phrases are counted separately", agencyEssay.actionVerbs.activeCount === 2 && agencyEssay.actionVerbs.weakCount === 2);
+check("action-verb excerpts cite exact sentences", agencyEssay.actionVerbs.activeExcerpts.some((item) => item.verb === "engineered" && item.excerpt.includes("I engineered the data pipeline")) && agencyEssay.actionVerbs.weakExcerpts.some((item) => item.phrase === "helped" && item.excerpt.includes("I helped with a survey")));
+check("the action ratio stays unknown when no measured verbs are present", analyzeEssay("A quiet afternoon.", { type: "supplemental" }).actionVerbs.ratioPct === null);
+const uncoveredPrompt = analyzeEssay("I enjoy learning about universities.", { prompt: "Describe a leadership experience and explain your financial need." });
+check("custom prompt coverage lists missing detected sub-questions", uncoveredPrompt.promptCoverage.source === "custom_prompt" && uncoveredPrompt.promptCoverage.missing.includes("leadership") && uncoveredPrompt.promptCoverage.missing.includes("financial_need"));
+check("prompt-coverage findings carry a machine-readable element", uncoveredPrompt.issues.some((issue) => issue.code === "prompt_coverage_missing" && issue.params?.element === "leadership"));
+check("essay-type coverage is explicit when no custom prompt is supplied", analyzeEssay("I am interested in this scholarship and contributed to my community.", { type: "scholarship" }).promptCoverage.source === "essay_type");
+const contextualComparison = compareVersions("I was involved in a group.", "I led a research project.", {
+  previous: { type: "supplemental", prompt: "Describe a research experience." },
+  current: { type: "supplemental", prompt: "Describe a research experience." },
+});
+check("version deltas include context-aware flow and agency dimensions", typeof contextualComparison.delta.flow === "number" && typeof contextualComparison.delta.agency === "number");
+
+section("6. Word limits are enforced");
 
 // 168 (draft) + 800 (padding) = ~968 words, comfortably over the 650 limit.
 const padded = `${strong} ${"Padding word. ".repeat(400)}`;
@@ -144,7 +170,7 @@ check("over the limit lowers the fit score", over.scores.fit < s.scores.fit);
 const under = analyzeEssay(strong.split("\n\n")[0], { wordLimit: 650 });
 check("far under the limit is flagged", under.issues.some((i) => i.code === "under_limit"));
 
-section("6. Degenerate input");
+section("7. Degenerate input");
 
 const empty = analyzeEssay("");
 check("empty text scores 0", empty.scores.total === 0);
@@ -155,7 +181,7 @@ check(
   !analyzeEssay("Short. ".repeat(40), { type: "supplemental" }).issues.some((i) => i.code === "too_short")
 );
 
-section("7. Determinism");
+section("8. Determinism");
 
 check(
   "the same text scores identically on every run",
@@ -163,7 +189,7 @@ check(
     JSON.stringify(analyzeEssay(strong, { targetName: "Purdue University" }).scores)
 );
 
-section("8. Version comparison");
+section("9. Version comparison");
 
 const cmp = compareVersions(weak, strong);
 check("an improved draft reports improvement", cmp.improved === true);

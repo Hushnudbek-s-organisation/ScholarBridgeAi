@@ -76,8 +76,15 @@ export const READINESS_WEIGHTS: Record<ReadinessKey, number> = {
   activities: 1 / 7,
   documents: 1 / 7,
   application: 1 / 7,
-  finance: 1 / 7,
+  // Use the exact remainder so summing the public weights equals one rather
+  // than 0.9999999999999998 due to binary floating-point representation.
+  finance: 1 - (1 / 7 + 1 / 7 + 1 / 7 + 1 / 7 + 1 / 7 + 1 / 7),
 };
+
+// Documents and applications have no universal required denominator. Their
+// headline progress uses fixed, monotone milestones instead of a ratio against
+// a changing number of tracked items. Detailed pending counts remain in gaps.
+const DOCUMENT_PROGRESS_MILESTONES = 5;
 
 export function profileReadiness(input: ReadinessInput): {
   categories: ReadinessCategory[];
@@ -95,9 +102,10 @@ export function profileReadiness(input: ReadinessInput): {
     tab: string,
     optional = true,
   ): ReadinessCategory => {
-    const count = Math.max(0, Math.min(total, recorded));
+    const safeTotal = finiteNonNegative(total);
+    const count = Math.min(safeTotal, finiteNonNegative(recorded));
     const unknown = optional && count === 0;
-    const precise = total > 0 ? roundTo((count / total) * 100, 1) : 0;
+    const precise = safeTotal > 0 ? roundTo((count / safeTotal) * 100, 1) : 0;
     const value = unknown ? 0 : precise;
     const state: ReadinessState = unknown
       ? "unknown"
@@ -161,19 +169,19 @@ export function profileReadiness(input: ReadinessInput): {
     ),
     make(
       "documents",
-      Number(input.documentsReady ?? 0),
-      Math.max(0, Number(input.documentsTotal ?? 0)),
-      [input.documentsTotal > input.documentsReady ? "documentsPending" : "documentChecklist"],
+      Math.min(DOCUMENT_PROGRESS_MILESTONES, finiteNonNegative(input.documentsReady ?? 0)),
+      DOCUMENT_PROGRESS_MILESTONES,
+      [finiteNonNegative(input.documentsTotal ?? 0) > finiteNonNegative(input.documentsReady ?? 0) ? "documentsPending" : "documentChecklist"],
       "documents",
-      Number(input.documentsTotal ?? 0) === 0,
+      finiteNonNegative(input.documentsTotal ?? 0) === 0,
     ),
     make(
       "application",
-      Number(input.applicationsSubmitted ?? 0),
-      Math.max(0, Number(input.applicationsStarted ?? 0)),
-      [input.applicationsStarted > input.applicationsSubmitted ? "applicationsPending" : "noApplications"],
+      applicationProgress(input.applicationsStarted, input.applicationsSubmitted),
+      100,
+      [finiteNonNegative(input.applicationsStarted ?? 0) > finiteNonNegative(input.applicationsSubmitted ?? 0) ? "applicationsPending" : "noApplications"],
       "applications",
-      Number(input.applicationsStarted ?? 0) === 0,
+      finiteNonNegative(input.applicationsStarted ?? 0) === 0,
     ),
     make(
       "finance",
@@ -188,9 +196,12 @@ export function profileReadiness(input: ReadinessInput): {
   ];
 
   const measured = categories.filter((category) => !category.unknown);
-  const totalWeight = measured.reduce((sum, category) => sum + READINESS_WEIGHTS[category.key], 0);
+  // Use the same seven-category denominator every time. Unknown categories
+  // remain explicitly marked unknown (and stay out of `weakest`); they are
+  // simply zero recorded-information coverage, not a negative admission signal.
+  const totalWeight = categories.reduce((sum, category) => sum + READINESS_WEIGHTS[category.key], 0);
   const overallPrecise = totalWeight
-    ? roundTo(measured.reduce((sum, category) => sum + category.precise * READINESS_WEIGHTS[category.key], 0) / totalWeight, 1)
+    ? roundTo(categories.reduce((sum, category) => sum + category.precise * READINESS_WEIGHTS[category.key], 0) / totalWeight, 1)
     : 0;
   const weakest = [...measured].sort((a, b) => a.pct - b.pct).slice(0, 3);
 
@@ -201,6 +212,19 @@ export function profileReadiness(input: ReadinessInput): {
     overallPrecise,
     weights: READINESS_WEIGHTS,
   };
+}
+
+function finiteNonNegative(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function applicationProgress(startedRaw: number, submittedRaw: number): number {
+  const started = finiteNonNegative(startedRaw ?? 0);
+  const submitted = Math.min(started, finiteNonNegative(submittedRaw ?? 0));
+  // Ten points for each of up to five tracked applications, and ten more for
+  // each submitted one. This remains monotone when a new pending application
+  // is added; the detailed checklist still reports actual pending counts.
+  return Math.min(100, Math.min(5, started) * 10 + Math.min(5, submitted) * 10);
 }
 
 export type TestGapState = "no_figure" | "no_score" | "below_figure" | "at_or_above_figure";

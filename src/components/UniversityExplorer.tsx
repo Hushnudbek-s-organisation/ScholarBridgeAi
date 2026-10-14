@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import { StudentProfile } from "./Navbar";
 import { UniversityDetail } from "./UniversityDetail";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
+import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
@@ -15,16 +17,16 @@ import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "./AppNote";
-import { 
-  Search, 
-  Globe, 
-  GraduationCap, 
-  DollarSign, 
-  Award, 
-  Filter, 
-  Check, 
-  Plus, 
-  Columns, 
+import {
+  Search,
+  Globe,
+  GraduationCap,
+  DollarSign,
+  Award,
+  Filter,
+  Check,
+  Plus,
+  Columns,
   ExternalLink,
   Briefcase,
   Star,
@@ -115,6 +117,7 @@ export function UniversityExplorer({
   // Filters
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("All");
+  const [selectedType, setSelectedType] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
   const [maxTuition, setMaxTuition] = useState<number>(70000);
 
@@ -153,7 +156,7 @@ export function UniversityExplorer({
   // (filters, search, sort, profile, or page size). Adjusted during render
   // (the React-endorsed alternative to a reset effect), so the debounced
   // fetch below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
+  const resultKey = [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedType, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -166,6 +169,7 @@ export function UniversityExplorer({
     const params = new URLSearchParams();
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
     if (selectedCountry !== "All") params.set("country", selectedCountry);
+    if (selectedType !== "All") params.set("type", selectedType);
     // For an active student, the catalogue is always locked to the degree
     // selected in their profile. Guests may still use the level filter.
     const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
@@ -309,7 +313,7 @@ export function UniversityExplorer({
         </div>
 
         {/* Filter Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
           {/* Text Search */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -340,6 +344,20 @@ export function UniversityExplorer({
                   </option>
                 );
               })}
+            </select>
+          </div>
+
+          {/* University type — unknown catalogue types remain visible only in All. */}
+          <div>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              aria-label={t("uniType")}
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="All">{t("exTypeAll")}</option>
+              <option value="Public">{t("exTypePublic")}</option>
+              <option value="Private">{t("exTypePrivate")}</option>
             </select>
           </div>
 
@@ -455,9 +473,12 @@ export function UniversityExplorer({
                 {/* Top Image Banner */}
                 <div className="relative h-40 w-full overflow-hidden bg-slate-100">
                   {uni.imageUrl ? (
-                    <img
+                    <Image
                       src={uni.imageUrl}
                       alt={`${uni.name} — ${uni.city}, ${uni.country}`}
+                      width={640}
+                      height={320}
+                      unoptimized
                       loading="lazy"
                       decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -470,10 +491,19 @@ export function UniversityExplorer({
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
 
                   {/* Match Score Badge */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                  <div className="absolute left-3 right-16 top-3 flex flex-wrap items-center gap-1.5">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
+                    {uni.matchBreakdown && (
+                      <MatchEvidenceBadge
+                        comparedDimensions={uni.matchBreakdown.comparedDimensions}
+                        totalDimensions={uni.matchBreakdown.totalDimensions}
+                        evidenceCoveragePct={uni.matchBreakdown.evidenceCoveragePct}
+                        evidenceLevel={uni.matchBreakdown.evidenceLevel}
+                        className="bg-white/95"
+                      />
+                    )}
                   </div>
 
                   {/* World Rank Badge */}
@@ -716,7 +746,18 @@ export function UniversityExplorer({
                   <tr>
                     <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
-                      <td key={u.id} className="py-2.5 px-4 font-bold text-blue-700">{u.matchScore != null ? t("exMatchPct", { score: u.matchScore }) : t("exMatchUnavailable")}</td>
+                      <td key={u.id} className="py-2.5 px-4 font-bold text-blue-700">
+                        {u.matchScore != null ? t("exMatchPct", { score: u.matchScore }) : t("exMatchUnavailable")}
+                        {u.matchBreakdown && (
+                          <MatchEvidenceBadge
+                            comparedDimensions={u.matchBreakdown.comparedDimensions}
+                            totalDimensions={u.matchBreakdown.totalDimensions}
+                            evidenceCoveragePct={u.matchBreakdown.evidenceCoveragePct}
+                            evidenceLevel={u.matchBreakdown.evidenceLevel}
+                            className="mt-1 block w-fit"
+                          />
+                        )}
+                      </td>
                     ))}
                   </tr>
                   <tr>

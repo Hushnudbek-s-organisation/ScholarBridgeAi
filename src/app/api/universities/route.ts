@@ -19,6 +19,7 @@ import { pickBestSource } from "@/lib/sourcePick";
 import { selectUniversities } from "@/lib/universities";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 /**
  * University discovery API (spec §16).
@@ -41,7 +42,12 @@ export async function GET(req: Request) {
     const minRank = searchParams.get("minRank") ? Number(searchParams.get("minRank")) : null;
     const maxRank = searchParams.get("maxRank") ? Number(searchParams.get("maxRank")) : null;
 
-    let allUnis = await selectUniversities();
+    let allUnis = (await selectUniversities()).map((uni) => ({
+      ...uni,
+      // Compatibility USD fields are derived from the canonical currency and
+      // period first; stale USD mirrors never drive filters or displays.
+      ...resolvedUsdUniversityCosts(uni),
+    }));
 
     // Get profile for match calculation if provided. The same mapping is used
     // by Explorer, Chancing and the dashboard, including the structured
@@ -98,6 +104,13 @@ export async function GET(req: Request) {
 
     if (country && country !== "All") {
       allUnis = allUnis.filter((u) => countriesMatch(u.country, country));
+    }
+
+    // Type is a published catalogue filter; an unpublished type stays unknown
+    // and is not silently treated as either Public or Private.
+    if (uniType && ["Public", "Private"].includes(uniType)) {
+      const wantedType = uniType.toLocaleLowerCase();
+      allUnis = allUnis.filter((u) => u.universityType?.trim().toLocaleLowerCase().includes(wantedType));
     }
 
     // Keep the owner's target degree authoritative and recognise equivalent

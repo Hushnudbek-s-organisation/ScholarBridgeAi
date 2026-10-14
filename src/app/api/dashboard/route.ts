@@ -32,8 +32,9 @@ import { hasUndergraduateAdmission, supportsDegreeLevel } from "@/lib/degreeLeve
 import { countriesMatch } from "@/lib/countries";
 import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
-import { buildFundingPlan } from "@/lib/journey/funding";
-import { calculateCosts } from "@/lib/costs";
+import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal } from "@/lib/journey/funding";
+import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import { gpaTo40Scale } from "@/lib/gpa";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
 import { summarizeApplications } from "@/lib/journey/applicationSummary";
@@ -163,37 +164,23 @@ export async function GET(req: Request) {
       .limit(50);
 
     let fundingGapClosed = false;
-    let annualCost = 0;
-    let fundingEstimated = false;
+    let annualCost: number | null = null;
+    const fundingEstimated = false;
     let fundingSummary: ReturnType<typeof buildFundingPlan> | null = null;
     if (acceptedApp?.universityId) {
       const [uni] = await db.select().from(universities).where(eq(universities.id, acceptedApp.universityId)).limit(1);
       if (uni) {
-        const costs = calculateCosts({
-          annualTuitionUsd: num(uni.annualTuition ?? uni.annualTuitionUsd),
-          annualLivingEstUsd: num(uni.annualLivingEst ?? uni.annualLivingEstUsd),
-          accommodationCostUsd: num(uni.accommodationCost ?? uni.accommodationCostUsd),
-          applicationFeeUsd: num(uni.applicationFee),
-          country: uni.country,
-          city: uni.city,
-          years: 1,
-          flightsPerYearUsd: 1400,
-          insurancePerYearUsd: 1200,
-          booksPerYearUsd: 900,
-          visaFeeUsd: 500,
-          scholarships: fundingRows
-            .filter((f) => f.kind === "scholarship" || f.kind === "aid")
-            .map((f) => ({
-              name: f.name,
-              amountUsd: f.amountUsd,
-              covers: "both" as const,
-              probability: f.status === "confirmed" || f.status === "awarded" ? 1 : 0.3,
-            })),
-        });
-        annualCost = costs.annualTotalUsd;
-        fundingEstimated = costs.lines.some((line) => line.estimated);
-        fundingSummary = buildFundingPlan({ annualCost, items: normalizeFunding(fundingRows) });
-        fundingGapClosed = fundingSummary.fundingGap === 0;
+        const costsUsd = resolvedUsdUniversityCosts(uni);
+        // Use the same full annual cost-line set as the funding planner. Do not
+        // present a tuition+living subtotal as the entire yearly cost while
+        // insurance, books, or travel remain unknown.
+        const lines = annualFundingCostLines(costsUsd);
+        annualCost = knownAnnualCostTotal(lines);
+        if (annualCost != null) {
+          const appFundingRows = fundingRows.filter((row) => row.applicationId === acceptedApp.id);
+          fundingSummary = buildFundingPlan({ annualCost, lines, items: normalizeFunding(appFundingRows) });
+          fundingGapClosed = fundingSummary.isCovered === true;
+        }
       }
     }
 
@@ -365,7 +352,9 @@ export async function GET(req: Request) {
         ielts: profile?.ieltsScore ?? null,
         target: (await highestTestTarget(profileId, "ielts")) ?? null,
       },
-      funding: fundingSummary ? { gap: fundingSummary.fundingGap, covered: fundingSummary.isCovered } : null,
+      funding: fundingSummary?.fundingGap != null
+        ? { gap: fundingSummary.fundingGap, covered: fundingSummary.isCovered === true }
+        : null,
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
@@ -403,9 +392,9 @@ export async function GET(req: Request) {
       readiness,
       phases,
       testGaps: gaps,
-      funding: fundingSummary && annualCost > 0
-        ? { ...fundingSummary, items: fundingRows.length, calculated: true, estimated: fundingEstimated }
-        : { annualCost: 0, isCovered: false, fundingGap: 0, securedGap: 0, items: fundingRows.length, calculated: false, estimated: false },
+      funding: fundingSummary && annualCost != null
+        ? { ...fundingSummary, items: fundingRows.filter((row) => row.applicationId === acceptedApp?.id).length, calculated: true, estimated: fundingEstimated }
+        : { annualCost: null, isCovered: null, fundingGap: null, securedGap: null, items: fundingRows.length, calculated: false, estimated: false },
       expiringDocuments: expiring.map((e) => ({
         ...e,
         expiresAt: e.expiresAt ? String(e.expiresAt).slice(0, 10) : null,
@@ -441,11 +430,6 @@ function normalizeFunding(rows: { kind: string; name: string; amountUsd: number;
     status: (statuses.has(r.status) ? r.status : "planned") as "planned" | "applied" | "awarded" | "confirmed" | "declined",
     covers: r.covers,
   }));
-}
-
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
 }
 
 function daysUntil(from: Date, iso: string): number | null {
@@ -567,7 +551,7 @@ async function recommendedFor(
 ) {
   const countries = parseList(profile.preferredCountries);
   const major = (profile.targetMajor ?? "").trim();
-  const gpa = profile.gpa ?? null;
+  const gpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
   const degreeLevel = profile.degreeLevel ?? null;
   const applicantCountry = profile.country ?? null;
 
@@ -624,7 +608,9 @@ async function recommendedFor(
       .slice(0, uniLimit);
   }
 
-  const universitiesOut = scored.map(({ uni: u, match }) => ({
+  const universitiesOut = scored.map(({ uni: u, match }) => {
+    const usdCosts = resolvedUsdUniversityCosts(u);
+    return {
       id: u.id,
       name: u.name,
       country: u.country,
@@ -635,7 +621,14 @@ async function recommendedFor(
       minGpa: u.minGpa,
       minIelts: u.minIelts,
       annualTuition: u.annualTuition,
-      annualTuitionUsd: u.annualTuitionUsd,
+      tuitionCurrency: u.tuitionCurrency,
+      tuitionPeriod: u.tuitionPeriod,
+      annualTuitionUsd: usdCosts.annualTuitionUsd,
+      annualLivingEst: u.annualLivingEst,
+      livingCostCurrency: u.livingCostCurrency,
+      livingCostPeriod: u.livingCostPeriod,
+      annualLivingEstUsd: usdCosts.annualLivingEstUsd,
+      postStudyWorkVisaYears: u.postStudyWorkVisaYears,
       verificationStatus: u.verificationStatus,
       lastVerifiedAt: u.lastVerifiedAt,
       sourceUrl: u.sourceUrl,
@@ -643,7 +636,9 @@ async function recommendedFor(
       matchScore: match.matchScore,
       matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
-  }));
+      matchBreakdown: match.breakdown,
+    };
+  });
 
   const schRows = await db
     .select()
@@ -681,7 +676,7 @@ async function recommendedFor(
       title: s.title,
       provider: s.provider,
       country: s.country,
-      amountUsdValue: s.amountUsdValue,
+      amountUsdValue: resolvedUsdScholarshipAmount(s),
       awardAmount: s.awardAmount,
       awardCurrency: s.awardCurrency,
       awardPeriod: s.awardPeriod,
@@ -697,6 +692,7 @@ async function recommendedFor(
       matchScore: match.matchScore,
       matchReasons: translateReasons(locale, "scholarship", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "scholarship", match.issueDetails, match.potentialIssues),
+      matchBreakdown: match.breakdown,
       gpaOk: s.minGpa == null || gpa == null || gpa >= s.minGpa,
       gpaProvided: gpa != null,
       /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */

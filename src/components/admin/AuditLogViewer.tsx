@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { History, Loader2, RefreshCw } from "lucide-react";
 
 interface AdminAuditViewerProps {
@@ -24,7 +24,7 @@ export function AuditLogViewer({ adminProfileId }: AdminAuditViewerProps) {
   const [loading, setLoading] = useState(true);
   const [entityType, setEntityType] = useState("");
 
-  const load = async (type = entityType) => {
+  const load = useCallback(async (type: string) => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ adminProfileId: String(adminProfileId) });
@@ -37,12 +37,11 @@ export function AuditLogViewer({ adminProfileId }: AdminAuditViewerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    load("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminProfileId]);
+    void Promise.resolve().then(() => load(""));
+  }, [load]);
 
   return (
     <div className="space-y-4">
@@ -68,7 +67,7 @@ export function AuditLogViewer({ adminProfileId }: AdminAuditViewerProps) {
             <option value="scholarship">Scholarships</option>
           </select>
           <button
-            onClick={() => load()}
+            onClick={() => load(entityType)}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   FileCheck2,
   Loader2,
@@ -65,7 +65,7 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
   const [check, setCheck] = useState<DocCheck | null>(null);
   const [suggested, setSuggested] = useState<Suggested[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!profileId) return;
     setLoading(true);
     try {
@@ -81,12 +81,11 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileId]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+    void Promise.resolve().then(load);
+  }, [load]);
 
   const toggleStatus = async (doc: DocItem) => {
     const next = doc.status === "uploaded" ? "missing" : "uploaded";

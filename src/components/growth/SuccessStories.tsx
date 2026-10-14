@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { AnimatePresence, motion } from "framer-motion";
@@ -23,6 +23,7 @@ import {
 import type { StudentProfile } from "../Navbar";
 import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "./ui";
 import { AppNote } from "@/components/AppNote";
+import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 
 interface Story {
   id: number;
@@ -102,6 +103,9 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
   const [degree, setDegree] = useState("");
   const [sort, setSort] = useState<"twin" | "featured" | "recent">(activeProfile ? "twin" : "featured");
   const [openStory, setOpenStory] = useState<Story | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeStory = useCallback(() => setOpenStory(null), []);
+  useDialogFocusTrap({ open: openStory !== null, dialogRef, onEscape: closeStory });
   const [form, setForm] = useState(emptyForm);
   const [sending, setSending] = useState(false);
   const [toast, showToast] = useToast();
@@ -500,7 +504,9 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
             onClick={() => setOpenStory(null)}
           >
             <motion.div
+              ref={dialogRef}
               role="dialog"
+              tabIndex={-1}
               aria-modal="true"
               aria-label={openStory.admittedUniversity}
               initial={{ y: 40, opacity: 0 }}

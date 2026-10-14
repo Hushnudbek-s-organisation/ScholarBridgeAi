@@ -30,6 +30,7 @@ import pg from "pg";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const SQL = readFileSync(new URL("../supabase/full_schema.sql", import.meta.url), "utf8");
+const PAYMENT_MIGRATION = readFileSync(new URL("../supabase/add_payment_provider_lifecycle.sql", import.meta.url), "utf8");
 const PORT = 5521;
 const DIR = "/tmp/scholarbridge-schema-repair";
 const CONN = `postgresql://t:t@127.0.0.1:${PORT}/sb`;
@@ -90,9 +91,19 @@ const main = async () => {
   // ---------------- Scenario 1: FRESH ----------------
   console.log("\nFRESH database (empty -> full_schema.sql):");
   await c.query(SQL);
+  // Exercise the focused additive payment migration independently of the
+  // generated full schema, including safe re-application.
+  await c.query("DROP INDEX IF EXISTS uq_payments_provider_transaction");
+  await c.query("DROP INDEX IF EXISTS uq_subscriptions_payment_id");
+  await c.query("ALTER TABLE payments DROP COLUMN IF EXISTS provider_created_at");
+  await c.query("ALTER TABLE payments DROP COLUMN IF EXISTS performed_at");
+  await c.query("ALTER TABLE payments DROP COLUMN IF EXISTS cancelled_at");
+  await c.query("ALTER TABLE payments DROP COLUMN IF EXISTS cancel_reason");
+  await c.query(PAYMENT_MIGRATION);
+  await c.query(PAYMENT_MIGRATION);
   const fresh = await stats(c);
-  check("creates the full table set (93)", fresh.tables === 93, `got ${fresh.tables}`);
-  check("creates every FK (115)", fresh.fks === 115, `got ${fresh.fks}`);
+  check("creates the full table set (95)", fresh.tables === 95, `got ${fresh.tables}`);
+  check("creates every FK (117)", fresh.fks === 117, `got ${fresh.fks}`);
   check(
     "composite programs(id, university_id) UNIQUE constraint exists",
     await uniqueConstraintOn(c, "programs", ["id", "university_id"]),
@@ -117,10 +128,33 @@ const main = async () => {
        FROM pg_class WHERE relkind='r' AND relnamespace='public'::regnamespace`,
     )
   ).rows[0];
-  check("RLS enabled on all 93 public tables", rls.total === 93 && rls.enabled === 93, `${rls.enabled}/${rls.total}`);
+  check("RLS enabled on all 95 public tables", rls.total === 95 && rls.enabled === 95, `${rls.enabled}/${rls.total}`);
   check(
     "rate-limit storage table rate_limit_hits exists",
     (await c.query(`SELECT 1 FROM information_schema.tables WHERE table_name='rate_limit_hits'`)).rows.length === 1,
+  );
+  const paymentColumns = await c.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='payments'
+       AND column_name IN ('provider_created_at','performed_at','cancelled_at','cancel_reason')`,
+  );
+  check("payments has all four provider lifecycle columns", paymentColumns.rows.length === 4);
+  const providerIndex = await c.query(
+    `SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='uq_payments_provider_transaction'`,
+  );
+  check(
+    "provider transaction ids are uniquely guarded per provider",
+    providerIndex.rows.length === 1 && /CREATE UNIQUE INDEX/.test(providerIndex.rows[0].indexdef) &&
+      /\(provider, provider_transaction_id\)/.test(providerIndex.rows[0].indexdef) &&
+      /WHERE.*provider_transaction_id.*<>/.test(providerIndex.rows[0].indexdef),
+  );
+  const subscriptionIndex = await c.query(
+    `SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='uq_subscriptions_payment_id'`,
+  );
+  check(
+    "a payment can activate at most one subscription",
+    subscriptionIndex.rows.length === 1 && /CREATE UNIQUE INDEX/.test(subscriptionIndex.rows[0].indexdef) &&
+      /\(payment_id\)/.test(subscriptionIndex.rows[0].indexdef) && /WHERE.*payment_id.*IS NOT NULL/.test(subscriptionIndex.rows[0].indexdef),
   );
 
   // ---------------- Scenario 2: BROKEN -> repaired ----------------
@@ -158,7 +192,7 @@ const main = async () => {
   // Repair with the canonical file.
   await c.query(SQL);
   const repaired = await stats(c);
-  check("repair restores every FK (115)", repaired.fks === 115, `got ${repaired.fks}`);
+  check("repair restores every FK (117)", repaired.fks === 117, `got ${repaired.fks}`);
   check(
     "repair backfills the composite FK on application_cycles",
     (

@@ -122,6 +122,11 @@ const budgetFit = withCtx.rows.find((r) => r.key === "budgetFit")!;
 check("a budget row appears when the student sets one", Boolean(budgetFit));
 check("an affordable option says so", /Within budget/.test(String(budgetFit.values[cheap.id])));
 check("an unaffordable option says by how much", /over budget/.test(String(budgetFit.values[picky.id])));
+const incompleteBudget = compareUniversities([
+  uni({ id: 101, name: "Tuition only", annualTuitionUsd: 20000, annualLivingEstUsd: null }),
+  uni({ id: 102, name: "Living only", annualTuitionUsd: null, annualLivingEstUsd: 14000 }),
+], { budgetAnnualUsd: 25000 }).rows.find((row) => row.key === "budgetFit")!;
+check("budget comparison stays unknown unless both USD cost lines are known", incompleteBudget.values[101] === null && incompleteBudget.values[102] === null);
 
 const noCtx = compareUniversities([cheap, elite]);
 check("no GPA row without a GPA", !noCtx.rows.some((r) => r.key === "gpaFit"));

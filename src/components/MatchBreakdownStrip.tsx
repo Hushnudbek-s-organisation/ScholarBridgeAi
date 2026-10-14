@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { MatchBreakdown } from "@/lib/matching";
+import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
 
 /**
  * The exact arithmetic behind a Fit score: one chip per scoring dimension with
@@ -43,9 +44,19 @@ export function MatchBreakdownStrip({
         <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
           {t("exScoreBreakdown")}
         </span>
-        <span className="text-[10px] font-semibold text-slate-500 tabular-nums">
-          {t("exDimensionsMeasured", { measured, total })}
-        </span>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <span className="text-[10px] font-semibold text-slate-500 tabular-nums">
+            {t("exDimensionsMeasured", { measured, total })}
+          </span>
+          {!Array.isArray(breakdown) && (
+            <MatchEvidenceBadge
+              comparedDimensions={measured}
+              totalDimensions={total}
+              evidenceCoveragePct={breakdown.evidenceCoveragePct}
+              evidenceLevel={breakdown.evidenceLevel}
+            />
+          )}
+        </div>
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
         {components

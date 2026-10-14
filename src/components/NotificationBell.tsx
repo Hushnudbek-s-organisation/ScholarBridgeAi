@@ -71,7 +71,7 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
     return () => window.removeEventListener("resize", computePanel);
   }, [open, computePanel]);
 
-  const load = async (unreadOnly = false) => {
+  const load = useCallback(async (unreadOnly = false) => {
     if (!profileId) return;
     setLoading(true);
     try {
@@ -85,12 +85,11 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileId]);
 
   useEffect(() => {
-    if (profileId) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+    if (profileId) void Promise.resolve().then(() => load());
+  }, [profileId, load]);
 
   // Close on outside click.
   useEffect(() => {

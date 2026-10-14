@@ -52,6 +52,26 @@ export interface WordLimit {
   max?: number;
 }
 
+/**
+ * Approximate TOEFL iBT total-score concordance. It supports comparison only;
+ * scholarship policies can set their own accepted tests/equivalencies and must
+ * be checked on the provider's official page.
+ */
+export function toeflToApproxIelts(score: number | null | undefined): number | null {
+  if (score == null || !Number.isFinite(score) || !Number.isInteger(score) || score <= 0 || score > 120) return null;
+  if (score <= 31) return 4;
+  if (score <= 34) return 4.5;
+  if (score <= 45) return 5;
+  if (score <= 59) return 5.5;
+  if (score <= 78) return 6;
+  if (score <= 93) return 6.5;
+  if (score <= 101) return 7;
+  if (score <= 109) return 7.5;
+  if (score <= 114) return 8;
+  if (score <= 117) return 8.5;
+  return 9;
+}
+
 export interface EssayFit {
   scholarshipId: number;
   title: string;
@@ -297,27 +317,39 @@ export function scoreEssayFit(essay: EssayInput, sh: ScholarshipInput, profile: 
     gaps.push(`GPA ${gpa4.toFixed(2)}/4.0 is below the ${sh.minGpa} minimum`);
   }
 
-  // 6. English (0–15). TOEFL is converted the same way the rest of the
-  // product does: (t − 40) / 12.
-  const english =
-    profile.ieltsScore != null && profile.ieltsScore > 0
+  // 6. English (0–15). TOEFL uses a published-range approximate concordance,
+  // not a linear conversion. Any alternative-test policy still needs official
+  // scholarship verification; this is never an eligibility decision.
+  const ielts =
+    profile.ieltsScore != null && Number.isFinite(profile.ieltsScore) && profile.ieltsScore > 0 && profile.ieltsScore <= 9
       ? profile.ieltsScore
-      : profile.toeflScore != null && profile.toeflScore > 0
-        ? (profile.toeflScore - 40) / 12
-        : null;
+      : null;
+  const toeflEquivalent = ielts == null ? toeflToApproxIelts(profile.toeflScore) : null;
+  const english = ielts ?? toeflEquivalent;
+  const usingApproximateToefl = ielts == null && toeflEquivalent != null;
+  const invalidToefl = ielts == null && Number(profile.toeflScore) > 0 && toeflToApproxIelts(profile.toeflScore) == null;
   if (sh.minIelts == null) {
     fit += 12;
     matched.push("no English minimum published");
   } else if (english == null) {
     fit += 5;
-    codes.push("english_missing");
-    gaps.push(`English minimum is IELTS ${sh.minIelts} but no test score is on file`);
+    if (invalidToefl) {
+      codes.push("english_unrecognized");
+      gaps.push("The recorded TOEFL score is outside the supported 0–120 scale; check the score and the provider's official test policy.");
+    } else {
+      codes.push("english_missing");
+      gaps.push(`English minimum is IELTS ${sh.minIelts} but no comparable test score is on file`);
+    }
   } else if (english >= sh.minIelts) {
     fit += 15;
-    matched.push(`English ${english.toFixed(1)} (IELTS equivalent) meets the ${sh.minIelts} minimum`);
+    matched.push(usingApproximateToefl
+      ? `Approximate concordance: TOEFL ${profile.toeflScore} ≈ IELTS ${english.toFixed(1)} meets the ${sh.minIelts} figure; verify that the provider accepts TOEFL.`
+      : `IELTS ${english.toFixed(1)} meets the ${sh.minIelts} minimum`);
   } else {
     codes.push("english_below_min");
-    gaps.push(`English ${english.toFixed(1)} (IELTS equivalent) is below the ${sh.minIelts} minimum`);
+    gaps.push(usingApproximateToefl
+      ? `Approximate concordance: TOEFL ${profile.toeflScore} ≈ IELTS ${english.toFixed(1)} is below ${sh.minIelts}; verify the provider's accepted tests and threshold.`
+      : `IELTS ${english.toFixed(1)} is below the ${sh.minIelts} minimum`);
   }
 
   return {
@@ -378,6 +410,9 @@ export function adaptationPlan(fit: EssayFit, sh: ScholarshipInput, essay: Essay
         break;
       case "english_missing":
         plan.push("No English test score on file — take one (IELTS, TOEFL or Duolingo) or confirm the scholarship accepts your background.");
+        break;
+      case "english_unrecognized":
+        plan.push("Check that the TOEFL score is an integer from 1 to 120, then verify the scholarship's accepted tests on its official page.");
         break;
       default:
         if (code.startsWith("theme_missing:")) {

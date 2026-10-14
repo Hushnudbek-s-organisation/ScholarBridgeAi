@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import { Gift, Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
 
 interface ConfigManagerProps {
@@ -22,7 +23,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
   const [uploading, setUploading] = useState<"logo" | "favicon" | "">("");
   const [branding, setBranding] = useState({ logo: "", favicon: "" });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/config?adminProfileId=${adminProfileId}`);
@@ -39,12 +40,11 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminProfileId]);
+    void Promise.resolve().then(load);
+  }, [load]);
 
   const save = async (key: string, value: string) => {
     setSavingKey(key);
@@ -119,7 +119,18 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
           {(["logo", "favicon"] as const).map((kind) => (
             <div key={kind} className="flex items-center gap-3 rounded-xl border border-white bg-white p-3 shadow-xs">
               <div className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
-                {branding[kind] ? <img src={branding[kind]} alt={`${kind} preview`} className="h-full w-full object-contain" /> : <ImageIcon className="h-5 w-5 text-slate-300" />}
+                {branding[kind] ? (
+                  <Image
+                    src={branding[kind]}
+                    alt={`${kind} preview`}
+                    width={48}
+                    height={48}
+                    unoptimized
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <ImageIcon className="h-5 w-5 text-slate-300" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-extrabold text-slate-700">{kind === "logo" ? "Site logo" : "Favicon"}</p>

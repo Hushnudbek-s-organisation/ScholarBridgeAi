@@ -41,6 +41,7 @@ interface Item {
   country: string;
   coverageType: string;
   amountUsdValue: number | null;
+  awardPeriod?: string | null;
   deadlineDate: string | null;
   matchScore: number | null;
   websiteUrl: string;
@@ -56,7 +57,15 @@ interface Data {
   applied: Item[];
   hidden: Item[];
   similar: { id: number; basedOn: string; similarity: number }[];
-  stats: { matches: number; applied: number; hidden: number; closingSoon: number; reopening: number; potentialUsd: number };
+  stats: {
+    matches: number;
+    applied: number;
+    hidden: number;
+    closingSoon: number;
+    reopening: number;
+    potentialUsd: number | null;
+    potentialPeriod: "year" | "month" | "one_time" | "total" | null;
+  };
 }
 
 type Filter = "all" | "noEssay" | "full" | "soon";
@@ -184,6 +193,10 @@ export function ScholarshipAutopilot({
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
               <DollarSign className="h-3 w-3" /> {money(s.amountUsdValue)}
+              {s.awardPeriod === "year" && <span>{" · "}{t("awardPeriod.year")}</span>}
+              {s.awardPeriod === "month" && <span>{" · "}{t("awardPeriod.month")}</span>}
+              {s.awardPeriod === "one_time" && <span>{" · "}{t("awardPeriod.one_time")}</span>}
+              {s.awardPeriod === "total" && <span>{" · "}{t("awardPeriod.total")}</span>}
             </span>
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -276,7 +289,12 @@ export function ScholarshipAutopilot({
             <StatCard label={t("statMatches")} value={data.stats.matches} icon={Sparkles} tone="indigo" />
             <StatCard label={t("statSoon")} value={data.stats.closingSoon} icon={CalendarClock} tone="rose" />
             <StatCard label={t("statApplied")} value={data.stats.applied} icon={CheckCircle2} tone="emerald" />
-            <StatCard label={t("statPotential")} value={money(data.stats.potentialUsd)} icon={DollarSign} tone="violet" />
+            <StatCard
+              label={t("statPotential")}
+              value={`${money(data.stats.potentialUsd)}${data.stats.potentialUsd != null && data.stats.potentialPeriod ? ` / ${t(`awardPeriod.${data.stats.potentialPeriod}`)}` : ""}`}
+              icon={DollarSign}
+              tone="violet"
+            />
           </div>
 
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">

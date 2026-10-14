@@ -359,28 +359,28 @@ export const DEFAULT_HIDDEN_NAV_ITEMS = [
   "advisor",
   "mentors",
   "opportunities",
-  "compare",
+  "countries",
   "parent",
 ];
 
 /** Parse the stored config value into a list of hidden ids. */
 export function parseHiddenNav(raw: string | null | undefined): string[] {
-  const stripUnavailable = (ids: string[]) =>
-    ids.filter((id) => id !== "details" && !UNHIDEABLE_NAV_ITEMS.includes(id));
-  if (!raw) return stripUnavailable([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  const normalize = (ids: string[]) => [...new Set(ids
+    .filter((id) => id !== "details" && !UNHIDEABLE_NAV_ITEMS.includes(id))
+    // `compare` was the old pane id; the visible pane is canonically `countries`.
+    .map((id) => id === "compare" ? "countries" : id))];
+  if (!raw) return normalize([...DEFAULT_HIDDEN_NAV_ITEMS]);
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       // Older configs could hide the former profile-details pane. Profile
       // editing now opens in a modal, so discard that stale navigation id.
-      return stripUnavailable(
-        parsed.filter((v): v is string => typeof v === "string" && !!v)
-      );
+      return normalize(parsed.filter((v): v is string => typeof v === "string" && !!v));
     }
   } catch {
     // corrupt value — fall back to defaults instead of breaking the sidebar
   }
-  return stripUnavailable([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  return normalize([...DEFAULT_HIDDEN_NAV_ITEMS]);
 }
 
 /**
@@ -547,7 +547,9 @@ export function groupOfSection(id: string): NavGroupId | null {
 export function visiblePanes(sectionId: string, hidden: string[]): NavPaneMeta[] {
   const section = NAV_SECTIONS.find((s) => s.id === sectionId);
   if (!section) return [];
-  return section.panes.filter((p) => !hidden.includes(p.id));
+  // Callers may pass a raw/legacy config without going through parseHiddenNav.
+  const hiddenIds = new Set(hidden.map((id) => id === "compare" ? "countries" : id));
+  return section.panes.filter((p) => !hiddenIds.has(p.id));
 }
 
 /** Destination id → key in the `nav` i18n namespace for its label. */

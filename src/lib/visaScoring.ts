@@ -13,6 +13,9 @@
  * Pure module — asserted in `scripts/check-visa.ts`.
  */
 
+import { compareDegreeLevels } from "./degreeLevels";
+import { subjectAffinity } from "./subjectAffinity";
+
 export interface VisaTurn {
   role: "officer" | "user";
   text: string;
@@ -29,12 +32,28 @@ export interface VisaRubric {
     languageClarity: number;
     total: number;
   };
-  /** Refusal grounds the transcript leaves exposed. */
-  risks: { code: string; message: string; severity: "high" | "medium" | "low" }[];
+  /** Refusal grounds and profile consistency checks the transcript leaves exposed. */
+  risks: { code: string; message: string; severity: "high" | "medium" | "low"; params?: Record<string, string | number> }[];
   /** Questions asked but never substantively answered. */
   unanswered: string[];
+  /** Deterministic, per-answer evidence and coaching cues from the transcript. */
+  turnFeedback: {
+    turnNumber: number;
+    question: string | null;
+    answerExcerpt: string;
+    answerWordCount: number;
+    evidence: ("purpose" | "funding" | "home_ties" | "specific_detail")[];
+    concerns: string[];
+  }[];
   answerCount: number;
   averageAnswerWords: number;
+}
+
+export interface VisaProfileContext {
+  targetMajor?: string | null;
+  degreeLevel?: string | null;
+  budgetAnnualUsd?: number | null;
+  fundingSources?: { name: string; kind: string; amountUsd: number; status?: string }[];
 }
 
 export interface VisaScoringOptions {
@@ -42,6 +61,8 @@ export interface VisaScoringOptions {
   homeCountry?: string | null;
   /** Where they plan to study. */
   destination?: string | null;
+  /** Signed-in user's saved, self-reported context; never an admission verdict. */
+  profile?: VisaProfileContext | null;
 }
 
 // --- Signal patterns -------------------------------------------------------
@@ -90,6 +111,118 @@ function findUnanswered(turns: VisaTurn[]): string[] {
   return unanswered.slice(0, 5);
 }
 
+function explicitMajorStatement(answer: string): string | null {
+  const match = /\b(?:i\s+(?:plan|intend|want|will)\s+to\s+study|my\s+(?:intended\s+)?(?:major|field)(?:\s+of\s+study)?\s+is)\s+(?:a|an|the\s+)?([^.!?;\n]+)/i.exec(answer);
+  if (!match) return null;
+  return match[1].split(/\b(?:at|because|so that|where)\b/i)[0].trim().slice(0, 100) || null;
+}
+
+function explicitDegreeStatement(answer: string): string | null {
+  const match = /\b(?:apply(?:ing)?\s+for|plan\s+to\s+pursue|intend\s+to\s+pursue|will\s+pursue|study\s+for|enrol(?:l)?\s+in)\s+(?:an?\s+)?(bachelor(?:'s)?|undergraduate|master(?:'s)?|postgraduate|graduate|doctoral?|doctorate|ph\.?d\.?)\b/i.exec(answer);
+  return match?.[1] ?? null;
+}
+
+function explicitBudget(answer: string): number | null {
+  const match = /\b(?:my\s+(?:annual\s+)?budget|annual\s+budget|i\s+can\s+afford|i\s+have\s+budgeted)\b[^\d$]{0,24}(?:usd\s*)?\$?\s*([\d][\d,]*(?:\.\d+)?)/i.exec(answer);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function primaryFundingSource(profile?: VisaProfileContext | null) {
+  return (profile?.fundingSources ?? [])
+    .filter((source) => (!source.status || ["confirmed", "awarded"].includes(source.status)) && Number.isFinite(source.amountUsd) && source.amountUsd >= 0)
+    .sort((a, b) => b.amountUsd - a.amountUsd || a.name.localeCompare(b.name))[0] ?? null;
+}
+
+function fundingSourceMentioned(source: NonNullable<ReturnType<typeof primaryFundingSource>>, text: string): boolean {
+  const lower = text.toLocaleLowerCase();
+  const nameTokens = source.name.toLocaleLowerCase().match(/[a-z\u0400-\u04ff0-9]+/gi)?.filter((token) => token.length > 3) ?? [];
+  if (nameTokens.some((token) => lower.includes(token))) return true;
+  const kind = source.kind.toLowerCase();
+  if (kind === "scholarship") return /\b(?:scholarship|grant|fellowship|award)\b/i.test(text);
+  if (kind === "aid") return /\b(?:financial aid|grant|assistantship|fellowship)\b/i.test(text);
+  if (kind === "family") return /\b(?:family|parents?|mother|father|relative|guardian)\b/i.test(text);
+  if (kind === "savings") return /\b(?:savings?|bank account|deposit)\b/i.test(text);
+  if (kind === "loan") return /\b(?:loan|lender|borrow)\b/i.test(text);
+  if (kind === "sponsor") return /\b(?:sponsor|employer|company)\b/i.test(text);
+  return false;
+}
+
+function buildTurnFeedback(turns: VisaTurn[], profile?: VisaProfileContext | null) {
+  const feedback: VisaRubric["turnFeedback"] = [];
+  const flags: {
+    major?: { profile: string; spoken: string };
+    degree?: { profile: string; spoken: string };
+    budget?: { profile: number; spoken: number };
+    fundingSource?: string;
+  } = {};
+  const mainSource = primaryFundingSource(profile);
+  let sourceMentioned = false;
+
+  turns.forEach((turn, index) => {
+    if (turn.role !== "user") return;
+    const answer = turn.text.trim();
+    const wordCount = words(answer).length;
+    const question = [...turns.slice(0, index)].reverse().find((previous) => previous.role === "officer")?.text.trim() ?? null;
+    const evidence: VisaRubric["turnFeedback"][number]["evidence"] = [];
+    const concerns: string[] = [];
+    if (PURPOSE_RE.test(answer)) evidence.push("purpose");
+    if (FUNDING_RE.test(answer)) evidence.push("funding");
+    if (HOME_TIES_RE.test(answer)) evidence.push("home_ties");
+    if (new RegExp(CONCRETE_RE.source, "i").test(answer)) evidence.push("specific_detail");
+    if (wordCount < MIN_ANSWER_WORDS) concerns.push("short_answer");
+    if (VAGUE_RE.test(answer)) concerns.push("vague_answer");
+    if (question && /\b(?:why|programme|program|study|major|course|degree)\b/i.test(question) && !PURPOSE_RE.test(answer)) {
+      concerns.push("purpose_not_addressed");
+    }
+    if (question && /\b(?:fund|pay|cost|tuition|expense|sponsor|money)\b/i.test(question) && !FUNDING_RE.test(answer)) {
+      concerns.push("funding_not_addressed");
+    }
+    if (question && /\b(?:return|home|family|after graduation|ties)\b/i.test(question) && !HOME_TIES_RE.test(answer)) {
+      concerns.push("home_ties_not_addressed");
+    }
+
+    const spokenMajor = profile?.targetMajor?.trim() ? explicitMajorStatement(answer) : null;
+    if (spokenMajor && profile?.targetMajor) {
+      const relation = subjectAffinity([profile.targetMajor], spokenMajor);
+      if (relation.level === "none") {
+        flags.major ??= { profile: profile.targetMajor, spoken: spokenMajor };
+        concerns.push("profile_major_conflict");
+      }
+    }
+
+    const spokenDegree = profile?.degreeLevel?.trim() ? explicitDegreeStatement(answer) : null;
+    if (spokenDegree && profile?.degreeLevel && compareDegreeLevels(profile.degreeLevel, spokenDegree) === "mismatch") {
+      flags.degree ??= { profile: profile.degreeLevel, spoken: spokenDegree };
+      concerns.push("profile_degree_conflict");
+    }
+
+    const spokenBudget = profile?.budgetAnnualUsd != null && profile.budgetAnnualUsd > 0 ? explicitBudget(answer) : null;
+    if (spokenBudget != null && profile?.budgetAnnualUsd != null && Math.abs(spokenBudget - profile.budgetAnnualUsd) / profile.budgetAnnualUsd >= 0.25) {
+      flags.budget ??= { profile: profile.budgetAnnualUsd, spoken: spokenBudget };
+      concerns.push("profile_budget_conflict");
+    }
+
+    if (mainSource && fundingSourceMentioned(mainSource, answer)) sourceMentioned = true;
+    if (mainSource && question && /\b(?:fund|pay|cost|tuition|expense|sponsor|money)\b/i.test(question) && !fundingSourceMentioned(mainSource, answer)) {
+      concerns.push("primary_funding_omitted");
+    }
+
+    feedback.push({
+      turnNumber: feedback.length + 1,
+      question: question?.slice(0, 500) ?? null,
+      answerExcerpt: answer.slice(0, 260),
+      answerWordCount: wordCount,
+      evidence,
+      concerns: [...new Set(concerns)],
+    });
+  });
+
+  if (mainSource && !sourceMentioned) flags.fundingSource = mainSource.name;
+  return { feedback, flags };
+}
+
 export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions = {}): VisaRubric {
   const answers = turns.filter((t) => t.role === "user").map((t) => t.text);
   const transcript = answers.join("\n");
@@ -99,6 +232,7 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
     ? Math.round(answerWords.reduce((a, b) => a + b, 0) / answerCount)
     : 0;
   const risks: VisaRubric["risks"] = [];
+  const { feedback: turnFeedback, flags: profileFlags } = buildTurnFeedback(turns, opts.profile);
 
   if (answerCount === 0) {
     return {
@@ -113,6 +247,7 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
       },
       risks: [{ code: "no_answers", message: "No answers were recorded.", severity: "high" }],
       unanswered: findUnanswered(turns),
+      turnFeedback,
       answerCount: 0,
       averageAnswerWords: 0,
     };
@@ -131,7 +266,8 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
 
   // --- Funding -------------------------------------------------------------
   const fundingMentioned = FUNDING_RE.test(transcript);
-  const funding = fundingMentioned ? clamp(60 + (CONCRETE_RE.test(transcript) ? 20 : 0)) : 20;
+  const concreteFunding = new RegExp(CONCRETE_RE.source, "i").test(transcript);
+  const funding = fundingMentioned ? clamp(60 + (concreteFunding ? 20 : 0)) : 20;
   if (!fundingMentioned) {
     risks.push({
       code: "funding_not_stated",
@@ -201,6 +337,39 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
     });
   }
 
+  if (profileFlags.major) {
+    risks.push({
+      code: "profile_major_conflict",
+      message: `Your answer names ${profileFlags.major.spoken}, while your saved profile lists ${profileFlags.major.profile}. Confirm which is current; this tool cannot decide which record is correct.`,
+      severity: "medium",
+      params: profileFlags.major,
+    });
+  }
+  if (profileFlags.degree) {
+    risks.push({
+      code: "profile_degree_conflict",
+      message: `Your answer describes ${profileFlags.degree.spoken}, while your saved profile lists ${profileFlags.degree.profile}. Confirm the intended degree level.`,
+      severity: "medium",
+      params: profileFlags.degree,
+    });
+  }
+  if (profileFlags.budget) {
+    risks.push({
+      code: "profile_budget_conflict",
+      message: `Your answer gives an annual budget of ${profileFlags.budget.spoken}, while your profile records ${profileFlags.budget.profile}. Confirm which figure is current.`,
+      severity: "medium",
+      params: profileFlags.budget,
+    });
+  }
+  if (profileFlags.fundingSource) {
+    risks.push({
+      code: "primary_funding_omitted",
+      message: `Your profile has ${profileFlags.fundingSource} as a confirmed funding source, but it was not identified in your answers. If it is still your main source, explain it and the supporting documents.`,
+      severity: "medium",
+      params: { source: profileFlags.fundingSource },
+    });
+  }
+
   // Weighted: funding, ties and intent are the actual refusal grounds.
   const total = clamp(
     purposeOfStudy * 0.2 +
@@ -215,6 +384,7 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
     scores: { purposeOfStudy, funding, homeTies, nonImmigrantIntent, specificity, languageClarity, total },
     risks,
     unanswered,
+    turnFeedback,
     answerCount,
     averageAnswerWords,
   };

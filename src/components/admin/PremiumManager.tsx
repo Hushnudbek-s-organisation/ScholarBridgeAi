@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Crown,
   Gift,
@@ -48,7 +48,7 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fetchProfiles = async () => {
+  const fetchProfiles = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/profiles?adminProfileId=${adminProfileId}`);
       const data = await res.json();
@@ -59,11 +59,11 @@ export function PremiumManager({ adminProfileId }: PremiumManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    fetchProfiles();
-  }, []);
+    void Promise.resolve().then(fetchProfiles);
+  }, [fetchProfiles]);
 
   const giftByEmail = async (recipientEmail: string) => {
     setSaving(true);

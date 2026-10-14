@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { dictionaries } from "@/i18n/messages";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
@@ -12,6 +13,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
+import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -34,6 +36,11 @@ interface UniversityRow {
   flag_emoji: string | null;
   world_ranking: number | null;
   program_major: string | null;
+  university_type: string | null;
+  annual_tuition_usd: number | null;
+  annual_living_est_usd: number | null;
+  min_ielts: number | null;
+  post_study_work_visa_years: number | null;
   official_website_url: string | null;
 }
 
@@ -76,6 +83,17 @@ export default async function UniversitiesPage({
         flagEmoji: universitiesTable.flagEmoji,
         worldRanking: universitiesTable.worldRanking,
         programMajor: universitiesTable.programMajor,
+        universityType: universitiesTable.universityType,
+        annualTuition: universitiesTable.annualTuition,
+        tuitionCurrency: universitiesTable.tuitionCurrency,
+        tuitionPeriod: universitiesTable.tuitionPeriod,
+        annualTuitionUsd: universitiesTable.annualTuitionUsd,
+        annualLivingEst: universitiesTable.annualLivingEst,
+        livingCostCurrency: universitiesTable.livingCostCurrency,
+        livingCostPeriod: universitiesTable.livingCostPeriod,
+        annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
+        minIelts: universitiesTable.minIelts,
+        postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
         officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
         websiteUrl: universitiesTable.websiteUrl,
       })
@@ -86,22 +104,31 @@ export default async function UniversitiesPage({
       .offset(from);
     // Nullable columns stay null (never "" or 0) — the card renders nothing
     // rather than pretending a ranking/focus exists.
-    rows = data.map((university) => ({
-      id: university.id,
-      name: university.name,
-      country: university.country,
-      city: university.city,
-      flag_emoji: university.flagEmoji,
-      world_ranking: university.worldRanking,
-      program_major: university.programMajor,
-      official_website_url: university.officialWebsiteUrl || university.websiteUrl,
-    }));
+    rows = data.map((university) => {
+      const costs = resolvedUsdUniversityCosts(university);
+      return {
+        id: university.id,
+        name: university.name,
+        country: university.country,
+        city: university.city,
+        flag_emoji: university.flagEmoji,
+        world_ranking: university.worldRanking,
+        program_major: university.programMajor,
+        university_type: university.universityType,
+        annual_tuition_usd: costs.annualTuitionUsd,
+        annual_living_est_usd: costs.annualLivingEstUsd,
+        min_ielts: university.minIelts,
+        post_study_work_visa_years: university.postStudyWorkVisaYears,
+        official_website_url: university.officialWebsiteUrl || university.websiteUrl,
+      };
+    });
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
     console.error("University catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
       <LocaleProvider initialLocale={locale}>
-        <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <PublicCatalogHeader />
+        <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
             {copy.universitiesLoadError}
           </p>
@@ -114,6 +141,7 @@ export default async function UniversitiesPage({
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
   const currentPage = Math.min(requestedPage, totalPages);
   const number = new Intl.NumberFormat(locale);
+  const usd = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const summary = formatMessage(copy.universitiesSummary, {
     from: number.format(totalItems === 0 ? 0 : from + 1),
     to: number.format(from + universities.length),
@@ -124,7 +152,8 @@ export default async function UniversitiesPage({
 
   return (
     <LocaleProvider initialLocale={locale}>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <PublicCatalogHeader />
+      <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <header className="mb-6">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             <GraduationCap className="h-6 w-6 shrink-0 text-blue-600" aria-hidden />
@@ -162,6 +191,13 @@ export default async function UniversitiesPage({
                 {university.program_major && (
                   <p className="mt-1 break-words text-xs text-slate-500">{university.program_major}</p>
                 )}
+                <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs dark:border-slate-700">
+                  <CatalogFact label={copy.institutionType} value={university.university_type ?? copy.notPublished} />
+                  <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
+                  <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
+                  <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />
+                  <CatalogFact label={copy.postStudyWork} value={university.post_study_work_visa_years == null ? copy.notPublished : `${number.format(university.post_study_work_visa_years)} ${university.post_study_work_visa_years === 1 ? copy.year : copy.years}`} numeric />
+                </dl>
                 {university.official_website_url && (
                   <Link
                     href={university.official_website_url}
@@ -184,5 +220,14 @@ export default async function UniversitiesPage({
         </p>
       </main>
     </LocaleProvider>
+  );
+}
+
+function CatalogFact({ label, value, numeric = false }: { label: string; value: string; numeric?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className={`text-right font-semibold text-slate-800 dark:text-slate-200 ${numeric ? "tabular-nums" : ""}`}>{value}</dd>
+    </div>
   );
 }

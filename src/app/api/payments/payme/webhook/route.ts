@@ -9,52 +9,42 @@ import { readJsonBody } from "@/lib/request";
 
 export const dynamic = "force-dynamic";
 
+function requestId(value: unknown): number | string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = (value as Record<string, unknown>).id;
+  return typeof id === "number" || typeof id === "string" || id === null ? id : null;
+}
+
+function rpcError(id: number | string | null, code: number, message: string) {
+  return NextResponse.json({ jsonrpc: "2.0", id, error: { code, message } }, { status: 200 });
+}
+
 /**
- * Payme merchant webhook (JSON-RPC over HTTP).
- * Implements CheckPerformTransaction, CreateTransaction, PerformTransaction,
- * CancelTransaction, CheckTransaction and GetStatement with correct error codes
- * and idempotency so repeated callbacks never double-credit a subscription.
- *
- * Authentication: Payme calls this endpoint with HTTP Basic auth using the
- * merchant id + merchant key. The request is rejected (401) when those
- * credentials are missing or wrong, and the endpoint is disabled entirely
- * until real merchant credentials are configured — an unauthenticated payment
- * callback would otherwise let anyone mark a transaction as paid.
+ * Payme Merchant API JSON-RPC webhook. Payme requires HTTP 200 for JSON-RPC
+ * success and error responses; failures are represented by the `error` object.
+ * Authentication uses the separate Payme-issued Basic login plus merchant key.
  */
 export async function POST(req: Request) {
+  let parsed: Awaited<ReturnType<typeof readJsonBody<unknown>>> | null = null;
+  let id: number | string | null = null;
   try {
-    if (!isPaymeConfigured()) {
-      return NextResponse.json(
-        { error: { code: -32000, message: "Payme is not configured", data: null } },
-        { status: 503 }
-      );
-    }
+    parsed = await readJsonBody<unknown>(req, 64 * 1024);
+    if (parsed.ok) id = requestId(parsed.body);
 
+    if (!isPaymeConfigured()) {
+      console.warn("[payme] webhook called before merchant credentials were configured");
+      return rpcError(id, -32504, "Insufficient privileges");
+    }
     if (!verifyPaymeAuth(req.headers.get("authorization"))) {
       console.warn("[payme] rejected webhook with invalid merchant credentials");
-      return NextResponse.json(
-        {
-          error: { code: -32504, message: "Unauthorized merchant", data: null },
-        },
-        { status: 401, headers: { "WWW-Authenticate": 'Basic realm="payme-merchant"' } }
-      );
+      return rpcError(id, -32504, "Insufficient privileges");
     }
+    if (!parsed.ok) return rpcError(null, -32700, "Parse error");
 
-    const parsed = await readJsonBody<PaymeRequest>(req, 64 * 1024);
-    if (!parsed.ok) {
-      return NextResponse.json(
-        { error: { code: -32700, message: "Parse error", data: null } },
-        { status: 400 }
-      );
-    }
-
-    const response = await handlePaymeRequest(parsed.body);
-    return NextResponse.json(response);
+    const response = await handlePaymeRequest(parsed.body as PaymeRequest);
+    return NextResponse.json({ jsonrpc: "2.0", ...response }, { status: 200 });
   } catch (error) {
-    console.error("POST /api/payments/payme/webhook error:", error);
-    return NextResponse.json(
-      { error: { code: -32700, message: "Parse error", data: null } },
-      { status: 400 }
-    );
+    console.error("POST /api/payments/payme/webhook error:", error instanceof Error ? error.message : "unknown error");
+    return rpcError(id, -32400, "System error");
   }
 }

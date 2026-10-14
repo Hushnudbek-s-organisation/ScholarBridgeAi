@@ -242,10 +242,10 @@ export async function POST(req: Request) {
     act: act.value as number | null,
     countries: countries.value as string[],
     budgetUsd: budgetUsd.value as number | null,
-    familyIncomeUsd: profile.familyIncomeUsd,
     fundingNeed: fundingNeed.value,
     languagePref: languagePref.value as string | null,
     startYear: startYear.value as number | null,
+    asOfDate: new Date().toISOString().slice(0, 10),
   };
 
   // ---- Load the catalog (any failure = 503, never mock data) -------------
@@ -276,6 +276,7 @@ export async function POST(req: Request) {
         websiteUrl: u.officialWebsiteUrl || u.websiteUrl,
         annualLivingEst: u.annualLivingEst != null ? Number(u.annualLivingEst) : null,
         livingCostCurrency: u.livingCostCurrency || "USD",
+        livingCostPeriod: u.livingCostPeriod || "year",
       });
     }
 

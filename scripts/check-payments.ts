@@ -63,6 +63,7 @@ const SECRET = "payments-test-secret-value-0123456789";
 
 /** Merchant credentials for this test run (never a demo fallback in src/). */
 const MERCHANT_ID = "678901";
+const MERCHANT_LOGIN = "12345678-1234-1234-1234-123456789012";
 const MERCHANT_KEY = "payme-merchant-key-for-test";
 const CLICK_SERVICE_ID = "31337";
 const CLICK_SECRET_KEY = "click-secret-for-test";
@@ -101,6 +102,7 @@ async function main() {
   process.env.DATABASE_URL = URL_;
   process.env.SESSION_SECRET = SECRET;
   process.env.PAYME_MERCHANT_ID = MERCHANT_ID;
+  process.env.PAYME_LOGIN = MERCHANT_LOGIN;
   process.env.PAYME_KEY = MERCHANT_KEY;
   process.env.CLICK_SERVICE_ID = CLICK_SERVICE_ID;
   process.env.CLICK_SECRET_KEY = CLICK_SECRET_KEY;
@@ -119,12 +121,17 @@ async function main() {
     packageForAmountUzs,
     resolvePremiumPackage,
     clickSignString,
+    buildClickCheckoutUrl,
+    buildPaymeCheckoutUrl,
     md5Hex,
     verifyClickSignature,
     verifyPaymeAuth,
     safeEqual,
   } = payments;
   const { getPremiumStatus } = await import("../src/lib/premium");
+  const clickPrepareRoute = await import("../src/app/api/payments/click/prepare/route");
+  const clickCompleteRoute = await import("../src/app/api/payments/click/complete/route");
+  const paymeWebhookRoute = await import("../src/app/api/payments/payme/webhook/route");
 
   const makeProfile = async (name: string) => {
     const [row] = await db
@@ -145,12 +152,111 @@ async function main() {
 
   const basic = (login: string, secret: string) =>
     `Basic ${Buffer.from(`${login}:${secret}`).toString("base64")}`;
-  check("the real merchant credentials are accepted", verifyPaymeAuth(basic(MERCHANT_ID, MERCHANT_KEY)));
-  check("a wrong merchant secret is rejected", !verifyPaymeAuth(basic(MERCHANT_ID, "nope")));
-  check("a wrong merchant id is rejected", !verifyPaymeAuth(basic("000000", MERCHANT_KEY)));
+  check("the issued Payme login and key are accepted", verifyPaymeAuth(basic(MERCHANT_LOGIN, MERCHANT_KEY)));
+  check("a wrong merchant secret is rejected", !verifyPaymeAuth(basic(MERCHANT_LOGIN, "nope")));
+  check("a wrong Payme login is rejected", !verifyPaymeAuth(basic("000000", MERCHANT_KEY)));
+  check("the checkout merchant id is not mistaken for the Basic-auth login", !verifyPaymeAuth(basic(MERCHANT_ID, MERCHANT_KEY)));
   check("a missing Authorization header is rejected", !verifyPaymeAuth(null));
   check("a non-Basic scheme is rejected", !verifyPaymeAuth(`Bearer ${MERCHANT_KEY}`));
+  const callPaymeWebhook = async (payload: unknown, authorization: string | null) => {
+    const request = new Request("https://test.example/api/payments/payme/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(authorization ? { authorization } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const response = await paymeWebhookRoute.POST(request);
+    return { status: response.status, body: await response.json() as Record<string, any> };
+  };
+  const rpcProbe = { id: 44, method: "NoSuchMethod", params: {} };
+  const badAuthResponse = await callPaymeWebhook(rpcProbe, basic("wrong-login", MERCHANT_KEY));
+  check(
+    "unauthorized Payme JSON-RPC errors use HTTP 200 and preserve the request id",
+    badAuthResponse.status === 200 && badAuthResponse.body.jsonrpc === "2.0" &&
+      badAuthResponse.body.id === 44 && badAuthResponse.body.error?.code === -32504
+  );
+  const goodAuthResponse = await callPaymeWebhook(rpcProbe, basic(MERCHANT_LOGIN, MERCHANT_KEY));
+  check(
+    "authenticated Payme JSON-RPC requests reach method dispatch over HTTP 200",
+    goodAuthResponse.status === 200 && goodAuthResponse.body.jsonrpc === "2.0" &&
+      goodAuthResponse.body.id === 44 && goodAuthResponse.body.error?.code === -32601
+  );
+  const savedPaymeLogin = process.env.PAYME_LOGIN;
+  delete process.env.PAYME_LOGIN;
+  const unconfiguredResponse = await callPaymeWebhook(rpcProbe, basic(MERCHANT_LOGIN, MERCHANT_KEY));
+  if (savedPaymeLogin !== undefined) process.env.PAYME_LOGIN = savedPaymeLogin;
+  check(
+    "an unconfigured Payme webhook fails closed with protocol HTTP 200",
+    unconfiguredResponse.status === 200 && unconfiguredResponse.body.error?.code === -32504
+  );
+  const oversizedPaymeBody = JSON.stringify(rpcProbe) + " ".repeat(64 * 1024);
+  const oversizedPaymeResponse = await paymeWebhookRoute.POST(new Request(
+    "https://test.example/api/payments/payme/webhook",
+    {
+      method: "POST",
+      headers: {
+        authorization: basic(MERCHANT_LOGIN, MERCHANT_KEY),
+        "content-type": "application/json",
+      },
+      body: oversizedPaymeBody,
+    }
+  ));
+  const oversizedPaymeResult = await oversizedPaymeResponse.json() as Record<string, any>;
+  check(
+    "oversized Payme bodies remain capped and return a JSON-RPC HTTP 200 error",
+    oversizedPaymeResponse.status === 200 && oversizedPaymeResult.error?.code === -32700
+  );
   check("safeEqual is constant-time-correct on equal/unequal", safeEqual("abc", "abc") && !safeEqual("abc", "abd"));
+
+  section("0a. Provider checkout links carry the selected amount and account");
+  const paymeCheckoutUrl = buildPaymeCheckoutUrl(MERCHANT_ID, tiyn(59000), { profile_id: 27, order_id: 31 });
+  const paymePayload = paymeCheckoutUrl
+    ? Buffer.from(decodeURIComponent(new URL(paymeCheckoutUrl).pathname.slice(1)), "base64").toString("utf8")
+    : "";
+  check(
+    "Payme checkout URL encodes merchant, account and amount in its documented payload",
+    paymePayload === `m=${MERCHANT_ID};ac.profile_id=27;ac.order_id=31;a=${tiyn(59000)}`
+  );
+  const clickCheckout = buildClickCheckoutUrl({
+    serviceId: CLICK_SERVICE_ID,
+    merchantId: MERCHANT_ID,
+    amountUzs: 59000,
+    paymentId: 31,
+  });
+  const clickCheckoutParams = clickCheckout ? new URL(clickCheckout.checkoutUrl).searchParams : null;
+  check(
+    "Click checkout uses N.NN amount format and does not require merchant_user_id",
+    clickCheckoutParams?.get("amount") === "59000.00" && !clickCheckoutParams.has("merchant_user_id") &&
+      clickCheckoutParams.get("service_id") === CLICK_SERVICE_ID &&
+      clickCheckoutParams.get("merchant_id") === MERCHANT_ID
+  );
+  const clickCheckoutWithUser = buildClickCheckoutUrl({
+    serviceId: CLICK_SERVICE_ID,
+    merchantId: MERCHANT_ID,
+    merchantUserId: "student-27",
+    amountUzs: 149000,
+    paymentId: 32,
+  });
+  check(
+    "Click merchant_user_id is included only when configured",
+    clickCheckoutWithUser !== null &&
+      new URL(clickCheckoutWithUser.checkoutUrl).searchParams.get("merchant_user_id") === "student-27"
+  );
+  check(
+    "Click link creation requires both service and merchant ids",
+    buildClickCheckoutUrl({ serviceId: CLICK_SERVICE_ID, merchantId: "", amountUzs: 59000, paymentId: 31 }) === null
+  );
+  const oversizedClickBody = await payments.readClickCallbackBody(new Request(
+    "https://test.example/api/payments/click/prepare",
+    {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: `padding=${"x".repeat(65 * 1024)}`,
+    }
+  ));
+  check("Click urlencoded callback parsing enforces its byte limit", oversizedClickBody === null);
 
   // -------------------------------------------------------------------------
   section("1. Package prices drive the webhook (nothing hardcoded)");
@@ -223,14 +329,18 @@ async function main() {
     (await payme("CheckPerformTransaction", { amount: 0, account: { profile_id: student.id } })).error
       ?.code === -31001
   );
+  const unknownProfileCheck = await payme("CheckPerformTransaction", {
+    amount: tiyn(59000), account: { profile_id: unknownProfile },
+  });
   check(
-    "an unknown profile is refused with -31003",
-    (await payme("CheckPerformTransaction", { amount: tiyn(59000), account: { profile_id: unknownProfile } }))
-      .error?.code === -31003
+    "an unknown profile returns localized Payme account-input error -31050",
+    unknownProfileCheck.error?.code === -31050 && unknownProfileCheck.error.data === "profile_id" &&
+      typeof unknownProfileCheck.error.message === "object"
   );
+  const missingProfileCheck = await payme("CheckPerformTransaction", { amount: tiyn(59000), account: {} });
   check(
-    "a missing profile_id is refused with -31003",
-    (await payme("CheckPerformTransaction", { amount: tiyn(59000), account: {} })).error?.code === -31003
+    "a missing profile_id returns the same localized account-input error",
+    missingProfileCheck.error?.code === -31050 && missingProfileCheck.error.data === "profile_id"
   );
 
   // -------------------------------------------------------------------------
@@ -254,6 +364,7 @@ async function main() {
       .returning();
 
     const txnId = `PM-${pkg}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const paymeTime = Date.now();
     const account = withOrderId
       ? { profile_id: profileId, order_id: row.id }
       : { profile_id: profileId };
@@ -261,21 +372,55 @@ async function main() {
     const checked = await payme("CheckPerformTransaction", { amount: tiyn(pack.priceUzs), account });
     const created = await payme("CreateTransaction", {
       id: txnId,
-      time: Date.now(),
+      time: paymeTime,
       amount: tiyn(pack.priceUzs),
       account,
     });
     const performed = await payme("PerformTransaction", { id: txnId, time: Date.now(), account });
-    return { pack, row, txnId, checked, created, performed };
+    return { pack, row, txnId, paymeTime, checked, created, performed };
   }
 
+  const wrongPaymeAccountProfile = await makeProfile("Wrong Payme Account");
   for (const pkg of ["monthly", "season", "yearly"] as const) {
     const buyer = await makeProfile(`Buyer ${pkg}`);
-    const { pack, row, txnId, checked, created, performed } = await buy(pkg, buyer.id, true);
+    const { pack, row, txnId, paymeTime, checked, created, performed } = await buy(pkg, buyer.id, true);
 
     check(`${pkg}: checkout is allowed`, (checked as any).result?.allow === true, JSON.stringify(checked));
     check(`${pkg}: transaction is created (state 1)`, (created as any).result?.state === 1, JSON.stringify(created));
     check(`${pkg}: transaction is performed (state 2)`, (performed as any).result?.state === 2, JSON.stringify(performed));
+    check(
+      `${pkg}: Payme responses distinguish provider id from our merchant transaction id`,
+      created.result?.transaction === String(row.id) && performed.result?.transaction === String(row.id)
+    );
+    if (pkg === "monthly") {
+      const wrongAccountRetry = await payme("CreateTransaction", {
+        id: txnId,
+        time: paymeTime,
+        amount: tiyn(pack.priceUzs),
+        account: { profile_id: wrongPaymeAccountProfile.id, order_id: row.id },
+      });
+      const wrongOrderRetry = await payme("CreateTransaction", {
+        id: txnId,
+        time: paymeTime,
+        amount: tiyn(pack.priceUzs),
+        account: { profile_id: buyer.id, order_id: row.id + 1000 },
+      });
+      const wrongAmountRetry = await payme("CreateTransaction", {
+        id: txnId,
+        time: paymeTime,
+        amount: tiyn(pack.priceUzs + 1),
+        account: { profile_id: buyer.id, order_id: row.id },
+      });
+      check(
+        "a duplicate Payme transaction cannot be rebound to another profile",
+        wrongAccountRetry.error?.code === -31050 && wrongAccountRetry.error.data === "profile_id"
+      );
+      check(
+        "a duplicate Payme transaction cannot be rebound to another order",
+        wrongOrderRetry.error?.code === -31050 && wrongOrderRetry.error.data === "order_id"
+      );
+      check("a duplicate Payme transaction rejects an amount change with -31001", wrongAmountRetry.error?.code === -31001);
+    }
 
     const [paid] = await db.select().from(schema.payments).where(eq(schema.payments.id, row.id));
     check(`${pkg}: the initiate row is the one that got paid`, paid.status === "paid", JSON.stringify(paid));
@@ -322,7 +467,7 @@ async function main() {
     );
     const createdAgain = await payme("CreateTransaction", {
       id: txnId,
-      time: Date.now(),
+      time: paymeTime,
       amount: tiyn(pack.priceUzs),
       account: { profile_id: buyer.id },
     });
@@ -380,8 +525,9 @@ async function main() {
     account: { profile_id: ownerB.id, order_id: rowA.id },
   });
   check(
-    "another profile's order_id is not stolen (a separate row is used)",
-    (stolen as any).result?.state === 1,
+    "another profile's order_id is rejected as an account-input error without creating a payment",
+    (stolen as any).error?.code === -31050 && (stolen as any).error?.data === "order_id" &&
+      (await findPaymentByProviderId("PM-STOLEN-1")) === null,
     JSON.stringify(stolen)
   );
   const [rowAAfter] = await db.select().from(schema.payments).where(eq(schema.payments.id, rowA.id));
@@ -400,8 +546,9 @@ async function main() {
   });
   const [rowAMismatch] = await db.select().from(schema.payments).where(eq(schema.payments.id, rowA.id));
   check(
-    "an order_id whose amount differs is not linked",
-    (mismatch as any).result?.state === 1 && rowAMismatch.providerTransactionId === "",
+    "an order_id whose amount differs is rejected with -31001 and left untouched",
+    (mismatch as any).error?.code === -31001 && rowAMismatch.providerTransactionId === "" &&
+      (await findPaymentByProviderId("PM-MISMATCH-1")) === null,
     JSON.stringify(rowAMismatch)
   );
 
@@ -442,7 +589,13 @@ async function main() {
     amount: tiyn(59000),
     account: { profile_id: canceller.id },
   });
-  const cancelled = await payme("CancelTransaction", { id: pendTxn });
+  const invalidCancelReason = await payme("CancelTransaction", { id: pendTxn, reason: 99 });
+  check(
+    "an unknown Payme cancellation reason is rejected without mutating the transaction",
+    invalidCancelReason.error?.code === -32602 &&
+      (await findPaymentByProviderId(pendTxn))?.status === "pending"
+  );
+  const cancelled = await payme("CancelTransaction", { id: pendTxn, reason: 3 });
   const [cancelledRow] = await db
     .select()
     .from(schema.payments)
@@ -466,33 +619,80 @@ async function main() {
     account: { profile_id: refunder.id },
   });
   await payme("PerformTransaction", { id: refundTxn });
-  const refunded = await payme("CancelTransaction", { id: refundTxn });
+  const refunded = await payme("CancelTransaction", { id: refundTxn, reason: 5 });
   const [refundedRow] = await db
     .select()
     .from(schema.payments)
     .where(eq(schema.payments.providerTransactionId, refundTxn));
   check(
-    "cancelling a PAID transaction marks it refunded (state -1)",
-    (refunded as any).result?.state === -1 && refundedRow?.status === "refunded",
+    "cancelling a PAID transaction marks it refunded (Payme state -2)",
+    (refunded as any).result?.state === -2 && refundedRow?.status === "refunded",
     JSON.stringify({ state: (refunded as any).result?.state, status: refundedRow?.status })
   );
-
   check(
-    "CheckTransaction reports the paid state (2)",
-    (await payme("CheckTransaction", { id: refundTxn })).result?.state === 2 ||
-      (await payme("CheckTransaction", { id: refundTxn })).result?.state === -2
+    "Payme timestamps use milliseconds and retain perform/cancel times",
+    refundedRow?.performedAt instanceof Date && refundedRow.performedAt.getTime() > 1_000_000_000_000 &&
+      refundedRow.cancelledAt instanceof Date && refundedRow.cancelledAt.getTime() > 1_000_000_000_000
+  );
+
+  const refundStatus = await payme("CheckTransaction", { id: refundTxn });
+  check(
+    "CheckTransaction reports the refunded state, merchant transaction id and lifecycle timestamps",
+    refundStatus.result?.state === -2 && refundStatus.result.transaction === String(refundedRow.id) &&
+      refundStatus.result.perform_time > 1_000_000_000_000 &&
+      refundStatus.result.cancel_time > 1_000_000_000_000
   );
   check(
     "CheckTransaction on an unknown transaction is -31003",
     (await payme("CheckTransaction", { id: "NOPE" })).error?.code === -31003
   );
   const statement = await payme("GetStatement", {
-    from: Math.floor(Date.now() / 1000) - 3600,
-    to: Math.floor(Date.now() / 1000) + 3600,
+    from: Date.now() - 3_600_000,
+    to: Date.now() + 3_600_000,
   });
   check(
-    "GetStatement returns the merchant's transactions",
-    Array.isArray((statement as any).result?.transactions) && (statement as any).result.transactions.length > 0
+    "GetStatement returns only created merchant transactions",
+    Array.isArray((statement as any).result?.transactions) &&
+      (statement as any).result.transactions.length > 0 &&
+      (statement as any).result.transactions.every((t: any) => t.id)
+  );
+  const refundStatementRow = (statement as any).result?.transactions?.find((t: any) => t.id === refundTxn);
+  check(
+    "GetStatement uses Payme's id in `id` and the merchant payment id in `transaction`",
+    refundStatementRow?.transaction === String(refundedRow.id) && refundStatementRow.id === refundTxn
+  );
+
+  const expiredProfile = await makeProfile("Expired Payme Student");
+  const expiredTxnId = `PM-TIMEOUT-${Date.now()}`;
+  const expiredPaymeTime = Date.now() - 12 * 60 * 60 * 1000 - 60_000;
+  const expiredCreate = await payme("CreateTransaction", {
+    id: expiredTxnId,
+    time: expiredPaymeTime,
+    amount: tiyn(59000),
+    account: { profile_id: expiredProfile.id },
+  });
+  const [expiredRow] = await db.select().from(schema.payments).where(eq(schema.payments.providerTransactionId, expiredTxnId));
+  const expiredCheck = await payme("CheckTransaction", { id: expiredTxnId });
+  check(
+    "Payme's 12-hour timeout cancels stale transactions with reason 4",
+    (expiredCreate as any).result?.state === -1 && expiredRow.status === "cancelled" &&
+      expiredRow.cancelReason === 4 && (expiredCheck as any).result?.state === -1 &&
+      (expiredCheck as any).result?.reason === 4
+  );
+  check(
+    "an expired Payme transaction cannot grant Premium",
+    (await payme("PerformTransaction", { id: expiredTxnId })).error?.code === -31008 &&
+      (await getPremiumStatus(expiredProfile.id)).isPremium === false
+  );
+  const expiredStatement = await payme("GetStatement", {
+    from: expiredPaymeTime - 1,
+    to: expiredPaymeTime + 1,
+  });
+  check(
+    "GetStatement filters/sorts by Payme's provider `time`, not checkout creation time",
+    (expiredStatement as any).result?.transactions?.some(
+      (t: any) => t.id === expiredTxnId && t.time === expiredPaymeTime && t.state === -1
+    ) === true
   );
   check(
     "an unknown JSON-RPC method is -32601",
@@ -504,22 +704,152 @@ async function main() {
 
   const clickBase = {
     clickTransId: "900001",
-    clickPaydocId: "800001",
     serviceId: CLICK_SERVICE_ID,
     secretKey: CLICK_SECRET_KEY,
     merchantTransId: "42",
-    amount: 499000,
+    amount: "499000",
     action: 0,
+    signTime: "2026-10-14 12:00:00",
   };
   const goodSign = md5Hex(clickSignString(clickBase));
-  check("the documented sign string is the documented field order", /90000180000131337click-secret-for-test424990000$/.test(clickSignString(clickBase)));
+  check(
+    "prepare signature uses Click v2 field order (without click_paydoc_id)",
+    clickSignString(clickBase) === "90000131337click-secret-for-test4249900002026-10-14 12:00:00"
+  );
+  check("complete signature adds merchant_prepare_id before amount", clickSignString({
+    ...clickBase,
+    action: 1,
+    merchantPrepareId: "42",
+  }) === "90000131337click-secret-for-test424249900012026-10-14 12:00:00");
   check("a correct signature verifies", verifyClickSignature(goodSign, goodSign));
   check("signature comparison is case-insensitive", verifyClickSignature(goodSign.toUpperCase(), goodSign));
   check("a wrong signature is refused", !verifyClickSignature(md5Hex("tampered"), goodSign));
   check("an empty signature is never accepted", !verifyClickSignature("", goodSign) && !verifyClickSignature(goodSign, ""));
   check(
-    "changing the amount changes the signature (an attacker cannot reuse one)",
-    md5Hex(clickSignString({ ...clickBase, amount: 59000 })) !== goodSign
+    "changing amount or sign_time changes the signature",
+    md5Hex(clickSignString({ ...clickBase, amount: "59000" })) !== goodSign &&
+      md5Hex(clickSignString({ ...clickBase, signTime: "2026-10-14 12:00:01" })) !== goodSign
+  );
+
+  // -------------------------------------------------------------------------
+  section("8a. Click callback lifecycle (prepare, complete, idempotent retry)");
+
+  const clickStudent = await makeProfile("Click Student");
+  const [clickPayment] = await db
+    .insert(schema.payments)
+    .values({
+      profileId: clickStudent.id,
+      provider: "click",
+      providerTransactionId: "",
+      amount: 59000,
+      currency: "UZS",
+      status: "pending",
+      purpose: "premium",
+    })
+    .returning();
+  const signedClickCallback = (
+    action: number,
+    amount: string,
+    serviceId = CLICK_SERVICE_ID,
+    clickTransId = "900001",
+    clickError = 0,
+    paymentId = clickPayment.id
+  ) => {
+    const payload: Record<string, unknown> = {
+      click_trans_id: clickTransId,
+      service_id: serviceId,
+      click_paydoc_id: "800001",
+      merchant_trans_id: String(paymentId),
+      merchant_prepare_id: String(paymentId),
+      amount,
+      action,
+      error: clickError,
+      error_note: clickError === 0 ? "Success" : "Provider payment error",
+      sign_time: "2026-10-14 12:00:00",
+    };
+    payload.sign_string = md5Hex(clickSignString({
+      clickTransId: String(payload.click_trans_id),
+      serviceId: String(payload.service_id),
+      secretKey: CLICK_SECRET_KEY,
+      merchantTransId: String(payload.merchant_trans_id),
+      amount,
+      action,
+      signTime: String(payload.sign_time),
+      ...(action === 1 ? { merchantPrepareId: String(payload.merchant_prepare_id) } : {}),
+    }));
+    return payload;
+  };
+  const postClick = async (
+    handler: (req: Request) => Promise<Response>,
+    payload: Record<string, unknown>,
+    form = false
+  ) => {
+    const body = form
+      ? new URLSearchParams(Object.entries(payload).map(([key, value]) => [key, String(value)]))
+      : JSON.stringify(payload);
+    const response = await handler(new Request("https://test.example/api/payments/click", {
+      method: "POST",
+      headers: { "content-type": form ? "application/x-www-form-urlencoded" : "application/json" },
+      body,
+    }));
+    return { status: response.status, body: await response.json() as Record<string, unknown> };
+  };
+
+  const invalidClickSign = signedClickCallback(0, "59000");
+  invalidClickSign.sign_string = "not-a-signature";
+  const invalidClickPrepare = await postClick(clickPrepareRoute.POST, invalidClickSign);
+  check("prepare refuses an invalid signature", invalidClickPrepare.body.error === -1);
+  const wrongService = await postClick(clickPrepareRoute.POST, signedClickCallback(0, "59000", "other-service"));
+  check("prepare refuses a callback for another service", wrongService.body.error === -8);
+
+  const preparePayload = signedClickCallback(0, "59000.00");
+  const prepared = await postClick(clickPrepareRoute.POST, preparePayload, true);
+  check("valid form-urlencoded action=0 prepare returns our payment id", prepared.body.error === 0 && prepared.body.merchant_prepare_id === clickPayment.id);
+  const preparedAgain = await postClick(clickPrepareRoute.POST, preparePayload);
+  check("repeated prepare with the same Click transaction is idempotent", preparedAgain.body.error === 0);
+  const [clickLinked] = await db.select().from(schema.payments).where(eq(schema.payments.id, clickPayment.id));
+  check("prepare binds click_trans_id to the pending Click payment", clickLinked.providerTransactionId === "900001");
+
+  const wrongClickAmount = await postClick(clickCompleteRoute.POST, signedClickCallback(1, "59001"));
+  check("complete rejects an authenticated but incorrect amount", wrongClickAmount.body.error === -2);
+  const completePayload = signedClickCallback(1, "59000.00");
+  const [complete1, complete2] = await Promise.all([
+    postClick(clickCompleteRoute.POST, completePayload, true),
+    postClick(clickCompleteRoute.POST, completePayload, true),
+  ]);
+  const clickSubs = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.paymentId, clickPayment.id));
+  check(
+    "valid form-urlencoded action=1 complete grants once; concurrent duplicate returns -4",
+    [complete1.body.error, complete2.body.error].includes(0) &&
+      [complete1.body.error, complete2.body.error].includes(-4) && clickSubs.length === 1
+  );
+  const [clickPaid] = await db.select().from(schema.payments).where(eq(schema.payments.id, clickPayment.id));
+  check("Click marks its own payment paid only after the signed complete callback", clickPaid.status === "paid");
+
+  const failedClickStudent = await makeProfile("Click Failed Student");
+  const [failedClickPayment] = await db
+    .insert(schema.payments)
+    .values({
+      profileId: failedClickStudent.id,
+      provider: "click",
+      providerTransactionId: "",
+      amount: 59000,
+      currency: "UZS",
+      status: "pending",
+      purpose: "premium",
+    })
+    .returning();
+  const failedClickPrepare = signedClickCallback(0, "59000.00", CLICK_SERVICE_ID, "900002", 0, failedClickPayment.id);
+  const failedPrepareResult = await postClick(clickPrepareRoute.POST, failedClickPrepare, true);
+  const failedClickComplete = signedClickCallback(1, "59000.00", CLICK_SERVICE_ID, "900002", -1, failedClickPayment.id);
+  const failedCompleteResult = await postClick(clickCompleteRoute.POST, failedClickComplete, true);
+  const [failedClickStored] = await db.select().from(schema.payments).where(eq(schema.payments.id, failedClickPayment.id));
+  const failedClickSubs = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.paymentId, failedClickPayment.id));
+  const failedCompleteAgain = await postClick(clickCompleteRoute.POST, failedClickComplete, true);
+  check(
+    "Click negative error cancels the prepared payment and never grants Premium",
+    failedPrepareResult.body.error === 0 && failedCompleteResult.body.error === -9 &&
+      failedClickStored.status === "cancelled" && failedClickSubs.length === 0 && failedCompleteAgain.body.error === -9
   );
 
   // -------------------------------------------------------------------------

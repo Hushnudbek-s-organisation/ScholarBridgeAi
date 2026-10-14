@@ -3,14 +3,14 @@
  *
  * The question a student actually has is not "what is the tuition?" but "can my
  * family afford this, and what would I still owe after every scholarship I
- * could plausibly win?" Tuition is the smallest part of the number — living
- * costs, flights, insurance, visa fees and the deposit usually decide it.
- *
- * Every estimate is labelled as an estimate, and anything the university has
- * not published is said to be missing rather than silently assumed.
+ * could plausibly win?" Tuition is only one part of the cost. Every amount
+ * below is either explicitly known in USD or remains unknown; this module does
+ * not fill missing budget lines with zeroes or generic cost estimates.
  *
  * Pure module — asserted in `scripts/check-costs.ts`.
  */
+
+import { normalizeScholarshipAwardPeriod } from "./usdCosts";
 
 export interface CostInputs {
   /** Published by the university; null means unknown. */
@@ -29,14 +29,16 @@ export interface CostInputs {
   visaFeeUsd?: number | null;
   /** Scholarships the student is actually going to apply to. */
   scholarships?: ScholarshipInput[];
-  /** What the family can contribute per year. */
+  /** What the family can contribute per year; income is not a contribution. */
   familyContributionUsd?: number | null;
 }
 
 export interface ScholarshipInput {
   name: string;
-  /** Annual value in USD. */
-  amountUsd: number;
+  /** Resolved award value in USD; null means unknown or unsupported currency. */
+  amountUsd: number | null;
+  /** Catalogue award period; annual calculations require a supported period. */
+  awardPeriod?: string | null;
   /** What it actually covers — a stipend does not pay tuition. */
   covers: "tuition" | "living" | "both" | "other";
   /** Days until the date listed by the catalogue, when available. */
@@ -46,231 +48,255 @@ export interface ScholarshipInput {
 export interface CostLine {
   key: string;
   label: string;
-  annualUsd: number;
-  totalUsd: number;
-  /** True when the university has not published it and we are estimating. */
+  /** Annual recurring amount, or null when not resolved. */
+  annualUsd: number | null;
+  /** Whole-programme amount, or null when amount/duration is unknown. */
+  totalUsd: number | null;
+  frequency: "annual" | "one_time";
+  /** Kept for explicitly sourced estimates; unknown values are not estimates. */
   estimated: boolean;
 }
 
 export interface CostBreakdown {
   lines: CostLine[];
-  annualTotalUsd: number;
-  totalUsd: number;
-  /** Missing published data — the student should verify these. */
+  /** Null unless every included recurring cost line is known. */
+  annualTotalUsd: number | null;
+  /** Null unless every included cost line and programme duration is known. */
+  totalUsd: number | null;
+  /** Missing, unsupported, or not-yet-verified inputs the student should check. */
   unknowns: string[];
   scholarship: {
-    /** Upper-bound scenario only: assumes listed awards can be received and combined as shown. */
-    bestCaseAnnualUsd: number;
-    coveragePct: number;
+    /** Best-case recurring awards in annual USD; null if any relevant award is unknown. */
+    bestCaseAnnualUsd: number | null;
+    /** Best-case non-recurring awards across the programme; null if unresolved. */
+    bestCaseOneTimeUsd: number | null;
+    coveragePct: number | null;
     /** Scholarships that pay for something other than the shortfall. */
     misaligned: string[];
   };
   net: {
-    annualAfterScholarshipUsd: number;
-    totalAfterScholarshipUsd: number;
-    familyContributionUsd: number;
+    annualAfterScholarshipUsd: number | null;
+    totalAfterScholarshipUsd: number | null;
+    familyContributionUsd: number | null;
     familyContributionKnown: boolean;
-    /** What is still unaccounted for. */
-    gapAnnualUsd: number;
-    gapTotalUsd: number;
-    affordable: boolean;
+    /** Known need after scholarships and any explicitly confirmed contribution. */
+    gapAnnualUsd: number | null;
+    gapTotalUsd: number | null;
+    /** Unknown until annual and whole-programme costs plus explicit support are known. */
+    affordable: boolean | null;
   };
-  /** One-line verdict, honest about the uncertainty. */
+  /** One-line verdict, honest about uncertainty and unconfirmed family support. */
   verdict: string;
 }
 
-// --- Defaults, with their reasoning kept visible ---------------------------
+const MAX_YEARS = 10;
+const money = (value: number) => Math.round(value);
 
-/**
- * Where a university publishes nothing, these are used AND flagged as
- * estimates. Ranges are deliberately wide-band midpoints, not optimistic.
- */
-const LIVING_BY_COUNTRY: { re: RegExp; usd: number; note: string }[] = [
-  { re: /united states|usa/i, usd: 16000, note: "US campus living" },
-  { re: /united kingdom|england|scotland/i, usd: 14000, note: "UK living" },
-  { re: /canada/i, usd: 12000, note: "Canada living" },
-  { re: /australia|new zealand/i, usd: 15000, note: "ANZ living" },
-  { re: /germany/i, usd: 11000, note: "Germany living-cost estimate — verify local costs" },
-  { re: /netherlands|belgium|austria|france/i, usd: 12500, note: "Western EU living" },
-  { re: /sweden|norway|denmark|finland|iceland/i, usd: 13500, note: "Nordic living" },
-  { re: /poland|hungary|czech|portugal|spain|italy|greece/i, usd: 8500, note: "Southern/Eastern EU living" },
-  { re: /turkey|russia|kazakhstan|uzbekistan/i, usd: 5500, note: "regional living" },
-  { re: /malaysia|china|japan|south korea|singapore/i, usd: 9500, note: "Asia living" },
-];
+function knownNonNegative(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
 
-const DEFAULT_LIVING_USD = 11000;
-const DEFAULT_BOOKS_USD = 900;
-const DEFAULT_INSURANCE_USD = 1200;
-const DEFAULT_FLIGHTS_USD = 1400;
-const DEFAULT_YEARS = 4;
+function programmeYears(value: number | null | undefined): number | null {
+  const years = knownNonNegative(value);
+  return years != null && years > 0 && years <= MAX_YEARS ? years : null;
+}
 
-const money = (v: number) => Math.round(v);
+function sumKnown(values: (number | null)[]): number | null {
+  let sum = 0;
+  for (const value of values) {
+    if (value == null) return null;
+    sum += value;
+  }
+  return money(sum);
+}
 
-function livingFor(country: string | null | undefined): { usd: number; note: string } {
-  if (!country) return { usd: DEFAULT_LIVING_USD, note: "typical international student living costs" };
-  const hit = LIVING_BY_COUNTRY.find((c) => c.re.test(country));
-  return { usd: hit?.usd ?? DEFAULT_LIVING_USD, note: hit?.note ?? "typical international student living costs" };
+function annualLine(key: string, label: string, amount: number | null, years: number | null): CostLine {
+  return {
+    key,
+    label,
+    annualUsd: amount == null ? null : money(amount),
+    totalUsd: amount == null || years == null ? null : money(amount * years),
+    frequency: "annual",
+    estimated: false,
+  };
+}
+
+function oneTimeLine(key: string, label: string, amount: number | null): CostLine {
+  return {
+    key,
+    label,
+    annualUsd: null,
+    totalUsd: amount == null ? null : money(amount),
+    frequency: "one_time",
+    estimated: false,
+  };
+}
+
+function bestCaseByCover(awards: { amount: number; covers: ScholarshipInput["covers"] }[]): number {
+  const tuitionAid = awards.filter((award) => award.covers === "tuition" || award.covers === "both");
+  const livingAid = awards.filter((award) => award.covers === "living");
+  const otherAid = awards.filter((award) => award.covers === "other");
+  // Avoid counting several full-tuition awards as if all could be stacked.
+  return (
+    (tuitionAid.length > 0 ? Math.max(...tuitionAid.map((award) => award.amount)) : 0) +
+    livingAid.reduce((sum, award) => sum + award.amount, 0) +
+    otherAid.reduce((sum, award) => sum + award.amount, 0)
+  );
 }
 
 export function calculateCosts(input: CostInputs): CostBreakdown {
-  const years = input.years && input.years > 0 ? Math.min(input.years, 10) : DEFAULT_YEARS;
+  const years = programmeYears(input.years);
   const unknowns: string[] = [];
+  const addUnknown = (message: string) => unknowns.push(message);
 
-  // --- Tuition -------------------------------------------------------------
-  const tuition = Number(input.annualTuitionUsd) > 0 ? Number(input.annualTuitionUsd) : 0;
-  const tuitionEstimated = tuition === 0;
-  if (tuitionEstimated) unknowns.push("Annual tuition is not published for this university.");
+  const tuition = knownNonNegative(input.annualTuitionUsd);
+  const living = knownNonNegative(input.annualLivingEstUsd);
+  const accommodation = knownNonNegative(input.accommodationCostUsd);
+  const insurance = knownNonNegative(input.insurancePerYearUsd);
+  const books = knownNonNegative(input.booksPerYearUsd);
+  const flights = knownNonNegative(input.flightsPerYearUsd);
+  const visaFee = knownNonNegative(input.visaFeeUsd);
+  const applicationFee = knownNonNegative(input.applicationFeeUsd);
 
-  // --- Living --------------------------------------------------------------
-  // Accommodation is usually inside the living estimate; only add it when the
-  // university publishes it separately and no living figure exists.
-  const publishedLiving = Number(input.annualLivingEstUsd) > 0 ? Number(input.annualLivingEstUsd) : 0;
-  const fallback = livingFor(input.country);
-  const living = publishedLiving > 0 ? publishedLiving : fallback.usd;
-  if (publishedLiving === 0) {
-    unknowns.push(
-      `Living costs are not published — using ${fallback.usd.toLocaleString("en-US")} USD/year for ${fallback.note}${input.country ? ` (${input.country})` : ""}.`
-    );
+  if (tuition == null) addUnknown("Annual tuition is unknown or unavailable in USD.");
+  if (living == null) addUnknown("Annual living costs are unknown or unavailable in USD.");
+  if (insurance == null) addUnknown("Annual health insurance cost is unknown.");
+  if (books == null) addUnknown("Annual books and materials cost is unknown.");
+  if (flights == null) addUnknown("Annual travel cost is unknown.");
+  if (visaFee == null) addUnknown("Visa or residence-permit fees are unknown; check official government guidance.");
+  if (applicationFee == null) addUnknown("Application fees are unknown; check each official programme page.");
+  if (years == null) {
+    addUnknown(`Programme duration is unknown or outside the supported 1–${MAX_YEARS} year range; whole-programme totals are unavailable.`);
   }
-  const separateAccommodation =
-    publishedLiving === 0 && Number(input.accommodationCostUsd) > 0 ? Number(input.accommodationCostUsd) : 0;
-
-  // --- Extras --------------------------------------------------------------
-  const insurance = Number(input.insurancePerYearUsd) > 0 ? Number(input.insurancePerYearUsd) : DEFAULT_INSURANCE_USD;
-  if (!(Number(input.insurancePerYearUsd) > 0)) {
-    unknowns.push(`Health insurance is estimated at ${DEFAULT_INSURANCE_USD} USD/year. Coverage rules and costs vary; check the official university and destination guidance.`);
-  }
-  const books = Number(input.booksPerYearUsd) > 0 ? Number(input.booksPerYearUsd) : DEFAULT_BOOKS_USD;
-  const flights = Number(input.flightsPerYearUsd) > 0 ? Number(input.flightsPerYearUsd) : DEFAULT_FLIGHTS_USD;
-
-  const annualTotal = tuition + living + separateAccommodation + insurance + books + flights;
 
   const lines: CostLine[] = [
-    {
-      key: "tuition",
-      label: "Tuition",
-      annualUsd: money(tuition),
-      totalUsd: money(tuition * years),
-      estimated: tuitionEstimated,
-    },
-    {
-      key: "living",
-      label: "Living (food, transport, phone)",
-      annualUsd: money(living),
-      totalUsd: money(living * years),
-      estimated: publishedLiving === 0,
-    },
+    annualLine("tuition", "Tuition", tuition, years),
+    annualLine("living", "Living (food, transport, phone)", living, years),
   ];
-  if (separateAccommodation > 0) {
-    lines.push({
-      key: "accommodation",
-      label: "Accommodation (published separately)",
-      annualUsd: money(separateAccommodation),
-      totalUsd: money(separateAccommodation * years),
-      estimated: false,
-    });
+
+  // Accommodation may be added separately only when the published living line
+  // is absent. If published living is present, assume it already includes
+  // accommodation and avoid double-counting it.
+  if (living == null && input.accommodationCostUsd != null) {
+    if (accommodation == null) addUnknown("Separately listed accommodation cost is not a valid non-negative USD amount.");
+    lines.push(annualLine("accommodation", "Accommodation (published separately)", accommodation, years));
   }
+
   lines.push(
-    {
-      key: "insurance",
-      label: "Health insurance",
-      annualUsd: money(insurance),
-      totalUsd: money(insurance * years),
-      estimated: !(Number(input.insurancePerYearUsd) > 0),
-    },
-    {
-      key: "books",
-      label: "Books & materials",
-      annualUsd: money(books),
-      totalUsd: money(books * years),
-      estimated: !(Number(input.booksPerYearUsd) > 0),
-    },
-    {
-      key: "flights",
-      label: "Flights home",
-      annualUsd: money(flights),
-      totalUsd: money(flights * years),
-      estimated: !(Number(input.flightsPerYearUsd) > 0),
-    }
+    annualLine("insurance", "Health insurance", insurance, years),
+    annualLine("books", "Books & materials", books, years),
+    annualLine("flights", "Flights home", flights, years),
+    oneTimeLine("visa_fee", "Visa or residence-permit fee", visaFee),
+    oneTimeLine("application_fee", "Application fee", applicationFee)
   );
 
-  const visaFee = Number(input.visaFeeUsd) > 0 ? Number(input.visaFeeUsd) : 0;
-  const appFee = Number(input.applicationFeeUsd) > 0 ? Number(input.applicationFeeUsd) : 0;
-  const oneOffTotal = visaFee + appFee;
-  if (visaFee > 0) {
-    lines.push({ key: "visa_fee", label: "Visa or residence-permit fee (entered)", annualUsd: 0, totalUsd: money(visaFee), estimated: false });
-  } else {
-    unknowns.push("Visa or residence-permit fees are not included. Requirements and fees depend on destination and personal circumstances; check official government guidance.");
-  }
-  if (appFee > 0) {
-    lines.push({ key: "application_fee", label: "Application fee (entered)", annualUsd: 0, totalUsd: money(appFee), estimated: false });
-  } else {
-    unknowns.push("Application fees are not included unless a current programme fee was supplied; check each official programme page.");
-  }
+  const annualLines = lines.filter((line) => line.frequency === "annual");
+  const annualTotal = sumKnown(annualLines.map((line) => line.annualUsd));
+  const totalCost = sumKnown(lines.map((line) => line.totalUsd));
 
-  // --- Scholarships --------------------------------------------------------
-  const scholarships = (input.scholarships ?? []).filter((s) => Number(s.amountUsd) > 0);
-  // Only the first matching tuition scholarship can pay the tuition — you do
-  // not collect three full rides. Living stipends do stack, in practice rarely.
-  const tuitionAid = scholarships.filter((s) => s.covers === "tuition" || s.covers === "both");
-  const livingAid = scholarships.filter((s) => s.covers === "living");
-  const otherAid = scholarships.filter((s) => s.covers === "other");
-
-  const bestCaseAnnual =
-    (tuitionAid.length > 0 ? Math.max(...tuitionAid.map((s) => s.amountUsd)) : 0) +
-    livingAid.reduce((sum, s) => sum + s.amountUsd, 0) +
-    otherAid.reduce((sum, s) => sum + s.amountUsd, 0);
-
-  const coveragePct = annualTotal > 0 ? Math.round(Math.min(100, (bestCaseAnnual / annualTotal) * 100)) : 0;
-
-  // A living stipend does not close a tuition hole — name the mismatch.
-  const misaligned: string[] = [];
-  for (const s of livingAid) {
-    if (tuition > 0 && livingAid.length > 0 && tuitionAid.length === 0) {
-      misaligned.push(`${s.name} covers living costs, not tuition — your ${tuition.toLocaleString("en-US")} USD tuition is still unfunded.`);
+  // Keep annual and one-time awards separate. Monthly awards can be annualized
+  // without an invented duration; unsupported or absent periods remain unknown.
+  const annualAwards: { amount: number; covers: ScholarshipInput["covers"] }[] = [];
+  const oneTimeAwards: { amount: number; covers: ScholarshipInput["covers"] }[] = [];
+  let annualAwardUnknown = false;
+  let oneTimeAwardUnknown = false;
+  for (const award of input.scholarships ?? []) {
+    const period = normalizeScholarshipAwardPeriod(award.awardPeriod);
+    const amount = knownNonNegative(award.amountUsd);
+    if (period === "year" || period === "month") {
+      if (amount == null || amount <= 0) {
+        annualAwardUnknown = true;
+        addUnknown(`${award.name} has no positive, resolved USD award amount.`);
+        continue;
+      }
+      annualAwards.push({ amount: period === "month" ? amount * 12 : amount, covers: award.covers });
+    } else if (period === "one_time" || period === "total") {
+      if (amount == null || amount <= 0) {
+        oneTimeAwardUnknown = true;
+        addUnknown(`${award.name} has no positive, resolved USD award amount.`);
+        continue;
+      }
+      oneTimeAwards.push({ amount, covers: award.covers });
+    } else {
+      annualAwardUnknown = true;
+      oneTimeAwardUnknown = true;
+      addUnknown(`${award.name} has an unknown or unsupported award period, so it cannot be compared with the annual budget.`);
     }
   }
 
-  // --- Net -----------------------------------------------------------------
-  const familyContributionKnown =
-    typeof input.familyContributionUsd === "number" && Number.isFinite(input.familyContributionUsd) && input.familyContributionUsd >= 0;
-  const family = familyContributionKnown ? Number(input.familyContributionUsd) : 0;
-  const afterScholarshipAnnual = Math.max(0, annualTotal - bestCaseAnnual);
-  const gapAnnual = Math.max(0, afterScholarshipAnnual - family);
+  const knownAnnualScholarship = money(bestCaseByCover(annualAwards));
+  const knownOneTimeScholarship = money(bestCaseByCover(oneTimeAwards));
+  const bestCaseAnnual = annualAwardUnknown ? null : knownAnnualScholarship;
+  const bestCaseOneTime = oneTimeAwardUnknown ? null : knownOneTimeScholarship;
+  const coveragePct = annualTotal != null && annualTotal > 0 && bestCaseAnnual != null
+    ? Math.round(Math.min(100, (bestCaseAnnual / annualTotal) * 100))
+    : null;
 
-  const totalAfterScholarship = afterScholarshipAnnual * years + oneOffTotal;
-  const gapTotal = gapAnnual * years + oneOffTotal;
+  const annualAfterScholarship = annualTotal == null || bestCaseAnnual == null
+    ? null
+    : money(Math.max(0, annualTotal - bestCaseAnnual));
+  const totalAfterScholarship = totalCost == null || years == null || bestCaseAnnual == null || bestCaseOneTime == null
+    ? null
+    : money(Math.max(0, totalCost - bestCaseAnnual * years - bestCaseOneTime));
+
+  const family = knownNonNegative(input.familyContributionUsd);
+  const familyContributionKnown = family != null;
+  const gapAnnual = annualAfterScholarship == null
+    ? null
+    : familyContributionKnown
+      ? money(Math.max(0, annualAfterScholarship - family))
+      : annualAfterScholarship;
+  const gapTotal = totalAfterScholarship == null || years == null
+    ? null
+    : familyContributionKnown
+      ? money(Math.max(0, totalAfterScholarship - family! * years))
+      : totalAfterScholarship;
+  const affordable = familyContributionKnown && gapAnnual != null && gapTotal != null
+    ? gapAnnual <= 0 && gapTotal <= 0
+    : null;
+
+  const misaligned: string[] = [];
+  const hasTuitionAid = annualAwards.some((award) => award.covers === "tuition" || award.covers === "both");
+  if (tuition != null && tuition > 0 && !hasTuitionAid) {
+    for (const award of annualAwards.filter((entry) => entry.covers === "living")) {
+      misaligned.push(`${award.amount.toLocaleString("en-US")} USD/year of living aid does not pay the ${tuition.toLocaleString("en-US")} USD tuition.`);
+    }
+  }
 
   let verdict: string;
-  if (tuitionEstimated) {
-    verdict =
-      "Tuition is not published, so this total is a floor, not a quote. Verify the fee on the programme page before planning around it.";
+  if (annualTotal == null) {
+    verdict = "Some annual cost lines are unknown or unavailable in USD. A full annual total and funding gap cannot be calculated until those amounts are verified.";
+  } else if (bestCaseAnnual == null || annualAfterScholarship == null) {
+    verdict = "At least one saved award has an unknown amount or unsupported period, so annual scholarship coverage and the funding gap remain unknown.";
   } else if (!familyContributionKnown) {
-    verdict = `The current best-case amount still needing a funding source is ${afterScholarshipAnnual.toLocaleString("en-US")} USD/year. Add the amount your family has explicitly confirmed before treating this as an affordability result.`;
-  } else if (gapAnnual <= 0) {
-    verdict = `On paper this is affordable: your family's ${family.toLocaleString("en-US")} USD/year covers the ${afterScholarshipAnnual.toLocaleString("en-US")} USD remaining after scholarships. That assumes every scholarship lands.`;
+    verdict = `Known annual costs leave ${annualAfterScholarship.toLocaleString("en-US")} USD/year before any unconfirmed family contribution. Add only an amount your family has explicitly confirmed; family income is not counted as available funding.`;
+  } else if (gapAnnual != null && gapAnnual <= 0 && gapTotal == null) {
+    verdict = "Known annual costs appear covered by the recorded awards and explicit contribution, but whole-programme affordability remains unknown because duration, one-off costs, or award totals are unresolved.";
+  } else if (gapAnnual != null && gapAnnual <= 0 && gapTotal != null && gapTotal <= 0) {
+    verdict = `On paper, confirmed annual family support covers the ${annualAfterScholarship.toLocaleString("en-US")} USD remaining after scholarships. This is a best-case scenario and assumes every listed award lands.`;
   } else {
-    verdict = `The current best-case calculation leaves a ${gapAnnual.toLocaleString("en-US")} USD/year gap (${gapTotal.toLocaleString("en-US")} USD over ${years} years). Confirm award conditions, upfront costs and any additional funding with the programme and scholarship providers.`;
+    verdict = `The annual funding gap is ${gapAnnual?.toLocaleString("en-US") ?? "unknown"} USD after confirmed contribution. Verify award conditions and any unknown cost lines before relying on this result.`;
   }
 
   return {
     lines,
-    annualTotalUsd: money(annualTotal),
-    totalUsd: money(annualTotal * years + oneOffTotal),
+    annualTotalUsd: annualTotal,
+    totalUsd: totalCost,
     unknowns,
     scholarship: {
-      bestCaseAnnualUsd: money(bestCaseAnnual),
+      bestCaseAnnualUsd: bestCaseAnnual,
+      bestCaseOneTimeUsd: bestCaseOneTime,
       coveragePct,
       misaligned,
     },
     net: {
-      annualAfterScholarshipUsd: money(afterScholarshipAnnual),
-      totalAfterScholarshipUsd: money(totalAfterScholarship),
-      familyContributionUsd: money(family),
+      annualAfterScholarshipUsd: annualAfterScholarship,
+      totalAfterScholarshipUsd: totalAfterScholarship,
+      familyContributionUsd: family,
       familyContributionKnown,
-      gapAnnualUsd: money(gapAnnual),
-      gapTotalUsd: money(gapTotal),
-      affordable: gapAnnual <= 0,
+      gapAnnualUsd: gapAnnual,
+      gapTotalUsd: gapTotal,
+      affordable,
     },
     verdict,
   };
@@ -308,7 +334,7 @@ export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
 
   advice.push({ key: list.length === 0 ? "noSavedAwards" : "unconfirmedAwards" });
 
-  const missingAmounts = list.filter((s) => !Number.isFinite(s.amountUsd) || s.amountUsd <= 0).length;
+  const missingAmounts = list.filter((s) => s.amountUsd == null || !Number.isFinite(s.amountUsd) || s.amountUsd <= 0).length;
   if (missingAmounts > 0) advice.push({ key: "missingAmounts", count: missingAmounts });
 
   const overdue = list.filter((s) => s.deadlineDays != null && s.deadlineDays < 0).length;

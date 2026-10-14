@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Loader2, History } from "lucide-react";
 
 interface RefreshCenterProps {
@@ -26,7 +26,7 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/refresh?adminProfileId=${adminProfileId}`);
@@ -37,12 +37,11 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminProfileId]);
+    void Promise.resolve().then(load);
+  }, [load]);
 
   const run = async (scope: "all" | "scholarships" | "universities") => {
     setRunning(true);

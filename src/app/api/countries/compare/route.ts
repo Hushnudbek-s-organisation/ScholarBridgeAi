@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
+import { eq } from "drizzle-orm";
 import { scholarships, universities } from "@/db/schema";
 import { compareCountries, listCountries, type CountryComparison } from "@/lib/countryCompare";
+import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 export const dynamic = "force-dynamic";
 
@@ -18,17 +20,37 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const [unis, schs] = await Promise.all([
+    const [universityRows, scholarshipRows] = await Promise.all([
       db
         .select({
           country: universities.country,
           annualTuitionUsd: universities.annualTuitionUsd,
+          annualTuition: universities.annualTuition,
+          tuitionCurrency: universities.tuitionCurrency,
+          tuitionPeriod: universities.tuitionPeriod,
           annualLivingEstUsd: universities.annualLivingEstUsd,
+          annualLivingEst: universities.annualLivingEst,
+          livingCostCurrency: universities.livingCostCurrency,
+          livingCostPeriod: universities.livingCostPeriod,
           minIelts: universities.minIelts,
+          postStudyWorkVisaYears: universities.postStudyWorkVisaYears,
         })
-        .from(universities),
-      db.select({ country: scholarships.country, amountUsdValue: scholarships.amountUsdValue }).from(scholarships),
+        .from(universities)
+        .where(eq(universities.isActive, true)),
+      db.select({
+        country: scholarships.country,
+        amountUsdValue: scholarships.amountUsdValue,
+        awardAmount: scholarships.awardAmount,
+        awardCurrency: scholarships.awardCurrency,
+        awardPeriod: scholarships.awardPeriod,
+      }).from(scholarships).where(eq(scholarships.isActive, true)),
     ]);
+    const unis = universityRows.map((row) => ({ ...row, ...resolvedUsdUniversityCosts(row) }));
+    const schs = scholarshipRows.map((row) => ({
+      country: row.country,
+      amountUsdValue: resolvedUsdScholarshipAmount(row),
+      awardPeriod: row.awardPeriod,
+    }));
 
     let wanted: string[];
     const param = url.searchParams.get("countries")?.trim();

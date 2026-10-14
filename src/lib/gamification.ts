@@ -1,6 +1,7 @@
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { computeDailyStreak } from "@/lib/streak";
+import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import {
   userPoints,
   pointsLedger,
@@ -74,7 +75,7 @@ export function computeLevel(totalPoints: number, levelRows: typeof levels.$infe
  * full row) so a lightweight query — e.g. the referral list, which only needs
  * a progress bar — can compute the exact same number the profile screen shows.
  */
-export interface CompletenessInput {
+export interface CompletenessInput extends ChancingProfile {
   name: string | null;
   email: string | null;
   targetMajor: string | null;
@@ -91,25 +92,9 @@ export interface CompletenessInput {
   researchPublications: number | null;
 }
 
+/** Uses the same validated profile facts and normalized coverage as chancing. */
 export function computeProfileCompleteness(profile: CompletenessInput): number {
-  const checks = [
-    !!profile.name,
-    !!profile.email,
-    !!profile.targetMajor,
-    !!profile.degreeLevel,
-    (profile.gpa ?? 0) > 0,
-    (profile.gpaScale ?? 0) > 0,
-    profile.ieltsScore != null,
-    profile.toeflScore != null,
-    profile.satScore != null,
-    profile.greScore != null,
-    (profile.budgetAnnualUsd ?? 0) > 0,
-    !!profile.extracurriculars,
-    profile.workExperienceYears != null,
-    profile.researchPublications != null,
-  ];
-  const filled = checks.filter(Boolean).length;
-  return Math.round((filled / checks.length) * 100);
+  return Math.round(profileCompletenessRatio(profile) * 100);
 }
 
 interface AwardResult {

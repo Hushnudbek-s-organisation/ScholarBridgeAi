@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Video,
   Plus,
@@ -127,7 +127,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/courses?adminProfileId=${adminProfileId}`);
       const data = await res.json();
@@ -138,11 +138,11 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminProfileId]);
 
   useEffect(() => {
-    fetchCourses();
-  }, []);
+    void Promise.resolve().then(fetchCourses);
+  }, [fetchCourses]);
 
   const startNew = () => {
     setDraft(emptyCourse());

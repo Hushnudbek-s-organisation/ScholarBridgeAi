@@ -60,9 +60,11 @@ import {
 import { computeNextActions, type NextStepsInput } from "../src/lib/journey/nextSteps";
 import { PLAN_PHASES, buildPhaseProgress, reversePlan } from "../src/lib/journey/planning";
 import {
+  annualFundingCostLines,
   COST_LINES,
   FUNDING_KIND_LABELS,
   buildFundingPlan,
+  knownAnnualCostTotal,
   postAdmissionFunding,
   type FundingItemLike,
 } from "../src/lib/journey/funding";
@@ -538,7 +540,7 @@ check("an optional unfinished row does not block submission", () => {
   assert.equal(p.readyToSubmit, true);
 });
 
-check("recommendations and finance fold into the same bar", () => {
+check("standalone recommendations and finance fold into the bar without double-counting", () => {
   const base = computeWorkspaceProgress(rows, {});
   const openRecs = computeWorkspaceProgress(rows, {}, { recommendationsTotal: 2, recommendationsSubmitted: 0, financeTotal: 2, financeDone: 2 });
   const rec = openRecs.sections.find((s) => s.key === "recommendations");
@@ -550,12 +552,43 @@ check("recommendations and finance fold into the same bar", () => {
 
   const allRecs = computeWorkspaceProgress(rows, {}, { recommendationsTotal: 2, recommendationsSubmitted: 2, financeTotal: 2, financeDone: 2 });
   assert.ok(allRecs.pct > base.pct, "finishing them must raise it again");
+  const overlapping = computeWorkspaceProgress([
+    { section: "recommendations", status: "done", isRequired: false, key: "recommendations.letter" },
+  ], {}, { recommendationsTotal: 2, recommendationsSubmitted: 1 });
+  const recommendationGroup = overlapping.sections.find((s) => s.key === "recommendations")!;
+  assert.equal(recommendationGroup.total, 2, "tracked requests replace, rather than stack on, their requirement-row placeholder");
+  assert.equal(recommendationGroup.done, 1, "only a submitted tracked request counts as done");
+  assert.ok(recommendationGroup.done <= recommendationGroup.total);
 });
 
-check("a submitted application is locked at 100", () => {
+check("submission requires at least one tracked requirement and every tracked recommendation", () => {
+  const completeRequirements: WorkspaceRow[] = [{ section: "documents", status: "done", isRequired: true, key: "passport" }];
+  assert.equal(computeWorkspaceProgress([], {}, { recommendationsTotal: 1, recommendationsSubmitted: 1 }).readyToSubmit, false);
+  const pending = computeWorkspaceProgress(completeRequirements, {}, { recommendationsTotal: 2, recommendationsSubmitted: 1 });
+  assert.equal(pending.readyToSubmit, false);
+  assert.ok(pending.blockers.some((blocker) => /recommendation request/i.test(blocker)));
+  const ready = computeWorkspaceProgress(completeRequirements, {}, { recommendationsTotal: 2, recommendationsSubmitted: 2 });
+  assert.equal(ready.readyToSubmit, true);
+  const placeholderOnly = computeWorkspaceProgress([
+    ...completeRequirements,
+    { section: "recommendations", status: "not_done", isRequired: true, key: "recommendations.letter", linkedType: "recommendation" },
+  ], {}, { recommendationsTotal: 1, recommendationsSubmitted: 1 });
+  assert.equal(placeholderOnly.readyToSubmit, true, "a stale placeholder does not block once the tracked request is submitted");
+  assert.equal(placeholderOnly.sections.find((section) => section.key === "recommendations")?.done, 1);
+});
+
+check("required application fee is satisfied by payment or a completed row", () => {
+  const fee: WorkspaceRow = { section: "finance", status: "todo", isRequired: true, key: "application.fee" };
+  assert.equal(computeWorkspaceProgress([fee], {}).readyToSubmit, false);
+  assert.equal(computeWorkspaceProgress([fee], {}, { applicationFeePaid: true }).readyToSubmit, true);
+  assert.equal(computeWorkspaceProgress([{ ...fee, status: "done" }], {}).readyToSubmit, true);
+  assert.equal(computeWorkspaceProgress([{ ...fee, status: "not_required" }], {}).readyToSubmit, true);
+});
+
+check("a submitted application locks progress at 100 but never bypasses the submit gate", () => {
   const p = computeWorkspaceProgress(rows, {}, { submitted: true });
   assert.equal(p.pct, 100);
-  assert.equal(p.readyToSubmit, true, "an already-submitted application is past the gate");
+  assert.equal(p.readyToSubmit, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -623,13 +656,23 @@ check("empty optional sections are excluded and do not create weakest categories
   assert.ok(result.categories.every((category) => category.unknown), "empty categories should be unknown, not poor");
 });
 
-check("document percentages only compare an existing checklist", () => {
+check("document coverage uses fixed milestones while preserving actual pending-list context", () => {
   const empty = profileReadiness({ activitiesCount: 0, documentsReady: 0, documentsTotal: 0, applicationsStarted: 0, applicationsSubmitted: 0 });
   const docs = empty.categories.find((category) => category.key === "documents")!;
   assert.equal(docs.state, "unknown");
   const tracked = profileReadiness(readiness({ documentsReady: 2, documentsTotal: 4 })).categories.find((category) => category.key === "documents")!;
-  assert.equal(tracked.pct, 50);
+  assert.equal(tracked.pct, 40);
   assert.equal(tracked.state, "partial");
+  assert.deepEqual(tracked.gaps, ["documentsPending"]);
+});
+
+check("adding tracked documents or applications never lowers the headline coverage", () => {
+  const before = profileReadiness(readiness({ documentsReady: 1, documentsTotal: 1, applicationsStarted: 1, applicationsSubmitted: 0 }));
+  const morePendingRecords = profileReadiness(readiness({ documentsReady: 1, documentsTotal: 3, applicationsStarted: 3, applicationsSubmitted: 0 }));
+  const documents = morePendingRecords.categories.find((category) => category.key === "documents")!;
+  assert.equal(documents.pct, before.categories.find((category) => category.key === "documents")!.pct);
+  assert.ok(morePendingRecords.overall >= before.overall);
+  assert.equal(Object.values(before.weights).reduce((sum, weight) => sum + weight, 0), 1);
 });
 
 check("test comparison describes catalogue figures, not admissions outcomes", () => {
@@ -846,7 +889,54 @@ check("interview practice and departure records never imply visa approval", () =
 section("Funding (explicit coverage, explicit gap)");
 // ---------------------------------------------------------------------------
 
-const lines = COST_LINES.map((l) => ({ key: l.key, label: l.label, cost: l.key === "tuition" ? 50000 : 10000 }));
+const lines = COST_LINES.map((l) => ({ key: l.key, label: l.label, cost: l.key === "tuition" ? 50000 : 14000 }));
+
+check("all known annual funding lines reconcile to the annual cost total", () => {
+  const annualCost = knownAnnualCostTotal(lines);
+  assert.equal(annualCost, 120000);
+  const plan = buildFundingPlan({ annualCost, lines, items: [] });
+  const itemizedTotal = plan.byLine.reduce((sum, line) => sum + (line.cost ?? 0), 0);
+  assert.equal(itemizedTotal, annualCost);
+  assert.equal(plan.annualCost, itemizedTotal);
+});
+
+check("catalogue funding totals stay unknown when insurance, books, or travel are not published", () => {
+  const annualLines = annualFundingCostLines({
+    annualTuitionUsd: 50000,
+    annualLivingEstUsd: 14000,
+    accommodationCostUsd: null,
+  });
+  assert.equal(annualLines.find((line) => line.key === "tuition")?.cost, 50000);
+  assert.equal(annualLines.find((line) => line.key === "living")?.cost, 14000);
+  assert.ok(["insurance", "books", "flights"].every((key) => annualLines.find((line) => line.key === key)?.cost === null));
+  assert.equal(knownAnnualCostTotal(annualLines), null);
+});
+
+check("accommodation is not double-counted with a living-cost total", () => {
+  const annualLines = annualFundingCostLines({
+    annualTuitionUsd: 50000,
+    annualLivingEstUsd: 14000,
+    accommodationCostUsd: 5000,
+  });
+  assert.equal(annualLines.some((line) => line.key === "accommodation"), false);
+});
+
+check("accommodation alone does not pretend to replace an unknown living-cost total", () => {
+  const annualLines = annualFundingCostLines({
+    annualTuitionUsd: 50000,
+    annualLivingEstUsd: null,
+    accommodationCostUsd: 5000,
+  });
+  assert.equal(annualLines.find((line) => line.key === "living")?.cost, null);
+  assert.equal(annualLines.find((line) => line.key === "accommodation")?.cost, 5000);
+  assert.equal(knownAnnualCostTotal(annualLines), null);
+});
+
+check("dashboard funding uses the complete verified annual cost-line set", () => {
+  const dashboard = readFileSync("src/app/api/dashboard/route.ts", "utf8");
+  assert.match(dashboard, /annualFundingCostLines\(costsUsd\)/);
+  assert.doesNotMatch(dashboard, /costsUsd\.annualTuitionUsd\s*\+\s*costsUsd\.annualLivingEstUsd/);
+});
 
 check("a plan with nothing recorded shows the whole cost as a gap", () => {
   const p = buildFundingPlan({ annualCost: 120000, lines, items: [] });
@@ -874,36 +964,54 @@ check("a declined item stops counting towards the plan", () => {
   assert.equal(p.fundingGap, 120000);
 });
 
-check("coverage is per line, and an item that covers nothing specific counts only once", () => {
+check("coverage is per line and restricted items only cover declared annual lines", () => {
   const p = buildFundingPlan({
     annualCost: 120000,
     lines,
     items: [item({ amountUsd: 10000, covers: JSON.stringify(["tuition"]) })],
   });
   const tuition = p.byLine.find((l) => l.key === "tuition")!;
-  const food = p.byLine.find((l) => l.key === "food")!;
+  const living = p.byLine.find((l) => l.key === "living")!;
   assert.equal(tuition.covered, 10000);
   assert.equal(tuition.gap, 40000);
-  assert.equal(food.covered, 0);
-  assert.equal(food.gap, 10000);
+  assert.equal(living.covered, 0);
+  assert.equal(living.gap, 14000);
 });
 
-check("an item that declares no coverage is applied per line but counted once in the total", () => {
+check("unscoped funding is allocated once in deterministic line order", () => {
   const p = buildFundingPlan({ annualCost: 120000, lines, items: [item({ amountUsd: 10000 })] });
-  // It helps every line it can, capped at each line's own cost…
   const tuition = p.byLine.find((l) => l.key === "tuition")!;
   assert.equal(tuition.covered, 10000);
-  for (const l of p.byLine) assert.ok(l.covered <= l.cost, `${l.key} is covered beyond its own cost`);
-  // …but the money itself is only ever counted once.
+  assert.equal(p.byLine.filter((line) => line.covered != null && line.covered > 0).length, 1);
+  for (const l of p.byLine) {
+    if (l.covered != null && l.cost != null) assert.ok(l.covered <= l.cost, `${l.key} is covered beyond its own cost`);
+  }
+  assert.ok(p.byLine.reduce((total, line) => total + (line.covered ?? 0), 0) <= p.projectedTotal);
   assert.equal(p.scholarshipTotal, 10000);
   assert.equal(p.projectedTotal, 10000);
   assert.equal(p.fundingGap, 110000);
 });
 
+check("explicit line items are allocated before an unrestricted pool", () => {
+  const allocationLines = COST_LINES.map((line) => ({
+    key: line.key,
+    label: line.label,
+    cost: line.key === "tuition" ? 50000 : line.key === "living" ? 40000 : line.key === "insurance" || line.key === "books" || line.key === "flights" ? 10000 : 0,
+  }));
+  const p = buildFundingPlan({ annualCost: 120000, lines: allocationLines, items: [
+    item({ name: "General grant", amountUsd: 50000, covers: null }),
+    item({ name: "Tuition award", amountUsd: 40000, covers: JSON.stringify(["tuition"]) }),
+  ] });
+  assert.equal(p.byLine.find((line) => line.key === "tuition")!.covered, 50000);
+  assert.equal(p.byLine.find((line) => line.key === "living")!.covered, 40000);
+  assert.equal(p.byLine.reduce((total, line) => total + (line.covered ?? 0), 0), 90000);
+  assert.ok(p.byLine.reduce((total, line) => total + (line.covered ?? 0), 0) <= p.projectedTotal);
+});
+
 check("a scholarship that only covers tuition leaves the other lines open", () => {
   const p = buildFundingPlan({ annualCost: 120000, lines, items: [item({ amountUsd: 60000, covers: JSON.stringify(["tuition"]) })] });
   assert.equal(p.byLine.find((l) => l.key === "tuition")!.gap, 0);
-  assert.equal(p.byLine.find((l) => l.key === "food")!.gap, 10000, "food is still short");
+  assert.equal(p.byLine.find((l) => l.key === "living")!.gap, 14000, "living costs are still short");
   assert.equal(p.fundingGap, 60000);
 });
 
@@ -912,6 +1020,24 @@ check("a fully funded year is reported as covered, with the items to prove it", 
   assert.equal(p.fundingGap, 0);
   assert.equal(p.securedGap, 0);
   assert.equal(p.isCovered, true);
+});
+
+check("unknown costs remain null and never produce a zero funding gap", () => {
+  const p = buildFundingPlan({
+    annualCost: null,
+    lines: [
+      { key: "tuition", label: "Tuition", cost: 50000 },
+      { key: "living", label: "Living", cost: null },
+    ],
+    items: [item({ amountUsd: 70000, status: "confirmed" })],
+  });
+  assert.equal(p.annualCost, null);
+  assert.equal(p.fundingGap, null);
+  assert.equal(p.securedGap, null);
+  assert.equal(p.isCovered, null);
+  assert.equal(p.byLine.find((line) => line.key === "living")?.cost, null);
+  assert.equal(p.byLine.find((line) => line.key === "living")?.covered, null);
+  assert.equal(p.byLine.find((line) => line.key === "tuition")?.gap, 0);
 });
 
 check("every funding kind has a human label and every cost line a key", () => {
@@ -930,17 +1056,42 @@ check("post-admission funding states the deposit, the payee and what is left", (
     universityName: "MIT",
   });
   assert.equal(f.scholarship, 12000);
+  assert.equal(f.otherConfirmed, 0);
   assert.equal(f.payableNow.amount, 5000);
   assert.equal(f.payableNow.payee, "MIT");
   assert.ok(f.explanation.some((e) => /60,000/.test(e)), f.explanation.join(" | "));
   assert.ok(f.explanation.some((e) => /48,000/.test(e)), "the remaining balance must be explicit");
 });
 
+check("only explicitly confirmed non-income contributions reduce post-admission tuition", () => {
+  const f = postAdmissionFunding({
+    tuition: 60000,
+    items: [
+      item({ amountUsd: 12000, status: "confirmed", kind: "scholarship" }),
+      item({ amountUsd: 5000, status: "confirmed", kind: "family" }),
+      item({ amountUsd: 40000, status: "planned", kind: "family" }),
+    ],
+    universityName: "MIT",
+  });
+  assert.equal(f.otherConfirmed, 5000);
+  assert.ok(f.explanation.some((line) => /Confirmed funding: \$17,000/.test(line)));
+  assert.ok(f.explanation.some((line) => /Remaining after confirmed funding: \$43,000/.test(line)));
+});
+
 check("no confirmed funding is stated plainly, not softened into 'full funding'", () => {
   const f = postAdmissionFunding({ tuition: 60000, items: [], universityName: "MIT" });
   assert.ok(f.explanation.some((e) => /No confirmed funding yet/.test(e)), f.explanation.join(" | "));
-  assert.equal(f.payableNow.amount, 60000);
+  assert.equal(f.payableNow.amount, null, "an unrecorded deposit is not replaced with the tuition balance");
+  assert.ok(f.explanation.some((line) => /Remaining after confirmed funding: \$60,000/.test(line)));
   assert.ok(!/full funding|full scholarship/i.test(f.explanation.join(" ")));
+});
+
+check("an unrecorded tuition commitment remains unknown, not $0", () => {
+  const f = postAdmissionFunding({ tuition: null, items: [], universityName: "MIT" });
+  assert.equal(f.tuition, null);
+  assert.equal(f.payableNow.amount, null);
+  assert.ok(f.explanation.some((line) => /Tuition commitment is not recorded/i.test(line)));
+  assert.ok(f.explanation.some((line) => /cannot be calculated/i.test(line)));
 });
 
 // ---------------------------------------------------------------------------
@@ -1153,7 +1304,7 @@ check("hidden-by-default ids are real panes, account screens or legacy ids", () 
   const paneIds = new Set(NAV_SECTIONS.flatMap((s) => s.panes.map((p) => p.id)));
   const utilityIds = new Set(["payments", "notifications", "rewards", "parent", "admin"]);
   for (const id of DEFAULT_HIDDEN_NAV_ITEMS) {
-    // A pane ("compare"), an account screen ("parent") or a pre-restructure id
+    // A pane ("countries"), an account screen ("parent") or a pre-restructure id
     // ("advisor", "mentors") that still resolves — all three are hideable.
     assert.ok(
       paneIds.has(id) || utilityIds.has(id) || resolveNavTarget(id) !== null,
@@ -1179,6 +1330,11 @@ check("profile editing stays in a modal instead of a separate navigation pane", 
   assert.ok(!stale.includes("profile"), "a stored 'profile' survives parsing");
   assert.ok(!stale.includes("details"), "a stored legacy 'details' id survives parsing");
   assert.ok(stale.includes("parent"), "other stored ids must survive");
+
+  const defaultHidden = parseHiddenNav(null);
+  assert.ok(defaultHidden.includes("countries") && !defaultHidden.includes("compare"), "the country-compare pane has a canonical hidden id");
+  assert.ok(parseHiddenNav(JSON.stringify(["compare"])).includes("countries"), "legacy compare config normalizes to countries");
+  assert.ok(!visiblePanes("universities", ["compare"]).some((p) => p.id === "countries"), "visiblePanes accepts raw legacy compare ids");
 
   const profileSection = NAV_SECTIONS.find((section) => section.id === "profile");
   assert.equal(profileSection?.locked, true, "Profile & Goals should remain a locked destination");
@@ -1243,6 +1399,44 @@ check("every journey route exists and is session-guarded", () => {
     const src = readFileSync(r, "utf8");
     assert.ok(src.includes("guardStudent") || src.includes("guardAdmin"), `${r} is not guarded`);
   }
+});
+
+check("workspace records are scoped to the current application wherever the schema allows", () => {
+  const workspace = readFileSync("src/app/api/workspace/route.ts", "utf8");
+  const requirements = readFileSync("src/app/api/requirements/route.ts", "utf8");
+  assert.ok(/eq\(fundingItems\.applicationId, applicationId\)/.test(workspace), "funding must not cross applications");
+  assert.ok(/eq\(recommendationRequests\.profileId, profileId\)[\s\S]{0,100}eq\(recommendationRequests\.applicationId, applicationId\)/.test(workspace), "recommendations need owner and application scope");
+  assert.ok(/applicationDocumentLinks\.applicationId, applicationId/.test(workspace), "documents must be linked to the current application");
+  assert.ok(/essayVersions\.universityId/.test(workspace) && /isNull\(essayVersions\.universityId\)/.test(workspace), "essays must not leak across university applications");
+  assert.ok(/eq\(applicationRequirements\.profileId, profileId\)[\s\S]{0,100}eq\(applicationRequirements\.applicationId, applicationId\)/.test(requirements), "requirement rows need owner and application scope");
+  assert.ok(/eq\(applicationDocumentLinks\.applicationId, applicationId/.test(requirements), "requirement facts must use application-linked documents");
+  assert.ok(/eq\(recommendationRequests\.profileId, profileId\)[\s\S]{0,100}eq\(recommendationRequests\.applicationId, applicationId\)/.test(requirements), "recommendation facts need owner and application scope");
+  assert.ok(/eq\(applicationRequirements\.applicationId, applicationId\)/.test(readFileSync("src/app/api/requirements/route.ts", "utf8")), "requirement mutations must remain application-scoped");
+});
+
+check("the general Funding Hub stays profile-wide and post-admission funding follows the active application", () => {
+  const hubs = readFileSync("src/components/hubs/index.tsx", "utf8");
+  const panel = readFileSync("src/components/journey/AfterAdmissionPanels.tsx", "utf8");
+  const fundingRoute = readFileSync("src/app/api/funding/route.ts", "utf8");
+  const fundingStart = hubs.indexOf("export function FundingHub");
+  const postAdmissionStart = hubs.indexOf("export function PostAdmissionFundingHub");
+  assert.ok(fundingStart >= 0 && postAdmissionStart > fundingStart, "funding hubs must exist");
+  const fundingHub = hubs.slice(fundingStart, hubs.indexOf("/* =========================================================================", fundingStart));
+  const postAdmissionHub = hubs.slice(postAdmissionStart, hubs.indexOf("/* =========================================================================", postAdmissionStart));
+  assert.match(fundingHub, /<FinancialPlanPanel profileId=\{profile\.id\} onNavigateTab=\{navigate\} \/>/);
+  assert.doesNotMatch(fundingHub, /applicationId=/, "the general Funding Hub must not inherit an application filter");
+  assert.match(postAdmissionHub, /applicationId=\{workspaceId \?\? null\}/, "post-admission funding must pass the active workspace application");
+  assert.match(panel, /if \(applicationId != null\) params\.set\("applicationId", String\(applicationId\)\)/);
+  assert.match(panel, /applicationId: applicationId \?\? null/);
+  assert.match(fundingRoute, /isNull\(fundingItems\.applicationId\)/, "profile-wide funding mutations and reads must remain unlinked");
+  assert.match(fundingRoute, /eq\(fundingItems\.applicationId, applicationId\)/, "application-scoped funding must stay within its application");
+  assert.doesNotMatch(fundingRoute, /orderBy\(desc\(applications\.updatedAt\)\)/, "profile-wide funding must not silently select the latest application");
+});
+
+check("the planning calculator never invents a programme duration from degree level", () => {
+  const planning = readFileSync("src/app/api/planning/route.ts", "utf8");
+  assert.match(planning, /years:\s*null/);
+  assert.doesNotMatch(planning, /profile\.degreeLevel === "Master"\s*\?/);
 });
 
 check("the visa-requirements route is admin-only for writes", () => {

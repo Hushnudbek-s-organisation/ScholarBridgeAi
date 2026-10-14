@@ -765,3 +765,32 @@ html:not(.dark) .text-slate-500 {
     min-height: 44px;
   }
 }
+
+/* Printable journey summaries can also be saved to PDF from the browser's
+   print dialog. Keep the export legible even when the user prefers dark mode. */
+@media print {
+  @page { margin: 12mm; }
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; color: #0f172a !important; }
+  body { font-size: 10pt; }
+  .dark {
+    color-scheme: light !important;
+    --color-slate-50: #ffffff;
+    --color-slate-100: #f8fafc;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-400: #64748b;
+    --color-slate-500: #475569;
+    --color-slate-600: #334155;
+    --color-slate-700: #1e293b;
+    --color-slate-800: #0f172a;
+    --color-slate-900: #0f172a;
+    --color-slate-950: #020617;
+  }
+  .dark .bg-white, .dark .bg-slate-900, .dark .bg-slate-800, .dark .bg-slate-700,
+  .sb-journey-hero { background: #fff !important; background-image: none !important; }
+  .dark .border-slate-700, .dark .border-slate-800, .dark .border-slate-900 { border-color: #cbd5e1 !important; }
+  .dark .text-white, .dark .text-slate-100, .dark .text-slate-200, .dark .text-slate-300 { color: #0f172a !important; }
+  .print\:hidden, nav, aside, button, .sticky, [role="tablist"], .sb-aurora { display: none !important; }
+  section, article, .rounded-2xl { box-shadow: none !important; break-inside: avoid-page; }
+  h1, h2, h3 { break-after: avoid-page; }
+}

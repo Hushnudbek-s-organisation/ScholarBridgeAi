@@ -905,18 +905,19 @@ check(
 section("10. Fit-score breakdown strip — the arithmetic, not just the number");
 
 const breakdownFixture = {
-  rawScore: 97.8,
-  comparedDimensions: 7,
-  totalDimensions: 8,
+  rawScore: 97,
+  comparedDimensions: 6,
+  totalDimensions: 7,
+  evidenceCoveragePct: 86,
+  evidenceLevel: "broad" as const,
   components: [
     { key: "base" as const, code: null, points: 70, compared: true },
-    { key: "gpa" as const, code: "gpa_above", points: 15, compared: true },
-    { key: "english" as const, code: "ielts_above", points: 8, compared: true },
+    { key: "gpa" as const, code: "gpa_above", points: 10, compared: true },
+    { key: "english" as const, code: "ielts_above", points: 5, compared: true },
     { key: "standardised_test" as const, code: null, points: 0, compared: false },
-    { key: "field" as const, code: "major_strong", points: 12, compared: true },
-    { key: "country" as const, code: "country_preferred", points: 8, compared: true },
+    { key: "field" as const, code: "major_strong", points: 8, compared: true },
+    { key: "country" as const, code: "country_preferred", points: 4, compared: true },
     { key: "cost" as const, code: "budget_fits", points: 8, compared: true },
-    { key: "income" as const, code: null, points: -15.2, compared: true },
     { key: "funding_requirement" as const, code: "full_funding_required", points: -8, compared: true },
   ],
 };
@@ -932,7 +933,7 @@ check("breakdown strip renders", strip.error === null, strip.error ?? "");
 check("the neutral base is not shown as a dimension", !/>Base</.test(strip.html));
 check(
   "every scored dimension appears with its exact signed points",
-  ["GPA", "English", "Field", "Preferred country", "Funding requirement", "+15.0", "+8.0", "+12.0", "-15.2", "-8.0"].every((token) => strip.html.includes(token)),
+  ["GPA", "English", "Field", "Preferred country", "Funding requirement", "+10.0", "+5.0", "+8.0", "+4.0", "-8.0"].every((token) => strip.html.includes(token)),
   strip.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200)
 );
 check("negative contributions are shown as negative", /-8\.0/.test(strip.html));
@@ -944,7 +945,10 @@ check(
 );
 check(
   "the strip states how much of the score rests on real data",
-  /7 of 8 dimensions measured/.test(strip.html)
+  /6 of 7 dimensions measured/.test(strip.html) &&
+    /Evidence 86%/.test(strip.html) &&
+    /Broad coverage/.test(strip.html) &&
+    /not admission odds/.test(strip.html)
 );
 check(
   "no strip is rendered when there is nothing to break down",
@@ -1019,10 +1023,13 @@ section("13. Public catalog pages localize visible copy and keep active paginati
 const universitiesPageSource = readFileSync(new URL("../src/app/universities/page.tsx", import.meta.url), "utf8");
 const scholarshipsPageSource = readFileSync(new URL("../src/app/scholarships/page.tsx", import.meta.url), "utf8");
 const paginationSource = readFileSync(new URL("../src/components/Pagination.tsx", import.meta.url), "utf8");
+const catalogHeaderSource = readFileSync(new URL("../src/components/PublicCatalogHeader.tsx", import.meta.url), "utf8");
 const activeUniversitiesPredicates = universitiesPageSource.match(/from\(universitiesTable\)\s*\.where\(eq\(universitiesTable\.isActive, true\)\)/g) ?? [];
 const activeScholarshipsPredicates = scholarshipsPageSource.match(/from\(scholarshipsTable\)\s*\.where\(eq\(scholarshipsTable\.isActive, true\)\)/g) ?? [];
 check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(universitiesPageSource));
 check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(scholarshipsPageSource));
+check("both public catalog pages share language/theme navigation", /<PublicCatalogHeader\s*\/>/.test(universitiesPageSource) && /<PublicCatalogHeader\s*\/>/.test(scholarshipsPageSource) && /LanguageSwitcher/.test(catalogHeaderSource) && /ThemeToggle/.test(catalogHeaderSource));
+check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdScholarshipAmount\(scholarship\)/.test(scholarshipsPageSource) && /awardCurrency: scholarshipsTable\.awardCurrency/.test(scholarshipsPageSource));
 check("university total and page data both filter to active rows", activeUniversitiesPredicates.length >= 2, `found ${activeUniversitiesPredicates.length}`);
 check("scholarship total and page data both filter to active rows", activeScholarshipsPredicates.length >= 2, `found ${activeScholarshipsPredicates.length}`);
 check("public error states do not render raw exception messages", !/\{message\}/.test(universitiesPageSource) && !/\{message\}/.test(scholarshipsPageSource));
@@ -1032,8 +1039,8 @@ for (const locale of ["en", "uz", "ru"]) {
   const messages = loadMessages(locale);
   check(`public catalog and pagination messages exist in ${locale}`,
     Boolean(messages.publicCatalog?.universityHeading && messages.publicCatalog?.scholarshipHeading &&
-      messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline &&
-      messages.pagination?.aria && messages.pagination?.goToPage));
+      messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline && messages.publicCatalog?.catalogNavigation &&
+      messages.journey?.opAmountUnknown && messages.pagination?.aria && messages.pagination?.goToPage));
 }
 
 // ---------------------------------------------------------------------------

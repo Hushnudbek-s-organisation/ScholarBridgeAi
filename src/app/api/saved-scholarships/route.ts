@@ -5,6 +5,7 @@ import { savedScholarships, scholarships } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
+import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 
 const SAVED_SCHOLARSHIP_STATUSES = new Set([
   "Saved",
@@ -53,7 +54,16 @@ export async function GET(req: Request) {
       .innerJoin(scholarships, eq(savedScholarships.scholarshipId, scholarships.id))
       .where(eq(savedScholarships.profileId, profileId));
 
-    return NextResponse.json({ savedScholarships: saved });
+    return NextResponse.json({
+      savedScholarships: saved.map((row) => ({
+        ...row,
+        scholarship: {
+          ...row.scholarship,
+          // Existing tracker UI consumes this USD compatibility field.
+          amountUsdValue: resolvedUsdScholarshipAmount(row.scholarship),
+        },
+      })),
+    });
   } catch (error) {
     console.error("GET /api/saved-scholarships error:", error);
     return NextResponse.json({ error: "Failed to fetch saved scholarships" }, { status: 500 });

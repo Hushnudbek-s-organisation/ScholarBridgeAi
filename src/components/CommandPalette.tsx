@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
+import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 import { NAV_GROUP_I18N, type NavGroupId } from "@/lib/navSections";
 import {
   Award,
@@ -94,8 +95,10 @@ export function CommandPalette({
   const [cursor, setCursor] = useState(0);
   const [entities, setEntities] = useState<PaletteItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  useDialogFocusTrap({ open, dialogRef, onEscape: onClose });
 
   const results = useMemo(() => {
     const q = fold(query.trim());
@@ -158,12 +161,6 @@ export function CommandPalette({
   // Focus the input when opened. The parent remounts this component on every
   // open (key), so the query/cursor state always starts fresh.
   useEffect(() => {
-    if (!open) return;
-    const id = window.setTimeout(() => inputRef.current?.focus(), 30);
-    return () => window.clearTimeout(id);
-  }, [open]);
-
-  useEffect(() => {
     listRef.current?.querySelector<HTMLElement>(`[data-idx="${cursor}"]`)?.scrollIntoView({ block: "nearest" });
   }, [cursor]);
 
@@ -186,10 +183,7 @@ export function CommandPalette({
   };
 
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    } else if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setCursor((c) => Math.min(results.length - 1, c + 1));
     } else if (e.key === "ArrowUp") {
@@ -205,6 +199,8 @@ export function CommandPalette({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
+          tabIndex={-1}
           className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-950/50 px-3 pt-[10vh] backdrop-blur-sm sm:pt-[14vh]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

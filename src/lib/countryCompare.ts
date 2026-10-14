@@ -14,17 +14,20 @@
  */
 
 import { countriesMatch, countryTranslationKey, normalizeCountryAlias } from "@/lib/countries";
+import { normalizeScholarshipAwardPeriod, type ComparableScholarshipAwardPeriod } from "@/lib/usdCosts";
 
 export interface UniInput {
   country: string | null;
   annualTuitionUsd?: number | null;
   annualLivingEstUsd?: number | null;
   minIelts?: number | null;
+  postStudyWorkVisaYears?: number | null;
 }
 
 export interface SchInput {
   country: string | null;
   amountUsdValue?: number | null;
+  awardPeriod?: string | null;
 }
 
 export interface CountryComparison {
@@ -33,9 +36,15 @@ export interface CountryComparison {
   tuition: { avgUsd: number | null; published: number };
   living: { avgUsd: number | null; published: number };
   minIelts: { avg: number | null; published: number };
-  scholarships: { count: number; avgUsd: number | null; totalUsd: number | null };
-  /** Not present in the database — reported as null, never filled in. */
-  workRights: null;
+  scholarships: {
+    count: number;
+    amountsPublished: number;
+    awardPeriod: ComparableScholarshipAwardPeriod | null;
+    avgUsd: number | null;
+    totalUsd: number | null;
+  };
+  /** Published post-study work data only; null means no country value is published. */
+  workRights: { avgYears: number; published: number } | null;
 }
 
 function average(values: number[]): number | null {
@@ -56,9 +65,22 @@ export function compareCountries(country: string, unis: UniInput[], schs: SchInp
   const tuition = inCountry.map((u) => u.annualTuitionUsd).filter((n): n is number => n != null && Number.isFinite(n));
   const living = inCountry.map((u) => u.annualLivingEstUsd).filter((n): n is number => n != null && Number.isFinite(n));
   const ielts = inCountry.map((u) => u.minIelts).filter((n): n is number => n != null && Number.isFinite(n));
-  const amounts = inSchs
-    .map((s) => s.amountUsdValue)
-    .filter((n): n is number => n != null && Number.isFinite(n) && n > 0);
+  const workVisaYears = inCountry
+    .map((u) => u.postStudyWorkVisaYears)
+    .filter((n): n is number => n != null && Number.isFinite(n) && n >= 0);
+  const awardAmounts = inSchs.flatMap((scholarship) => {
+    const amount = scholarship.amountUsdValue;
+    const period = normalizeScholarshipAwardPeriod(scholarship.awardPeriod);
+    return amount != null && Number.isFinite(amount) && amount > 0 && period
+      ? [{ amount, period }]
+      : [];
+  });
+  const awardPeriods = new Set(awardAmounts.map((award) => award.period));
+  const commonAwardPeriod =
+    inSchs.length > 0 && awardAmounts.length === inSchs.length && awardPeriods.size === 1
+      ? awardAmounts[0].period
+      : null;
+  const comparableAwardAmounts = commonAwardPeriod == null ? [] : awardAmounts.map((award) => award.amount);
 
   return {
     country: country.trim(),
@@ -68,10 +90,18 @@ export function compareCountries(country: string, unis: UniInput[], schs: SchInp
     minIelts: { avg: oneDecimal(ielts), published: ielts.length },
     scholarships: {
       count: inSchs.length,
-      avgUsd: average(amounts),
-      totalUsd: amounts.length ? amounts.reduce((a, b) => a + b, 0) : null,
+      amountsPublished: awardAmounts.length,
+      awardPeriod: commonAwardPeriod,
+      // Amounts are comparable only when every award has a positive USD value
+      // and all catalogue rows declare the same supported award period.
+      avgUsd: comparableAwardAmounts.length ? average(comparableAwardAmounts) : null,
+      totalUsd: comparableAwardAmounts.length
+        ? comparableAwardAmounts.reduce((a, b) => a + b, 0)
+        : null,
     },
-    workRights: null,
+    workRights: workVisaYears.length > 0
+      ? { avgYears: oneDecimal(workVisaYears)!, published: workVisaYears.length }
+      : null,
   };
 }
 

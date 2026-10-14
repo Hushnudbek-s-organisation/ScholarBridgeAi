@@ -37,6 +37,7 @@ interface NextActionsPanelProps {
 }
 
 export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanelProps) {
+  const profileId = activeProfile?.id;
   const [actions, setActions] = useState<NextAction[]>([]);
   const [rest, setRest] = useState<NextAction[]>([]);
   const [headline, setHeadline] = useState("");
@@ -45,13 +46,13 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
   const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
-    if (!activeProfile?.id) {
+    if (!profileId) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/next-actions?profileId=${activeProfile.id}`);
+      const res = await fetch(`/api/next-actions?profileId=${profileId}`);
       const data = await res.json();
       if (res.ok) {
         setActions(data.actions ?? []);
@@ -64,10 +65,10 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id]);
+  }, [profileId]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(load);
   }, [load]);
 
   if (!activeProfile) return null;

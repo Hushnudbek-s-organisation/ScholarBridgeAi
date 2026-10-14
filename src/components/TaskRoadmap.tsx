@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { CheckSquare, Plus, Trash2, Check, Clock } from "lucide-react";
@@ -25,6 +25,7 @@ interface TaskRoadmapProps {
 export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   const tr = useTranslations("taskRoadmap");
   const locale = useLocale();
+  const profileId = activeProfile?.id;
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"All" | "Pending" | "Completed">("All");
@@ -56,15 +57,11 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   const [newDueDate, setNewDueDate] = useState("");
   const [newPriority, setNewPriority] = useState("Medium");
 
-  useEffect(() => {
-    fetchTasks();
-  }, [activeProfile?.id]);
-
-  const fetchTasks = async () => {
-    if (!activeProfile?.id) return;
+  const fetchTasks = useCallback(async () => {
+    if (!profileId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/tasks?profileId=${activeProfile.id}`);
+      const res = await fetch(`/api/tasks?profileId=${profileId}`);
       const data = await res.json();
       if (data.tasks) {
         setTasks(data.tasks);
@@ -74,7 +71,11 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileId]);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchTasks);
+  }, [fetchTasks]);
 
   const handleToggleTask = async (id: number, currentCompleted: boolean) => {
     // Optimistic

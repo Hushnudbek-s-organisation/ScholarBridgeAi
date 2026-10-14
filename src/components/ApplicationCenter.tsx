@@ -128,11 +128,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
     };
   }, [activeProfile?.id]);
 
+  const activeProfileId = activeProfile?.id;
   const load = useCallback(async () => {
-    if (!activeProfile?.id) return;
+    if (!activeProfileId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/applications?profileId=${activeProfile.id}`);
+      const res = await fetch(`/api/applications?profileId=${activeProfileId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("loadError"));
       setRows(data.applications ?? []);
@@ -141,10 +142,10 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id, t]);
+  }, [activeProfileId, t]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(load);
   }, [load]);
 
   const addApplication = async () => {

@@ -22,6 +22,7 @@ export async function selectUniversities() {
         city: universities.city,
         flagEmoji: universities.flagEmoji,
         worldRanking: universities.worldRanking,
+        universityType: universities.universityType,
         degreeLevel: universities.degreeLevel,
         programMajor: universities.programMajor,
         annualTuitionUsd: universities.annualTuitionUsd,

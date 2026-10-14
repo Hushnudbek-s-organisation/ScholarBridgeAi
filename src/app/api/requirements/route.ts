@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  applicationDocumentLinks,
   applicationRequirements,
   applications,
   essayVersions,
@@ -66,24 +67,37 @@ export async function GET(req: Request) {
       db
         .select()
         .from(applicationRequirements)
-        .where(eq(applicationRequirements.applicationId, applicationId))
+        .where(and(eq(applicationRequirements.profileId, profileId), eq(applicationRequirements.applicationId, applicationId)))
         .orderBy(asc(applicationRequirements.sortOrder), asc(applicationRequirements.id)),
       db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1),
       app.universityId
         ? db.select().from(universities).where(eq(universities.id, app.universityId)).limit(1)
         : Promise.resolve([]),
-      db.select().from(userDocuments).where(eq(userDocuments.profileId, profileId)),
-      db.select().from(essayVersions).where(eq(essayVersions.profileId, profileId)),
-      db.select().from(recommendationRequests).where(eq(recommendationRequests.applicationId, applicationId)),
+      db
+        .select({ id: userDocuments.id })
+        .from(userDocuments)
+        .innerJoin(applicationDocumentLinks, eq(applicationDocumentLinks.documentId, userDocuments.id))
+        .where(and(eq(userDocuments.profileId, profileId), eq(applicationDocumentLinks.applicationId, applicationId))),
+      db.select().from(essayVersions).where(and(
+        eq(essayVersions.profileId, profileId),
+        app.universityId != null
+          ? or(eq(essayVersions.universityId, app.universityId), isNull(essayVersions.universityId))
+          : isNull(essayVersions.universityId),
+      )),
+      db.select().from(recommendationRequests).where(and(
+        eq(recommendationRequests.profileId, profileId),
+        eq(recommendationRequests.applicationId, applicationId),
+      )),
       db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
     ]);
 
     const progress = computeWorkspaceProgress(
-      rows.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired })),
+      rows.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired, linkedType: r.linkedType })),
       Object.fromEntries(rows.map((r) => [r.itemKey, r.title])),
       {
         recommendationsSubmitted: recs.filter((r) => r.status === "submitted").length,
-        recommendationsTotal: recs.length || rows.filter((r) => r.section === "recommendations").length,
+        recommendationsTotal: recs.length,
+        applicationFeePaid: app.applicationFeePaid,
         submitted: !!app.submittedAt,
       }
     );
@@ -97,6 +111,7 @@ export async function GET(req: Request) {
         deadline: app.deadline ? String(app.deadline).slice(0, 10) : null,
         status: app.status,
         submittedAt: app.submittedAt,
+        applicationFeePaid: app.applicationFeePaid,
         portalUrl: app.portalUrl,
       },
       university: uni[0]
@@ -134,7 +149,7 @@ export async function GET(req: Request) {
         essays: essays.length,
         recommendations: recs.length,
         testPlans: plans.length,
-        profileComplete: !!profile[0]?.gpa,
+        profileComplete: profile[0]?.gpa != null,
       },
     });
   } catch (err) {
@@ -175,12 +190,18 @@ export async function PATCH(req: Request) {
   if (!g.ok) return g.response;
   const { profileId } = g.value;
   const id = Number(b.value.id);
+  const applicationId = Number(b.value.applicationId);
   if (!Number.isInteger(id) || id <= 0) return jsonError(400, "id is required", "bad_request");
+  if (!Number.isInteger(applicationId) || applicationId <= 0) return jsonError(400, "applicationId is required", "bad_request");
   try {
     const [row] = await db
       .select()
       .from(applicationRequirements)
-      .where(and(eq(applicationRequirements.id, id), eq(applicationRequirements.profileId, profileId)))
+      .where(and(
+        eq(applicationRequirements.id, id),
+        eq(applicationRequirements.profileId, profileId),
+        eq(applicationRequirements.applicationId, applicationId),
+      ))
       .limit(1);
     if (!row) return jsonError(404, "Requirement not found", "not_found");
 
@@ -216,10 +237,13 @@ async function ensureRequirements(profileId: number, applicationId: number, forc
   const existing = await db
     .select()
     .from(applicationRequirements)
-    .where(eq(applicationRequirements.applicationId, applicationId));
+    .where(and(
+      eq(applicationRequirements.profileId, profileId),
+      eq(applicationRequirements.applicationId, applicationId),
+    ));
   if (existing.length > 0 && !force) return 0;
 
-  const [app] = await db.select().from(applications).where(eq(applications.id, applicationId)).limit(1);
+  const [app] = await db.select().from(applications).where(and(eq(applications.id, applicationId), eq(applications.profileId, profileId))).limit(1);
   if (!app) return 0;
 
   const uni = app.universityId

@@ -35,12 +35,13 @@ interface SimilarProfilesProps {
  */
 export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   const t = useTranslations("similarOutcomes");
+  const profileId = activeProfile?.id;
   const [data, setData] = useState<SimilarityResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    if (!activeProfile?.id) {
+    if (!profileId) {
       setData(null);
       setLoading(false);
       return;
@@ -49,7 +50,7 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
     setData(null);
     setError(false);
     try {
-      const res = await fetch(`/api/similar-profiles?profileId=${activeProfile.id}`);
+      const res = await fetch(`/api/similar-profiles?profileId=${profileId}`);
       if (!res.ok) throw new Error("request failed");
       const payload = (await res.json()) as SimilarityResult;
       setData(payload);
@@ -59,10 +60,10 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeProfile?.id]);
+  }, [profileId]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(load);
   }, [load]);
 
   if (!activeProfile) {
