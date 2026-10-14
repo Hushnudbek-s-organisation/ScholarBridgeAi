@@ -5,10 +5,13 @@
  */
 import { aiGenerate } from "@/lib/ai/index";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
-import { logAIUsage } from "@/lib/ai/usage";
-
 export { isAiConfigured } from "@/lib/ai/index";
 
+/**
+ * Text reply for a prompt, or "" when AI is unavailable. Usage (tokens, cost,
+ * failures) is recorded by the router against `opts.profileId` — this wrapper
+ * no longer writes its own row, so a call is never counted twice.
+ */
 export async function callAI(
   prompt: string,
   systemInstruction?: string,
@@ -19,6 +22,7 @@ export async function callAI(
     prompt,
     systemInstruction,
     taskType,
+    profileId: opts.profileId ?? null,
   });
 
   if (!response) return "";
@@ -27,22 +31,5 @@ export async function callAI(
   // HTML entities, literal \n, tables and stray tags — the UI renders the
   // cleaned text, and DB rows (e.g. ai_evaluations) stay clean too.
   // Empty replies stay empty so caller fallbacks keep working.
-  const reply = normalizeAiReply(response.text);
-
-  try {
-    await logAIUsage({
-      profileId: opts.profileId ?? null,
-      taskType,
-      provider: response.provider,
-      model: response.model,
-      promptTokens: response.promptTokens,
-      completionTokens: response.completionTokens,
-      costEstimate: response.costEstimate,
-      status: "success",
-    });
-  } catch (err) {
-    console.error("Failed to log AI usage:", err);
-  }
-
-  return reply;
+  return normalizeAiReply(response.text);
 }

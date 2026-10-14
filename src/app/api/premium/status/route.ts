@@ -8,7 +8,7 @@ import {
   getPremiumPeriodDays,
   PREMIUM_CURRENCY,
 } from "@/lib/payments";
-import { getConfigNumber } from "@/lib/config";
+import { CONFIG_DEFAULTS, getConfigNumber } from "@/lib/config";
 
 const FEATURES = Object.keys(DEFAULT_FEATURE_PLAN) as FeatureKey[];
 
@@ -40,10 +40,10 @@ export async function GET(req: Request) {
       await Promise.all([
         getPremiumPriceUzs(),
         getPremiumPeriodDays(),
-        getConfigNumber("payment_premium_season_price_uzs", 149000),
-        getConfigNumber("payment_premium_season_days", 90),
-        getConfigNumber("payment_premium_yearly_price_uzs", 499000),
-        getConfigNumber("payment_premium_yearly_days", 365),
+        getConfigNumber("payment_premium_season_price_uzs", Number(CONFIG_DEFAULTS.payment_premium_season_price_uzs)),
+        getConfigNumber("payment_premium_season_days", Number(CONFIG_DEFAULTS.payment_premium_season_days)),
+        getConfigNumber("payment_premium_yearly_price_uzs", Number(CONFIG_DEFAULTS.payment_premium_yearly_price_uzs)),
+        getConfigNumber("payment_premium_yearly_days", Number(CONFIG_DEFAULTS.payment_premium_yearly_days)),
       ]);
 
     const packages = [

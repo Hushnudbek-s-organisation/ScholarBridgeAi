@@ -28,6 +28,7 @@ import {
   acceptsReasoningEffort,
   autoSelectProvider,
   hasExplicitProviderChoice,
+  isAIProviderId,
   isChatProvider,
   parseDisabledProviders,
   providerBaseUrl,
@@ -42,9 +43,19 @@ import {
 } from "./settings";
 import { getStoredConfig } from "@/lib/config";
 import { resolveAllProviderCredentials, resolveProviderCredential } from "./credentials";
+import {
+  AI_PRICING_CONFIG_KEY,
+  costForUsage,
+  parsePricingJson,
+  type AICostStatus,
+  type PricingTable,
+} from "./pricing";
+import { evaluateAiBudget } from "./budget-gate";
+import { logAIUsage } from "./usage";
 
 export { TASK_PROVIDER_ENV } from "./settings";
 export type { AIProviderId, AITaskId, AICapability, PublicCredential, ResolvedCredential } from "./settings";
+export type { AICostStatus } from "./pricing";
 
 export interface AIProviderConfig {
   apiKey?: string;
@@ -68,6 +79,28 @@ export interface AIRequest {
   jsonMode?: boolean;
   /** Reasoning hint (only sent to model families that accept it). */
   reasoningEffort?: "low" | "medium" | "high";
+  /**
+   * The signed-in account this request is charged to (null = anonymous /
+   * system). Recorded on the usage row; per-account quotas are checked by the
+   * route guard (lib/ai/guard) before the router is reached.
+   */
+  profileId?: number | null;
+}
+
+/** What a provider adapter returns: the reply plus whatever usage it reported. */
+export interface AIAdapterResponse {
+  text: string;
+  provider: string;
+  model: string;
+  /** Total prompt tokens, including cached ones. 0 when not reported. */
+  promptTokens: number;
+  completionTokens: number;
+  /** Subset of promptTokens served from the provider's cache. */
+  cachedPromptTokens: number;
+  /** False when the provider returned no usage metadata. Tokens are then unknown, not zero. */
+  usageReported: boolean;
+  /** USD the provider itself billed for this call, when it reports one (OpenRouter usage.cost). */
+  providerCostUsd?: number;
 }
 
 export interface AIResponse {
@@ -76,7 +109,15 @@ export interface AIResponse {
   model: string;
   promptTokens: number;
   completionTokens: number;
-  costEstimate: number;
+  cachedPromptTokens: number;
+  usageReported: boolean;
+  /**
+   * USD for this call — null when it is not known. A number is either the
+   * provider's own billed amount or an estimate from the configured price;
+   * see costStatus. Never a fabricated 0.
+   */
+  costEstimate: number | null;
+  costStatus: AICostStatus;
 }
 
 export type AIProviderName = Exclude<AIProviderId, "gemini">;
@@ -93,6 +134,8 @@ export type AIErrorCategory =
   | "timeout"
   | "network"
   | "empty_response"
+  /** A platform or per-provider spend budget is used up — no paid call was made. */
+  | "budget_exhausted"
   | "unknown";
 
 /** A provider failure with a safe, redacted message (no key, no prompt). */
@@ -114,9 +157,20 @@ export interface AIProviderAdapter {
   name: AIProviderName;
   /**
    * Return null if the provider is not configured (no key / base URL).
-   * Throws AIProviderError on provider failures.
+   * Throws AIProviderError on provider failures. Adapters report usage only;
+   * cost is decided by the router (see costForUsage in ./pricing).
    */
-  call(req: AIRequest, config: AIProviderConfig): Promise<AIResponse | null>;
+  call(req: AIRequest, config: AIProviderConfig): Promise<AIAdapterResponse | null>;
+}
+
+/** Usage fields as providers report them; anything missing stays unknown. */
+function reportedCount(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : undefined;
+}
+
+/** A USD amount as reported (fractions kept). */
+function usdAmount(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
 }
 
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -210,17 +264,25 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
           max_tokens: req.maxTokens ?? 4096,
           ...(req.jsonMode && supportsCapability(name, "structured") ? { response_format: { type: "json_object" } } : {}),
           ...(req.reasoningEffort && acceptsReasoningEffort(name, model) ? { reasoning_effort: req.reasoningEffort } : {}),
+          // OpenRouter returns the billed USD amount only when asked (usage accounting).
+          ...(name === "openrouter" ? { usage: { include: true } } : {}),
         }),
       });
       if (!res.ok) throw await readError(name, res, cfg.apiKey);
       const data = await res.json();
+      const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;
+      const prompt = reportedCount(usage?.prompt_tokens);
+      const completion = reportedCount(usage?.completion_tokens);
+      const cost = usdAmount(usage?.cost);
       return {
         text: data?.choices?.[0]?.message?.content ?? "",
         provider: name,
         model: data?.model || model,
-        promptTokens: data?.usage?.prompt_tokens ?? 0,
-        completionTokens: data?.usage?.completion_tokens ?? 0,
-        costEstimate: 0,
+        promptTokens: prompt ?? 0,
+        completionTokens: completion ?? 0,
+        cachedPromptTokens: reportedCount(usage?.prompt_tokens_details?.cached_tokens) ?? 0,
+        usageReported: prompt !== undefined || completion !== undefined,
+        ...(cost !== undefined ? { providerCostUsd: cost } : {}),
       };
     },
   };
@@ -250,13 +312,21 @@ const anthropic: AIProviderAdapter = {
     });
     if (!res.ok) throw await readError("anthropic", res, cfg.apiKey);
     const data = await res.json();
+    const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;
+    // Anthropic reports input_tokens EXCLUDING prompt-cache reads and writes;
+    // fold them in so promptTokens is the full prompt, as for OpenAI-style APIs.
+    const uncached = reportedCount(usage?.input_tokens);
+    const cacheRead = reportedCount(usage?.cache_read_input_tokens) ?? 0;
+    const cacheWrite = reportedCount(usage?.cache_creation_input_tokens) ?? 0;
+    const completion = reportedCount(usage?.output_tokens);
     return {
       text: data?.content?.map((b: { text?: string }) => b.text ?? "").join("") ?? "",
       provider: "anthropic",
       model: data?.model || model,
-      promptTokens: data?.usage?.input_tokens ?? 0,
-      completionTokens: data?.usage?.output_tokens ?? 0,
-      costEstimate: 0,
+      promptTokens: uncached === undefined && cacheRead + cacheWrite === 0 ? 0 : (uncached ?? 0) + cacheRead + cacheWrite,
+      completionTokens: completion ?? 0,
+      cachedPromptTokens: cacheRead,
+      usageReported: uncached !== undefined || completion !== undefined,
     };
   },
 };
@@ -278,6 +348,8 @@ export interface RuntimeAIConfig {
   dbProviders: Record<string, string>;
   disabled: AIProviderId[];
   fallback: AIProviderId | null;
+  /** Admin-entered USD prices per provider/model (empty = every cost is unknown). */
+  pricing: PricingTable;
 }
 
 /**
@@ -289,25 +361,36 @@ export async function loadRuntimeAIConfig(taskType: string): Promise<RuntimeAICo
   const dbProviders: Record<string, string> = {};
   let disabledRaw: string | null = null;
   let fallbackRaw: string | null = null;
+  let pricingRaw: string | null = null;
   try {
-    const [def, task, disabled, fallback] = await Promise.all([
+    const [def, task, disabled, fallback, pricing] = await Promise.all([
       getStoredConfig(DEFAULT_PROVIDER_CONFIG_KEY),
       getStoredConfig(taskProviderConfigKey(taskType)),
       getStoredConfig(DISABLED_PROVIDERS_CONFIG_KEY),
       getStoredConfig(FALLBACK_PROVIDER_CONFIG_KEY),
+      getStoredConfig(AI_PRICING_CONFIG_KEY),
     ]);
     if (def) dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] = def;
     if (task) dbProviders[taskProviderConfigKey(taskType)] = task;
     disabledRaw = disabled;
     fallbackRaw = fallback;
+    pricingRaw = pricing;
   } catch {
     // DB unavailable — env/auto only, the app keeps working.
   }
+  // An unparsable saved price table is ignored (costs become unknown) rather
+  // than failing requests; the admin save path rejects it up front.
+  const priced = parsePricingJson(pricingRaw, isChatProviderId);
   return {
     dbProviders,
     disabled: parseDisabledProviders(disabledRaw ?? process.env.AI_PROVIDERS_DISABLED),
     fallback: resolveFallbackProvider(fallbackRaw),
+    pricing: priced.ok ? priced.table : {},
   };
+}
+
+function isChatProviderId(id: string): boolean {
+  return isAIProviderId(id) && isChatProvider(id);
 }
 
 /** A provider is usable when it is a chat provider, enabled, and has key (+ base URL / model). */
@@ -382,24 +465,6 @@ export async function isAiConfigured(taskType: string): Promise<boolean> {
   return Boolean(await usableCredential(runtime.name, cfg.disabled));
 }
 
-// ---------------------------------------------------------------------------
-// Service entry
-// ---------------------------------------------------------------------------
-
-export type AIChatResult =
-  | { ok: true; response: AIResponse; fallbackUsed: boolean; attempts: number }
-  | { ok: false; error: AIProviderError; attempts: number };
-
-export interface AIChatOptions {
-  /** Capabilities the caller needs (default: ["text"]). */
-  require?: AICapability[];
-  /** Tries on the SAME provider for transient failures (default 1 = no retry). */
-  maxAttempts?: number;
-  baseDelayMs?: number;
-  /** Injected sleeper for tests. */
-  sleep?: (ms: number) => Promise<void>;
-}
-
 /** Structured request log — metadata only, never prompts, replies or keys. */
 function logAiRequest(entry: {
   task: string;
@@ -410,17 +475,23 @@ function logAiRequest(entry: {
   category?: AIErrorCategory;
   fallback?: boolean;
   attempt?: number;
+  costStatus?: AICostStatus;
 }) {
   const line = JSON.stringify({ evt: "ai_request", ...entry });
   if (entry.status === "ok") console.info(line);
   else console.warn(line);
 }
 
-async function callOnce(provider: AIProviderId, req: AIRequest, disabled: AIProviderId[], require: AICapability[]): Promise<AIResponse> {
+async function callOnce(
+  provider: AIProviderId,
+  req: AIRequest,
+  cfg: RuntimeAIConfig,
+  require: AICapability[]
+): Promise<AIResponse> {
   if (!isChatProvider(provider)) {
     throw new AIProviderError(provider, "unsupported_capability", `${AI_PROVIDERS[provider].label} has no chat API`);
   }
-  if (disabled.includes(provider)) {
+  if (cfg.disabled.includes(provider)) {
     throw new AIProviderError(provider, "disabled", `${AI_PROVIDERS[provider].label} is disabled by the administrator`);
   }
   const missing = require.filter((c) => !supportsCapability(provider, c));
@@ -429,14 +500,42 @@ async function callOnce(provider: AIProviderId, req: AIRequest, disabled: AIProv
   }
   const cred = await resolveProviderCredential(provider);
   const adapter = PROVIDERS[provider as AIProviderName];
-  const response = await adapter.call(req, { apiKey: cred.apiKey, model: cred.model });
-  if (!response) {
+  const adapted = await adapter.call(req, { apiKey: cred.apiKey, model: cred.model });
+  if (!adapted) {
     throw new AIProviderError(provider, "not_configured", `${AI_PROVIDERS[provider].label} is not configured`);
   }
-  if (!response.text.trim()) {
+  if (!adapted.text.trim()) {
     throw new AIProviderError(provider, "empty_response", "The provider returned an empty reply");
   }
-  return response;
+  // The one place a reply's cost is decided: provider-reported > estimate > unknown.
+  const priced = costForUsage(
+    provider,
+    cred.model,
+    {
+      promptTokens: adapted.promptTokens,
+      completionTokens: adapted.completionTokens,
+      cachedPromptTokens: adapted.cachedPromptTokens,
+      reported: adapted.usageReported,
+      providerCostUsd: adapted.providerCostUsd ?? null,
+    },
+    cfg.pricing
+  );
+  return {
+    text: adapted.text,
+    provider: adapted.provider,
+    model: adapted.model,
+    promptTokens: adapted.promptTokens,
+    completionTokens: adapted.completionTokens,
+    cachedPromptTokens: adapted.cachedPromptTokens,
+    usageReported: adapted.usageReported,
+    costEstimate: priced.costUsd,
+    costStatus: priced.costStatus,
+  };
+}
+
+/** Error that stops the attempt loop without a provider call (budget gate). */
+function budgetError(provider: AIProviderId, scope: string): AIProviderError {
+  return new AIProviderError(provider, "budget_exhausted", `AI spend budget reached (${scope})`);
 }
 
 async function callWithRetry(
@@ -457,8 +556,21 @@ async function callWithRetry(
     attempts = attempt;
     const started = Date.now();
     try {
-      const response = await callOnce(provider, req, cfg.disabled, require);
-      logAiRequest({ task, provider, model: response.model, status: "ok", latencyMs: Date.now() - started, fallback: isFallback, attempt });
+      // Budget is re-checked before EVERY paid attempt: a retry chain must not
+      // keep spending after the platform has crossed its limit mid-request.
+      const verdict = await evaluateAiBudget(provider);
+      if (!verdict.allowed) throw budgetError(provider, verdict.scope);
+      const response = await callOnce(provider, req, cfg, require);
+      logAiRequest({
+        task,
+        provider,
+        model: response.model,
+        status: "ok",
+        latencyMs: Date.now() - started,
+        fallback: isFallback,
+        attempt,
+        costStatus: response.costStatus,
+      });
       return { response, attempts: attempt };
     } catch (err) {
       last = err instanceof AIProviderError
@@ -473,33 +585,112 @@ async function callWithRetry(
   return { error: last, attempts };
 }
 
+// ---------------------------------------------------------------------------
+// Service entry
+// ---------------------------------------------------------------------------
+
+export type AIChatResult =
+  | { ok: true; response: AIResponse; fallbackUsed: boolean; attempts: number }
+  | { ok: false; error: AIProviderError; attempts: number };
+
+export interface AIChatOptions {
+  /** Capabilities the caller needs (default: ["text"]). */
+  require?: AICapability[];
+  /** Tries on the SAME provider for transient failures (default 1 = no retry). */
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  /** Injected sleeper for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Write exactly ONE usage row for this logical request — success or failure,
+ * however many attempts it took. Best-effort: a storage error is logged and
+ * never changes the reply the user gets.
+ */
+async function recordUsage(entry: {
+  profileId: number | null;
+  task: string;
+  provider: string;
+  model: string;
+  response?: AIResponse;
+  error?: AIProviderError;
+  attempts: number;
+  fallbackUsed: boolean;
+}): Promise<void> {
+  try {
+    const r = entry.response;
+    await logAIUsage({
+      profileId: entry.profileId,
+      taskType: entry.task,
+      provider: entry.provider,
+      model: entry.model,
+      promptTokens: r?.promptTokens ?? 0,
+      completionTokens: r?.completionTokens ?? 0,
+      cachedPromptTokens: r?.cachedPromptTokens ?? 0,
+      costEstimate: r?.costEstimate ?? 0,
+      costStatus: r ? r.costStatus : "usage_unreported",
+      attempts: entry.attempts,
+      fallbackUsed: entry.fallbackUsed,
+      status: r ? "success" : "error",
+      errorCategory: entry.error ? entry.error.category : null,
+    });
+  } catch (err) {
+    console.error("AI usage not recorded:", redactSecrets(String((err as Error)?.message ?? err)).slice(0, 160));
+  }
+}
+
 /**
  * Chat completion with a structured result (used where the caller needs to
  * explain failures, e.g. the visa interview). Explicit fallback only.
  */
 export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<AIChatResult> {
   const task = req.taskType || "general";
+  const profileId = req.profileId ?? null;
   const cfg = await loadRuntimeAIConfig(task);
   const primary = await resolveRuntimeProvider(task, cfg);
   const first = await callWithRetry(task, primary.name, req, cfg, opts, false);
-  if (first.response) return { ok: true, response: first.response, fallbackUsed: false, attempts: first.attempts };
+  if (first.response) {
+    await recordUsage({ profileId, task, provider: primary.name, model: first.response.model, response: first.response, attempts: first.attempts, fallbackUsed: false });
+    return { ok: true, response: first.response, fallbackUsed: false, attempts: first.attempts };
+  }
 
   const error = first.error ?? new AIProviderError(primary.name, "unknown", "AI request failed");
-  // bad_request would most likely fail the same way elsewhere; everything
-  // else may go to the fallback — but only one the admin chose explicitly.
+  // bad_request would most likely fail the same way elsewhere; budget_exhausted
+  // must not be bypassed by another paid provider unless the admin chose one.
+  // Everything else may go to the fallback — but only one the admin chose explicitly.
   const fb = cfg.fallback;
-  if (fb && fb !== primary.name && error.category !== "bad_request") {
+  let fallbackAttempts = 0;
+  if (fb && fb !== primary.name && error.category !== "bad_request" && error.category !== "budget_exhausted") {
     const second = await callWithRetry(task, fb, req, cfg, { ...opts, maxAttempts: 1 }, true);
+    fallbackAttempts = second.attempts;
     if (second.response) {
-      return {
-        ok: true,
-        response: { ...second.response, provider: `${second.response.provider}:fallback` },
-        fallbackUsed: true,
+      const labelled = { ...second.response, provider: `${second.response.provider}:fallback` };
+      await recordUsage({
+        profileId,
+        task,
+        provider: fb,
+        model: second.response.model,
+        response: second.response,
         attempts: first.attempts + second.attempts,
-      };
+        fallbackUsed: true,
+      });
+      return { ok: true, response: labelled, fallbackUsed: true, attempts: first.attempts + second.attempts };
     }
   }
-  return { ok: false, error, attempts: first.attempts };
+  // One failure row for the logical request; every attempt made (including the
+  // fallback's) is counted, so retries never hide spend.
+  const totalAttempts = first.attempts + fallbackAttempts;
+  await recordUsage({
+    profileId,
+    task,
+    provider: primary.name,
+    model: primary.model ?? "",
+    error,
+    attempts: totalAttempts,
+    fallbackUsed: false,
+  });
+  return { ok: false, error, attempts: totalAttempts };
 }
 
 /** Backward-compatible entry: the reply, or null when AI is unavailable. */
@@ -519,6 +710,7 @@ export function aiErrorStatus(error: AIProviderError): number {
     case "not_configured":
     case "disabled":
     case "unsupported_capability":
+    case "budget_exhausted":
       return 503;
     case "rate_limited":
       return 429;
@@ -554,6 +746,9 @@ export function describeAiError(error: AIProviderError): string {
       return `The AI provider (${label}) rejected the request${error.message ? ` (${error.message})` : ""}.`;
     case "empty_response":
       return "The AI returned an empty reply. Please try again.";
+    // Deliberately generic: no budget amounts, limits or billing details reach students.
+    case "budget_exhausted":
+      return "AI features are temporarily paused while the service is at capacity. Please try again later.";
     default:
       return "The AI request failed. Please try again.";
   }

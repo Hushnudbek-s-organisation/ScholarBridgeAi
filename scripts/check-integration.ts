@@ -1675,9 +1675,11 @@ async function main() {
     JSON.stringify(vh2.body).slice(0, 300)
   );
 
-  // Without profileId the analysis still works but nothing is persisted.
+  // Without a session the analysis still works but nothing is persisted.
+  // (A real anonymous request: `call()` would attach the student's cookie, and
+  // a signed-in free account is correctly subject to its practice cap.)
   const before = vh2.body?.count;
-  const va2 = await call(visaAnalyze as any, "/api/visa/analyze", {
+  const va2 = await visaAnalyze(new Request("http://localhost/api/visa/analyze", {
     method: "POST",
     headers: { ...json({}) },
     body: JSON.stringify({
@@ -1687,8 +1689,9 @@ async function main() {
         { role: "user", text: "Computer science, specifically data engineering, at a university in the United States." },
       ],
     }),
-  });
-  check("visa analyze: anonymous run still answers", va2.status === 200);
+  }));
+  const va2Body = await va2.json().catch(() => null);
+  check("visa analyze: anonymous run still answers", va2.status === 200, `got ${va2.status} ${JSON.stringify(va2Body)?.slice(0, 120)}`);
   const vh3 = await call(visaHistory as any, `/api/visa/history?profileId=${profile.id}`);
   check("visa history: anonymous run is not persisted", vh3.body?.count === before);
 
@@ -2016,10 +2019,13 @@ async function main() {
     .from(schema.aiUsage)
     .where(and(eq(schema.aiUsage.taskType, "visa"), sql`${schema.aiUsage.profileId} IS NULL`));
   check("visa chat: anonymous practice still works and is logged with a null profile", vchatAnon.status === 200 && anonUsageRows.length >= 1, `status ${vchatAnon.status}, rows ${anonUsageRows.length}`);
-  const vanalyze = await call(visaAnalyzeRoute.POST as any, "/api/visa/analyze", {
+  // Anonymous on purpose: `call()` would attach the student's cookie, and the
+  // free practice cap (exercised in section 10 and 13) applies to signed-in accounts.
+  const vanalyzeRes = await visaAnalyzeRoute.POST(new Request("http://localhost/api/visa/analyze", {
     method: "POST", headers: jsonHdr,
     body: JSON.stringify({ countryCode: "US", messages: [{ role: "user", text: "I will study computer science and fund it myself." }, { role: "assistant", text: "Why that university?" }] }),
-  });
+  }));
+  const vanalyze = { status: vanalyzeRes.status, body: await vanalyzeRes.json().catch(() => null) };
   check("visa analyze: the model answer keeps its disclaimer and rubric", vanalyze.status === 200 && vanalyze.body?.aiAvailable === true && typeof vanalyze.body?.chanceDisclaimer === "string" && vanalyze.body?.rubric != null, JSON.stringify(vanalyze.body)?.slice(0, 120));
   // Deliberate, documented policy (audit A21): one interview is a multi-step
   // conversation, so the DAILY AI quota must not cut it off mid-interview.
@@ -2099,6 +2105,256 @@ async function main() {
   const instStudent = await call(instructorsRoute.GET as any, "/api/admin/instructors", { headers: otherHdr2 });
   const instAnonPost = await call(instructorsRoute.POST as any, "/api/admin/instructors", { method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify({ type: "instructor", name: "x" }) });
   check("instructors: the admin endpoint refuses anonymous (401) and student (403) access", instAnon.status === 401 && instStudent.status === 403 && instAnonPost.status === 401, `got ${instAnon.status}/${instStudent.status}/${instAnonPost.status}`);
+
+  // ---- 13. AI cost accounting, budgets, race-safe quotas, Live voice ----------
+  section("13. AI cost controls — pricing, budgets, race-safe quotas, Live voice allowance (2026-10)");
+  {
+    const aiRouter = await import("../src/lib/ai/index");
+    const budgetGate = await import("../src/lib/ai/budget-gate");
+    const { guardAiRequest } = await import("../src/lib/ai/guard");
+    const { signSessionToken: sign } = await import("../src/lib/auth");
+
+    // A priced mock provider on a dedicated port (the A21 mock is closed by now).
+    let mockMode: string[] = [];
+    let mockCalls13 = 0;
+    const mock13 = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c: string) => (raw += c));
+      req.on("end", () => {
+        mockCalls13++;
+        const step = mockMode.shift() ?? "ok";
+        if (step === "fail500") {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: { message: "upstream down" } }));
+          return;
+        }
+        if (step === "rate") {
+          res.writeHead(429, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: { message: "slow down" } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          model: "priced-model",
+          choices: [{ index: 0, message: { role: "assistant", content: "Priced reply." }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1000, completion_tokens: 500 },
+        }));
+      });
+    });
+    await new Promise<void>((resolve) => mock13.listen(55456, "127.0.0.1", resolve));
+    const savedEnv13 = { key: process.env.AI_CUSTOM_API_KEY, base: process.env.AI_CUSTOM_BASE_URL, model: process.env.AI_CUSTOM_MODEL };
+    process.env.AI_CUSTOM_API_KEY = "test-custom-key-13";
+    process.env.AI_CUSTOM_BASE_URL = "http://127.0.0.1:55456/v1";
+    process.env.AI_CUSTOM_MODEL = "priced-model";
+    const savedGemini = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY; // Live token tests must never reach Google
+    await setConfig("ai_provider_general", "custom");
+    await setConfig("ai_model_pricing", JSON.stringify({ custom: { "priced-model": { inputPerMTok: 2, outputPerMTok: 4 } } }));
+    await setConfig("ai_budget_daily_usd", "");
+    await setConfig("ai_budget_monthly_usd", "");
+    await setConfig("ai_budget_provider_daily_usd", "{}");
+
+    const [acct] = await db
+      .insert(schema.studentProfiles)
+      .values({ name: "Cost Student", email: "cost-student@example.com", passwordHash: profile.passwordHash })
+      .returning();
+    const acctCookie = `sb_session=${sign({ id: acct.id, passwordHash: acct.passwordHash })}`;
+
+    // --- (a) priced call: estimated cost, exact arithmetic, one row ---------
+    const priced = await aiRouter.aiChat({ taskType: "general", prompt: "hello", profileId: acct.id }, { sleep: async () => {} });
+    check("pricing: a priced reply carries an ESTIMATED cost (1000×$2 + 500×$4 per 1M = $0.004)",
+      priced.ok && priced.response.costStatus === "estimated" && Math.abs((priced.ok ? priced.response.costEstimate ?? -1 : -1) - 0.004) < 1e-9,
+      JSON.stringify(priced.ok ? priced.response : priced.error));
+    const [pricedRow] = await db.select().from(schema.aiUsage).where(and(eq(schema.aiUsage.profileId, acct.id), eq(schema.aiUsage.taskType, "general")));
+    check("pricing: exactly one ai_usage row, with cost_status estimated and the profile charged",
+      Boolean(pricedRow) && pricedRow.costStatus === "estimated" && Math.abs(pricedRow.costEstimate - 0.004) < 1e-9 && pricedRow.status === "success" && pricedRow.attempts === 1,
+      JSON.stringify(pricedRow));
+
+    // --- (b) retry on a transient error: one reply, one row, attempts = 2 --
+    mockMode = ["rate", "ok"];
+    const retried = await aiRouter.aiChat({ taskType: "general", prompt: "again", profileId: acct.id }, { maxAttempts: 3, sleep: async () => {} });
+    const rowsAfterRetry = await db.select().from(schema.aiUsage).where(and(eq(schema.aiUsage.profileId, acct.id), eq(schema.aiUsage.taskType, "general")));
+    check("retry: a transient failure then success is ONE logical request (no duplicate usage row)",
+      retried.ok && rowsAfterRetry.length === 2 && rowsAfterRetry.filter((r) => r.attempts === 2).length === 1,
+      `rows ${rowsAfterRetry.length} attempts ${JSON.stringify(rowsAfterRetry.map((r) => r.attempts))}`);
+
+    // --- (c) a failed request is recorded as a failure, cost not invented ---
+    mockMode = ["fail500"];
+    const failed = await aiRouter.aiChat({ taskType: "general", prompt: "fail", profileId: acct.id }, { maxAttempts: 1, sleep: async () => {} });
+    const [failRow] = await db
+      .select()
+      .from(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.profileId, acct.id), eq(schema.aiUsage.status, "error")))
+      .orderBy(desc(schema.aiUsage.createdAt));
+    check("failures: a failed request leaves one error row with its category and no fabricated cost",
+      failed.ok === false && Boolean(failRow) && failRow.errorCategory === "provider_unavailable" && failRow.costStatus === "usage_unreported",
+      JSON.stringify(failRow));
+
+    // --- (d) budget: a 0 daily budget blocks BEFORE any provider call -------
+    await setConfig("ai_budget_daily_usd", "0");
+    const callsBefore = mockCalls13;
+    const blocked = await aiRouter.aiChat({ taskType: "general", prompt: "blocked", profileId: acct.id }, { sleep: async () => {} });
+    check("budget: a 0 daily budget refuses the call with budget_exhausted and makes NO provider call",
+      !blocked.ok && blocked.error.category === "budget_exhausted" && mockCalls13 === callsBefore,
+      `calls ${mockCalls13 - callsBefore}`);
+    const [blockRow] = await db
+      .select()
+      .from(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.profileId, acct.id), eq(schema.aiUsage.errorCategory, "budget_exhausted")));
+    check("budget: the refusal is itself recorded (usage-limit events are visible in admin)", Boolean(blockRow));
+    const shown = aiRouter.describeAiError(new aiRouter.AIProviderError("custom", "budget_exhausted", "daily"));
+    check("budget: the student sees a neutral message (no amounts, no budget words)", !/budget|\$|USD/i.test(shown), shown);
+    await setConfig("ai_budget_daily_usd", "");
+
+    // --- (e) spend already counted: daily / per-provider / monthly ----------
+    await setConfig("ai_budget_daily_usd", "0.001");
+    const dailyVerdict = await budgetGate.evaluateAiBudget("custom");
+    check("budget: spend already at the daily limit → blocked with scope daily",
+      !dailyVerdict.allowed && dailyVerdict.scope === "daily", JSON.stringify(dailyVerdict));
+    await setConfig("ai_budget_daily_usd", "");
+    await setConfig("ai_budget_provider_daily_usd", '{"custom": 0.001}');
+    const providerVerdict = await budgetGate.evaluateAiBudget("custom");
+    check("budget: a per-provider daily cap blocks only that provider",
+      !providerVerdict.allowed && providerVerdict.scope === "provider" && (await budgetGate.evaluateAiBudget("openrouter")).allowed === true,
+      JSON.stringify(providerVerdict));
+    await setConfig("ai_budget_provider_daily_usd", "{}");
+    await setConfig("ai_budget_monthly_usd", "0.0095"); // spend is 0.008 by now → ~84%: a warning, not a block
+    const warnVerdict = await budgetGate.evaluateAiBudget("custom");
+    check("budget: at 80% of the monthly limit the call is allowed and a warning is raised",
+      warnVerdict.allowed === true && warnVerdict.warning?.scope === "monthly" && (warnVerdict.warning?.percent ?? 0) >= 80,
+      JSON.stringify(warnVerdict));
+    await setConfig("ai_budget_monthly_usd", "");
+
+    // --- (f) race-safe request quota: 10 parallel → exactly the limit -------
+    const [racer] = await db
+      .insert(schema.studentProfiles)
+      .values({ name: "Racer", email: "racer-quota@example.com", passwordHash: profile.passwordHash })
+      .returning();
+    const racerCookie = `sb_session=${sign({ id: racer.id, passwordHash: racer.passwordHash })}`;
+    await setConfig("ai_free_requests_per_day", "3");
+    const json13 = { "Content-Type": "application/json" };
+    const parallel = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        guardAiRequest(new Request("http://localhost/api/ai/chat", {
+          method: "POST",
+          headers: { ...json13, cookie: racerCookie },
+          body: JSON.stringify({ profileId: racer.id, message: "hi" }),
+        })),
+      ),
+    );
+    const admitted = parallel.filter((g) => g.ok).length;
+    const denied = parallel.filter((g) => !g.ok);
+    const deniedCodes = await Promise.all(denied.map(async (g) => (g.ok ? null : (await g.response.json())?.code)));
+    check("quota race: 10 concurrent requests against a limit of 3 admit exactly 3",
+      admitted === 3 && deniedCodes.every((c) => c === "ai_quota_exceeded"), `admitted ${admitted}, codes ${JSON.stringify(deniedCodes)}`);
+    await setConfig("ai_free_requests_per_day", "5");
+
+    // --- (g) Live voice: kill switch, plan allowance, race-safe slot ---------
+    const liveRoute = await import("../src/app/api/visa/live-token/route");
+    const liveCall = (cookie: string) =>
+      liveRoute.POST(new Request("http://localhost/api/visa/live-token", {
+        method: "POST",
+        headers: { ...json13, cookie },
+        body: JSON.stringify({ countryCode: "US", gender: "male" }),
+      }));
+    await setConfig("ai_live_voice_enabled", "false");
+    const off = await liveCall(acctCookie);
+    check("voice: the admin kill switch answers 503 live_voice_disabled, no token minted",
+      off.status === 503 && (await off.json()).code === "live_voice_disabled");
+    await setConfig("ai_live_voice_enabled", "true");
+
+    await setConfig("ai_free_live_sessions_per_day", "0");
+    const noPlan = await liveCall(acctCookie);
+    const noPlanBody = await noPlan.json();
+    check("voice: a free account with a 0 allowance is refused (403 premium_required)",
+      noPlan.status === 403 && noPlanBody.code === "premium_required", JSON.stringify(noPlanBody));
+
+    await setConfig("ai_free_live_sessions_per_day", "1");
+    const [liveAcct] = await db
+      .insert(schema.studentProfiles)
+      .values({ name: "Live Student", email: "live-student@example.com", passwordHash: profile.passwordHash })
+      .returning();
+    const liveCookie = `sb_session=${sign({ id: liveAcct.id, passwordHash: liveAcct.passwordHash })}`;
+    // No Gemini key in this run: every attempt fails AFTER the quota check. A
+    // failed attempt must not use up the allowance (only admitted sessions count).
+    const first = await liveCall(liveCookie);
+    const firstBody = await first.json();
+    check("voice: a session attempt with no key fails closed (503, neutral text, no config detail)",
+      first.status === 503 && firstBody.code === "live_unavailable" && !/GEMINI|key|config/i.test(firstBody.error ?? ""), JSON.stringify(firstBody));
+    const second = await liveCall(liveCookie);
+    check("voice: failed attempts do not use up the allowance (the next attempt is still allowed)", second.status === 503, `got ${second.status}`);
+
+    // Simulate one admitted session earlier today (the allowance is 1 per day).
+    await db.insert(schema.rateLimitHits).values({ key: `visa:live-day:${liveAcct.id}`, hitAt: new Date() });
+    const third = await liveCall(liveCookie);
+    const thirdBody = await third.json();
+    check("voice: after the day's admitted session, the next one is refused (429 live_quota_exceeded)",
+      third.status === 429 && thirdBody.code === "live_quota_exceeded" && thirdBody.remaining === 0, JSON.stringify(thirdBody));
+    check("voice: the 429 carries Retry-After", Boolean(third.headers.get("Retry-After")));
+    await setConfig("ai_free_live_sessions_per_day", "2");
+
+    // Platform-wide cap: 0 turns Live off for everyone, whatever the plan.
+    await setConfig("ai_live_global_sessions_per_day", "0");
+    const capped = await liveCall(liveCookie);
+    check("voice: the platform-wide daily cap refuses every session (429 live_capacity_reached)",
+      capped.status === 429 && (await capped.json()).code === "live_capacity_reached");
+    await setConfig("ai_live_global_sessions_per_day", "30");
+
+    const premiumUntil = new Date(Date.now() + 7 * 86400000);
+    await db.update(schema.studentProfiles).set({ isPremium: true, premiumUntil }).where(eq(schema.studentProfiles.id, liveAcct.id));
+    const premiumLive = await liveCall(liveCookie);
+    check("voice: a Premium account is not blocked by the free allowance (reaches the key check)",
+      premiumLive.status === 503 && (await premiumLive.json()).code === "live_unavailable");
+    await db.update(schema.studentProfiles).set({ isPremium: false, premiumUntil: null }).where(eq(schema.studentProfiles.id, liveAcct.id));
+
+    const liveUsage = await db.select().from(schema.aiUsage).where(eq(schema.aiUsage.taskType, "visa_live"));
+    check("voice: no usage row is written when no token was minted", liveUsage.length === 0, `rows ${liveUsage.length}`);
+
+    // --- (h) visa practice cap cannot be skipped by omitting profileId ------
+    const [practice] = await db
+      .insert(schema.studentProfiles)
+      .values({ name: "Practice Student", email: "practice-cap@example.com", passwordHash: profile.passwordHash })
+      .returning();
+    const practiceCookie = `sb_session=${sign({ id: practice.id, passwordHash: practice.passwordHash })}`;
+    const visaAnalyze = (await import("../src/app/api/visa/analyze/route")).POST;
+    await setConfig("free_visa_practice_per_day", "1");
+    // Pin the visa task to an UNCONFIGURED provider: otherwise auto-selection would
+    // pick the custom mock (it has a key here) and the non-JSON mock reply would 502.
+    await setConfig("ai_provider_visa", "groq");
+    const transcript = [{ role: "user", text: "I will study computer science and fund it myself." }, { role: "assistant", text: "Why that university?" }];
+    const practice1 = await visaAnalyze(new Request("http://localhost/api/visa/analyze", {
+      method: "POST", headers: { ...json13, cookie: practiceCookie }, body: JSON.stringify({ countryCode: "US", messages: transcript }),
+    }));
+    const practice2 = await visaAnalyze(new Request("http://localhost/api/visa/analyze", {
+      method: "POST", headers: { ...json13, cookie: practiceCookie }, body: JSON.stringify({ countryCode: "US", messages: transcript }),
+    }));
+    const practice2Body = await practice2.json();
+    check("visa cap: a free account is capped even when it omits profileId (403 plan_limit on the 2nd session)",
+      practice1.status === 200 && practice2.status === 403 && practice2Body.code === "plan_limit", `got ${practice1.status}/${practice2.status}`);
+    await setConfig("free_visa_practice_per_day", "2");
+    await deleteConfig("ai_provider_visa");
+
+    // --- (i) the usage row is charged to the account and the price table is applied per model
+    const [pricedRowAgain] = await db.select().from(schema.aiUsage).where(eq(schema.aiUsage.profileId, acct.id)).orderBy(desc(schema.aiUsage.createdAt));
+    check("usage: the account's newest row carries the cost status it was priced with", Boolean(pricedRowAgain?.costStatus));
+
+    // Restore everything this section changed.
+    await deleteConfig("ai_provider_general");
+    await deleteConfig("ai_model_pricing");
+    await deleteConfig("ai_budget_daily_usd");
+    await deleteConfig("ai_budget_monthly_usd");
+    await deleteConfig("ai_budget_provider_daily_usd");
+    await deleteConfig("ai_budget_warn_percent");
+    await deleteConfig("ai_live_voice_enabled");
+    await deleteConfig("ai_free_live_sessions_per_day");
+    await deleteConfig("ai_free_requests_per_day");
+    await deleteConfig("free_visa_practice_per_day");
+    if (savedEnv13.key === undefined) delete process.env.AI_CUSTOM_API_KEY; else process.env.AI_CUSTOM_API_KEY = savedEnv13.key;
+    if (savedEnv13.base === undefined) delete process.env.AI_CUSTOM_BASE_URL; else process.env.AI_CUSTOM_BASE_URL = savedEnv13.base;
+    if (savedEnv13.model === undefined) delete process.env.AI_CUSTOM_MODEL; else process.env.AI_CUSTOM_MODEL = savedEnv13.model;
+    if (savedGemini !== undefined) process.env.GEMINI_API_KEY = savedGemini;
+    mock13.close();
+  }
 
   // -----------------------------------------------------------------------
   // -----------------------------------------------------------------------

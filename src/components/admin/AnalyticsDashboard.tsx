@@ -587,7 +587,18 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             <MiniStat label="Qaytarilgan" value={formatNumber(r?.refundedCount ?? 0)} tone="rose" />
             <MiniStat label="Obunalar" value={formatNumber(r?.subscriptionCount ?? 0)} tone="indigo" />
             <MiniStat label="7 kunda tugaydi" value={formatNumber(r?.expiringSoon ?? 0)} hint="yangilash kerak" tone="amber" />
-            <MiniStat label="AI xarajati" value={`$${(e?.aiCost ?? 0).toLocaleString("en-US")}`} hint={`${formatNumber(e?.aiRequests ?? 0)} so'rov`} tone="sky" />
+            {/* Sum of KNOWN costs only (provider-reported or priced). Requests without a
+                configured price are counted separately — they are never shown as $0. */}
+            <MiniStat
+              label="AI xarajati"
+              value={`$${(e?.aiCost ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
+              hint={
+                (e?.aiCostUnknownRequests ?? 0) > 0
+                  ? `${formatNumber(e?.aiCostUnknownRequests ?? 0)} so'rov narxsiz (noma'lum)`
+                  : `${formatNumber(e?.aiRequests ?? 0)} so'rov`
+              }
+              tone={(e?.aiCostUnknownRequests ?? 0) > 0 ? "amber" : "sky"}
+            />
           </div>
           {r?.byProvider.length || r?.byCurrency.length ? (
             <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">

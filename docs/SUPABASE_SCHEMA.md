@@ -179,9 +179,16 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `model` | text |  | — |  |
 | `prompt_tokens` | integer |  | yes |  |
 | `completion_tokens` | integer |  | yes |  |
-| `cost_estimate` | double precision |  | yes |  |
-| `status` | text |  | yes |  |
+| `cost_estimate` | double precision |  | yes | USD. Meaningful only when `cost_status` is `provider_reported` or `estimated`. |
+| `cost_status` | text |  | `unknown` | `provider_reported` · `estimated` · `unknown_pricing` · `usage_unreported`. `unknown` = row written before cost accounting; its 0 is not a measured zero. |
+| `cached_prompt_tokens` | integer |  | yes | Subset of `prompt_tokens` served from the provider cache. |
+| `attempts` | integer |  | yes | Provider calls made for this one logical request (retries included). |
+| `fallback_used` | boolean |  | yes | Explicit admin fallback produced the reply. |
+| `error_category` | text | yes | — | Failure category for `status = 'error'` (no prompt, key or provider payload). |
+| `status` | text |  | yes | `success` or `error`; one row per logical request. |
 | `created_at` | timestamp |  | yes |  |
+
+Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes inside).
 
 ### `answer_prompts`
 

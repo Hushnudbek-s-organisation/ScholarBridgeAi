@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
 import { authenticate } from "@/lib/auth";
-import { logAIUsage } from "@/lib/ai/usage";
 import {
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
@@ -12,7 +11,8 @@ import {
   type VisaMessage,
   type VisaOfficerGender,
 } from "@/lib/visa-interview";
-import { LIMITS, checkRateLimit, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 
 /**
@@ -21,9 +21,9 @@ import { readJsonBody } from "@/lib/request";
  * Returns: { reply } — the AI visa officer's next line (first question when
  * `messages` is empty).
  *
- * Metering (audit A21): every signed-in caller's usage is recorded in
- * `ai_usage` (admin statistics are complete) and throttled per account;
- * anonymous callers keep the per-IP throttle. The daily AI request quota is
+ * Metering: the router records every model call in `ai_usage` against the
+ * signed-in caller (null for anonymous); throttles are shared across instances.
+ * Signed-in callers are throttled per account, anonymous callers per IP. The daily AI request quota is
  * INTENTIONALLY not applied here: one practice interview is a multi-step
  * conversation (10+ messages) and would exhaust a free 5-request/day budget
  * mid-interview — the per-minute limits below are the abuse control instead.
@@ -38,8 +38,8 @@ export async function POST(req: Request) {
     const session = auth.ok ? auth.session : null;
 
     const limit = session
-      ? checkRateLimit(`visa:chat:${session.profile.id}`, LIMITS.ai)
-      : checkRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
+      ? await checkSharedRateLimit(`visa:chat:${session.profile.id}`, LIMITS.ai)
+      : await checkSharedRateLimit(`visa:ip:${clientIp(req)}`, LIMITS.aiAnonymous);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     const parsed = await readJsonBody<Record<string, any>>(req, 128 * 1024);
@@ -72,7 +72,15 @@ export async function POST(req: Request) {
     const gender: VisaOfficerGender =
       body?.gender === "female" ? "female" : "male";
     const history = sanitizeHistory(body?.messages);
-    const profile = (body?.profile || null) as VisaApplicantProfile | null;
+    // The applicant file comes from the signed-in profile, never the request
+    // body: client text must not be placed in the officer's system prompt.
+    const profile: VisaApplicantProfile | null = session
+      ? {
+          name: typeof session.profile.name === "string" ? session.profile.name.slice(0, 80) : null,
+          degreeLevel: typeof session.profile.degreeLevel === "string" ? session.profile.degreeLevel.slice(0, 60) : null,
+          targetMajor: typeof session.profile.targetMajor === "string" ? session.profile.targetMajor.slice(0, 120) : null,
+        }
+      : null;
 
     // gpt-oss is a reasoning model: reasoning tokens share max_tokens, so a
     // 300-token cap returns an empty spoken line. 2048 + low effort keeps
@@ -82,6 +90,7 @@ export async function POST(req: Request) {
     const result = await aiChat(
       {
         taskType: "visa",
+        profileId: session?.profile.id ?? null,
         prompt: "",
         messages: [
           {
@@ -109,25 +118,6 @@ export async function POST(req: Request) {
         { error: "The AI officer returned an empty reply. Please try again." },
         { status: 502 },
       );
-    }
-
-    // Usage goes to the caller (or null for anonymous) so admin statistics
-    // and future per-task reporting are complete (audit A21). Awaited (not
-    // fire-and-forget) so the row exists before the response is sent; a
-    // storage blip must never fail an otherwise successful interview turn.
-    try {
-      await logAIUsage({
-        profileId: session?.profile.id ?? null,
-        taskType: "visa",
-        provider: result.response.provider,
-        model: result.response.model,
-        promptTokens: result.response.promptTokens,
-        completionTokens: result.response.completionTokens,
-        costEstimate: result.response.costEstimate,
-        status: "success",
-      });
-    } catch (err) {
-      console.error("Visa chat usage log failed:", err);
     }
 
     return NextResponse.json({ reply });

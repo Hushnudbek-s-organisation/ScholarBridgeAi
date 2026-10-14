@@ -28,6 +28,29 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   ai_premium_requests_per_day: "200",
   ai_free_tokens_per_day: "20000",
   ai_premium_tokens_per_day: "500000",
+  // AI cost control (Admin → AI → Cost & budgets). See lib/ai/pricing + budget.
+  // Prices are NOT shipped: "{}" means every cost is "no price configured".
+  ai_model_pricing: "{}",
+  // Platform spend budgets (USD). "" = no limit, "0" = block paid AI in that
+  // scope. These defaults are conservative placeholders — set real values in
+  // the admin panel before launch.
+  ai_budget_daily_usd: "10",
+  ai_budget_monthly_usd: "150",
+  ai_budget_provider_daily_usd: "{}",
+  ai_budget_warn_percent: "80",
+  // Gemini Live voice for visa practice: kill switch and per-day session
+  // allowances (a session = one live connection). Browser speech stays available.
+  ai_live_voice_enabled: "true",
+  // Live voice is a Premium entitlement: at the published Live audio price a
+  // 10-minute session costs roughly $0.1, so a free allowance would cost more
+  // than the Premium price per active account (docs/AI_COST_AUDIT_2026-10-14.md).
+  // Placeholders — the administrator sets the final values.
+  ai_free_live_sessions_per_day: "0",
+  ai_premium_live_sessions_per_day: "2",
+  ai_live_session_max_minutes: "10",
+  // Platform-wide cap on Live sessions per day (all accounts). Live audio cost
+  // is not visible to the token budget, so this is the control that bounds it.
+  ai_live_global_sessions_per_day: "30",
   ai_default_provider: "openrouter",
   ai_provider_admissions: "openrouter",
   ai_provider_essay: "openrouter",
@@ -84,9 +107,20 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   feature_notifications_advanced: "premium",
 };
 
-const cache = new Map<string, string | null>();
+/**
+ * Per-process caches with a short TTL. A change saved on one instance reaches
+ * the others within CONFIG_CACHE_TTL_MS (budgets and quotas must not stay stale
+ * for the lifetime of a process). The saving instance updates its own cache
+ * immediately (setConfig).
+ */
+export const CONFIG_CACHE_TTL_MS = 30_000;
+const cache = new Map<string, { value: string | null; at: number }>();
 /** Values an admin actually saved (no defaults) — null = never saved. */
-const storedCache = new Map<string, string | null>();
+const storedCache = new Map<string, { value: string | null; at: number }>();
+
+function fresh<T extends { at: number }>(entry: T | undefined): entry is T {
+  return entry !== undefined && Date.now() - entry.at < CONFIG_CACHE_TTL_MS;
+}
 
 /**
  * The value saved in app_config, or null when the key was never saved.
@@ -94,10 +128,11 @@ const storedCache = new Map<string, string | null>();
  * selection) instead of being masked by CONFIG_DEFAULTS.
  */
 export async function getStoredConfig(key: string): Promise<string | null> {
-  if (storedCache.has(key)) return storedCache.get(key) ?? null;
+  const hit = storedCache.get(key);
+  if (fresh(hit)) return hit.value;
   const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
   const value = row?.value ?? null;
-  storedCache.set(key, value);
+  storedCache.set(key, { value, at: Date.now() });
   return value;
 }
 
@@ -108,13 +143,14 @@ export async function deleteConfig(key: string): Promise<void> {
   storedCache.delete(key);
 }
 
-/** Get a config value (cached per process). */
+/** Get a config value (cached per process for CONFIG_CACHE_TTL_MS). */
 export async function getConfig(key: string): Promise<string> {
-  if (cache.has(key)) return cache.get(key) as string;
+  const hit = cache.get(key);
+  if (fresh(hit)) return hit.value ?? "";
   try {
     const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
     const value = row?.value ?? CONFIG_DEFAULTS[key] ?? "";
-    cache.set(key, value);
+    cache.set(key, { value, at: Date.now() });
     return value;
   } catch {
     // DB unavailable — fall back to defaults so the app still works.
@@ -145,8 +181,8 @@ export async function setConfig(key: string, value: string, description?: string
       description: description ?? undefined,
     });
   }
-  cache.set(key, value);
-  storedCache.set(key, value);
+  cache.set(key, { value, at: Date.now() });
+  storedCache.set(key, { value, at: Date.now() });
   return getConfig(key);
 }
 

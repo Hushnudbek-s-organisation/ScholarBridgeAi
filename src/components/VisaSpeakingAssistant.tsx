@@ -594,6 +594,26 @@ interface LiveTokenResponse {
   apiVersion?: string;
   voice?: string;
   expiresAt?: string;
+  /** Server-enforced cap on one Live session (minutes × 60). */
+  maxSessionSeconds?: number;
+}
+
+/** Error from /api/visa/live-token carrying the server's stable code. */
+type LiveTokenError = Error & { code?: string };
+
+/**
+ * Which localized notice explains why the interview moved to text practice.
+ * Keys come from the server's stable `code`, never from its English text.
+ */
+function liveFallbackNoticeKey(
+  reason: unknown,
+): "liveFallback" | "liveQuotaReached" | "liveDisabled" | "livePremiumRequired" | "liveSessionTimeLimit" {
+  const code = typeof reason === "object" && reason !== null ? (reason as { code?: unknown }).code : undefined;
+  if (code === "live_quota_exceeded") return "liveQuotaReached";
+  if (code === "live_voice_disabled") return "liveDisabled";
+  if (code === "premium_required") return "livePremiumRequired";
+  if (code === "session_time_limit") return "liveSessionTimeLimit";
+  return "liveFallback";
 }
 
 interface LiveSessionLike {
@@ -752,6 +772,8 @@ export function VisaSpeakingAssistant({
   const liveSessionHandleRef = useRef<string | null>(null);
   const liveIntentionalCloseRef = useRef(false);
   const liveReconnectTimerRef = useRef<number | null>(null);
+  /** Ends a Live session at the server's time cap; falls back to text practice. */
+  const liveSessionLimitTimerRef = useRef<number | null>(null);
   const liveReconnectAttemptsRef = useRef(0);
   const liveMicStreamRef = useRef<MediaStream | null>(null);
   const liveInputCtxRef = useRef<AudioContext | null>(null);
@@ -965,6 +987,7 @@ export function VisaSpeakingAssistant({
 
     function closeLiveSession(): void {
       clearLiveReconnectTimer();
+      clearLiveSessionLimitTimer();
       liveIntentionalCloseRef.current = true;
       try {
         liveSessionRef.current?.close();
@@ -1325,6 +1348,24 @@ export function VisaSpeakingAssistant({
       void ensureMicPermissionThenListen(token);
     }
 
+    function clearLiveSessionLimitTimer(): void {
+      if (liveSessionLimitTimerRef.current !== null) {
+        window.clearTimeout(liveSessionLimitTimerRef.current);
+        liveSessionLimitTimerRef.current = null;
+      }
+    }
+
+    function armLiveSessionLimit(seconds: number | undefined): void {
+      clearLiveSessionLimitTimer();
+      if (!seconds || seconds <= 0) return;
+      liveSessionLimitTimerRef.current = window.setTimeout(() => {
+        liveSessionLimitTimerRef.current = null;
+        if (engineModeRef.current !== "gemini-live" || !mountedRef.current) return;
+        const err = Object.assign(new Error("Live session time limit"), { code: "session_time_limit" });
+        void scheduleFallbackAfterLiveFailure(err);
+      }, seconds * 1000);
+    }
+
     async function requestLiveToken(): Promise<LiveTokenResponse> {
       const c = getVisaCountry(configRef.current?.countryCode);
       if (!c) throw new Error("Missing visa country.");
@@ -1346,11 +1387,17 @@ export function VisaSpeakingAssistant({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || typeof data?.token !== "string") {
-        throw new Error(
+        const err: LiveTokenError = new Error(
           typeof data?.error === "string" ? data.error : t("liveTokenError"),
         );
+        err.code = typeof data?.code === "string" ? data.code : undefined;
+        throw err;
       }
       return {
+        maxSessionSeconds:
+          typeof data.maxSessionSeconds === "number" && data.maxSessionSeconds > 0
+            ? data.maxSessionSeconds
+            : undefined,
         token: data.token,
         model:
           typeof data.model === "string"
@@ -1617,6 +1664,8 @@ export function VisaSpeakingAssistant({
       setLiveConnectedState(true);
       liveReconnectAttemptsRef.current = 0;
       if (sendKickoff) {
+        // The time cap runs from the start of the interview, not each reconnect.
+        armLiveSessionLimit(token.maxSessionSeconds);
         setOfficer("thinking");
         listeningRef.current = false;
         setListening(false);
@@ -1629,7 +1678,7 @@ export function VisaSpeakingAssistant({
       console.warn("Gemini Live unavailable; falling back:", reason);
       stopLiveAll();
       setMode("fallback");
-      setNotice(t("liveFallback"));
+      setNotice(t(liveFallbackNoticeKey(reason)));
       const needsFirstQuestion = messagesRef.current.length === 0;
       await startFallbackInterview(needsFirstQuestion);
       if (!needsFirstQuestion) setOfficer("idle");
@@ -1651,9 +1700,18 @@ export function VisaSpeakingAssistant({
         void (async () => {
           try {
             await ensureLiveAudio();
+            // A Live token is single-use and each one is a counted session:
+            // a reconnect asks the server for a new token (and its allowance check).
+            liveTokenRef.current = null;
             await connectLiveSession(false);
             setNotice(null);
           } catch (err) {
+            // Out of allowance / disabled / not on this plan: stop retrying and
+            // continue in text practice with the reason shown.
+            if (liveFallbackNoticeKey(err) !== "liveFallback") {
+              void scheduleFallbackAfterLiveFailure(err);
+              return;
+            }
             scheduleLiveReconnect(err instanceof Error ? err.message : "reconnect");
           }
         })();

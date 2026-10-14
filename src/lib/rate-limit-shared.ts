@@ -103,3 +103,84 @@ export async function checkSharedRateLimit(
 export async function resetSharedRateLimits(): Promise<void> {
   await db.delete(rateLimitHits);
 }
+
+/**
+ * Hits currently inside the window, read-only (no hit is recorded). Used as a
+ * cheap pre-check before doing paid work.
+ */
+export async function sharedHitCount(
+  key: string,
+  windowMs: number,
+  now: number = Date.now()
+): Promise<{ count: number; oldest: Date | null }> {
+  const windowStart = new Date(now - windowMs);
+  const [row] = await db
+    .select({
+      n: sql<number>`count(*)::int`,
+      oldest: sql<Date | null>`min(${rateLimitHits.hitAt})`,
+    })
+    .from(rateLimitHits)
+    .where(and(eq(rateLimitHits.key, key), gt(rateLimitHits.hitAt, windowStart)));
+  return {
+    count: Number(row?.n ?? 0),
+    oldest: row?.oldest ? new Date(row.oldest) : null,
+  };
+}
+
+/**
+ * Admit ONE unit of an allowance — exactly. At most `limit` admissions happen
+ * in any window, even when many requests race (a per-key transaction-scoped
+ * advisory lock serialises the count-and-insert).
+ *
+ * A REJECTED attempt is not recorded, so it cannot use up the allowance (or
+ * extend the wait). Use this when only admitted work should count. The
+ * per-hour abuse limiters above (`checkSharedRateLimit`) keep recording every
+ * hit on purpose.
+ *
+ * Degrades to the in-process limiter (logged) if the database is unavailable.
+ */
+export async function reserveSharedSlot(key: string, options: RateLimitOptions): Promise<RateLimitResult> {
+  const now = options.now ? options.now() : Date.now();
+  const windowStart = new Date(now - options.windowMs);
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+      const [row] = await tx
+        .select({
+          n: sql<number>`count(*)::int`,
+          oldest: sql<Date | null>`min(${rateLimitHits.hitAt})`,
+        })
+        .from(rateLimitHits)
+        .where(and(eq(rateLimitHits.key, key), gt(rateLimitHits.hitAt, windowStart)));
+      const before = Number(row?.n ?? 0);
+      if (before >= options.limit) {
+        const oldest = row?.oldest ? new Date(row.oldest).getTime() : now;
+        const resetMs = Math.max(0, oldest + options.windowMs - now);
+        return {
+          ok: false,
+          remaining: 0,
+          limit: options.limit,
+          retryAfterSec: Math.max(1, Math.ceil(resetMs / 1000)),
+          resetMs,
+        };
+      }
+      await tx.insert(rateLimitHits).values({ key, hitAt: new Date(now) });
+      return {
+        ok: true,
+        remaining: Math.max(0, options.limit - before - 1),
+        limit: options.limit,
+        retryAfterSec: 0,
+        resetMs: options.windowMs,
+      };
+    });
+  } catch (err) {
+    if (now - fallbackNoticedAt > 60_000) {
+      fallbackNoticedAt = now;
+      console.error(
+        "Shared rate-limit store unavailable — falling back to the in-process limiter:",
+        (err as Error)?.message
+      );
+    }
+    return checkRateLimit(key, options);
+  }
+}

@@ -37,6 +37,12 @@ export interface OpenRouterOptions {
   retryDelaysMs?: number[];
   /** Hard cap on total AI calls per provider instance (spec §17). */
   maxCalls?: number;
+  /**
+   * Replaces the direct HTTP call. The research agent passes the central AI
+   * router here, so its calls are priced, budget-gated and logged in ai_usage
+   * like every other AI call. Returns the raw reply text, or null on failure.
+   */
+  complete?: (system: string, user: string, maxTokens: number) => Promise<string | null>;
 }
 
 /** Simple content hash for the request cache (spec §17: normalizedUrl + contentHash). */
@@ -115,6 +121,7 @@ export class OpenRouterAIProvider implements AIProvider {
   private readonly fetchFn: typeof fetch;
   private readonly retryDelaysMs: number[];
   private readonly maxCalls: number;
+  private readonly complete?: OpenRouterOptions["complete"];
   private calls = 0;
   private readonly cache = new Map<string, unknown>();
 
@@ -129,7 +136,8 @@ export class OpenRouterAIProvider implements AIProvider {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.retryDelaysMs = opts.retryDelaysMs ?? [800, 2000];
     this.maxCalls = opts.maxCalls ?? 40;
-    this.available = Boolean(this.apiKey);
+    this.complete = opts.complete;
+    this.available = Boolean(this.apiKey) || Boolean(this.complete);
   }
 
   async classifyPage(input: AIPageInput): Promise<PageClassificationResult | null> {
@@ -166,6 +174,17 @@ export class OpenRouterAIProvider implements AIProvider {
 
   /** Raw chat with retries + backoff + strict JSON parsing (spec §18, §20). */
   private async chat<T>(system: string, user: string): Promise<T | null> {
+    if (this.complete) {
+      // Routed through the central AI router (which retries and records usage).
+      this.calls++;
+      const text = await this.complete(system, user, 1500);
+      if (text === null) return null;
+      const parsed = parseModelJson<T>(text);
+      if (parsed === null) {
+        console.warn(`[research-agent] ${this.name} returned malformed JSON — fallback to deterministic rules`);
+      }
+      return parsed;
+    }
     if (!this.apiKey) return null;
     this.calls++;
     const headers: Record<string, string> = {
@@ -249,7 +268,7 @@ export class NullAIProvider implements AIProvider {
 /** Create the configured provider (server-side only — env is never sent to the client). */
 export function createAIProvider(opts: OpenRouterOptions = {}): AIProvider {
   const apiKey = opts.apiKey ?? process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return new NullAIProvider();
+  if (!apiKey && !opts.complete) return new NullAIProvider();
   return new OpenRouterAIProvider(opts);
 }
 

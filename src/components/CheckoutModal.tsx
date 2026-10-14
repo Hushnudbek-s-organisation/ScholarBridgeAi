@@ -41,8 +41,10 @@ export function CheckoutModal({
 
   if (!isOpen) return null;
 
-  const price = packageMeta?.priceUzs ?? 59000;
-  const days = packageMeta?.days ?? 30;
+  // Price and length come from the selected package (server config). No
+  // fallback amount: the checkout never shows a price the server did not send.
+  const price = packageMeta?.priceUzs ?? null;
+  const days = packageMeta?.days ?? null;
   const label = packageMeta?.labelUz || packageMeta?.label || t("planPremium");
 
   const startCheckout = async (provider: "payme" | "click") => {
@@ -101,10 +103,10 @@ export function CheckoutModal({
               {t("planLabel")}: {label}
             </span>
             <span className="text-lg font-extrabold text-indigo-900">
-              {price.toLocaleString("uz-UZ")} UZS
+              {price === null ? "—" : `${price.toLocaleString("uz-UZ")} UZS`}
             </span>
           </div>
-          <p className="text-[11px] text-indigo-600 mt-1">/ {days} days</p>
+          <p className="text-[11px] text-indigo-600 mt-1">/ {days ?? "—"} days</p>
         </div>
 
         <p className="text-xs font-semibold text-slate-600">{t("chooseProvider")}</p>
@@ -114,7 +116,7 @@ export function CheckoutModal({
             <button
               key={provider}
               onClick={() => startCheckout(provider)}
-              disabled={loading}
+              disabled={loading || price === null}
               className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gradient-to-r text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50"
               style={{
                 backgroundImage: `linear-gradient(to right, ${

@@ -92,6 +92,8 @@ const num = (v: unknown): number => {
 
 /** Round to 1 decimal (percentages, averages). */
 const round1 = (v: number): number => Math.round(v * 10) / 10;
+/** USD amounts keep 4 decimals — rounding to 0.1 would show real small costs as $0. */
+const round4 = (v: number): number => Math.round(v * 10000) / 10000;
 
 /**
  * Percentage change vs. the previous period.
@@ -294,7 +296,10 @@ export interface EngagementStats {
   aiFailures: number;
   aiPromptTokens: number;
   aiCompletionTokens: number;
+  /** USD summed over requests whose cost is known (provider-reported or priced). */
   aiCost: number;
+  /** Successful requests with NO known cost (no price configured / usage unreported). Never counted as $0. */
+  aiCostUnknownRequests: number;
   aiUsers: number;
   aiByTask: { taskType: string; count: number }[];
   evaluations: number;
@@ -1049,7 +1054,9 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
         .select({
           prompt: sql<number>`coalesce(sum(${aiUsage.promptTokens}), 0)`,
           completion: sql<number>`coalesce(sum(${aiUsage.completionTokens}), 0)`,
-          cost: sql<number>`coalesce(sum(${aiUsage.costEstimate}), 0)`,
+          // Only costs that are a real number (provider-reported or priced) are summed.
+          cost: sql<number>`coalesce(sum(case when ${aiUsage.costStatus} in ('provider_reported', 'estimated') then ${aiUsage.costEstimate} else 0 end), 0)`,
+          unknownCost: sql<number>`count(*) filter (where ${aiUsage.status} = 'success' and ${aiUsage.costStatus} not in ('provider_reported', 'estimated'))::int`,
         })
         .from(aiUsage)
     ),
@@ -1111,7 +1118,8 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
     aiFailures,
     aiPromptTokens: num(aiTotals[0]?.prompt),
     aiCompletionTokens: num(aiTotals[0]?.completion),
-    aiCost: round1(num(aiTotals[0]?.cost)),
+    aiCost: round4(num(aiTotals[0]?.cost)),
+    aiCostUnknownRequests: num(aiTotals[0]?.unknownCost),
     aiUsers,
     aiByTask: aiByTask.map((r) => ({ taskType: r.taskType, count: num(r.value) })),
     evaluations,
