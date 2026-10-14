@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
   FileText, 
@@ -23,6 +24,7 @@ interface AiSopStudioProps {
 }
 
 export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
+  const t = useTranslations("ai");
   const [activeTab, setActiveTab] = useState<"drafter" | "reviewer">("drafter");
 
   // Drafter State
@@ -32,14 +34,20 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
   const [targetProgram, setTargetProgram] = useState(activeProfile?.targetMajor || "");
   const [personalHook, setPersonalHook] = useState("");
   const [careerGoals, setCareerGoals] = useState("");
+  const [programEvidence, setProgramEvidence] = useState("");
+  const [experienceExample, setExperienceExample] = useState("");
   const [generatedSop, setGeneratedSop] = useState<string | null>(null);
+  const [draftUsedAi, setDraftUsedAi] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
+  const [draftError, setDraftError] = useState("");
 
   // Reviewer State
   const [existingDraft, setExistingDraft] = useState("");
   const [reviewUni, setReviewUni] = useState("");
   const [sopReview, setSopReview] = useState<string | null>(null);
+  const [reviewUsedAi, setReviewUsedAi] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   // Copy state
   const [copied, setCopied] = useState(false);
@@ -48,6 +56,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
     e.preventDefault();
     if (!activeProfile) return;
     setIsDrafting(true);
+    setDraftError("");
     setGeneratedSop(null);
 
     try {
@@ -60,14 +69,18 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
           programName: targetProgram,
           personalHook,
           careerGoals,
+          programEvidence,
+          experienceExample,
         }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("sopRequestError"));
       if (data.sopDraft) {
         setGeneratedSop(data.sopDraft);
+        setDraftUsedAi(data.aiUsed === true);
       }
     } catch (err) {
-      console.error(err);
+      setDraftError(err instanceof Error ? err.message : t("sopRequestError"));
     } finally {
       setIsDrafting(false);
     }
@@ -77,6 +90,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
     e.preventDefault();
     if (!existingDraft) return;
     setIsReviewing(true);
+    setReviewError("");
     setSopReview(null);
 
     try {
@@ -87,18 +101,39 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
           sopText: existingDraft,
           targetUniversity: reviewUni,
           targetMajor: activeProfile?.targetMajor,
+          language: activeProfile?.preferredLocale || "en",
         }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("sopRequestError"));
       if (data.review) {
         setSopReview(data.review);
+        setReviewUsedAi(data.aiUsed === true);
       }
     } catch (err) {
-      console.error(err);
+      setReviewError(err instanceof Error ? err.message : t("sopRequestError"));
     } finally {
       setIsReviewing(false);
     }
   };
+
+  const profileContext = [
+    activeProfile?.gpa != null
+      ? `GPA ${activeProfile.gpa}${activeProfile.gpaScale != null ? `/${activeProfile.gpaScale}` : ""}`
+      : null,
+    activeProfile?.ieltsScore != null ? `IELTS ${activeProfile.ieltsScore}` : null,
+    activeProfile?.toeflScore != null ? `TOEFL ${activeProfile.toeflScore}` : null,
+    activeProfile?.duolingoScore != null ? `Duolingo ${activeProfile.duolingoScore}` : null,
+    activeProfile?.satScore != null ? `SAT ${activeProfile.satScore}` : null,
+    activeProfile?.actScore != null ? `ACT ${activeProfile.actScore}` : null,
+    activeProfile?.greScore != null ? `GRE ${activeProfile.greScore}` : null,
+    Number(activeProfile?.researchPublications) > 0
+      ? `Publications recorded: ${activeProfile?.researchPublications}`
+      : null,
+    Number(activeProfile?.workExperienceYears) > 0
+      ? `Work experience recorded: ${activeProfile?.workExperienceYears} years`
+      : null,
+  ].filter((fact): fact is string => Boolean(fact));
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -116,9 +151,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
             AI SOP & Application Essay Suite
           </div>
           <h1 className="text-xl font-bold text-slate-900">Statement of Purpose & Essay Studio</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Generate tailored SOP drafts or evaluate existing essays against elite admissions committee standards.
-          </p>
+          <p className="text-xs text-slate-500 mt-1">{t("sopStudioSubtitle")}</p>
         </div>
 
         {/* Tab Toggle */}
@@ -181,7 +214,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 <label className="block font-semibold text-slate-700 mb-1">Personal Inspiration / Academic Hook</label>
                 <textarea
                   rows={3}
-                  placeholder="e.g. During my undergraduate capstone, I optimized distributed database queries, cutting execution time by 40%..."
+                  placeholder={t("sopPersonalHookPlaceholder")}
                   value={personalHook}
                   onChange={(e) => setPersonalHook(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -192,16 +225,41 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 <label className="block font-semibold text-slate-700 mb-1">Post-Graduation Career Ambitions</label>
                 <textarea
                   rows={2}
-                  placeholder="e.g. Work as Lead Machine Learning Architect in cloud infrastructure..."
+                  placeholder={t("sopCareerGoalPlaceholder")}
                   value={careerGoals}
                   onChange={(e) => setCareerGoals(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
 
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{t("sopExampleLabel")}</label>
+                <textarea
+                  rows={3}
+                  placeholder={t("sopExamplePlaceholder")}
+                  value={experienceExample}
+                  onChange={(e) => setExperienceExample(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t("sopExampleHelp")}</p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{t("sopProgramEvidenceLabel")}</label>
+                <textarea
+                  rows={3}
+                  placeholder={t("sopProgramEvidencePlaceholder")}
+                  value={programEvidence}
+                  onChange={(e) => setProgramEvidence(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t("sopProgramEvidenceHelp")}</p>
+              </div>
+
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-                <span className="font-bold text-slate-800">Auto-Included Profile Context:</span>
-                <p>GPA: {activeProfile?.gpa}/{activeProfile?.gpaScale} • Test: IELTS {activeProfile?.ieltsScore ?? "Not set"} • {activeProfile?.researchPublications || 0} Pubs • {activeProfile?.workExperienceYears || 0} yrs Exp</p>
+                <span className="font-bold text-slate-800">{t("sopProfileContextTitle")}</span>
+                <p>{profileContext.length ? profileContext.join(" · ") : t("sopNoProfileFacts")}</p>
+                <p className="text-slate-500">{t("sopProfileContextHelp")}</p>
               </div>
 
               <button
@@ -210,7 +268,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
               >
                 <Bot className="h-4 w-4" />
-                {isDrafting ? "Drafting SOP with AI..." : "Generate 5-Paragraph SOP Draft"}
+                {isDrafting ? t("sopDrafting") : t("sopGenerateWorkingDraft")}
               </button>
             </form>
           </div>
@@ -221,7 +279,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <FileText className="h-4 w-4 text-purple-600" />
-                  Generated Statement of Purpose
+                  {t("sopWorkingDraftTitle")}
                 </h3>
 
                 {generatedSop && (
@@ -235,10 +293,16 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 )}
               </div>
 
+              {draftError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{draftError}</p>}
               {generatedSop ? (
-                <div className="max-h-[600px] overflow-y-auto pr-2">
-                  <AiFormattedText text={generatedSop} className="text-xs sm:text-sm text-slate-700" />
-                </div>
+                <>
+                  <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                    {draftUsedAi ? t("sopDraftAiNotice") : t("sopDraftOutlineNotice")}
+                  </p>
+                  <div className="max-h-[600px] overflow-y-auto pr-2">
+                    <AiFormattedText text={generatedSop} className="text-xs sm:text-sm text-slate-700" />
+                  </div>
+                </>
               ) : (
                 <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
                   <Sparkles className="h-10 w-10 text-indigo-300" />
@@ -292,7 +356,7 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
                 className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
               >
                 <Bot className="h-4 w-4" />
-                {isReviewing ? "Evaluating SOP with AI..." : "Evaluate & Diagnose Essay"}
+                {isReviewing ? t("sopReviewing") : t("sopReviewButton")}
               </button>
             </form>
           </div>
@@ -300,13 +364,19 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
           {/* Right Review Feedback Output */}
           <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs min-h-[500px]">
             <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 mb-4">
-              AI Diagnostic Evaluation & Rewrite Suggestions
+              {t("sopReviewTitle")}
             </h3>
 
+            {reviewError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{reviewError}</p>}
             {sopReview ? (
-              <div className="max-h-[600px] overflow-y-auto pr-2">
-                <AiFormattedText text={sopReview} className="text-xs sm:text-sm text-slate-700" />
-              </div>
+              <>
+                <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900">
+                  {reviewUsedAi ? t("sopReviewAiNotice") : t("sopReviewFallbackNotice")}
+                </p>
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <AiFormattedText text={sopReview} className="text-xs sm:text-sm text-slate-700" />
+                </div>
+              </>
             ) : (
               <div className="h-80 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-3">
                 <Bot className="h-10 w-10 text-purple-300" />

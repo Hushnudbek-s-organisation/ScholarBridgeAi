@@ -4,17 +4,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, FileText, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
+import type { RecLetterBrief } from "@/lib/recLetter";
 
-interface Brief {
-  forUniversity: string | null;
-  deadline: string | null;
-  talkingPoints: string[];
-  outline: { section: string; draft: string }[];
-  dataMissing: string[];
-  checklist: string[];
-}
-
-function briefToText(b: Brief): string {
+function briefToText(b: RecLetterBrief, preparationTitle: string, preparationAdvice: string[]): string {
   const lines: string[] = [];
   lines.push(`RECOMMENDATION LETTER BRIEF${b.forUniversity ? ` — ${b.forUniversity}` : ""}${b.deadline ? ` (deadline ${b.deadline})` : ""}`);
   lines.push("", "TALKING POINTS");
@@ -27,6 +19,8 @@ function briefToText(b: Brief): string {
     lines.push("ADD TO YOUR PROFILE FIRST");
     for (const d of b.dataMissing) lines.push(`- ${d}`);
   }
+  lines.push("", preparationTitle);
+  for (const advice of preparationAdvice) lines.push(`- ${advice}`);
   lines.push("", "BEFORE YOU SEND");
   for (const c of b.checklist) lines.push(`- [ ] ${c}`);
   return lines.join("\n");
@@ -39,40 +33,78 @@ function briefToText(b: Brief): string {
  */
 export function RecLetterPanel() {
   const t = useTranslations("recLetter");
-  const [brief, setBrief] = useState<Brief | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [brief, setBrief] = useState<RecLetterBrief | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [university, setUniversity] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [relationshipContext, setRelationshipContext] = useState("");
+  const [requestedFocus, setRequestedFocus] = useState("");
+  const [supportingExample, setSupportingExample] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const load = useCallback(async (uni: string, dl: string) => {
-    setLoading(true);
-    setError(null);
+  const fetchBrief = useCallback(async (
+    uni: string,
+    dl: string,
+    relationship: string,
+    focus: string,
+    example: string
+  ): Promise<RecLetterBrief> => {
     const params = new URLSearchParams();
     if (uni.trim()) params.set("universityTitle", uni.trim());
     if (dl.trim()) params.set("deadline", dl.trim());
+    if (relationship.trim()) params.set("relationshipContext", relationship.trim());
+    if (focus.trim()) params.set("requestedFocus", focus.trim());
+    if (example.trim()) params.set("supportingExample", example.trim());
     const qs = params.toString() ? `?${params.toString()}` : "";
+    const r = await fetch(`/api/recommendation-letter${qs}`, { cache: "no-store" });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b?.error ?? `HTTP ${r.status}`);
+    return b as RecLetterBrief;
+  }, []);
+
+  const load = useCallback(async (
+    uni: string,
+    dl: string,
+    relationship: string,
+    focus: string,
+    example: string
+  ) => {
+    setLoading(true);
+    setError(null);
     try {
-      const r = await fetch(`/api/recommendation-letter${qs}`, { cache: "no-store" });
-      const b = await r.json();
-      if (!r.ok) throw new Error(b?.error ?? `HTTP ${r.status}`);
-      setBrief(b);
+      setBrief(await fetchBrief(uni, dl, relationship, focus, example));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchBrief]);
 
   useEffect(() => {
-    void load("", "");
-  }, [load]);
+    let cancelled = false;
+    void fetchBrief("", "", "", "", "")
+      .then((result) => {
+        if (!cancelled) setBrief(result);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchBrief]);
 
   const copyAll = async () => {
     if (!brief) return;
     try {
-      await navigator.clipboard.writeText(briefToText(brief));
+      const preparationAdvice = brief.personalizationAdvice.map((item) =>
+        t(`advice.${item.key}` as never, item.values as never)
+      );
+      await navigator.clipboard.writeText(briefToText(brief, t("writingAdviceTitle"), preparationAdvice));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -92,7 +124,7 @@ export function RecLetterPanel() {
         {brief && (
           <button
             onClick={() => void copyAll()}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? t("copied") : t("copy")}
@@ -100,27 +132,82 @@ export function RecLetterPanel() {
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input
-          className="w-56 rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-          placeholder={t("universityPlaceholder")}
-          value={university}
-          onChange={(e) => setUniversity(e.target.value)}
-        />
-        <input
-          className="w-44 rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-          placeholder={t("deadlinePlaceholder")}
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-        />
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <label className="text-[11px] font-semibold text-slate-600">
+          {t("universityLabel")}
+          <input
+            className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            placeholder={t("universityPlaceholder")}
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            maxLength={160}
+          />
+        </label>
+        <label className="text-[11px] font-semibold text-slate-600">
+          {t("deadlineLabel")}
+          <input
+            className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            placeholder={t("deadlinePlaceholder")}
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            maxLength={80}
+          />
+        </label>
         <button
-          onClick={() => void load(university, deadline)}
+          type="button"
+          onClick={() => void load(university, deadline, relationshipContext, requestedFocus, supportingExample)}
           disabled={loading}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+          className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-60"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("generate")}
+          {loading ? (
+            <>
+              <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+              {t("loading")}
+            </>
+          ) : t("generate")}
         </button>
       </div>
+
+      <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <summary className="flex min-h-11 cursor-pointer items-center px-1 text-xs font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          {t("personalizeTitle")}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs leading-relaxed text-slate-600">{t("personalizeHelp")}</p>
+          <label className="block text-[11px] font-semibold text-slate-700">
+            {t("relationshipContextLabel")}
+            <input
+              className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder={t("relationshipContextPlaceholder")}
+              value={relationshipContext}
+              onChange={(e) => setRelationshipContext(e.target.value)}
+              maxLength={240}
+            />
+          </label>
+          <label className="block text-[11px] font-semibold text-slate-700">
+            {t("focusLabel")}
+            <textarea
+              className="mt-1 min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder={t("focusPlaceholder")}
+              value={requestedFocus}
+              onChange={(e) => setRequestedFocus(e.target.value)}
+              maxLength={300}
+              rows={3}
+            />
+          </label>
+          <label className="block text-[11px] font-semibold text-slate-700">
+            {t("exampleLabel")}
+            <textarea
+              className="mt-1 min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder={t("examplePlaceholder")}
+              value={supportingExample}
+              onChange={(e) => setSupportingExample(e.target.value)}
+              maxLength={500}
+              rows={3}
+            />
+          </label>
+        </div>
+      </details>
 
       {error && (
         <p className="mt-3 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
@@ -158,14 +245,40 @@ export function RecLetterPanel() {
                 </ul>
               </div>
             )}
+
+            {brief.personalizationAdvice.length > 0 && (
+              <section className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 dark:border-indigo-900 dark:bg-indigo-950/25">
+                <h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-100">
+                  {t("writingAdviceTitle")}
+                </h4>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                  {t("writingAdviceSubtitle")}
+                </p>
+                <ol className="mt-3 space-y-3">
+                  {brief.personalizationAdvice.map((item, index) => (
+                    <li key={`${item.key}-${index}`} className="flex items-start gap-2.5">
+                      <span aria-hidden="true" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900 dark:text-indigo-200 dark:ring-indigo-800">
+                        {index + 1}
+                      </span>
+                      <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+                        {t(`advice.${item.key}` as never, item.values as never)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
           </div>
 
           <div>
             <h4 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("outline")}</h4>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              {t("outlineNote")} {t("letterLanguageNote")}
+            </p>
             <div className="mt-2 space-y-2">
               {brief.outline.map((o, i) => (
-                <details key={i} className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2">
-                  <summary className="cursor-pointer text-xs font-bold text-slate-700">{o.section}</summary>
+                <details key={i} open={i === 0} className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2">
+                  <summary className="flex min-h-11 cursor-pointer items-center text-xs font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{o.section}</summary>
                   <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{o.draft}</p>
                 </details>
               ))}

@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS "idx_applications_profile" ON "applications" ("profil
 CREATE INDEX IF NOT EXISTS "idx_applications_university" ON "applications" ("university_id");
 CREATE INDEX IF NOT EXISTS "idx_applications_deadline" ON "applications" ("deadline");
 
-CREATE TABLE IF NOT EXISTS "saved_universities" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "university_id" integer NOT NULL, "match_category" text NOT NULL DEFAULT 'Match', "match_score" integer NOT NULL DEFAULT 85, "status" text NOT NULL DEFAULT 'Shortlisted', "notes" text DEFAULT '', "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "saved_universities" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "university_id" integer NOT NULL, "status" text NOT NULL DEFAULT 'Shortlisted', "notes" text DEFAULT '', "created_at" timestamp NOT NULL DEFAULT now());
 
 CREATE TABLE IF NOT EXISTS "saved_scholarships" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "scholarship_id" integer NOT NULL, "status" text NOT NULL DEFAULT 'Saved', "notes" text DEFAULT '', "created_at" timestamp NOT NULL DEFAULT now());
 
@@ -257,8 +257,6 @@ ALTER TABLE "applications" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAU
 -- ---------- saved_universities ----------
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "university_id" integer;
-ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "match_category" text DEFAULT 'Match';
-ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "match_score" integer DEFAULT 85;
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'Shortlisted';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "notes" text DEFAULT '';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT now();

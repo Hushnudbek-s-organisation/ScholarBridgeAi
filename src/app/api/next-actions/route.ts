@@ -3,8 +3,8 @@ import { db } from "@/db";
 import {
   applications,
   applicationOutcomes,
-  applicationDocuments,
   applicationTasks,
+  recommendationRequests,
   savedScholarships,
   savedUniversities,
   studentProfiles,
@@ -12,8 +12,6 @@ import {
 import { eq } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
-import { profileStrength } from "@/lib/chancing";
-import { chancingProfileWithActivities } from "@/lib/profileMapping";
 
 /**
  * Personalized Roadmap — "What should I do next?" (#4).
@@ -41,11 +39,11 @@ export async function GET(req: Request) {
 
     const today = new Date();
 
-    const [savedUnis, savedSch, tasks, docs, apps, outcomes] = await Promise.all([
+    const [savedUnis, savedSch, tasks, recRows, apps, outcomes] = await Promise.all([
       db.select().from(savedUniversities).where(eq(savedUniversities.profileId, profileId)),
       db.select().from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
       db.select().from(applicationTasks).where(eq(applicationTasks.profileId, profileId)),
-      db.select().from(applicationDocuments).where(eq(applicationDocuments.profileId, profileId)),
+      db.select().from(recommendationRequests).where(eq(recommendationRequests.profileId, profileId)),
       db.select().from(applications).where(eq(applications.profileId, profileId)),
       db.select({ applicationId: applicationOutcomes.applicationId }).from(applicationOutcomes).where(eq(applicationOutcomes.profileId, profileId)),
     ]);
@@ -75,26 +73,7 @@ export async function GET(req: Request) {
         })),
     ].filter((d) => d.daysRemaining !== null) as { id: string; title: string; type: string; daysRemaining: number }[];
 
-    const statements = docs.filter((d) => d.documentType === "statement");
-    const hasEssay = statements.some((d) => d.status === "uploaded");
-    const recommendationsRequested = docs.some(
-      (d) => d.documentType === "recommendation" && d.status !== "missing"
-    );
-
-    // Built through the shared mapping layer so saved activity rows count too.
-    // Completeness must match Profile & Goals → Readiness exactly; a second
-    // hand-built profile object here produced a different percentage (42 vs 50)
-    // for the same student on the same dashboard.
-    const chancingProfile = await chancingProfileWithActivities(profile);
-
-    const hasEnglish =
-      Number(profile.ieltsScore) > 0 || Number(profile.toeflScore) > 0 || Number(profile.duolingoScore) > 0;
-    const hasStandardized = Number(profile.satScore) > 0 || Number(profile.actScore) > 0;
-    const targetsUsaOrCa = /united states|usa|canada/i.test(profile.preferredCountries || "");
-
     const context: NextActionsContext = {
-      today,
-      completeness: profileStrength(chancingProfile).completeness / 100,
       deadlines,
       applications: apps.map((a) => ({
         id: a.id,
@@ -102,14 +81,7 @@ export async function GET(req: Request) {
         status: a.status,
         deadlineDaysRemaining: daysUntil(today, a.deadline),
       })),
-      hasEnglishTest: hasEnglish,
-      // An English score is required for essentially every international
-      // programme; only skip the reminder once one is on file.
-      needsEnglishTest: true,
-      hasStandardizedTest: hasStandardized,
-      requiresStandardizedTest: targetsUsaOrCa || profile.degreeLevel === "Master",
-      hasEssay,
-      recommendationsRequested,
+      recommendationApplicationIds: [...new Set(recRows.map((row) => row.applicationId))],
       savedUniversityCount: savedUnis.length,
       savedScholarshipCount: savedSch.length,
       openTaskCount: openTasks.length,
@@ -118,7 +90,6 @@ export async function GET(req: Request) {
       submittedWithoutOutcome: apps.filter(
         (a) => ["submitted", "interview", "decision"].includes(a.status) && !outcomeIds.has(a.id)
       ).length,
-      graduationYear: profile.graduationYear,
     };
 
     const result = buildNextActions(context, 3);
@@ -128,7 +99,6 @@ export async function GET(req: Request) {
       actions: result.actions,
       rest: result.rest,
       criticalCount: result.criticalCount,
-      completeness: Math.round(context.completeness * 100),
     });
   } catch (error) {
     console.error("GET /api/next-actions error:", error);

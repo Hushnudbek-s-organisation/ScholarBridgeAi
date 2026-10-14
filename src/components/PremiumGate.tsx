@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Lock, Crown } from "lucide-react";
 import type { FeatureKey } from "@/lib/entitlements";
 
@@ -11,31 +12,34 @@ interface PremiumGateProps {
   title?: string;
   description?: string;
   onUpgrade: () => void;
-  children: ReactNode;
+  children?: ReactNode;
+}
+
+/** Key the stateful gate by profile + feature so a profile switch cannot reuse old access. */
+export function PremiumGate(props: PremiumGateProps) {
+  return <FeatureGateContent key={`${props.profileId ?? "none"}:${props.feature}`} {...props} />;
 }
 
 /**
- * Wraps a premium-only section. Access comes from /api/premium/status, which
- * answers per feature with the same rule the APIs enforce server-side (plan,
- * admin role and the admin's feature_<name> overrides). When locked, the
- * section is NOT mounted: its APIs would refuse a free account anyway, and a
- * blurred copy of the real section only invites a DevTools "unlock".
+ * Access comes from /api/premium/status, which answers per feature with the
+ * same rule the APIs enforce server-side (plan, admin role and the admin's
+ * feature_<name> overrides). When locked, the section is NOT mounted: its APIs
+ * would refuse a free account anyway, and a blurred copy of the real section
+ * only invites a DevTools "unlock".
  */
-export function PremiumGate({ profileId, feature, title, description, onUpgrade, children }: PremiumGateProps) {
-  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+function FeatureGateContent({ profileId, feature, title, description, onUpgrade, children }: PremiumGateProps) {
+  const t = useTranslations("premiumGate");
+  const [isPremium, setIsPremium] = useState<boolean | null>(profileId ? null : false);
 
   useEffect(() => {
+    if (!profileId) return;
     let cancelled = false;
-    if (!profileId) {
-      setIsPremium(false);
-      return;
-    }
     fetch(`/api/premium/status?profileId=${profileId}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        const allowed = data?.features?.[feature];
-        setIsPremium(typeof allowed === "boolean" ? allowed : !!data?.isPremium);
+        // Unknown/missing feature data fails closed; the server remains the source of truth.
+        setIsPremium(data?.features?.[feature] === true);
       })
       .catch(() => {
         if (!cancelled) setIsPremium(false);
@@ -47,8 +51,8 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
 
   if (isPremium === null) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-xs font-semibold text-slate-400 shadow-xs">
-        Checking premium access…
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-700 shadow-xs" role="status" aria-live="polite">
+        {t("checking")}
       </div>
     );
   }
@@ -59,7 +63,7 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
 
   return (
     <div className="relative">
-      <div aria-hidden="true" className="pointer-events-none select-none min-h-[420px] rounded-2xl border border-slate-200 bg-white p-6 space-y-4 opacity-40">
+      <div aria-hidden="true" className="pointer-events-none min-h-[420px] select-none space-y-4 rounded-2xl border border-slate-200 bg-white p-6 opacity-40">
         <div className="h-6 w-1/3 rounded-lg bg-slate-200" />
         <div className="h-4 w-2/3 rounded-lg bg-slate-100" />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -69,29 +73,26 @@ export function PremiumGate({ profileId, feature, title, description, onUpgrade,
         <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
         <div className="h-4 w-3/5 rounded-lg bg-slate-100" />
       </div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="bg-white/95 backdrop-blur rounded-3xl border border-amber-300 shadow-2xl p-8 max-w-md w-full text-center space-y-4">
-          <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg">
-            <Lock className="h-8 w-8 text-white sb-ink-on-warm" />
+      <div className="absolute inset-0 flex items-center justify-center p-3">
+        <div className="w-full max-w-md space-y-4 rounded-3xl border border-amber-300 bg-white/95 p-6 text-center shadow-2xl backdrop-blur sm:p-8">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg">
+            <Lock className="h-8 w-8 text-white sb-ink-on-warm" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
-              <Crown className="h-5 w-5 text-amber-500" />
-              {title || "This is Premium"}
+            <h2 className="flex items-center justify-center gap-2 text-xl font-extrabold text-slate-900">
+              <Crown className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+              {title || t("title")}
             </h2>
-            <p className="text-sm text-slate-500 mt-2">
-              {description || "You need an active Premium subscription to access this section."}
-            </p>
+            <p className="mt-2 break-words text-sm text-slate-700">{description || t("description")}</p>
           </div>
           <button
+            type="button"
             onClick={onUpgrade}
-            className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white sb-ink-on-warm font-bold rounded-xl shadow-md transition-all"
+            className="min-h-12 w-full rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 font-bold text-slate-950 sb-ink-on-warm shadow-md transition-colors hover:from-amber-600 hover:to-yellow-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
-            Pro ga o&apos;tish
+            {t("viewPlans")}
           </button>
-          <p className="text-[11px] text-slate-400">
-            SOP AI, cheksiz saqlash, viza mashqi, ota-ona paneli, to&apos;liq kurslar
-          </p>
+          <p className="break-words text-xs text-slate-600">{t("accessNote")}</p>
         </div>
       </div>
     </div>

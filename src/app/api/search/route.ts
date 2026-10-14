@@ -120,7 +120,11 @@ export async function GET(req: Request) {
           )
         )
         .limit(6),
-      db.select({ id: courses.id, title: courses.title, description: courses.description }).from(courses).where(ilike(courses.title, like)).limit(4),
+      db
+        .select({ id: courses.id, title: courses.title, description: courses.description })
+        .from(courses)
+        .where(and(eq(courses.isPublished, true), ilike(courses.title, like)))
+        .limit(4),
       db
         .select({ id: journeyDeadlines.id, title: journeyDeadlines.title, kind: journeyDeadlines.kind })
         .from(journeyDeadlines)
@@ -141,23 +145,23 @@ export async function GET(req: Request) {
     for (const u of unis)
       // The row id travels on the `scholarbridge:focus-record` event, so the
       // tab stays a real section id the sidebar already understands.
-      found.push({ kind: "university", id: u.id, title: u.name, subtitle: `${u.city}, ${u.country}`, group: "Discover", tab: "universities" });
+      found.push({ kind: "university", id: u.id, title: u.name, subtitle: `${u.city}, ${u.country}`, group: "explore", tab: "universities/search" });
     for (const s of schs)
-      found.push({ kind: "scholarship", id: s.id, title: s.title, subtitle: `${s.provider} · ${s.country}`, group: "Discover", tab: `scholarship-${s.id}` });
+      found.push({ kind: "scholarship", id: s.id, title: s.title, subtitle: `${s.provider} · ${s.country}`, group: "explore", tab: "scholarships/browse" });
     for (const a of apps)
-      found.push({ kind: "application", id: a.id, title: a.universityName || "Application", subtitle: a.programName ?? "Your application", group: "Apply", tab: "workspace" });
+      found.push({ kind: "application", id: a.id, title: a.universityName || "Application", subtitle: a.programName ?? "Your application", group: "applications", tab: "applications/workspace" });
     for (const d of docs)
-      found.push({ kind: "document", id: d.id, title: d.title, subtitle: `${d.docType} · ${d.status}`, group: "Prepare", tab: "documents" });
+      found.push({ kind: "document", id: d.id, title: d.title, subtitle: `${d.docType} · ${d.status}`, group: "applications", tab: "materials/documents" });
     for (const s of stories)
-      found.push({ kind: "story", id: s.id, title: s.admittedUniversity, subtitle: s.major ?? "Admission story", group: "My Journey", tab: "stories" });
+      found.push({ kind: "story", id: s.id, title: s.admittedUniversity, subtitle: s.major ?? "Admission story", group: "plan", tab: "profile/stories" });
     for (const c of courseRows)
-      found.push({ kind: "course", id: c.id, title: c.title, subtitle: c.description ?? "Course", group: "Help", tab: "courses" });
+      found.push({ kind: "course", id: c.id, title: c.title, subtitle: c.description ?? "Course", group: "help", tab: "community/courses" });
     for (const t of tasks)
-      found.push({ kind: "task", id: t.id, title: t.title, subtitle: t.kind, group: "Apply", tab: "tasks" });
+      found.push({ kind: "task", id: t.id, title: t.title, subtitle: t.kind, group: "applications", tab: "tasks/tasks" });
     for (const a of activities)
-      found.push({ kind: "activity", id: a.id, title: a.title, subtitle: a.category, group: "My Journey", tab: "activities" });
+      found.push({ kind: "activity", id: a.id, title: a.title, subtitle: a.category, group: "plan", tab: "profile/activities" });
     for (const e of essays)
-      found.push({ kind: "essay", id: e.id, title: e.title || e.essayType, subtitle: "Essay", group: "Apply", tab: "sop" });
+      found.push({ kind: "essay", id: e.id, title: e.title || e.essayType, subtitle: "Essay", group: "applications", tab: "materials/essays" });
 
     return NextResponse.json({
       query: q,

@@ -239,6 +239,29 @@ const LABEL_KEYS: Record<string, string> = {
   admin: "adminPanel",
 };
 
+/** Translation keys for visible search hints; never render source metadata as UI copy. */
+const NAV_HINT_KEYS: Record<string, string> = {
+  dashboard: "dashboard",
+  universities: "universities",
+  scholarships: "scholarships",
+  "study-plan": "sectionStudyPlan",
+  tasks: "tasks",
+  profile: "profile",
+  funding: "sectionFunding",
+  applications: "applications",
+  materials: "sectionMaterials",
+  offers: "sectionOffers",
+  "post-admission-funding": "sectionPostAdmissionFunding",
+  visa: "visa",
+  guidance: "advisor",
+  community: "forum",
+  payments: "payments",
+  notifications: "notifications",
+  rewards: "rewards",
+  parent: "parent",
+  admin: "admin",
+};
+
 /** Legacy names a student may still type ("Answer Vault", "My Chances"…). */
 const PANE_KEYWORDS: Record<string, string> = {
   "universities/careers": "Career & Major Explorer careers majors jobs",
@@ -435,14 +458,8 @@ export function Navbar({
 
   const hintFor = useCallback(
     (id: string): string | undefined => {
-      const section = NAV_SECTIONS.find((s) => s.id === id);
-      if (section) {
-        const hintKey = "hint" + id.replace(/(^|-)([a-z])/g, (_m, _p, c: string) => c.toUpperCase());
-        const translated = th.has?.(hintKey) ? th(hintKey) : undefined;
-        return translated ?? section.description;
-      }
-      const utility = NAV_UTILITY_SECTIONS.find((u) => u.id === id);
-      return utility?.description;
+      const hintKey = NAV_HINT_KEYS[id];
+      return hintKey && th.has?.(hintKey) ? th(hintKey as never) : undefined;
     },
     [th]
   );
@@ -468,10 +485,10 @@ export function Navbar({
       group: "home" as NavGroupId, // never grouped in the sidebar; kept for the palette
       premium: !!u.premium,
       isNew: !!u.isNew && isNewBadgeActive(),
-      hint: u.description,
+      hint: hintFor(u.id),
     }));
     return list;
-  }, [hiddenItems, isAdmin, labelFor]);
+  }, [hiddenItems, isAdmin, labelFor, hintFor]);
 
   /* Populated on demand — panes are searchable so "Answer Vault" still lands
      on Application Materials → Documents & saved answers. */
@@ -483,7 +500,7 @@ export function Navbar({
         out.push({
           id: `${section.id}/${pane.id}`,
           label: `${labelFor(section.id)} → ${tp(pane.id as never)}`,
-          hint: `${pane.description} ${PANE_KEYWORDS[`${section.id}/${pane.id}`] ?? ""}`.trim(),
+          searchTerms: `${pane.description} ${PANE_KEYWORDS[`${section.id}/${pane.id}`] ?? ""}`.trim(),
           group: t(NAV_GROUP_I18N[section.group]),
           icon: ICONS[pane.id] ?? Sparkles,
           premium: !!pane.premium,
@@ -556,13 +573,13 @@ export function Navbar({
         key={item.id}
         onClick={() => go(item.id)}
         aria-current={isActive ? "page" : undefined}
-        className={`relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors duration-150 ${stateCls}`}
+        className={`relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors duration-150 ${stateCls}`}
       >
         {isActive && (
           <motion.span layoutId={layoutId} className={`absolute inset-0 rounded-lg shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
         )}
         <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-500" : "text-slate-500 dark:text-slate-400"}`} />
-        <span className="relative flex-1 truncate">{item.label}</span>
+        <span className="relative min-w-0 flex-1 break-words whitespace-normal">{item.label}</span>
         {item.isNew && !isActive && (
           <span className={`relative shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 ${inDrawer ? "" : "hidden xl:inline"}`}>
             {t("newBadge")}
@@ -597,7 +614,7 @@ export function Navbar({
           type="button"
           onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
           aria-expanded={open}
-          className="mb-1 flex min-h-9 w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="mb-1 flex min-h-11 w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           <span aria-hidden>{NAV_GROUP_ICONS[g]}</span>
           {t(NAV_GROUP_I18N[g])}
@@ -637,8 +654,8 @@ export function Navbar({
         <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
       </div>
       <div className="min-w-0">
-        <span className="block truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
-        <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{tm("tagline")}</p>
+        <span className="block break-words text-lg font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
+        <p className="break-words text-[10px] text-slate-500 dark:text-slate-400">{tm("tagline")}</p>
       </div>
     </div>
   );
@@ -646,10 +663,10 @@ export function Navbar({
   const SearchButton = (
     <button
       onClick={openSearch}
-      className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+      className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
     >
       <Search className="h-3.5 w-3.5 shrink-0" />
-      <span className="flex-1 truncate">{t("searchButton")}</span>
+      <span className="min-w-0 flex-1 break-words">{t("searchButton")}</span>
       <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] text-slate-500 dark:border-slate-600 dark:bg-slate-900 xl:inline">Ctrl K</kbd>
     </button>
   );
@@ -661,11 +678,11 @@ export function Navbar({
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 truncate text-xs font-bold text-slate-900 dark:text-white">
-            <span className="truncate">{activeProfile?.name || t("noProfile")}</span>
+          <p className="flex min-w-0 items-center gap-1 break-words text-xs font-bold text-slate-900 dark:text-white">
+            <span className="min-w-0 break-words">{activeProfile?.name || t("noProfile")}</span>
             {isAdmin && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-slate-600 dark:text-slate-300" />}
           </p>
-          <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
+          <p className="break-all text-[10px] text-slate-500 dark:text-slate-400">
             {activeProfile?.email && !isTelegramPlaceholderEmail(activeProfile.email) ? activeProfile.email : activeProfile?.email ? "Telegram" : t("studentProfile")}
           </p>
         </div>
@@ -685,7 +702,7 @@ export function Navbar({
           className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
           title={t("editProfile")}
         >
-          <Pencil className="h-3.5 w-3.5" /> <span className="max-w-full truncate">{t("edit")}</span>
+          <Pencil className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{t("edit")}</span>
         </button>
         {onSwitchProfile && (
           <button
@@ -696,7 +713,7 @@ export function Navbar({
             className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
             title={t("switchAccountTitle")}
           >
-            <ArrowLeftRight className="h-3.5 w-3.5" /> <span className="max-w-full truncate">{activeProfile ? t("switch") : t("signIn")}</span>
+            <ArrowLeftRight className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{activeProfile ? t("switch") : t("signIn")}</span>
           </button>
         )}
         <button
@@ -707,7 +724,7 @@ export function Navbar({
           className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           title={t("addNewTitle")}
         >
-          <Plus className="h-3.5 w-3.5" /> <span className="max-w-full truncate">{t("addShort")}</span>
+          <Plus className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{t("addShort")}</span>
         </button>
       </div>
     </div>
@@ -720,7 +737,7 @@ export function Navbar({
       {onLogout && (
         <button
           onClick={onLogout}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
           title={t("logout")}
           aria-label={t("logout")}
         >
@@ -745,7 +762,7 @@ export function Navbar({
 
       {/* ================= LAPTOP / DESKTOP: LEFT SIDEBAR ================= */}
       <aside className="sticky top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex xl:w-72 dark:border-slate-800 dark:bg-slate-900">
-        <button className="border-b border-slate-100 px-5 py-4 text-left dark:border-slate-800" onClick={() => go("dashboard")}>
+        <button className="min-h-11 border-b border-slate-100 px-5 py-4 text-left dark:border-slate-800" onClick={() => go("dashboard")}>
           {Logo}
         </button>
         <div className="px-3 pt-3">{SearchButton}</div>
@@ -764,23 +781,23 @@ export function Navbar({
         <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             aria-label={t("openMenu")}
             aria-expanded={drawerOpen}
             aria-haspopup="dialog"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <button className="flex min-w-0 items-center gap-2" onClick={() => go("dashboard")}>
+          <button className="flex min-h-11 min-w-0 items-center gap-2" onClick={() => go("dashboard")}>
             <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700">
               <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
             </div>
-            <span className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
+            <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <button
               onClick={openSearch}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               aria-label={t("searchButton")}
             >
               <Search className="h-[18px] w-[18px]" />
@@ -819,7 +836,7 @@ export function Navbar({
                   />
                 )}
                 <Icon className="h-5 w-5" />
-                <span className="w-full truncate text-center leading-tight">{t(item.labelKey)}</span>
+                <span className="w-full min-w-0 break-words whitespace-normal text-center leading-tight">{t(item.labelKey)}</span>
               </button>
             );
           })}

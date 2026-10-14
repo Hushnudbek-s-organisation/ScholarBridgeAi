@@ -52,8 +52,6 @@ export async function GET(req: Request) {
         id: savedUniversities.id,
         profileId: savedUniversities.profileId,
         universityId: savedUniversities.universityId,
-        matchCategory: savedUniversities.matchCategory,
-        matchScore: savedUniversities.matchScore,
         status: savedUniversities.status,
         notes: savedUniversities.notes,
         createdAt: savedUniversities.createdAt,
@@ -63,21 +61,14 @@ export async function GET(req: Request) {
       .innerJoin(universities, eq(savedUniversities.universityId, universities.id))
       .where(eq(savedUniversities.profileId, profileId));
 
-    // The row stores the fit score AT SAVE TIME. The fit engine is the single
-    // source of truth, so the response recomputes it (a scorer change or a
-    // profile edit must never leave this list contradicting the Explorer /
-    // Chancing screens). The stored pair is kept for audit.
+    // Fit is computed from the current profile and available catalogue data;
+    // do not persist or return a stale score or an admissions-style tier.
     const matchProfile = profile ? await toMatchProfileWithActivities(profile) : null;
     const withLiveMatch = saved.map((row) => {
-      if (!matchProfile) return row;
-      const live = calculateUniversityMatch(matchProfile, toUniversityData(row.university));
-      return {
-        ...row,
-        matchScore: live.matchScore,
-        matchCategory: live.matchCategory,
-        storedMatchScore: row.matchScore,
-        storedMatchCategory: row.matchCategory,
-      };
+      const live = matchProfile
+        ? calculateUniversityMatch(matchProfile, toUniversityData(row.university))
+        : null;
+      return { ...row, matchScore: live?.matchScore ?? null };
     });
 
     return NextResponse.json({ savedUniversities: withLiveMatch });
@@ -140,18 +131,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "University not found", code: "not_found" }, { status: 404 });
     }
 
-    const match = calculateUniversityMatch(
-      await toMatchProfileWithActivities(profile),
-      toUniversityData(uni),
-    );
-    const score = match.matchScore;
-    const cat = match.matchCategory;
-
     const [newSaved] = await db.insert(savedUniversities).values({
       profileId,
       universityId,
-      matchCategory: cat,
-      matchScore: score,
       status,
       notes,
     }).returning();

@@ -307,7 +307,7 @@ export function CareerExplorerPanel({
                 </p>
                 {/* Show matched field(s) so the student sees WHY this university appears for the chosen major */}
                 {(u.programMajor || (Array.isArray(u.programFields) && u.programFields.length > 0)) && (
-                  <p className="mt-1 line-clamp-2 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                  <p className="mt-1 break-words text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
                     {(() => {
                       const fields: string[] = Array.isArray(u.programFields) && u.programFields.length > 0
                         ? u.programFields

@@ -19,10 +19,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { PlanningStudio } from "../src/components/PlanningStudio";
+import { RecLetterPanel } from "../src/components/RecLetterPanel";
 import { MentorMarketplace } from "../src/components/MentorMarketplace";
+import { ConsultingSection } from "../src/components/ConsultingSection";
+import { DeadlineCenter } from "../src/components/DeadlineCenter";
+import { PremiumGate } from "../src/components/PremiumGate";
 import { ParentDashboard } from "../src/components/ParentDashboard";
+import { ParentShareView } from "../src/components/ParentShareView";
+import { LocaleProvider } from "../src/i18n/LocaleProvider";
 import { LandingPage } from "../src/components/LandingPage";
 import { UniversityExplorer } from "../src/components/UniversityExplorer";
+import { ScholarshipHub } from "../src/components/ScholarshipHub";
 import { UniversityDetail } from "../src/components/UniversityDetail";
 import { DegreeLevelLabel } from "../src/components/DegreeLevelLabel";
 import { ProfileModal } from "../src/components/ProfileModal";
@@ -32,7 +39,14 @@ import { RecommendationStudio } from "../src/components/RecommendationStudio";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
 import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
 import { DailyStreakCard } from "../src/components/DailyStreakCard";
+import { TaskRoadmap } from "../src/components/TaskRoadmap";
 import { MatchBreakdownStrip } from "../src/components/MatchBreakdownStrip";
+import { SimilarProfiles } from "../src/components/SimilarProfiles";
+import { ArrivalPlanPanel } from "../src/components/journey/ArrivalPlanPanel";
+import { FaqSection } from "../src/components/FaqSection";
+import { AppErrorFallback } from "../src/components/AppErrorFallback";
+import { PointsBadge } from "../src/components/PointsBadge";
+import { MiniApp } from "../src/components/telegram/MiniApp";
 
 let passed = 0;
 let failed = 0;
@@ -52,7 +66,28 @@ function section(title: string) {
 }
 
 /** The component prop shape. Only `id` is read by the fetch calls. */
-const profile = { id: 7 } as any;
+const profile = { id: 7, email: "student@example.com" } as any;
+const loadMessages = (locale: string) =>
+  JSON.parse(readFileSync(new URL(`../src/i18n/messages/${locale}.json`, import.meta.url), "utf8"));
+const withEnglishIntl = (node: React.ReactElement) =>
+  // eslint-disable-next-line react/no-children-prop
+  React.createElement(NextIntlClientProvider, {
+    locale: "en",
+    messages: loadMessages("en"),
+    timeZone: "UTC",
+    children: node,
+  });
+const withEnglishLocale = (node: React.ReactElement) =>
+  // eslint-disable-next-line react/no-children-prop
+  React.createElement(LocaleProvider, { initialLocale: "en", children: node });
+const withIntlLocale = (locale: string, node: React.ReactElement) =>
+  // eslint-disable-next-line react/no-children-prop
+  React.createElement(NextIntlClientProvider, {
+    locale,
+    messages: loadMessages(locale),
+    timeZone: "UTC",
+    children: node,
+  });
 
 /** Render and return markup, or the thrown error as a string. */
 function render(node: React.ReactElement): { html: string; error: string | null } {
@@ -64,9 +99,27 @@ function render(node: React.ReactElement): { html: string; error: string | null 
 }
 
 const components: [string, (p: any) => React.ReactElement][] = [
-  ["PlanningStudio", (p) => React.createElement(PlanningStudio, { activeProfile: p })],
-  ["MentorMarketplace", (p) => React.createElement(MentorMarketplace, { activeProfile: p })],
-  ["ParentDashboard", (p) => React.createElement(ParentDashboard, { activeProfile: p })],
+  ["PlanningStudio", (p) => withEnglishIntl(React.createElement(PlanningStudio, { activeProfile: p }))],
+  ["MentorMarketplace", (p) => withEnglishIntl(React.createElement(MentorMarketplace, { activeProfile: p }))],
+  ["ConsultingSection", (p) => withEnglishIntl(React.createElement(ConsultingSection, { activeProfile: p }))],
+  ["DeadlineCenter", (p) => withEnglishIntl(React.createElement(DeadlineCenter, { profileId: p?.id ?? null }))],
+  ["PremiumGate", (p) => withEnglishIntl(React.createElement(PremiumGate, { profileId: p?.id ?? null, feature: "ai_essay", onUpgrade: () => undefined }, React.createElement("p", null, "premium child")))],
+  ["ParentDashboard", (p) => withEnglishIntl(React.createElement(ParentDashboard, { activeProfile: p }))],
+  ["ScholarshipHub", (p) => withEnglishIntl(React.createElement(ScholarshipHub, {
+    activeProfile: p,
+    savedScholarshipIds: new Set<number>(),
+    onSaveScholarship: async () => undefined,
+    onUnsaveScholarship: async () => undefined,
+    autoFocusScholarship: null,
+  }))],
+  ["ArrivalPlanPanel", (p) => withEnglishIntl(React.createElement(ArrivalPlanPanel, {
+    profileId: p?.id ?? null,
+    onNavigateTab: () => undefined,
+  }))],
+  ["FaqSection", () => withEnglishLocale(React.createElement(FaqSection))],
+  ["PointsBadge", () => withEnglishIntl(React.createElement(PointsBadge, { points: 120, levelName: "Explorer" }))],
+  ["AppErrorFallback", () => React.createElement(AppErrorFallback, { error: new Error("smoke test"), reset: () => undefined })],
+  ["TelegramMiniApp", () => React.createElement(MiniApp)],
 ];
 
 // ---------------------------------------------------------------------------
@@ -89,20 +142,52 @@ for (const [name, make] of components) {
 section("3. Each component says what it is");
 
 const planning = render(components[0][1](profile)).html;
+const faq = render(components.find(([name]) => name === "FaqSection")![1](profile)).html;
+const pointsBadge = render(components.find(([name]) => name === "PointsBadge")![1](profile)).html;
+const errorFallback = render(components.find(([name]) => name === "AppErrorFallback")![1](profile)).html;
+const telegramMiniApp = render(components.find(([name]) => name === "TelegramMiniApp")![1](profile)).html;
+check("FAQ renders translated message-file questions", faq.includes("What does ScholarBridge help me do?") && faq.includes("How do I know if a scholarship is open to me?"));
+check("PointsBadge renders the translated points label", pointsBadge.includes("Points") && !/\bpts\b/.test(pointsBadge));
+check("error fallback renders and exposes retry guidance", errorFallback.includes("Something went wrong") && errorFallback.includes("Try again"));
+check("Telegram Mini App loading state uses its selected message dictionary", telegramMiniApp.includes("Yuklanmoqda…"));
 check("PlanningStudio names the cost calculator", /cost/i.test(planning));
 check("PlanningStudio offers a scholarship tab", /scholarship/i.test(planning));
 check("PlanningStudio offers a CV tab", /\bCV\b/.test(planning));
 check("PlanningStudio offers a comparison tab", /compar/i.test(planning));
 
 const mentors = render(components[1][1](profile)).html;
-check("MentorMarketplace explains the sorting", /sorted by how closely/i.test(mentors));
-check("MentorMarketplace has a rate filter", /Max hourly rate/i.test(mentors));
+check("MentorMarketplace labels its overlap heuristic rather than promising an outcome", /heuristic based on available profile fields/i.test(mentors));
+check("MentorMarketplace has a translated rate filter", /Maximum hourly rate \(USD\)/i.test(mentors));
 
-const parent = render(components[2][1](profile)).html;
+const parent = render(components.find(([name]) => name === "ParentDashboard")![1](profile)).html;
 check("ParentDashboard offers the share toggle", /Share a read-only summary/i.test(parent));
-check("ParentDashboard states what is withheld", /never see/i.test(parent));
-check("ParentDashboard names essays as withheld", /essay drafts/i.test(parent));
-check("ParentDashboard names passwords as withheld", /password/i.test(parent));
+check("ParentDashboard states what is excluded", /Not included/i.test(parent));
+check("ParentDashboard names essays as excluded", /essay drafts/i.test(parent));
+check("ParentDashboard names passwords as excluded", /password/i.test(parent));
+check("ParentDashboard avoids an unsupported on-track claim", !/\bon track\b/i.test(parent));
+
+const parentShare = render(withEnglishLocale(React.createElement(ParentShareView, { token: "x".repeat(43) })));
+check("the bearer link has a translated loading state", parentShare.error === null && /Loading shared summary/i.test(parentShare.html), parentShare.error ?? "loading copy missing");
+
+const consulting = render(components.find(([name]) => name === "ConsultingSection")![1](profile)).html;
+check("consulting uses localized copy and makes no reply-time promise", /One-to-one guidance/.test(consulting) && !/1-2 business days/i.test(consulting));
+const deadlines = render(components.find(([name]) => name === "DeadlineCenter")![1](null)).html;
+check("DeadlineCenter renders a no-profile state instead of remaining in loading", /Choose a student profile/.test(deadlines) && !/Loading deadlines/i.test(deadlines));
+const premiumNoProfile = render(components.find(([name]) => name === "PremiumGate")![1](null));
+check("PremiumGate fails closed and keeps locked children unmounted", premiumNoProfile.error === null && !/premium child/.test(premiumNoProfile.html) && /View plans/.test(premiumNoProfile.html));
+
+section("3b. Deadline, consulting, mentor and premium copy render in every locale");
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale);
+  const mentorLocale = render(withIntlLocale(locale, React.createElement(MentorMarketplace, { activeProfile: null })));
+  check(`mentor title and no-profile copy render in ${locale}`, mentorLocale.error === null && mentorLocale.html.includes(messages.mentorMarketplace.title) && mentorLocale.html.includes(messages.mentorMarketplace.noProfile), mentorLocale.error ?? "localized text missing");
+  const consultingLocale = render(withIntlLocale(locale, React.createElement(ConsultingSection, { activeProfile: null })));
+  check(`consulting title and contact guidance render in ${locale}`, consultingLocale.error === null && consultingLocale.html.includes(messages.consultingPanel.title) && consultingLocale.html.includes(messages.consultingPanel.contactHelper), consultingLocale.error ?? "localized text missing");
+  const deadlineLocale = render(withIntlLocale(locale, React.createElement(DeadlineCenter, { profileId: null })));
+  check(`deadline title and no-profile copy render in ${locale}`, deadlineLocale.error === null && deadlineLocale.html.includes(messages.deadlineCenter.title) && deadlineLocale.html.includes(messages.deadlineCenter.noProfile), deadlineLocale.error ?? "localized text missing");
+  const premiumLocale = render(withIntlLocale(locale, React.createElement(PremiumGate, { profileId: null, feature: "ai_essay", onUpgrade: () => undefined }, React.createElement("p", null, "premium child"))));
+  check(`premium gate fallback copy renders in ${locale}`, premiumLocale.error === null && premiumLocale.html.includes(messages.premiumGate.viewPlans) && !premiumLocale.html.includes("premium child"), premiumLocale.error ?? "localized text missing");
+}
 
 section("4. The no-profile state is handled, not crashed");
 
@@ -122,6 +207,31 @@ check(
   !/Estimated cost per year/i.test(noProfile.html)
 );
 
+section("4b. Shared Outcomes renders in every supported locale");
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale).similarOutcomes;
+  const withoutProfile = render(
+    withIntlLocale(locale, React.createElement(SimilarProfiles, { activeProfile: null }))
+  );
+  check(`Shared Outcomes handles no profile in ${locale}`, withoutProfile.error === null, withoutProfile.error ?? "");
+  check(`no-profile copy is localized in ${locale}`, withoutProfile.html.includes(messages.noProfile));
+
+  const initial = render(
+    withIntlLocale(locale, React.createElement(SimilarProfiles, { activeProfile: profile }))
+  );
+  check(`Shared Outcomes loading state renders in ${locale}`, initial.error === null, initial.error ?? "");
+  check(`title and loading copy are localized in ${locale}`, initial.html.includes(messages.title) && initial.html.includes(messages.loading));
+}
+
+const focusScholarship = render(withEnglishIntl(React.createElement(ScholarshipHub, {
+  activeProfile: profile,
+  savedScholarshipIds: new Set<number>(),
+  onSaveScholarship: async () => undefined,
+  onUnsaveScholarship: async () => undefined,
+  autoFocusScholarship: { id: 321, title: "Search Focus Regression Grant", requestId: 1 },
+})));
+check("global scholarship selection renders the existing catalogue with its title in the search input", focusScholarship.error === null && /value="Search Focus Regression Grant"/.test(focusScholarship.html), focusScholarship.error ?? "title not present");
+
 section("5. Rendering is deterministic");
 
 const a = render(components[0][1](profile)).html;
@@ -131,8 +241,6 @@ check("the same props give the same markup", a === b);
 // ---------------------------------------------------------------------------
 section("6. LandingPage renders (i18n-wrapped) and stays honest");
 
-const loadMessages = (locale: string) =>
-  JSON.parse(readFileSync(new URL(`../src/i18n/messages/${locale}.json`, import.meta.url), "utf8"));
 const renderLanding = (locale: string) =>
   render(
     // react-intl types NextIntlClientProvider as IntlConfig & { children: ReactNode },
@@ -142,6 +250,7 @@ const renderLanding = (locale: string) =>
     React.createElement(NextIntlClientProvider, {
       locale,
       messages: loadMessages(locale),
+      timeZone: "UTC",
       children: React.createElement(LandingPage, { onStart: () => {}, onSignIn: () => {} }),
     })
   );
@@ -169,9 +278,17 @@ const landingHtml = renderLanding("en").html;
 check("landing has a Sign in button (not 'Log in')", /Sign in/.test(landingHtml) && !/Log in/.test(landingHtml));
 check("landing has the hero heading", /Your path to university/.test(landingHtml));
 check("landing lists the how-it-works steps", /Build your profile/.test(landingHtml) && /Find your fit/.test(landingHtml));
+const landingText = landingHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+const admissionProbabilityIndex = landingText.indexOf("Admission probability");
+const admissionProbabilityRow = admissionProbabilityIndex >= 0
+  ? landingText.slice(admissionProbabilityIndex, admissionProbabilityIndex + 80)
+  : "";
 check(
-  "landing keeps admission estimate honest (no invented probability)",
-  /Admission estimate/.test(landingHtml) && /intentionally does not invent a probability/i.test(landingHtml)
+  "landing labels fit separately and leaves admission probability unestimated",
+  landingText.includes("Example profile fit") &&
+    admissionProbabilityRow.includes("Not estimated") &&
+    !/\d+\s*%/.test(admissionProbabilityRow),
+  admissionProbabilityRow
 );
 check("landing footer links to privacy and terms", /\/privacy/.test(landingHtml) && /\/terms/.test(landingHtml));
 // The footer carries the honest small print the app itself shows above its
@@ -189,9 +306,9 @@ check(
 check(
   "landing dashboard preview mirrors the current navigation",
   /Study Plan &amp; Tests/.test(landingHtml) &&
+    /Tasks &amp; Timeline/.test(landingHtml) &&
     /After Admission/.test(landingHtml) &&
-    /Account &amp; settings/.test(landingHtml) &&
-    /University Portfolio Strategy/.test(landingHtml)
+    /Account &amp; settings/.test(landingHtml)
 );
 check(
   "landing dashboard preview no longer shows the old flat sidebar links",
@@ -207,17 +324,19 @@ check(
   anchorIds.filter((id) => !landingHtml.includes(`id="${id}"`)).join(", ")
 );
 check(
-  "landing still scopes the admission estimate to evidence (never a number)",
-  /Admission estimate/.test(landingHtml) && !/Admission estimate<\/span>\s*<[^>]*>\s*\d/.test(landingHtml)
+  "landing demo shows fit as an example, not as an admission probability",
+  landingText.includes("Fit — not a probability") &&
+    admissionProbabilityIndex >= 0 &&
+    !/\d+\s*%/.test(admissionProbabilityRow)
 );
 
 // The dashboard preview used to show an "Admissions Index" percentage — a
 // second, differently-computed number that read like an admission chance. It
 // now shows the same profile-readiness score the Readiness pane uses.
 const strengthLabel: Record<string, string> = {
-  en: "Readiness",
-  uz: "Tayyorlik",
-  ru: "Готовность",
+  en: "Profile information coverage",
+  uz: "Profil ma’lumotlari qamrovi",
+  ru: "Заполненность профиля данными",
 };
 const noRawKeys: Record<string, boolean> = {};
 for (const locale of ["en", "uz", "ru"]) {
@@ -247,6 +366,7 @@ for (const locale of ["en", "uz", "ru"]) {
     React.createElement(NextIntlClientProvider, {
       locale,
       messages: loadMessages(locale),
+      timeZone: "UTC",
       children: React.createElement(DashboardView, {
         profile: { id: 7, name: "Test Student", gpa: 3.6, gpaScale: 4, ieltsScore: 7, budgetAnnualUsd: 30000, degreeLevel: "Master", targetMajor: "Computer Science" } as any,
         onNavigateTab: () => {},
@@ -274,6 +394,7 @@ const renderExplorer = (locale: string, p: any) =>
     React.createElement(NextIntlClientProvider, {
       locale,
       messages: loadMessages(locale),
+      timeZone: "UTC",
       children: React.createElement(UniversityExplorer, {
         activeProfile: p,
         savedUniIds: new Set<number>(),
@@ -288,6 +409,7 @@ const renderDetail = (locale: string) =>
     React.createElement(NextIntlClientProvider, {
       locale,
       messages: loadMessages(locale),
+      timeZone: "UTC",
       children: React.createElement(UniversityDetail, {
         universityId: 1,
         activeProfile: null,
@@ -340,7 +462,95 @@ const renderLocalized = (locale: string, node: React.ReactElement) => {
   const props = { locale, messages: loadMessages(locale), timeZone: "UTC", children: node };
   return render(React.createElement(NextIntlClientProvider, props));
 };
-const text = (html: string) => html.replace(/&#x27;/g, "'");
+const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+
+// Render the exact onboarding choice step rather than only the earlier degree
+// step, so a missing nested next-intl key cannot hide behind a successful build.
+section("8a. Onboarding direction cards resolve nested messages in every locale");
+const onboardingPathIds = ["goal", "interests", "undecided"] as const;
+for (const locale of ["en", "uz", "ru"]) {
+  const localeMessages = loadMessages(locale) as any;
+  const pathMessages = localeMessages.careerDiscovery.path;
+  const result = renderLocalized(
+    locale,
+    React.createElement(OnboardingWizard, {
+      profile: { ...profile, onboardingStep: 2, onboardingCompleted: false, studyInterests: null, targetMajor: null },
+      onComplete: () => {},
+    })
+  );
+  const markup = text(result.html);
+  const visibleText = markup.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+  check(`OnboardingWizard choice step renders in ${locale}`, result.error === null, result.error ?? "");
+  const onboardingMessages = localeMessages.onboarding;
+  const stepCount = onboardingMessages.stepCount
+    .replace("{current}", "3")
+    .replace("{total}", "8");
+  check(
+    `onboarding progress, legal note and controls are localized (${locale})`,
+    [
+      onboardingMessages.completeProfile,
+      stepCount,
+      onboardingMessages.consentIntro,
+      onboardingMessages.termsLabel,
+      onboardingMessages.consentAnd,
+      onboardingMessages.privacyLabel,
+      onboardingMessages.back,
+      onboardingMessages.skip,
+      onboardingMessages.continue,
+    ].every((copy: string) => visibleText.includes(copy))
+  );
+  check(
+    `OnboardingWizard leaks no careerDiscovery. key text (${locale})`,
+
+    !/\bcareerDiscovery\./.test(markup),
+    markup.match(/.{0,24}careerDiscovery\..{0,40}/)?.[0] ?? ""
+  );
+  check(
+    `all three radio choices render with translated title sentences (${locale})`,
+    onboardingPathIds.every((id) => {
+      const title = pathMessages[id]?.title;
+      return typeof title === "string" && title.trim().length >= 12 && title.trim().split(/\s+/u).length >= 3 && visibleText.includes(title);
+    })
+  );
+  check(
+    `all three card explanations render as localized copy (${locale})`,
+    onboardingPathIds.every((id) => {
+      const body = pathMessages[id]?.body;
+      return typeof body === "string" && body.trim().length >= 12 && visibleText.includes(body);
+    })
+  );
+  check(
+    `the direction group has a translated accessible name and three radios (${locale})`,
+    result.html.includes(`role="radiogroup" aria-label="${localeMessages.careerDiscovery.pathTitle}"`) &&
+      (result.html.match(/role="radio"/g) ?? []).length === 3 &&
+      (result.html.match(/aria-checked="false"/g) ?? []).length === 3
+  );
+
+  const selectedResult = renderLocalized(
+    locale,
+    React.createElement(OnboardingWizard, {
+      profile: {
+        ...profile,
+        onboardingStep: 2,
+        onboardingCompleted: false,
+        studyInterests: JSON.stringify([{ kind: "area", areaId: "computer_science_it_software" }]),
+        targetMajor: null,
+      },
+      onComplete: () => {},
+    })
+  );
+  const selectedMarkup = selectedResult.html;
+  const selectedVisibleText = text(selectedMarkup);
+  check(
+    `the selected-state status message is localized and leaks no raw key (${locale})`,
+    selectedResult.error === null &&
+      selectedVisibleText.includes(localeMessages.careerDiscovery.pathSelectedHint) &&
+      !/\bcareerDiscovery\./.test(selectedMarkup) &&
+      (selectedMarkup.match(/aria-checked="true"/g) ?? []).length === 1
+  );
+}
+
 const degreeLabels: Record<string, { Bachelor: string; Master: string; PhD: string; all: string; unspecified: string }> = {
   en: { Bachelor: "Bachelor (undergraduate)", Master: "Master (graduate)", PhD: "PhD (doctoral)", all: "All degree levels", unspecified: "Level: not specified" },
   uz: { Bachelor: "Bakalavr (bakalavriat)", Master: "Magistr (magistratura)", PhD: "PhD (doktorantura)", all: "Barcha darajalar", unspecified: "Daraja: ko'rsatilmagan" },
@@ -379,7 +589,7 @@ for (const locale of ["en", "uz", "ru"]) {
   const modal = renderLocalized(locale, React.createElement(ProfileModal, { isOpen: true, isNew: true, profile: null, onClose: () => {}, onSave: async () => {} }));
   check(`profile degree choices have paired names, not changed option values (${locale})`, modal.error === null && ["Bachelor", "Master", "PhD"].every((level) => modal.html.includes(`<option value="${level}"`)) && [expected.Bachelor, expected.Master, expected.PhD].every((label) => text(modal.html).includes(label)), modal.error ?? "missing degree choice");
   const onboarding = renderLocalized(locale, React.createElement(OnboardingWizard, { profile: { ...profile, onboardingStep: 1, degreeLevel: "Undergraduate degree" }, onComplete: () => {} }));
-  check(`onboarding degree choices use paired names and recognise an existing alias (${locale})`, onboarding.error === null && [expected.Bachelor, expected.Master, expected.PhD].every((label) => text(onboarding.html).includes(label)) && onboarding.html.includes("border-indigo-600 bg-indigo-50"), onboarding.error ?? "missing paired choice or selected alias");
+  check(`onboarding degree choices use paired names and recognise an existing alias (${locale})`, onboarding.error === null && [expected.Bachelor, expected.Master, expected.PhD].every((label) => text(onboarding.html).includes(label)) && onboarding.html.includes("border-indigo-500 bg-indigo-50"), onboarding.error ?? "missing paired choice or selected alias");
 
   // Initial paints of the other consumers. Effects and browser interactions
   // are deliberately not claimed here; this sandbox has no browser.
@@ -436,8 +646,10 @@ function recPayload(overrides: Record<string, unknown> = {}) {
         lastVerifiedAt: null,
         saved: true,
         matchScore: 99,
+        // This legacy field is intentionally hostile: the student UI must not
+        // show old Reach/Target/Safety tiers even if they remain in stored data.
         matchCategory: "Safety",
-        matchReasons: ["GPA 3.72 well above the 3.2 minimum"],
+        matchReasons: ["Published university-level GPA figure — verify it against the exact programme."],
         matchIssues: [],
       },
     ],
@@ -462,7 +674,7 @@ function recPayload(overrides: Record<string, unknown> = {}) {
         gpaOk: true,
         gpaProvided: true,
         matchScore: 98,
-        matchReasons: ["GPA 3.72 well above the 3.3 minimum"],
+        matchReasons: ["Recorded GPA is available for comparison; verify the award’s current criteria."],
         matchIssues: [],
         countryEligibility: "unknown",
       },
@@ -489,13 +701,13 @@ const recFull = renderLocalized("en", React.createElement(RecommendedPanel, {
 }));
 check("recommended panel renders a full profile payload", recFull.error === null, recFull.error ?? "");
 check(
-  "recommended panel shows the engine fit score and band, not a generic label",
-  recFull.html.includes("Fit 99%") && recFull.html.includes("Safety"),
-  recFull.html.slice(0, 200)
+  "recommended panel shows catalogue fit without an admissions tier",
+  recFull.html.includes("Fit score: 99%") && !/\b(?:Reach|Target|Safety)\b/i.test(text(recFull.html)),
+  text(recFull.html).slice(0, 200)
 );
 check(
   "recommended panel repeats the engine's own evidence line",
-  recFull.html.includes("GPA 3.72 well above the 3.2 minimum")
+  recFull.html.includes("Published university-level GPA figure — verify it against the exact programme.")
 );
 check(
   "recommended panel states an unknown citizenship rule instead of implying eligibility",
@@ -531,8 +743,8 @@ const recUz = renderLocalized("uz", React.createElement(RecommendedPanel, {
   onNavigateTab: () => {},
 }));
 check(
-  "recommended panel is localized (uz chip + band)",
-  text(recUz.html).includes("Moslik 99%") && text(recUz.html).includes("Ishonchli"),
+  "recommended panel is localized (uz fit chip) and shows no old admissions tier",
+  text(recUz.html).includes("Moslik balli: 99%") && !/\b(?:Reach|Target|Safety|Ishonchli|Maqsadli)\b/i.test(text(recUz.html)),
   text(recUz.html).slice(0, 200)
 );
 const recRu = renderLocalized("ru", React.createElement(RecommendedPanel, {
@@ -540,8 +752,8 @@ const recRu = renderLocalized("ru", React.createElement(RecommendedPanel, {
   onNavigateTab: () => {},
 }));
 check(
-  "recommended panel is localized (ru chip)",
-  text(recRu.html).includes("Соответствие 99%")
+  "recommended panel is localized (ru fit chip) and shows no old admissions tier",
+  text(recRu.html).includes("Оценка соответствия: 99%") && !/\b(?:Reach|Target|Safety)\b/i.test(text(recRu.html))
 );
 
 // ---------------------------------------------------------------------------
@@ -573,10 +785,10 @@ check(
   "the scale is not NULL-safe"
 );
 check(
-  "the wizard does not pre-tick the scholarship step",
-  /needScholarship: profile\?\.needScholarship \?\? false/.test(wizard) &&
-    !/needScholarship: form\.needScholarship \|\| true/.test(wizard),
-  "the wizard answers the scholarship question for the student"
+  "the wizard leaves unanswered financial-aid need unknown",
+  /needsFinancialAid: profile\?\.needsFinancialAid \?\? \(profile\?\.needScholarship === true \? true : null\)/.test(wizard) &&
+    /value: null, key: "financialAidUnknown"/.test(wizard),
+  "the wizard no longer silently defaults unanswered aid need to no"
 );
 check(
   "the SOP studio does not write for an invented major",
@@ -693,7 +905,7 @@ check(
 section("10. Fit-score breakdown strip — the arithmetic, not just the number");
 
 const breakdownFixture = {
-  rawScore: 96.3,
+  rawScore: 97.8,
   comparedDimensions: 7,
   totalDimensions: 8,
   components: [
@@ -702,10 +914,10 @@ const breakdownFixture = {
     { key: "english" as const, code: "ielts_above", points: 8, compared: true },
     { key: "standardised_test" as const, code: null, points: 0, compared: false },
     { key: "field" as const, code: "major_strong", points: 12, compared: true },
-    { key: "portfolio" as const, code: "activity_strength", points: 8.49, compared: true },
+    { key: "country" as const, code: "country_preferred", points: 8, compared: true },
     { key: "cost" as const, code: "budget_fits", points: 8, compared: true },
-    { key: "income" as const, code: null, points: -15.19, compared: true },
-    { key: "experience" as const, code: "research_none", points: -10, compared: true },
+    { key: "income" as const, code: null, points: -15.2, compared: true },
+    { key: "funding_requirement" as const, code: "full_funding_required", points: -8, compared: true },
   ],
 };
 const sum = Math.round(breakdownFixture.components.reduce((total, c) => total + c.points, 0) * 10) / 10;
@@ -720,10 +932,10 @@ check("breakdown strip renders", strip.error === null, strip.error ?? "");
 check("the neutral base is not shown as a dimension", !/>Base</.test(strip.html));
 check(
   "every scored dimension appears with its exact signed points",
-  ["GPA", "English", "Field", "+15.0", "+8.0", "+12.0", "+8.5", "-15.2"].every((token) => strip.html.includes(token)),
+  ["GPA", "English", "Field", "Preferred country", "Funding requirement", "+15.0", "+8.0", "+12.0", "-15.2", "-8.0"].every((token) => strip.html.includes(token)),
   strip.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200)
 );
-check("negative contributions are shown as negative", /-10\.0/.test(strip.html));
+check("negative contributions are shown as negative", /-8\.0/.test(strip.html));
 check(
   "a dimension with no data shows a dash, not a fake zero",
   /Standardised test<span>—<\/span>/.test(strip.html) &&
@@ -753,6 +965,76 @@ check(
     return out.error === null && out.html.length > 200;
   })
 );
+
+// ---------------------------------------------------------------------------
+section("11. Recommendation-letter customization is localized in every supported language");
+const recLetterLabels: Record<string, { title: string; university: string; relationship: string; loading: string }> = {
+  en: {
+    title: "Recommendation letter brief",
+    university: "Target university or program",
+    relationship: "How does the recommender know you?",
+    loading: "Building brief…",
+  },
+  uz: {
+    title: "Tavsiyanoma uchun professional brif",
+    university: "Maqsadli universitet yoki dastur",
+    relationship: "Tavsiyachi sizni qayerdan taniydi?",
+    loading: "Brif tayyorlanmoqda…",
+  },
+  ru: {
+    title: "Профессиональный бриф для рекомендательного письма",
+    university: "Целевой университет или программа",
+    relationship: "Откуда рекомендатель вас знает?",
+    loading: "Бриф готовится…",
+  },
+};
+for (const locale of ["en", "uz", "ru"]) {
+  const recLetter = renderLocalized(locale, React.createElement(RecLetterPanel));
+  check(`recommendation-letter panel renders in ${locale}`, recLetter.error === null, recLetter.error ?? "");
+  check(`recommendation-letter customization labels are translated in ${locale}`,
+    recLetter.html.includes(recLetterLabels[locale].title) &&
+      recLetter.html.includes(recLetterLabels[locale].university) &&
+      recLetter.html.includes(recLetterLabels[locale].relationship) &&
+      recLetter.html.includes(recLetterLabels[locale].loading));
+  check(`recommendation-letter panel leaks no unresolved key in ${locale}`,
+    !/recLetter\.[A-Za-z0-9_.]+/.test(recLetter.html));
+}
+
+// ---------------------------------------------------------------------------
+section("12. Task roadmap labels render in each supported locale");
+for (const locale of ["en", "uz", "ru"]) {
+  const taskRoadmap = renderLocalized(locale, React.createElement(TaskRoadmap, { activeProfile: null }));
+  const messages = loadMessages(locale).taskRoadmap;
+  check(`task roadmap renders in ${locale}`, taskRoadmap.error === null, taskRoadmap.error ?? "");
+  check(`task roadmap heading and loading state are localized in ${locale}`,
+    taskRoadmap.html.includes(messages.title) &&
+      taskRoadmap.html.includes(messages.addTask) &&
+      taskRoadmap.html.includes(messages.loading));
+  check(`task roadmap leaks no raw namespace keys in ${locale}`,
+    !/taskRoadmap\.[A-Za-z0-9_.]+/.test(taskRoadmap.html));
+}
+
+// ---------------------------------------------------------------------------
+section("13. Public catalog pages localize visible copy and keep active pagination aligned");
+const universitiesPageSource = readFileSync(new URL("../src/app/universities/page.tsx", import.meta.url), "utf8");
+const scholarshipsPageSource = readFileSync(new URL("../src/app/scholarships/page.tsx", import.meta.url), "utf8");
+const paginationSource = readFileSync(new URL("../src/components/Pagination.tsx", import.meta.url), "utf8");
+const activeUniversitiesPredicates = universitiesPageSource.match(/from\(universitiesTable\)\s*\.where\(eq\(universitiesTable\.isActive, true\)\)/g) ?? [];
+const activeScholarshipsPredicates = scholarshipsPageSource.match(/from\(scholarshipsTable\)\s*\.where\(eq\(scholarshipsTable\.isActive, true\)\)/g) ?? [];
+check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(universitiesPageSource));
+check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(scholarshipsPageSource));
+check("university total and page data both filter to active rows", activeUniversitiesPredicates.length >= 2, `found ${activeUniversitiesPredicates.length}`);
+check("scholarship total and page data both filter to active rows", activeScholarshipsPredicates.length >= 2, `found ${activeScholarshipsPredicates.length}`);
+check("public error states do not render raw exception messages", !/\{message\}/.test(universitiesPageSource) && !/\{message\}/.test(scholarshipsPageSource));
+check("both public catalog grids use one mobile column with readable wrapping", /grid-cols-1 gap-4 sm:grid-cols-2/.test(universitiesPageSource) && /grid-cols-1 gap-4 sm:grid-cols-2/.test(scholarshipsPageSource));
+check("pagination copy comes from messages and its controls meet the 44px target", /useTranslations\(\"pagination\"\)/.test(paginationSource) && /h-11 min-w-11/.test(paginationSource));
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale);
+  check(`public catalog and pagination messages exist in ${locale}`,
+    Boolean(messages.publicCatalog?.universityHeading && messages.publicCatalog?.scholarshipHeading &&
+      messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline &&
+      messages.pagination?.aria && messages.pagination?.goToPage));
+}
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

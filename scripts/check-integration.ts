@@ -75,6 +75,7 @@ async function main() {
   // The db module reads these at import time, so they must be set first.
   process.env.DATABASE_URL = URL_;
   process.env.SESSION_SECRET = SECRET;
+  process.env.APP_URL = "https://scholarbridge.example";
   // NODE_ENV is read-only on the typed env object; cast to assign it.
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
@@ -202,7 +203,7 @@ async function main() {
     } catch {
       /* non-JSON */
     }
-    return { status: res.status, body };
+    return { status: res.status, body, headers: res.headers };
   }
 
   /** Notification lookup by (profileId, type) and optional link. */
@@ -476,7 +477,7 @@ async function main() {
 
   section("3. /api/mentors — matching against real mentor rows");
 
-  const { GET: mentorsGet } = await import("../src/app/api/mentors/route");
+  const { GET: mentorsGet, POST: mentorsPost } = await import("../src/app/api/mentors/route");
   const m = await call(mentorsGet as any, `/api/mentors?profileId=${profile.id}`);
 
   check("responds 200", m.status === 200, `got ${m.status} ${JSON.stringify(m.body)?.slice(0, 200)}`);
@@ -492,6 +493,23 @@ async function main() {
   );
   check("the mentor is flagged verified", m.body?.matches?.[0]?.verified === true);
   check("the mentor id survives the round trip", m.body?.matches?.[0]?.id === mentor.id);
+  check("localized reason descriptors are returned for UI rendering", m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.sameUniversity"));
+  check("profile country is not mistaken for a preferred study country", !m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.sameCountry") && !m.body?.matches?.[0]?.gapMessages?.some((r: any) => r.key === "gaps.differentCountry"));
+  check("account interface locale is not converted into a mentor language preference", !m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.languages"));
+
+  const introPayload = { profileId: profile.id, mentorId: mentor.id, topic: "Application planning", message: "What should I verify?" };
+  const intro = await call(mentorsPost as any, "/api/mentors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(introPayload),
+  });
+  check("mentor introduction request is persisted as a pending request", intro.status === 200 && intro.body?.request?.status === "pending");
+  const duplicateIntro = await call(mentorsPost as any, "/api/mentors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(introPayload),
+  });
+  check("a second pending request is refused", duplicateIntro.status === 409);
 
   section("4. /api/parent-share — token issue, read and revocation");
 
@@ -501,7 +519,34 @@ async function main() {
   const premiumForParentShare = { isPremium: true, premiumUntil: new Date(Date.now() + 86400000) };
   await db.update(schema.studentProfiles).set(premiumForParentShare).where(eq(schema.studentProfiles.id, profile.id));
 
-  const { POST: parentPost, GET: parentGet } = await import("../src/app/api/parent-share/route");
+  const { POST: parentPost, PATCH: parentPatch, GET: parentGet } = await import("../src/app/api/parent-share/route");
+  const [currentProfilePreferences] = await db
+    .select({ preferredCountries: schema.studentProfiles.preferredCountries })
+    .from(schema.studentProfiles)
+    .where(eq(schema.studentProfiles.id, profile.id));
+  await db.update(schema.studentProfiles).set({ preferredCountries: '["Canada"]' }).where(eq(schema.studentProfiles.id, profile.id));
+
+  const [sharedAppSubmitted] = await db
+    .insert(schema.applications)
+    .values({ profileId: profile.id, universityName: "Private University Name", status: "interview" })
+    .returning({ id: schema.applications.id });
+  const [sharedAppPreparing] = await db
+    .insert(schema.applications)
+    .values({ profileId: profile.id, universityName: "Another Private University", status: "preparing" })
+    .returning({ id: schema.applications.id });
+  await db.insert(schema.applicationOutcomes).values({
+    applicationId: sharedAppSubmitted.id,
+    profileId: profile.id,
+    result: "accepted",
+    scholarshipName: "Private Award Name",
+    scholarshipAmountUsd: 20000,
+    notes: "Private outcome note",
+    snapshotGpa: 3.7,
+    snapshotGpaScale: 4,
+    snapshotMajor: "Computer Science",
+    snapshotCountry: "Germany",
+    shareConsent: false,
+  });
 
   const on = await call(parentPost as any, "/api/parent-share", {
     method: "POST",
@@ -511,28 +556,48 @@ async function main() {
   check("sharing can be enabled", on.status === 200 && on.body?.enabled === true, `got ${on.status}`);
   const link: string = on.body?.link ?? "";
   check("a link is returned", /^https?:\/\/.+\/parent\/.+/.test(link), link.slice(0, 80));
+  check("the link uses the configured canonical origin, not the request Host", link.startsWith("https://scholarbridge.example/parent/"));
+  check("state-changing response is not cacheable", /no-store/i.test(on.headers.get("cache-control") ?? ""));
 
   const sharedToken = decodeURIComponent(link.split("/parent/")[1] ?? "");
+  const ownerSettings = await (async () => {
+    const res = await (parentGet as any)(new Request(`http://localhost/api/parent-share?profileId=${profile.id}`, { headers: { cookie } }));
+    return { status: res.status, body: await res.json().catch(() => null), cacheControl: res.headers.get("cache-control") };
+  })();
+  check("owner settings can be restored after reload", ownerSettings.status === 200 && ownerSettings.body?.enabled === true && ownerSettings.body?.link === link);
+  check("owner settings are not cacheable", /no-store/i.test(ownerSettings.cacheControl ?? ""));
+  const ownerSettingsAnonymous = await (parentGet as any)(new Request(`http://localhost/api/parent-share?profileId=${profile.id}`));
+  check("owner settings require an authenticated owner", ownerSettingsAnonymous.status === 401);
+
+  const emailSave = await call(parentPatch as any, "/api/parent-share", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ profileId: profile.id, email: "parent@example.com" }),
+  });
+  check("the owner can save the optional contact note without rotating the link", emailSave.status === 200 && emailSave.body?.email === "parent@example.com");
+  const settingsAfterEmail = await call(parentGet as any, `/api/parent-share?profileId=${profile.id}`);
+  check("the contact note persists on read-back", settingsAfterEmail.body?.email === "parent@example.com" && settingsAfterEmail.body?.link === link);
+
   const view = await (async () => {
     const res = await (parentGet as any)(new Request(`http://localhost/api/parent-share?token=${encodeURIComponent(sharedToken)}`));
-    return { status: res.status, body: await res.json().catch(() => null) };
+    return { status: res.status, body: await res.json().catch(() => null), cacheControl: res.headers.get("cache-control"), referrerPolicy: res.headers.get("referrer-policy") };
   })();
 
   check("the link resolves to a summary", view.status === 200, `got ${view.status}`);
-  // The child's name lands in `headline`; `overview` is deliberately generic.
-  check("the summary names the child", /Aziza/.test(view.body?.summary?.headline ?? ""), view.body?.summary?.headline);
-  check("the application count is present", typeof view.body?.summary?.progress?.length === "number");
-  check(
-    "the privacy note is included",
-    /never includes passwords/i.test(view.body?.summary?.privacyNote ?? "")
-  );
+  check("the summary identifies the shared student by first name", view.body?.summary?.studentFirstName === "Aziza");
+  check("the shared preferred-country field uses preferences, not applicant country", view.body?.summary?.profileContext?.targetCountries === "Canada");
+  check("the tracker total counts real application records", view.body?.summary?.applicationRecords?.total === 2);
+  check("only submitted or later-stage records are counted as submitted", view.body?.summary?.applicationRecords?.submittedOrLater === 1);
+  check("the latest accepted outcome is marked student-reported", view.body?.summary?.applicationRecords?.studentReportedAcceptedOutcomes === 1);
+  check("public bearer response is no-store and suppresses referrers", /no-store/i.test(view.cacheControl ?? "") && view.referrerPolicy === "no-referrer");
 
-  // The whitelist claim: nothing private leaks even though the row has it all.
+  // The allowlist claim: nothing private leaks even though rows contain it.
   const leaked = JSON.stringify(view.body ?? {});
   check("no password material leaks", !/\$2b\$|passwordHash/.test(leaked));
-  check("no email leaks", !/aziza@example\.com/.test(leaked));
-  check("no GPA value leaks", !/3\.7/.test(leaked));
-  check("no IELTS score leaks", !/7\.5/.test(leaked));
+  check("no owner or parent email leaks", !/aziza@example\.com|parent@example\.com/.test(leaked));
+  check("no GPA, IELTS value, or essay data leaks", !/3\.7|7\.5|essayDraft/i.test(leaked));
+  check("no university or scholarship names leak", !/Private University|Private Award Name/.test(leaked));
+  check("no private outcome notes or financial award amount leak", !/Private outcome note|20000/.test(leaked));
 
   const bogus = await (async () => {
     const res = await (parentGet as any)(new Request(`http://localhost/api/parent-share?token=${"a".repeat(40)}`));
@@ -545,13 +610,24 @@ async function main() {
     headers: { "Content-Type": "application/json", cookie },
     body: JSON.stringify({ profileId: profile.id, enabled: false }),
   });
-  check("sharing can be revoked", off.status === 200 && off.body?.enabled === false);
+  check("sharing can be revoked", off.status === 200 && off.body?.enabled === false && off.body?.email === "");
+  const revokedState = await db
+    .select({ enabled: schema.studentProfiles.parentShareEnabled, token: schema.studentProfiles.parentShareToken, email: schema.studentProfiles.parentShareEmail })
+    .from(schema.studentProfiles)
+    .where(eq(schema.studentProfiles.id, profile.id));
+  check("revocation clears the bearer token and stored parent email", revokedState[0]?.enabled === false && revokedState[0]?.token === null && revokedState[0]?.email === null);
 
   const afterRevoke = await (async () => {
     const res = await (parentGet as any)(new Request(`http://localhost/api/parent-share?token=${encodeURIComponent(sharedToken)}`));
     return { status: res.status };
   })();
   check("the old link stops working after revocation", afterRevoke.status === 404, `got ${afterRevoke.status}`);
+
+  await db.delete(schema.applications).where(inArray(schema.applications.id, [sharedAppSubmitted.id, sharedAppPreparing.id]));
+  await db
+    .update(schema.studentProfiles)
+    .set({ preferredCountries: currentProfilePreferences.preferredCountries ?? null })
+    .where(eq(schema.studentProfiles.id, profile.id));
 
   await db
     .update(schema.studentProfiles)
@@ -663,7 +739,7 @@ async function main() {
   const appDelBlocked = await call(appDelete as any, `/api/applications?id=${otherApp.id}`, { method: "DELETE" });
   check("applications DELETE: stranger refused", appDelBlocked.status === 403, `got ${appDelBlocked.status}`);
 
-  // -- outcome (the data flywheel) ---------------------------------------
+  // -- outcome record and explicit per-result sharing consent -------------
   const outcomeBlocked = await call(outcomePost as any, "/api/applications/outcome", {
     method: "POST",
     headers: { ...json({}), cookie },
@@ -698,8 +774,8 @@ async function main() {
     outcomeOwn.body?.outcome?.result === "waitlisted" &&
       outcomeOwn.body?.outcome?.shareConsent === true
   );
-  // The snapshot is stored as separate columns, not a JSON blob — that is
-  // what makes it queryable for the model later.
+  // The decision-time snapshot is stored as separate columns for the opt-in
+  // historical comparison view; it does not feed profile-fit calculations.
   check(
     "outcome POST: the profile snapshot is taken at decision time",
     outcomeOwn.body?.outcome?.snapshotGpa === 3.7 &&
@@ -710,6 +786,22 @@ async function main() {
       ielts: outcomeOwn.body?.outcome?.snapshotIelts,
       major: outcomeOwn.body?.outcome?.snapshotMajor,
     })
+  );
+
+  const [stringConsentApp] = await db
+    .insert(schema.applications)
+    .values({ profileId: profile.id, universityId: uniA.id, status: "Submitted" })
+    .returning();
+  const stringConsent = await call(outcomePost as any, "/api/applications/outcome", {
+    method: "POST",
+    headers: { ...json({}), cookie },
+    // A string that looks false must not be coerced to the consent boolean true.
+    body: JSON.stringify({ applicationId: stringConsentApp.id, result: "accepted", shareConsent: "false" }),
+  });
+  check(
+    "outcome POST: string-valued consent is not treated as opt-in",
+    stringConsent.status === 200 && stringConsent.body?.outcome?.shareConsent === false,
+    JSON.stringify(stringConsent.body?.outcome?.shareConsent)
   );
 
   // -- saved-universities ------------------------------------------------
@@ -774,32 +866,47 @@ async function main() {
   check("documents: a ghost id is also refused", ghostDoc.status === 404, `got ${ghostDoc.status}`);
 
   // -----------------------------------------------------------------------
-  // 6. /api/chancing — the flagship route. PROBABILITY POLICY (2026-10): the
-  // admission probability dimension is NEVER returned as a number — the
-  // response carries `probability: { available: false }` instead, and a fit
-  // score must never be read as a probability. That is asserted here against
-  // rows fetched from the database, plus the two claims about data that only
-  // a real corpus can settle: that consented outcomes change the basis
-  // (dataBasis/sampleSize), and that non-consented ones do not.
-  section("6. /api/chancing — probability unavailable, fit stays its own number");
+  // 6. /api/chancing — the route compares this profile against university
+  // catalogue data. Admission probability is explicitly unavailable, and
+  // other students' outcomes must never affect or leak into this fit response.
+  section("6. /api/chancing — profile-to-catalogue fit, no admission probability");
 
   const { GET: chancingGet } = await import("../src/app/api/chancing/route");
+  const { GET: similarProfilesGet } = await import("../src/app/api/similar-profiles/route");
   const ch = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
 
   check("responds 200", ch.status === 200, `got ${ch.status} ${JSON.stringify(ch.body)?.slice(0, 200)}`);
   check(
-    "both saved universities are estimated",
+    "both saved universities are compared against catalogue data",
     ch.body?.results?.length === 2,
     `got ${ch.body?.results?.length}`
   );
 
   const first = ch.body?.results?.[0] ?? {};
+  const fitSnapshot = (row: any) =>
+    JSON.stringify({
+      universityId: row?.universityId,
+      universityName: row?.universityName,
+      fitScore: row?.fitScore,
+      fitReasons: row?.fitReasons,
+      fitIssues: row?.fitIssues,
+      comparedDimensions: row?.comparedDimensions,
+      totalDimensions: row?.totalDimensions,
+      probability: row?.probability,
+    });
+  const baselineByUniversity: Record<string, string> = Object.fromEntries(
+    (ch.body?.results ?? []).map((row: any) => [String(row.universityId), fitSnapshot(row)])
+  );
 
-  // --- the standing requirement -----------------------------------------
+  // The route compares this student's recorded profile with catalogue data.
+  // It deliberately does not produce admission odds, rank applicant quality,
+  // or blend other students' outcomes into the fit score.
   check("Fit score is present as its own number", typeof first.fitScore === "number", JSON.stringify(first.fitScore));
   check(
-    "admission probability is NEVER exposed as a number (policy)",
-    first.probability?.available === false && first.admission === undefined,
+    "admission probability is explicitly unavailable, never numeric",
+    first.probability?.available === false &&
+      first.probability?.reason === "no-validated-methodology" &&
+      first.admission === undefined,
     JSON.stringify({ probability: first.probability, admission: first.admission })
   );
   check(
@@ -808,68 +915,41 @@ async function main() {
     JSON.stringify(first).slice(0, 200)
   );
   check(
-    "Fit and the probability dimension stay separate (fit numeric, probability unavailable)",
+    "fit and admission probability remain separate",
     typeof first.fitScore === "number" && first.probability?.available === false,
     `fit=${first.fitScore} probability=${JSON.stringify(first.probability)}`
   );
   check(
-    "probability dimension is labelled unavailable with a reason",
-    first.probability?.available === false && typeof first.probability?.reason === "string" && first.probability.reason.length > 0,
-    JSON.stringify(first.probability)
+    "the catalogue comparison reports its evidence coverage",
+    typeof first.comparedDimensions === "number" &&
+      typeof first.totalDimensions === "number" &&
+      first.comparedDimensions >= 0 &&
+      first.comparedDimensions <= first.totalDimensions &&
+      first.totalDimensions > 0,
+    JSON.stringify({ compared: first.comparedDimensions, total: first.totalDimensions })
+  );
+  check(
+    "explanations are grounded in the university match",
+    Array.isArray(first.fitReasons) &&
+      Array.isArray(first.fitIssues) &&
+      (first.fitReasons.length + first.fitIssues.length > 0),
+    JSON.stringify({ reasons: first.fitReasons, issues: first.fitIssues })
+  );
+  check(
+    "legacy sub-scores and unverified positive/negative claims are not returned",
+    first.subScores === undefined && first.positives === undefined && first.negatives === undefined,
+    JSON.stringify({ subScores: first.subScores, positives: first.positives, negatives: first.negatives })
+  );
+  check(
+    "no outcome-derived basis, sample count, or readiness claim is returned",
+    first.dataBasis === undefined && first.sampleSize === undefined && ch.body?.dataset === undefined,
+    JSON.stringify({ dataBasis: first.dataBasis, sampleSize: first.sampleSize, dataset: ch.body?.dataset })
   );
 
-  const SUBS = [
-    "academicFit",
-    "testFit",
-    "extracurricularFit",
-    "majorFit",
-    "internationalFactors",
-    "financialFit",
-  ];
-  check(
-    "all six sub-scores are returned",
-    SUBS.every((k) => typeof first.subScores?.[k] === "number"),
-    JSON.stringify(first.subScores)
-  );
-
-  check("the 'Why?' positives list is present", Array.isArray(first.positives));
-  check("the 'Why?' negatives list is present", Array.isArray(first.negatives));
-  check(
-    "the reasons are non-empty for a real profile",
-    (first.positives?.length ?? 0) + (first.negatives?.length ?? 0) > 0
-  );
-  check(
-    "fit reasons come from the university match, not the estimate",
-    Array.isArray(first.fitReasons) && first.fitReasons.length > 0
-  );
-
-  // --- honesty about the basis ------------------------------------------
-  check(
-    "with no consented outcomes the basis is the public estimate",
-    first.dataBasis === "public-estimate",
-    `got ${first.dataBasis}`
-  );
-  check(
-    "probability policy is stated in the response (no validated methodology)",
-    first.probability?.reason === "no-validated-methodology",
-    JSON.stringify(first.probability)
-  );
-  check("the dataset readiness gate is reported", ch.body?.dataset?.stage != null, JSON.stringify(ch.body?.dataset?.stage));
-  check(
-    "the readiness gate refuses an ML claim on an empty corpus",
-    ch.body?.dataset?.allowed?.mlModel === false,
-    JSON.stringify(ch.body?.dataset?.allowed)
-  );
-  check(
-    "the gate names what the product must not claim yet",
-    Array.isArray(ch.body?.dataset?.forbiddenClaims) &&
-      ch.body.dataset.forbiddenClaims.includes("guaranteed admission"),
-    JSON.stringify(ch.body?.dataset?.forbiddenClaims)
-  );
-
-  // --- consented outcomes change the basis -------------------------------
-  // Twelve consented results at one university: enough to cross the blending
-  // floor, so the estimate should start citing ScholarBridge data.
+  // --- outcomes do not alter the profile-to-catalogue fit ----------------
+  // Consent permits the app to retain outcomes for an explicitly supported
+  // purpose; it does not make the unvalidated admission-estimate engine safe.
+  // The route must therefore remain a pure profile/catalogue comparison.
   const consentApps = await db
     .insert(schema.applications)
     .values(
@@ -889,46 +969,44 @@ async function main() {
       result: i < 4 ? "accepted" : i < 9 ? "rejected" : "waitlisted",
       shareConsent: true,
       snapshotGpa: 3.4,
+      snapshotGpaScale: 4,
       snapshotMajor: "Computer Science",
       snapshotCountry: "Uzbekistan",
     }))
   );
 
   const ch2 = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
-  const tumRow = (ch2.body?.results ?? []).find((r: any) => r.universityId === uniA.id);
-
-  // Section 5 already recorded one consented outcome at this university
-  // (the owner's own POST), so the corpus here is 12 + 1. That overlap is
-  // worth keeping: it confirms the earlier POST really persisted a row.
-  const EXPECTED_SAMPLE = 13;
-
+  const consentedOutcomesDidNotChangeFit =
+    ch2.status === 200 &&
+    (ch2.body?.results ?? []).length === Object.keys(baselineByUniversity).length &&
+    (ch2.body?.results ?? []).every(
+      (row: any) => baselineByUniversity[String(row.universityId)] === fitSnapshot(row)
+    );
   check(
-    "consented outcomes move the basis off the public estimate",
-    tumRow?.dataBasis === "hybrid" || tumRow?.dataBasis === "scholarbridge-data",
-    `got ${tumRow?.dataBasis}, sample=${tumRow?.sampleSize}`
+    "12 consented outcome rows are stored for the isolation fixture",
+    consentApps.length === 12,
+    `got ${consentApps.length}`
   );
   check(
-    "the sample size reflects the consented rows",
-    tumRow?.sampleSize === EXPECTED_SAMPLE,
-    `got ${tumRow?.sampleSize}, expected ${EXPECTED_SAMPLE}`
+    "consented outcomes do not change the profile-to-catalogue fit",
+    consentedOutcomesDidNotChangeFit,
+    JSON.stringify(ch2.body?.results?.map(fitSnapshot))
   );
   check(
-    "blending is still reported via dataBasis + sampleSize — and still no numeric probability",
-    (tumRow?.dataBasis === "hybrid" || tumRow?.dataBasis === "scholarbridge-data") &&
-      typeof tumRow?.sampleSize === "number" &&
-      tumRow?.probability?.available === false,
-    `basis=${tumRow?.dataBasis} sample=${tumRow?.sampleSize} prob=${JSON.stringify(tumRow?.probability)}`
-  );
-  check(
-    "Fit stays its own number even after blending",
-    typeof tumRow?.fitScore === "number" && tumRow?.probability?.available === false,
-    `fit=${tumRow?.fitScore} probability=${JSON.stringify(tumRow?.probability)}`
+    "consented outcomes do not add probability or cohort-estimate fields",
+    (ch2.body?.results ?? []).every(
+      (row: any) =>
+        row.probability?.available === false &&
+        row.probability?.reason === "no-validated-methodology" &&
+        row.dataBasis === undefined &&
+        row.sampleSize === undefined
+    ) && ch2.body?.dataset === undefined,
+    JSON.stringify(ch2.body)
   );
 
   // --- non-consented outcomes must NOT be used ---------------------------
-  // This is the privacy claim: a student who never agreed cannot have their
-  // result folded into anyone's estimate. Assert it by watching the basis
-  // and the sample count stay exactly where they were.
+  // This also verifies the public fit response is unchanged; the catalogue
+  // comparison does not train on, sample, or disclose another student's data.
   const privateApps = await db
     .insert(schema.applications)
     .values(
@@ -948,38 +1026,72 @@ async function main() {
       result: i < 18 ? "accepted" : "rejected",
       shareConsent: false, // never consented
       snapshotGpa: 3.9,
+      snapshotGpaScale: 4,
       snapshotMajor: "Computer Science",
+      snapshotCountry: "Germany",
     }))
   );
 
-  const ch3 = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
-  const lmuRow = (ch3.body?.results ?? []).find((r: any) => r.universityId === uniB.id);
-  const tumRow3 = (ch3.body?.results ?? []).find((r: any) => r.universityId === uniA.id);
+  const sharedOutcomes = await call(
+    similarProfilesGet as any,
+    `/api/similar-profiles?profileId=${profile.id}&limit=50`
+  );
+  const sharedMatches = sharedOutcomes.body?.matches ?? [];
+  check(
+    "Shared Outcomes returns only the 13 matching consented records",
+    sharedOutcomes.status === 200 && sharedOutcomes.body?.total === 13 && sharedMatches.length === 13,
+    `status=${sharedOutcomes.status} total=${sharedOutcomes.body?.total} shown=${sharedMatches.length}`
+  );
+  check(
+    "non-consented records with comparable fields and school names stay private",
+    !sharedMatches.some((match: any) => ["LMU Munich", "Private University Name"].includes(match.universityName)),
+    JSON.stringify(sharedMatches.map((match: any) => match.universityName))
+  );
+  check(
+    "the response contains only institution, recorded decision and compared-field codes",
+    sharedMatches.every(
+      (match: any) => Object.keys(match).sort().join(",") === "comparedFields,result,universityName"
+    ) &&
+      sharedOutcomes.body?.acceptanceShare === undefined &&
+      sharedOutcomes.body?.positionNote === undefined,
+    JSON.stringify(sharedMatches[0])
+  );
+  const sharedForeign = await call(similarProfilesGet as any, `/api/similar-profiles?profileId=${other.id}`);
+  check("Shared Outcomes refuses access to another profile", sharedForeign.status === 403, `got ${sharedForeign.status}`);
 
+  const ch3 = await call(chancingGet as any, `/api/chancing?profileId=${profile.id}`);
+
+  const allOutcomesDidNotChangeFit =
+    ch3.status === 200 &&
+    (ch3.body?.results ?? []).length === Object.keys(baselineByUniversity).length &&
+    (ch3.body?.results ?? []).every(
+      (row: any) => baselineByUniversity[String(row.universityId)] === fitSnapshot(row)
+    );
   check(
-    "non-consented outcomes are not counted in the sample",
-    lmuRow?.sampleSize === 0,
-    `got ${lmuRow?.sampleSize}`
+    "20 non-consented outcome rows are stored for the isolation fixture",
+    privateApps.length === 20,
+    `got ${privateApps.length}`
   );
   check(
-    "a university with only non-consented data stays on the public estimate",
-    lmuRow?.dataBasis === "public-estimate",
-    `got ${lmuRow?.dataBasis}`
+    "non-consented outcome rows do not change either university's fit",
+    allOutcomesDidNotChangeFit,
+    JSON.stringify(ch3.body?.results?.map(fitSnapshot))
   );
   check(
-    "the consented university's sample is unchanged by the new rows",
-    tumRow3?.sampleSize === EXPECTED_SAMPLE,
-    `got ${tumRow3?.sampleSize}, expected ${EXPECTED_SAMPLE}`
+    "no consent state exposes a sample count, outcome-derived basis, or readiness claim",
+    (ch3.body?.results ?? []).every(
+      (row: any) => row.dataBasis === undefined && row.sampleSize === undefined
+    ) && ch3.body?.dataset === undefined,
+    JSON.stringify({ results: ch3.body?.results, dataset: ch3.body?.dataset })
   );
   check(
-    "the readiness gate counts only consented rows",
-    ch3.body?.dataset?.records === EXPECTED_SAMPLE,
-    `got ${ch3.body?.dataset?.records}, expected ${EXPECTED_SAMPLE} (the 20 non-consented rows must be invisible)`
-  );
-  check(
-    "the readiness gate still refuses an ML claim",
-    ch3.body?.dataset?.allowed?.mlModel === false,
-    JSON.stringify(ch3.body?.dataset?.allowed)
+    "probability remains explicitly unavailable after outcome rows are inserted",
+    (ch3.body?.results ?? []).every(
+      (row: any) =>
+        row.probability?.available === false &&
+        row.probability?.reason === "no-validated-methodology"
+    ),
+    JSON.stringify(ch3.body?.results?.map((row: any) => row.probability))
   );
 
   // --- authorisation -----------------------------------------------------
@@ -1016,30 +1128,41 @@ async function main() {
       ps.body.strength.basis.length > 10
   );
   check(
-    "the extracurricular analysis exposes precise values",
-    typeof ps.body?.extracurriculars?.precise?.impact === "number"
+    "all recorded-field coverage values stay in their documented ranges",
+    ps.body?.strength?.sections?.every(
+      (s: any) =>
+        typeof s.score === "number" && s.score >= 0 && s.score <= 100 &&
+        typeof s.coverage === "number" && s.coverage >= 0 && s.coverage <= 1
+    )
   );
   check(
-    "all section scores stay in 0–100",
-    ps.body?.strength?.sections?.every((s: any) => typeof s.score === "number" && s.score >= 0 && s.score <= 100)
+    "overall is a coverage percentage, with no completeness or eligibility claim",
+    typeof ps.body?.strength?.overall === "number" &&
+      ps.body.strength.overall >= 0 &&
+      ps.body.strength.overall <= 100 &&
+      typeof ps.body?.strength?.overallPrecise === "number" &&
+      ps.body.strength.overallPrecise >= 0 &&
+      ps.body.strength.overallPrecise <= 100 &&
+      ps.body?.strength?.completeness === undefined &&
+      ps.body?.strength?.eligibility === undefined &&
+      /does not measure eligibility.*admission likelihood/i.test(ps.body?.strength?.basis ?? "")
   );
   check(
-    "overall and completeness are percentages",
-    typeof ps.body?.strength?.overall === "number" && ps.body.strength.overall >= 0 && ps.body.strength.overall <= 100 &&
-    typeof ps.body?.strength?.completeness === "number" && ps.body.strength.completeness >= 0 && ps.body.strength.completeness <= 100
+    "the seeded profile reports coverage only for sections with recorded details",
+    typeof ps.body?.strength?.scoredSections === "number" &&
+      ps.body.strength.scoredSections > 0 &&
+      ps.body.strength.scoredSections <= ps.body.strength.totalSections &&
+      ps.body.strength.overall > 0,
+    `scored=${ps.body?.strength?.scoredSections} overall=${ps.body?.strength?.overall}`
   );
   check(
-    "the seeded profile scores above empty",
-    (ps.body?.strength?.completeness ?? 0) > 0 && (ps.body?.strength?.overall ?? 0) > 0,
-    `completeness=${ps.body?.strength?.completeness} overall=${ps.body?.strength?.overall}`
-  );
-  check(
-    "extracurricular analysis returns four scores and suggestions",
-    typeof ps.body?.extracurriculars?.leadership === "number" &&
-    typeof ps.body?.extracurriculars?.impact === "number" &&
-    typeof ps.body?.extracurriculars?.consistency === "number" &&
-    typeof ps.body?.extracurriculars?.academicFit === "number" &&
-    Array.isArray(ps.body?.extracurriculars?.suggestions) && ps.body.extracurriculars.suggestions.length > 0
+    "extracurricular analysis reports four recorded counts and no merit scores",
+    Object.keys(ps.body?.extracurriculars ?? {}).sort().join(",") ===
+      "activities,awards,leadership,research" &&
+      ["activities", "awards", "leadership", "research"].every(
+        (key) => Number.isInteger(ps.body?.extracurriculars?.[key]) && ps.body.extracurriculars[key] >= 0
+      ),
+    JSON.stringify(ps.body?.extracurriculars)
   );
 
   const psAnon = await (async () => {
@@ -1697,6 +1820,127 @@ async function main() {
   const seedAnon = await call(seedRoute.POST as any, "/api/admin/courses/seed", { method: "POST", headers: anonHdr, body: "{}" });
   check("courses seed: the explicit (re)seed endpoint is admin-only (401)", seedAnon.status === 401, `got ${seedAnon.status}`);
 
+  // ---- Catalogue visibility and global-search destinations ---------------
+  const [draftCourse] = await db
+    .insert(schema.courses)
+    .values({
+      title: "Private Draft Search Sentinel",
+      description: "Unpublished lesson preview sentinel",
+      isPublished: false,
+    })
+    .returning();
+  const courseDetailRoute = await import("../src/app/api/courses/[id]/route");
+  const draftDetail = await call(
+    ((request: Request) =>
+      courseDetailRoute.GET(request, { params: Promise.resolve({ id: String(draftCourse.id) }) })) as any,
+    `/api/courses/${draftCourse.id}?profileId=${profile.id}`
+  );
+  check(
+    "courses: an authenticated student cannot fetch an unpublished course by id",
+    draftDetail.status === 404 && draftDetail.body?.error === "Course not found",
+    `got ${draftDetail.status}`
+  );
+  const draftSearch = await call(
+    (await import("../src/app/api/search/route")).GET as any,
+    `/api/search?profileId=${profile.id}&q=${encodeURIComponent(draftCourse.title)}`
+  );
+  check(
+    "courses: global search does not expose unpublished course metadata",
+    draftSearch.status === 200 && !draftSearch.body?.results?.some((r: any) => r.kind === "course" && r.id === draftCourse.id),
+    JSON.stringify(draftSearch.body?.results ?? []).slice(0, 160)
+  );
+  await db.delete(schema.courses).where(eq(schema.courses.id, draftCourse.id));
+
+  const [searchTarget] = await db
+    .insert(schema.scholarships)
+    .values({
+      title: "Search Navigation Regression Grant",
+      provider: "Test Provider",
+      country: "Uzbekistan",
+      description: "Search routing test fixture.",
+      requirements: "Test fixture only.",
+      websiteUrl: "https://example.org/search-test",
+    })
+    .returning();
+  const searchRoute = await import("../src/app/api/search/route");
+  const searchPayload = await call(
+    searchRoute.GET as any,
+    `/api/search?profileId=${profile.id}&q=${encodeURIComponent(searchTarget.title)}`
+  );
+  const scholarshipHit = searchPayload.body?.results?.find((r: any) => r.kind === "scholarship" && r.id === searchTarget.id);
+  check(
+    "search: scholarship records return a resolvable browse-pane target and localized group id",
+    searchPayload.status === 200 && scholarshipHit?.tab === "scholarships/browse" && scholarshipHit?.group === "explore",
+    JSON.stringify(scholarshipHit)
+  );
+
+  const focusedRows = await db
+    .insert(schema.scholarships)
+    .values([
+      {
+        title: "Focus Search Regression Grant",
+        provider: "Test Provider A",
+        country: "Uzbekistan",
+        description: "Duplicate-title focus fixture.",
+        requirements: "Test fixture only.",
+        websiteUrl: "https://example.org/focus-a",
+      },
+      {
+        title: "Focus Search Regression Grant",
+        provider: "Test Provider B",
+        country: "Uzbekistan",
+        description: "Selected duplicate-title focus fixture.",
+        requirements: "Test fixture only.",
+        websiteUrl: "https://example.org/focus-b",
+      },
+    ])
+    .returning();
+  const scholarshipsRoute = await import("../src/app/api/scholarships/route");
+  const focusedCatalog = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?search=${encodeURIComponent(focusedRows[0].title)}&focusId=${focusedRows[1].id}&page=1&perPage=1`,
+    { headers: anonHdr }
+  );
+  check(
+    "scholarships: global-search focus id is first in the existing title-filtered catalogue",
+    focusedCatalog.status === 200 && focusedCatalog.body?.scholarships?.[0]?.id === focusedRows[1].id,
+    JSON.stringify(focusedCatalog.body?.scholarships?.[0])?.slice(0, 140)
+  );
+
+  const [inactiveScholarship] = await db
+    .insert(schema.scholarships)
+    .values({
+      title: "Inactive Scholarship Visibility Sentinel",
+      provider: "Inactive Test Provider",
+      country: "Uzbekistan",
+      description: "Inactive record must not appear in student catalogues.",
+      requirements: "Test fixture only.",
+      websiteUrl: "https://example.org/inactive-test",
+      isActive: false,
+    })
+    .returning();
+  const inactiveCatalog = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?search=${encodeURIComponent(inactiveScholarship.title)}&page=1&perPage=20`,
+    { headers: anonHdr }
+  );
+  const inactiveSearch = await call(
+    searchRoute.GET as any,
+    `/api/search?profileId=${profile.id}&q=${encodeURIComponent(inactiveScholarship.title)}`
+  );
+  check(
+    "scholarships: inactive records stay out of both browse and global search",
+    inactiveCatalog.status === 200 &&
+      !inactiveCatalog.body?.scholarships?.some((s: any) => s.id === inactiveScholarship.id) &&
+      inactiveSearch.status === 200 &&
+      !inactiveSearch.body?.results?.some((r: any) => r.kind === "scholarship" && r.id === inactiveScholarship.id)
+  );
+  await db.delete(schema.scholarships).where(inArray(schema.scholarships.id, [
+    searchTarget.id,
+    ...focusedRows.map((row: any) => row.id),
+    inactiveScholarship.id,
+  ]));
+
   // ---- A20: rate limits shared across instances ---------------------------
   const { checkSharedRateLimit } = await import("../src/lib/rate-limit-shared");
   const { resetRateLimits } = await import("../src/lib/rate-limit");
@@ -1835,6 +2079,12 @@ async function main() {
   const deadlinesRoute = await import("../src/app/api/deadlines/route");
   const freeDeadlines = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
   check("deadlines: a FREE account gets the full deadline list from the web API", freeDeadlines.status === 200 && Array.isArray(freeDeadlines.body?.items), `got ${freeDeadlines.status}`);
+  const savedUniversityEntries = (freeDeadlines.body?.items ?? []).filter((item: any) => item.type === "university");
+  check(
+    "deadlines: saved universities without a deadline are not falsely marked OPEN",
+    savedUniversityEntries.length > 0 && savedUniversityEntries.every((item: any) => item.date === null && item.status === "NO DEADLINE ON FILE"),
+    JSON.stringify(savedUniversityEntries.map((item: any) => ({ status: item.status, date: item.date })))
+  );
   const { readFileSync: readFile2 } = await import("node:fs");
   const deadlinesSrc = readFile2("src/app/api/deadlines/route.ts", "utf8");
   check("deadlines: the web API has no premium gate (policy: visibility is free)", !/premiumGate|requireFeatureSession/.test(deadlinesSrc));

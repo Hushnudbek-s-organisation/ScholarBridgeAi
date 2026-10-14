@@ -1,47 +1,71 @@
 # Supabase schema — yagona aniq manba (single canonical schema)
 
-**Nima bu (uz):** Bu hujjat Supabaseda aynan qanday ma'lumotlar turishi kerakligini
-bitta joyda aniq qilib beradi. Ilovadan kerak bo'ladigan barcha jadval va ustunlar
-`src/db/schema.ts` (Drizzle) da bitta manbada saqlanadi; `supabase/full_schema.sql`
-esa shu manbadan avtomatik yaratilgan **bitta** tayyor schema fayli. Uni Supabase
-SQL Editor'da bir marta ishga tushirsangiz, ilovaning BARCHA joylari aniq ishlaydi —
-"bazi joylar to'g'ri kelmayapti" muammosi yo'qoladi.
+**Nima bu:** `src/db/schema.ts` — ilovaning Drizzle schema manbasi;
+`supabase/full_schema.sql` shu schema asosida yaratilgan bootstrap/reconciliation
+skriptidir. Skript kerakli jadvallar, ustunlar, indekslar va ayrim FK/check
+qoidalarini yaratadi yoki qo'shadi. Schema mosligi ilovaning barcha workflow'lari
+ishlashini, ma'lumotlarning to'g'riligini yoki production holatini o'z-o'zidan
+isbotlamaydi.
+
+> **Production xavfsizligi:** `full_schema.sql` faqat strukturani qo'shadigan
+> no-op emas. Part 5 ushbu skriptni bajarayotgan rolega tegishli `public`
+> jadvallarda RLS'ni yoqadi, `anon` va `authenticated` rollaridan jadval
+> huquqlarini olib tashlaydi va `universities`/`scholarships` uchun SELECT'ni
+> qayta beradi. Shu ikki jadvaldagi `public_catalog_read` siyosatini ham qayta
+> yaratadi; boshqa owner'ga tegishli jadvallarni o'tkazib yuboradi. Mavjud
+> direct-Supabase klientlari va custom access siyosatiga ta'sir qilishi mumkin.
+> Production'da ishlatishdan oldin DDL/role/RLS ta'sirini tekshiring, staging'da
+> sinang, backup oling va alohida operator tasdig'ini oling. `db:verify` bu
+> ruxsatlarni tekshirmaydi.
+
+> **Audit holati — 2026-10-14:** Drizzle manbasida 95 jadval va 1,041 ustun bor.
+> `npm run test:schema` repodagi DDL bilan offline tekshiruv; live Supabase yoki
+> production bazaga ulanilmadi va hech narsa o'zgartirilmadi. Shuning uchun
+> production schema **UNVERIFIED**. `supabase/remove_profile_match_tiers.sql`
+> `saved_universities.match_category`/`match_score` ustunlarini o'chiradi; u
+> tayyorlangan, lekin qo'llanmagan va alohida tasdiqsiz ishlatilmasin.
 
 ## 1. Qanday ishlatish (3 qadam)
 
-1. **Schema tayyorlash** — `supabase/full_schema.sql` ni Supabase Dashboard → SQL
-   Editor → New query ga butunlay qo'ying va **Run** bosing.
-   (Fayl xavfsiz: faqat qo'shadi, hech narsani o'chirmaydi, qayta ishlatish mumkin.)
-   Yoki terminalda: `DATABASE_URL=postgresql://... npm run db:apply-full-schema`
-2. **Tekshirish** — `DATABASE_URL=postgresql://... npm run db:verify`
-   (Ilovaning kerak qiladigan har bir jadval/ustun haqiqiy bazada bormi — aniq
-   ro'yxat chiqadi. Hammasi ✓ bo'lsa — "PASSED: Hammasi aniq ishlaydi".)
-3. **schema.ts o'zgarganda** — `npm run db:gen:full-schema` (fayl qayta yaratiladi)
-   va yana 1-qadamni takrorlang. Drift bo'lsa `npm run test:schema` yengilab turadi.
+1. **Avval tekshirish** — `supabase/full_schema.sql` ni ko'rib chiqing. Yangi
+   throwaway/staging bazada sinang. Production uchun yuqoridagi backup, RLS
+   ta'siri, staging va tasdiq talablariga rioya qiling; skriptni faqat alohida
+   ruxsat bilan Supabase SQL Editor'da ishlating; script orqali qo'llashda
+   `SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY=YES` tasdig'i ham majburiy.
+2. **Schema shaklini tekshirish** — `DATABASE_URL=postgresql://... npm run db:verify`
+   kerakli jadval/ustun/turlarni `information_schema` bilan solishtiradi. PASS
+   faqat shu strukturaviy solishtirishni bildiradi; RLS, grants, indekslar,
+   mavjud qatorlar, katalog ma'lumotlari va product workflow'larini tasdiqlamaydi.
+3. **Schema o'zgarganda** — `npm run db:gen:full-schema` bilan SQL'ni qayta
+   yarating va `npm run test:schema` (offline drift) hamda kerak bo'lsa
+   staging/live verifikatsiyasini qayta bajaring. Build avtomatik `db:push`
+   qilmaydi.
 
-> Eski `supabase/add_*.sql` fayllari ham xavfsiz qoladi (hammasi `IF NOT EXISTS`),
-> lekin endi ularni almashtirish uchun bitta `full_schema.sql` yetarli.
+> `supabase/add_*.sql` va ilovaning lazy-DDL manbalari offline tekshiruv hamda
+> feature setup uchun saqlanadi. `full_schema.sql` seed/data migration yoki
+> production release tasdig'ining o'rnini bosmaydi.
 
 ## 2. Qaysi joyda qanday ma'lumotlar turadi (feature → jadvallar)
 
-Bu jadval "ilovaning shu bo'limi Supabasedan aynan qaysi jadval/ustunlarni
-o'qiydi/yozadi" savoliga javob. Har bir qator haqiqiy API so'roviga mos.
+Bu jadval asosiy bo'limlarni schema jadvallari bilan bog'laydi. U live bazadagi
+mavjud qatorlar, route'larning to'liq qamrovi yoki butun user workflow ishlashini
+isbotlamaydi; UI/API yo'nalishi bo'yicha aniq xarita audit natijasida beriladi.
 
 | Ilova joyi (bo'lim) | Jadvalar | Qanday ma'lumot chiqadi / saqlanadi |
 |---|---|---|
 | **Profil / Autentifikatsiya** (kirish, onboarding) | `student_profiles` | Ism, email, **parol hashing** (hech qachon ochiq matn), GPA, Ielts/Toefl/SAT/GRE, byudjet, mamlakatlar, barqaror ID'li qiziqish yo'nalishlari (`study_interests`) va eski `target_major`, hujjatlar haqidagi to'liq profil (akademik, moliyaviy, sport, olimpiadalar), onboarding qadami, premium holati, parent-link |
-| **Universitetlar sahifasi** (`/universities`) | `universities`, `university_rankings`, `university_sources` | Nomi, mamlakat, shahar, reyting (QS/THE yil-bosma), har bir kurs haqiqiy puli (summa + valyuta + davr), kirish talablari (min GPA/IELTS), rahbariyat, ofitsial saytlar, manba + so'nggi tekshiruv vaqti |
-| **Universitet ichida dasturlar** (programmasi) | `programs`, `program_requirements`, `application_cycles`, `program_sources` | Har bir universitetning dasturlari (yo'nalish, daraja, davomiyligi, puli, til), dastur uchun aniq talablar (IELTS/TOEFL/DET/GPA, portfolio, intervyu), hujjat topshirish muddatlari (Fall/Spring, round) |
-| **Stipendiya markazi** (`/scholarships`) | `scholarships`, `scholarship_sources`, `scholarship_decisions` | Stipendiya nomi, beruvchi, qamrov turi, summa (valyuta + davr bilan), muddat, talab GPA/IELTS, qaysi mamlakatlar/darajalar, hujjatlar ro'yxati, manba + holat |
-| **Meni saqlaganlar** (shortlist) | `saved_universities`, `saved_programs`, `saved_scholarships` | Talaba qaysi universitet/dastur/stipendiyani saqladi, match balli, status, izoh |
-| **Ariza markazi** | `applications`, `application_outcomes`, `application_documents`, `application_requirements`, `application_document_links` | Har bir ariza (universitet, dastur, round, muddat, status, portali), natija (accept/reject/waitlist — chancing uchun o'rgansh ma'lumotlari), hujjat checklists, talablar checklist (manba bilan) |
-| **Hujjatlar ombori** (vault) | `user_documents` | Bir marta yuklangan hujjat (pasport, transkript, IELTS...), muddati, statusi — barcha arizalardan takror ishlatiladi |
+| **Universitetlar sahifasi** (`/universities`) | `universities`, `university_rankings`, `university_sources` | Katalog nomi/mamlakati, mavjud reyting yozuvlari (provayder + yil), narx va talablar uchun maydonlar, manba/tekshiruv metama'lumoti; schema katalog qiymatlarining hozirgi to'g'riligini tasdiqlamaydi |
+| **Universitet ichida dasturlar** (programmasi) | `programs`, `program_requirements`, `application_cycles`, `program_sources` | Dastur, talab va application-cycle maydonlari; imtihon, GPA, portfolio, til va muddat talablari dasturga xos, rasmiy joriy manba bilan tekshiriladi (waiver/alternativlar ham bo'lishi mumkin) |
+| **Stipendiya markazi** (`/scholarships`) | `scholarships`, `scholarship_sources`, `scholarship_decisions` | Katalogda mavjud stipendiya maydonlari (beruvchi, qamrov, summa/muddat, eligibility, manba va status); mavjud yozuvning to'liqligi yoki yangiligi schema bilan kafolatlanmaydi |
+| **Meni saqlaganlar** (shortlist) | `saved_universities`, `saved_programs`, `saved_scholarships` | Talaba saqlagan universitet/dastur/stipendiya, status va o'zi yozgan izoh; saved-university qatorida qabul tieri yoki match bali saqlanmaydi |
+| **Ariza markazi** | `applications`, `application_outcomes`, `application_documents`, `application_requirements`, `application_document_links` | Ariza holati va checklistlar; outcome egasining shaxsiy tarixida saqlanadi, faqat aniq `share_consent=true` bo'lgan qatorlar de-identifikatsiya qilingan o'xshash tarixiy misollar ro'yxatiga kirishi mumkin; bu admission ehtimoli yoki fit hisobi emas |
+| **Hujjatlar ombori** (vault) | `user_documents` | Foydalanuvchining hujjat metama'lumotlari; talaba hujjatni tegishli arizalarga ulasa, qayta ishlatishi mumkin |
 | **Forum** | `forum_categories`, `forum_threads`, `forum_replies`, `forum_likes`, `forum_reports` | Kategoriyalar, mavzular, javoblar (teskari darajalash), layklar, shikoyatlar (moderatsiya) |
 | **Kurslar / video darslar** | `courses`, `course_categories`, `course_modules`, `lessons`, `lesson_progress`, `quizzes`, `quiz_questions`, `quiz_attempts`, `certificates`, `instructors`, `course_enrollments` | Kurslar (sarlavha, daraja, muallim), modul → dars → video + davomiyligi, talabaning qarash progressi, testlar (savol/javob/ball), sertifikat (kod bilan) |
 | **To'lovlar (Payme/Click) va obuna** | `payments`, `subscriptions` | Har bir to'lov (provayder, tranzaksiya ID, summa, maqsad, status), obuna (reja, davr) |
 | **O'yinlashtirish** | `user_points`, `points_ledger`, `levels`, `badges`, `user_badges`, `referrals` | Ochko'lar (qaysi ismdan, nechta), darajalar, belgilar, havolalar |
-| **AI** (chat, SOP, chancing) | `ai_evaluations`, `ai_usage`, `ai_provider_credentials` | AI javoblar, har so'rov uchun token/harajat (limit uchun), admin panelga qo'yilgan API kalitlar (shifrlangan) |
-| **Bilim yo'li (Journey)** | `study_plans`, `study_plan_phases`, `test_plans`, `test_attempts`, `test_tasks`, `student_activities`, `activity_evidence`, `recommendation_requests`, `admission_offers`, `funding_items`, `journey_deadlines` | O'qish rejasi (10 bosqich), testlar rejasi (hozirgi/nishan balli, harakatlar), faoliyat portfoli (dalillar bilan), tavsiyanoma so'rovlar, offerlar, moliya rejasi, barcha muddatlar bitta taxtada |
+| **AI yordam** (chat, SOP va tahlil) | `ai_evaluations`, `ai_usage`, `ai_provider_credentials` | Saqlanishi yoqilgan AI javoblari, token/harajat hisoboti va admin boshqaradigan provider credential'lari; AI draftlari rasmiy fakt emas, talaba tajribasini o'ylab topmasligi va tekshirilishi kerak |
+| **Bilim yo'li (Journey)** | `study_plans`, `study_plan_phases`, `test_plans`, `test_attempts`, `test_tasks`, `student_activities`, `activity_evidence`, `career_discoveries`, `arrival_checklist_items`, `recommendation_requests`, `admission_offers`, `funding_items`, `journey_deadlines` | Rejalar, testga oid javob/harakatlar, dalilli faoliyatlar, kasb discovery javoblari va arrival checklist holati; test talablari dastur bo'yicha o'zgaradi, arrival ro'yxati umumiy yo'riqnoma va rasmiy immigratsiya maslahati emas |
 | **Mentorlar** | `mentors`, `mentor_requests` | Mentorlar (qaysi universitet/mamlakat, taklif qilinadigan stipendiya, narx), uchrashuv so'rovlar |
 | **SOP / esselar** | `essay_versions`, `essay_reviews` | Har bir versiya (matn, so'zlar soni, rubrik balli, AI fikri), sinfdoshlar ko'rib chiqishi |
 | **Muvaffaqiyat hikoyalari** | `success_stories` | Kirib olingan talabalar (kim, qayerga, GPA/Ielts, stipendiya), admin moderatsiya |
@@ -49,31 +73,34 @@ o'qiydi/yozadi" savoliga javob. Har bir qator haqiqiy API so'roviga mos.
 | **So'nggi cheklist (so'nggi bosqichlar)** | `checklist_items`, `student_checklist` | "Offerdan keyin" qadamlar (viza, pul, turar joy, safar, kelish) |
 | **E'lonlar / xabarlar** | `notifications`, `notification_preferences` | Muddat yaqinlashdi, ariza ochildi... xabarlari + sozlamalar |
 | **Imtiyozlar (o'sish)** | `opportunities` | Tanlovlar, tadqiqotlar, amaliyot, yozgi maktablar (admin boshqaradi) |
-| **Biznes / admin** | `app_config`, `audit_logs`, `refresh_jobs`, `consulting_requests`, `visa_requirements`, `learning_providers`, `learning_provider_links`, `learning_provider_scores`, `platform_ownership`, `ownership_transfers`, `site_visits` | Ilova sozlamalari (narxlar, limitlar), o'zgarish tarixi, yangilash ishlari, maslahat so'rovlar, viza talablari (mamlakat × tur), tashqi test-provayderlari, platforma egasi, analitika |
+| **Biznes / admin va xavfsizlik** | `app_config`, `audit_logs`, `refresh_jobs`, `consulting_requests`, `visa_requirements`, `learning_providers`, `learning_provider_links`, `learning_provider_scores`, `platform_ownership`, `ownership_transfers`, `site_visits`, `rate_limit_hits`, `user_sessions` | Admin sozlamalari/audit, provider va visa katalog metama'lumoti, session revoke uchun token hash, hamda instance'lararo rate-limit hitlari; real-time production holati emas |
 | **Telegram bot** | `telegram_links`, `telegram_login_requests`, `telegram_messages`, `telegram_updates` | Talabaning Telegram'ga ulanishi, kirish kodlar (hash bilan), xabarlar tarixi, takror so'rovlarni filtrlash |
 
 ## 3. Qoidalar (nima uchun aynan shunday)
 
-1. **Noma'lum = NULL.** Hech qachon 0 yoki o'ycha matn bo'lmaydi. Masalan,
-   universitet puli ma'lum bo'lmasa `annual_tuition` NULL qoladi — ilova
-   "Ma'lum emas" deb ko'rsatadi, 0$ deb yozmaydi.
-2. **Pul = summa + valyuta + davr** (`*_amount`, `*_currency`, `*_period`).
-   Eski `*_usd` ustunlari saqlanadi, lekin haqiqiy manba yangi uchtasidir.
-3. **Manba birinchi darajali.** Har bir fakt `sources` jadvaliga ulanadi
-   (`university_sources`, `program_sources`, `scholarship_sources`); har bir
-   jadvalda `source_url` + `last_verified_at` + `verification_status` bor.
-   AI hech qachon manbasiz fakt o'ylab topmaydi.
-4. **Birlashtirish (identifikator):** universitet — `canonical_name`
-   (kichik harf + bo'shliqlarsiz), dastur — `(university_id, name, degree_level)`,
-   reyting — `(university_id, provider, name, year)`, saqlangan —
-   `(profile_id, target_id)`. Takrorlar bazada imkoni yo'q.
-5. **O'chirish:** talaba o'chsa — uning barcha qatorlari cascade o'chadi;
-   katalog (universitet) o'chsa — bog'liq saqlanganlar o'chadi, lekin mustaqil
-   qoladigan faktlar `SET NULL` bilan saqlanadi.
+1. **Noma'lum external fact = NULL/unverified.** `0` faqat haqiqiy nolni
+   anglatadi; progress/counter ustunlarining default `0` qiymatini GPA, narx,
+   talab yoki scholarship award uchun noma'lum qiymat deb talqin qilmang.
+2. **Pul maydoni mavjud bo'lsa** summa, valyuta va davrni birga tekshiring.
+   Eski `*_usd` ustunlari ayrim joylarda saqlangan; ularni yangi valyuta
+   ustunlariga avtomatik tenglashtirmang.
+3. **Manba va tasdiq holati.** Ayrim katalog ma'lumotlari (masalan, universitet,
+   dastur, stipendiya yoki viza talabi) uchun source URL va verification metadata
+   mavjud; bu ustunlar har bir jadvalda yoki har bir yozuvda bo'lishini
+   anglatmaydi. `unverified`/manbasiz qiymat tekshirilgan fakt sifatida
+   ko'rsatilmasin. AI javobi rasmiy manba emas; fact-check talab etiladi.
+4. **Birlashtirish (identifikator):** universitet canonical name, dastur
+   universitet + nom + daraja, ariza/natija esa tegishli ID orqali bog'lanadi.
+   Shortlist takrorlarini alohida unique qoidalar (`profile_id` + tegishli
+   `university_id`/`program_id`/`scholarship_id`) cheklaydi.
+5. **O'chirish:** cascade, set null yoki restrict xatti-harakati har bir FK'da
+   alohida belgilanadi; talaba yoki katalog o'chirilganda barcha qatorlar bir
+   xil yo'qoladi deb taxmin qilinmasin.
 
 ## 4. Barcha jadval va ustunlar (to'liq ro'yxat)
 
-Quyidagi ro'yxat `src/db/schema.ts` dan avtomatik yaratilgan (91 jadval).
+Quyidagi ro'yxat `src/db/schema.ts` bilan tekshirilgan; `test:schema` jadval
+sarlavhalarining to'liq qamrovini ham regression sifatida tekshiradi.
 Har bir ustun — ilova aniq so'raydigan ustun.
 
 ### `activity_evidence`
@@ -87,6 +114,19 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `url` | text | yes | — |  |
 | `document_id` | integer | yes | — | FK → user_documents(id) on delete set null |
 | `created_at` | timestamp |  | yes |  |
+
+### `arrival_checklist_items`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `item_key` | text |  | — | Stable checklist item key |
+| `item_window` | text |  | yes | d7 by default; definitions in `src/lib/journey/arrival.ts` |
+| `status` | text |  | yes | pending by default |
+| `completed_at` | timestamp | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
 
 ### `admission_offers`
 
@@ -338,6 +378,19 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `description` | text |  | yes |  |
 | `icon_url` | text |  | yes |  |
 | `criteria` | text |  | yes |  |
+
+### `career_discoveries`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `answers` | jsonb |  | yes | Student answers; defaults to an empty object |
+| `trial_feedback` | jsonb |  | yes | Student feedback; defaults to an empty object |
+| `recommendations` | jsonb |  | yes | Deterministic engine output; defaults to an empty array |
+| `selected_career_id` | text | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
 
 ### `certificates`
 
@@ -864,6 +917,13 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `pass_threshold` | integer |  | yes |  |
 | `created_at` | timestamp |  | yes |  |
 
+### `rate_limit_hits`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `key` | text |  | — | Rate-limit bucket key |
+| `hit_at` | timestamp |  | yes | Hit timestamp; table is pruned opportunistically |
+
 ### `recommendation_requests`
 
 | column | type | null | default | notes |
@@ -958,8 +1018,6 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `id` | serial |  | yes | PK |
 | `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
 | `university_id` | integer |  | — | FK → universities(id) on delete cascade |
-| `match_category` | text |  | yes |  |
-| `match_score` | integer |  | yes |  |
 | `status` | text |  | yes |  |
 | `notes` | text | yes | yes |  |
 | `created_at` | timestamp |  | yes |  |
@@ -1121,8 +1179,9 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `email` | text |  | — | unique |
 | `password_hash` | text | yes | — |  |
 | `degree_level` | text |  | yes |  |
-| `target_major` | text |  | yes |  |
-| `gpa` | double precision |  | yes |  |
+| `target_major` | text | yes | — |  |
+| `study_interests` | text | yes | — | Structured locale-independent IDs; nullable for legacy profiles |
+| `gpa` | double precision | yes | — |  |
 | `gpa_scale` | double precision |  | yes |  |
 | `ielts_score` | double precision | yes | yes |  |
 | `toefl_score` | integer | yes | yes |  |
@@ -1527,6 +1586,20 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 | `created_at` | timestamp |  | yes |  |
 | `updated_at` | timestamp |  | yes |  |
 
+### `user_sessions`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `token_hash` | text |  | — | Unique SHA-256 hash; raw session token is not stored |
+| `scope` | text |  | yes | web by default |
+| `user_agent` | text | yes | — |  |
+| `ip` | text | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `last_seen_at` | timestamp |  | yes |  |
+| `revoked_at` | timestamp | yes | — |  |
+
 ### `visa_requirements`
 
 | column | type | null | default | notes |
@@ -1548,17 +1621,19 @@ Har bir ustun — ilova aniq so'raydigan ustun.
 
 ## 5. Qanday bazaga qo'yiladi — tartib va ta'mirlash (fresh vs existing)
 
-**Faylning xarakteri:** `full_schema.sql` to'liq **qo'shadi va takrorlanuvchan**
-(idempotent). U:
-- **Yangi bo'sh bazada** — butun schemani yaratadi (93 jadval, 115 FK, barcha
-  UNIQUE qoidalar, RLS). Hech qaysi UNIQUE ustunda 2 ta qoida emas — har bir
-  unique ustun uchun aynan bitta `uq_<jadval>_<ustun>` qoidasi.
-- **Mavjud bazada** (masalan, drizzle `push` bilan yaratilgan dev bazada) —
-  faqat YO'Q bo'lganini qo'shadi. Qoidalar **nom bo'yicha emas, USTUN
-  POZISIYASI bo'yicha** aniqlanadi (`pg_constraint.conkey`): shu sababli drizzle
-  o'z nomlari bilan (`student_profiles_email_unique` kabi) qo'ygan qoidalarni
-  qayta qo'shmaydi, lekin ularni "topib" o'tkazib yuboradi. Buni
-  `npm run test:schema-repair` avtomatik tekshiradi.
+**Faylning xarakteri:** jadval/ustun/FK/index qismi takroran ishlatishga
+mo'ljallangan, ammo butun skriptni **purely additive/no-op** deb bo'lmaydi.
+- **Yangi throwaway bazada** — schema jadvallarini yaratadi, unique/FK/check
+  qoidalari va RLS konfiguratsiyasini qo'llaydi.
+- **Mavjud bazada** — yo'q obyektlarni qo'shishga harakat qiladi; FK/check
+  backfill ziddiyatli mavjud qatorlarda NOTICE bilan o'tkazib yuborilishi mumkin.
+  Qoidalar ayrim joylarda `pg_constraint.conkey` ustun pozitsiyasi bo'yicha
+  solishtiriladi. Buni `npm run test:schema-repair` throwaway Postgres'da
+  tekshiradi.
+- **Part 5** RLS va role huquqlarini ham o'zgartiradi (yuqoridagi warning).
+  Bu ish production direct-client access'iga ta'sir qilishi mumkin; idempotent
+  deb atalishi uning production'da xavfsizligi yoki kerakli grantlar saqlanishini
+  isbotlamaydi.
 
 **Nima uchun aynan shunday (eski xato):** eski `drizzle push` yangi bazada
 42830 xatosi bilan to'xtagan: `application_cycles → programs(id, university_id)`
@@ -1572,14 +1647,19 @@ haqiqiy UNIQUE **qoida** bo'lmagan. Endi:
   indeks shu nom bilan tursa, faqat qoida EMAS ekanini aniqlab, uni olib
   qoidani toza yaratadi.
 
-**Texnik xodim uchun aniq tartib (Supabase/Render):**
-1. Bo'sh base: `full_schema.sql` → Run (yoki `npm run db:apply-full-schema`).
-2. Tekshirish: `npm run db:verify` (har bir kerakli jadval/ustun ✓ bo'lishi kerak).
-3. Dev (drizzle) base: avval `npm run db:push`, keyin ixtiyoriy
-   `npm run db:apply-full-schema` — hech narsa o'zgarmasligi kerak (idempotent).
-4. Eski/nozolat base: `full_schema.sql` ni qo'ying — FK lar qayta tiklanadi
-   (NOTICE bilan qaysi biri zidligi uchun o'tkazilgani aytib beriladi), qoidalar
-   qo'shiladi, ma'lumotlar saqlanadi. Keyin `npm run db:verify`.
+**Texnik xodim uchun tartib (Supabase/Render):**
+1. Throwaway/staging bazada `full_schema.sql` ni qo'llang; script yo'li
+   `SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY=YES npm run db:apply-full-schema`
+   operator review'ini talab qiladi. Production'da esa alohida tasdiq, backup,
+   RLS/grants preflight va staging natijasisiz ishlatmang.
+2. `npm run db:verify` faqat jadval/ustun/turlarni tekshiradi; access control,
+   indeks/FK, qatorlar yoki workflow uchun alohida tekshiruv zarur.
+3. Dev (drizzle) bazada `npm run db:push` schema o'zgartirishi mumkin; undan
+   keyingi `full_schema.sql` esa RLS/grants'ni ham o'zgartiradi — "hech narsa
+   o'zgarmasligi kerak" deb taxmin qilmang.
+4. Eski bazada: backup + staging/preflight qiling; skript tegishli FK/qoidalarni
+   qo'shishga urinadi va ziddiyatli qatorlarda ayrim qoidalarni NOTICE bilan
+   o'tkazib yuborishi mumkin. So'ng `db:verify` bilan faqat strukturani tekshiring.
 
 **Avto-tekshiruv (CI + local):**
 - `npm run test:schema` — schema.ts ↔ full_schema.sql drift yo'qligini

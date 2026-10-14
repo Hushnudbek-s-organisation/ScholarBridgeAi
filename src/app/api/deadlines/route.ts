@@ -16,7 +16,7 @@ import { daysUntil } from "@/lib/nextActions";
 
 /**
  * Unified deadline center (spec §21 + user request #10). Merges:
- *  - university application deadlines (applications table + saved universities)
+ *  - application deadlines (applications table); saved universities with no deadline on file
  *  - scholarship deadlines (with computed status)
  *  - test dates (IELTS / SAT / TOEFL / Duolingo / GRE)
  *  - user-created milestones (applicationTasks)
@@ -81,8 +81,8 @@ export async function GET(req: Request) {
       }
     }
 
-    // --- Saved universities (deadline not stored in universities table —
-    //     use created/updated as placeholder only if a deadline exists) ---
+    // --- Saved universities (the current university record has no application
+    //     deadline field, so keep it visible without inventing a date) ---
     const savedUnis = await db
       .select()
       .from(savedUniversities)
@@ -99,7 +99,8 @@ export async function GET(req: Request) {
           title: u.name,
           subtitle: `${u.country} · ${u.programMajor}`,
           date: null,
-          status: "OPEN",
+          // A saved university row carries no deadline field. Do not imply that its deadline is open or officially unannounced.
+          status: "NO DEADLINE ON FILE",
           daysRemaining: null,
           source: u.websiteUrl || null,
           saved: true,
@@ -139,7 +140,7 @@ export async function GET(req: Request) {
         id: `app-${a.id}`,
         type: "application",
         title: `${a.universityName}${a.programName ? ` — ${a.programName}` : ""}`,
-        subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · ") || "Application",
+        subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · "),
         date: due ? due.toISOString() : null,
         status: a.status,
         daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
@@ -160,6 +161,9 @@ export async function GET(req: Request) {
         type: "test",
         title: `${b.testType.toUpperCase()} test${b.location ? ` — ${b.location}` : ""}`,
         subtitle: b.registered ? "Registered" : "Not registered yet",
+        testType: b.testType,
+        testLocation: b.location,
+        testRegistered: b.registered,
         date: testDay.toISOString(),
         status: b.registered ? "REGISTERED" : "PENDING",
         daysRemaining: daysUntil(now, testDay.toISOString()),

@@ -168,7 +168,6 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
     label: "Tasks & Timeline",
     description:
       "Everything you have to do and when it is due — general tasks and the ones tied to a specific application.",
-    premium: true,
     stage: "apply",
     panes: [
       { id: "tasks", label: "Tasks & roadmap", description: "Your task list with the reason each task matters and a link straight to the relevant feature." },

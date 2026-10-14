@@ -630,26 +630,20 @@ export async function seedDatabase() {
         {
           profileId: profile.id,
           universityId: insertedUnis[2].id, // TUM
-          matchCategory: "Safety",
-          matchScore: 94,
           status: "Preparing Application",
-          notes: "Low tuition fee, excellent AI research group. Preparing German blocked account."
+          notes: "Demo note: compare listed costs and programme details, then check the destination's official visa guidance."
         },
         {
           profileId: profile.id,
           universityId: insertedUnis[3].id, // U of Toronto
-          matchCategory: "Match",
-          matchScore: 88,
           status: "Shortlisted",
-          notes: "3-year PGWP is a huge plus. Vector Institute partnership aligns with ML interest."
+          notes: "Demo note: verify current programme details and post-study work information with official sources."
         },
         {
           profileId: profile.id,
           universityId: insertedUnis[1].id, // Oxford
-          matchCategory: "Reach",
-          matchScore: 76,
           status: "Shortlisted",
-          notes: "Aspirational target. Need killer SOP and Clarendon scholarship application."
+          notes: "Demo note: compare the programme's official requirements, available funding, costs, and deadlines."
         }
       ]);
     }

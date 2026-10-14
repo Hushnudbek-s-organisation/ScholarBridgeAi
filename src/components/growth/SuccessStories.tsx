@@ -246,7 +246,7 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
           {t("likeYou")}: {s.reasons.slice(0, 3).map(reasonLabel).join(", ")}
         </p>
       )}
-      {s.advice && <p className="mt-2 line-clamp-3 text-xs italic leading-relaxed text-slate-600">“{s.advice}”</p>}
+      {s.advice && <p className="mt-2 break-words text-xs italic leading-relaxed text-slate-600">“{s.advice}”</p>}
       {s.scholarshipName && (
         <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
           <Award className="h-3.5 w-3.5" /> {s.scholarshipName}

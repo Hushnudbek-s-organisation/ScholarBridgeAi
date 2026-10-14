@@ -1,77 +1,49 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { aiEvaluations, essayVersions, scholarships, studentProfiles, universities } from "@/db/schema";
+import { aiEvaluations, scholarships, studentProfiles, universities } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest } from "@/lib/ai/guard";
 import { localeToLanguageName, type Locale } from "@/i18n/config";
 import { asLocale, translateReasons } from "@/lib/engineText";
-import { profileStrength } from "@/lib/chancing";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
-import { chancingProfileWithActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   buildProfileReport,
   type ReportFacts,
   type ReportMatchFact,
   type ReportScholarshipFact,
+  type ReportTranslator,
 } from "@/lib/profileReportFallback";
 
 /**
- * Profile evaluation ("Run AI Audit").
- *
- * HONESTY RULES (same policy as the Chancing pane):
- *   • the readiness number comes from the shared `profileStrength` engine —
- *     this route must never invent a second score;
- *   • universities and scholarships come from the live engines and the
- *     catalogue — never from a hardcoded list in the prompt;
- *   • the model is explicitly forbidden from producing percentiles,
- *     acceptance rates or "chance of admission" figures, because the platform
- *     has no validated methodology for them;
- *   • when the AI provider is unavailable, the built-in report is built from
- *     the very same facts (`buildProfileReport`), so the fallback can never
- *     contradict the rest of the app either.
+ * Profile review. It summarizes recorded facts and catalogue comparisons only;
+ * no readiness score, admission probability, or programme requirement is
+ * inferred. The fallback and AI report use the same verified inputs.
  */
-
 async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: Locale): Promise<ReportFacts> {
-  const [uniRows, scholarshipRows, latestEssay] = await Promise.all([
+  const [uniRows, scholarshipRows] = await Promise.all([
     db.select().from(universities).where(eq(universities.isActive, true)),
     db.select().from(scholarships),
-    db
-      .select({ rubricTotal: essayVersions.rubricTotal })
-      .from(essayVersions)
-      .where(eq(essayVersions.profileId, profile.id))
-      .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
-      .limit(1),
   ]);
-
-  const essayScore = latestEssay.length ? (latestEssay[0].rubricTotal ?? null) : null;
-  const strength = profileStrength(await chancingProfileWithActivities(profile), { essayScore });
   const matchProfile = await toMatchProfileWithActivities(profile);
 
   const scored = uniRows
     .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, uni) }))
     .sort((a, b) => b.match.matchScore - a.match.matchScore);
 
-  // The fit engine already ranks and trims these (top 2 evidence, top 2
-  // issues) — take the first of each, never re-rank them here.
   const toFact = (row: (typeof scored)[number]): ReportMatchFact => ({
     name: row.uni.name,
     country: row.uni.country,
     score: row.match.matchScore,
-    category: row.match.matchCategory,
-    // The report is written in the student's language, so its evidence lines
-    // must be too (the engine emits codes; engineText does the wording).
     reason: translateReasons(locale, "university", row.match.reasonDetails, row.match.reasons)[0] ?? null,
     issue: translateReasons(locale, "university", row.match.issueDetails, row.match.potentialIssues)[0] ?? null,
   });
-  const byCategory = (category: string) =>
-    scored.filter((row) => row.match.matchCategory === category).slice(0, 3).map(toFact);
-
   const scholarshipFacts: ReportScholarshipFact[] = scholarshipRows
     .map((row) => ({ row, match: calculateScholarshipMatch(matchProfile, row) }))
     .sort((a, b) => b.match.matchScore - a.match.matchScore)
-    .filter(({ match }) => match.matchScore >= 60)
     .slice(0, 4)
     .map(({ row }) => ({
       title: row.title,
@@ -88,111 +60,98 @@ async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: L
     gpaScale: profile.gpaScale,
     ieltsScore: profile.ieltsScore ?? null,
     budgetAnnualUsd: profile.budgetAnnualUsd ?? null,
-    needScholarship: Boolean(profile.needScholarship),
+    // Positive only when explicitly recorded; false remains "not confirmed".
+    needScholarship: profile.needsFinancialAid === true || profile.needScholarship === true,
     workExperienceYears: profile.workExperienceYears ?? 0,
     researchPublications: profile.researchPublications ?? 0,
     extracurriculars: profile.extracurriculars ?? null,
-    readiness: {
-      overall: strength.overall,
-      completeness: strength.completeness,
-      sections: strength.sections.map((s) => ({ key: s.key, score: s.score })),
-    },
-    reached: byCategory("Reach"),
-    matched: byCategory("Match"),
-    safety: byCategory("Safety"),
+    programmeMatches: scored.slice(0, 6).map(toFact),
     scholarships: scholarshipFacts,
   };
 }
 
 function factsForPrompt(facts: ReportFacts): string {
-  const uni = (rows: ReportMatchFact[]) =>
-    rows.length
-      ? rows.map((r) => `${r.name} (${r.country}) — fit ${r.score}%${r.issue ? `; main gap: ${r.issue}` : r.reason ? `; strength: ${r.reason}` : ""}`).join("\n  ")
-      : "none";
+  const programmeRows = facts.programmeMatches.length
+    ? facts.programmeMatches
+        .map((row) => `${row.name} (${row.country}) — profile-to-catalogue fit ${row.score}%${row.issue ? `; signal to verify: ${row.issue}` : row.reason ? `; recorded comparison signal: ${row.reason}` : ""}`)
+        .join("\n")
+    : "no programme comparisons are available in the current catalogue";
+  const scholarshipRows = facts.scholarships.length
+    ? facts.scholarships
+        .map((row) => `${row.title} — ${row.provider}; coverage type: ${row.coverageType}; catalogue deadline: ${row.deadlineDate ?? "not published"}`)
+        .join("\n")
+    : "no scholarship entry is included in this catalogue result; do not infer that no funding exists";
+
   return [
-    `- Readiness score: ${facts.readiness.overall}/100 (ScholarBridge readiness engine — NOT a probability of admission)`,
-    `- Profile completeness: ${facts.readiness.completeness}%`,
-    `- Readiness by section: ${facts.readiness.sections.map((s) => `${s.key} ${s.score}`).join(", ")}`,
-    "- Universities whose fit the platform actually computed (use these names ONLY):",
-    `  Reach:\n  ${uni(facts.reached)}`,
-    `  Match:\n  ${uni(facts.matched)}`,
-    `  Safety:\n  ${uni(facts.safety)}`,
-    "- Scholarships from the catalogue (use these ONLY):",
-    facts.scholarships.length
-      ? facts.scholarships.map((s) => `  ${s.title} — ${s.provider} (${s.coverageType}); deadline: ${s.deadlineDate ?? "not published"}`).join("\n")
-      : "  none matched this profile",
+    `- Student: ${facts.name}`,
+    `- Study context: degree ${facts.degreeLevel ?? "not recorded"}; intended field ${facts.targetMajor ?? "not recorded"}`,
+    `- GPA recorded: ${facts.gpa == null ? "not recorded" : `${facts.gpa}${facts.gpaScale == null ? "" : `/${facts.gpaScale}`}`}`,
+    `- IELTS recorded: ${facts.ieltsScore ?? "not recorded"}`,
+    `- Annual budget recorded: ${facts.budgetAnnualUsd == null ? "not recorded" : `$${facts.budgetAnnualUsd.toLocaleString("en-US")}`}`,
+    `- Scholarship need recorded: ${facts.needScholarship ? "yes" : "not confirmed"}`,
+    `- Work experience entries: ${facts.workExperienceYears > 0 ? facts.workExperienceYears : "not recorded"}`,
+    `- Publication entries: ${facts.researchPublications > 0 ? facts.researchPublications : "not recorded"}`,
+    `- Extracurricular details: ${facts.extracurriculars || "not recorded"}`,
+    "- Catalogue comparisons, sorted by current profile-to-catalogue fit; they are not admission probabilities or eligibility decisions:",
+    programmeRows,
+    "- Current catalogue scholarship entries for review; do not present them as confirmed awards or eligibility decisions:",
+    scholarshipRows,
   ].join("\n");
 }
 
 export async function POST(req: Request) {
   try {
-    // Size cap + rate limit + ownership of `profileId` (see lib/ai/guard).
     const guarded = await guardAiRequest(req);
     if (!guarded.ok) return guarded.response;
 
     const profileId = guarded.profileId;
-
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
 
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
-
     if (!profile) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    const locale = profile.preferredLocale || "en";
-    const facts = await loadFacts(profile, asLocale(locale));
+    const locale = asLocale(profile.preferredLocale || "en");
+    const facts = await loadFacts(profile, locale);
+    const reportMessages = await getTranslations({ locale, namespace: "profileReport" });
+    const translateReport: ReportTranslator = (key, values = {}) =>
+      reportMessages(key as never, values as never) as string;
 
-    const prompt = `You are ScholarBridgeAI, an international admissions counselor. Evaluate the student below using ONLY the verified platform data provided. Write the ENTIRE evaluation in ${localeToLanguageName(locale)}.
+    const prompt = `You are ScholarBridgeAI, an international study-planning assistant. Write a concise report draft in ${localeToLanguageName(locale)} using ONLY the verified platform data below. The report must say it is a draft and tell the student to verify all programme details on current official pages.
 
-STUDENT PROFILE (as saved by the student):
-- Name: ${profile.name}
-- Degree level target: ${profile.degreeLevel ?? "not provided"}
-- Target major: ${profile.targetMajor ?? "not provided"}
-- GPA: ${profile.gpa == null ? "not provided" : `${profile.gpa} / ${profile.gpaScale ?? "?"}`}
-- IELTS: ${profile.ieltsScore ?? "not provided"} · TOEFL: ${profile.toeflScore ?? "not provided"} · SAT: ${profile.satScore ?? "not provided"} · GRE: ${profile.greScore ?? "not provided"}
-- Annual budget: ${facts.budgetAnnualUsd == null ? "not specified" : `$${facts.budgetAnnualUsd.toLocaleString("en-US")}`}
-- Scholarship needed: ${facts.needScholarship ? "yes" : "no"}
-- Financial aid needed: ${profile.needsFinancialAid ? "yes" : "no"} · Full scholarship required: ${profile.requiresFullScholarship ? "yes" : "no"}
-- Family income: ${profile.familyIncomeUsd == null ? "not specified" : `$${profile.familyIncomeUsd.toLocaleString("en-US")}`}
-- Work experience: ${facts.workExperienceYears} years · Publications: ${facts.researchPublications}
-- Extracurriculars: ${facts.extracurriculars || "none stated"}
-- Structured activities: ${[profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates].filter(Boolean).join("; ") || "none stated"}
-
-VERIFIED PLATFORM DATA — the only numbers, names and claims you may use:
+VERIFIED PROFILE AND CATALOGUE DATA:
 ${factsForPrompt(facts)}
 
-ABSOLUTE RULES (a violation makes the whole answer wrong):
-1. NEVER invent or estimate an acceptance rate, percentile, ranking, probability, scholarship amount or deadline. If a number is not in the verified data above, write that it is not published.
-2. NEVER state or imply a chance of admission. Readiness/fit scores measure the profile against published requirements — say so explicitly once.
-3. Do not name universities or scholarships that are not listed above.
-4. Do not promise admission, funding or visa outcomes.
+ABSOLUTE RULES:
+1. Use only names, facts and numbers above. Never invent or estimate test requirements, acceptance rates, percentiles, rankings, admission chances, scholarship amounts or deadlines.
+2. A fit score compares the saved profile with available catalogue fields. It is not admission probability, eligibility, or a guarantee. Some catalogue entries may be university-level or incomplete.
+3. Do not imply an English or standardized test is required because a score is absent. Programme policies vary; alternatives and waivers may apply. Mention a test rule only if an exact verified programme rule is supplied above (none are supplied here).
+4. Do not invent applicant achievements, projects, skills, career goals, recommenders, faculty/labs, essay content, or programme details. Do not recommend universal GPA, award, leadership, activity, or application-count targets.
+5. Do not assign reach/match/safety tiers, claim outcomes improve estimates, or present visa documents as universal. Direct visa questions to current official country and university guidance.
+6. Clearly distinguish recorded facts from unknown fields. An unrecorded field is not a weakness or proof of a missing requirement.
+7. Any suggested writing is a draft for the student's review; do not state unverifiable claims as fact. Keep the report concise and actionable without adding filler.
 
 FORMAT RULES (follow exactly):
-- Plain markdown only: one short heading (##) per section, bold for key terms, short bullet points.
-- NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences.
-- At most 1-2 emojis in the whole reply.
-Sections: 1) Overall Profile Score & Readiness Assessment (use the readiness score above and explain what it measures), 2) Key Competitive Strengths, 3) Critical Gaps & How to Fix Them, 4) Tailored University Strategy (the Reach/Match/Safety lists above, with the stated gap/strength for each), 5) Funding (the catalogue entries above, noting deadlines that are not published), 6) Suggested Next Steps.`;
+- Use plain text with short headings and simple bullets.
+- NO HTML, NO markdown tables, and no fenced code blocks.
+- Keep the report concise and suitable for editing in the student's dashboard. Suggested sections: recorded profile details, current catalogue comparisons, funding catalogue entries, and verification steps. Do not add generic essays, document, recommendation, or test recommendations unless the verified data says they apply.`;
 
     const systemInstruction =
-      "You are ScholarBridge's senior AI Admissions Strategist. You are strictly factual: you only use the verified platform data given to you, you never invent statistics, and you never promise admission.";
+      "You are ScholarBridge's factual study-planning assistant. Use only the verified facts supplied, distinguish unknown information, and never estimate admission outcomes.";
 
     let evaluationResult = await callAI(prompt, systemInstruction, {
       taskType: "admissions",
       profileId: guarded.usageProfileId,
     });
-    // aiUsed=true only when the AI provider actually returned an evaluation.
-    // When AI is unavailable the route returns a built-in report flagged as
-    // fallback so the UI never presents fixed info as "AI analysis".
     const aiUsed = Boolean(evaluationResult);
 
     if (!evaluationResult) {
-      evaluationResult = normalizeAiReply(buildProfileReport(locale, facts));
+      evaluationResult = normalizeAiReply(buildProfileReport(facts, translateReport));
     }
 
-    // Save to AI evaluations table
     await db.insert(aiEvaluations).values({
       profileId,
       evaluationType: "Profile Analysis",

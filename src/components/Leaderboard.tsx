@@ -60,10 +60,10 @@ export function Leaderboard({ entries, highlightProfileId }: LeaderboardProps) {
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-slate-800 truncate">
-                  {entry.name} {isMe && <span className="text-indigo-600 text-xs font-semibold">(You)</span>}
+                <p className="break-words text-sm font-bold text-slate-800">
+                  {entry.name} {isMe && <span className="text-indigo-600 text-xs font-semibold">({t("you")})</span>}
                 </p>
-                <p className="text-[11px] text-slate-400 truncate">
+                <p className="break-words text-[11px] text-slate-400">
                   {entry.targetMajor} {entry.levelName ? `· ${entry.levelIcon} ${entry.levelName}` : ""}
                 </p>
               </div>

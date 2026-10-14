@@ -1,22 +1,40 @@
 import { NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
+import { isLocale } from "@/i18n/config";
 import { db } from "@/db";
-import { applications, savedUniversities, studentProfiles, universities } from "@/db/schema";
+import {
+  applicationOutcomes,
+  applicationTasks,
+  applications,
+  recommendationRequests,
+  savedScholarships,
+  savedUniversities,
+  studentProfiles,
+  universities,
+} from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { callAI } from "@/lib/ai";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
-import { ADVISOR_SYSTEM_PROMPT, buildAdvisorBrief, isTrustworthyReply, rulesAdvice, type AdvisorInput } from "@/lib/advisor";
-import { ADMISSION_PROBABILITY, estimateAdmissionChance, profileCompletenessRatio, type ChancingResult } from "@/lib/chancing";
+import {
+  ADVISOR_SYSTEM_PROMPT,
+  buildAdvisorBrief,
+  isTrustworthyReply,
+  rulesAdvice,
+  type AdvisorFitComparison,
+  type AdvisorInput,
+  type AdvisorRuleKey,
+} from "@/lib/advisor";
+import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
 import { calculateUniversityMatch } from "@/lib/matching";
-import { chancingProfileWithActivities, toChancingUniversity, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 
 /**
  * AI Admissions Advisor (#3).
  *
- * The numbers come from the deterministic chancing engine; the model only
- * explains them. A reply that quotes a percentage absent from the brief is
- * rejected and the rules-based advice is returned instead — better a plainer
- * true answer than a confident invented one.
+ * The model can only explain profile-to-catalogue comparisons. No admission
+ * probability estimator is run. A reply that quotes a percentage absent from
+ * the brief is rejected and the rules-based advice is returned instead.
  */
 export async function POST(req: Request) {
   try {
@@ -34,74 +52,106 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // --- Facts: shortlist + applications → chancing estimates -------------
-    const savedUnis = await db.select().from(savedUniversities).where(eq(savedUniversities.profileId, profileId));
-    const apps = await db.select().from(applications).where(eq(applications.profileId, profileId));
+    // --- Facts: saved programmes, application work and outcomes -----------
+    const [savedUnis, apps, savedSch, recRows, tasks, outcomes] = await Promise.all([
+      db.select().from(savedUniversities).where(eq(savedUniversities.profileId, profileId)),
+      db.select().from(applications).where(eq(applications.profileId, profileId)),
+      db.select().from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
+      db.select().from(recommendationRequests).where(eq(recommendationRequests.profileId, profileId)),
+      db.select().from(applicationTasks).where(eq(applicationTasks.profileId, profileId)),
+      db
+        .select({ applicationId: applicationOutcomes.applicationId })
+        .from(applicationOutcomes)
+        .where(eq(applicationOutcomes.profileId, profileId)),
+    ]);
+    const openTasks = tasks.filter((task) => !task.isCompleted);
+    const outcomeIds = new Set(outcomes.map((outcome) => outcome.applicationId));
     const appUniIds = apps.map((a) => a.universityId).filter((id): id is number => id !== null);
     const uniIds = [...new Set([...savedUnis.map((s) => s.universityId), ...appUniIds])];
 
     const chancingProfile = await chancingProfileWithActivities(profile);
     const matchProfile = await toMatchProfileWithActivities(profile);
 
-    const chances: ChancingResult[] = [];
+    const comparisons: AdvisorFitComparison[] = [];
     if (uniIds.length > 0) {
       const uniRows = await db.select().from(universities).where(inArray(universities.id, uniIds));
       for (const uni of uniRows) {
         const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni));
-        chances.push(
-          estimateAdmissionChance(chancingProfile, toChancingUniversity(uni), { fitScore: fit.matchScore })
-        );
+        comparisons.push({
+          universityId: uni.id,
+          universityName: uni.name,
+          fitScore: fit.matchScore,
+          positives: fit.reasons,
+          negatives: fit.potentialIssues,
+        });
       }
     }
 
     // --- The three roadmap actions, so the advisor agrees with them -------
     const today = new Date();
     const context: NextActionsContext = {
-      today,
-      completeness: profileCompletenessRatio(chancingProfile),
-      deadlines: apps
-        .filter((a) => a.status !== "withdrawn" && a.deadline)
-        .map((a) => ({
-          id: `app-${a.id}`,
-          title: a.universityName,
-          type: "application",
-          daysRemaining: daysUntil(today, a.deadline),
-        }))
-        .filter((d) => d.daysRemaining !== null) as { id: string; title: string; type: string; daysRemaining: number }[],
-      applications: apps.map((a) => ({
-        id: a.id,
-        universityName: a.universityName,
-        status: a.status,
-        deadlineDaysRemaining: daysUntil(today, a.deadline),
+      deadlines: [
+        ...apps
+          .filter((application) => application.status !== "withdrawn" && application.deadline)
+          .map((application) => ({
+            id: `app-${application.id}`,
+            title: application.programName
+              ? `${application.universityName} — ${application.programName}`
+              : application.universityName,
+            type: "application",
+            daysRemaining: daysUntil(today, application.deadline),
+          })),
+        ...openTasks
+          .filter((task) => task.dueDate)
+          .map((task) => ({
+            id: `task-${task.id}`,
+            title: task.title,
+            type: "milestone",
+            daysRemaining: daysUntil(today, task.dueDate),
+          })),
+      ].filter((deadline) => deadline.daysRemaining !== null) as {
+        id: string;
+        title: string;
+        type: string;
+        daysRemaining: number;
+      }[],
+      applications: apps.map((application) => ({
+        id: application.id,
+        universityName: application.universityName,
+        status: application.status,
+        deadlineDaysRemaining: daysUntil(today, application.deadline),
       })),
-      hasEnglishTest:
-        Number(profile.ieltsScore) > 0 || Number(profile.toeflScore) > 0 || Number(profile.duolingoScore) > 0,
-      needsEnglishTest: true,
-      hasStandardizedTest: Number(profile.satScore) > 0 || Number(profile.actScore) > 0,
-      requiresStandardizedTest: /united states|usa|canada/i.test(profile.preferredCountries || ""),
-      hasEssay: false,
-      recommendationsRequested: false,
+      recommendationApplicationIds: [...new Set(recRows.map((row) => row.applicationId))],
       savedUniversityCount: savedUnis.length,
-      savedScholarshipCount: 0,
-      openTaskCount: 0,
+      savedScholarshipCount: savedSch.length,
+      openTaskCount: openTasks.length,
       requiresFullScholarship: Boolean(profile.requiresFullScholarship),
-      submittedWithoutOutcome: 0,
-      graduationYear: profile.graduationYear,
+      submittedWithoutOutcome: apps.filter(
+        (application) =>
+          ["submitted", "interview", "decision"].includes(application.status) && !outcomeIds.has(application.id)
+      ).length,
     };
     const roadmap = buildNextActions(context, 3);
 
     const input: AdvisorInput = {
       studentName: profile.name,
       profile: chancingProfile,
-      completenessPct: Math.round(profileCompletenessRatio(chancingProfile) * 100),
-      chances,
+      comparisons,
       nextActions: roadmap.actions,
       question: question || undefined,
+      locale: isLocale(profile.preferredLocale || "") ? profile.preferredLocale! : "en",
     };
+
+    // Rules-based prose comes from the shared message catalog so its fallback
+    // is readable in English, Uzbek, and Russian as well as the AI response.
+    const locale = input.locale ?? "en";
+    const t = await getTranslations({ locale, namespace: "ai" });
+    const translateRule = (key: AdvisorRuleKey, values?: Record<string, string | number>) =>
+      t(`advisorRules.${key}` as never, values as never) as string;
 
     // Always compute the honest baseline first — it is the fallback AND the
     // structure the UI renders around the model's prose.
-    const advice = rulesAdvice(input);
+    const advice = rulesAdvice(input, translateRule);
     const brief = buildAdvisorBrief(input);
 
     let aiReply = "";
@@ -130,11 +180,11 @@ export async function POST(req: Request) {
       aiRejectedFor: aiRejectedFor || null,
       headline: roadmap.headline,
       nextActions: roadmap.actions,
-      // Probability policy (2026-10): fit scores only — no admission
-      // probability numbers (no validated methodology + outcome data yet).
-      chances: chances.map((c) => ({
-        universityName: c.universityName,
-        fitScore: c.fitScore,
+      // Fit comparisons only; the probability state is explicitly unavailable
+      // because no admission-probability methodology has been validated.
+      comparisons: comparisons.map(({ universityName, fitScore }) => ({
+        universityName,
+        fitScore,
       })),
       probability: ADMISSION_PROBABILITY,
     });

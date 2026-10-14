@@ -155,7 +155,7 @@ export function DailyStreakCard({
           <span className="text-lg font-black leading-none text-slate-900 tabular-nums dark:text-white">
             {current}
           </span>
-          <span className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+          <span className="break-words text-[11px] font-semibold text-slate-600 dark:text-slate-300">
             {t("streakDays", { count: current })} · {t("streakBest", { count: longest })}
           </span>
         </div>

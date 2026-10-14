@@ -33,7 +33,7 @@ import {
 } from "./ui";
 
 export interface JourneyDashboard {
-  profile: { id: number; name: string; plan: string; completeness: number };
+  profile: { id: number; name: string; plan: string };
   journey: {
     current: string;
     currentLabel: string;
@@ -46,8 +46,11 @@ export interface JourneyDashboard {
   };
   nextSteps: {
     id: string;
-    title: string;
-    detail: string;
+    titleKey: string;
+    detailKey: string;
+    values?: Record<string, string | number>;
+    rawTitle?: string;
+    rawTitleKind?: "deadline" | "journey";
     urgency: string;
     dot: string;
     dueInDays: number | null;
@@ -57,8 +60,8 @@ export interface JourneyDashboard {
   applications: { total: number; preparing: number; submitted: number; decision: number };
   readiness: {
     /** Application checklist: what is filled in and linked (documents, applications, funding). */
-    categories: { key: string; label: string; pct: number; precise?: number; state: string; gaps: string[]; tab: string }[];
-    weakest: { key: string; label: string; pct: number; gaps: string[]; tab: string }[];
+    categories: { key: string; label: string; pct: number; precise?: number; state: string; gaps: string[]; tab: string; unknown?: boolean }[];
+    weakest: { key: string; label: string; pct: number; gaps: string[]; tab: string; unknown?: boolean }[];
     /** Checklist overall — NOT the profile readiness score. */
     overall: number;
     /** Unrounded weighted average behind `overall`. */
@@ -68,14 +71,13 @@ export interface JourneyDashboard {
       overall: number;
       /** Unrounded value behind `overall` — printed so both screens agree. */
       overallPrecise: number;
-      completeness: number;
       /** Dimensions that had real data / dimensions the engine measures. */
       measured: number;
       total: number;
     } | null;
   };
   phases: { key: string; title: string; icon: string; tab: string; status: string; pct: number; missing: string[] }[];
-  testGaps: { testType: string; state: string; current: number | null; required: number; message: string }[];
+  testGaps: { testType: string; state: string; current: number | null; catalogueFigure: number | null; messageKey: string }[];
   funding: { annualCost: number; isCovered: boolean; fundingGap: number; securedGap: number; items: number; calculated: boolean; estimated: boolean };
   expiringDocuments: { id: number; title: string; docType: string; expiresAt: string | null; daysRemaining: number | null }[];
   recommended: {
@@ -103,7 +105,6 @@ export interface JourneyDashboard {
       saved: boolean;
       /** Real fit from the shared match engine — same number as the Explorer. */
       matchScore: number;
-      matchCategory: string;
       matchReasons: string[];
       matchIssues: string[];
     }[];
@@ -159,12 +160,6 @@ const REC_FIELD_KEYS: Record<string, string> = {
 function recFieldLabel(t: RecTranslator) {
   return (field: string) => (REC_FIELD_KEYS[field] ? t(REC_FIELD_KEYS[field]) : field);
 }
-function recBandLabel(t: RecTranslator, category: string): string {
-  if (category === "Safety") return t("ccRecBandSafety");
-  if (category === "Reach") return t("ccRecBandReach");
-  return t("ccRecBandMatch");
-}
-
 function useScholarshipAwardLabel() {
   const t = useTranslations("journey");
   return (s: JourneyDashboard["recommended"]["scholarships"][number]): string => {
@@ -189,7 +184,7 @@ function actionLabelForStep(t: RecTranslator, id: string, tab: string): string {
   if (id === "requirements-open") return t("ccActionOpenWorkspace");
   if (id.startsWith("test-")) return t("ccActionTestPlanner");
   if (id.startsWith("readiness-")) return t("ccActionImproveProfile");
-  if (id === "documents-expiring" || id === "documents-missing") return t("ccActionReviewDocuments");
+  if (id === "documents-expiring" || id === "documents-review") return t("ccActionReviewDocuments");
   if (id === "funding-gap") return t("ccActionFindScholarships");
   if (id === "recommendations") return t("ccActionManageLetters");
   if (id === "profile") return t("ccActionCompleteProfile");
@@ -267,7 +262,7 @@ export function RecommendedPanel({
                   </p>
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
-                      {t("ccRecFitChip", { score: u.matchScore, band: recBandLabel(t, u.matchCategory) })}
+                      {t("ccRecFitChip", { score: u.matchScore })}
                     </span>
                     {u.saved && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
@@ -356,7 +351,7 @@ export function RecommendedPanel({
               {recommended.opportunities.map((o) => (
                 <li key={o.id} className="flex items-center gap-2 text-sm">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">
+                  <span className="min-w-0 flex-1 break-words whitespace-normal text-slate-700 dark:text-slate-200">
                     {o.title}
                     {o.provider && <span className="text-slate-400"> · {o.provider}</span>}
                     <span className="text-slate-400">
@@ -451,25 +446,54 @@ export function JourneyControlCenter({
       default: return fallback;
     }
   };
+  const translatedStageDone = (id: string) => {
+    switch (id) {
+      case "discover": return t("ccStageDone.discover");
+      case "match": return t("ccStageDone.match");
+      case "prepare": return t("ccStageDone.prepare");
+      case "apply": return t("ccStageDone.apply");
+      case "accepted": return t("ccStageDone.accepted");
+      case "fund": return t("ccStageDone.fund");
+      case "visa": return t("ccStageDone.visa");
+      case "depart": return t("ccStageDone.depart");
+      default: return t("ccStageDone.discover");
+    }
+  };
   const translatedStillNeeded = (text: string) => {
     switch (text) {
-      case "Complete your profile so matches are personalised": return t("ccNeedDiscover");
-      case "Save universities you are considering": return t("ccNeedMatchSave");
+      case "Add any profile context you choose to record for more specific programme comparisons": return t("ccNeedDiscover");
+      case "Save a programme you are considering, then verify its details on the official page": return t("ccNeedMatchSave");
       case "Check which of them fit your profile": return t("ccNeedMatchCheck");
-      case "Start an application to generate your checklist": return t("ccNeedPrepareApplication");
-      case "Add universities to research": return t("ccNeedPrepareUniversities");
-      case "Build your funding plan": return t("ccNeedPrepareFunding");
+      case "Add an application to track when you are ready": return t("ccNeedPrepareApplication");
+      case "Save a programme you want to compare": return t("ccNeedPrepareUniversities");
       case "Start your first application": return t("ccNeedApplyStart");
-      case "Finish and submit your application": return t("ccNeedApplySubmit");
+      case "Add an application when you are ready to track one": return t("ccNeedApplyStart");
+      case "Review the official checklist and submission steps for your tracked application": return t("ccNeedApplySubmit");
       case "Record the offers you receive": return t("ccNeedAcceptedRecord");
       case "Decide on the offers you received": return t("ccNeedAcceptedDecide");
-      case "Add your scholarship and family budget": return t("ccNeedFundAdd");
-      case "Close the funding gap for your offer": return t("ccNeedFundClose");
-      case "Start your visa case": return t("ccNeedVisaStart");
-      case "Finish your visa case": return t("ccNeedVisaFinish");
+      case "Record how you plan to cover study costs, if relevant": return t("ccNeedFundAdd");
+      case "Review recorded amounts, conditions and any estimated funding gap": return t("ccNeedFundClose");
+      case "Check current official immigration instructions for your destination": return t("ccNeedVisaStart");
+      case "Review official immigration guidance when you know your destination and institution": return t("ccNeedVisaFinish");
       case "Complete the departure checklist": return t("ccNeedDepart");
       default: return text;
     }
+  };
+  const nextStepTitle = (step: JourneyDashboard["nextSteps"][number]) => {
+    if (step.rawTitleKind === "deadline") return step.rawTitle ?? "";
+    if (step.rawTitleKind === "journey") return translatedStillNeeded(step.rawTitle ?? "");
+    const values: Record<string, string | number> = { ...(step.values ?? {}) };
+    if (step.titleKey === "fundingGap") values.amount = formatMoney(Number(values.amount ?? 0), "USD");
+    return t(`nextStepTitle.${step.titleKey}` as never, values as never);
+  };
+  const nextStepDetail = (step: JourneyDashboard["nextSteps"][number]) => {
+    const values: Record<string, string | number> = { ...(step.values ?? {}) };
+    if (step.detailKey === "testPolicyNoScore" || step.detailKey === "testPolicyCompare") {
+      const testType = String(values.test ?? "other");
+      values.test = t(`tpTestType.${testType}` as never);
+    }
+    if (step.detailKey === "fundingGapReview") values.amount = formatMoney(Number(values.amount ?? 0), "USD");
+    return t(`nextStepDetail.${step.detailKey}` as never, values as never);
   };
   const currentStageLabel = translatedStageLabel(journey.current, journey.currentLabel);
   const nextStageLabel = journey.next ? translatedStageLabel(journey.next, journey.next) : null;
@@ -526,7 +550,7 @@ export function JourneyControlCenter({
 
         <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
           <Button
-            className="min-h-11 w-full px-4 py-2.5 sm:w-auto"
+            className="min-h-12 w-full px-4 py-2.5 sm:w-auto"
             onClick={() => onNavigateTab(journey.continueTab)}
           >
             <span className="min-w-0 break-words">{t("ccContinue", { stage: currentStageLabel })}</span>
@@ -571,7 +595,7 @@ export function JourneyControlCenter({
                 <motion.button
                   type="button"
                   onClick={() => onNavigateTab(s.tab)}
-                  title={s.doneWhen}
+                  title={translatedStageDone(s.id)}
                   aria-current={s.current ? "step" : undefined}
                   whileHover={reduceMotion ? undefined : { y: -1, scale: 1.02 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.98 }}
@@ -645,13 +669,7 @@ export function JourneyControlCenter({
                 : t("ccReadinessTileHint")
             }
             icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
-            state={
-              (readiness.profile?.overall ?? 0) >= 75
-                ? "good"
-                : (readiness.profile?.overall ?? 0) >= 45
-                  ? "warn"
-                  : "bad"
-            }
+            state={readiness.profile ? "brand" : "neutral"}
           />
         </RevealItem>
         <RevealItem>
@@ -725,15 +743,15 @@ export function JourneyControlCenter({
                   {s.dot}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{s.title}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {s.detail}
+                  <p className="break-words text-sm font-semibold text-slate-900 dark:text-white">{nextStepTitle(s)}</p>
+                  <p className="break-words text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                    {nextStepDetail(s)}
                     {s.dueInDays != null && s.dueInDays >= 0 && (
                       <span className="ml-1 font-semibold text-slate-600 dark:text-slate-300">· {daysLabel(s.dueInDays)}</span>
                     )}
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onNavigateTab(s.tab)}>
+                <Button size="sm" variant="outline" className="min-h-11 shrink-0" onClick={() => onNavigateTab(s.tab)}>
                   {actionLabelForStep(t, s.id, s.tab)}
                 </Button>
               </motion.li>
@@ -753,7 +771,7 @@ export function JourneyControlCenter({
             <Empty
               title={t("ccNoDeadlines")}
               hint={t("ccNoDeadlinesHint")}
-              action={<Button size="sm" variant="outline" onClick={() => onNavigateTab("universities")}>Explore universities</Button>}
+              action={<Button size="sm" variant="outline" className="min-h-11" onClick={() => onNavigateTab("universities")}>{t("ccExploreUniversities")}</Button>}
             />
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -764,15 +782,17 @@ export function JourneyControlCenter({
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-30px 0px" }}
                   transition={{ delay: reduceMotion ? 0 : i * 0.04, duration: 0.3 }}
-                  className="flex items-center gap-3 py-2"
+                  className="flex min-w-0 items-center gap-3 py-2"
                 >
                   <Pill tone={toneForDays(d.daysRemaining)}>{daysLabel(d.daysRemaining)}</Pill>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{d.title}</p>
-                    <p className="text-[11px] uppercase tracking-wide text-slate-400">{d.kind}</p>
+                    <p className="break-words text-sm font-medium text-slate-800 dark:text-slate-100">{d.title || t("ccApplicationFallback")}</p>
+                    <p className="break-words text-[11px] uppercase tracking-wide text-slate-400">
+                      {t(`ccDeadlineKinds.${["application", "university", "scholarship", "test", "document", "visa", "other"].includes(d.kind) ? d.kind : "other"}` as never)}
+                    </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => onNavigateTab(d.tab)}>
-                    Open
+                  <Button size="sm" variant="ghost" className="min-h-11 shrink-0" onClick={() => onNavigateTab(d.tab)}>
+                    {t("ccOpen")}
                   </Button>
                 </motion.li>
               ))}
@@ -789,11 +809,11 @@ export function JourneyControlCenter({
             <Empty
               title={t("ccNoApplications")}
               hint={t("ccNoApplicationsHint")}
-              action={<Button size="sm" onClick={() => onNavigateTab("applications")}>Start an application</Button>}
+              action={<Button size="sm" className="min-h-11" onClick={() => onNavigateTab("applications")}>{t("ccStartApplication")}</Button>}
             />
           ) : (
             <>
-              <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                 {[
                   { label: t("ccStatTotal"), value: applications.total, tone: "text-slate-900 dark:text-white" },
                   { label: t("ccStatPreparing"), value: applications.preparing, tone: "text-amber-600 dark:text-amber-400" },
@@ -806,7 +826,7 @@ export function JourneyControlCenter({
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true, margin: "-30px 0px" }}
                     transition={{ delay: reduceMotion ? 0 : i * 0.06, type: "spring", stiffness: 320, damping: 26 }}
-                    className="rounded-xl bg-slate-50 px-2 py-3 dark:bg-slate-800/60"
+                    className="min-w-0 rounded-xl bg-slate-50 px-2 py-3 dark:bg-slate-800/60"
                   >
                     <p className={`text-2xl font-extrabold tabular-nums ${s.tone}`}>
                       <CountUp value={s.value} />
@@ -823,18 +843,14 @@ export function JourneyControlCenter({
         </JourneyCard>
       </div>
 
-      {/* ---- 5. Profile readiness ----------------------------------------- */}
+      {/* ---- 5. Recorded profile and application details ------------------ */}
       <JourneyCard
         title={t("ccChecklistTitle", {
-          // One decimal here too: "43.7% in place" is the arithmetic the engine
-          // produced, not a rounded restatement of it.
           pct: typeof readiness.overallPrecise === "number" ? readiness.overallPrecise.toFixed(1) : readiness.overall,
         })}
         subtitle={t("ccChecklistSubtitle")}
       >
-        {/* 2 columns on phones too: seven full-width tiles made a ~700px
-            stack that pushed the next actions off the first screen. */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {readiness.categories.map((c) => (
             <motion.button
               key={c.key}
@@ -842,24 +858,22 @@ export function JourneyControlCenter({
               onClick={() => onNavigateTab(c.tab)}
               whileHover={reduceMotion ? undefined : { y: -2 }}
               whileTap={reduceMotion ? undefined : { scale: 0.99 }}
-              className="rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30"
+              className="min-h-16 rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{c.label}</span>
-                <span
-                  className={`text-sm font-extrabold ${
-                    c.pct >= 75 ? "text-emerald-600" : c.pct >= 45 ? "text-amber-600" : "text-rose-600"
-                  }`}
-                >
-                  {typeof c.precise === "number" ? `${c.precise.toFixed(1)}%` : `${c.pct}%`}
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {t(`ccReadinessCategory.${c.key}` as never)}
+                </span>
+                <span className="shrink-0 text-sm font-extrabold text-indigo-700 dark:text-indigo-300">
+                  {c.unknown ? "—" : `${typeof c.precise === "number" ? c.precise.toFixed(1) : c.pct}%`}
                 </span>
               </div>
               <div className="mt-1.5">
                 <ProgressBar
-                  pct={c.pct}
+                  pct={c.unknown ? 0 : c.pct}
                   size="sm"
-                  tone={c.pct >= 75 ? "good" : c.pct >= 45 ? "warn" : "bad"}
-                  label={c.gaps[0] ?? t("ccLookingGood")}
+                  tone="brand"
+                  label={c.gaps[0] ? t(`ccReadinessGap.${c.gaps[0]}` as never) : t("ccLookingGood")}
                 />
               </div>
             </motion.button>
@@ -867,25 +881,30 @@ export function JourneyControlCenter({
         </div>
       </JourneyCard>
 
-      {/* ---- Test gaps (spec §8) ------------------------------------------ */}
+      {/* ---- University-level test catalogue comparisons ------------------ */}
       {data.testGaps.length > 0 && (
         <JourneyCard title={t("ccTestReqsTitle")} subtitle={t("ccTestReqsSubtitle")}>
           <ul className="space-y-2">
-            {data.testGaps.map((g) => (
-              <li key={g.testType} className="flex flex-wrap items-center gap-2 text-sm">
-                <Pill tone={g.state === "met" ? "good" : g.state === "below" ? "warn" : "slate"}>
-                  {g.testType.toUpperCase()}
-                </Pill>
-                <span className="min-w-0 flex-1 text-slate-700 dark:text-slate-200">{g.message}</span>
-                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("tests")}>
-                  Test planner
-                </Button>
-              </li>
-            ))}
+            {data.testGaps.map((gap) => {
+              const label = t(`tpTestType.${gap.testType}` as never);
+              const message = gap.messageKey === "scoreNotRecorded"
+                ? t("tpGapScoreNotRecorded", { test: label, figure: gap.catalogueFigure ?? "—" })
+                : gap.messageKey === "belowCatalogueFigure"
+                  ? t("tpGapBelowFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" })
+                  : gap.messageKey === "atOrAboveCatalogueFigure"
+                    ? t("tpGapAtOrAboveFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" })
+                    : t("tpGapNoFigure", { test: label });
+              return (
+                <li key={gap.testType} className="flex min-w-0 flex-col items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
+                  <Pill tone="slate">{label}</Pill>
+                  <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{message}</span>
+                  <Button size="sm" variant="ghost" className="min-h-11 shrink-0" onClick={() => onNavigateTab("tests")}>
+                    {t("tpOpenPlanner")}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
-          <p className="mt-2 text-[11px] text-slate-400">
-            We show the gap against the published minimum. We never estimate how a score change affects your admission chances.
-          </p>
         </JourneyCard>
       )}
 
@@ -899,9 +918,9 @@ export function JourneyControlCenter({
             {data.expiringDocuments.map((d) => (
               <li key={d.id} className="flex items-center gap-2 text-sm">
                 <Pill tone={toneForDays(d.daysRemaining)}>{daysLabel(d.daysRemaining)}</Pill>
-                <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">{d.title}</span>
-                <Button size="sm" variant="ghost" onClick={() => onNavigateTab("documents")}>
-                  Open vault
+                <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{d.title}</span>
+                <Button size="sm" variant="ghost" className="min-h-11 shrink-0" onClick={() => onNavigateTab("documents")}>
+                  {t("ccOpenVault")}
                 </Button>
               </li>
             ))}
@@ -930,12 +949,12 @@ export function JourneyControlCenter({
               </p>
             </div>
             {!data.funding.calculated ? (
-              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Add annual study costs to calculate the gap; zero is not treated as a verified cost.</p>
+              <p className="basis-full break-words text-xs text-slate-600 dark:text-slate-300">{t("ccAddAnnualCostsToCalculateGap")}</p>
             ) : data.funding.estimated ? (
-              <p className="basis-full text-xs text-slate-600 dark:text-slate-300">Some cost lines are estimated. Review the assumptions and official university costs before relying on this figure.</p>
+              <p className="basis-full break-words text-xs text-slate-600 dark:text-slate-300">{t("ccEstimatedCostNote")}</p>
             ) : null}
-            <Button variant="outline" onClick={() => onNavigateTab("funding")}>
-              Open financial plan
+            <Button variant="outline" className="min-h-11" onClick={() => onNavigateTab("funding")}>
+              {t("ccOpenFinancialPlan")}
             </Button>
           </div>
         </JourneyCard>
@@ -949,7 +968,7 @@ export function JourneyControlCenter({
               <button
                 type="button"
                 onClick={() => onNavigateTab(p.tab)}
-                className={`h-full w-full rounded-xl border p-3 text-left transition hover:shadow-sm ${
+                className={`min-h-24 h-full w-full rounded-xl border p-3 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                   p.status === "done"
                     ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
                     : p.status === "in_progress"
@@ -960,12 +979,18 @@ export function JourneyControlCenter({
                 <p className="text-base" aria-hidden>
                   {p.icon}
                 </p>
-                <p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-100">{p.title}</p>
+                <p className="mt-1 break-words text-xs font-bold text-slate-800 dark:text-slate-100">
+                  {t(`spPhase.${p.key}.title` as never)}
+                </p>
                 <div className="mt-1.5">
                   <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                 </div>
-                <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                  {p.status === "done" ? t("ccPhaseDone") : (p.missing[0] ?? `${p.pct}%`)}
+                <p className="mt-1 break-words text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                  {p.status === "done"
+                    ? t("spStatus.done")
+                    : p.missing[0]
+                      ? t(`spPhaseMissing.${p.missing[0]}` as never)
+                      : t(`spStatus.${p.status}` as never)}
                 </p>
               </button>
             </li>

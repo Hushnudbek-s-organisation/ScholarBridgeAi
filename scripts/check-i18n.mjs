@@ -15,7 +15,7 @@ import IntlMessageFormat from "intl-messageformat";
 
 const LOCALES = ["en", "uz", "ru"];
 const MESSAGES_DIR = "src/i18n/messages";
-const COMPONENTS_DIR = "src/components";
+const SOURCE_DIR = "src";
 
 let errors = 0;
 const fail = (msg) => {
@@ -47,6 +47,74 @@ function assertNoDottedKeys(obj, path = "") {
   }
 }
 
+/** Keep the onboarding cards on the nested path shape next-intl resolves. */
+function assertCareerPathMessages(locale, messages) {
+  const careerDiscovery = messages?.careerDiscovery;
+  const path = careerDiscovery?.path;
+  if (!path || typeof path !== "object" || Array.isArray(path)) {
+    fail(`[${locale}] careerDiscovery.path must be a nested object`);
+    return;
+  }
+
+  for (const id of ["goal", "interests", "undecided"]) {
+    const card = path[id];
+    if (!card || typeof card !== "object" || Array.isArray(card)) {
+      fail(`[${locale}] careerDiscovery.path.${id} must be a nested object`);
+      continue;
+    }
+    for (const field of ["title", "body"]) {
+      if (typeof card[field] !== "string" || !card[field].trim()) {
+        fail(`[${locale}] careerDiscovery.path.${id}.${field} must be non-empty translated text`);
+      }
+    }
+  }
+
+  // Catch the exact legacy regression even if a future change tries to add a
+  // second, flat version alongside the valid nested messages.
+  for (const key of ["path.goal.title", "path.goal.body", "path.interests.title", "path.interests.body", "path.undecided.title", "path.undecided.body"]) {
+    if (Object.hasOwn(careerDiscovery, key)) {
+      fail(`[${locale}] careerDiscovery.${key} is flat; keep it under careerDiscovery.path`);
+    }
+  }
+}
+
+function assertRecLetterMessages(locale, messages) {
+  const recLetter = messages?.recLetter;
+  if (!recLetter || typeof recLetter.rmEmptyHint !== "string" || !recLetter.rmEmptyHint.trim()) {
+    fail(`[${locale}] recLetter.rmEmptyHint must be translated guidance`);
+    return;
+  }
+  if (locale === "en") {
+    const advice = JSON.stringify(recLetter);
+    if (/two or three|no more than two|one or two relevant examples|4–6 weeks|two weeks early|about a week before|Most universities ask for one or two letters/i.test(advice)) {
+      fail("[en] recLetter still contains unsupported example-count or timing guidance");
+    }
+  }
+}
+
+function assertCvMessages(locale, messages) {
+  const cv = messages?.cvBuilder;
+  if (!cv || typeof cv !== "object") {
+    fail(`[${locale}] cvBuilder must be an object`);
+    return;
+  }
+  for (const key of ["cvTitle", "cvMeta", "copy", "copied", "missingTitle", "missingNote"]) {
+    if (typeof cv[key] !== "string" || !cv[key].trim()) fail(`[${locale}] cvBuilder.${key} must be translated text`);
+  }
+  for (const key of ["fullName", "email", "country", "targetMajor", "gpa", "graduationYear", "testScores"]) {
+    if (typeof cv.missing?.[key] !== "string" || !cv.missing[key].trim()) fail(`[${locale}] cvBuilder.missing.${key} must be translated text`);
+  }
+  for (const key of ["noActivities", "empty", "noEvidence", "length", "manyEntries"]) {
+    if (typeof cv.warning?.[key] !== "string" || !cv.warning[key].trim()) fail(`[${locale}] cvBuilder.warning.${key} must be translated text`);
+  }
+  if (locale === "en") {
+    const advice = JSON.stringify(cv);
+    if (/two or three strongest|prioritize sustained responsibility over|usually easiest to scan|under two minutes per file|first thing a reader looks for|strongest two pages/i.test(advice)) {
+      fail("[en] cvBuilder still contains unsupported universal admissions guidance");
+    }
+  }
+}
+
 // ---- 1 & 2: ICU validity + parity -------------------------------------------
 const flat = {};
 let keyCount = 0;
@@ -54,6 +122,9 @@ for (const loc of LOCALES) {
   const raw = readFileSync(join(MESSAGES_DIR, `${loc}.json`), "utf8");
   const parsed = JSON.parse(raw);
   assertNoDottedKeys(parsed, loc);
+  assertCareerPathMessages(loc, parsed);
+  assertCvMessages(loc, parsed);
+  assertRecLetterMessages(loc, parsed);
   const map = flatten(parsed);
   flat[loc] = map;
   if (loc === "en") keyCount = map.size;
@@ -84,7 +155,7 @@ const files = [];
     if (entry.isDirectory()) walk(full);
     else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) files.push(full);
   }
-})(COMPONENTS_DIR);
+})(SOURCE_DIR);
 
 let tCalls = 0;
 for (const file of files) {
@@ -110,6 +181,7 @@ for (const file of files) {
 
 console.log(`  locales: ${LOCALES.join(", ")}`);
 console.log(`  keys per locale (en): ${keyCount}`);
+console.log("  careerDiscovery path cards: nested title/body checked in all locales");
 console.log(`  namespaces: ${[...new Set([...nsOf.values()].flat())].sort().join(", ")}`);
 console.log(`  translated component files: ${nsOf.size}`);
 console.log(`  t() call sites checked: ${tCalls}`);

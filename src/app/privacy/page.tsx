@@ -56,7 +56,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-base font-extrabold text-slate-900">3. How We Use Your Data</h2>
               <ul className="mt-2 list-disc pl-5 space-y-1">
-                <li><strong>Matching:</strong> GPA, test scores, budget, and preferred countries are used by our deterministic matching engine to rank universities and scholarships (Reach / Match / Safety) and to compute eligibility.</li>
+                <li><strong>Matching:</strong> GPA, test scores, budget, and preferred countries are used by our deterministic matching engine to compare available profile and catalogue fields for universities and scholarships. These comparisons do not estimate admission probability or guarantee eligibility.</li>
                 <li><strong>AI features:</strong> Your profile data, SOP drafts, and chat messages are sent to our AI provider (via OpenRouter / configured models) to generate SOP drafts, evaluate your profile, review essays, and answer counselor questions. AI usage is logged for cost control (ai_usage table) but prompts are not sold.</li>
                 <li><strong>Communication:</strong> Email for account notifications, deadline reminders, scholarship openings, and support replies. You can manage in-app notification preferences.</li>
                 <li><strong>Product improvement:</strong> Aggregated analytics (counts of profiles, saved items) to understand feature usage. No personal GPA or budget is shared publicly.</li>

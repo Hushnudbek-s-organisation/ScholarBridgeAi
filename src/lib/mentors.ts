@@ -36,10 +36,13 @@ export interface Mentor {
 }
 
 export interface MentorRequest {
+  /** Legacy explicit target-country field; new callers should use targetCountries. */
   country?: string | null;
   city?: string | null;
-  /** Universities the student is actually applying to. */
+  /** Universities the student saved. */
   targetUniversities?: string[];
+  /** Explicit countries the student prefers for study (not their home country). */
+  targetCountries?: string[];
   targetMajor?: string | null;
   degreeLevel?: string | null;
   /** Scholarships the student has saved. */
@@ -49,14 +52,43 @@ export interface MentorRequest {
   maxHourlyRateUsd?: number | null;
 }
 
+export type MentorMessageKey =
+  | "reasons.sameUniversity"
+  | "reasons.sameCountry"
+  | "reasons.sameScholarship"
+  | "reasons.sameField"
+  | "reasons.sameDegree"
+  | "reasons.languages"
+  | "reasons.verified"
+  | "reasons.rated"
+  | "reasons.fewSessions"
+  | "reasons.newProfile"
+  | "gaps.differentUniversity"
+  | "gaps.differentCountry"
+  | "gaps.noScholarshipExperience"
+  | "gaps.differentProgram"
+  | "gaps.programListed"
+  | "gaps.noLanguageMatch"
+  | "gaps.notVerified"
+  | "notes.noMatches"
+  | "notes.noneVerified"
+  | "notes.overBudget"
+  | "notes.verifiedCount";
+
+export interface MentorMessage {
+  key: MentorMessageKey;
+  values?: Record<string, string | number>;
+}
+
 export interface MentorMatch {
   mentor: Mentor;
-  /** 0–100 */
+  /** 0–100 profile-overlap heuristic; never an admissions estimate. */
   score: number;
-  /** Concrete reasons, in order of weight. Never empty. */
+  /** English compatibility fields retained for API consumers; UI uses the localized message tokens. */
   reasons: string[];
-  /** What does NOT match — shown so the student is not misled. */
   gaps: string[];
+  reasonMessages: MentorMessage[];
+  gapMessages: MentorMessage[];
   verified: boolean;
   price: "free" | "paid" | "unknown";
 }
@@ -65,7 +97,9 @@ export interface MentorMatchResult {
   matches: MentorMatch[];
   /** How many were filtered out, and why. */
   filtered: { inactive: number; overBudget: number };
+  /** English compatibility field retained for API consumers. */
   note: string;
+  noteMessage: MentorMessage;
 }
 
 // --- helpers ---------------------------------------------------------------
@@ -167,12 +201,13 @@ export function matchMentors(
 ): MentorMatchResult {
   const limit = opts.limit ?? 10;
   const targets = (request.targetUniversities ?? []).map(norm).filter(Boolean);
+  const targetCountries = [...(request.targetCountries ?? []), ...(request.country ? [request.country] : [])].map(norm).filter(Boolean);
   const scholarships = (request.targetScholarships ?? []).map(norm).filter(Boolean);
   const languages = (request.preferredLanguages ?? []).map(norm).filter(Boolean);
-  const maxRate =
-    request.maxHourlyRateUsd != null && Number(request.maxHourlyRateUsd) > 0
-      ? Number(request.maxHourlyRateUsd)
-      : null;
+  const requestedRate = request.maxHourlyRateUsd == null ? null : Number(request.maxHourlyRateUsd);
+  const maxRate = requestedRate !== null && Number.isFinite(requestedRate) && requestedRate >= 0
+    ? requestedRate
+    : null;
 
   const filtered = { inactive: 0, overBudget: 0 };
   const matches: MentorMatch[] = [];
@@ -184,8 +219,8 @@ export function matchMentors(
     }
     const rate = m.hourlyRateUsd != null ? Number(m.hourlyRateUsd) : null;
     const isFree = m.freeSessions === true || rate === 0;
-    // Only filter on price when the student set a ceiling AND the mentor has a
-    // published rate above it. An unknown rate is not an over-budget mentor.
+    // Only filter on price when the student set a non-negative ceiling AND the
+    // mentor has a published rate above it. An unknown rate is not over budget.
     if (maxRate !== null && !isFree && rate !== null && rate > maxRate) {
       filtered.overBudget += 1;
       continue;
@@ -193,24 +228,38 @@ export function matchMentors(
 
     const reasons: string[] = [];
     const gaps: string[] = [];
+    const reasonMessages: MentorMessage[] = [];
+    const gapMessages: MentorMessage[] = [];
+    const addReason = (text: string, key: MentorMessageKey, values?: MentorMessage["values"]) => {
+      reasons.push(text);
+      reasonMessages.push({ key, ...(values ? { values } : {}) });
+    };
+    const addGap = (text: string, key: MentorMessageKey, values?: MentorMessage["values"]) => {
+      gaps.push(text);
+      gapMessages.push({ key, ...(values ? { values } : {}) });
+    };
     let score = 0;
 
-    // --- Same university: the single strongest signal ----------------------
-    const uniHit = targets.some((t) => nameOverlap(t, m.university) >= 0.5);
-    if (uniHit) {
+    // --- Same university: compare only when the student has saved targets. ---
+    const uniHit = targets.length > 0 && targets.some((t) => nameOverlap(t, m.university) >= 0.5);
+    if (uniHit && m.university) {
       score += 40;
-      reasons.push(`Studies at ${m.university} — one of your target universities`);
-    } else if (m.university) {
-      gaps.push(`Different university (${m.university})`);
+      addReason(
+        `Profile lists ${m.university} — one of your saved universities`,
+        "reasons.sameUniversity",
+        { university: m.university }
+      );
+    } else if (targets.length > 0 && m.university) {
+      addGap(`Profile lists a different university: ${m.university}`, "gaps.differentUniversity", { university: m.university });
     }
 
-    // --- Same country ------------------------------------------------------
-    if (norm(request.country) && norm(m.country) === norm(request.country)) {
+    // --- Same country: missing student country is unknown, not a mismatch. ---
+    const countryHit = Boolean(m.country && targetCountries.includes(norm(m.country)));
+    if (countryHit && m.country) {
       score += 22;
-      reasons.push(`Lives in ${m.country} — knows the visa, housing and cost of day to day`);
-    } else if (m.country) {
-      score += 4;
-      gaps.push(`Based in ${m.country}, not ${request.country || "your target country"}`);
+      addReason(`Mentor profile lists ${m.country}, one of your preferred study countries`, "reasons.sameCountry", { country: m.country });
+    } else if (m.country && targetCountries.length > 0) {
+      addGap(`Mentor profile lists ${m.country}, not one of your preferred study countries`, "gaps.differentCountry", { country: m.country });
     }
 
     // --- Same scholarship --------------------------------------------------
@@ -218,56 +267,64 @@ export function matchMentors(
       scholarships.length > 0 &&
       m.scholarshipName &&
       scholarships.some((s) => nameOverlap(s, m.scholarshipName) >= 0.5);
-    if (schHit) {
+    if (schHit && m.scholarshipName) {
       score += 25;
-      reasons.push(`Won ${m.scholarshipName} — you are applying to it too`);
+      addReason(
+        `Profile reports experience with ${m.scholarshipName}; you have saved this scholarship`,
+        "reasons.sameScholarship",
+        { scholarship: m.scholarshipName }
+      );
     } else if (request.needsFinancialAid && !m.scholarshipName) {
-      gaps.push("Has not held a scholarship, so cannot speak to funding");
+      addGap("No scholarship experience is listed on this profile", "gaps.noScholarshipExperience");
     }
 
     // --- Same field and level ----------------------------------------------
     const programOverlap = nameOverlap(request.targetMajor, m.program);
-    if (programOverlap >= 0.5) {
+    if (norm(request.targetMajor) && programOverlap >= 0.5 && m.program) {
       score += 12;
-      reasons.push(`Same field of study (${m.program})`);
-    } else if (m.program) {
-      gaps.push(`Studied ${m.program}, not ${request.targetMajor || "your field"}`);
+      addReason(`Profile lists ${m.program} as its field`, "reasons.sameField", { program: m.program });
+    } else if (norm(request.targetMajor) && m.program) {
+      addGap(`Profile lists ${m.program}, not your stated field`, "gaps.differentProgram", { program: m.program });
+    } else if (!norm(request.targetMajor) && m.program) {
+      addGap(`Profile lists ${m.program}; you have not specified a field to compare`, "gaps.programListed", { program: m.program });
     }
     if (request.degreeLevel && norm(m.degreeLevel) === norm(request.degreeLevel)) {
       score += 6;
-      reasons.push("Same degree level");
+      addReason("Profile lists the same degree level", "reasons.sameDegree");
     }
 
     // --- Language ----------------------------------------------------------
     const mentorLangs = toList(m.languages);
     if (languages.length > 0 && mentorLangs.some((l) => languages.includes(l))) {
       score += 8;
-      reasons.push(`Speaks your language (${mentorLangs.filter((l) => languages.includes(l)).join(", ")})`);
+      const matchedLanguages = mentorLangs.filter((l) => languages.includes(l)).join(", ");
+      addReason(`Profile lists these languages: ${matchedLanguages}`, "reasons.languages", { languages: matchedLanguages });
     } else if (languages.length > 0) {
-      gaps.push("Does not list your preferred language");
+      addGap("No selected communication language is listed on this profile", "gaps.noLanguageMatch");
     }
 
     // --- Verification ------------------------------------------------------
     // Verified mentors outrank unverified ones at equal relevance, and an
     // unverified mentor is always labelled so the student knows.
     if (m.isVerified) {
-      score += 10;
-      reasons.push("Identity verified by ScholarBridge");
+      addReason("Profile marked as verified by ScholarBridge", "reasons.verified");
     } else {
-      score -= 8;
-      gaps.push("Not verified yet — ScholarBridge has not confirmed their enrolment");
+      addGap("Profile is not marked verified; this says nothing about the accuracy of advice", "gaps.notVerified");
     }
 
     // --- Reputation, weighted so one review cannot dominate ----------------
     const rating = m.ratingAverage != null ? Number(m.ratingAverage) : null;
     const count = m.ratingCount != null ? Number(m.ratingCount) : 0;
     if (rating !== null && count >= 3) {
-      score += Math.max(0, (rating - 3.5) * 4);
-      reasons.push(`Rated ${rating.toFixed(1)}/5 from ${count} sessions`);
+      addReason(
+        `Profile lists an average of ${rating.toFixed(1)}/5 across ${count} sessions`,
+        "reasons.rated",
+        { rating: rating.toFixed(1), count }
+      );
     } else if (count > 0) {
-      reasons.push(`${count} session${count === 1 ? "" : "s"} so far — too few to rate yet`);
+      addReason(`${count} sessions are listed; not enough for a rating`, "reasons.fewSessions", { count });
     } else {
-      reasons.push("New mentor — no sessions yet");
+      addReason("No sessions are listed on this profile yet", "reasons.newProfile");
     }
 
     // A mentor who matched nothing is not a match.
@@ -278,6 +335,8 @@ export function matchMentors(
       score: Math.max(0, Math.min(100, Math.round(score))),
       reasons,
       gaps,
+      reasonMessages,
+      gapMessages,
       verified: m.isVerified === true,
       price: isFree ? "free" : rate !== null ? "paid" : "unknown",
     });
@@ -295,16 +354,20 @@ export function matchMentors(
   const verifiedCount = top.filter((m) => m.verified).length;
 
   let note: string;
+  let noteMessage: MentorMessage;
   if (top.length === 0) {
-    note =
-      "No mentors match yet. The marketplace grows as students who have been through it sign up — your own profile can become a listing once you enrol.";
+    note = "No active mentor profiles match the current profile and filters. Try changing the rate limit or check back later.";
+    noteMessage = { key: "notes.noMatches" };
   } else if (verifiedCount === 0) {
-    note = "None of these mentors are verified yet. Treat their advice as experience, not authority.";
+    note = "No result is marked verified. Treat profile details as unverified and confirm them independently.";
+    noteMessage = { key: "notes.noneVerified" };
   } else if (filtered.overBudget > 0) {
-    note = `${filtered.overBudget} mentor${filtered.overBudget === 1 ? "" : "s"} were hidden because their rate is above your budget. Free sessions are always shown first.`;
+    note = `${filtered.overBudget} profile${filtered.overBudget === 1 ? " was" : "s were"} hidden because the listed rate is above your limit. Free sessions remain eligible; results are ordered by verification flag and profile overlap, not price.`;
+    noteMessage = { key: "notes.overBudget", values: { count: filtered.overBudget } };
   } else {
-    note = `${verifiedCount} of ${top.length} are verified. Sorted by how closely their path matches yours, not by price.`;
+    note = `${verifiedCount} of ${top.length} result profiles are marked verified. Results are ordered by verification flag, then profile overlap—not price.`;
+    noteMessage = { key: "notes.verifiedCount", values: { verified: verifiedCount, total: top.length } };
   }
 
-  return { matches: top, filtered, note };
+  return { matches: top, filtered, note, noteMessage };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Navbar, StudentProfile } from "@/components/Navbar";
 import { ProfileModal } from "@/components/ProfileModal";
 import type { SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
@@ -100,6 +101,27 @@ function SessionRestoreError({ error, onRetry, onSignIn }: { error: string | nul
         </div>
       </section>
     </main>
+  );
+}
+
+function ParentDashboardGate({
+  activeProfile,
+  onUpgrade,
+}: {
+  activeProfile: StudentProfile | null;
+  onUpgrade: () => void;
+}) {
+  const t = useTranslations("parentDashboard");
+  return (
+    <PremiumGate
+      profileId={activeProfile?.id ?? null}
+      feature="parent_dashboard"
+      title={t("premiumTitle")}
+      description={t("premiumDescription")}
+      onUpgrade={onUpgrade}
+    >
+      <ParentDashboard key={activeProfile?.id ?? "no-profile"} activeProfile={activeProfile} />
+    </PremiumGate>
   );
 }
 
@@ -237,6 +259,13 @@ export function Home({
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   // Which university the Explorer should open (set by the global search, §34).
   const [focusUniversityId, setFocusUniversityId] = useState<number | null>(null);
+  // A scholarship result opens the existing catalogue search and highlights its exact record.
+  const [focusScholarship, setFocusScholarship] = useState<{
+    id: number;
+    title: string;
+    requestId: number;
+  } | null>(null);
+  const scholarshipFocusSequence = useRef(0);
 
   // Referral system: capture ?ref=CODE from the URL and keep it for up to
   // 48h so a visitor who browses first and registers later is still credited.
@@ -452,7 +481,7 @@ export function Home({
   // Global search (spec §34) asks the page to focus a record it found.
   useEffect(() => {
     const onFocus = (e: Event) => {
-      const detail = (e as CustomEvent<{ kind: string; id?: string | number }>).detail;
+      const detail = (e as CustomEvent<{ kind: string; id?: string | number; title?: string }>).detail;
       if (!detail) return;
       if (detail.kind === "university") {
         setFocusUniversityId(Number(detail.id) || null);
@@ -460,6 +489,16 @@ export function Home({
       } else if (detail.kind === "application") {
         setWorkspaceId(Number(detail.id) || null);
         handleNavigateTab("applications/workspace");
+      } else if (detail.kind === "scholarship") {
+        const id = Number(detail.id);
+        if (!Number.isSafeInteger(id) || id <= 0) return;
+        scholarshipFocusSequence.current += 1;
+        setFocusScholarship({
+          id,
+          title: String(detail.title ?? "").trim(),
+          requestId: scholarshipFocusSequence.current,
+        });
+        handleNavigateTab("scholarships/browse");
       } else {
         handleNavigateTab((detail.kind as string) === "task" ? "tasks" : detail.kind);
       }
@@ -503,10 +542,13 @@ export function Home({
 
   /** Open the profile picker for sign-in or switching accounts. */
   const openProfilePicker = useCallback(async () => {
-    await loadAllProfiles();
+    // The protected profile list is only useful after a valid profile has
+    // loaded. Visitors and signed-out users can use the email/Telegram form
+    // directly; calling it unauthenticated produced a noisy, expected 401.
+    if (activeProfile) await loadAllProfiles();
     setPickerMessage("");
     setIsPickerOpen(true);
-  }, [loadAllProfiles]);
+  }, [activeProfile, loadAllProfiles]);
 
   /**
    * Picking an account that this device used before is a convenience only: the
@@ -837,7 +879,7 @@ export function Home({
   if (view === "wizard") {
     return (
       <LocaleProvider initialLocale={initialLocale}>
-        <div className="min-h-screen bg-slate-100 py-10 px-4">
+        <div className="min-h-screen bg-slate-100 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
           <OnboardingWizard
             profile={null}
             onCreated={handleWizardCreated}
@@ -866,9 +908,11 @@ export function Home({
       <div className="flex-1 min-w-0 flex flex-col">
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
-        {/* Sections swap with a short cross-fade + lift. Keyed on what is
-            actually on screen so the wizard and every tab participate. */}
+        {/* Sections swap with a short cross-fade + lift. The outer profile key
+            is also an isolation boundary: unmount every profile-scoped loader,
+            checklist and draft immediately when the selected student changes. */}
         <PageTransition
+          key={activeProfile?.id ?? "none"}
           transitionKey={
             activeProfile && !activeProfile.onboardingCompleted
               ? "onboarding"
@@ -932,6 +976,7 @@ export function Home({
               savedScholarshipIds={savedScholarshipIds}
               onSaveScholarship={handleSaveScholarship}
               onUnsaveScholarship={handleUnsaveScholarship}
+              autoFocusScholarship={focusScholarship}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1087,15 +1132,10 @@ export function Home({
           )}
 
           {activeTab === "parent" && (
-            <PremiumGate
-              profileId={activeProfile?.id ?? null}
-              feature="parent_dashboard"
-              title="Parent dashboard is Pro"
-              description="Share a read-only progress page with your family — a Pro feature families pay for."
+            <ParentDashboardGate
+              activeProfile={activeProfile}
               onUpgrade={() => handleNavigateTab("payments")}
-            >
-              <ParentDashboard activeProfile={activeProfile} />
-            </PremiumGate>
+            />
           )}
 
           {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
@@ -1116,10 +1156,10 @@ export function Home({
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>
             <div className="flex items-center gap-3">
-              <a href="/terms" className="inline-flex min-h-6 items-center px-1 hover:text-slate-800 underline underline-offset-4">
+              <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 hover:text-slate-800 underline underline-offset-4">
                 Terms
               </a>
-              <a href="/privacy" className="inline-flex min-h-6 items-center px-1 hover:text-slate-800 underline underline-offset-4">
+              <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 hover:text-slate-800 underline underline-offset-4">
                 Privacy
               </a>
             </div>
@@ -1128,13 +1168,13 @@ export function Home({
               must be reachable with Tab and announced as controls. `flex-wrap`
               keeps the row inside the viewport at 200% zoom. */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("universities")}>
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("universities")}>
               University Matcher
             </button>
-            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("scholarships")}>
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("scholarships")}>
               Scholarship Discovery
             </button>
-            <button type="button" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("mentor")}>
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("mentor")}>
               AI Mentor
             </button>
           </div>

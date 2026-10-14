@@ -88,6 +88,7 @@ interface ScholarshipHubProps {
   savedScholarshipIds: Set<number>;
   onSaveScholarship: (scholarshipId: number) => Promise<void>;
   onUnsaveScholarship: (scholarshipId: number) => Promise<void>;
+  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
 }
 
 export function ScholarshipHub({
@@ -95,6 +96,7 @@ export function ScholarshipHub({
   savedScholarshipIds,
   onSaveScholarship,
   onUnsaveScholarship,
+  autoFocusScholarship = null,
 }: ScholarshipHubProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
@@ -105,6 +107,13 @@ export function ScholarshipHub({
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedCoverage, setSelectedCoverage] = useState("All");
+  const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
+  if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
+    setLastFocusRequestId(autoFocusScholarship.requestId);
+    setSearch(autoFocusScholarship.title);
+    setSelectedCountry("All");
+    setSelectedCoverage("All");
+  }
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
   // `grid-cols-1 md:grid-cols-2`, so 8 / 16 cards.
@@ -133,6 +142,12 @@ export function ScholarshipHub({
       if (selectedCountry !== "All") params.set("country", selectedCountry);
       if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
       if (search.trim()) params.set("search", search.trim());
+      if (
+        autoFocusScholarship &&
+        search.trim().toLocaleLowerCase() === autoFocusScholarship.title.trim().toLocaleLowerCase()
+      ) {
+        params.set("focusId", String(autoFocusScholarship.id));
+      }
       params.set("page", page.toString());
       params.set("perPage", perPage.toString());
 
@@ -163,7 +178,19 @@ export function ScholarshipHub({
     const t = setTimeout(() => fetchScholarships(), 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, search, page, perPage]);
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, search, page, perPage, autoFocusScholarship?.requestId]);
+
+  const focusScholarshipId = autoFocusScholarship?.id ?? null;
+  const focusRequestId = autoFocusScholarship?.requestId ?? null;
+  useEffect(() => {
+    if (focusScholarshipId === null || loading) return;
+    const target = document.querySelector<HTMLElement>(
+      `[data-scholarship-id="${focusScholarshipId}"]`
+    );
+    if (!target) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+  }, [focusRequestId, focusScholarshipId, loading, scholarships]);
 
   // Search + filters run server-side (see fetchScholarships above) so the
   // numbered pages below always match the filtered result set.
@@ -196,9 +223,10 @@ export function ScholarshipHub({
             <input
               type="text"
               placeholder={t("searchPlaceholder")}
+              aria-label={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              className="min-h-11 w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
             />
           </div>
 
@@ -207,7 +235,8 @@ export function ScholarshipHub({
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+              aria-label={t("allCountries")}
+              className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">{t("allCountries")}</option>
               {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
@@ -228,7 +257,8 @@ export function ScholarshipHub({
             <select
               value={selectedCoverage}
               onChange={(e) => setSelectedCoverage(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+              aria-label={t("allCoverage")}
+              className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">{t("allCoverage")}</option>
               <option value="Full Tuition + Stipend">{t("coverageFullStipend")}</option>
@@ -264,13 +294,22 @@ export function ScholarshipHub({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filtered.map((s) => {
             const isSaved = savedScholarshipIds.has(s.id);
+            const isFocused =
+              autoFocusScholarship?.id === s.id &&
+              search.trim().toLowerCase() === autoFocusScholarship.title.trim().toLowerCase();
             // NULL score = no profile selected — never show a fake 80%.
             const score = s.matchScore ?? null;
 
             return (
               <div
                 key={s.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-lg hover:border-amber-300 transition-all p-5 flex flex-col justify-between space-y-4"
+                data-scholarship-id={s.id}
+                data-focused-record={isFocused ? "true" : undefined}
+                className={`bg-white rounded-2xl border shadow-xs transition-all p-5 flex flex-col justify-between space-y-4 ${
+                  isFocused
+                    ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
+                    : "border-slate-200 hover:shadow-lg hover:border-amber-300"
+                }`}
               >
                 {/* Header */}
                 <div className="space-y-2">
@@ -341,7 +380,7 @@ export function ScholarshipHub({
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                  <p className="break-words text-xs leading-relaxed text-slate-600">
                     {s.description}
                   </p>
                 </div>

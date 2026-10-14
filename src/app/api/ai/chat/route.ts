@@ -45,8 +45,8 @@ export async function POST(req: Request) {
 - IELTS/TOEFL: ${profile.ieltsScore || profile.toeflScore || "Not set"}
 - Budget: ${profile.budgetAnnualUsd == null ? "Not set" : "$" + profile.budgetAnnualUsd.toLocaleString("en-US") + "/year"}
 - Family income: ${profile.familyIncomeUsd == null ? "Not set" : "$" + profile.familyIncomeUsd.toLocaleString("en-US") + "/year"}
-- Financial aid needed: ${profile.needsFinancialAid || profile.needScholarship ? "Yes" : "No"}
-- Full scholarship required: ${profile.requiresFullScholarship ? "Yes" : "No"}
+- Financial aid needed: ${profile.needsFinancialAid === true || profile.needScholarship === true ? "Yes" : profile.needsFinancialAid === false ? "No (explicitly stated)" : "Not recorded"}
+- Full scholarship required: ${profile.requiresFullScholarship === true ? "Yes" : profile.requiresFullScholarship === false ? "No (explicitly stated)" : "Not recorded"}
 - Countries: ${profile.preferredCountries}
 - Activities: ${[profile.extracurriculars, profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates].filter(Boolean).join("; ") || "Not provided"}`;
       }

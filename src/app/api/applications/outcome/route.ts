@@ -4,20 +4,20 @@ import { db } from "@/db";
 import { applicationOutcomes, applications, studentProfiles } from "@/db/schema";
 import { requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
+import { hasExplicitOutcomeShareConsent } from "@/lib/similarProfiles";
 
 export const dynamic = "force-dynamic";
 
-/** Accepted results — rejections included, they are the negative examples. */
+/** Recognized application decisions that a student can record. */
 const RESULTS = ["accepted", "rejected", "waitlisted", "deferred", "withdrawn"] as const;
 
 /**
- * POST /api/applications/outcome — "Did you get admitted?"
+ * POST /api/applications/outcome — record a decision in the owner's tracker.
  *
- * This is the data flywheel: every result (accepted AND rejected) is stored
- * with a snapshot of the profile at decision time. With the student's consent
- * (`shareConsent`) the row also feeds the chancing engine, so estimates get
- * sharper as ScholarBridge collects its own outcomes instead of guessing from
- * public statistics.
+ * The result and profile snapshot are stored in the owner's account. Only an
+ * explicit boolean `shareConsent: true` makes this row eligible for the
+ * historical examples in Similar Profiles. Those examples do not train or
+ * feed the profile-to-catalogue fit or an admission-probability estimate.
  */
 export async function POST(req: Request) {
   try {
@@ -48,14 +48,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
-    // Snapshot the profile as it was at decision time — that is the training
-    // row. Without it, later profile edits would silently rewrite history.
+    // Snapshot the comparison fields as they stood at decision time; later
+    // profile edits must not silently rewrite a historical outcome example.
     const [profile] = await db
       .select()
       .from(studentProfiles)
       .where(eq(studentProfiles.id, application.profileId));
 
-    const shareConsent = Boolean(body.shareConsent);
+    // JSON strings such as "true"/"false" are not consent; require literal boolean true.
+    const shareConsent = hasExplicitOutcomeShareConsent(body.shareConsent);
 
     const [outcome] = await db
       .insert(applicationOutcomes)
@@ -76,7 +77,6 @@ export async function POST(req: Request) {
         snapshotAct: profile?.actScore ?? null,
         snapshotMajor: profile?.targetMajor ?? null,
         snapshotCountry: profile?.country ?? null,
-        snapshotExtracurriculars: profile?.extracurriculars ?? null,
         shareConsent,
       })
       .returning();

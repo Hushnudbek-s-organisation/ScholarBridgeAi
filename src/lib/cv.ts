@@ -1,14 +1,14 @@
 /**
  * CV / Resume Builder (Phase 3).
  *
- * An application CV is not a job CV. Admissions readers want academics,
- * evidence and impact in that order, on one page, with no photograph, no
- * marital status and no date of birth — several countries treat those as
- * discrimination risks and some portals reject files that carry them.
+ * CV content and formatting requirements vary by country, institution,
+ * programme, degree level and application. This builder organizes information
+ * supplied by the student; it does not rank profile categories or make claims
+ * about universal admissions preferences.
  *
- * This builds the structure deterministically from the student's own profile.
  * It never invents an award, a date or a number: a field that is empty is
- * omitted, not filled with plausible-sounding text.
+ * omitted, not filled with plausible-sounding text. Missing fields and review
+ * prompts are stable message keys so the API can localize them.
  *
  * Pure module — asserted in `scripts/check-cv.ts`.
  */
@@ -49,15 +49,52 @@ export interface CvSection {
   items: string[];
 }
 
+export type CvGuidanceKey =
+  | "targetMajor"
+  | "targetMajorMissing"
+  | "evidence"
+  | "evidenceMissing"
+  | "leadership"
+  | "leadershipMissing"
+  | "academicComplete"
+  | "academicIncomplete"
+  | "testScoresPresent"
+  | "testScoresMissing"
+  | "lengthOnePage"
+  | "lengthLong";
+
+export interface CvGuidance {
+  key: CvGuidanceKey;
+  values?: Record<string, string | number>;
+}
+
+export type CvMissingKey =
+  | "fullName"
+  | "email"
+  | "country"
+  | "targetMajor"
+  | "gpa"
+  | "graduationYear"
+  | "testScores";
+
+export type CvWarningKey = "noActivities" | "empty" | "noEvidence" | "length" | "manyEntries";
+
+export interface CvIssue<Key extends string> {
+  key: Key;
+  values?: Record<string, string | number>;
+}
+
 export interface CvResult {
   name: string;
   headline: string;
   contact: string[];
   sections: CvSection[];
-  /** Fields the student has not filled — shown as a to-do, never fabricated. */
-  missing: string[];
-  /** Structural problems a reader would notice. */
-  warnings: string[];
+  /** Profile fields not supplied — localized by the API, never fabricated. */
+  missing: CvIssue<CvMissingKey>[];
+  /** Profile-specific, actionable revision guidance; never adds CV claims. */
+  guidance: CvGuidance[];
+  /** Structural review prompts — localized by the API. */
+  warnings: CvIssue<CvWarningKey>[];
   /** Rough page count at ~45 lines/page. */
   estimatedPages: number;
   totalItems: number;
@@ -99,26 +136,27 @@ export const FORBIDDEN_ON_CV = [
 const has = (v: unknown): boolean => v != null && String(v).trim() !== "";
 
 export function buildCv(profile: CvProfile): CvResult {
-  const missing: string[] = [];
-  const warnings: string[] = [];
+  const missing: CvIssue<CvMissingKey>[] = [];
+  const warnings: CvIssue<CvWarningKey>[] = [];
   const sections: CvSection[] = [];
 
   // --- Header --------------------------------------------------------------
   const name = has(profile.name) ? String(profile.name).trim() : "Your Name";
-  if (!has(profile.name)) missing.push("Full name");
+  if (!has(profile.name)) missing.push({ key: "fullName" });
 
   const contact: string[] = [];
   if (has(profile.email)) contact.push(String(profile.email).trim());
-  else missing.push("Email address");
+  else missing.push({ key: "email" });
   if (has(profile.country)) contact.push(String(profile.country).trim());
-  else missing.push("Country");
+  else missing.push({ key: "country" });
 
-  const headline = has(profile.targetMajor)
-    ? `${String(profile.targetMajor).trim()} applicant${has(profile.degreeLevel) ? ` · ${String(profile.degreeLevel).trim()}` : ""}`
+  const targetMajor = has(profile.targetMajor) ? String(profile.targetMajor).trim() : null;
+  const headline = targetMajor
+    ? `${targetMajor} applicant${has(profile.degreeLevel) ? ` · ${String(profile.degreeLevel).trim()}` : ""}`
     : has(profile.careerGoal)
       ? String(profile.careerGoal).trim()
       : "Applicant";
-  if (!has(profile.targetMajor)) missing.push("Intended major");
+  if (!targetMajor) missing.push({ key: "targetMajor" });
 
   // --- Education -----------------------------------------------------------
   const education: string[] = [];
@@ -126,10 +164,10 @@ export function buildCv(profile: CvProfile): CvResult {
     const scale = Number(profile.gpaScale) > 0 ? Number(profile.gpaScale) : 4;
     education.push(`GPA ${Number(profile.gpa)}/${scale}`);
   } else {
-    missing.push("GPA — the first thing a reader looks for");
+    missing.push({ key: "gpa" });
   }
   if (Number(profile.graduationYear) > 0) education.push(`Expected graduation ${profile.graduationYear}`);
-  else missing.push("Graduation year");
+  else missing.push({ key: "graduationYear" });
   const coursework = [
     ...parseList(profile.apCourses).map((c) => `AP ${c}`),
     ...parseList(profile.ibCourses).map((c) => `IB ${c}`),
@@ -145,7 +183,7 @@ export function buildCv(profile: CvProfile): CvResult {
   if (Number(profile.ieltsScore) > 0) tests.push(`IELTS ${profile.ieltsScore}`);
   if (Number(profile.toeflScore) > 0) tests.push(`TOEFL ${profile.toeflScore}`);
   if (tests.length > 0) sections.push({ heading: "Standardized Tests", items: tests });
-  else missing.push("Any test score (SAT/ACT/IELTS/TOEFL)");
+  else missing.push({ key: "testScores" });
 
   // --- Research & projects: evidence first ---------------------------------
   const research = parseList(profile.researchExperience);
@@ -169,12 +207,12 @@ export function buildCv(profile: CvProfile): CvResult {
     ...parseList(profile.sports),
     ...parseList(profile.clubs),
   ];
-  // Leadership goes first: depth of responsibility reads better than volume.
+  // Group profile entries without scoring one activity type above another.
   if (leadership.length + other.length > 0) {
-    sections.push({ heading: "Leadership & Activities", items: [...leadership, ...other] });
+    sections.push({ heading: "Activities & Leadership", items: [...leadership, ...other] });
   }
-  if (leadership.length === 0) {
-    warnings.push("No leadership role listed. One sustained role beats five one-week activities.");
+  if (leadership.length === 0 && other.length === 0) {
+    warnings.push({ key: "noActivities" });
   }
 
   // --- Work experience ------------------------------------------------------
@@ -203,12 +241,10 @@ export function buildCv(profile: CvProfile): CvResult {
   // --- Structural warnings --------------------------------------------------
   const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
   if (totalItems === 0) {
-    warnings.push("The CV is empty. Fill in your profile and it builds itself.");
+    warnings.push({ key: "empty" });
   }
   if (research.length + projects.length === 0 && honours.length === 0) {
-    warnings.push(
-      "No evidence section. A reader needs something concrete — a project, a competition result, an award."
-    );
+    warnings.push({ key: "noEvidence" });
   }
   // Count the lines the renderer will actually emit: header, one line per
   // item, one per heading, plus the blank line between sections. At ~45 lines
@@ -219,15 +255,33 @@ export function buildCv(profile: CvProfile): CvResult {
     totalItems;
   const estimatedPages = Math.max(1, Math.ceil(renderedLines / 45));
   if (estimatedPages > 2) {
-    warnings.push(
-      `This runs to about ${estimatedPages} pages. Admissions readers spend under two minutes per file — cut to the strongest two pages.`
-    );
+    warnings.push({ key: "length", values: { pages: estimatedPages } });
   }
   if (totalItems > 22) {
-    warnings.push(
-      `${totalItems} entries is a list, not a CV. Depth reads better than volume: keep what shows impact.`
-    );
+    warnings.push({ key: "manyEntries", values: { count: totalItems } });
   }
+
+  const evidenceCount = research.length + projects.length + honours.length;
+  const activityCount = leadership.length + other.length;
+  const hasAcademicRecord =
+    Number(profile.gpa) > 0 && Number(profile.gpaScale) > 0 && Number(profile.graduationYear) > 0;
+  const hasTestScores = tests.length > 0;
+  const guidance: CvGuidance[] = [
+    targetMajor
+      ? { key: "targetMajor", values: { major: targetMajor } }
+      : { key: "targetMajorMissing" },
+    evidenceCount > 0
+      ? { key: "evidence", values: { count: evidenceCount } }
+      : { key: "evidenceMissing" },
+    activityCount > 0
+      ? { key: "leadership", values: { count: activityCount } }
+      : { key: "leadershipMissing" },
+    { key: hasAcademicRecord ? "academicComplete" : "academicIncomplete" },
+    { key: hasTestScores ? "testScoresPresent" : "testScoresMissing" },
+    estimatedPages > 1
+      ? { key: "lengthLong", values: { pages: estimatedPages } }
+      : { key: "lengthOnePage" },
+  ];
 
   return {
     name,
@@ -235,6 +289,7 @@ export function buildCv(profile: CvProfile): CvResult {
     contact,
     sections,
     missing,
+    guidance,
     warnings,
     estimatedPages,
     totalItems,

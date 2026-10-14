@@ -825,6 +825,8 @@ async function main() {
     const gate = readFileSync(join(ROOT, "src/components/PremiumGate.tsx"), "utf8");
     assert.match(gate, /feature: FeatureKey/);
     assert.match(gate, /data\?\.features\?\.\[feature\]/);
+    assert.match(gate, /setIsPremium\(data\?\.features\?\.\[feature\] === true\)/, "unknown or missing feature access must fail closed");
+    assert.doesNotMatch(gate, /data\?\.isPremium/, "a general plan flag must not substitute for a feature entitlement");
     const lockedBranch = gate.slice(gate.indexOf("if (isPremium) {"));
     assert.equal((lockedBranch.match(/\{children\}/g) || []).length, 1, "children may only render in the unlocked branch");
     // Every mount, wherever it lives — the app shell renders PremiumGate

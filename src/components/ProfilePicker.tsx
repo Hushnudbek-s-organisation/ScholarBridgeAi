@@ -153,7 +153,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
             <h2 id="picker-title" className="text-lg font-extrabold">{t("title")}</h2>
             <p className="mt-0.5 text-xs text-indigo-100">{t("subtitle")}</p>
           </div>
-          <button onClick={close} aria-label={t("close")} className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 hover:text-white">
+          <button onClick={close} aria-label={t("close")} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -179,7 +179,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                       key={p.id}
                       onClick={() => onSelect(p)}
                       disabled={isCurrent}
-                      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${
+                      className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                         isCurrent ? "cursor-default border-indigo-300 bg-indigo-50" : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50"
                       }`}
                     >
@@ -197,14 +197,14 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate text-sm font-bold text-slate-800">{p.name}</span>
+                          <span className="min-w-0 break-words text-sm font-bold text-slate-800">{p.name}</span>
                           {isAdmin && (
                             <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">
                               <ShieldCheck className="h-2.5 w-2.5 text-amber-300" /> ADMIN
                             </span>
                           )}
                         </div>
-                        <p className="truncate text-[11px] text-slate-400">{tgOnly ? t("telegramAccount") : p.email}</p>
+                        <p className="break-all text-[11px] text-slate-400">{tgOnly ? t("telegramAccount") : p.email}</p>
                       </div>
                       {isCurrent && <span className="shrink-0 text-[10px] font-bold text-indigo-600">{t("active")}</span>}
                     </button>
@@ -229,7 +229,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     role="tab"
                     aria-selected={active === id}
                     onClick={() => setMethod(id)}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                       active === id ? (id === "telegram" ? "bg-sky-500 text-white sb-ink-on-bright" : "bg-indigo-600 text-white") : "text-slate-500 hover:bg-slate-100"
                     }`}
                   >
@@ -260,7 +260,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t("email")}
                     aria-label={t("email")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     autoComplete="email"
                     required
                   />
@@ -270,7 +270,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t("password")}
                     aria-label={t("password")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     autoComplete="current-password"
                     required
                   />
@@ -282,7 +282,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                   <button
                     type="submit"
                     disabled={signInBusy}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-60"
                   >
                     {signInBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogIn className="h-3.5 w-3.5" />}
                     {signInBusy ? t("signingIn") : t("signIn")}
@@ -294,7 +294,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
 
           <button
             onClick={onAddNew}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             <Plus className="h-3.5 w-3.5" /> {t("createAccount")}
           </button>

@@ -30,5 +30,5 @@ export function isThemeChoice(value: unknown): value is ThemeChoice {
  * nonce-based policy, and an inline script without a nonce is blocked.
  */
 export function themeInitScript(): string {
-  return `(function(){try{var k="${THEME_STORAGE_KEY}";var s=localStorage.getItem(k);var t=(s==="light"||s==="dark"||s==="system")?s:"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t;var r=document.documentElement;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
+  return `(function(){try{var k="${THEME_STORAGE_KEY}";var s=localStorage.getItem(k);var t=(s==="light"||s==="dark"||s==="system")?s:"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t==="dark";var r=document.documentElement;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
 }

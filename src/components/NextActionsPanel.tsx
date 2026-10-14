@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Loader2, ListChecks, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, ListChecks, AlertTriangle } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 
 /**
@@ -40,7 +40,6 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
   const [actions, setActions] = useState<NextAction[]>([]);
   const [rest, setRest] = useState<NextAction[]>([]);
   const [headline, setHeadline] = useState("");
-  const [completeness, setCompleteness] = useState<number | null>(null);
   const [criticalCount, setCriticalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -58,7 +57,6 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
         setActions(data.actions ?? []);
         setRest(data.rest ?? []);
         setHeadline(data.headline ?? "");
-        setCompleteness(data.completeness ?? null);
         setCriticalCount(data.criticalCount ?? 0);
       }
     } catch {
@@ -86,12 +84,6 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
           </h2>
           <p className="mt-0.5 text-xs text-slate-600">{headline}</p>
         </div>
-        {completeness !== null && (
-          <div className="flex items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600">
-            <Sparkles className="h-3 w-3 text-indigo-500" />
-            profile {completeness}%
-          </div>
-        )}
       </div>
 
       {loading ? (

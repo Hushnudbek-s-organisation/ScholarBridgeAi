@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -39,6 +40,7 @@ interface Issue {
   code: string;
   message: string;
   severity: "blocker" | "warning" | "info";
+  excerpt?: string;
 }
 
 interface Feedback {
@@ -69,20 +71,27 @@ interface Version {
 }
 
 const ESSAY_TYPES = [
-  { value: "sop", label: "Statement of Purpose" },
-  { value: "personal_statement", label: "Personal Statement" },
-  { value: "why_us", label: "Why This University" },
-  { value: "supplemental", label: "Supplemental" },
-  { value: "scholarship", label: "Scholarship Essay" },
+  { value: "sop", labelKey: "essayTypeSop" },
+  { value: "personal_statement", labelKey: "essayTypePersonal" },
+  { value: "why_us", labelKey: "essayTypeWhyUs" },
+  { value: "supplemental", labelKey: "essayTypeSupplemental" },
+  { value: "scholarship", labelKey: "essayTypeScholarship" },
+] as const;
+
+const SUBSCORES: { key: keyof Scores; labelKey: string }[] = [
+  { key: "hook", labelKey: "essaySubscoreHook" },
+  { key: "structure", labelKey: "essaySubscoreStructure" },
+  { key: "specificity", labelKey: "essaySubscoreSpecificity" },
+  { key: "language", labelKey: "essaySubscoreLanguage" },
+  { key: "fit", labelKey: "essaySubscoreFit" },
 ];
 
-const SUBSCORES: { key: keyof Scores; label: string }[] = [
-  { key: "hook", label: "Opening hook" },
-  { key: "structure", label: "Structure" },
-  { key: "specificity", label: "Specificity & evidence" },
-  { key: "language", label: "Language" },
-  { key: "fit", label: "Prompt fit" },
-];
+const ESSAY_ISSUE_CODES = new Set([
+  "opening_boilerplate", "long_first_sentence", "cliche_opening", "too_few_paragraphs",
+  "paragraph_too_long", "no_conclusion", "run_on_sentences", "no_evidence", "thin_evidence",
+  "unsupported_adjective", "cliches", "passive_voice", "monotone_rhythm", "repeated_word",
+  "target_not_named", "why_us_generic", "over_limit", "under_limit", "no_forward_look", "too_short",
+]);
 
 const SEVERITY_STYLE: Record<Issue["severity"], string> = {
   blocker: "bg-red-50 text-red-700 border-red-200",
@@ -90,11 +99,18 @@ const SEVERITY_STYLE: Record<Issue["severity"], string> = {
   info: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
+const SEVERITY_LABEL_KEY: Record<Issue["severity"], string> = {
+  blocker: "essaySeverityBlocker",
+  warning: "essaySeverityWarning",
+  info: "essaySeverityInfo",
+};
+
 interface EssayRubricStudioProps {
   activeProfile: StudentProfile | null;
 }
 
 export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
+  const t = useTranslations("ai");
   const [text, setText] = useState("");
   const [essayType, setEssayType] = useState("sop");
   const [targetName, setTargetName] = useState("");
@@ -179,7 +195,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   if (!activeProfile) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to score your essays.
+        {t("essaySignedOut")}
       </div>
     );
   }
@@ -241,18 +257,27 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
   const limit = wordLimit ? Number(wordLimit) : null;
   const overLimit = limit !== null && wordCount > limit;
+  const localizeIssue = (issue: Issue) => {
+    if (!ESSAY_ISSUE_CODES.has(issue.code)) return issue.message;
+    const values =
+      issue.code === "over_limit" || issue.code === "under_limit"
+        ? { words: feedback?.wordCount ?? wordCount, limit: limit ?? 0 }
+        : issue.code === "too_short"
+          ? { words: feedback?.wordCount ?? wordCount }
+          : undefined;
+    return t(`essayIssues.${issue.code}` as never, values as never) as string;
+  };
+  const localizeIssueCode = (code: string) =>
+    ESSAY_ISSUE_CODES.has(code) ? (t(`essayIssues.${code}` as never) as string) : code;
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
           <Sparkles className="h-5 w-5 text-indigo-600" />
-          Essay rubric & version history
+          {t("essayStudioTitle")}
         </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Scores are computed from your text by a fixed rubric — the same draft always gets the
-          same score, so you can see what actually improved.
-        </p>
+        <p className="mt-0.5 text-xs text-slate-500">{t("essayStudioSubtitle")}</p>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-4">
           <select
@@ -260,34 +285,34 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
             value={essayType}
             onChange={(e) => setEssayType(e.target.value)}
           >
-            {ESSAY_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
+            {ESSAY_TYPES.map((essayType) => (
+              <option key={essayType.value} value={essayType.value}>
+                {t(essayType.labelKey)}
               </option>
             ))}
           </select>
           <input
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder="Target university"
+            placeholder={t("essayTargetPlaceholder")}
             value={targetName}
             onChange={(e) => setTargetName(e.target.value)}
           />
           <input
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
             type="number"
-            placeholder="Word limit"
+            placeholder={t("essayLimitPlaceholder")}
             value={wordLimit}
             onChange={(e) => setWordLimit(e.target.value)}
           />
           <div className={`rounded-lg border px-3 py-2 text-sm font-bold ${overLimit ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 text-slate-600"}`}>
-            {wordCount}
-            {limit ? ` / ${limit}` : " words"}
+            {t("essayWordCount", { words: wordCount })}
+            {limit ? ` / ${limit}` : ""}
           </div>
         </div>
 
         <textarea
           className="mt-3 min-h-[280px] w-full rounded-xl border border-slate-200 p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none"
-          placeholder="Paste your essay here…"
+          placeholder={t("essayTextPlaceholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -298,7 +323,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
             disabled={busy || !text.trim()}
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            Score this draft
+            {t("essayScoreDraftButton")}
           </button>
           <button
             onClick={() => void saveVersion()}
@@ -306,7 +331,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
             className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save as new version
+            {busy ? t("essaySavingVersion") : t("essaySaveVersionButton")}
           </button>
         </div>
       </div>
@@ -319,7 +344,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Rubric total</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("essayRubricTotal")}</div>
               <div
                 className={`text-3xl font-extrabold ${
                   feedback.scores.total >= 75 ? "text-emerald-600" : feedback.scores.total >= 50 ? "text-amber-600" : "text-red-600"
@@ -328,6 +353,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 {feedback.scores.total}
                 <span className="text-base font-bold text-slate-400">/100</span>
               </div>
+              <p className="mt-1 max-w-lg text-[11px] leading-relaxed text-slate-500">{t("essayRubricDisclaimer")}</p>
             </div>
             {comparison && (
               <div
@@ -344,17 +370,16 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 ) : (
                   <TrendingDown className="h-3.5 w-3.5" />
                 )}
-                {(comparison.delta.total ?? 0) > 0 ? "+" : ""}
-                {comparison.delta.total ?? 0} vs previous
+                {t("essayPreviousDelta", { score: `${(comparison.delta.total ?? 0) > 0 ? "+" : ""}${comparison.delta.total ?? 0}` })}
               </div>
             )}
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {SUBSCORES.map(({ key, label }) => (
+            {SUBSCORES.map(({ key, labelKey }) => (
               <div key={key}>
                 <div className="flex justify-between text-[11px] font-semibold text-slate-600">
-                  <span>{label}</span>
+                  <span>{t(labelKey as never)}</span>
                   <span className="flex items-center gap-1.5">
                     {comparison && typeof comparison.delta[key] === "number" && comparison.delta[key] !== 0 && (
                       <span className={comparison.delta[key]! > 0 ? "text-emerald-600" : "text-red-600"}>
@@ -377,9 +402,16 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
               {feedback.issues.map((issue, i) => (
                 <li key={`${issue.code}-${i}`} className="flex flex-wrap items-start gap-2">
                   <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${SEVERITY_STYLE[issue.severity]}`}>
-                    {issue.severity}
+                    {t(SEVERITY_LABEL_KEY[issue.severity] as never)}
                   </span>
-                  <span className="min-w-0 flex-1 text-xs text-slate-700">{issue.message}</span>
+                  <span className="min-w-0 flex-1 text-xs text-slate-700">
+                    {localizeIssue(issue)}
+                    {issue.excerpt && (
+                      <span className="mt-1 block break-words rounded-md bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+                        <span className="font-semibold">{t("essayExcerptLabel")}:</span> “{issue.excerpt}”
+                      </span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -387,7 +419,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
 
           {feedback.cliches.length > 0 && (
             <p className="mt-3 text-[11px] text-slate-500">
-              Clichés to cut: {feedback.cliches.map((c) => `"${c.phrase}" ×${c.count}`).join(", ")}
+              {t("essayClichesToCut", { items: feedback.cliches.map((c) => `“${c.phrase}” ×${c.count}`).join(", ") })}
             </p>
           )}
 
@@ -395,12 +427,14 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
             <p className="mt-3 text-[11px] text-slate-500">
               {comparison.fixedIssues.length > 0 && (
                 <span className="mr-3 inline-flex items-center gap-1 text-emerald-700">
-                  <CheckCircle2 className="h-3 w-3" /> fixed: {comparison.fixedIssues.join(", ")}
+                  <CheckCircle2 className="h-3 w-3" />
+                  {t("essayFixedIssues", { items: comparison.fixedIssues.map(localizeIssueCode).join(", ") })}
                 </span>
               )}
               {comparison.newIssues.length > 0 && (
                 <span className="inline-flex items-center gap-1 text-red-700">
-                  <AlertTriangle className="h-3 w-3" /> new: {comparison.newIssues.join(", ")}
+                  <AlertTriangle className="h-3 w-3" />
+                  {t("essayNewIssues", { items: comparison.newIssues.map(localizeIssueCode).join(", ") })}
                 </span>
               )}
             </p>
@@ -515,12 +549,12 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
                   v{v.versionNumber}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{v.title}</span>
+                <span className="min-w-0 flex-1 break-words text-xs font-semibold text-slate-700">{v.title}</span>
                 <span className="text-[11px] text-slate-400">{v.wordCount} words</span>
                 <span className="text-xs font-extrabold text-indigo-700">{v.rubricTotal ?? "—"}</span>
                 <button
                   onClick={() => setText(v.content)}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                  className="min-h-11 shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
                 >
                   Load
                 </button>
@@ -848,7 +882,7 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
               {openEssays.slice(0, 8).map((o) => (
                 <li key={o.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2">
                   <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-slate-700">
+                    <p className="break-words text-[11px] font-bold text-slate-700">
                       v{o.versionNumber} · {o.title}
                     </p>
                     <p className="text-[10px] text-slate-400">
@@ -857,7 +891,7 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
                   </div>
                   <button
                     onClick={() => setReviewFor(o)}
-                    className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-indigo-700"
+                    className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-[10px] font-bold text-white hover:bg-indigo-700"
                   >
                     <PenLine className="h-3 w-3" /> Review
                   </button>
@@ -867,12 +901,12 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
           ) : (
             <div className="mt-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] font-bold text-slate-700">
+                <p className="break-words text-[11px] font-bold text-slate-700">
                   v{reviewFor.versionNumber} · {reviewFor.title}
                 </p>
                 <button
                   onClick={() => setReviewFor(null)}
-                  className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                  className="min-h-11 shrink-0 px-2 text-[10px] font-bold text-slate-400 hover:text-slate-600"
                 >
                   ← back
                 </button>
@@ -880,7 +914,7 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
               <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2 text-[10px] leading-relaxed text-slate-100">
                 {reviewFor.content}
               </pre>
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-1.5">
                 {PEER_DIMS.map((d) => (
                   <label key={d.key} className="block">
                     <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{d.label}</span>

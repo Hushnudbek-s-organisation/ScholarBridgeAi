@@ -14,6 +14,8 @@
  *    server applies the same ownership checks, entitlements and quotas.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dictionaries, type Messages } from "@/i18n/messages";
+import { formatMessage } from "@/i18n/formatMessage";
 import {
   Bell,
   BookmarkCheck,
@@ -74,148 +76,14 @@ interface MiniProfile {
 }
 
 // ---------------------------------------------------------------------------
-// Texts
-// ---------------------------------------------------------------------------
-
-const TXT = {
-  uz: {
-    loading: "Yuklanmoqda…",
-    outsideTitle: "Telegram ichida oching",
-    outsideBody: "Bu sahifa ScholarBridge Telegram botining ilovasi. Uni botdagi «Ilovani ochish» tugmasi orqali oching.",
-    errorTitle: "Ulanib bo'lmadi",
-    errorBody: "Telegram seansini tekshirib bo'lmadi. Ilovani yopib, botdan qayta oching.",
-    retry: "Qayta urinish",
-    unlinkedTitle: "Akkaunt ulanmagan",
-    unlinkedBody: "Bu Telegram hali ScholarBridge akkauntiga ulanmagan. Saytda ro'yxatdan o'ting yoki kiring, so'ng «Telegram va xabarlar» bo'limida «Telegramni ulash» tugmasini bosing.",
-    openSite: "Saytni ochish",
-    fullSite: "To'liq saytni ochish",
-    tabs: { home: "Asosiy", universities: "Universitet", scholarships: "Stipendiya", applications: "Arizalar", profile: "Profil" },
-    hello: (n: string) => `Salom, ${n}!`,
-    nextSteps: "Keyingi qadamlar",
-    nothingUrgent: "Hozircha shoshilinch vazifa yo'q.",
-    savedUnis: "Saqlangan universitetlar",
-    savedSch: "Saqlangan stipendiyalar",
-    searchUni: "Universitet, davlat yoki yo'nalish…",
-    searchSch: "Stipendiya, davlat yoki tashkilot…",
-    search: "Qidirish",
-    noResults: "Hech narsa topilmadi.",
-    more: "Yana ko'rsatish",
-    save: "Saqlash",
-    saved: "Saqlangan",
-    perYear: "/yil",
-    match: "moslik",
-    deadline: "Muddat",
-    apps: "Arizalarim",
-    appsEmpty: "Hali ariza yo'q. Ularni saytdagi «Arizalar» bo'limida qo'shing.",
-    plan: "Tarif",
-    planNames: { free: "Bepul", premium: "Premium", admin: "Admin" } as Record<string, string>,
-    level: "Daraja",
-    major: "Yo'nalish",
-    english: "Ingliz tili",
-    countries: "Davlatlar",
-    budget: "Byudjet",
-    notSet: "ko'rsatilmagan",
-    notifications: "Telegram bildirishnomalari",
-    reminders: "Muddat eslatmalari (kun oldin)",
-    remindersOff: "Eslatmasiz",
-    disconnect: "Telegramni uzish",
-    disconnectConfirm: "Telegramni ScholarBridge akkauntidan uzasizmi?",
-    unavailable: "Ma'lumotlar vaqtincha mavjud emas.",
-    failed: "Xatolik yuz berdi. Qayta urinib ko'ring.",
-    rateLimited: "Juda ko'p so'rov. Birozdan keyin urinib ko'ring.",
-  },
-  ru: {
-    loading: "Загрузка…",
-    outsideTitle: "Откройте в Telegram",
-    outsideBody: "Это приложение Telegram-бота ScholarBridge. Откройте его кнопкой «Открыть приложение» в боте.",
-    errorTitle: "Не удалось подключиться",
-    errorBody: "Не удалось проверить сеанс Telegram. Закройте приложение и откройте его из бота снова.",
-    retry: "Повторить",
-    unlinkedTitle: "Аккаунт не подключён",
-    unlinkedBody: "Этот Telegram ещё не подключён к аккаунту ScholarBridge. Зарегистрируйтесь или войдите на сайте и нажмите «Подключить Telegram» в разделе «Telegram и уведомления».",
-    openSite: "Открыть сайт",
-    fullSite: "Открыть полный сайт",
-    tabs: { home: "Главная", universities: "Вузы", scholarships: "Стипендии", applications: "Заявки", profile: "Профиль" },
-    hello: (n: string) => `Здравствуйте, ${n}!`,
-    nextSteps: "Следующие шаги",
-    nothingUrgent: "Срочных задач нет.",
-    savedUnis: "Сохранённые вузы",
-    savedSch: "Сохранённые стипендии",
-    searchUni: "Вуз, страна или направление…",
-    searchSch: "Стипендия, страна или организация…",
-    search: "Найти",
-    noResults: "Ничего не найдено.",
-    more: "Показать ещё",
-    save: "Сохранить",
-    saved: "Сохранено",
-    perYear: "/год",
-    match: "совпадение",
-    deadline: "Дедлайн",
-    apps: "Мои заявки",
-    appsEmpty: "Заявок пока нет. Добавьте их в разделе «Заявки» на сайте.",
-    plan: "Тариф",
-    planNames: { free: "Бесплатный", premium: "Premium", admin: "Админ" } as Record<string, string>,
-    level: "Уровень",
-    major: "Направление",
-    english: "Английский",
-    countries: "Страны",
-    budget: "Бюджет",
-    notSet: "не указано",
-    notifications: "Уведомления в Telegram",
-    reminders: "Напоминания о дедлайнах (за дней)",
-    remindersOff: "Без напоминаний",
-    disconnect: "Отвязать Telegram",
-    disconnectConfirm: "Отвязать Telegram от аккаунта ScholarBridge?",
-    unavailable: "Данные временно недоступны.",
-    failed: "Произошла ошибка. Попробуйте ещё раз.",
-    rateLimited: "Слишком много запросов. Попробуйте позже.",
-  },
-  en: {
-    loading: "Loading…",
-    outsideTitle: "Open inside Telegram",
-    outsideBody: "This page is the ScholarBridge Telegram bot's app. Open it with the “Open app” button in the bot.",
-    errorTitle: "Could not connect",
-    errorBody: "We could not verify your Telegram session. Close the app and open it again from the bot.",
-    retry: "Try again",
-    unlinkedTitle: "Account not connected",
-    unlinkedBody: "This Telegram is not connected to a ScholarBridge account yet. Sign up or sign in on the website, then press “Connect Telegram” under “Telegram & alerts”.",
-    openSite: "Open website",
-    fullSite: "Open full website",
-    tabs: { home: "Home", universities: "Universities", scholarships: "Scholarships", applications: "Applications", profile: "Profile" },
-    hello: (n: string) => `Hi, ${n}!`,
-    nextSteps: "Next steps",
-    nothingUrgent: "Nothing urgent right now.",
-    savedUnis: "Saved universities",
-    savedSch: "Saved scholarships",
-    searchUni: "University, country or major…",
-    searchSch: "Scholarship, country or provider…",
-    search: "Search",
-    noResults: "Nothing found.",
-    more: "Show more",
-    save: "Save",
-    saved: "Saved",
-    perYear: "/yr",
-    match: "match",
-    deadline: "Deadline",
-    apps: "My applications",
-    appsEmpty: "No applications yet. Add them under “Applications” on the website.",
-    plan: "Plan",
-    planNames: { free: "Free", premium: "Premium", admin: "Admin" } as Record<string, string>,
-    level: "Level",
-    major: "Major",
-    english: "English",
-    countries: "Countries",
-    budget: "Budget",
-    notSet: "not set",
-    notifications: "Telegram notifications",
-    reminders: "Deadline reminders (days before)",
-    remindersOff: "No reminders",
-    disconnect: "Disconnect Telegram",
-    disconnectConfirm: "Disconnect Telegram from your ScholarBridge account?",
-    unavailable: "Data is temporarily unavailable.",
-    failed: "Something went wrong. Please try again.",
-    rateLimited: "Too many requests. Please try again later.",
-  },
+// Copy is centralized in the checked-in en/uz/ru message files. The Mini App
+// selects the language reported by Telegram/profile rather than assuming the
+// website's current cookie locale.
+type MiniAppMessages = Messages["telegram"]["miniApp"];
+const TXT: Record<Lang, MiniAppMessages> = {
+  en: dictionaries.en.telegram.miniApp,
+  uz: dictionaries.uz.telegram.miniApp,
+  ru: dictionaries.ru.telegram.miniApp,
 };
 
 const PRESETS: { id: string; days: number[] }[] = [
@@ -420,7 +288,7 @@ export function MiniApp() {
       <nav
         className="fixed inset-x-0 bottom-0 border-t"
         style={{ background: C.bg, borderColor: C.card, paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="ScholarBridge"
+        aria-label={t.navigationLabel}
       >
         <div className="mx-auto grid max-w-xl grid-cols-5">
           {tabs.map(({ id, icon: Icon }) => (
@@ -429,7 +297,7 @@ export function MiniApp() {
               type="button"
               onClick={() => setScreen(id)}
               aria-current={screen === id ? "page" : undefined}
-              className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold"
+              className="flex min-h-11 min-w-11 flex-col items-center gap-0.5 rounded-lg py-2 text-[10px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               style={{ color: screen === id ? C.button : C.hint }}
             >
               <Icon className="h-5 w-5" />
@@ -455,7 +323,7 @@ function PrimaryButton({ children, onClick, disabled }: { children: React.ReactN
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
       style={{ background: C.button, color: C.buttonText }}
     >
       {children}
@@ -522,19 +390,19 @@ function HomeScreen({ t, api, profile, go }: { t: T; api: Api; profile: MiniProf
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">{t.hello(profile.name)}</h1>
+      <h1 className="text-xl font-bold">{formatMessage(t.hello, { name: profile.name })}</h1>
       {state.loading && <Spinner />}
       {state.error ? <Notice text={errorText(t, state.error)} /> : null}
       {state.data && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => go("universities")} className="text-left">
+            <button type="button" onClick={() => go("universities")} className="rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
               <Card>
                 <p className="text-2xl font-bold">{state.data.unis}</p>
                 <p className="text-xs" style={{ color: C.hint }}>{t.savedUnis}</p>
               </Card>
             </button>
-            <button type="button" onClick={() => go("scholarships")} className="text-left">
+            <button type="button" onClick={() => go("scholarships")} className="rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
               <Card>
                 <p className="text-2xl font-bold">{state.data.schs}</p>
                 <p className="text-xs" style={{ color: C.hint }}>{t.savedSch}</p>
@@ -704,7 +572,7 @@ function SearchScreen({ kind, t, api, profile }: { kind: "u" | "s"; t: T; api: A
                 type="button"
                 onClick={() => !isSaved && save(it.id)}
                 disabled={isSaved || busy === it.id}
-                className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 style={isSaved ? { color: C.hint } : { background: C.button, color: C.buttonText }}
                 aria-label={isSaved ? t.saved : t.save}
               >
@@ -821,22 +689,33 @@ function ProfileScreen({
       return t.notSet;
     }
   }, [profile.preferredCountries, t.notSet]);
-  const english = profile.ieltsScore != null ? `IELTS ${profile.ieltsScore}` : profile.toeflScore != null ? `TOEFL ${profile.toeflScore}` : t.notSet;
+  const english = profile.ieltsScore != null
+    ? formatMessage(t.ieltsScore, { score: profile.ieltsScore })
+    : profile.toeflScore != null
+      ? formatMessage(t.toeflScore, { score: profile.toeflScore })
+      : t.notSet;
   const activePreset = link ? PRESETS.find((p) => p.days.join(",") === link.reminderDays.join(","))?.id ?? null : null;
+  const planLabel = plan === "free"
+    ? t.planNames.free
+    : plan === "premium"
+      ? t.planNames.premium
+      : plan === "admin"
+        ? t.planNames.admin
+        : plan ?? "…";
 
   return (
     <div className="space-y-4">
       <Card>
         <p className="text-base font-bold">{profile.name}</p>
         <p className="text-xs" style={{ color: C.hint }}>
-          {t.plan}: <b>{plan ? t.planNames[plan] ?? plan : "…"}</b>
+          {t.plan}: <b>{planLabel}</b>
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
           <dt style={{ color: C.hint }}>{t.level}</dt>
           <dd>{profile.degreeLevel || t.notSet}</dd>
           <dt style={{ color: C.hint }}>{t.major}</dt>
           <dd>{profile.targetMajor || t.notSet}</dd>
-          <dt style={{ color: C.hint }}>GPA</dt>
+          <dt style={{ color: C.hint }}>{t.gpa}</dt>
           <dd>{profile.gpa != null ? `${profile.gpa}${profile.gpaScale ? ` / ${profile.gpaScale}` : ""}` : t.notSet}</dd>
           <dt style={{ color: C.hint }}>{t.english}</dt>
           <dd>{english}</dd>
@@ -851,7 +730,7 @@ function ProfileScreen({
         <Card>
           <label className="flex items-center justify-between gap-3 text-sm font-semibold">
             <span className="flex items-center gap-2"><Bell className="h-4 w-4" /> {t.notifications}</span>
-            <input type="checkbox" checked={link.notifyEnabled} onChange={(e) => update({ notifyEnabled: e.target.checked })} className="h-5 w-5" />
+            <input type="checkbox" checked={link.notifyEnabled} onChange={(e) => update({ notifyEnabled: e.target.checked })} className="h-5 w-5 min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" />
           </label>
           <p className="mt-3 text-xs" style={{ color: C.hint }}>{t.reminders}</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -860,7 +739,7 @@ function ProfileScreen({
                 key={p.id}
                 type="button"
                 onClick={() => update({ reminderDays: p.days })}
-                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                className="min-h-11 min-w-11 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 style={activePreset === p.id ? { background: C.button, color: C.buttonText } : { background: C.bg, color: C.text }}
                 aria-pressed={activePreset === p.id}
               >
@@ -876,7 +755,7 @@ function ProfileScreen({
         <PrimaryButton onClick={() => openSite("/")}>
           <ExternalLink className="h-4 w-4" /> {t.fullSite}
         </PrimaryButton>
-        <button type="button" onClick={disconnect} className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600" style={{ background: C.card }}>
+        <button type="button" onClick={disconnect} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" style={{ background: C.card }}>
           <Unplug className="h-4 w-4" /> {t.disconnect}
         </button>
       </div>

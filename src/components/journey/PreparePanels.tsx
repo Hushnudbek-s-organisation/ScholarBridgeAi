@@ -203,28 +203,29 @@ interface TestPlanRow {
   nextTestDate: string | null;
   tasks: { id: number; title: string; isCompleted: boolean }[];
   attempts: { id: number; testDate: string; score: number | null; resultLabel: string | null }[];
-  requirements: { university: string; required: number }[];
-  gap: { state: string; message: string };
+  catalogueFigures: { university: string; catalogueFigure: number }[];
+  gap: { state: string; catalogueFigure: number | null; current: number | null; messageKey: string };
 }
 interface TestData {
   testTypes: { key: string; label: string; max: number; skills: string[] }[];
   plans: TestPlanRow[];
-  /** Published minimums demanded by the universities the student applied to. */
-  demanded: { testType: string; required: number; universities: string[] }[];
+  /** University-level catalogue figures that should be verified by programme. */
+  catalogueSignals: { testType: string; catalogueFigure: number; universities: string[] }[];
 }
 
 export function TestPlannerPanel({ profileId }: { profileId: number }) {
+  const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<TestData>(
-    useCallback(() => getJson<TestData>(`/api/test-planner?profileId=${profileId}`, "Could not load the test planner"), [profileId]),
+    useCallback(() => getJson<TestData>(`/api/test-planner?profileId=${profileId}`, t("tpLoadError")), [profileId, t]),
     [profileId],
-    { initial: { testTypes: [], plans: [], demanded: [] }, errorFallback: "Could not load the test planner" }
+    { initial: { testTypes: [], plans: [], catalogueSignals: [] }, errorFallback: t("tpLoadError") }
   );
   const [busy, setBusy] = useState(false);
 
   const save = async (payload: Record<string, unknown>) => {
     setBusy(true);
     try {
-      await sendJson("/api/test-planner", { method: "POST", body: JSON.stringify({ profileId, ...payload }) }, "Could not save");
+      await sendJson("/api/test-planner", { method: "POST", body: JSON.stringify({ profileId, ...payload }) }, t("tpSaveError"));
       await reload();
     } finally {
       setBusy(false);
@@ -232,155 +233,190 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
   };
 
   const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/test-planner", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, "Could not save");
+    await sendJson("/api/test-planner", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("tpSaveError"));
     await reload();
   };
 
-  if (loading && data.plans.length === 0) return <Loading label="Loading your test plan…" />;
+  const testLabel = (key: string) => {
+    const translationKey = `tpTestType.${key}`;
+    try {
+      return t(translationKey as never);
+    } catch {
+      return data.testTypes.find((item) => item.key === key)?.label ?? key;
+    }
+  };
 
-  // A university can demand a test the student never added a plan for — show it
-  // rather than silently omitting a real requirement.
-  const unplanned = data.demanded.filter((d) => !data.plans.some((p) => p.testType === d.testType));
+  const gapMessage = (gap: TestPlanRow["gap"], label: string) => {
+    switch (gap.messageKey) {
+      case "scoreNotRecorded":
+        return t("tpGapScoreNotRecorded", { test: label, figure: gap.catalogueFigure ?? "—" });
+      case "belowCatalogueFigure":
+        return t("tpGapBelowFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" });
+      case "atOrAboveCatalogueFigure":
+        return t("tpGapAtOrAboveFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" });
+      default:
+        return t("tpGapNoFigure", { test: label });
+    }
+  };
+
+  if (loading && data.plans.length === 0) return <Loading label={t("tpLoading")} />;
+
+  // Catalogue figures with no saved plan are shown as verification prompts,
+  // not as tests the student's applications require.
+  const untrackedSignals = data.catalogueSignals.filter(
+    (signal) => !data.plans.some((plan) => plan.testType === signal.testType),
+  );
 
   return (
     <div className="space-y-4">
       {error && <ErrorNote message={error} />}
-      <JourneyCard title="Add a test" subtitle="Which tests you can take is configurable — these are the defaults.">
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {data.testTypes.map((t) => (
-            <Button key={t.key} variant="outline" size="sm" disabled={busy} onClick={() => void save({ testType: t.key })}>
-              <Plus className="h-3 w-3" /> {t.label}
+      <JourneyCard title={t("tpAddTestTitle")} subtitle={t("tpAddTestSubtitle")}>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {data.testTypes.map((test) => (
+            <Button
+              key={test.key}
+              variant="outline"
+              size="sm"
+              className="min-h-11 whitespace-normal text-left"
+              disabled={busy}
+              onClick={() => void save({ testType: test.key })}
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{testLabel(test.key)}</span>
             </Button>
           ))}
         </div>
       </JourneyCard>
 
       {data.plans.length === 0 ? (
-        <Empty title="No test plans yet" hint="Add IELTS, TOEFL, SAT or any other test to track your current score, target and date." />
+        <Empty title={t("tpEmptyTitle")} hint={t("tpEmptyHint")} />
       ) : (
-        data.plans.map((p) => (
-          <JourneyCard
-            key={p.id}
-            title={p.label}
-            subtitle={p.gap.message}
-            action={
-              <Pill tone={p.gap.state === "met" ? "good" : p.gap.state === "below" ? "warn" : "slate"}>
-                {p.currentScore ?? "—"} / {p.targetScore ?? "—"}
-              </Pill>
-            }
-          >
-            <div className="grid gap-2 sm:grid-cols-4">
-              <Field label="Current score">
-                <input
-                  className={inputClass}
-                  type="number"
-                  step="0.1"
-                  defaultValue={p.currentScore ?? ""}
-                  onBlur={(e) => void patch({ testPlanId: p.id, currentScore: e.target.value === "" ? null : Number(e.target.value) })}
-                />
-              </Field>
-              <Field label="Target score">
-                <input
-                  className={inputClass}
-                  type="number"
-                  step="0.1"
-                  defaultValue={p.targetScore ?? ""}
-                  onBlur={(e) => void patch({ testPlanId: p.id, targetScore: e.target.value === "" ? null : Number(e.target.value) })}
-                />
-              </Field>
-              <Field label="Target date">
-                <input className={inputClass} type="date" defaultValue={p.targetDate ?? ""} onChange={(e) => void patch({ testPlanId: p.id, targetDate: e.target.value })} />
-              </Field>
-              <Field label="Next test date">
-                <input className={inputClass} type="date" defaultValue={p.nextTestDate ?? ""} onChange={(e) => void patch({ testPlanId: p.id, nextTestDate: e.target.value })} />
-              </Field>
-            </div>
+        data.plans.map((plan) => {
+          const label = testLabel(plan.testType);
+          const maxScore = data.testTypes.find((test) => test.key === plan.testType)?.max;
+          return (
+            <JourneyCard
+              key={plan.id}
+              title={label}
+              subtitle={gapMessage(plan.gap, label)}
+              action={
+                <Pill tone="slate" className="max-w-full whitespace-normal">
+                  {t("tpScoreAndTarget", { current: plan.currentScore ?? "—", target: plan.targetScore ?? "—" })}
+                </Pill>
+              }
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Field label={t("tpCurrentScore")}>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={0}
+                    max={maxScore}
+                    step="0.1"
+                    defaultValue={plan.currentScore ?? ""}
+                    onBlur={(event) => void patch({ testPlanId: plan.id, currentScore: event.target.value === "" ? null : Number(event.target.value) })}
+                  />
+                </Field>
+                <Field label={t("tpTargetScore")}>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={0}
+                    max={maxScore}
+                    step="0.1"
+                    defaultValue={plan.targetScore ?? ""}
+                    onBlur={(event) => void patch({ testPlanId: plan.id, targetScore: event.target.value === "" ? null : Number(event.target.value) })}
+                  />
+                </Field>
+                <Field label={t("tpTargetDate")}>
+                  <input className={inputClass} type="date" defaultValue={plan.targetDate ?? ""} onChange={(event) => void patch({ testPlanId: plan.id, targetDate: event.target.value })} />
+                </Field>
+                <Field label={t("tpNextTestDate")}>
+                  <input className={inputClass} type="date" defaultValue={plan.nextTestDate ?? ""} onChange={(event) => void patch({ testPlanId: plan.id, nextTestDate: event.target.value })} />
+                </Field>
+              </div>
 
-            <div className="mt-3 grid gap-4 lg:grid-cols-2">
-              <div>
-                <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Practice tasks</h3>
-                {p.tasks.length === 0 ? (
-                  <p className="text-xs text-slate-500">No practice tasks yet.</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {p.tasks.map((t) => (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          onClick={() => void patch({ taskId: t.id, isCompleted: !t.isCompleted })}
-                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[9px] ${
-                              t.isCompleted ? "border-emerald-500 bg-emerald-500 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
-                            }`}
+              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="min-w-0">
+                  <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPracticeTasks")}</h3>
+                  {plan.tasks.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t("tpNoTasks")}</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {plan.tasks.map((task) => (
+                        <li key={task.id}>
+                          <button
+                            type="button"
+                            aria-pressed={task.isCompleted}
+                            onClick={() => void patch({ taskId: task.id, isCompleted: !task.isCompleted })}
+                            className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
                           >
-                            {t.isCompleted && <Check className="h-2.5 w-2.5" />}
-                          </span>
-                          <span className={t.isCompleted ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}>
-                            {t.title}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[9px] ${
+                                task.isCompleted ? "border-emerald-600 bg-emerald-600 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              {task.isCompleted && <Check className="h-3 w-3" />}
+                            </span>
+                            <span className={`min-w-0 break-words ${task.isCompleted ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}>
+                              {task.title}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPreviousAttempts")}</h3>
+                  {plan.attempts.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t("tpNoAttempts")}</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {plan.attempts.map((attempt) => (
+                        <li key={attempt.id} className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                          <time className="text-xs text-slate-500" dateTime={attempt.testDate}>{attempt.testDate}</time>
+                          <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.score ?? "—"}</span>
+                          {attempt.resultLabel && <Pill tone="slate">{attempt.resultLabel}</Pill>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <RecordAttempt planId={plan.id} onSubmit={patch} />
+                </div>
               </div>
-              <div>
-                <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Previous attempts</h3>
-                {p.attempts.length === 0 ? (
-                  <p className="text-xs text-slate-500">No attempts recorded.</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {p.attempts.map((a) => (
-                      <li key={a.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-24 text-xs text-slate-500">{a.testDate}</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{a.score ?? "—"}</span>
-                        {a.resultLabel && <Pill tone="slate">{a.resultLabel}</Pill>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <RecordAttempt planId={p.id} onSubmit={patch} />
-              </div>
-            </div>
 
-            {p.requirements.length > 0 && (
-              <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">What your applications require</p>
-                <ul className="mt-1 space-y-0.5">
-                  {p.requirements.map((r) => (
-                    <li key={r.university} className="text-xs text-slate-600 dark:text-slate-300">
-                      {r.university}: {r.required}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </JourneyCard>
-        ))
+              {plan.catalogueFigures.length > 0 && (
+                <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("tpCatalogueFiguresTitle")}</p>
+                  <ul className="mt-1 space-y-1">
+                    {plan.catalogueFigures.map((figure) => (
+                      <li key={figure.university} className="break-words text-xs text-slate-600 dark:text-slate-300">
+                        {t("tpUniversityFigure", { university: figure.university, figure: figure.catalogueFigure })}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </JourneyCard>
+          );
+        })
       )}
 
-      <p className="text-[11px] text-slate-400">
-        We show the gap against each university&apos;s published minimum. We never claim a score change alters your admission
-        chances — we do not have the data to say that.
-      </p>
+      <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t("tpHonesty")}</p>
 
-      {unplanned.length > 0 && (
-        <JourneyCard
-          title="Your applications ask for a test you have not added"
-          subtitle="These are the published minimums of the universities in your application list."
-        >
-          <ul className="space-y-1.5">
-            {unplanned.map((d) => {
-              const meta = data.testTypes.find((t) => t.key === d.testType);
+      {untrackedSignals.length > 0 && (
+        <JourneyCard title={t("tpSignalsTitle")} subtitle={t("tpSignalsSubtitle")}>
+          <ul className="space-y-2">
+            {untrackedSignals.map((signal) => {
+              const label = testLabel(signal.testType);
               return (
-                <li key={d.testType} className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{meta?.label ?? d.testType}</span>
-                  <Pill tone="warn">minimum {d.required}</Pill>
-                  <span className="text-xs text-slate-500">{d.universities.join(", ")}</span>
-                  <Button size="sm" variant="outline" onClick={() => void save({ testType: d.testType })}>
-                    <Plus className="h-3 w-3" /> Track it
+                <li key={signal.testType} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
+                  <span className="min-w-0 flex-1 break-words font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+                  <Pill tone="slate" className="max-w-full whitespace-normal">{t("tpCatalogueReference", { figure: signal.catalogueFigure })}</Pill>
+                  <span className="min-w-0 break-words text-xs text-slate-500 sm:flex-1">{signal.universities.join(", ")}</span>
+                  <Button size="sm" variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" disabled={busy} onClick={() => void save({ testType: signal.testType })}>
+                    <Plus className="h-3.5 w-3.5" /> {t("tpTrackIt")}
                   </Button>
                 </li>
               );
@@ -388,22 +424,29 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
           </ul>
         </JourneyCard>
       )}
-      {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="planning" className="mt-2" />
     </div>
   );
 }
 
 function RecordAttempt({ planId, onSubmit }: { planId: number; onSubmit: (p: Record<string, unknown>) => Promise<void> }) {
+  const t = useTranslations("journey");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [score, setScore] = useState("");
   return (
-    <div className="mt-2 flex flex-wrap items-end gap-2">
-      <input type="date" className={`${inputClass} w-auto`} value={date} onChange={(e) => setDate(e.target.value)} />
-      <input type="number" step="0.1" placeholder="Score" className={`${inputClass} w-28`} value={score} onChange={(e) => setScore(e.target.value)} />
+    <div className="mt-2 flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+      <label className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300">
+        <span className="sr-only">{t("tpAttemptDate")}</span>
+        <input type="date" aria-label={t("tpAttemptDate")} className={inputClass} value={date} onChange={(event) => setDate(event.target.value)} />
+      </label>
+      <label className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300 sm:w-28">
+        <span className="sr-only">{t("tpScorePlaceholder")}</span>
+        <input type="number" step="0.1" placeholder={t("tpScorePlaceholder")} aria-label={t("tpScorePlaceholder")} className={inputClass} value={score} onChange={(event) => setScore(event.target.value)} />
+      </label>
       <Button
         size="sm"
         variant="outline"
+        className="min-h-11 w-full sm:w-auto"
         disabled={!score}
         onClick={() => {
           const n = Number(score);
@@ -412,7 +455,7 @@ function RecordAttempt({ planId, onSubmit }: { planId: number; onSubmit: (p: Rec
           void onSubmit({ testPlanId: planId, attemptDate: date, score: n });
         }}
       >
-        <CalendarPlus className="h-3.5 w-3.5" /> Record attempt
+        <CalendarPlus className="h-4 w-4" /> {t("tpRecordAttempt")}
       </Button>
     </div>
   );
@@ -439,13 +482,17 @@ interface StudyPlanData {
 }
 
 export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+  const t = useTranslations("journey");
+  const phaseTitle = (key: string) => t(`spPhase.${key}.title` as never);
+  const phaseDescription = (key: string) => t(`spPhase.${key}.description` as never);
+  const phaseMissing = (key: string) => t(`spPhaseMissing.${key}` as never);
   const { data, loading, error, reload } = useResource<StudyPlanData>(
-    useCallback(() => getJson<StudyPlanData>(`/api/study-plan?profileId=${profileId}`, "Could not load your study plan"), [profileId]),
+    useCallback(() => getJson<StudyPlanData>(`/api/study-plan?profileId=${profileId}`, t("spLoadError")), [profileId, t]),
     [profileId],
-    { initial: { plan: null, phases: [], phaseDefinitions: [] }, errorFallback: "Could not load your study plan" }
+    { initial: { plan: null, phases: [], phaseDefinitions: [] }, errorFallback: t("spLoadError") }
   );
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ title: "", targetMajor: "", targetCountry: "", goalYear: "", fundingGoal: "Full scholarship" });
+  const [form, setForm] = useState({ title: "", targetMajor: "", targetCountry: "", goalYear: "", fundingGoal: "Not decided" });
 
   const create = async () => {
     if (!form.title.trim()) return;
@@ -454,7 +501,7 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
       await sendJson(
         "/api/study-plan",
         { method: "POST", body: JSON.stringify({ profileId, ...form, goalYear: form.goalYear ? Number(form.goalYear) : null }) },
-        "Could not save your study plan"
+        t("spSaveError")
       );
       await reload();
     } finally {
@@ -467,49 +514,46 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
     await reload();
   };
 
-  if (loading) return <Loading label="Building your study plan…" />;
+  if (loading) return <Loading label={t("spLoading")} />;
 
   if (!data.plan) {
     return (
       <div className="space-y-4">
-        <JourneyCard
-          title="My study plan"
-          subtitle="Start with the goal. We build the ten phases and keep them updated as your profile, tests and applications change."
-        >
+        <JourneyCard title={t("spTitle")} subtitle={t("spSubtitle")}>
           {error && <ErrorNote message={error} />}
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            <Field label="Goal">
-              <input className={inputClass} placeholder="Computer Science in the USA" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Field label={t("spFieldGoal")}>
+              <input className={inputClass} placeholder={t("spGoalPlaceholder")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </Field>
-            <Field label="Major">
+            <Field label={t("spFieldMajor")}>
               <input className={inputClass} value={form.targetMajor} onChange={(e) => setForm({ ...form, targetMajor: e.target.value })} />
             </Field>
-            <Field label="Country">
+            <Field label={t("spFieldCountry")}>
               <input className={inputClass} value={form.targetCountry} onChange={(e) => setForm({ ...form, targetCountry: e.target.value })} />
             </Field>
-            <Field label="Year">
+            <Field label={t("spFieldYear")}>
               <input className={inputClass} type="number" value={form.goalYear} onChange={(e) => setForm({ ...form, goalYear: e.target.value })} />
             </Field>
-            <Field label="Funding">
+            <Field label={t("spFieldFunding")}>
               <select className={inputClass} value={form.fundingGoal} onChange={(e) => setForm({ ...form, fundingGoal: e.target.value })}>
-                <option>Full scholarship</option>
-                <option>Partial scholarship</option>
-                <option>Self-funded</option>
-                <option>Not decided</option>
+                <option value="Full scholarship">{t("spFundFull")}</option>
+                <option value="Partial scholarship">{t("spFundPartial")}</option>
+                <option value="Self-funded">{t("spFundSelf")}</option>
+                <option value="Not decided">{t("spFundUndecided")}</option>
               </select>
             </Field>
           </div>
-          <Button className="mt-3" onClick={create} disabled={busy || !form.title.trim()}>
-            Create my study plan
+          <Button className="mt-3 min-h-12" onClick={create} disabled={busy || !form.title.trim()}>
+            {t("spCreate")}
           </Button>
         </JourneyCard>
-        <JourneyCard title="What you will get">
-          <ol className="grid gap-1.5 sm:grid-cols-2">
-            {(data.phaseDefinitions.length ? data.phaseDefinitions : DEFAULT_PHASES).map((p, i) => (
-              <li key={p.key} className="flex items-center gap-2 text-sm">
-                <span aria-hidden>{p.icon}</span>
-                <span className="text-slate-700 dark:text-slate-200">
-                  <strong>{i + 1}.</strong> {p.title}
+        <JourneyCard title={t("spWhatYouGet")}>
+          <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {(data.phaseDefinitions.length ? data.phaseDefinitions : DEFAULT_PHASES).map((phase, index) => (
+              <li key={phase.key} className="flex min-w-0 items-start gap-2 text-sm">
+                <span aria-hidden className="shrink-0">{phase.icon}</span>
+                <span className="min-w-0 break-words text-slate-700 dark:text-slate-200">
+                  <strong>{index + 1}.</strong> {phaseTitle(phase.key)}
                 </span>
               </li>
             ))}
@@ -531,7 +575,7 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
             <p className="text-2xl font-extrabold text-slate-900 dark:text-white">
               {done}/{data.phases.length}
             </p>
-            <p className="text-[10px] font-bold uppercase text-slate-500">Phases done</p>
+            <p className="text-[10px] font-bold uppercase text-slate-500">{t("spPhasesDone")}</p>
           </div>
         }
       >
@@ -548,7 +592,7 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
                 <button
                   type="button"
                   onClick={() => void togglePhase(p.key, p.status !== "done")}
-                  aria-label={p.status === "done" ? `Reopen ${p.title}` : `Complete ${p.title}`}
+                  aria-label={t(p.status === "done" ? "spReopenPhase" : "spCompletePhase", { title: phaseTitle(p.key) })}
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                     p.status === "done" ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                   }`}
@@ -556,17 +600,17 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
                   {p.status === "done" ? <Check className="h-3 w-3" /> : i + 1}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <span aria-hidden>{p.icon}</span> {p.title}
+                  <p className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <span aria-hidden>{p.icon}</span> {phaseTitle(p.key)}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{p.description}</p>
-                  {p.missing.length > 0 && <p className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">→ {p.missing[0]}</p>}
+                  <p className="break-words text-xs leading-relaxed text-slate-600 dark:text-slate-400">{phaseDescription(p.key)}</p>
+                  {p.missing.length > 0 && <p className="mt-1 break-words text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">{phaseMissing(p.missing[0])}</p>}
                   <div className="mt-1.5 max-w-xs">
                     <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onNavigateTab(p.tab)}>
-                  Open
+                <Button size="sm" variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => onNavigateTab(p.tab)}>
+                  {t("spOpenPhase")}
                 </Button>
               </div>
             </li>

@@ -382,7 +382,23 @@ check("new UI strings exist in en/uz/ru", () => {
   const langs = ["en", "uz", "ru"] as const;
   const msgs = Object.fromEntries(langs.map((l) => [l, JSON.parse(read(`src/i18n/messages/${l}.json`))]));
   const get = (o: any, path: string) => path.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
+  const flatten = (o: any, prefix = "", out: Record<string, string> = {}) => {
+    for (const [key, value] of Object.entries(o)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (value && typeof value === "object") flatten(value, path, out);
+      else out[path] = String(value);
+    }
+    return out;
+  };
   const required = [
+    "telegram.miniApp.loading",
+    "telegram.miniApp.outsideTitle",
+    "telegram.miniApp.tabs.home",
+    "telegram.miniApp.hello",
+    "telegram.miniApp.navigationLabel",
+    "telegram.miniApp.gpa",
+    "telegram.miniApp.ieltsScore",
+    "telegram.miniApp.toeflScore",
     "telegram.loginButton",
     "telegram.errors.wrong_code",
     "telegram.errors.generic",
@@ -398,8 +414,15 @@ check("new UI strings exist in en/uz/ru", () => {
     "navHints.notifications",
     "help.notifications",
   ];
+  const enMini = flatten(msgs.en.telegram.miniApp);
   for (const l of langs) {
     for (const k of required) assert.equal(typeof get(msgs[l], k), "string", `${l}: ${k}`);
+    const mini = flatten(msgs[l].telegram.miniApp);
+    assert.deepEqual(Object.keys(mini).sort(), Object.keys(enMini).sort(), `${l}: Mini App message parity`);
+    for (const key of Object.keys(enMini)) {
+      const ph = (s: string) => (s.match(/\{\w+\}/g) || []).sort().join(",");
+      assert.equal(ph(mini[key]), ph(enMini[key]), `${l}: placeholders of telegram.miniApp.${key}`);
+    }
     for (const type of TELEGRAM_NOTIFICATION_TYPES) {
       assert.equal(typeof get(msgs[l], `telegram.types.${type}`), "string", `${l}: telegram.types.${type}`);
       assert.equal(typeof get(msgs[l], `telegram.typeHints.${type}`), "string", `${l}: telegram.typeHints.${type}`);
@@ -410,6 +433,9 @@ check("new UI strings exist in en/uz/ru", () => {
       assert.equal(ph(get(msgs[l], k)), ph(get(msgs.en, k)), `${l}: placeholders of ${k}`);
     }
   }
+  const miniAppSource = read("src/components/telegram/MiniApp.tsx");
+  assert.ok(miniAppSource.includes("dictionaries.en.telegram.miniApp"), "Mini App uses checked-in message dictionaries");
+  assert.ok(miniAppSource.includes("formatMessage(t.hello"), "Mini App interpolation uses the shared message formatter");
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

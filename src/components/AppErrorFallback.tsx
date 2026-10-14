@@ -1,41 +1,15 @@
 "use client";
 
 import React, { useEffect, useSyncExternalStore } from "react";
-
-type Locale = "en" | "uz" | "ru";
+import type { Locale } from "@/i18n/config";
+import { dictionaries } from "@/i18n/messages";
 
 /**
- * Copy for the app-level error screens.
- *
- * Deliberately NOT read through next-intl: if the crash happened inside the
- * message provider, a boundary that needs that provider would fail too and the
- * student would get a blank page — the exact thing this component exists to
- * prevent. The locale is read from `<html lang>` (set by the root layout from
- * the same cookie the LocaleProvider uses) with an English fallback.
+ * The fallback reads checked-in message files directly, not next-intl hooks:
+ * if a crash happened inside the provider, the boundary must still be able to
+ * render without that provider. The locale comes from `<html lang>` with an
+ * English server-rendering fallback.
  */
-const COPY: Record<Locale, { title: string; body: string; retry: string; reload: string; details: string }> = {
-  en: {
-    title: "Something went wrong",
-    body: "This screen hit an unexpected error. Your saved work is safe — try again, and if it keeps happening reload the page.",
-    retry: "Try again",
-    reload: "Reload the page",
-    details: "Error details",
-  },
-  uz: {
-    title: "Xatolik yuz berdi",
-    body: "Bu ekranda kutilmagan xatolik sodir bo‘ldi. Saqlangan ma’lumotlaringiz joyida — qayta urinib ko‘ring, takrorlansa sahifani yangilang.",
-    retry: "Qayta urinish",
-    reload: "Sahifani yangilash",
-    details: "Xatolik tafsilotlari",
-  },
-  ru: {
-    title: "Что-то пошло не так",
-    body: "На этом экране произошла непредвиденная ошибка. Ваши сохранённые данные в порядке — попробуйте ещё раз, а если повторится, обновите страницу.",
-    retry: "Повторить",
-    reload: "Обновить страницу",
-    details: "Подробности ошибки",
-  },
-};
 
 function currentLocale(): Locale {
   const lang = document.documentElement.lang?.slice(0, 2).toLowerCase();
@@ -71,7 +45,7 @@ export function AppErrorFallback({
   // first client render must agree, and the value is read from the DOM rather
   // than mirrored into state.
   const locale = useSyncExternalStore(neverChanges, currentLocale, serverLocale);
-  const t = COPY[locale];
+  const t = dictionaries[locale].appError;
 
   // Log with the digest Next.js attaches so a production report can be matched
   // against the server log without putting the stack in front of the student.
@@ -94,21 +68,21 @@ export function AppErrorFallback({
         <button
           type="button"
           onClick={reset}
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           {t.retry}
         </button>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
+          className="min-h-11 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
         >
           {t.reload}
         </button>
       </div>
       {error?.message ? (
         <details className="mt-5 text-left">
-          <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-medium text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:text-slate-400">
             {t.details}
           </summary>
           <p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{error.message}</p>

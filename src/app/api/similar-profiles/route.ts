@@ -1,27 +1,23 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { applicationOutcomes, applications, studentProfiles, universities } from "@/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import {
   findSimilarProfiles,
   gpaTo4,
+  normalizeOutcomeResult,
   type OutcomeRecord,
   type ProfileVector,
 } from "@/lib/similarProfiles";
-import { parseListColumn } from "@/lib/chancing";
 
 /**
- * Accepted-student & similar-profile matching (#10).
+ * GET /api/similar-profiles — opt-in historical outcome examples only.
  *
- * "Someone with my profile got in" is the most persuasive evidence a student
- * can see. It is also other people's data, so:
- *
- *   1. ONLY rows with `shareConsent = true` are read. A row without consent
- *      never leaves its owner's account — not aggregated, not anonymised.
- *   2. Rows are joined to a profile snapshot taken at decision time, so the
- *      comparison uses what the applicant actually had when they applied.
- *   3. Small samples never render as a percentage (see lib/similarProfiles).
+ * The authenticated profile owner may see records explicitly shared by their
+ * owners. Only fields needed for the heuristic comparison are selected from
+ * the database. These records do not affect profile-to-catalogue fit or
+ * admission estimates.
  */
 export async function GET(req: Request) {
   try {
@@ -49,80 +45,83 @@ export async function GET(req: Request) {
       major: profile.targetMajor,
       country: profile.country,
       degreeLevel: profile.degreeLevel,
-      activityCount:
-        parseListColumn(profile.leadership).length +
-        parseListColumn(profile.volunteering).length +
-        parseListColumn(profile.sports).length +
-        parseListColumn(profile.clubs).length +
-        parseListColumn(profile.projects).length,
-      leadershipCount: parseListColumn(profile.leadership).length,
-      awardCount: parseListColumn(profile.awards).length + parseListColumn(profile.olympiads).length,
-      requiresFullScholarship: profile.requiresFullScholarship,
     };
 
-    // The consent filter is in the query itself, so a non-consented row is
-    // never even loaded into memory.
+    // Consent is enforced in SQL. Do not load notes, scholarship information,
+    // profile ids, or other outcome columns that this read path does not need.
     const rows = await db
-      .select()
+      .select({
+        applicationId: applicationOutcomes.applicationId,
+        universityId: applicationOutcomes.universityId,
+        result: applicationOutcomes.result,
+        snapshotGpa: applicationOutcomes.snapshotGpa,
+        snapshotGpaScale: applicationOutcomes.snapshotGpaScale,
+        snapshotIelts: applicationOutcomes.snapshotIelts,
+        snapshotToefl: applicationOutcomes.snapshotToefl,
+        snapshotSat: applicationOutcomes.snapshotSat,
+        snapshotAct: applicationOutcomes.snapshotAct,
+        snapshotMajor: applicationOutcomes.snapshotMajor,
+        snapshotCountry: applicationOutcomes.snapshotCountry,
+      })
       .from(applicationOutcomes)
-      .where(and(eq(applicationOutcomes.shareConsent, true)));
+      .where(eq(applicationOutcomes.shareConsent, true));
 
-    // Resolve university names for the consented rows only.
-    const uniIds = [...new Set(rows.map((r) => r.universityId).filter((id): id is number => id !== null))];
+    const uniIds = [...new Set(rows.map((row) => row.universityId).filter((id): id is number => id !== null))];
     const uniNames = new Map<number, string>();
     if (uniIds.length > 0) {
       const uniRows = await db
         .select({ id: universities.id, name: universities.name })
         .from(universities)
         .where(inArray(universities.id, uniIds));
-      uniRows.forEach((u) => uniNames.set(u.id, u.name));
+      uniRows.forEach((university) => uniNames.set(university.id, university.name));
     }
 
-    const appIds = [...new Set(rows.map((r) => r.applicationId))];
+    // The application's own name is a fallback only when there is no linked
+    // catalogue university. Limit that query to those rows.
+    const appIds = [...new Set(rows.filter((row) => row.universityId === null).map((row) => row.applicationId))];
     const appNames = new Map<number, string>();
     if (appIds.length > 0) {
       const appRows = await db
         .select({ id: applications.id, universityName: applications.universityName })
         .from(applications)
         .where(inArray(applications.id, appIds));
-      appRows.forEach((a) => appNames.set(a.id, a.universityName));
+      appRows.forEach((application) => appNames.set(application.id, application.universityName));
     }
 
-    const outcomes: OutcomeRecord[] = rows.map((r) => ({
-      profile: {
-        gpa4: gpaTo4(r.snapshotGpa, r.snapshotGpaScale),
-        ielts: r.snapshotIelts,
-        toefl: r.snapshotToefl,
-        sat: r.snapshotSat,
-        act: r.snapshotAct,
-        major: r.snapshotMajor,
-        country: r.snapshotCountry,
-        degreeLevel: null,
-        activityCount: parseListColumn(r.snapshotExtracurriculars).length,
-        leadershipCount: 0,
-        awardCount: 0,
-      },
-      universityName:
-        (r.universityId != null ? uniNames.get(r.universityId) : null) ??
-        appNames.get(r.applicationId) ??
-        "A ScholarBridge university",
-      result: (r.result as OutcomeRecord["result"]) ?? "rejected",
-      shareConsent: true, // selected with that filter; stated for defence in depth
-    }));
+    const outcomes: OutcomeRecord[] = rows.flatMap((row) => {
+      // Legacy or malformed statuses are unknown; never turn them into a rejection.
+      const result = normalizeOutcomeResult(row.result);
+      if (!result) return [];
 
-    const result = findSimilarProfiles(me, outcomes, {
-      limit: Number(searchParams.get("limit")) || 10,
+      const universityName = (
+        (row.universityId !== null ? uniNames.get(row.universityId) : null) ?? appNames.get(row.applicationId) ?? null
+      )?.trim() || null;
+
+      return [{
+        profile: {
+          gpa4: gpaTo4(row.snapshotGpa, row.snapshotGpaScale),
+          ielts: row.snapshotIelts,
+          toefl: row.snapshotToefl,
+          sat: row.snapshotSat,
+          act: row.snapshotAct,
+          major: row.snapshotMajor,
+          country: row.snapshotCountry,
+          // The outcome snapshot does not include a degree level; keep it unknown.
+          degreeLevel: null,
+        },
+        universityName,
+        result,
+        shareConsent: true, // selected with the consent predicate above
+      }];
     });
 
-    return NextResponse.json({
-      ...result,
-      // Reminds the UI that this is opt-in data, which is the whole model.
-      consentNote:
-        "Only students who chose to share their results appear here. Rejections are included — a dataset of acceptances alone would teach the wrong lesson.",
-      myConsent: Boolean(profile.dataShareConsent),
-    });
+    const rawLimit = Number(searchParams.get("limit"));
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 10;
+    const result = findSimilarProfiles(me, outcomes, { limit });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("GET /api/similar-profiles error:", error);
-    return NextResponse.json({ error: "Failed to find similar profiles" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load shared outcome examples" }, { status: 500 });
   }
 }

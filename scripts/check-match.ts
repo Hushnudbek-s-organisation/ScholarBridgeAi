@@ -105,24 +105,21 @@ const scholarship = {
 section("1. University match — requirements, cost, country, field");
 // ---------------------------------------------------------------------------
 
-// Base 70
-//   + GPA 3.80 vs 3.50 — 0.30 of the 0.50 span above the bar → +9.0
-//   + field alignment (+12) + preferred country (+8)
-//   + budget $70 000 vs $63 700 cost (coverage 1.099 → +8.49)
-//   − IELTS missing (−25) − SAT missing (−20)
-// = 62.49 raw → 62 (rounded once, at the end). Meeting a published minimum is
-// the zero point of the continuous grade: exceeding it earns, falling short
-// costs, and nothing is awarded for being exactly at the bar.
+// Base 70 plus the recorded GPA, field, country and budget comparisons exceeds
+// the display cap. The missing IELTS/SAT values stay unknown and do not lower
+// the fit score; the breakdown marks those catalogue dimensions unscored.
 const noTests = calculateUniversityMatch({ ...baseProfile }, uni);
-check("no IELTS/SAT → score reflects the two missing bars", noTests.matchScore === 62, String(noTests.matchScore));
-check("no IELTS/SAT → category Reach", noTests.matchCategory === "Reach", noTests.matchCategory);
+check("unrecorded IELTS/SAT scores do not lower fit", noTests.matchScore === 99, String(noTests.matchScore));
+check("fit score carries no Reach/Match/Safety admissions category", !("matchCategory" in noTests));
 check(
-  "no IELTS → the issue names the required band and the missing score",
-  noTests.potentialIssues.some((i: string) => /IELTS 6\.5 required — you don't have an IELTS score/.test(i))
+  "unrecorded IELTS is not treated as a failed requirement",
+  noTests.breakdown.components.some((item) => item.key === "english" && !item.compared && item.points === 0) &&
+    !noTests.potentialIssues.some((issue: string) => /IELTS/.test(issue))
 );
 check(
-  "no SAT → the issue names the required band and the missing score",
-  noTests.potentialIssues.some((i: string) => /SAT 1400 required — you don't have an SAT score/.test(i))
+  "unrecorded SAT is not treated as a failed requirement",
+  noTests.breakdown.components.some((item) => item.key === "standardised_test" && !item.compared && item.points === 0) &&
+    !noTests.potentialIssues.some((issue: string) => /SAT/.test(issue))
 );
 check("field alignment is the top reason (weight 12)", /Offers your field: Computing/.test(noTests.reasons[0] ?? ""), noTests.reasons[0]);
 
@@ -131,14 +128,24 @@ check("strong profile → high score", strong.matchScore >= 80, String(strong.ma
 check("max 2 reasons", strong.reasons.length <= 2, String(strong.reasons.length));
 check("max 2 issues", strong.potentialIssues.length <= 2, String(strong.potentialIssues.length));
 
+const portfolioProfile = {
+  ...baseProfile,
+  extracurriculars: JSON.stringify([{ type: "leadership", title: "Student club president" }, { type: "research", title: "Lab assistant" }]),
+  workExperienceYears: 8,
+  researchPublications: 4,
+} as StudentProfileData;
+const withPortfolio = calculateUniversityMatch(portfolioProfile, uni);
+check("activities, work years, and publications do not inflate university fit", withPortfolio.matchScore === noTests.matchScore, `${withPortfolio.matchScore} vs ${noTests.matchScore}`);
+check("university fit does not claim activities strengthen admission", !withPortfolio.reasons.some((reason: string) => /activity|experience|portfolio|publication/i.test(reason)));
+
 const exactIelts = calculateUniversityMatch({ ...baseProfile, ieltsScore: 6.5, satScore: 1450 }, uni);
 check("IELTS exactly at the bar → no IELTS issue", !exactIelts.potentialIssues.some((i: string) => /IELTS/.test(i)));
 
 const lowIelts = calculateUniversityMatch({ ...baseProfile, ieltsScore: 5.0 }, uni);
 check("IELTS below the bar → penalty vs a score that meets it", lowIelts.matchScore < exactIelts.matchScore, `${lowIelts.matchScore} vs ${exactIelts.matchScore}`);
 check(
-  "IELTS below → issue shows required vs actual",
-  lowIelts.potentialIssues.some((i: string) => /IELTS 6\.5 required — you have 5/.test(i)),
+  "IELTS below → issue asks the student to verify the programme-level policy",
+  lowIelts.potentialIssues.some((i: string) => /IELTS 5 is below the university-catalogue figure 6\.5; check the programme-specific accepted tests and waiver options/.test(i)),
   JSON.stringify(lowIelts.potentialIssues)
 );
 
@@ -147,17 +154,14 @@ const noReqs = calculateUniversityMatch({ ...baseProfile }, uniNoReqs);
 check("no published minimums → no test issues", !noReqs.potentialIssues.some((i: string) => /IELTS|SAT/.test(i)));
 check("no published minimums → high score", noReqs.matchScore >= 85, String(noReqs.matchScore));
 
-// TOEFL instead of IELTS: not "no certificate" — a smaller, honest issue.
+// A different recorded test is not assumed equivalent to an IELTS catalogue
+// value, but its absence does not lower fit either. The exact programme policy
+// and accepted alternatives remain for the applicant to verify.
 const toeflOnly = calculateUniversityMatch({ ...baseProfile, toeflScore: 100 }, uni);
 check(
-  "TOEFL instead of IELTS → confirm-acceptance issue, not 'no IELTS'",
-  toeflOnly.potentialIssues.some((i: string) => /TOEFL 100/.test(i) && /confirm whether it is accepted/.test(i)),
-  JSON.stringify(toeflOnly.potentialIssues)
-);
-check(
-  "TOEFL instead of IELTS → smaller penalty than a missing test",
-  toeflOnly.matchScore > noTests.matchScore && toeflOnly.matchScore < exactIelts.matchScore,
-  `${noTests.matchScore} < ${toeflOnly.matchScore} < ${exactIelts.matchScore}`
+  "TOEFL instead of IELTS does not lower fit or claim equivalence",
+  toeflOnly.matchScore === noTests.matchScore &&
+    !toeflOnly.potentialIssues.some((issue: string) => /IELTS|TOEFL/.test(issue))
 );
 
 // Field mismatch must lower the score, and it must be visible whenever the
@@ -264,16 +268,20 @@ const allMajorsAward = { ...scholarship, eligibleMajors: JSON.stringify(["All"])
 const allMajorsMatch = calculateScholarshipMatch(blankMajorProfile, allMajorsAward);
 check("'All' majors award → no field issue for a blank major", !allMajorsMatch.potentialIssues.some((i: string) => /eligible fields/.test(i)));
 
-// English tests on scholarships.
+// An unrecorded IELTS result on a scholarship is unknown, not an eligibility
+// failure. A recorded alternative is not silently treated as equivalent.
 const noEnglish = { ...masterProfile, ieltsScore: null, toeflScore: null } as StudentProfileData;
+const noEnglishAward = calculateScholarshipMatch(noEnglish, scholarship);
 check(
-  "no English test → 'you don't have an IELTS score'",
-  calculateScholarshipMatch(noEnglish, scholarship).potentialIssues.some((i: string) => /don't have an IELTS score/.test(i))
+  "no English test is not scored as a scholarship failure",
+  !noEnglishAward.potentialIssues.some((issue: string) => /IELTS|TOEFL/.test(issue)) &&
+    noEnglishAward.breakdown.components.some((item) => item.key === "english" && !item.compared && item.points === 0)
 );
 const toeflScholarship = calculateScholarshipMatch({ ...masterProfile, ieltsScore: null, toeflScore: 100 } as StudentProfileData, scholarship);
 check(
-  "TOEFL → smaller confirm-acceptance issue",
-  toeflScholarship.potentialIssues.some((i: string) => /TOEFL 100/.test(i))
+  "TOEFL instead of IELTS stays unscored until award acceptance is verified",
+  toeflScholarship.matchScore === noEnglishAward.matchScore &&
+    !toeflScholarship.potentialIssues.some((issue: string) => /IELTS|TOEFL/.test(issue))
 );
 
 // Merit/need signals.
@@ -308,7 +316,7 @@ check("a label with an unrecognised part stays unspecified", compareDegreeLevels
 check("JSON-array label is compared, not read as unknown", compareDegreeLevels("Master", JSON.stringify(["Master", "PhD"])) === "match");
 
 // ---------------------------------------------------------------------------
-section("5. SAT/ACT are undergraduate tests (never a graduate requirement)");
+section("5. SAT/ACT catalogue figures are compared only for undergraduate applicants");
 // ---------------------------------------------------------------------------
 
 const gradUni = { ...uni, degreeLevel: "Master", minSat: 1400 } as UniversityData;
@@ -321,9 +329,11 @@ check(
   String(gradStudent.matchScore)
 );
 const undergradUni = { ...uni, degreeLevel: "All", minSat: 1400 } as UniversityData;
+const undergradMissingSat = calculateUniversityMatch({ ...baseProfile, degreeLevel: "Bachelor" }, undergradUni);
 check(
-  "undergraduate applicant still sees the SAT bar",
-  calculateUniversityMatch({ ...baseProfile, degreeLevel: "Bachelor" }, undergradUni).potentialIssues.some((i: string) => /SAT 1400 required/.test(i))
+  "undergraduate applicant's missing SAT remains unknown, not a failure",
+  !undergradMissingSat.potentialIssues.some((issue: string) => /SAT/.test(issue)) &&
+    undergradMissingSat.breakdown.components.some((item) => item.key === "standardised_test" && !item.compared)
 );
 check(
   "a graduate applicant at an undergraduate+graduate university is not scored on SAT",

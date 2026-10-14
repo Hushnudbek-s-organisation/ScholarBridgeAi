@@ -31,6 +31,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Offline schema and documentation regression tests
+        run: npm run test:schema
+
+      - name: Full-schema apply safety guard
+        run: npm run test:schema-apply-safety
+
       - name: Security regression tests
         run: npm run test:security
 
@@ -78,6 +84,9 @@ jobs:
 
       - name: Lint (baseline gate — fails on new or worsened problems)
         run: npm run lint:baseline
+
+      - name: Responsive source-level regression tests
+        run: npm run test:responsive
 
       - name: Dark-mode contrast audit
         run: npm run test:dark

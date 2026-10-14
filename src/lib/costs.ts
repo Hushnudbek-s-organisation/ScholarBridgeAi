@@ -39,8 +39,7 @@ export interface ScholarshipInput {
   amountUsd: number;
   /** What it actually covers — a stipend does not pay tuition. */
   covers: "tuition" | "living" | "both" | "other";
-  /** Probability the student wins it, 0–1; null when no validated estimate exists. */
-  probability: number | null;
+  /** Days until the date listed by the catalogue, when available. */
   deadlineDays?: number | null;
 }
 
@@ -60,10 +59,7 @@ export interface CostBreakdown {
   /** Missing published data — the student should verify these. */
   unknowns: string[];
   scholarship: {
-    guaranteedAnnualUsd: number;
-    /** Null unless every included award has an evidence-based probability. */
-    expectedAnnualUsd: number | null;
-    probabilityDataAvailable: boolean;
+    /** Upper-bound scenario only: assumes listed awards can be received and combined as shown. */
     bestCaseAnnualUsd: number;
     coveragePct: number;
     /** Scholarships that pay for something other than the shortfall. */
@@ -94,7 +90,7 @@ const LIVING_BY_COUNTRY: { re: RegExp; usd: number; note: string }[] = [
   { re: /united kingdom|england|scotland/i, usd: 14000, note: "UK living" },
   { re: /canada/i, usd: 12000, note: "Canada living" },
   { re: /australia|new zealand/i, usd: 15000, note: "ANZ living" },
-  { re: /germany/i, usd: 11000, note: "Germany living (blocked account ≈ €11k/yr)" },
+  { re: /germany/i, usd: 11000, note: "Germany living-cost estimate — verify local costs" },
   { re: /netherlands|belgium|austria|france/i, usd: 12500, note: "Western EU living" },
   { re: /sweden|norway|denmark|finland|iceland/i, usd: 13500, note: "Nordic living" },
   { re: /poland|hungary|czech|portugal|spain|italy|greece/i, usd: 8500, note: "Southern/Eastern EU living" },
@@ -106,7 +102,6 @@ const DEFAULT_LIVING_USD = 11000;
 const DEFAULT_BOOKS_USD = 900;
 const DEFAULT_INSURANCE_USD = 1200;
 const DEFAULT_FLIGHTS_USD = 1400;
-const DEFAULT_VISA_FEE_USD = 350;
 const DEFAULT_YEARS = 4;
 
 const money = (v: number) => Math.round(v);
@@ -143,7 +138,7 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   // --- Extras --------------------------------------------------------------
   const insurance = Number(input.insurancePerYearUsd) > 0 ? Number(input.insurancePerYearUsd) : DEFAULT_INSURANCE_USD;
   if (!(Number(input.insurancePerYearUsd) > 0)) {
-    unknowns.push(`Health insurance is estimated at ${DEFAULT_INSURANCE_USD} USD/year — most countries mandate a specific policy.`);
+    unknowns.push(`Health insurance is estimated at ${DEFAULT_INSURANCE_USD} USD/year. Coverage rules and costs vary; check the official university and destination guidance.`);
   }
   const books = Number(input.booksPerYearUsd) > 0 ? Number(input.booksPerYearUsd) : DEFAULT_BOOKS_USD;
   const flights = Number(input.flightsPerYearUsd) > 0 ? Number(input.flightsPerYearUsd) : DEFAULT_FLIGHTS_USD;
@@ -199,9 +194,19 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     }
   );
 
-  const oneOff = Number(input.visaFeeUsd) > 0 ? Number(input.visaFeeUsd) : DEFAULT_VISA_FEE_USD;
+  const visaFee = Number(input.visaFeeUsd) > 0 ? Number(input.visaFeeUsd) : 0;
   const appFee = Number(input.applicationFeeUsd) > 0 ? Number(input.applicationFeeUsd) : 0;
-  const oneOffTotal = oneOff + appFee;
+  const oneOffTotal = visaFee + appFee;
+  if (visaFee > 0) {
+    lines.push({ key: "visa_fee", label: "Visa or residence-permit fee (entered)", annualUsd: 0, totalUsd: money(visaFee), estimated: false });
+  } else {
+    unknowns.push("Visa or residence-permit fees are not included. Requirements and fees depend on destination and personal circumstances; check official government guidance.");
+  }
+  if (appFee > 0) {
+    lines.push({ key: "application_fee", label: "Application fee (entered)", annualUsd: 0, totalUsd: money(appFee), estimated: false });
+  } else {
+    unknowns.push("Application fees are not included unless a current programme fee was supplied; check each official programme page.");
+  }
 
   // --- Scholarships --------------------------------------------------------
   const scholarships = (input.scholarships ?? []).filter((s) => Number(s.amountUsd) > 0);
@@ -211,12 +216,6 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   const livingAid = scholarships.filter((s) => s.covers === "living");
   const otherAid = scholarships.filter((s) => s.covers === "other");
 
-  const guaranteedAnnual = 0; // nothing is guaranteed until an award letter exists
-  const probabilityDataAvailable =
-    scholarships.length > 0 && scholarships.every((s) => typeof s.probability === "number" && Number.isFinite(s.probability));
-  const expectedAnnual = probabilityDataAvailable
-    ? scholarships.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability as number), 0)
-    : null;
   const bestCaseAnnual =
     (tuitionAid.length > 0 ? Math.max(...tuitionAid.map((s) => s.amountUsd)) : 0) +
     livingAid.reduce((sum, s) => sum + s.amountUsd, 0) +
@@ -250,10 +249,8 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     verdict = `The current best-case amount still needing a funding source is ${afterScholarshipAnnual.toLocaleString("en-US")} USD/year. Add the amount your family has explicitly confirmed before treating this as an affordability result.`;
   } else if (gapAnnual <= 0) {
     verdict = `On paper this is affordable: your family's ${family.toLocaleString("en-US")} USD/year covers the ${afterScholarshipAnnual.toLocaleString("en-US")} USD remaining after scholarships. That assumes every scholarship lands.`;
-  } else if (coveragePct >= 70) {
-    verdict = `Close, but there is a ${gapAnnual.toLocaleString("en-US")} USD/year gap. Your scholarships cover ${coveragePct}% in the best case — the remaining year-one deposit is usually the hard part.`;
   } else {
-    verdict = `There is a ${gapAnnual.toLocaleString("en-US")} USD/year gap (${gapTotal.toLocaleString("en-US")} USD over ${years} years). Without more funding this programme is not reachable — look at lower-tuition countries or a full-ride scholarship.`;
+    verdict = `The current best-case calculation leaves a ${gapAnnual.toLocaleString("en-US")} USD/year gap (${gapTotal.toLocaleString("en-US")} USD over ${years} years). Confirm award conditions, upfront costs and any additional funding with the programme and scholarship providers.`;
   }
 
   return {
@@ -262,9 +259,6 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     totalUsd: money(annualTotal * years + oneOffTotal),
     unknowns,
     scholarship: {
-      guaranteedAnnualUsd: money(guaranteedAnnual),
-      expectedAnnualUsd: expectedAnnual == null ? null : money(expectedAnnual),
-      probabilityDataAvailable,
       bestCaseAnnualUsd: money(bestCaseAnnual),
       coveragePct,
       misaligned,
@@ -282,85 +276,46 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   };
 }
 
-function clamp01(v: number): number {
-  if (!Number.isFinite(v)) return 0;
-  return Math.max(0, Math.min(1, v));
-}
-
 /**
- * Scholarship portfolio health. Ten applications with real deadlines beat one
- * dream award — and a portfolio that is all "Full Tuition + Stipend" with a
- * 3% hit rate is not a plan.
+ * Student-facing scholarship review based on saved catalogue facts. It does not
+ * infer award probability, recommend a universal application count, or treat a
+ * saved scholarship as secured funding.
  */
 export interface PortfolioInputs {
   scholarships: ScholarshipInput[];
-  annualCostUsd: number;
-  familyContributionUsd: number;
+}
+
+export type PortfolioAdviceKey =
+  | "noSavedAwards"
+  | "unconfirmedAwards"
+  | "missingAmounts"
+  | "deadlinesPassed"
+  | "deadlinesUpcoming";
+
+export interface PortfolioAdviceItem {
+  key: PortfolioAdviceKey;
+  count?: number;
 }
 
 export interface PortfolioAdvice {
   count: number;
-  expectedAnnualUsd: number | null;
-  expectedCoveragePct: number | null;
-  /** P(at least one award), only when every input has validated probability data. */
-  chanceOfAnyAwardPct: number | null;
-  probabilityDataAvailable: boolean;
-  diversification: "good" | "thin" | "risky";
-  advice: string[];
+  advice: PortfolioAdviceItem[];
 }
 
 export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
-  const list = input.scholarships.filter((s) => Number(s.amountUsd) > 0);
-  const probabilityDataAvailable =
-    list.length > 0 && list.every((s) => typeof s.probability === "number" && Number.isFinite(s.probability));
-  const expectedAnnual = probabilityDataAvailable
-    ? list.reduce((sum, s) => sum + s.amountUsd * clamp01(s.probability as number), 0)
-    : null;
-  const chanceOfNone = probabilityDataAvailable
-    ? list.reduce((acc, s) => acc * (1 - clamp01(s.probability as number)), 1)
-    : null;
-  const chanceOfAny = chanceOfNone == null ? null : Math.round((1 - chanceOfNone) * 100);
-  const shortfall = Math.max(0, input.annualCostUsd - input.familyContributionUsd);
-  const coverage = expectedAnnual == null ? null : shortfall > 0 ? Math.round(Math.min(100, (expectedAnnual / shortfall) * 100)) : 100;
+  const list = input.scholarships;
+  const advice: PortfolioAdviceItem[] = [];
 
-  const bigOnly = probabilityDataAvailable && list.every((s) => (s.probability as number) <= 0.1);
-  const diversification: PortfolioAdvice["diversification"] =
-    list.length >= 8 ? "good" : list.length >= 4 ? "thin" : "risky";
+  advice.push({ key: list.length === 0 ? "noSavedAwards" : "unconfirmedAwards" });
 
-  const advice: string[] = [];
-  if (list.length < 8) {
-    advice.push(
-      `Apply to at least 8 scholarships. With ${list.length} you are betting the whole year on ${list.length === 1 ? "one decision" : "a few decisions"}.`
-    );
-  }
-  if (bigOnly) {
-    advice.push(
-      "Every entry on your list is a low-probability flagship award. Add smaller departmental or country-specific ones — a 4,000 USD award you actually win beats a 40,000 USD one you probably will not."
-    );
-  }
-  if (expectedAnnual != null && expectedAnnual < shortfall && list.length > 0) {
-    advice.push(
-      `Expected funding is ${Math.round(expectedAnnual).toLocaleString("en-US")} USD/year against a ${shortfall.toLocaleString("en-US")} USD shortfall.`
-    );
-  }
-  if (list.length > 0 && !probabilityDataAvailable) {
-    advice.push("Award probabilities are not available, so expected funding and chance-of-award percentages are not calculated. Use confirmed awards and the best-case total separately.");
-  }
-  if (list.length === 0) {
-    advice.push("No scholarships yet. Start with the ones your target universities offer automatically on admission.");
-  }
-  const soon = list.filter((s) => s.deadlineDays != null && s.deadlineDays <= 30).length;
-  if (soon > 0) {
-    advice.push(`${soon} deadline${soon === 1 ? "" : "s"} inside 30 days — scholarship files need references, so start those first.`);
-  }
+  const missingAmounts = list.filter((s) => !Number.isFinite(s.amountUsd) || s.amountUsd <= 0).length;
+  if (missingAmounts > 0) advice.push({ key: "missingAmounts", count: missingAmounts });
 
-  return {
-    count: list.length,
-    expectedAnnualUsd: expectedAnnual == null ? null : Math.round(expectedAnnual),
-    expectedCoveragePct: coverage,
-    chanceOfAnyAwardPct: chanceOfAny,
-    probabilityDataAvailable,
-    diversification,
-    advice,
-  };
+  const overdue = list.filter((s) => s.deadlineDays != null && s.deadlineDays < 0).length;
+  if (overdue > 0) advice.push({ key: "deadlinesPassed", count: overdue });
+
+  const upcoming = list.filter((s) => s.deadlineDays != null && s.deadlineDays >= 0 && s.deadlineDays <= 30).length;
+  if (upcoming > 0) advice.push({ key: "deadlinesUpcoming", count: upcoming });
+
+  return { count: list.length, advice };
 }

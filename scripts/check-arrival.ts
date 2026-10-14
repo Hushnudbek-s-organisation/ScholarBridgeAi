@@ -129,6 +129,7 @@ check("the API route validates item keys server-side", /isKnownArrivalItem/.test
 check("the API route validates status server-side", /isArrivalItemStatus/.test(apiSrc));
 const panelSrc = readFileSync("src/components/journey/ArrivalPlanPanel.tsx", "utf8");
 check("the panel shows the general-guidance badge", panelSrc.includes('t("guidanceBadge")'));
+check("checklist controls announce the specific translated item", panelSrc.includes("markPendingItem") && panelSrc.includes("openItemSection") && panelSrc.includes("t(`items.${item.key}`)"));
 check("the panel fetches only relative /api paths", !/fetch\(\s*["'`][a-z]+:/i.test(panelSrc));
 check("the panel reads no server secrets", !/process\.env|apiKey\s*[:=]/.test(panelSrc));
 

@@ -247,7 +247,8 @@ function usdCost(value: number | null | undefined, currency: string | null | und
 }
 
 /**
- * Fit scoring — requirements, affordability, field and portfolio.
+ * Fit scoring — a comparison of recorded profile details with available
+ * catalogue fields (including academic, subject, location, and cost data).
  *
  * PRECISION CONTRACT (2026-10)
  * ----------------------------
@@ -274,12 +275,10 @@ export type MatchDimension =
   | "english"
   | "standardised_test"
   | "field"
-  | "portfolio"
   | "cost"
   | "income"
   | "funding_requirement"
   | "country"
-  | "experience"
   | "level"
   | "major_eligibility"
   | "need_basis"
@@ -368,57 +367,30 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
         : shortfall(gpaDiff, 0, 1.0, 25);
     score += points;
     if (gpaDiff >= 0.5) {
-      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} well above the ${uni.minGpa} minimum`, weight: 15, points });
+      reasons.push({ code: "gpa_well_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `Recorded GPA ${normGpa.toFixed(2)} is above the university-catalogue figure ${uni.minGpa}; verify the programme-specific rule`, weight: 15, points });
     } else if (gpaDiff >= 0.2) {
-      reasons.push({ code: "gpa_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} above the ${uni.minGpa} minimum`, weight: 10, points });
+      reasons.push({ code: "gpa_above", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `Recorded GPA ${normGpa.toFixed(2)} is above the university-catalogue figure ${uni.minGpa}; verify the programme-specific rule`, weight: 10, points });
     } else if (gpaDiff >= 0) {
-      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} meets the ${uni.minGpa} minimum`, weight: 5, points });
+      reasons.push({ code: "gpa_meets", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `Recorded GPA ${normGpa.toFixed(2)} is at or above the university-catalogue figure ${uni.minGpa}; verify the programme-specific rule`, weight: 5, points });
     } else if (gpaDiff >= -0.3) {
-      potentialIssues.push({ code: "gpa_slightly_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} slightly below the ${uni.minGpa} minimum`, weight: 12, points });
+      potentialIssues.push({ code: "gpa_slightly_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `Recorded GPA ${normGpa.toFixed(2)} is below the university-catalogue figure ${uni.minGpa}; verify the programme-specific rule`, weight: 12, points });
     } else {
-      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `GPA ${normGpa.toFixed(2)} is below the ${uni.minGpa} requirement`, weight: 25, points });
+      potentialIssues.push({ code: "gpa_below", params: { gpa: normGpa.toFixed(2), min: uni.minGpa }, text: `Recorded GPA ${normGpa.toFixed(2)} is below the university-catalogue figure ${uni.minGpa}; verify the programme-specific rule`, weight: 25, points });
     }
     components.push(component("gpa", points, gpaDiff >= 0 ? "gpa" : "gpa"));
   } else {
     components.push(component("gpa", 0, null, false));
   }
 
-  // Language Requirement (IELTS) — a missing test is a real penalty:
-  // a university that requires IELTS must NEVER show a 98% match for a
-  // student without an IELTS score (spec §23, §19).
+  // University-level IELTS catalogue values are contextual signals only:
+  // they may not apply to a specific programme. An unrecorded score (including
+  // a profile that records another test) is unknown, not a failure. Only an
+  // actually recorded IELTS score is compared, and even that comparison must
+  // be verified against the programme's current policy.
   if (uni.minIelts != null) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      // An equivalent test (TOEFL / Duolingo) is NOT the same as "no English
-      // certificate", so it carries a smaller, clearly-worded issue: the
-      // published bar is IELTS, and acceptance of the alternative must be
-      // confirmed with the university — we never silently treat it as met.
-      const hasAlternative =
-        (typeof profile.toeflScore === "number" && profile.toeflScore > 0) ||
-        (typeof profile.duolingoScore === "number" && profile.duolingoScore > 0);
-      if (hasAlternative) {
-        const alt =
-          typeof profile.toeflScore === "number" && profile.toeflScore > 0
-            ? `TOEFL ${profile.toeflScore}`
-            : `Duolingo ${profile.duolingoScore}`;
-        score -= 5;
-        potentialIssues.push({
-          code: "ielts_alternative",
-          params: { min: uni.minIelts, alt },
-          text: `IELTS ${uni.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
-          weight: 5,
-        });
-        components.push(component("english", -5, "ielts_alternative"));
-      } else {
-        score -= 25;
-        potentialIssues.push({
-          code: "ielts_missing",
-          params: { min: uni.minIelts },
-          text: `IELTS ${uni.minIelts} required — you don't have an IELTS score yet`,
-          weight: 25,
-        });
-        components.push(component("english", -25, "ielts_missing"));
-      }
+      components.push(component("english", 0, null, false));
     } else {
       // 0.5 above the bar earns the full +8; each 0.5 band is worth the same
       // step, so a 7.5 against a 6.5 bar is worth strictly more than a 7.0.
@@ -426,16 +398,16 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 8, 0) : shortfall(ieltsDiff, 0, 1.5, 25);
       score += points;
       if (ieltsDiff >= 0.5) {
-        reasons.push({ code: "ielts_above", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} above the ${uni.minIelts} requirement`, weight: 8, points });
+        reasons.push({ code: "ielts_above", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} is above the university-catalogue figure ${uni.minIelts}; confirm the programme-specific rule`, weight: 8, points });
         components.push(component("english", points, "ielts_above"));
       } else if (ieltsDiff >= 0) {
-        reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} meets the ${uni.minIelts} requirement`, weight: 4, points });
+        reasons.push({ code: "ielts_meets", params: { score: profile.ieltsScore!, min: uni.minIelts }, text: `IELTS ${profile.ieltsScore} is at or above the university-catalogue figure ${uni.minIelts}; confirm the programme-specific rule`, weight: 4, points });
         components.push(component("english", points, "ielts_meets"));
       } else {
         potentialIssues.push({
           code: "ielts_below",
           params: { min: uni.minIelts, score: profile.ieltsScore! },
-          text: `IELTS ${uni.minIelts} required — you have ${profile.ieltsScore}`,
+          text: `IELTS ${profile.ieltsScore} is below the university-catalogue figure ${uni.minIelts}; check the programme-specific accepted tests and waiver options`,
           weight: 20,
           points,
         });
@@ -446,22 +418,17 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     components.push(component("english", 0, null, false));
   }
 
-  // SAT — only when the university officially specifies a minimum AND the
-  // test can actually be part of this student's admission. A graduate
-  // applicant (or a graduate-only institution) must not be told that a
-  // published undergraduate SAT minimum is "required", nor be penalised for
-  // not holding a score they never needed.
+  // SAT — only compare an undergraduate catalogue figure for an
+  // undergraduate applicant. Because testing policies differ by programme,
+  // UI copy must frame the comparison as something to verify, not a universal
+  // requirement.
   if (uni.minSat != null && undergraduateTestApplies(uni.degreeLevel, profile.degreeLevel)) {
     const hasSat = typeof profile.satScore === "number" && profile.satScore > 0;
     if (!hasSat) {
-      score -= 20;
-      potentialIssues.push({
-        code: "sat_missing",
-        params: { min: uni.minSat },
-        text: `SAT ${uni.minSat} required — you don't have an SAT score yet`,
-        weight: 20,
-      });
-      components.push(component("standardised_test", -20, "sat_missing"));
+      // Missing does not mean required, waived, or failed; leave this
+      // university-level catalogue dimension unscored until a programme
+      // policy and an applicant score can actually be compared.
+      components.push(component("standardised_test", 0, null, false));
     } else {
       const satDiff = profile.satScore! - uni.minSat;
       // 200 points above the published bar earns the full +6; a shortfall is
@@ -469,13 +436,13 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       const points = satDiff >= 0 ? meets(satDiff, 0, 200, 6, 0) : shortfall(satDiff, 0, 300, 22);
       score += points;
       if (satDiff >= 0) {
-        reasons.push({ code: "sat_meets", params: { score: profile.satScore!, min: uni.minSat }, text: `SAT ${profile.satScore} meets the ${uni.minSat} requirement`, weight: 6, points });
+        reasons.push({ code: "sat_meets", params: { score: profile.satScore!, min: uni.minSat }, text: `SAT ${profile.satScore} is at or above the university-catalogue figure ${uni.minSat}; verify the programme policy`, weight: 6, points });
         components.push(component("standardised_test", points, "sat_meets"));
       } else {
         potentialIssues.push({
           code: "sat_below",
           params: { min: uni.minSat, score: profile.satScore! },
-          text: `SAT ${uni.minSat} required — you have ${profile.satScore}`,
+          text: `SAT ${profile.satScore} is below the university-catalogue figure ${uni.minSat}; verify whether the programme considers SAT scores`,
           weight: 15,
           points,
         });
@@ -508,29 +475,6 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
     components.push(component("field", -15, "major_not_offered"));
   } else {
     components.push(component("field", 0, null, false));
-  }
-
-  // Activities — the profile's activity portfolio is part of the fit, not just
-  // the separate readiness page. Empty/unknown activity data stays neutral;
-  // entered activities contribute breadth, leadership and research. The curve
-  // saturates: the sixth activity is worth less than the first, and no count
-  // can push the portfolio share past its 12-point cap.
-  const activity = activityFacts(profile);
-  const portfolioSize = activity.activities + activity.awards;
-  if (portfolioSize > 0 || activity.leadership > 0 || activity.research > 0) {
-    const breadth = 8 * saturatingCurve(portfolioSize, 6);
-    const depth = 4 * saturatingCurve(activity.leadership + activity.research, 2);
-    const activityBoost = Math.min(12, roundTo(breadth + depth, 2));
-    score += activityBoost;
-    reasons.push({
-      code: "activity_strength",
-      params: { activities: portfolioSize },
-      text: `${portfolioSize} activities and achievements strengthen your application`,
-      weight: activityBoost,
-    });
-    components.push(component("portfolio", activityBoost, "activity_strength"));
-  } else {
-    components.push(component("portfolio", 0, null, false));
   }
 
   // Financial fit — compare the full verified annual cost, not tuition alone.
@@ -679,31 +623,13 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   }
   components.push(component("country", countryPreferred ? 8 : 0, countryPreferred ? "country_preferred" : null, preferredList.length > 0));
 
-  // Research / Work Experience Boost for Master/PhD or top ranking
-  const hasExperience = (profile.researchPublications || 0) > 0 || (profile.workExperienceYears || 0) > 0;
-  const experienceKnown = profile.researchPublications != null || profile.workExperienceYears != null;
-  if (hasExperience) {
-    score += 5;
-    reasons.push({ code: "experience_boost", params: {}, text: "Research / work experience strengthens your application", weight: 5 });
-  }
-  components.push(component("experience", hasExperience ? 5 : 0, hasExperience ? "experience_boost" : null, experienceKnown));
-
   // Clamp Score — rounded exactly once, after every component is summed.
   const rawScore = roundTo(score, 1);
   const matchScore = Math.min(99, Math.max(35, Math.round(rawScore)));
 
-  // Categorize
-  let matchCategory: "Reach" | "Match" | "Safety" = "Match";
-  if (matchScore >= 85) {
-    matchCategory = "Safety";
-  } else if (matchScore >= 68) {
-    matchCategory = "Match";
-  } else {
-    matchCategory = "Reach";
-  }
-
-  // Ranked output: the 2 most important positives and the 2 biggest
-  // negatives — a missing requirement is always visible as a "−".
+  // Ranked output: the 2 most important positives and the 2 largest
+  // data-backed shortfalls. Unrecorded test scores are unknown, not failures,
+  // and therefore do not enter the negative-reason list.
   reasons.sort((a, b) => b.weight - a.weight);
   potentialIssues.sort((a, b) => b.weight - a.weight);
 
@@ -711,7 +637,6 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
 
   return {
     matchScore,
-    matchCategory,
     // Unclamped total and the exact per-dimension arithmetic behind it.
     rawScore,
     breakdown,
@@ -754,40 +679,14 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     components.push(component("gpa", 0, null, false));
   }
 
-  // IELTS check — a missing test is a real penalty (same rule as
-  // calculateUniversityMatch): a scholarship requiring IELTS must NEVER show
-  // a high match for a student without an IELTS score. An equivalent test
-  // (TOEFL / Duolingo) is a smaller, clearly-worded issue: the published bar
-  // is IELTS and acceptance of the alternative must be confirmed.
+  // A missing IELTS score is unknown rather than evidence of ineligibility.
+  // Compare an IELTS value only when the applicant has recorded one; other
+  // tests remain alternatives to verify with the award provider, not presumed
+  // equivalents and not a penalty in the fit score.
   if (scholarship.minIelts && scholarship.minIelts > 0) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      const hasAlternative =
-        (typeof profile.toeflScore === "number" && profile.toeflScore > 0) ||
-        (typeof profile.duolingoScore === "number" && profile.duolingoScore > 0);
-      if (hasAlternative) {
-        const alt =
-          typeof profile.toeflScore === "number" && profile.toeflScore > 0
-            ? `TOEFL ${profile.toeflScore}`
-            : `Duolingo ${profile.duolingoScore}`;
-        score -= 3;
-        potentialIssues.push({
-          code: "ielts_alternative",
-          params: { min: scholarship.minIelts, alt },
-          text: `IELTS ${scholarship.minIelts} is the published bar — you have ${alt}; confirm whether it is accepted`,
-          weight: 3,
-        });
-        components.push(component("english", -3, "ielts_alternative"));
-      } else {
-        score -= 15;
-        potentialIssues.push({
-          code: "ielts_missing",
-          params: { min: scholarship.minIelts },
-          text: `IELTS ${scholarship.minIelts} required — you don't have an IELTS score yet`,
-          weight: 15,
-        });
-        components.push(component("english", -15, "ielts_missing"));
-      }
+      components.push(component("english", 0, null, false));
     } else {
       const ieltsDiff = profile.ieltsScore! - scholarship.minIelts;
       const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 10, 0) : shortfall(ieltsDiff, 0, 1.5, 20);

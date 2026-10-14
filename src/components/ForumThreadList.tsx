@@ -119,8 +119,8 @@ export function ForumThreadList({
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 mt-1.5 line-clamp-1">{thread.title}</h3>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{thread.body}</p>
+                  <h3 className="mt-1.5 break-words text-sm font-bold text-slate-900">{thread.title}</h3>
+                  <p className="mt-1 break-words text-xs text-slate-500">{thread.body}</p>
                 </div>
               </div>
 

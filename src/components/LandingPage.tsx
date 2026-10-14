@@ -161,45 +161,36 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
     { label: td("statSop"), value: td("statSopReady"), sub: td("statSopSub"), icon: FileText, tone: "bg-violet-50 text-violet-600" },
   ];
 
-  const mockPortfolio = [
-    { label: t("mockReach"), examples: td("reachExamples"), tone: "border-purple-200 bg-purple-50 text-purple-900" },
-    { label: t("mockMatch"), examples: td("matchExamples"), tone: "border-blue-200 bg-blue-50 text-blue-900" },
-    { label: t("mockSafety"), examples: td("safetyExamples"), tone: "border-emerald-200 bg-emerald-50 text-emerald-900" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* ===== Header ===== */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-[72px] w-[min(1160px,92%)] items-center justify-between gap-2">
-          <a href="#top" className="flex min-w-0 items-center gap-2 text-base font-extrabold tracking-tight sm:gap-2.5 sm:text-lg" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          <a href="#top" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl text-base font-extrabold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:gap-2.5 sm:text-lg" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
             <span className="grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
               <BrandingImage alt={t("logoAlt")} className="h-[34px] w-[34px] object-cover" />
             </span>
-            {/* `truncate` stays as a safety net, but nothing is allowed to
-                squeeze the wordmark away on a 320px phone: the header keeps
-                only the controls that fit and the rest move into the menu. */}
-            <span className="truncate text-[15px] sm:text-lg">{tm("appName")}</span>
+            <span className="min-w-0 break-words whitespace-normal text-[15px] leading-tight sm:text-lg">{tm("appName")}</span>
           </a>
           <nav aria-label={t("navAria")} className="hidden items-center gap-6 text-sm text-slate-600 lg:flex xl:gap-7">
-            <button onClick={() => scrollToId("how")} className="hover:text-slate-900">{t("navHow")}</button>
-            <button onClick={() => scrollToId("features")} className="hover:text-slate-900">{t("navFeatures")}</button>
-            <button onClick={() => scrollToId("chancing")} className="hover:text-slate-900">{t("navChancing")}</button>
-            <button onClick={() => scrollToId("roadmap")} className="hover:text-slate-900">{t("navPlanning")}</button>
+            <button onClick={() => scrollToId("how")} className="inline-flex min-h-11 items-center rounded-lg px-1 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("navHow")}</button>
+            <button onClick={() => scrollToId("features")} className="inline-flex min-h-11 items-center rounded-lg px-1 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("navFeatures")}</button>
+            <button onClick={() => scrollToId("chancing")} className="inline-flex min-h-11 items-center rounded-lg px-1 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("navChancing")}</button>
+            <button onClick={() => scrollToId("roadmap")} className="inline-flex min-h-11 items-center rounded-lg px-1 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("navPlanning")}</button>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             <ThemeSwitch />
             {onSignIn && (
               <button
                 onClick={onSignIn}
-                className="hidden whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold hover:-translate-y-px hover:border-slate-300 transition sm:block sm:px-4 sm:py-2.5"
+                className="hidden min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-bold transition hover:-translate-y-px hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:block sm:px-4"
               >
                 {t("signIn")}
               </button>
             )}
             <button
               onClick={onStart}
-              className="hidden whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition sm:block sm:px-4 sm:py-2.5"
+              className="hidden min-h-11 rounded-xl bg-indigo-600 px-3 py-2 text-center text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 sm:block sm:px-4"
             >
               {t("getStarted")}
             </button>
@@ -210,7 +201,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               aria-expanded={menuOpen}
               aria-controls="landing-mobile-nav"
               aria-label={t("navAria")}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 lg:hidden"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden"
             >
               {menuOpen ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
             </button>
@@ -234,7 +225,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <li key={item.id}>
                   <button
                     onClick={() => goToSection(item.id)}
-                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     {item.label}
                   </button>
@@ -244,7 +235,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               <li className="mt-1 border-t border-slate-100 pt-1 sm:hidden">
                 <button
                   onClick={() => { menuTriggerRef.current?.focus(); setMenuOpen(false); onStart(); }}
-                  className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-bold text-indigo-700 hover:bg-slate-50"
+                  className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-bold text-indigo-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   {t("getStarted")}
                 </button>
@@ -253,7 +244,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <li className="sm:mt-1 sm:border-t sm:border-slate-100 sm:pt-1">
                   <button
                     onClick={() => { menuTriggerRef.current?.focus(); setMenuOpen(false); onSignIn(); }}
-                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     {t("signIn")}
                   </button>
@@ -284,24 +275,24 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
               <motion.div variants={heroItem} className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   onClick={onStart}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/25 hover:-translate-y-px hover:bg-indigo-500 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
                 >
                   {t("ctaStart")} <ArrowRight className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => scrollToId("how")}
-                  className="rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-bold text-slate-700 hover:-translate-y-px hover:border-slate-300 transition"
+                  className="rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-bold text-slate-700 hover:-translate-y-px hover:border-slate-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   {t("ctaHow")}
                 </button>
               </motion.div>
-              <motion.div variants={heroItem} className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-400">
+              <motion.div variants={heroItem} className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-600">
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust1")}</span>
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust2")}</span>
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />{t("trust3")}</span>
               </motion.div>
               {onEnterApp && (
-                <motion.button variants={heroItem} onClick={onEnterApp} className="mt-5 text-xs font-semibold text-slate-400 underline-offset-4 hover:text-slate-600 hover:underline">
+                <motion.button variants={heroItem} onClick={onEnterApp} className="mt-5 inline-flex min-h-11 items-center rounded px-2 text-xs font-semibold text-slate-600 underline-offset-4 hover:text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                   {t("enterApp")}
                 </motion.button>
               )}
@@ -338,7 +329,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                     </div>
                     {mockSidebarGroups.map((group) => (
                       <div key={group.id} className="mb-1">
-                        <div className="px-2 pb-0.5 pt-1 text-[7px] font-black uppercase tracking-wider text-slate-400">
+                        <div className="px-2 pb-0.5 pt-1 text-[8px] font-black uppercase tracking-wider text-slate-600">
                           {group.label}
                         </div>
                         {group.items.map(({ id, label, icon: Icon, pro }) => (
@@ -361,7 +352,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                     ))}
                     {/* Account & settings — Premium, Telegram & alerts, Rewards. */}
                     <div className="mt-1 border-t border-slate-100 pt-1">
-                      <div className="px-2 pb-0.5 text-[7px] font-black uppercase tracking-wider text-slate-400">
+                      <div className="px-2 pb-0.5 text-[8px] font-black uppercase tracking-wider text-slate-600">
                         {nav("accountCluster")}
                       </div>
                       {mockAccountItems.map(({ id, label, icon: Icon, pro }) => (
@@ -396,7 +387,6 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                         <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/60">
                           <span className="text-base font-black text-amber-400">47<small className="text-[7px] text-white">%</small></span>
                         </div>
-                        <div className="text-[7px] font-semibold">{td("tierNeeds")}</div>
                         <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-bold text-slate-900 sb-ink-on-warm">
                           <Bot className="h-2.5 w-2.5" /> {td("runAudit")}
                         </div>
@@ -410,7 +400,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                             <span className={`grid h-4 w-4 place-items-center rounded ${tone}`}><Icon className="h-2.5 w-2.5" /></span>
                           </div>
                           <strong className="mt-1 block text-base font-black">{value}</strong>
-                          <span className="text-[7px] text-slate-400">{sub}</span>
+                          <span className="text-[9px] text-slate-600">{sub}</span>
                         </div>
                       ))}
                     </div>
@@ -418,15 +408,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                       <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-700">
                         <Compass className="h-3 w-3" /> {td("portfolioTitle")}
                       </div>
-                      <div className="mt-2 grid grid-cols-3 gap-1.5">
-                        {mockPortfolio.map((tier) => (
-                          <div key={tier.label} className={`rounded-lg border p-1.5 ${tier.tone}`}>
-                            <div className="text-[7px] font-black uppercase tracking-wide">{tier.label}</div>
-                            <div className="mt-0.5 text-[7px] leading-tight">{tier.examples}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="mt-1.5 text-[7px] leading-snug text-slate-400">{t("mockPortfolioNote")}</p>
+                      <p className="mt-1.5 text-[8px] leading-snug text-slate-500">{t("mockPortfolioNote")}</p>
                     </div>
                   </div>
                 </div>
@@ -468,7 +450,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <RevealItem key={f.title} className="min-h-[205px] rounded-2xl border border-white/10 bg-slate-800 p-6">
                   <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-sm font-black text-indigo-300">{f.icon}</div>
                   <h3 className="text-base font-extrabold">{f.title}</h3>
-                  <p className="mt-1.5 text-sm text-slate-400">{f.text}</p>
+                  <p className="mt-1.5 text-sm text-slate-300">{f.text}</p>
                 </RevealItem>
               ))}
             </RevealGroup>
@@ -508,7 +490,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <span className="text-sm text-slate-600">{t("chanceDataBasis")}</span>
                 <strong className="text-base font-black">{t("chanceDataPublished")}</strong>
               </div>
-              <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{t("chanceNote")}</p>
+              <p className="mt-3 text-[11px] leading-relaxed text-slate-600">{t("chanceNote")}</p>
             </Reveal>
           </div>
         </section>
@@ -540,7 +522,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             <div className="mx-auto max-w-[900px] rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-9 text-center sm:p-10">
               <div className="flex justify-center"><Sparkles className="h-5 w-5 text-indigo-500" /></div>
               <p className="mt-4 text-xl font-bold leading-relaxed tracking-[-0.01em] sm:text-2xl">“{t("quote")}”</p>
-              <p className="mt-4 text-[13px] text-slate-500">{t("quoteBy")}</p>
+              <p className="mt-4 text-[13px] text-slate-600">{t("quoteBy")}</p>
             </div>
             </Reveal>
           </div>
@@ -560,7 +542,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                 <p className="mx-auto mt-3 max-w-[620px] text-sm text-slate-300 sm:text-base">{t("ctaText")}</p>
                 <button
                   onClick={onStart}
-                  className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-extrabold text-indigo-700 shadow-xl hover:-translate-y-px transition"
+                  className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-extrabold text-indigo-700 shadow-xl hover:-translate-y-px transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900"
                 >
                   {t("ctaBtn")} <ArrowRight className="h-4 w-4" />
                 </button>
@@ -572,14 +554,12 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
       </main>
 
       {/* ===== Footer ===== */}
-      <footer className="border-t border-slate-200 py-9 text-xs text-slate-400">
+      <footer className="border-t border-slate-200 py-9 text-xs text-slate-600">
         <div className="mx-auto flex w-[min(1160px,92%)] flex-col items-center justify-between gap-4 sm:flex-row">
           <div>© {new Date().getFullYear()} {t("footerLeft")}</div>
-          {/* min-h-6 keeps the tap targets at the 24px minimum even though the
-              type is xs; px-1 widens them without changing the visual rhythm. */}
           <div className="flex items-center gap-4">
-            <a href="/privacy" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerPrivacy")}</a>
-            <a href="/terms" className="inline-flex min-h-6 items-center rounded px-1 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">{t("footerTerms")}</a>
+            <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("footerPrivacy")}</a>
+            <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{t("footerTerms")}</a>
           </div>
         </div>
         {/* Honest small print, always just above the Privacy / Terms links:

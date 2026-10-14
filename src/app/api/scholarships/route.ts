@@ -27,8 +27,14 @@ export async function GET(req: Request) {
     const search = searchParams.get("search")?.toLowerCase();
     const country = searchParams.get("country");
     const coverageType = searchParams.get("coverageType");
+    const focusId = Number(searchParams.get("focusId"));
 
-    let allScholarships = await db.select().from(scholarships);
+    // The public catalogue and global search share one visibility boundary:
+    // inactive records stay out of student-facing lists and search results.
+    let allScholarships = await db
+      .select()
+      .from(scholarships)
+      .where(eq(scholarships.isActive, true));
 
     let profileData = null;
     let matchProfile = null;
@@ -189,6 +195,13 @@ export async function GET(req: Request) {
         if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
         return a.id - b.id;
       });
+    }
+
+    // A command-search result may pass its record id with an exact-title
+    // catalogue search. Promote only that already-filtered active row so it is
+    // visible on the first page; normal catalogue ordering is unchanged.
+    if (Number.isSafeInteger(focusId) && focusId > 0) {
+      results.sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId));
     }
 
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).

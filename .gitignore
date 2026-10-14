@@ -26,5 +26,8 @@ yarn-error.log*
 # database dumps / archives
 *.zip
 
+# local audit captures (manual evidence only — not a reproducible browser test)
+/screenshots/
+
 # local embedded postgres data directory (scripts/dev-db.mjs)
 /.pgdata/

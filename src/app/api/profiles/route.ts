@@ -125,6 +125,7 @@ export async function POST(req: Request) {
           {
             error:
               "An account with this email already exists. Close this window and use Sign in instead.",
+            code: "email_taken",
           },
           { status: 409 }
         );
@@ -191,7 +192,12 @@ export async function POST(req: Request) {
             ? Math.round(Number(body.budgetAnnualUsd))
             : null,
         preferredCountries: countriesStr,
+        // The legacy boolean is kept for compatibility; only explicit yes is
+        // true. The nullable column preserves "not answered" separately from
+        // an explicit no.
         needScholarship: body.needScholarship === true,
+        needsFinancialAid:
+          typeof body.needsFinancialAid === "boolean" ? body.needsFinancialAid : null,
         extracurriculars: clampString(body.extracurriculars, 4000) || null,
         workExperienceYears: numOrNull(body.workExperienceYears),
         researchPublications: numOrNull(body.researchPublications),

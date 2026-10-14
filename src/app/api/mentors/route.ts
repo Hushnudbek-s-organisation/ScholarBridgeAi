@@ -31,11 +31,10 @@ export async function GET(req: Request) {
     // the whole row — including password_hash — into memory for nothing.
     const [profile] = await db
       .select({
-        country: studentProfiles.country,
+        preferredCountries: studentProfiles.preferredCountries,
         targetMajor: studentProfiles.targetMajor,
         degreeLevel: studentProfiles.degreeLevel,
         needsFinancialAid: studentProfiles.needsFinancialAid,
-        preferredLocale: studentProfiles.preferredLocale,
       })
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId));
@@ -71,13 +70,15 @@ export async function GET(req: Request) {
     const rows = await db.select().from(mentors).where(eq(mentors.isActive, true));
 
     const request: MentorRequest = {
-      country: profile.country,
+      targetCountries: parseListColumn(profile.preferredCountries),
       targetUniversities,
       targetMajor: profile.targetMajor,
       degreeLevel: profile.degreeLevel,
       targetScholarships,
       needsFinancialAid: profile.needsFinancialAid,
-      preferredLanguages: parseListColumn(profile.preferredLocale ? [profile.preferredLocale] : []),
+      // UI locale is not evidence of a preferred spoken language; no language
+      // match is scored until the student explicitly supplies that preference.
+      preferredLanguages: [],
       maxHourlyRateUsd: searchParams.get("maxRate") ? Number(searchParams.get("maxRate")) : null,
     };
 
@@ -103,11 +104,14 @@ export async function GET(req: Request) {
         score: m.score,
         reasons: m.reasons,
         gaps: m.gaps,
+        reasonMessages: m.reasonMessages,
+        gapMessages: m.gapMessages,
         verified: m.verified,
         price: m.price,
       })),
       filtered: result.filtered,
       note: result.note,
+      noteMessage: result.noteMessage,
     });
   } catch (error) {
     console.error("GET /api/mentors error:", error);

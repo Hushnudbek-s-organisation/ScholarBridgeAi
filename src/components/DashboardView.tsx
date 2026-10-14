@@ -50,11 +50,9 @@ export function DashboardView({
   const [isEvaluating, setIsEvaluating] = useState(false);
   // Real scholarship match count (fetched, never a hardcoded claim).
   const [scholarshipMatchCount, setScholarshipMatchCount] = useState<number | null>(null);
-  // Profile readiness — the SAME number the Readiness pane shows, from the
-  // same endpoint (src/lib/chancing.ts `profileStrength`). The dashboard used
-  // to compute its own second formula ("Admissions Index"), so one student saw
-  // two different strength numbers in two screens.
-  const [strength, setStrength] = useState<{ overall: number; completeness: number } | null>(null);
+  // Profile information coverage from the shared summary endpoint; it is not
+  // an admissions score or an applicant-quality tier.
+  const [strength, setStrength] = useState<{ overall: number } | null>(null);
 
   // Count how many scholarships actually match this profile (matchScore >= 60).
   useEffect(() => {
@@ -87,10 +85,7 @@ export function DashboardView({
         const res = await fetch(`/api/profile-strength?profileId=${profile.id}`);
         const data = await res.json();
         if (!cancelled && res.ok && data?.strength) {
-          setStrength({
-            overall: Number(data.strength.overall) || 0,
-            completeness: Number(data.strength.completeness) || 0,
-          });
+          setStrength({ overall: Number(data.strength.overall) || 0 });
         }
       } catch {
         // keep null — the card shows a neutral dash instead of a made-up score
@@ -127,19 +122,6 @@ export function DashboardView({
       setIsEvaluating(false);
     }
   };
-
-  // Readiness tier label (deterministic, from the fetched profile-strength
-  // score — no second scoring formula lives in this component).
-  const admissionTier =
-    strength == null
-      ? null
-      : strength.overall >= 85
-      ? t("tierTop")
-      : strength.overall >= 70
-      ? t("tierCompetitive")
-      : strength.overall >= 55
-      ? t("tierDeveloping")
-      : t("tierNeeds");
 
   // No invented fallback list: "not chosen yet" is stated, not filled in.
   let preferredCountriesList: string[] = [];
@@ -227,14 +209,8 @@ export function DashboardView({
             </div>
 
             <div className="text-xs text-indigo-100 font-medium">
-              {admissionTier ?? t("strengthUnavailable")}
+              {strength == null ? t("strengthUnavailable") : t("strengthCompleteness", { percent: strength.overall })}
             </div>
-
-            {strength != null && (
-              <div className="text-[11px] text-indigo-200">
-                {t("strengthCompleteness", { percent: strength.completeness })}
-              </div>
-            )}
 
             <p className="text-[10px] leading-snug text-indigo-200/80">{t("readinessNote")}</p>
 
@@ -360,30 +336,9 @@ export function DashboardView({
               {t("portfolioIntro")}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-purple-700 uppercase">{t("reachLabel")}</span>
-                <div className="text-sm font-bold text-purple-900">{t("reachExamples")}</div>
-                <p className="text-[11px] text-purple-700">{t("reachText")}</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-blue-700 uppercase">{t("matchLabel")}</span>
-                <div className="text-sm font-bold text-blue-900">{t("matchExamples")}</div>
-                <p className="text-[11px] text-blue-700">{t("matchText")}</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
-                <span className="text-[10px] font-bold tracking-wider text-emerald-700 uppercase">{t("safetyLabel")}</span>
-                <div className="text-sm font-bold text-emerald-900">{t("safetyExamples")}</div>
-                <p className="text-[11px] text-emerald-700">{t("safetyText")}</p>
-              </div>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+              <p className="text-xs leading-relaxed text-slate-700">{t("portfolioNote")}</p>
             </div>
-
-            {/* These tiers are the same fit bands the Chancing pane uses
-                (match score < 68 / 68–84 / 85+). They are NOT admission odds,
-                so the panel says so instead of implying a probability. */}
-            <p className="text-[11px] leading-snug text-slate-500">{t("portfolioNote")}</p>
           </div>
 
           {/* Key Quick Launcher Tools */}

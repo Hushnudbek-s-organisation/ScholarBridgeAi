@@ -104,7 +104,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-base font-extrabold text-slate-900">6. Disclaimer — No Guarantee of Admission</h2>
               <p className="mt-2">
-                Match scores, eligibility percentages, Reach / Match / Safety labels, and AI-drafted SOP content are <strong>guidance only</strong> and not a guarantee of admission, scholarship award, or visa approval. Admissions decisions are made solely by universities and scholarship committees based on their own criteria, which can change at any time.
+                Profile-to-catalogue fit scores, eligibility indicators, and AI-drafted SOP content are <strong>guidance only</strong>. They are not admission probabilities, guarantees, or official decisions. Admissions decisions are made solely by universities and scholarship committees based on their own criteria, which can change at any time.
               </p>
               <p className="mt-2">
                 We source university and scholarship information from official pages where possible and link each result to its origin via our <em>sources</em> tables, showing a &quot;Source&quot; link and &quot;Last verified&quot; date on each card. If no verified source is linked yet, we display &quot;Source: pending verification&quot;. Always confirm critical details (deadlines, tuition, requirements) on the official university or scholarship website before applying.

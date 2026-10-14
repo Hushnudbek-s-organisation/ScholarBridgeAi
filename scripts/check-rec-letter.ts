@@ -6,7 +6,7 @@
  *   2. An empty profile produces zero talking points and a full gap list —
  *      never invented facts.
  *   3. Outline sections appear only when the facts for them exist.
- *   4. The checklist reacts to a deadline when one is given.
+ *   4. The checklist carries a supplied deadline without asserting universal timing.
  *
  * Run: npm run test:rec-letter
  */
@@ -75,7 +75,13 @@ const empty: RecLetterProfile = {
   graduationYear: null,
 };
 
-const opts = { universityTitle: "Technical University of Munich", deadline: "2027-01-15" };
+const opts = {
+  universityTitle: "Technical University of Munich",
+  deadline: "2027-01-15",
+  relationshipContext: "Computer Science teacher and robotics mentor for two years",
+  requestedFocus: "independent research and mentoring younger students",
+  supportingExample: "the robotics project where Aziza documented the testing process and coached new members",
+};
 
 // ---------------------------------------------------------------------------
 section("1. Talking points use only real data");
@@ -90,12 +96,18 @@ check("Research point", fullBrief.talkingPoints.includes("Research: ML research 
 check("Community point", fullBrief.talkingPoints.includes("Community: Coding for seniors"));
 check("Work-experience point", fullBrief.talkingPoints.includes("1 year of work experience"));
 check("a complete profile reports no gaps", fullBrief.dataMissing.length === 0, fullBrief.dataMissing.join(" | "));
+const fullAdviceKeys = fullBrief.personalizationAdvice.map((item) => item.key);
+check("profile-specific advice reflects all three customization fields", fullAdviceKeys.includes("relationshipProvided") && fullAdviceKeys.includes("focusProvided") && fullAdviceKeys.includes("exampleProvided"));
+check("profile-specific advice uses verified achievements and academic context", fullAdviceKeys.includes("evidencePresent") && fullAdviceKeys.includes("academicContext"));
 
-const emptyBrief = buildRecLetterBrief(empty, opts);
+const emptyBrief = buildRecLetterBrief(empty, { universityTitle: opts.universityTitle, deadline: opts.deadline });
 check("an empty profile produces zero talking points", emptyBrief.talkingPoints.length === 0, emptyBrief.talkingPoints.join(" | "));
 check("an empty profile lists what is missing", emptyBrief.dataMissing.length >= 5, emptyBrief.dataMissing.join(" | "));
 check("missing GPA is named", emptyBrief.dataMissing.includes("GPA and scale"));
 check("missing leadership is named", emptyBrief.dataMissing.includes("Leadership roles"));
+check("missing major is named so the brief can be targeted", emptyBrief.dataMissing.includes("Intended major or program"));
+check("empty-profile advice explains how to add evidence without inventing it", emptyBrief.personalizationAdvice.some((item) => item.key === "evidenceMissing"));
+check("empty-profile advice has a fully localizable focus prompt without a fabricated field", emptyBrief.personalizationAdvice.some((item) => item.key === "focusMissingNoMajor"));
 
 const gpaOnly = buildRecLetterBrief({ ...empty, gpa: 3.7, gpaScale: 5 }, {});
 check("5-point 3.7 is converted to 2.96/4.0, not copied", gpaOnly.talkingPoints[0] === "GPA 3.7 on a 5 scale (2.96/4.0)", gpaOnly.talkingPoints[0]);
@@ -104,10 +116,17 @@ section("2. Outline placement");
 
 check("opening names the student", fullBrief.outline[0].draft.includes("Aziza Karimova"), fullBrief.outline[0].draft);
 check("opening names the university and major", fullBrief.outline[0].draft.includes("Technical University of Munich program in Computer Science"));
-check("full profile gets all five sections", fullBrief.outline.length === 5, fullBrief.outline.map((o) => o.section).join(","));
-check("academic section carries the real GPA", fullBrief.outline.find((o) => o.section === "Academic strengths")?.draft.includes("3.9") === true);
-check("leadership section carries the real role", fullBrief.outline.find((o) => o.section === "Leadership and initiative")?.draft.includes("Robotics Club President") === true);
-check("character section carries the real volunteering", fullBrief.outline.find((o) => o.section === "Character and commitment")?.draft.includes("Coding for seniors") === true);
+check("full profile receives a detailed outline", fullBrief.outline.length >= 8, fullBrief.outline.map((o) => o.section).join(","));
+const evidenceOutline = fullBrief.outline.find((o) => o.section === "Leadership, research, and initiative")?.draft ?? "";
+const closingOutline = fullBrief.outline.find((o) => o.section === "Closing endorsement")?.draft ?? "";
+check("the recommender brief has no fixed example-count rule", /no universal number/i.test(evidenceOutline) && !/no more than two/i.test(evidenceOutline));
+check("the closing selects evidence according to the letter's purpose and length", /purpose and length allow/i.test(closingOutline) && !/two strongest examples/i.test(closingOutline));
+check("opening names the supplied recommender context and asks for verification", fullBrief.outline[0].draft.includes(opts.relationshipContext) && /verify/i.test(fullBrief.outline[0].draft));
+check("academic section carries the real GPA and warns against unsupported claims", fullBrief.outline.find((o) => o.section === "Academic strengths")?.draft.includes("3.9") === true && /personally observed/i.test(fullBrief.outline.find((o) => o.section === "Academic strengths")?.draft ?? ""));
+check("leadership section carries the real role and gives a specific evidence prompt", fullBrief.outline.find((o) => o.section === "Leadership, research, and initiative")?.draft.includes("Robotics Club President") === true && /responsibility.*challenge|challenge.*action/i.test(fullBrief.outline.find((o) => o.section === "Leadership, research, and initiative")?.draft ?? ""));
+check("character section carries the real volunteering and requests a concrete example", fullBrief.outline.find((o) => o.section === "Character and commitment")?.draft.includes("Coding for seniors") === true && /specific moment/i.test(fullBrief.outline.find((o) => o.section === "Character and commitment")?.draft ?? ""));
+check("student-requested focus is clearly marked for verification", fullBrief.outline.some((o) => o.section.includes("Student-requested") && o.draft.includes(opts.requestedFocus) && /not as a verified claim/i.test(o.draft)));
+check("student-suggested example is included but must be independently checked", fullBrief.outline.some((o) => o.section.includes("Student-suggested") && o.draft.includes(opts.supportingExample) && /verify it independently/i.test(o.draft)));
 check("empty profile keeps only opening and closing", emptyBrief.outline.length === 2, emptyBrief.outline.map((o) => o.section).join(","));
 
 section("3. No fabrication");
@@ -118,8 +137,9 @@ check("no awards → the gap is listed", awardsNull.dataMissing.includes("Awards
 
 section("4. Checklist and determinism");
 
-check("deadline present → 2-weeks-before rule", fullBrief.checklist[0].includes("2 weeks before the 2027-01-15 deadline"), fullBrief.checklist[0]);
-check("no deadline → 3–4-weeks rule", buildRecLetterBrief(full, {}).checklist[0].includes("3–4 weeks"));
+check("a supplied deadline is included without a universal lead-time rule", fullBrief.checklist[0].includes("2027-01-15") && /portal cutoff|time zone/i.test(fullBrief.checklist[0]), fullBrief.checklist[0]);
+check("without a supplied deadline, timing is agreed with the recommender", /what timing works|no universal lead time/i.test(buildRecLetterBrief(full, {}).checklist[0]));
+check("request, submission and reminder guidance has no fixed week count", !/4–6 weeks|two weeks early|about a week before/i.test(fullBrief.checklist.join(" ")));
 check("five checklist steps", fullBrief.checklist.length === 5, `got ${fullBrief.checklist.length}`);
 check("forUniversity and deadline are echoed", fullBrief.forUniversity === "Technical University of Munich" && fullBrief.deadline === "2027-01-15");
 check(

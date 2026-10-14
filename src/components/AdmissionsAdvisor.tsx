@@ -17,17 +17,12 @@ import { StudentProfile } from "./Navbar";
 /**
  * AI Admissions Advisor (#3).
  *
- * The numbers on this screen come from the deterministic chancing engine —
- * the model writes prose around them and is rejected if it quotes a
- * percentage that is not in its brief. That guarantee is stated in the UI so
- * the student knows which numbers are computed and which are prose.
- *
- * PROBABILITY POLICY (2026-10): only fit scores are shown. The admission
- * probability dimension is labelled "unavailable" — it is never computed or
- * displayed because no validated methodology + outcome data exists yet.
+ * The model can explain profile-to-catalogue fit comparisons, but no
+ * admission-probability estimator is run. The brief validator rejects invented
+ * percentages and outcome promises before model prose is shown.
  */
 
-interface ChanceRow {
+interface ComparisonRow {
   universityName: string;
   fitScore: number | null;
 }
@@ -46,7 +41,7 @@ interface AdvisorResponse {
   aiReply: string | null;
   aiUsed: boolean;
   headline: string;
-  chances: ChanceRow[];
+  comparisons: ComparisonRow[];
 }
 
 interface AdmissionsAdvisorProps {
@@ -170,14 +165,14 @@ export function AdmissionsAdvisor({ activeProfile }: AdmissionsAdvisorProps) {
 
             <p className="mt-2 text-sm leading-relaxed text-slate-700">{data.advice.summary}</p>
 
-            {data.chances.length > 0 && (
+            {data.comparisons.length > 0 && (
               <div className="mt-4 space-y-2">
-                {data.chances.map((c) => (
+                {data.comparisons.map((c) => (
                   <div
                     key={c.universityName}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2"
                   >
-                    <span className="truncate text-xs font-bold text-slate-800">{c.universityName}</span>
+                    <span className="min-w-0 break-words text-xs font-bold text-slate-800">{c.universityName}</span>
                     <span className="flex items-center gap-2 text-[11px] font-bold">
                       <span className="rounded-md bg-white px-2 py-0.5 text-slate-600">
                         {t("advisorFit", { score: c.fitScore ?? "—" })}

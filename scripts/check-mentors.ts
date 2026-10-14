@@ -1,10 +1,5 @@
 /**
- * Deterministic checks for mentor marketplace matching (Phase 4).
- *
- * A mentor is worth talking to because they walked the same path. The matching
- * must be precise about WHY each one was suggested — a student who cannot see
- * the reason will not trust the introduction — and verification must never be
- * quietly optional.
+ * Deterministic checks for mentor marketplace matching.
  *
  * Run: npm run test:mentors
  */
@@ -46,11 +41,12 @@ const mentor = (over: Partial<Mentor> & { id: number; displayName: string }): Me
 });
 
 const request: MentorRequest = {
-  country: "Germany",
+  targetCountries: ["Germany"],
   targetUniversities: ["TU Munich"],
   targetMajor: "Computer Science",
   degreeLevel: "Bachelor",
   targetScholarships: ["DAAD"],
+  needsFinancialAid: true,
   preferredLanguages: ["English"],
 };
 
@@ -68,104 +64,97 @@ const unrelated = mentor({
   country: "Brazil",
   university: "USP",
   program: "Law",
+  scholarshipName: "DAAD Scholarship",
   languages: '["Portuguese"]',
   ratingAverage: null,
   ratingCount: 0,
 });
 
-// ---------------------------------------------------------------------------
-section("1. The closest path ranks first");
+section("1. The closest profile overlap ranks first");
 
 const result = matchMentors(request, [unrelated, sameCountryOnly, exact]);
-check("all three are returned", result.matches.length === 3);
+check("profiles with sufficient shared data are returned", result.matches.length === 3);
 check(
   "the exact-path mentor is first",
   result.matches[0].mentor.displayName === "Dilnoza",
   result.matches.map((m) => m.mentor.displayName).join(" > ")
 );
 check(
-  "the unrelated mentor is last",
+  "the profile with one shared scholarship but other mismatches is last",
   result.matches[result.matches.length - 1].mentor.displayName === "Ana"
 );
 check("the exact match scores much higher", result.matches[0].score > result.matches[2].score + 40);
+check("the overlap score is not displayed as an outcome probability", result.matches[0].score <= 100);
 
-section("2. Every match explains itself");
+section("2. Every result has localized message descriptors and truthful reasons");
 
 const top = result.matches[0];
-check("reasons are never empty", top.reasons.length > 0);
-check("the shared university is named", top.reasons.some((r) => /TU Munich|Technical University of Munich/i.test(r)));
-check("the shared scholarship is named", top.reasons.some((r) => /DAAD/.test(r)));
-check("the same country is named", top.reasons.some((r) => /Germany/.test(r)));
-check("the same field is named", top.reasons.some((r) => /Same field of study/.test(r)));
-check("verification is stated", top.reasons.some((r) => /verified/i.test(r)));
-check("a mentor with enough reviews shows the rating", top.reasons.some((r) => /Rated 4.8\/5 from 12 sessions/.test(r)));
+check("reasons are never empty", top.reasonMessages.length > 0);
+check("every displayed reason has a translation key", top.reasonMessages.every((m) => typeof m.key === "string"));
+check("the shared university is named as profile data", top.reasons.some((r) => /Profile lists Technical University of Munich/.test(r)));
+check("the shared scholarship is described as reported experience", top.reasons.some((r) => /reports experience with DAAD/.test(r)));
+check("the matching preferred study country is named", top.reasons.some((r) => /preferred study countries/.test(r)));
+check("the same field is described as profile data", top.reasons.some((r) => /Profile lists Computer Science as its field/.test(r)));
+check("verification is described as a profile flag", top.reasons.some((r) => /Profile marked as verified/.test(r)));
+check("ratings are described as listed profile data", top.reasons.some((r) => /Profile lists an average of 4.8\/5 across 12 sessions/.test(r)));
 
 const ana = result.matches.find((m) => m.mentor.id === unrelated.id)!;
-check("a weak match still has a reason", ana.reasons.length > 0);
-check("its mismatches are listed as gaps", ana.gaps.length >= 3);
-check("a different university is named as a gap", ana.gaps.some((g) => /Different university/.test(g)));
-check("a missing language is named as a gap", ana.gaps.some((g) => /preferred language/.test(g)));
+check("its mismatches are paired with localized keys", ana.gapMessages.length >= 3 && ana.gapMessages.every((m) => !!m.key));
+check("a different university is named as a gap", ana.gaps.some((g) => /different university/i.test(g)));
+check("a different preferred country is named as a gap", ana.gaps.some((g) => /not one of your preferred study countries/.test(g)));
+check("a missing communication language is named as a gap", ana.gaps.some((g) => /No selected communication language/.test(g)));
 
-section("3. Name matching tolerates abbreviations");
+section("3. Unknown targets are not treated as mismatches");
 
+const countryOnly = matchMentors({ targetCountries: ["Germany"] }, [exact]).matches[0];
+check("no saved university does not create a false university mismatch", !countryOnly.gapMessages.some((m) => m.key === "gaps.differentUniversity"));
+check("no stated field is treated as unknown, not a different field", countryOnly.gapMessages.some((m) => m.key === "gaps.programListed"));
+const legacyCountry = matchMentors({ country: "Germany" }, [exact]).matches[0];
+check("the explicit legacy target-country field remains supported", legacyCountry.reasonMessages.some((m) => m.key === "reasons.sameCountry"));
+const noCountryPreference = matchMentors({ targetUniversities: ["TU Munich"] }, [exact]).matches[0];
+check("mentor location is not compared to a missing student target country", !noCountryPreference.reasonMessages.some((m) => m.key === "reasons.sameCountry") && !noCountryPreference.gapMessages.some((m) => m.key === "gaps.differentCountry"));
 check(
-  "TU Munich matches Technical University of Munich",
-  matchMentors({ targetUniversities: ["TU Munich"] }, [exact]).matches.length === 1
-);
-check(
-  "a completely different university does not score the university bonus",
-  matchMentors({ targetUniversities: ["Harvard"] }, [exact]).matches[0].reasons.every(
-    (r) => !/target universities/i.test(r)
-  )
+  "an unrelated university does not receive the university match bonus",
+  matchMentors({ targetUniversities: ["Harvard"] }, [exact]).matches.every((m) => m.reasonMessages.every((r) => r.key !== "reasons.sameUniversity"))
 );
 
-section("4. Verification is never silently optional");
+section("4. Verification is separate from the overlap score and remains visible");
 
 const unverified = mentor({ id: 4, displayName: "Unverified", isVerified: false });
 const verifiedWeak = mentor({ id: 5, displayName: "Verified Weak", country: "France", university: "Sorbonne" });
-const ordering = matchMentors({ country: "Germany", targetUniversities: ["TU Munich"] }, [
-  unverified,
-  verifiedWeak,
-]);
+const ordering = matchMentors(request, [unverified, verifiedWeak]);
 check(
-  "a verified mentor outranks a better-matching unverified one",
+  "a verified profile sorts ahead of a stronger unverified overlap",
   ordering.matches[0].mentor.displayName === "Verified Weak",
-  ordering.matches.map((m) => `${m.mentor.displayName}:${m.verified}`).join(" > ")
+  ordering.matches.map((m) => `${m.mentor.displayName}:${m.verified}:${m.score}`).join(" > ")
 );
-check("an unverified mentor is labelled", ordering.matches.find((m) => m.mentor.id === 4)!.verified === false);
-check(
-  "an unverified mentor says so in its gaps",
-  ordering.matches.find((m) => m.mentor.id === 4)!.gaps.some((g) => /Not verified/i.test(g))
-);
+const verifiedScore = matchMentors({ targetUniversities: ["TU Munich"] }, [exact]).matches[0].score;
+const unverifiedScore = matchMentors({ targetUniversities: ["TU Munich"] }, [unverified]).matches[0].score;
+check("verification does not inflate profile overlap", verifiedScore === unverifiedScore);
+check("an unverified profile explains that it is not marked verified", ordering.matches.find((m) => m.mentor.id === 4)!.gapMessages.some((g) => g.key === "gaps.notVerified"));
 const allUnverified = matchMentors(
-  { country: "Germany", targetUniversities: ["TU Munich"] },
-  [mentor({ id: 11, displayName: "Unverified A", isVerified: false }),
-   mentor({ id: 12, displayName: "Unverified B", isVerified: false, university: "LMU Munich" })]
+  { targetCountries: ["Germany"], targetUniversities: ["TU Munich"] },
+  [mentor({ id: 11, displayName: "Unverified A", isVerified: false }), mentor({ id: 12, displayName: "Unverified B", isVerified: false, university: "LMU Munich" })]
 );
-check(
-  "the note warns when nothing is verified",
-  /None of these mentors are verified/i.test(allUnverified.note),
-  allUnverified.note
-);
+check("the note warns when no result is marked verified", allUnverified.noteMessage.key === "notes.noneVerified");
 
-section("5. Price filtering");
+section("5. Price filtering includes a zero-dollar ceiling");
 
 const pricey = mentor({ id: 6, displayName: "Pricey", hourlyRateUsd: 150 });
 const free = mentor({ id: 7, displayName: "Free", freeSessions: true, hourlyRateUsd: 0 });
 const unknownRate = mentor({ id: 8, displayName: "Unknown rate", hourlyRateUsd: null });
-
 const budgeted = matchMentors({ ...request, maxHourlyRateUsd: 30 }, [pricey, free, unknownRate]);
 check("a mentor over the ceiling is filtered out", !budgeted.matches.some((m) => m.mentor.id === 6));
 check("the filtered count is reported", budgeted.filtered.overBudget === 1);
 check("a free mentor survives", budgeted.matches.some((m) => m.mentor.id === 7));
-check(
-  "an unknown rate is not treated as over budget",
-  budgeted.matches.some((m) => m.mentor.id === 8),
-  budgeted.matches.map((m) => m.mentor.displayName).join(",")
-);
-check("the note explains what was hidden", /hidden because their rate/.test(budgeted.note));
-check("price labels are set", budgeted.matches.find((m) => m.mentor.id === 7)!.price === "free");
-check("a null rate reads as unknown, not free", budgeted.matches.find((m) => m.mentor.id === 8)!.price === "unknown");
+check("an unknown rate is not treated as over budget", budgeted.matches.some((m) => m.mentor.id === 8));
+check("the note explains what was hidden", budgeted.noteMessage.key === "notes.overBudget");
+check("free is distinct from an unknown rate", budgeted.matches.find((m) => m.mentor.id === 7)!.price === "free" && budgeted.matches.find((m) => m.mentor.id === 8)!.price === "unknown");
+const zeroCeiling = matchMentors({ ...request, maxHourlyRateUsd: 0 }, [pricey, free, unknownRate]);
+check("a zero-dollar ceiling filters known paid rates", !zeroCeiling.matches.some((m) => m.mentor.id === 6) && zeroCeiling.filtered.overBudget === 1);
+check("a zero-dollar ceiling retains free and unknown-rate profiles", zeroCeiling.matches.some((m) => m.mentor.id === 7) && zeroCeiling.matches.some((m) => m.mentor.id === 8));
+const invalidCeiling = matchMentors({ ...request, maxHourlyRateUsd: Number.NaN }, [pricey]);
+check("an invalid rate ceiling does not corrupt matching", invalidCeiling.matches.some((m) => m.mentor.id === 6));
 
 section("6. Inactive mentors never appear");
 
@@ -173,38 +162,28 @@ const inactive = matchMentors(request, [mentor({ id: 9, displayName: "Gone", isA
 check("an inactive mentor is excluded", !inactive.matches.some((m) => m.mentor.id === 9));
 check("the exclusion is counted", inactive.filtered.inactive === 1);
 
-section("7. Empty states");
+section("7. Empty results are not padded");
 
 const none = matchMentors(request, []);
 check("no mentors returns no matches", none.matches.length === 0);
-check("and explains how the marketplace grows", /sign up/i.test(none.note));
-
-const irrelevant = matchMentors({ country: "Germany", targetUniversities: ["TU Munich"] }, [unrelated]);
-check(
-  "a mentor who matched nothing is dropped rather than padded",
-  irrelevant.matches.every((m) => m.score >= 10)
-);
+check("the no-result note describes filters rather than unsupported signup promises", none.noteMessage.key === "notes.noMatches");
+const irrelevant = matchMentors({ targetCountries: ["Germany"], targetUniversities: ["TU Munich"] }, [unrelated]);
+check("a profile without enough overlap is dropped", irrelevant.matches.length === 0);
 
 section("8. Parsing and determinism");
 
-check("a JSON expertise column parses", matchMentors(request, [exact]).matches[0].reasons.length > 0);
+check("JSON expertise and language columns do not break matching", matchMentors(request, [exact]).matches[0].reasonMessages.length > 0);
 const listMentor = mentor({ id: 10, displayName: "List", languages: ["Uzbek", "English"], expertise: ["visa"] });
 check(
-  "a plain array also parses",
-  matchMentors({ preferredLanguages: ["uzbek"] }, [listMentor]).matches.some((m) =>
-    m.reasons.some((r) => /Speaks your language/i.test(r))
+  "plain arrays parse and only explicit communication preferences match",
+  matchMentors({ targetCountries: ["Germany"], preferredLanguages: ["uzbek"] }, [listMentor]).matches.some((m) =>
+    m.reasonMessages.some((r) => r.key === "reasons.languages")
   )
 );
-
 const a = matchMentors(request, [exact, sameCountryOnly, unrelated]);
 const b = matchMentors(request, [unrelated, sameCountryOnly, exact]);
-check(
-  "input order does not change the ranking",
-  JSON.stringify(a.matches.map((m) => m.mentor.id)) === JSON.stringify(b.matches.map((m) => m.mentor.id))
-);
-
+check("input order does not change ranking", JSON.stringify(a.matches.map((m) => m.mentor.id)) === JSON.stringify(b.matches.map((m) => m.mentor.id)));
 check("the result is limited", matchMentors(request, Array.from({ length: 20 }, (_, i) => mentor({ id: i + 100, displayName: `M${i}` })), { limit: 5 }).matches.length === 5);
 
-// ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;

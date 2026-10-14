@@ -86,10 +86,10 @@ export function HubTabs({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(pane.id)}
             onKeyDown={(e) => onKeyDown(e, pane.id)}
-            className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-colors sm:text-[13px] ${
+            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-colors sm:text-[13px] ${
               isActive
                 ? "bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900"
-                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
             {pane.label}
@@ -128,10 +128,17 @@ export function HubPanel({
   active: string;
   children: React.ReactNode;
 }) {
-  if (id !== active) return null;
+  const isActive = id === active;
   return (
-    <div role="tabpanel" id={`hub-panel-${id}`} aria-labelledby={`hub-tab-${id}`} tabIndex={-1} className="focus:outline-none">
-      {children}
+    <div
+      role="tabpanel"
+      id={`hub-panel-${id}`}
+      aria-labelledby={`hub-tab-${id}`}
+      tabIndex={isActive ? -1 : undefined}
+      hidden={!isActive}
+      className="focus:outline-none"
+    >
+      {isActive ? children : null}
     </div>
   );
 }
@@ -168,6 +175,19 @@ export function HubPage({
 }) {
   const t = useTranslations("hubs");
   const reduceMotion = useReducedMotion();
+  const visibleTabPanes = panes?.filter((pane) => !hiddenPanes.includes(pane.id)) ?? [];
+  const hasTabPanels = visibleTabPanes.length > 1 && Boolean(activePane);
+  const animatedContent = (
+    <motion.div
+      key={activePane ?? "single"}
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-4"
+    >
+      {children}
+    </motion.div>
+  );
   return (
     <div className="space-y-4">
       <JourneyCard tone="hero">
@@ -209,15 +229,17 @@ export function HubPage({
         </div>
       )}
 
-      <motion.div
-        key={activePane ?? "single"}
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className="space-y-4"
-      >
-        {children}
-      </motion.div>
+      {hasTabPanels ? (
+        <div className="space-y-4">
+          {visibleTabPanes.map((pane) => (
+            <HubPanel key={pane.id} id={pane.id} active={activePane ?? ""}>
+              {pane.id === activePane ? animatedContent : null}
+            </HubPanel>
+          ))}
+        </div>
+      ) : (
+        animatedContent
+      )}
     </div>
   );
 }
