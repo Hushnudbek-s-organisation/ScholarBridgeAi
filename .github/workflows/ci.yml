@@ -49,6 +49,9 @@ jobs:
       - name: AI format tests
         run: npm run test:ai-format
 
+      - name: AI cost, budget and entitlement tests
+        run: npm run test:ai-cost
+
       - name: Ownership tests (embedded Postgres)
         run: npm run test:ownership
 
