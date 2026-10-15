@@ -7,27 +7,32 @@ import {
   Calculator,
   CheckCircle2,
   Copy,
+  ExternalLink,
   FileText,
+  Globe,
   Loader2,
   Printer,
+  RotateCcw,
+  SlidersHorizontal,
   Table2,
   Wallet,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import type { CvGuidance } from "@/lib/cv";
 import type { PortfolioAdviceKey } from "@/lib/costs";
+import {
+  COUNTRY_COST_BENCHMARKS,
+  CURRENCY_RATES_TO_USD,
+  formatCurrencyAmount,
+} from "@/lib/countryCostBenchmarks";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "@/components/AppNote";
 import { HighlightedText, SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import type { CvBuilderSample } from "@/lib/samples/exemplars";
 
 /**
- * Planning Studio (Phase 3) — cost calculator, scholarship portfolio, CV
- * builder and comparison table.
- *
- * Every number here is derived from verified USD values or explicit student
- * entries. Missing or unsupported amounts stay unknown and make affected
- * aggregates unknown — they are never filled with zeroes or generic estimates.
+ * Planning Studio (Phase 3) — multi-currency cost calculator, scholarship
+ * portfolio, CV builder and comparison table.
  */
 
 interface CostLine {
@@ -99,17 +104,43 @@ interface Comparison {
   dataGaps: { universityId: number; name: string; missing: string[] }[];
 }
 
+interface BenchmarkSource {
+  country: string;
+  name: string;
+  url: string;
+  notes: string;
+  defaultCurrency: string;
+}
+
+interface ResolvedInputs {
+  years: number;
+  degreeLevel: string;
+  annualTuitionUsd: number;
+  annualLivingEstUsd: number;
+  insurancePerYearUsd: number;
+  booksPerYearUsd: number;
+  flightsPerYearUsd: number;
+  visaFeeUsd: number;
+  applicationFeeUsd: number;
+  familyContributionUsd: number | null;
+}
+
 interface PlanningData {
   costs: CostBreakdown;
   portfolio: Portfolio;
   costTarget: { id: number; name: string; country: string } | null;
   universities: { id: number; name: string; country: string }[];
+  catalogUniversities?: { id: number; name: string; country: string }[];
+  countries?: string[];
+  currencyRates?: typeof CURRENCY_RATES_TO_USD;
+  displayCurrency?: string;
+  benchmarkSource?: BenchmarkSource;
+  conversionNotes?: string[];
+  resolvedInputs?: ResolvedInputs;
   cv: Cv;
   cvText: string;
   comparison: Comparison;
 }
-
-const money = (v: number | null) => v == null ? "Unknown" : `$${Math.round(v).toLocaleString("en-US")}`;
 
 const TABS = [
   { id: "cost", label: "Cost calculator", icon: Calculator },
@@ -117,6 +148,29 @@ const TABS = [
   { id: "cv", label: "CV builder", icon: FileText },
   { id: "compare", label: "Compare universities", icon: Table2 },
 ] as const;
+
+const CURRENCY_CODES = Object.keys(CURRENCY_RATES_TO_USD);
+const DEFAULT_COUNTRIES = Object.keys(COUNTRY_COST_BENCHMARKS);
+
+interface CustomOverridesState {
+  tuitionUsd: string;
+  livingUsd: string;
+  insuranceUsd: string;
+  booksUsd: string;
+  flightsUsd: string;
+  visaUsd: string;
+  appFeeUsd: string;
+}
+
+const EMPTY_OVERRIDES: CustomOverridesState = {
+  tuitionUsd: "",
+  livingUsd: "",
+  insuranceUsd: "",
+  booksUsd: "",
+  flightsUsd: "",
+  visaUsd: "",
+  appFeeUsd: "",
+};
 
 interface PlanningStudioProps {
   activeProfile: StudentProfile | null;
@@ -126,24 +180,45 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   const tCv = useTranslations("cvBuilder");
   const tPortfolio = useTranslations("costPlanner");
   const ts = useTranslations("samples");
-  // A gold-standard CV opened beside the student's own (view/copy only).
   const [compareCv, setCompareCv] = useState<CvBuilderSample | null>(null);
   const profileId = activeProfile?.id ?? null;
+
   const [result, setResult] = useState<{ requestKey: string; data: PlanningData } | null>(null);
   const [errorResult, setErrorResult] = useState<{ requestKey: string; message: string } | null>(null);
   const [universityId, setUniversityId] = useState<number | null>(null);
+  const [countryOverride, setCountryOverride] = useState<string>("");
+  const [displayCurrency, setDisplayCurrency] = useState<string>("USD");
+  const [degreeLevel, setDegreeLevel] = useState<string>("");
+  const [yearsOverride, setYearsOverride] = useState<string>("");
+  const [familyContributionUsd, setFamilyContributionUsd] = useState<string>("");
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customAmounts, setCustomAmounts] = useState<CustomOverridesState>(EMPTY_OVERRIDES);
+
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("cost");
   const [copied, setCopied] = useState(false);
-  const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}`;
-  const data = result?.requestKey === requestKey ? result.data : null;
+
+  const overridesQueryKey = JSON.stringify(customAmounts);
+  const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}:${countryOverride}:${degreeLevel}:${yearsOverride}:${familyContributionUsd}:${overridesQueryKey}`;
+  const data = result?.requestKey === requestKey ? result.data : result?.data ?? null;
   const error = errorResult?.requestKey === requestKey ? errorResult.message : "";
-  const loading = profileId !== null && data === null && error === "";
+  const loading = profileId !== null && result === null && error === "";
 
   useEffect(() => {
     if (profileId === null) return;
     let cancelled = false;
     const params = new URLSearchParams({ profileId: String(profileId) });
-    if (universityId) params.set("universityId", String(universityId));
+    if (universityId !== null) params.set("universityId", String(universityId));
+    if (countryOverride) params.set("country", countryOverride);
+    if (degreeLevel) params.set("degreeLevel", degreeLevel);
+    if (yearsOverride) params.set("years", yearsOverride);
+    if (familyContributionUsd.trim() !== "") params.set("familyContributionUsd", familyContributionUsd.trim());
+    if (customAmounts.tuitionUsd.trim() !== "") params.set("tuitionUsd", customAmounts.tuitionUsd.trim());
+    if (customAmounts.livingUsd.trim() !== "") params.set("livingUsd", customAmounts.livingUsd.trim());
+    if (customAmounts.insuranceUsd.trim() !== "") params.set("insuranceUsd", customAmounts.insuranceUsd.trim());
+    if (customAmounts.booksUsd.trim() !== "") params.set("booksUsd", customAmounts.booksUsd.trim());
+    if (customAmounts.flightsUsd.trim() !== "") params.set("flightsUsd", customAmounts.flightsUsd.trim());
+    if (customAmounts.visaUsd.trim() !== "") params.set("visaUsd", customAmounts.visaUsd.trim());
+    if (customAmounts.appFeeUsd.trim() !== "") params.set("appFeeUsd", customAmounts.appFeeUsd.trim());
 
     void (async () => {
       try {
@@ -164,7 +239,16 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
     return () => {
       cancelled = true;
     };
-  }, [profileId, requestKey, universityId]);
+  }, [
+    profileId,
+    requestKey,
+    universityId,
+    countryOverride,
+    degreeLevel,
+    yearsOverride,
+    familyContributionUsd,
+    customAmounts,
+  ]);
 
   if (!activeProfile) {
     return (
@@ -173,6 +257,13 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
       </div>
     );
   }
+
+  const money = (v: number | null) => {
+    if (v == null) return "Unknown";
+    const formatted = formatCurrencyAmount(v, displayCurrency);
+    if (displayCurrency === "USD") return formatted;
+    return `${formatted} ($${Math.round(v).toLocaleString("en-US")})`;
+  };
 
   const copyCv = async () => {
     if (!data) return;
@@ -185,15 +276,28 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
     }
   };
 
+  const resetCustomizations = () => {
+    setCustomAmounts(EMPTY_OVERRIDES);
+    setYearsOverride("");
+    setFamilyContributionUsd("");
+  };
+
   const compareIds = data?.universities.slice(0, 6) ?? [];
+  const catalogList = (data?.catalogUniversities ?? []).filter(
+    (c) => !(data?.universities ?? []).some((u) => u.id === c.id)
+  );
+  const countriesList = data?.countries ?? DEFAULT_COUNTRIES;
+  const activeCountry = countryOverride || data?.benchmarkSource?.country || data?.costTarget?.country || "United States";
+  const resolvedYears = yearsOverride || String(data?.resolvedInputs?.years ?? 4);
+  const resolvedDegree = degreeLevel || data?.resolvedInputs?.degreeLevel || activeProfile.degreeLevel || "Bachelor";
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-bold text-slate-900">Planning studio</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Real costs, real funding gaps, a CV built from your profile, and a side-by-side
-          comparison — all from your own data.
+          Multi-currency global cost calculator, scholarship portfolio, a CV built from your profile, and a side-by-side
+          university comparison.
         </p>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -211,26 +315,260 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           ))}
         </div>
 
-        {data && data.universities.length > 0 && (tab === "cost" || tab === "compare") && (
+        {data && tab === "cost" && (
+          <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  University / Target
+                </label>
+                <select
+                  aria-label="University or target selection"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
+                  value={universityId === 0 ? "0" : String(universityId ?? data.costTarget?.id ?? "")}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setUniversityId(val);
+                    if (val > 0) {
+                      setCountryOverride("");
+                    }
+                    setCustomAmounts(EMPTY_OVERRIDES);
+                  }}
+                >
+                  {data.universities.length > 0 && (
+                    <optgroup label="Your Saved Universities">
+                      {data.universities.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.country})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {catalogList.length > 0 && (
+                    <optgroup label="Global University Catalogue">
+                      {catalogList.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.country})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Country Benchmark Explorer">
+                    <option value="0">Explore by Country Official Benchmark</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Destination Country
+                </label>
+                <select
+                  aria-label="Destination country"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
+                  value={activeCountry}
+                  onChange={(e) => {
+                    setCountryOverride(e.target.value);
+                    setUniversityId(0);
+                    setCustomAmounts(EMPTY_OVERRIDES);
+                  }}
+                >
+                  {countriesList.map((c) => (
+                    <option key={c} value={c}>
+                      {c} ({COUNTRY_COST_BENCHMARKS[c]?.defaultCurrency ?? "USD"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Display Currency
+                </label>
+                <select
+                  aria-label="Display currency"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
+                  value={displayCurrency}
+                  onChange={(e) => setDisplayCurrency(e.target.value)}
+                >
+                  {CURRENCY_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {CURRENCY_RATES_TO_USD[code].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    Degree
+                  </label>
+                  <select
+                    aria-label="Degree level"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800"
+                    value={resolvedDegree}
+                    onChange={(e) => {
+                      setDegreeLevel(e.target.value);
+                      setYearsOverride("");
+                    }}
+                  >
+                    <option value="Bachelor">Bachelor</option>
+                    <option value="Master">Master</option>
+                    <option value="PhD">PhD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    Duration
+                  </label>
+                  <select
+                    aria-label="Programme duration in years"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800"
+                    value={resolvedYears}
+                    onChange={(e) => setYearsOverride(e.target.value)}
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((yr) => (
+                      <option key={yr} value={String(yr)}>
+                        {yr} {yr === 1 ? "yr" : "yrs"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-slate-700">
+                  Confirmed family contribution (USD/yr):
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={500}
+                  placeholder="e.g. 5000"
+                  value={familyContributionUsd}
+                  onChange={(e) => setFamilyContributionUsd(e.target.value)}
+                  className="w-32 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomizeOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  {customizeOpen ? "Hide custom amounts" : "Customize amounts"}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetCustomizations}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {customizeOpen && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="mb-2 text-[11px] font-semibold text-slate-600">
+                  Override any line in USD (leave blank to use published university or official country benchmark figures):
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Tuition (USD/yr)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.annualTuitionUsd ?? "")}
+                      value={customAmounts.tuitionUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, tuitionUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Living (USD/yr)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.annualLivingEstUsd ?? "")}
+                      value={customAmounts.livingUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, livingUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Insurance (USD/yr)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.insurancePerYearUsd ?? "")}
+                      value={customAmounts.insuranceUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, insuranceUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Books (USD/yr)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.booksPerYearUsd ?? "")}
+                      value={customAmounts.booksUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, booksUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Flights Home (USD/yr)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.flightsPerYearUsd ?? "")}
+                      value={customAmounts.flightsUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, flightsUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Visa Fee (USD one-off)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.visaFeeUsd ?? "")}
+                      value={customAmounts.visaUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, visaUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">Application Fee (USD)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={String(data.resolvedInputs?.applicationFeeUsd ?? "")}
+                      value={customAmounts.appFeeUsd}
+                      onChange={(e) => setCustomAmounts({ ...customAmounts, appFeeUsd: e.target.value })}
+                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {data && data.universities.length > 0 && tab === "compare" && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">University</span>
-            {tab === "cost" ? (
-              <select
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-                value={universityId ?? data.costTarget?.id ?? ""}
-                onChange={(e) => setUniversityId(Number(e.target.value))}
-              >
-                {data.universities.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.country})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-xs text-slate-600">
-                {compareIds.length} saved — showing up to 6
-              </span>
-            )}
+            <span className="text-xs text-slate-600">
+              {compareIds.length} saved — showing up to 6
+            </span>
           </div>
         )}
       </div>
@@ -251,17 +589,23 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {tab === "cost" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-bold text-slate-900">
-                  {data.costTarget ? `${data.costTarget.name} — annual cost` : "Annual cost"}
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {data.costTarget ? `${data.costTarget.name} (${data.costTarget.country}) — cost breakdown` : "Annual cost"}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700">
+                    <Globe className="h-3 w-3" />
+                    {resolvedDegree} · {resolvedYears} {Number(resolvedYears) === 1 ? "year" : "years"} · {displayCurrency}
+                  </span>
+                </div>
                 <ul className="mt-3 divide-y divide-slate-100">
                   {data.costs.lines.map((line) => (
                     <li key={line.key} className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-2 text-xs text-slate-700">
+                      <span className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
                         {line.label}
                         {line.estimated && (
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-                            estimated
+                            country benchmark
                           </span>
                         )}
                       </span>
@@ -277,10 +621,35 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   <span className="text-base font-extrabold text-slate-900">{money(data.costs.annualTotalUsd)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">Whole programme</span>
+                  <span className="text-[11px] text-slate-500">Whole programme ({resolvedYears} {Number(resolvedYears) === 1 ? "yr" : "yrs"} + one-off fees)</span>
                   <span className="text-xs font-bold text-slate-600">{money(data.costs.totalUsd)}</span>
                 </div>
               </div>
+
+              {data.benchmarkSource && (
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
+                      Official {data.benchmarkSource.country} Benchmark Source
+                    </h4>
+                    <a
+                      href={data.benchmarkSource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 hover:underline"
+                    >
+                      {data.benchmarkSource.name}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-700">{data.benchmarkSource.notes}</p>
+                  {data.conversionNotes && data.conversionNotes.length > 0 && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {data.conversionNotes.join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {data.costs.unknowns.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">

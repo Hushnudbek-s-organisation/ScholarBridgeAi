@@ -10,6 +10,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { ensureRichPlatformDataSeeded } from "@/db/seedRichPlatformData";
 import { journeyStatements } from "./ddl";
 
 let ready: boolean | null = null;
@@ -28,6 +29,7 @@ export async function ensureJourneyTables(): Promise<boolean> {
       for (const stmt of journeyStatements()) {
         await db.execute(sql.raw(stmt));
       }
+      await ensureRichPlatformDataSeeded();
       ready = true;
     } catch (err) {
       console.error("[journey] schema bootstrap failed:", err);

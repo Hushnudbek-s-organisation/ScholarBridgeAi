@@ -347,8 +347,46 @@ check("a fully filled profile reaches 100", () =>
 check("more data never scores lower than less data", () =>
   assert.ok(profileCompleteness(sparseProfile) < profileCompleteness(richProfile)));
 
-if (failures.length) {
-  console.log(`\ngrowth test FAILED: ${failures.length} failure(s)`);
-  process.exit(1);
-}
-console.log(`\ngrowth test passed (${passed} assertions)`);
+console.log("\nVerified 2026-2027 Rich Platform Data Catalogs");
+void (async () => {
+  const {
+    RICH_LEARNING_PROVIDERS,
+    RICH_MENTORS,
+    RICH_SUCCESS_STORIES,
+    RICH_VISA_REQUIREMENTS,
+  } = await import("../src/db/seedRichPlatformData");
+  const { OPPORTUNITY_CATALOG } = await import("../src/db/seedOpportunities");
+
+  check("12 verified Uzbek student success stories across major destinations", () => {
+    assert.equal(RICH_SUCCESS_STORIES.length, 12);
+    assert.ok(RICH_SUCCESS_STORIES.every((s) => s.status === "approved" && s.isVerified && s.proofUrl.startsWith("https://")));
+  });
+  check("50+ official source-linked visa requirements across 10 countries", () => {
+    assert.ok(RICH_VISA_REQUIREMENTS.length >= 50);
+    const countries = new Set(RICH_VISA_REQUIREMENTS.map((r) => r.country));
+    assert.ok(countries.size >= 10);
+    assert.ok(RICH_VISA_REQUIREMENTS.every((r) => r.sourceUrl.startsWith("http") && r.sourceName.length > 3));
+  });
+  check("34 verified global & Uzbekistan-eligible opportunities in OPPORTUNITY_CATALOG", () => {
+    assert.equal(OPPORTUNITY_CATALOG.length, 34);
+    assert.ok(OPPORTUNITY_CATALOG.every((o) => o.url.startsWith("https://") && o.description.length >= 40));
+  });
+  check("12 verified alumni mentors & 8 official learning/test-prep providers", () => {
+    assert.equal(RICH_MENTORS.length, 12);
+    assert.ok(RICH_MENTORS.every((m) => m.isVerified && m.isActive));
+    assert.equal(RICH_LEARNING_PROVIDERS.length, 8);
+    assert.ok(RICH_LEARNING_PROVIDERS.every((p) => p.isEnabled && p.status === "sandbox"));
+  });
+  check("14 localized FAQ items in en, uz, and ru", () => {
+    for (const l of ["en", "uz", "ru"]) {
+      const faqItems = (msgs[l].faq as { items: Record<string, { question: string; answer: string }> }).items;
+      assert.equal(Object.keys(faqItems).length, 14, `${l} faq.items count`);
+    }
+  });
+
+  if (failures.length) {
+    console.log(`\ngrowth test FAILED: ${failures.length} failure(s)`);
+    process.exit(1);
+  }
+  console.log(`\ngrowth test passed (${passed} assertions)`);
+})();

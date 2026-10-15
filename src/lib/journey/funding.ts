@@ -51,6 +51,9 @@ export function annualFundingCostLines(costs: {
   annualTuitionUsd: number | null;
   annualLivingEstUsd: number | null;
   accommodationCostUsd: number | null;
+  insurancePerYearUsd?: number | null;
+  booksPerYearUsd?: number | null;
+  flightsPerYearUsd?: number | null;
 }): AnnualFundingCostLine[] {
   return COST_LINES
     // A published living-cost total may already include housing. Only show
@@ -67,7 +70,13 @@ export function annualFundingCostLines(costs: {
           ? costs.annualLivingEstUsd
           : key === "accommodation"
             ? costs.accommodationCostUsd
-            : null,
+            : key === "insurance"
+              ? (costs.insurancePerYearUsd ?? null)
+              : key === "books"
+                ? (costs.booksPerYearUsd ?? null)
+                : key === "flights"
+                  ? (costs.flightsPerYearUsd ?? null)
+                  : null,
     }));
 }
 

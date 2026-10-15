@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { applications, fundingItems, savedScholarships, scholarships, universities } from "@/db/schema";
+import { applications, fundingItems, savedScholarships, savedUniversities, scholarships, universities } from "@/db/schema";
 import { guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal, ONE_OFF_COST_LINES, FUNDING_KIND_LABELS, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
-import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import {
+  COUNTRY_COST_BENCHMARKS,
+  CURRENCY_RATES_TO_USD,
+  resolveCompleteCostInputs,
+  resolveMultiCurrencyScholarshipAmount,
+} from "@/lib/countryCostBenchmarks";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +17,7 @@ const KINDS = ["scholarship", "aid", "family", "savings", "loan", "other"] as co
 const STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"] as const;
 
 /**
- * GET /api/funding?profileId=[&applicationId=]
+ * GET /api/funding?profileId=[&applicationId=][&country=][&currency=]
  *
  * My Funding Plan: canonical annual cost lines plus separately reported
  * one-off application/visa fees, scholarships, aid and the remaining gap.
@@ -29,6 +34,9 @@ export async function GET(req: Request) {
   if (rawApplicationId != null && (!Number.isInteger(applicationId) || applicationId! <= 0)) {
     return jsonError(400, "applicationId must be a positive integer", "bad_request");
   }
+  const countryParam = (searchParams.get("country") || "").trim() || null;
+  const displayCurrency = ((searchParams.get("currency") || "USD").trim().toUpperCase()) || "USD";
+
   try {
     let app: typeof applications.$inferSelect | undefined;
     if (applicationId != null) {
@@ -40,21 +48,45 @@ export async function GET(req: Request) {
       if (!app) return jsonError(404, "Application not found", "not_found");
     }
 
-    const uni = app?.universityId
-      ? (await db.select().from(universities).where(eq(universities.id, app.universityId)).limit(1))[0]
+    let uni = app?.universityId
+      ? (await db.select().from(universities).where(eq(universities.id, app.universityId)).limit(1))[0] ?? null
       : null;
 
-    // Only verified USD catalogue values enter the funding calculation.
-    // Missing, unsupported or merely estimated costs stay null; a missing cost
-    // must never become a $0 line or a deceptively small funding gap.
-    const universityCostsUsd = resolvedUsdUniversityCosts(uni ?? {});
-    const lines = annualFundingCostLines(universityCostsUsd);
+    if (!uni && !countryParam) {
+      const [firstSaved] = await db
+        .select({ universityId: savedUniversities.universityId })
+        .from(savedUniversities)
+        .where(eq(savedUniversities.profileId, profileId))
+        .limit(1);
+      if (firstSaved?.universityId) {
+        [uni] = await db.select().from(universities).where(eq(universities.id, firstSaved.universityId)).limit(1);
+      }
+    }
+
+    const resolved = resolveCompleteCostInputs({
+      university: countryParam ? null : uni,
+      countryOverride: countryParam ?? uni?.country ?? "United States",
+      degreeLevel: uni?.degreeLevel ?? g.value.session.profile.degreeLevel ?? null,
+    });
+
+    const lines = annualFundingCostLines({
+      annualTuitionUsd: resolved.inputs.annualTuitionUsd ?? null,
+      annualLivingEstUsd: resolved.inputs.annualLivingEstUsd ?? null,
+      accommodationCostUsd: resolved.inputs.accommodationCostUsd ?? null,
+      insurancePerYearUsd: resolved.inputs.insurancePerYearUsd ?? null,
+      booksPerYearUsd: resolved.inputs.booksPerYearUsd ?? null,
+      flightsPerYearUsd: resolved.inputs.flightsPerYearUsd ?? null,
+    });
     const annualCost = knownAnnualCostTotal(lines);
+    const estimatedLines = lines
+      .filter((line) => resolved.benchmarkKeys.has(line.key))
+      .map((line) => line.label);
     const unknownLines = lines.filter((line) => line.cost == null).map((line) => line.label);
     const oneOffCosts = ONE_OFF_COST_LINES.map(({ key, label }) => ({
       key,
       label,
-      amountUsd: key === "application_fee" ? universityCostsUsd.applicationFeeUsd : null,
+      amountUsd: key === "application_fee" ? (resolved.inputs.applicationFeeUsd ?? null) : (resolved.inputs.visaFeeUsd ?? null),
+      estimated: resolved.benchmarkKeys.has(key),
     }));
 
     const rows = await db
@@ -90,7 +122,7 @@ export async function GET(req: Request) {
         id: s.id,
         title: s.title,
         provider: s.provider,
-        amountUsdValue: resolvedUsdScholarshipAmount(s),
+        amountUsdValue: resolveMultiCurrencyScholarshipAmount(s).amountUsd,
         tuitionCoverage: s.tuitionCoverage || "Not specified",
         deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
       }))
@@ -105,14 +137,18 @@ export async function GET(req: Request) {
       application: app
         ? { id: app.id, universityId: app.universityId, universityName: app.universityName, programName: app.programName }
         : null,
-      university: uni ? { id: uni.id, name: uni.name, country: uni.country, city: uni.city, sourceUrl: uni.sourceUrl, lastVerifiedAt: uni.lastVerifiedAt } : null,
+      university: uni && !countryParam
+        ? { id: uni.id, name: uni.name, country: uni.country, city: uni.city, sourceUrl: uni.sourceUrl, lastVerifiedAt: uni.lastVerifiedAt }
+        : null,
+      benchmarkSource: resolved.benchmarkSource,
+      countries: Object.keys(COUNTRY_COST_BENCHMARKS),
+      currencyRates: CURRENCY_RATES_TO_USD,
+      displayCurrency,
       annualCost,
-      /** Incomplete amounts are listed explicitly instead of being zero-filled. */
-      estimatedLines: [],
+      estimatedLines,
       unknownLines,
       plan,
       items: rows.map((r) => ({ ...r, kindLabel: FUNDING_KIND_LABELS[(r.kind as FundingKind) in FUNDING_KIND_LABELS ? (r.kind as FundingKind) : "other"] })),
-      // "Find scholarships for remaining gap" — the CTA the spec asks for.
       gapActions: {
         gap: plan.fundingGap,
         scholarships: plan.fundingGap == null

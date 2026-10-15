@@ -12,6 +12,16 @@
 import { assessPortfolio, calculateCosts, type ScholarshipInput } from "../src/lib/costs";
 import { normalizeScholarshipAwardPeriod, resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "../src/lib/usdCosts";
 import { normalizedScholarshipAmounts } from "../src/lib/research-agent/normalize";
+import {
+  COUNTRY_COST_BENCHMARKS,
+  CURRENCY_RATES_TO_USD,
+  calculateCompleteCosts,
+  convertCurrencyToUsd,
+  convertUsdToCurrency,
+  formatCurrencyAmount,
+  resolveCompleteCostInputs,
+  resolveMultiCurrencyScholarshipAmount,
+} from "../src/lib/countryCostBenchmarks";
 
 let passed = 0;
 let failed = 0;
@@ -264,6 +274,47 @@ section("7. Determinism");
 const a = calculateCosts({ annualTuitionUsd: 25000, country: "Canada", years: 4 });
 const b = calculateCosts({ annualTuitionUsd: 25000, country: "Canada", years: 4 });
 check("the same input gives the same numbers", JSON.stringify(a) === JSON.stringify(b));
+
+section("8. Multi-Currency & Official Country Benchmarks (2026-2027)");
+
+check("at least 20 currencies are supported in CURRENCY_RATES_TO_USD", Object.keys(CURRENCY_RATES_TO_USD).length >= 20);
+check("at least 18 countries are supported in COUNTRY_COST_BENCHMARKS", Object.keys(COUNTRY_COST_BENCHMARKS).length >= 18);
+
+const eurToUsd = convertCurrencyToUsd(10000, "EUR");
+check("EUR to USD converts using benchmark rate", eurToUsd === 10800);
+const usdToUzs = convertUsdToCurrency(1000, "UZS");
+check("USD to UZS converts accurately", usdToUzs !== null && usdToUzs > 10_000_000);
+check("formatCurrencyAmount formats GBP and KRW with symbols", formatCurrencyAmount(10000, "GBP").startsWith("£") && formatCurrencyAmount(10000, "KRW").startsWith("₩"));
+
+const deUniversity = calculateCompleteCosts({
+  university: {
+    name: "Technical University of Munich (TUM)",
+    country: "Germany",
+    currency: "EUR",
+    tuitionPerYear: 3000,
+    livingCostPerYear: 12000,
+    applicationFee: 75,
+  },
+  degreeLevel: "Master",
+});
+check("German EUR university converts tuition & living and fills insurance/books/flights/visa from DAAD benchmark", deUniversity.costs.annualTotalUsd !== null && deUniversity.costs.totalUsd !== null && deUniversity.costs.lines.length === 7);
+check("benchmarked lines are explicitly flagged with estimated: true while published lines are estimated: false", deUniversity.costs.lines.find((l) => l.key === "tuition")?.estimated === false && deUniversity.costs.lines.find((l) => l.key === "insurance")?.estimated === true);
+check("Master degree defaults to 2-year programme duration in Germany", deUniversity.resolved.inputs.years === 2);
+
+const krBenchmarkOnly = resolveCompleteCostInputs({
+  countryOverride: "South Korea",
+  degreeLevel: "Bachelor",
+});
+check("South Korea benchmark mode resolves complete 4-year cost inputs with NIIED source provenance", krBenchmarkOnly.inputs.years === 4 && (krBenchmarkOnly.inputs.annualTuitionUsd ?? 0) > 0 && krBenchmarkOnly.benchmarkSource.country === "South Korea");
+
+const gbpScholarship = resolveMultiCurrencyScholarshipAmount({
+  title: "Chevening Award",
+  amountUsdValue: null,
+  amountMin: 28000,
+  amountMax: 32000,
+  currency: "GBP",
+});
+check("multi-currency scholarship converter resolves GBP scholarship range to USD", gbpScholarship.amountUsd === Math.round(28000 * 1.29));
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

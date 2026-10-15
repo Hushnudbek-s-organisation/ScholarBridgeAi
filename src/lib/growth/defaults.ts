@@ -270,6 +270,38 @@ export const SEED_GOAL_TEMPLATES: {
     level: "any",
     estWeeks: 12,
   },
+  {
+    pillar: "academic",
+    title: "Prepare your academic transcript and grading scale legend",
+    description: "International universities evaluate your grades in the context of your official grading scale (5.0, 100-point or 4.0) and any required apostille or credential evaluation.",
+    steps: ["Request an official transcript and grading scale legend from your school or university", "Verify whether target countries require a Hague Apostille (e.g. via my.gov.uz) or WES evaluation", "Arrange certified English or destination-language translations where required", "Check that course names, credit hours and graduation dates match across all documents"],
+    level: "any",
+    estWeeks: 4,
+  },
+  {
+    pillar: "academic",
+    title: "Draft a Master's or scholarship research pre-proposal",
+    description: "Scholarships such as DAAD, MEXT, ETH ESOP and GKS Graduate require a structured study plan or research proposal aligned with host faculty.",
+    steps: ["Identify a specific research question or applied problem in your field", "Review recent publications from 2–3 potential host laboratories or departments", "Outline your methodology, datasets and semester-by-semester study plan", "Have a professor or mentor review the draft for technical clarity and feasibility"],
+    level: "grad",
+    estWeeks: 6,
+  },
+  {
+    pillar: "activities",
+    title: "Document community or civic impact with verifiable evidence",
+    description: "Scholarships like Chevening, Global UGRAD, Pearson and El-Yurt Umidi value sustained, verifiable contribution to your school or local community.",
+    steps: ["Select an ongoing community, tutoring or civic initiative you actively support", "Keep a factual log of hours, dates, collaborators and concrete deliverables", "Gather a supervisor reference or official certificate confirming your role", "Connect what you learned to your post-graduation career plan"],
+    level: "any",
+    estWeeks: 8,
+  },
+  {
+    pillar: "career",
+    title: "Build a multi-currency funding and scholarship portfolio",
+    description: "Combine institutional financial aid, bilateral government scholarships and national grants so your annual tuition and living costs are fully covered.",
+    steps: ["Calculate total annual cost of attendance in the destination currency and USD", "Shortlist 3–5 scholarships whose eligibility, degree level and citizenship rules match your profile", "Prepare required financial documents (tax certificates, sponsor affidavit or CSS Profile)", "Track each scholarship deadline at least 6 weeks before the portal closes"],
+    level: "any",
+    estWeeks: 6,
+  },
 ];
 
 export const SEED_ANSWER_PROMPTS: {
@@ -286,6 +318,10 @@ export const SEED_ANSWER_PROMPTS: {
   { category: "challenge", question: "Describe a challenge you overcame.", hint: "Focus on what you learned and how you changed, not only the problem.", wordLimit: 250 },
   { category: "community", question: "How have you contributed to your community?", hint: "Volunteering, helping family, teaching others — small and real counts.", wordLimit: 200 },
   { category: "general", question: "Describe your greatest achievement.", hint: "Pick one, explain why it matters to you.", wordLimit: 150 },
+  { category: "motivation", question: "Why did you choose this specific university and programme?", hint: "Name 2–3 concrete courses, professors or labs and link them to your prior preparation.", wordLimit: 250 },
+  { category: "career", question: "How will your degree contribute to Uzbekistan's development upon your return?", hint: "Name the specific sector, institution or reform where you will apply your skills in years 1–5.", wordLimit: 250 },
+  { category: "leadership", question: "Describe a time you built a network or partnership to solve a problem.", hint: "Essential for Chevening and GKS: show how you brought different people or groups together.", wordLimit: 250 },
+  { category: "general", question: "Explain any financial need or family circumstances relevant to your scholarship application.", hint: "State factual income, household dependents and confirmed family contribution clearly.", wordLimit: 200 },
 ];
 
 export const SEED_CHECKLIST_ITEMS: {
@@ -308,4 +344,8 @@ export const SEED_CHECKLIST_ITEMS: {
   { phase: "travel", title: "Organize important documents", description: "Use the official checklist to decide which documents and copies to carry or store securely; protect personal information.", linkTab: null },
   { phase: "arrival", title: "Check registration steps after arrival", description: "Confirm whether local or university registration applies, where to complete it and by when using official guidance.", linkTab: null },
   { phase: "arrival", title: "Review local services after arrival", description: "Explore a SIM card, banking or transport options if useful; availability, fees and rules vary.", linkTab: null },
+  { phase: "visa", title: "Complete Hague Apostille and certified translations", description: "If your destination requires apostilled diplomas, transcripts or birth certificates (e.g. via my.gov.uz), complete them before your embassy appointment.", linkTab: "visa" },
+  { phase: "money", title: "Prepare sponsor affidavit and income tax certificates", description: "When parents or sponsors fund your studies, gather stamped bank statements, birth certificate relationship proof and official tax/income certificates.", linkTab: "planning" },
+  { phase: "housing", title: "Save dormitory or lease proof of address for visa filing", description: "Many embassies require an official university dormitory placement letter or signed accommodation contract before issuing a study visa.", linkTab: null },
+  { phase: "arrival", title: "Activate student health insurance and municipal address registration", description: "Complete mandatory post-arrival steps such as SEVIS check-in (US), Anmeldung & Girokonto activation (Germany), ARC (Korea) or BRP/eVisa check (UK).", linkTab: null },
 ];

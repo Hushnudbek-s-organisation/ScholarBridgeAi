@@ -2452,6 +2452,46 @@
       "costs": {
         "question": "Saytdagi xarajat va muddatlarga to‘liq ishonsam bo‘ladimi?",
         "answer": "Ulardan rejalashtirish uchun foydalaning, ammo rasmiy to‘lov jadvali yoki ariza portalining o‘rniga emas. Xarajatlar, valyuta kurslari va muddatlar o‘zgarishi mumkin; to‘lov yoki ariza yuborishdan oldin universitet yoki grant tashkilotchisining joriy manbasini tekshiring."
+      },
+      "gpaConversion": {
+        "question": "O‘zbekistondagi 5 ballik yoki 100 ballik GPA baholarini 4.0 shkalaga qanday o‘tkazaman?",
+        "answer": "ScholarBridge profilingizga rasmiy o‘rtacha bahoyingizni va asl shkalangizni (5.0, 100 yoki 4.0) kiriting. Tizimimiz universitet talablari bilan solishtirish uchun bahoni avtomatik normallashtiradi, lekin CV va hujjatlarda asl baho shkalangizni saqlab qoladi."
+      },
+      "multiCurrency": {
+        "question": "Ko‘p valyutali Xarajatlar Kalkulyatori EUR, GBP, KRW, CAD va UZS valyutalarini qanday hisoblaydi?",
+        "answer": "Kalkulyatorimiz 24 ta valyutadagi (USD, UZS, EUR, GBP, KRW, CAD, AUD, CHF, JPY va boshqalar) kontrakt va yashash xarajatlarini hisoblaydi hamda universitet e’lon qilmagan tibbiy sug‘urta, kitoblar, Toshkentdan aviachipta va viza to‘lovlarini 2026-yilgi rasmiy davlat me’yorlari asosida to‘ldirib ko‘rsatadi."
+      },
+      "elYurtUmidi": {
+        "question": "«El-yurt umidi» jamg‘armasi stipendiyasi o‘zbekistonlik talabalar uchun qanday ishlaydi?",
+        "answer": "O‘zbekiston Respublikasi Prezidenti huzuridagi «El-yurt umidi» jamg‘armasi nufuzli xorijiy universitetlarga (ayniqsa QS/THE/ARWU Top-300 talikka) qabul qilingan bakalavr, magistr va doktorantlarning o‘qish, yashash, tibbiy sug‘urta va aviachipta xarajatlarini to‘liq qoplaydi; bitiruvchilar o‘qishdan so‘ng O‘zbekistonda ishlab berish majburiyatini oladilar."
+      },
+      "gksKorea": {
+        "question": "Janubiy Koreyaning GKS dasturida Elchixona yo‘nalishi (Embassy Track) va Universitet yo‘nalishi (University Track) nimasi bilan farq qiladi?",
+        "answer": "Toshkentdagi Koreya Elchixonasi orqali topshirilganda 3 ta universitetni (kamida bitta B toifali hududiy universitet bilan), Universitet yo‘nalishida esa bevosita 1 ta universitetni (masalan, KAIST, POSTECH, UNIST yoki SNU) tanlaysiz. GKS 100% kontrakt, aviachipta, oylik stipendiya va 1 yillik koreys tili kursini qoplaydi."
+      },
+      "sperrkontoGermany": {
+        "question": "2026–2027 o‘quv yili uchun Germaniya bloklangan hisob raqamiga (Sperrkonto) qancha mablag‘ kerak?",
+        "answer": "2026–2027 o‘quv yilida Toshkentdagi Germaniya elchixonasi milliy talaba vizasi (§16b) uchun Expatrio yoki Fintiba kabi bloklangan hisob raqamida yiliga €11,904 (oyiga €992) mablag‘ bo‘lishini talab qiladi (DAAD yoki «El-yurt umidi» kabi to‘liq davlat гранti sohiblari bundan mustasno)."
+      },
+      "sponsorAffidavit": {
+        "question": "Talaba vizasiga ota-onam homiylik qilishi uchun qanday moliyaviy hujjatlar kerak bo‘ladi?",
+        "answer": "Elchixonalar homiy nomidagi bank ma’lumotnomasi, notarial tasdiqlangan homiylik xati (Affidavit of Support), ota-onalikni tasdiqlovchi tug‘ilganlik haqidagi guvohnoma tarjimasi hamda my.gov.uz / soliq.uz orqali QR-kodli rasmiy yillik daromad va soliq ma’lumotnomalarini talab qiladi."
+      },
+      "englishWaivers": {
+        "question": "Agar O‘zbekistonda bakalavrni ingliz tilida o‘qigan bo‘lsam, IELTS yoki TOEFL talabidan ozod bo‘lishim mumkinmi?",
+        "answer": "Ko‘plab AQSh, Yevropa va Buyuk Britaniya magistratura dasturlari Toshkentdagi xalqaro universitetlarda (masalan, WIUT, INHA, Webster, Yangi O‘zbekiston universiteti) ta’lim 100% ingliz tilida olib borilganini tasdiqlovchi Medium of Instruction (MOI) ma’lumotnomasi asosida IELTS/TOEFL talabidan ozod qilishi mumkin. Har bir dasturning rasmiy sahifasini tekshiring."
+      },
+      "visaMockInterview": {
+        "question": "Toshkentdagi AQSh F-1, Britaniya yoki Germaniya elchixonasi viza suhbatiga qanday tayyorlanish kerak?",
+        "answer": "To‘rtta asosiy yo‘nalishga e’tibor qarating: (1) nima uchun aynan shu universitet va dasturni tanlaganingiz, (2) akademik tayyorgarligingiz, (3) yillik xarajatlar, grant miqdori va homiy daromadini aniq bilishingiz hamda (4) o‘qishdan keyin O‘zbekistondagi aniq karyera rejangiz."
+      },
+      "documentApostille": {
+        "question": "O‘zbekiston shahodatnomasi yoki diplomiga Gaaga Apostilini (Apostille) qachon va qanday olaman?",
+        "answer": "Janubiy Koreya, Germaniya, Italiya, Vengriya, Turkiya va Polsha kabi davlatlar asl diplom va ilovaga Apostil qo‘yilishini talab qiladi. Hujjatlarni notarial tarjima qilishdan oldin my.gov.uz portali yoki Adliya vazirligi orqali rasmiy elektron Apostil oling."
+      },
+      "proPlanValue": {
+        "question": "ScholarBridge platformasida qaysi xizmatlar bepul va Pro obunasi nimalarni ochadi?",
+        "answer": "Universitet va grantlarni qidirish, moslikni tekshirish, ko‘p valyutali xarajatlar kalkulyatori, muddatlar taqvimi va forum o‘qish bepul. Pro obunasi esa cheksiz AI SOP va insho tahlili, 24/7 AI maslahatchi, Grant Avtopiloti hamda forumda yangi mavzular ochish imkonini beradi."
       }
     }
   },
@@ -2553,7 +2593,47 @@
     "g4s4": "Faqat dastur qabul qiladigan formatda ulashing",
     "g6s4": "Tavsiya beruvchining imkonini tasdiqlab, topshirilish holatini kuzating",
     "g7s4": "O‘rganilgan yoki erishilgan, tekshiriladigan natijani oshirib ko‘rsatmay yozing",
-    "c13d": "Foydali bo‘lsa, SIM-karta, bank va transport variantlarini o‘rganing; mavjudlik, to‘lov va qoidalar farq qiladi."
+    "c13d": "Foydali bo‘lsa, SIM-karta, bank va transport variantlarini o‘rganing; mavjudlik, to‘lov va qoidalar farq qiladi.",
+    "g8t": "Akademik transkript va baholash shkalasi ma’lumotnomasini tayyorlash",
+    "g8d": "Xorijiy universitetlar baholaringizni rasmiy baholash shkalangiz (5.0, 100 ballik yoki 4.0) hamda zarur apostil yoki ekvivalentlik hujjati asosida ko‘rib chiqadi.",
+    "g8s0": "Maktab, litsey yoki universitetingizdan rasmiy transkript va baholash shkalasi izohini oling",
+    "g8s1": "Maqsadli davlatlar uchun Gaaga Apostili (my.gov.uz orqali) yoki WES baholashi kerakligini tekshiring",
+    "g8s2": "Talab qilingan hollarda ingliz yoki o‘qish davlati tiliga tasdiqlangan tarjima qildiring",
+    "g8s3": "Fan nomlari, kredit soatlari va bitiruv sanalari barcha hujjatlarda mos kelishini tekshiring",
+    "g9t": "Magistratura yoki stipendiya uchun ilmiy tadqiqot rejasi (Study Plan) yozish",
+    "g9d": "DAAD, MEXT, ETH ESOP va GKS magistratura dasturlari qabul qiluvchi kafedra yo‘nalishiga mos aniq o‘quv va tadqiqot rejasini talab qiladi.",
+    "g9s0": "Sohangizdagi aniq ilmiy savol yoki amaliy muammoni belgilab oling",
+    "g9s1": "Tanlangan universitetdagi 2–3 ta laboratoriya yoki professorning so‘nggi maqolalarini o‘rganing",
+    "g9s2": "Metodologiya, ma’lumotlar bazasi va semestrlar bo‘yicha o‘quv rejangizni yozib chiqing",
+    "g9s3": "Qoralama matnni ilmiy aniqlik uchun ustoz yoki mentorga ko‘rsating",
+    "g10t": "Jamoat va ijtimoiy faollikni tasdiqlovchi dalillar bilan hujjatlashtirish",
+    "g10d": "Chevening, Global UGRAD, Pearson va «El-yurt umidi» kabi grantlar maktab yoki jamiyatga qo‘shilgan haqiqiy, tasdiqlangan hissani yuqori baholaydi.",
+    "g10s0": "O‘zingiz faol qatnashayotgan ta’lim, volontyorlik yoki ijtimoiy loyihani tanlang",
+    "g10s1": "Soatlar, sanalar, hamkorlar va erishilgan aniq natijalarni qayd etib boring",
+    "g10s2": "Mas’ul rahbardan tavsiyanoma yoki rasmiy tasdiqlovchi sertifikat oling",
+    "g10s3": "Olgan tajribangizni o‘qishdan keyingi karyera rejangiz bilan bog‘lang",
+    "g11t": "Ko‘p valyutali moliyalashtirish va grantlar portfelini shakllantirish",
+    "g11d": "Yillik kontrakt va yashash xarajatlarini to‘liq qoplash uchun universitet, xorijiy hukumat va milliy grantlarni birgalikda rejalashtiring.",
+    "g11s0": "Tanlangan davlat valyutasida va AQSh dollarida to‘liq yillik xarajatlarni hisoblang",
+    "g11s1": "Profilingiz, darajangiz va fuqarolik shartlariga mos 3–5 ta stipendiyani saralab oling",
+    "g11s2": "Kerakli moliyaviy hujjatlarni (soliq ma’lumotnomalari, homiylik xati yoki CSS Profile) tayyorlang",
+    "g11s3": "Har bir grant muddatini portal yopilishidan kamida 6 hafta oldin nazoratga oling",
+    "p8q": "Nima uchun aynan shu universitet va dasturni tanladingiz?",
+    "p8h": "2–3 ta aniq fan, professor yoki laboratoriyani tilga olib, ularni avvalgi tayyorgarligingiz bilan bog‘lang.",
+    "p9q": "O‘qishni bitirib qaytganingizdan so‘ng, olgan bilimingiz O‘zbekiston rivojiga qanday hissa qo‘shadi?",
+    "p9h": "1–5 yil ichida bilimingizni qo‘llaydigan aniq soha, tashkilot yoki islohotni ko‘rsating.",
+    "p10q": "Muammoni hal qilish uchun hamkorlik yoki tarmoq (networking) yaratgan vaziyatingizni tasvirlab bering.",
+    "p10h": "Chevening va GKS uchun muhim: turli insonlar yoki guruhlarni qanday birlashtirganingizni ko‘rsating.",
+    "p11q": "Stipendiya arizangizga oid moliyaviy ehtiyoj yoki oilaviy holatingizni tushuntiring.",
+    "p11h": "Oila daromadi, qaramog‘idagi a’zolar va tasdiqlangan oilaviy ulushni aniq faktlar bilan bayon qiling.",
+    "c14t": "Gaaga Apostili va tasdiqlangan tarjimalarni yakunlash",
+    "c14d": "Agar boradigan davlatingiz diplom, transkript yoki tug‘ilganlik guvohnomasiga apostil talab qilsa (my.gov.uz orqali), elchixona suhbatigacha tayyorlab qo‘ying.",
+    "c15t": "Homiy kafolat xati va rasmiy daromad/soliq ma’lumotnomalarini tayyorlash",
+    "c15d": "Ota-ona yoki homiy o‘qishingizni moliyalashtirganda, bank ma’lumotnomasi, tug‘ilganlik guvohnomasi va soliq ma’lumotnomalarini jamlang.",
+    "c16t": "Viza topshirish uchun yotoqxona yoki ijara shartnomasini saqlab qo‘yish",
+    "c16d": "Ko‘plab elchixonalar talaba vizasini berishdan oldin universitet yotoqxonasi tasdig‘i yoki ijara shartnomasini so‘raydi.",
+    "c17t": "Yetib borgach talaba tibbiy sug‘urtasi va manzil ro‘yxatini (Anmeldung / ARC) faollashtirish",
+    "c17d": "Yetib borgandan keyingi majburiy qadamlarni bajaring: SEVIS ro‘yxati (AQSh), Anmeldung va Girokonto (Germaniya), ARC karta (Koreya) yoki eVisa (UK)."
   },
   "bell": {
     "title": "Bildirishnomalar",

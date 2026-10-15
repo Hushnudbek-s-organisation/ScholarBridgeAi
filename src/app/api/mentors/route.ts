@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { mentorRequests, mentors, savedScholarships, savedUniversities, scholarships, studentProfiles, universities } from "@/db/schema";
+import { ensureRichPlatformDataSeeded } from "@/db/seedRichPlatformData";
 import { and, eq } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { readJsonBody, clampString } from "@/lib/request";
@@ -17,6 +18,7 @@ import { parseListColumn } from "@/lib/chancing";
  */
 export async function GET(req: Request) {
   try {
+    await ensureRichPlatformDataSeeded();
     const { searchParams } = new URL(req.url);
     const profileId = Number(searchParams.get("profileId"));
     if (!profileId) {

@@ -3,6 +3,7 @@ import { and, asc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { visaRequirements } from "@/db/schema";
 import { guardAdmin, guardStudent, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
+import { ensureJourneyTables } from "@/lib/journey/db";
 import { countriesMatch } from "@/lib/countries";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
   const country = (searchParams.get("country") ?? "").trim();
   const visaType = (searchParams.get("visaType") ?? "").trim();
   try {
+    await ensureJourneyTables();
     // The distinct countries we have published something for. Resolving known
     // aliases against these saved labels keeps the API contract and stored
     // values unchanged while allowing searches such as USA → United States.

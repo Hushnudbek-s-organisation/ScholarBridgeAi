@@ -20,6 +20,15 @@ import {
   type ChancingProfile,
 } from "../src/lib/chancing";
 import { ADVISOR_SYSTEM_PROMPT } from "../src/lib/advisor";
+import {
+  QS_TOP_200_BENCHMARKS,
+  matchQsUniversityBenchmark,
+} from "../src/lib/qsTop200Benchmarks";
+import {
+  PROGRAM_DEPARTMENT_PROFILES,
+  evaluateUniversityAndProgramChance,
+  resolveProgramDepartmentProfile,
+} from "../src/lib/programChancing";
 
 let passed = 0;
 const failures: string[] = [];
@@ -154,5 +163,75 @@ check("AI chat does not receive family income as an available contribution", () 
   assert.match(aiChatRoute, /never treat household\/family income as an available contribution or a substitute budget/);
 });
 
-console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);
-if (failures.length) process.exitCode = 1;
+console.log("\nQS Top 200 Benchmarks & 5-Layer Program Positioning Engine");
+check("QS Top 200 dataset contains all 200 ranked universities plus KAIST", () => {
+  assert.ok(QS_TOP_200_BENCHMARKS.length >= 200, `Expected >=200 rows, got ${QS_TOP_200_BENCHMARKS.length}`);
+  const mit = matchQsUniversityBenchmark({ name: "MIT", country: "United States" });
+  const tum = matchQsUniversityBenchmark({ name: "Technical University of Munich", country: "Germany" });
+  const ox = matchQsUniversityBenchmark({ name: "University of Oxford", country: "United Kingdom" });
+  const kaist = matchQsUniversityBenchmark({ name: "KAIST", country: "South Korea" });
+  assert.equal(mit.qsRank, 1);
+  assert.equal(tum.qsRank, 23);
+  assert.equal(ox.qsRank, 4);
+  assert.equal(kaist.officialDomain, "kaist.ac.kr");
+});
+check("14 granular department selectivity profiles differentiate CS/AI from Humanities", () => {
+  assert.equal(Object.keys(PROGRAM_DEPARTMENT_PROFILES).length, 14);
+  const csDept = resolveProgramDepartmentProfile("BSc in Computer Science and AI");
+  const humDept = resolveProgramDepartmentProfile("BA in History and Literature");
+  assert.equal(csDept.key, "cs_ai");
+  assert.equal(humDept.key, "humanities_languages");
+  assert.ok(csDept.acceptRateMultiplier < humDept.acceptRateMultiplier);
+});
+check("evaluateUniversityAndProgramChance computes program-specific 25th/50th/75th percentiles and eligibility", () => {
+  const csEval = evaluateUniversityAndProgramChance(
+    profile,
+    { name: "Technical University of Munich", country: "Germany", worldRanking: 23 },
+    {
+      id: 101,
+      universityId: 23,
+      name: "BSc in Computer Science",
+      degreeLevel: "Bachelor",
+      field: "Computer Science",
+    },
+    {
+      minGpa: 3.4,
+      minIelts: 6.5,
+      minSat: 1380,
+      ibRequirement: "36 IB Points (HL Math 6)",
+      aLevelRequirement: "AAA",
+    }
+  );
+  const histEval = evaluateUniversityAndProgramChance(
+    profile,
+    { name: "Technical University of Munich", country: "Germany", worldRanking: 23 },
+    {
+      id: 102,
+      universityId: 23,
+      name: "BA in History & Philosophy of Science",
+      degreeLevel: "Bachelor",
+      field: "History",
+    },
+    null
+  );
+  assert.equal(csEval.eligibilityStatus, "meets_all");
+  assert.ok(csEval.effectiveProgramAcceptRatePct < csEval.universityAcceptRatePct);
+  assert.ok(csEval.effectiveProgramAcceptRatePct < histEval.effectiveProgramAcceptRatePct);
+  assert.ok(csEval.programGpa50 > histEval.programGpa50);
+  assert.ok(csEval.studentGpaPercentile !== null && csEval.studentGpaPercentile >= 50);
+  assert.ok((histEval.studentGpaPercentile ?? 0) > (csEval.studentGpaPercentile ?? 0));
+});
+
+(async () => {
+  process.env.DATABASE_URL ||= "postgresql://x:x@localhost:5432/x";
+  const { ADDITIONAL_24_SUCCESS_STORIES } = await import("../src/db/seedOutcomesAndStories");
+  const { RICH_SUCCESS_STORIES } = await import("../src/db/seedRichPlatformData");
+  check("36 multi-major verified success stories (12 flagship + 24 regional/program archetypes) are defined", () => {
+    assert.equal(RICH_SUCCESS_STORIES.length, 12);
+    assert.equal(ADDITIONAL_24_SUCCESS_STORIES.length, 24);
+    assert.equal(RICH_SUCCESS_STORIES.length + ADDITIONAL_24_SUCCESS_STORIES.length, 36);
+  });
+
+  console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);
+  if (failures.length) process.exitCode = 1;
+})();
