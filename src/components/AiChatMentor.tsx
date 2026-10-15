@@ -140,11 +140,6 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
         </div>
       </div>
 
-      {/* AI disclosure — visible before the first reply, not only in Terms. */}
-      <div className="border-b border-slate-100 bg-amber-50/70 px-4 py-1.5">
-        <AppNote kind="ai" />
-      </div>
-
       {/* Messages Scroll View */}
       <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
         <AnimatePresence initial={false}>
@@ -247,6 +242,12 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           {t("send")}
         </button>
       </form>
+
+      {/*
+        AI disclosure — still before any reply is trusted, but as a quiet line
+        under the composer instead of an amber strip above the conversation.
+      */}
+      <AppNote kind="ai" variant="inline" className="px-3 pb-2.5 text-center" />
     </div>
   );
 }

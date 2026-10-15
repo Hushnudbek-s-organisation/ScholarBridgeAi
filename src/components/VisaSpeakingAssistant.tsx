@@ -53,10 +53,10 @@ import {
   Volume2,
   VolumeX,
   Waves,
-  Zap,
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
 import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
+import { AiOrbFaceAvatar } from "@/components/visa/AiOrbFaceAvatar";
 import {
   classifySpeechError,
   LIVE_SPEAK_WATCHDOG_MS,
@@ -450,82 +450,6 @@ function Steps({ current }: { current: 0 | 1 | 2 }) {
   );
 }
 
-function HudWave({ level, active }: { level: number; active: boolean }) {
-  return (
-    <div className="flex h-14 items-center justify-center gap-1" aria-hidden="true">
-      {Array.from({ length: 29 }, (_, i) => {
-        const center = Math.sin((i / 28) * Math.PI);
-        const pulse = active ? level : 0.04;
-        const height = 8 + pulse * 54 * (0.25 + center * 0.75);
-        return (
-          <span
-            key={i}
-            className={`w-1 rounded-full transition-all duration-75 ${
-              active ? "bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.75)]" : "bg-slate-500/40"
-            }`}
-            style={{ height: `${height}px`, opacity: active ? 0.55 + center * 0.45 : 0.35 }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function ReactorCore({
-  status,
-  level,
-  mode,
-}: {
-  status: "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
-  level: number;
-  mode: "gemini-live" | "fallback";
-}) {
-  const active = status !== "IDLE";
-  const palette =
-    status === "LISTENING"
-      ? "from-emerald-400 via-cyan-300 to-blue-500"
-      : status === "THINKING"
-        ? "from-amber-300 via-orange-400 to-pink-500"
-        : status === "SPEAKING"
-          ? "from-fuchsia-400 via-violet-400 to-cyan-300"
-          : "from-slate-500 via-slate-400 to-slate-600";
-  const scale = 1 + Math.min(0.18, level * 0.18);
-
-  return (
-    <div className="flex flex-col items-center gap-5">
-      <div className="relative flex h-64 w-64 items-center justify-center sm:h-80 sm:w-80">
-        <div
-          className={`absolute inset-7 rounded-full bg-gradient-to-br ${palette} opacity-25 blur-2xl ${
-            active ? "animate-pulse" : ""
-          }`}
-        />
-        <div className="absolute inset-2 rounded-full border border-cyan-300/20" />
-        <div className="absolute inset-9 rounded-full border border-white/10" />
-        <div
-          className={`absolute rounded-full border border-cyan-200/30 ${
-            active ? "animate-ping" : ""
-          }`}
-          style={{ inset: `${34 - level * 16}px` }}
-        />
-        <div
-          className={`relative flex h-40 w-40 flex-col items-center justify-center rounded-full bg-gradient-to-br ${palette} text-white shadow-[0_0_60px_rgba(34,211,238,0.35)] ring-4 ring-white/10 transition-transform duration-100 sm:h-52 sm:w-52`}
-          style={{ transform: `scale(${scale})` }}
-        >
-          <div className="absolute inset-4 rounded-full bg-white/25 blur-md" />
-          <Zap className="relative h-8 w-8 text-white drop-shadow sm:h-10 sm:w-10" />
-          <span className="relative mt-3 text-xs font-black tracking-[0.28em] text-white sm:text-sm">
-            {status}
-          </span>
-          <span className="relative mt-1 rounded-full bg-black/20 px-2.5 py-0.5 text-[10px] font-bold text-white/85">
-            {mode === "gemini-live" ? "Gemini Live" : "Fallback"}
-          </span>
-        </div>
-      </div>
-      <HudWave level={level} active={active} />
-    </div>
-  );
-}
-
 function ScoreRing({
   value,
   label,
@@ -765,6 +689,17 @@ export function VisaSpeakingAssistant({
   const meterRafRef = useRef(0);
   /** Watchdog for a speechSynthesis utterance whose onend never fires. */
   const speakWatchdogRef = useRef<number | null>(null);
+  /**
+   * Neural-voice playback (POST /api/visa/tts). The audio is routed through an
+   * AnalyserNode so the officer's mouth is driven by the REAL waveform rather
+   * than by the synthetic syllable oscillator — which is only needed for
+   * browser speechSynthesis, since that API exposes no amplitude at all.
+   */
+  const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
+  const ttsRafRef = useRef(0);
+  /** Set once the server answers 204/no-key, so we stop re-asking every turn. */
+  const ttsUnavailableRef = useRef(false);
   /** Watchdog for a Gemini Live turn that stops producing audio mid-speech. */
   const liveSpeakWatchdogRef = useRef<number | null>(null);
   /** Retry timer for a `SpeechRecognition.start()` that threw (transient). */
@@ -854,6 +789,18 @@ export function VisaSpeakingAssistant({
       meterStreamRef.current = null;
       meterAudioCtxRef.current?.close().catch(() => {});
       meterAudioCtxRef.current = null;
+
+      // A neural clip still playing would keep talking over the next screen.
+      try {
+        ttsSourceRef.current?.stop();
+      } catch {
+        // already stopped
+      }
+      ttsSourceRef.current = null;
+      cancelAnimationFrame(ttsRafRef.current);
+      ttsRafRef.current = 0;
+      ttsAudioCtxRef.current?.close().catch(() => {});
+      ttsAudioCtxRef.current = null;
 
       if (speakWatchdogRef.current !== null) {
         window.clearTimeout(speakWatchdogRef.current);
@@ -1099,6 +1046,89 @@ export function VisaSpeakingAssistant({
       }
     }
 
+    /**
+     * Stop any neural clip that is still playing (barge-in, mute, unmount).
+     * speechSynthesis has its own cancel; this is the server-voice equivalent.
+     */
+    function stopNeuralSpeech(): void {
+      try {
+        ttsSourceRef.current?.stop();
+      } catch {
+        // already stopped — AudioBufferSourceNode.stop() throws if called twice
+      }
+      ttsSourceRef.current = null;
+      cancelAnimationFrame(ttsRafRef.current);
+      ttsRafRef.current = 0;
+      setOutputLevel(0);
+    }
+
+    /**
+     * Play a server-rendered voice clip and drive `outputLevel` from the real
+     * waveform, so the avatar's mouth tracks the actual audio.
+     *
+     * Returns false when playback could not start (no AudioContext, decode
+     * failure) — the caller then uses the browser voice instead of going silent.
+     */
+    async function playNeuralSpeech(
+      text: string,
+      bytes: ArrayBuffer,
+      token: number,
+      onDone: () => void
+    ): Promise<boolean> {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return false;
+      try {
+        const ctx = ttsAudioCtxRef.current ?? new Ctor();
+        ttsAudioCtxRef.current = ctx;
+        if (ctx.state === "suspended") await ctx.resume();
+        const buffer = await ctx.decodeAudioData(bytes.slice(0));
+        if (sessionRef.current !== token) return true;
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        ttsSourceRef.current = source;
+
+        const bins = new Uint8Array(analyser.frequencyBinCount);
+        const tick = () => {
+          if (ttsSourceRef.current !== source) return;
+          analyser.getByteFrequencyData(bins);
+          let sum = 0;
+          for (let i = 0; i < bins.length; i += 1) sum += bins[i];
+          setOutputLevel(Math.max(0, Math.min(1, sum / bins.length / 140)));
+          ttsRafRef.current = requestAnimationFrame(tick);
+        };
+
+        source.onended = () => {
+          if (ttsSourceRef.current === source) {
+            ttsSourceRef.current = null;
+            cancelAnimationFrame(ttsRafRef.current);
+            ttsRafRef.current = 0;
+            setOutputLevel(0);
+          }
+          onDone();
+        };
+
+        setOfficer("speaking");
+        source.start();
+        ttsRafRef.current = requestAnimationFrame(tick);
+        // Same reasoning as the browser voice: if `onended` never fires the
+        // officer must not stay "speaking" with the mic disabled.
+        clearSpeakWatchdog();
+        speakWatchdogRef.current = window.setTimeout(() => {
+          stopNeuralSpeech();
+          onDone();
+        }, speakWatchdogMs(text));
+        return true;
+      } catch {
+        stopNeuralSpeech();
+        return false;
+      }
+    }
+
     function fallbackSpeak(text: string): void {
       const token = sessionRef.current;
       if (mutedRef.current || !("speechSynthesis" in window)) {
@@ -1106,11 +1136,11 @@ export function VisaSpeakingAssistant({
         autoListen(token);
         return;
       }
-      // Whatever ends the utterance — onend, onerror or the watchdog — the
-      // interview must continue the same way: officer idle, then LISTEN.
-      // (onerror used to reset the state without reopening the microphone, so
-      // after a question the student had to click the mic themselves; if that
-      // click also failed, typing was the only way forward.)
+      // Whatever ends the utterance — onend, onerror, a decode failure or the
+      // watchdog — the interview must continue the same way: officer idle, then
+      // LISTEN. (onerror used to reset the state without reopening the
+      // microphone, so after a question the student had to click the mic
+      // themselves; if that click also failed, typing was the only way forward.)
       let finished = false;
       const finishSpeaking = () => {
         if (finished || sessionRef.current !== token) return;
@@ -1119,31 +1149,75 @@ export function VisaSpeakingAssistant({
         setOfficer("idle");
         autoListen(token);
       };
-      try {
-        window.speechSynthesis.cancel();
-        const c = getVisaCountry(configRef.current?.countryCode);
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = c?.locale ?? "en-US";
-        const selectedVoice = pickVoice(
-          utter.lang,
-          configRef.current?.gender ?? "male",
-        );
-        if (selectedVoice) utter.voice = selectedVoice;
-        utter.rate = 0.95;
-        utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
-        setOfficer("speaking");
-        utter.onend = finishSpeaking;
-        utter.onerror = finishSpeaking;
-        window.speechSynthesis.speak(utter);
-        // Some browsers fire neither onend nor onerror (no user activation,
-        // throttled tab, cancelled utterance). Without this the officer stayed
-        // "speaking" forever and the microphone button stayed disabled.
-        clearSpeakWatchdog();
-        speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
-      } catch {
-        setOfficer("idle");
-        autoListen(token);
+
+      /** The browser voice: always available, no amplitude to read. */
+      const browserSpeak = () => {
+        if (sessionRef.current !== token || finished) return;
+        try {
+          window.speechSynthesis.cancel();
+          const c = getVisaCountry(configRef.current?.countryCode);
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = c?.locale ?? "en-US";
+          const selectedVoice = pickVoice(
+            utter.lang,
+            configRef.current?.gender ?? "male",
+          );
+          if (selectedVoice) utter.voice = selectedVoice;
+          utter.rate = 0.95;
+          utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
+          setOfficer("speaking");
+          utter.onend = finishSpeaking;
+          utter.onerror = finishSpeaking;
+          window.speechSynthesis.speak(utter);
+          // Some browsers fire neither onend nor onerror (no user activation,
+          // throttled tab, cancelled utterance). Without this the officer stayed
+          // "speaking" forever and the microphone button stayed disabled.
+          clearSpeakWatchdog();
+          speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
+        } catch {
+          finishSpeaking();
+        }
+      };
+
+      // ---- 1. Neural officer voice from the server --------------------------
+      // POST /api/visa/tts returns audio/mpeg, or 204 when the deployment has
+      // no OpenAI key. 204 is not an error: it means "use the browser voice",
+      // which is exactly what the catch/all-other-status branches do too.
+      if (ttsUnavailableRef.current) {
+        browserSpeak();
+        return;
       }
+      setOfficer("speaking");
+      void (async () => {
+        try {
+          const res = await fetch("/api/visa/tts", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              text,
+              gender: configRef.current?.gender ?? "male",
+              language: getVisaCountry(configRef.current?.countryCode)?.locale,
+            }),
+          });
+          if (sessionRef.current !== token || finished) return;
+          if (res.status === 204) {
+            // No key configured anywhere: stop asking for the rest of the session.
+            ttsUnavailableRef.current = true;
+            browserSpeak();
+            return;
+          }
+          if (!res.ok) {
+            browserSpeak();
+            return;
+          }
+          const bytes = await res.arrayBuffer();
+          if (sessionRef.current !== token || finished) return;
+          const ok = await playNeuralSpeech(text, bytes, token, finishSpeaking);
+          if (!ok) browserSpeak();
+        } catch {
+          if (sessionRef.current === token && !finished) browserSpeak();
+        }
+      })();
     }
 
     async function fetchOfficerReply(history: VisaMessage[]): Promise<void> {
@@ -1771,6 +1845,7 @@ export function VisaSpeakingAssistant({
       }
       recognitionRef.current = null;
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      stopNeuralSpeech();
       stopFallbackMeter();
       resetConversation();
       setError(null);
@@ -1854,6 +1929,7 @@ export function VisaSpeakingAssistant({
         return;
       }
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      stopNeuralSpeech();
       clearSpeakWatchdog();
       stopListening();
       setOfficer("idle");
@@ -1867,6 +1943,7 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      stopNeuralSpeech();
       setOfficer("idle");
       setAnalysis(null);
       setAnalyzeError(null);
@@ -1892,6 +1969,7 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      stopNeuralSpeech();
       setOfficer("idle");
       resetConversation();
       setError(null);
@@ -1906,6 +1984,7 @@ export function VisaSpeakingAssistant({
       setMuted(next);
       if (next) {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        stopNeuralSpeech();
         clearLivePlayback();
       } else {
         liveOutputCtxRef.current?.resume().catch(() => {});
@@ -1959,22 +2038,24 @@ export function VisaSpeakingAssistant({
 
   return (
     <div className="space-y-5">
-      <div className="overflow-hidden rounded-3xl border border-blue-100 bg-slate-950 p-5 text-white shadow-lg sm:p-6">
-        <div className="absolute" />
+      {/* Theme-adaptive hero: alabaster-indigo in light mode, obsidian-indigo
+          in dark. The old hardcoded slate-950 banner stayed black in Light
+          Mode, which read as a rendering fault. */}
+      <div className="sb-journey-hero overflow-hidden rounded-3xl border border-slate-200 p-5 shadow-sm sm:p-6 dark:border-slate-700/80">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] font-black tracking-[0.2em] text-cyan-100 uppercase">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/50 bg-indigo-100/70 px-3 py-1 text-[11px] font-black tracking-[0.2em] text-indigo-700 uppercase dark:border-indigo-400/30 dark:bg-indigo-400/15 dark:text-indigo-200">
               <Radio className="h-3.5 w-3.5" />
-              Gemini Live
+              {t("aiSimulatorBadge")}
             </div>
             <h1 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl">
               🎙️ {t("title")}
             </h1>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300 sm:text-sm">
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 sm:text-sm dark:text-slate-300">
               {t("subtitle")}
             </p>
           </div>
-          <div className="rounded-2xl bg-white/10 px-3 py-2 backdrop-blur-sm">
+          <div className="rounded-2xl bg-white/60 px-3 py-2 backdrop-blur-sm dark:bg-white/10">
             <Steps current={screen === "setup" ? 0 : screen === "result" ? 2 : 1} />
           </div>
         </div>
@@ -2148,15 +2229,15 @@ export function VisaSpeakingAssistant({
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset ${
                 engineMode === "gemini-live"
-                  ? "bg-cyan-50 text-cyan-700 ring-cyan-200"
-                  : "bg-amber-50 text-amber-700 ring-amber-200"
+                  ? "bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-200 dark:ring-indigo-800"
+                  : "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
               }`}
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
               </span>
-              {engineMode === "gemini-live" ? t("realtimeMode") : t("fallbackMode")}
+              {engineMode === "gemini-live" ? t("aiLiveVoice") : t("aiStandardVoice")}
             </span>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
               {t("answers", { count: userTurns })}
@@ -2171,34 +2252,52 @@ export function VisaSpeakingAssistant({
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 text-white shadow-xl">
+          {/* Theme-adaptive studio: light alabaster-indigo by day, deep
+              obsidian-indigo at night. Replaces the old slab of `bg-slate-950`,
+              which was black in both themes. */}
+          <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-indigo-50/35 to-sky-50/25 text-slate-900 shadow-lg dark:border-slate-700/80 dark:from-[#0b1325] dark:via-[#111c35] dark:to-[#0d1528] dark:text-slate-100">
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_420px] lg:p-6">
-              <div className="flex min-h-[440px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.18),transparent_58%)] p-4">
-                <ReactorCore status={reactorStatus} level={reactorLevel} mode={engineMode} />
-                <div className="mt-3 grid w-full max-w-xl grid-cols-3 gap-2 text-center text-[10px] font-black tracking-wide text-slate-300 uppercase sm:text-xs">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+              <div className="relative flex min-h-[430px] flex-col items-center justify-center rounded-3xl border border-slate-200/80 bg-white/85 p-6 shadow-xs backdrop-blur-md dark:border-slate-700/70 dark:bg-[#131f38]/85">
+                <AiOrbFaceAvatar
+                  state={reactorStatus}
+                  level={reactorLevel}
+                  countryFlag={country.flag}
+                  countryName={localizedCountryName(country.name)}
+                  statusLabel={
+                    reactorStatus === "SPEAKING"
+                      ? `🔊 ${t("avSpeaking")}`
+                      : reactorStatus === "LISTENING"
+                        ? `🎙️ ${t("avListening")}`
+                        : reactorStatus === "THINKING"
+                          ? `✨ ${t("avThinking")}`
+                          : `✅ ${t("avReady")}`
+                  }
+                  roleLabel={t("avOfficerRole")}
+                />
+                <div className="mt-4 grid w-full max-w-xl grid-cols-3 gap-2 text-center text-[10px] font-black tracking-wide text-slate-500 uppercase sm:text-xs dark:text-slate-300">
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {liveConnected || engineMode === "fallback" ? t("connected") : t("connecting")}
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {muted ? t("soundOff") : t("soundOn")}
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {country.language}
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-[#15223c]">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-3xl ring-1 ring-white/15">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-3xl ring-1 ring-slate-200 dark:bg-indigo-950/60 dark:ring-indigo-800/50">
                       {gender === "female" ? "👩‍💼" : "👨‍💼"}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-black">
+                      <div className="text-sm font-black text-slate-900 dark:text-slate-100">
                         {t("officer")} · {localizedCountryName(country.name)}
                       </div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
                         {reactorStatus === "SPEAKING"
                           ? t("speaking")
                           : reactorStatus === "THINKING"
@@ -2209,31 +2308,31 @@ export function VisaSpeakingAssistant({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 min-h-24 rounded-2xl bg-black/25 p-4 ring-1 ring-white/10 ring-inset">
+                  <div className="mt-4 min-h-24 rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-indigo-800/50 dark:bg-indigo-950/40">
                     {officerState === "thinking" && !lastOfficer && !liveOutputPartial ? (
-                      <span className="inline-flex items-center gap-2 text-sm text-cyan-100">
+                      <span className="inline-flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-200">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {t("thinking")}
                       </span>
                     ) : liveOutputPartial ? (
-                      <p className="text-sm leading-relaxed font-medium text-cyan-50 sm:text-base">
+                      <p className="text-sm leading-relaxed font-medium text-slate-800 sm:text-base dark:text-slate-100">
                         &ldquo;{liveOutputPartial}&rdquo;
                       </p>
                     ) : lastOfficer ? (
-                      <p className="text-sm leading-relaxed font-medium text-cyan-50 sm:text-base">
+                      <p className="text-sm leading-relaxed font-medium text-slate-800 sm:text-base dark:text-slate-100">
                         &ldquo;{lastOfficer.text}&rdquo;
                       </p>
                     ) : null}
                   </div>
                   {engineMode === "fallback" && !ttsSupported && (
-                    <p className="mt-2 text-[11px] text-slate-400">
+                    <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
                       {t("voiceUnavailable")}
                     </p>
                   )}
                 </div>
 
-                <div className="min-h-0 flex-1 rounded-3xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="text-xs font-black tracking-[0.2em] text-slate-400 uppercase">
+                <div className="min-h-0 flex-1 rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-[#15223c]">
+                  <h3 className="text-xs font-black tracking-[0.2em] text-slate-500 uppercase dark:text-slate-400">
                     {t("transcriptTitle")}
                   </h3>
                   <div
@@ -2241,7 +2340,7 @@ export function VisaSpeakingAssistant({
                     className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1"
                   >
                     {messages.length === 0 && !interim && !liveOutputPartial && (
-                      <p className="py-8 text-center text-xs text-slate-500">
+                      <p className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
                         {t("emptyTranscript")}
                       </p>
                     )}
@@ -2249,9 +2348,9 @@ export function VisaSpeakingAssistant({
                       m.role === "officer" ? (
                         <div
                           key={i}
-                          className="mr-6 rounded-2xl rounded-tl-sm bg-cyan-400/10 px-3 py-2 text-xs leading-relaxed text-cyan-50 ring-1 ring-cyan-300/15 ring-inset sm:text-sm"
+                          className="mr-6 rounded-2xl rounded-tl-sm border border-slate-200/80 bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-800 sm:text-sm dark:border-indigo-800/50 dark:bg-indigo-950/60 dark:text-slate-100"
                         >
-                          <span className="mb-0.5 block text-[10px] font-bold text-cyan-300">
+                          <span className="mb-0.5 block text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                             {t("officer")}
                           </span>
                           {m.text}
@@ -2259,9 +2358,9 @@ export function VisaSpeakingAssistant({
                       ) : (
                         <div
                           key={i}
-                          className="ml-6 rounded-2xl rounded-tr-sm bg-blue-600 px-3 py-2 text-xs leading-relaxed text-white sm:text-sm"
+                          className="ml-6 rounded-2xl rounded-tr-sm bg-indigo-600 px-3 py-2 text-xs leading-relaxed text-white shadow-xs sm:text-sm"
                         >
-                          <span className="mb-0.5 block text-[10px] font-bold text-blue-200">
+                          <span className="mb-0.5 block text-[10px] font-bold text-indigo-200">
                             {t("you")}
                           </span>
                           {m.text}
@@ -2269,7 +2368,7 @@ export function VisaSpeakingAssistant({
                       ),
                     )}
                     {liveOutputPartial && (
-                      <div className="mr-6 rounded-2xl rounded-tl-sm border border-dashed border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-50 italic sm:text-sm">
+                      <div className="mr-6 rounded-2xl rounded-tl-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
                         <span className="mb-0.5 block text-[10px] font-bold text-cyan-300">
                           {t("officer")}
                         </span>
@@ -2277,8 +2376,8 @@ export function VisaSpeakingAssistant({
                       </div>
                     )}
                     {interim && (
-                      <div className="ml-6 rounded-2xl rounded-tr-sm border border-dashed border-blue-300/40 bg-blue-500/10 px-3 py-2 text-xs text-blue-50 italic sm:text-sm">
-                        <span className="mb-0.5 block text-[10px] font-bold text-blue-200">
+                      <div className="ml-6 rounded-2xl rounded-tr-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        <span className="mb-0.5 block text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
                           {t("you")}
                         </span>
                         {interim}…
@@ -2353,63 +2452,69 @@ export function VisaSpeakingAssistant({
                       : t("micStart")}
               </p>
 
-              {showTextFallback && (
-                <div className="mx-auto mt-4 max-w-2xl space-y-2 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 ring-inset">
-                  <p className="text-[11px] text-slate-300">
-                    {!sttSupported ? t("sttUnsupported") : t("micBlocked")}
-                  </p>
-                  {sttSupported && (
-                    <div className="space-y-1.5">
-                      <button
-                        type="button"
-                        onClick={() => engineRef.current?.onMicClick()}
-                        disabled={officerState !== "idle"}
-                        className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Mic className="h-3.5 w-3.5" />
-                        {t("micRetry")}
-                      </button>
-                      <p className="text-[11px] leading-relaxed text-slate-400">
-                        {t("micInlineHint")}
-                      </p>
-                      {embedded && (
-                        <a
-                          href={typeof window === "undefined" ? "/" : window.location.href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-[11px] font-black text-cyan-100 hover:bg-cyan-300/15"
+              {/* Hybrid input is ALWAYS available: voice when the microphone
+                  works, typing when it does not. It used to appear only after a
+                  mic failure, so a desktop or mobile student who simply
+                  preferred typing had no way in. */}
+              <div className="mx-auto mt-4 max-w-2xl space-y-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700/60 dark:bg-white/5">
+                {showTextFallback && (
+                  <>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {!sttSupported ? t("sttUnsupported") : t("micBlocked")}
+                    </p>
+                    {sttSupported && (
+                      <div className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => engineRef.current?.onMicClick()}
+                          disabled={officerState !== "idle"}
+                          className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Mic className="h-3.5 w-3.5" />
-                          {t("micOpenTab")}
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      value={textAnswer}
-                      onChange={(e) => setTextAnswer(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && textAnswer.trim()) {
-                          engineRef.current?.submitAnswer(textAnswer);
-                        }
-                      }}
-                      placeholder={t("typePlaceholder")}
-                      disabled={officerState !== "idle"}
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-300 focus:border-cyan-300 disabled:bg-slate-800"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => engineRef.current?.submitAnswer(textAnswer)}
-                      disabled={!textAnswer.trim() || officerState !== "idle"}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-600"
-                    >
-                      <Send className="h-4 w-4" />
-                      {t("send")}
-                    </button>
-                  </div>
+                          {t("micRetry")}
+                        </button>
+                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                          {t("micInlineHint")}
+                        </p>
+                        {embedded && (
+                          <a
+                            href={typeof window === "undefined" ? "/" : window.location.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300/50 bg-indigo-50 px-3 py-2 text-[11px] font-black text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200"
+                          >
+                            <Mic className="h-3.5 w-3.5" />
+                            {t("micOpenTab")}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    value={textAnswer}
+                    onChange={(e) => setTextAnswer(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && textAnswer.trim()) {
+                        engineRef.current?.submitAnswer(textAnswer);
+                      }
+                    }}
+                    placeholder={t("typePlaceholder")}
+                    disabled={officerState !== "idle"}
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400 disabled:bg-slate-100 dark:border-slate-700/70 dark:bg-[#0f1a30] dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.submitAnswer(textAnswer)}
+                    disabled={!textAnswer.trim() || officerState !== "idle"}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Send className="h-4 w-4" />
+                    {t("send")}
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

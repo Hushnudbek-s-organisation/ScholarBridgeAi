@@ -348,4 +348,16 @@ export const SEED_CHECKLIST_ITEMS: {
   { phase: "money", title: "Prepare sponsor affidavit and income tax certificates", description: "When parents or sponsors fund your studies, gather stamped bank statements, birth certificate relationship proof and official tax/income certificates.", linkTab: "planning" },
   { phase: "housing", title: "Save dormitory or lease proof of address for visa filing", description: "Many embassies require an official university dormitory placement letter or signed accommodation contract before issuing a study visa.", linkTab: null },
   { phase: "arrival", title: "Activate student health insurance and municipal address registration", description: "Complete mandatory post-arrival steps such as SEVIS check-in (US), Anmeldung & Girokonto activation (Germany), ARC (Korea) or BRP/eVisa check (UK).", linkTab: null },
+  // ---------------------------------------------------------------------------
+  // Added so every phase has enough to actually work through: several phases
+  // previously had a single item, which made the checklist read as complete
+  // after one click.
+  // ---------------------------------------------------------------------------
+  { phase: "offer", title: "Confirm the scholarship side of your offer", description: "If the offer includes an award, confirm its conditions, renewal rules and reporting duties in writing with the provider before you accept.", linkTab: "applications" },
+  { phase: "visa", title: "Book the earliest workable appointment", description: "Appointment waiting times vary by season and post. Check the official booking system for the current wait, then book rather than waiting for a perfect slot.", linkTab: "visa" },
+  { phase: "money", title: "Set up a monthly budget for the first term", description: "List rent, food, transport, insurance and one-off setup costs separately. The first term carries costs that later terms do not.", linkTab: "planning" },
+  { phase: "housing", title: "Read the tenancy terms before signing", description: "Check deposit protection, notice period, whether utilities are included and who the contract is with. Never pay a deposit before seeing a contract.", linkTab: null },
+  { phase: "travel", title: "Print and separately store key documents", description: "Carry the passport, visa or permit decision, admission letter and insurance proof; keep digital copies somewhere you can reach without the originals.", linkTab: null },
+  { phase: "arrival", title: "Open a local bank account and phone line", description: "Most destinations need a local address or registration number first, so sequence these after the registration step rather than before it.", linkTab: null },
+  { phase: "arrival", title: "Register with the student support office", description: "Introduce yourself to the international student office in your first week: they handle the permits, extensions and institutional paperwork you will need later.", linkTab: null },
 ];

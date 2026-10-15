@@ -16,8 +16,119 @@ export const TEST_TYPES = [
   { key: "sat", label: "SAT", max: 1600, skills: ["math", "reading", "writing"] },
   { key: "act", label: "ACT", max: 36, skills: ["english", "math", "reading", "science"] },
   { key: "ap", label: "AP", max: 5, skills: ["subject"] },
+  // GRE and TOPIK were missing, so a student preparing for a US graduate
+  // programme or a Korean-taught degree could only file them under "Other" —
+  // which produced a plan with no skills, no target and no roadmap.
+  { key: "gre", label: "GRE", max: 340, skills: ["verbal", "quantitative", "analytical-writing"] },
+  { key: "topik", label: "TOPIK", max: 6, skills: ["listening", "reading", "writing"] },
   { key: "other", label: "Other", max: 100, skills: ["general"] },
 ] as const;
+
+/**
+ * One-click starter roadmaps.
+ *
+ * A new student saw five unlabelled buttons and an empty state. Each roadmap
+ * below is a named, achievable target with five concrete milestones, so the
+ * first action is "start this", not "invent a study plan". The booking links
+ * point at the official registry or the in-country test centre — never at a
+ * reseller — and each roadmap names where it applies.
+ */
+export interface StarterRoadmap {
+  id: string;
+  testType: string;
+  targetScore: number;
+  /** Milliseconds-free: days from "now" to the suggested target date. */
+  targetInDays: number;
+  milestones: string[];
+  booking: { label: string; url: string }[];
+}
+
+export const STARTER_ROADMAPS: StarterRoadmap[] = [
+  {
+    id: "ielts_75",
+    testType: "ielts",
+    targetScore: 7.5,
+    targetInDays: 120,
+    milestones: [
+      "Diagnostic mock under timed conditions — record the baseline band",
+      "Reading: 3 passage sets/week, focus on True/False/Not Given accuracy",
+      "Listening: 2 full sections/day with transcript review of every miss",
+      "Writing Task 2: 2 essays/week, one reviewed for Task Response and Coherence",
+      "Speaking: record 3 Part 2 answers/week, target 2 minutes without pauses",
+    ],
+    booking: [
+      { label: "British Council Uzbekistan (IELTS)", url: "https://www.britishcouncil.uz/exam/ielts" },
+      { label: "IDP IELTS Tashkent", url: "https://ielts.idp.com/uzbekistan" },
+    ],
+  },
+  {
+    id: "sat_1500",
+    testType: "sat",
+    targetScore: 1500,
+    targetInDays: 150,
+    milestones: [
+      "Diagnostic Digital SAT on Bluebook — note the module split between RW and Math",
+      "Math: algebra and advanced-math drills, 30 questions/day, error log by topic",
+      "Reading & Writing: 1 module/day, annotate every evidence question",
+      "Full adaptive mock every 3 weeks, compare against the 1500 target line",
+      "Review the College Board question bank by weakest domain in the final month",
+    ],
+    booking: [
+      { label: "College Board — register for the Digital SAT", url: "https://satsuite.collegeboard.org/sat/registration" },
+      { label: "American Councils Tashkent", url: "https://uzbekistan.americancouncils.org/" },
+    ],
+  },
+  {
+    id: "toefl_105",
+    testType: "toefl",
+    targetScore: 105,
+    targetInDays: 120,
+    milestones: [
+      "Diagnostic TOEFL iBT to establish the section-by-section baseline",
+      "Integrated Writing: 2 responses/week, template the reading–lecture contrast",
+      "Academic Listening: 2 lectures/day with note-taking, then answer from notes only",
+      "Speaking: 4 tasks/day recorded, target 100+ words in 45 seconds for Task 1",
+      "Two full mocks in the final three weeks with official ETS scoring",
+    ],
+    booking: [
+      { label: "ETS — TOEFL iBT registration", url: "https://www.ets.org/toefl/test-takers/ibt/register.html" },
+      { label: "American Councils Tashkent", url: "https://uzbekistan.americancouncils.org/" },
+    ],
+  },
+  {
+    id: "gre_quant_165",
+    testType: "gre",
+    targetScore: 165,
+    targetInDays: 150,
+    milestones: [
+      "Diagnostic GRE to separate Quantitative from Verbal headroom",
+      "Quantitative: 40 problems/day by topic, track accuracy per topic not overall",
+      "Quantitative: master the arithmetic and algebra question sets before geometry",
+      "Verbal: 20 sentence-equivalence and text-completion items/day with a vocabulary log",
+      "Two full-length mocks in the final month, analyse every wrong Quantitative item",
+    ],
+    booking: [
+      { label: "ETS — GRE General Test registration", url: "https://www.ets.org/gre/test-takers/general-test/register.html" },
+    ],
+  },
+  {
+    id: "topik_4",
+    testType: "topik",
+    targetScore: 4,
+    targetInDays: 240,
+    milestones: [
+      "Baseline mock TOPIK I to place vocabulary and grammar level",
+      "Vocabulary: 30 new words/day with spaced repetition across the week",
+      "Listening: one TOPIK II section daily, replay at 1.25× for retraining",
+      "Writing: 1 short-answer and 1 essay per week, self-marked against the published rubric",
+      "Full TOPIK II mock every month from month three onward",
+    ],
+    booking: [
+      { label: "TOPIK — official registration (NIIED)", url: "https://www.topik.go.kr/" },
+      { label: "TOPIK in Uzbekistan — embassy announcements", url: "https://overseas.mofa.go.kr/uz-en/index.do" },
+    ],
+  },
+];
 
 /**
  * Which `universities` column carries the published minimum for a test.
@@ -99,6 +210,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       testTypes: TEST_TYPES,
+      /** One-click starter roadmaps — see STARTER_ROADMAPS above. */
+      roadmaps: STARTER_ROADMAPS,
       plans: out,
       /** University-level catalogue figures for context, even with no plan set. */
       catalogueSignals: catalogueFiguresBy(unis),
@@ -116,18 +229,29 @@ export async function POST(req: Request) {
   if (!g.ok) return g.response;
   const { profileId } = g.value;
   const testType = oneOf(b.value.testType, TEST_TYPES.map((t) => t.key) as unknown as readonly string[], "other") as string;
+  // A roadmap request names the roadmap instead of a bare test type; its target
+  // score and five milestones are applied server-side so the client cannot send
+  // a partial plan.
+  const roadmap =
+    typeof b.value.roadmap === "string" ? STARTER_ROADMAPS.find((r) => r.id === b.value.roadmap) ?? null : null;
+  if (b.value.roadmap !== undefined && !roadmap) {
+    return jsonError(400, "unknown roadmap", "bad_request");
+  }
+  const effectiveTestType = roadmap ? roadmap.testType : testType;
   try {
     const [existing] = await db
       .select()
       .from(testPlans)
-      .where(and(eq(testPlans.profileId, profileId), eq(testPlans.testType, testType)))
+      .where(and(eq(testPlans.profileId, profileId), eq(testPlans.testType, effectiveTestType)))
       .limit(1);
     if (existing) {
       const [updated] = await db
         .update(testPlans)
         .set({
           currentScore: numberOr(b.value.currentScore, existing.currentScore),
-          targetScore: numberOr(b.value.targetScore, existing.targetScore),
+          targetScore: roadmap
+            ? roadmap.targetScore
+            : numberOr(b.value.targetScore, existing.targetScore),
           targetDate: b.value.targetDate === undefined ? existing.targetDate : isoDate(dateOnly(b.value.targetDate)),
           nextTestDate: b.value.nextTestDate === undefined ? existing.nextTestDate : isoDate(dateOnly(b.value.nextTestDate)),
           notes: b.value.notes === undefined ? existing.notes : text(b.value.notes),
@@ -142,28 +266,36 @@ export async function POST(req: Request) {
       .insert(testPlans)
       .values({
         profileId,
-        testType,
+        testType: effectiveTestType,
         currentScore: numberOr(b.value.currentScore, null),
-        targetScore: numberOr(b.value.targetScore, null),
+        targetScore: roadmap ? roadmap.targetScore : numberOr(b.value.targetScore, null),
         targetDate: isoDate(dateOnly(b.value.targetDate)),
         nextTestDate: isoDate(dateOnly(b.value.nextTestDate)),
         notes: text(b.value.notes),
       })
       .returning();
 
-    const meta = TEST_TYPES.find((t) => t.key === testType);
-    await db.insert(testTasks).values(
-      [
-        ...(meta?.skills ?? ["general"]).map((skill, i) => ({
+    const meta = TEST_TYPES.find((t) => t.key === effectiveTestType);
+    // A roadmap ships its own five concrete milestones; a bare test type keeps
+    // the generic per-skill tasks.
+    const tasks = roadmap
+      ? roadmap.milestones.map((title, i) => ({
           testPlanId: plan.id,
-          title: `${cap(skill)} practice`,
-          skill,
+          title,
+          skill: (meta?.skills ?? ["general"])[i % Math.max(1, meta?.skills?.length ?? 1)] ?? "general",
           sortOrder: i,
-        })),
-        { testPlanId: plan.id, title: "Full mock test", skill: "mock", sortOrder: 90 },
-      ]
-    );
-    return NextResponse.json({ ok: true, plan, created: true });
+        }))
+      : [
+          ...(meta?.skills ?? ["general"]).map((skill, i) => ({
+            testPlanId: plan.id,
+            title: `${cap(skill)} practice`,
+            skill,
+            sortOrder: i,
+          })),
+          { testPlanId: plan.id, title: "Full mock test", skill: "mock", sortOrder: 90 },
+        ];
+    await db.insert(testTasks).values(tasks);
+    return NextResponse.json({ ok: true, plan, created: true, roadmap: roadmap?.id ?? null });
   } catch (err) {
     return serverError("test-planner POST", err);
   }

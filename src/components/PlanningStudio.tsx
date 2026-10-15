@@ -651,20 +651,28 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 </div>
               )}
 
-              {data.costs.unknowns.length > 0 && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">
+              {/*
+                Only surfaced when the annual total itself is missing. When the
+                benchmarked cost lines supply a complete total, a list of
+                "unknown inputs" is noise above a number that is already final —
+                and it read as a warning on a page that had nothing wrong.
+                Collapsed by default so the detail stays available, not loud.
+              */}
+              {data.costs.annualTotalUsd == null && data.costs.unknowns.length > 0 && (
+                <details className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/40">
+                  <summary className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:underline dark:text-slate-400">
+                    <AlertTriangle className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
                     Unknown inputs — excluded from totals
-                  </h4>
+                  </summary>
                   <ul className="mt-1.5 space-y-1">
                     {data.costs.unknowns.map((u, i) => (
-                      <li key={i} className="flex gap-1.5 text-xs text-amber-900">
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <li key={i} className="flex gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden />
                         <span>{u}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
+                </details>
               )}
 
               <div

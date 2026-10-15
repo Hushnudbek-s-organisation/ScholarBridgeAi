@@ -10,6 +10,7 @@ import {
   type ArrivalItemStatus,
 } from "@/lib/journey/arrival";
 import { summarizeStatuses } from "@/lib/calculations";
+import { countryArrivalGuidance } from "@/lib/journey/arrivalCountryGuidance";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export async function GET(req: Request) {
       .select({
         needScholarship: studentProfiles.needScholarship,
         needsFinancialAid: studentProfiles.needsFinancialAid,
+        preferredCountries: studentProfiles.preferredCountries,
       })
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId))
@@ -84,10 +86,30 @@ export async function GET(req: Request) {
     });
     const allItems = windows.flatMap((window) => window.items);
 
+    // Sourced, country-specific practical guidance for the first destination the
+    // student named. The generic plan above never carries a national rule
+    // (scripts/check-arrival.ts enforces that); this block does, and every tip
+    // ships with the official source that states it.
+    const preferred = parsePreferredCountries(profile?.preferredCountries);
+    const guidance = countryArrivalGuidance(preferred[0] ?? null);
+
     return NextResponse.json({
       unlocked: plan.unlocked,
       progress: summarizeStatuses(allItems, (item) => item.status === "done"),
       windows,
+      countryGuidance: guidance
+        ? {
+            country: guidance.country,
+            flag: guidance.flag,
+            tips: guidance.tips.map((tip) => ({
+              key: tip.key,
+              window: tip.window,
+              text: tip.text,
+              sourceUrl: tip.sourceUrl,
+              sourceLabel: tip.sourceLabel,
+            })),
+          }
+        : null,
     });
   } catch (err) {
     return serverError("journey/arrival GET", err);
@@ -153,6 +175,22 @@ export async function DELETE(req: Request) {
   } catch (err) {
     return serverError("journey/arrival DELETE", err);
   }
+}
+
+/**
+ * `preferredCountries` is stored as a JSON array by the profile form and as a
+ * comma list by older rows, so accept both. The first entry is the student's
+ * first-choice destination and drives the country guidance below.
+ */
+function parsePreferredCountries(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string" && !!x.trim());
+  } catch {
+    // plain comma list — fall through
+  }
+  return raw.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
 function windowOf(itemKey: string): string {

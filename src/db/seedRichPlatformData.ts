@@ -1,11 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "./index";
 import {
+  answerPrompts,
+  checklistItems,
+  goalTemplates,
   learningProviders,
   mentors,
   successStories,
   visaRequirements,
 } from "./schema";
+import {
+  SEED_ANSWER_PROMPTS,
+  SEED_CHECKLIST_ITEMS,
+  SEED_GOAL_TEMPLATES,
+} from "@/lib/growth/defaults";
 
 const VERIFIED_DATE = new Date("2026-10-01T00:00:00.000Z");
 
@@ -1531,11 +1539,17 @@ export async function seedRichPlatformData(): Promise<{
   visaRequirementsInserted: number;
   mentorsInserted: number;
   providersInserted: number;
+  goalTemplatesInserted: number;
+  answerPromptsInserted: number;
+  checklistItemsInserted: number;
 }> {
   let storiesInserted = 0;
   let visaRequirementsInserted = 0;
   let mentorsInserted = 0;
   let providersInserted = 0;
+  let goalTemplatesInserted = 0;
+  let answerPromptsInserted = 0;
+  let checklistItemsInserted = 0;
 
   // 1. Seed Verified Success Stories (idempotent by displayName + admittedUniversity)
   for (const story of RICH_SUCCESS_STORIES) {
@@ -1665,11 +1679,63 @@ export async function seedRichPlatformData(): Promise<{
     providersInserted += 1;
   }
 
+  // 5. Seed the growth catalogues. `ensureGrowthTables` (src/lib/growth/db.ts)
+  //    inserts the same rows on its own bootstrap, so both paths must dedupe on
+  //    the same natural key — a title (or prompt question) is the only stable
+  //    identity we have, and it is what makes a re-run a no-op.
+  //
+  //    Each catalogue is independent and individually tolerant of its table not
+  //    existing yet: this function is also reached from routes that never run
+  //    the growth DDL (mentors, journey), and a missing `goal_templates` table
+  //    must not cost them the stories, visa requirements, mentors or providers
+  //    they actually asked for.
+  try {
+    const existingGoalTitles = new Set(
+      (await db.select({ title: goalTemplates.title }).from(goalTemplates)).map((g) => g.title)
+    );
+    for (const [i, g] of SEED_GOAL_TEMPLATES.entries()) {
+      if (existingGoalTitles.has(g.title)) continue;
+      await db.insert(goalTemplates).values({ ...g, steps: JSON.stringify(g.steps), sortOrder: i });
+      goalTemplatesInserted += 1;
+    }
+  } catch (err) {
+    console.error("seedRichPlatformData: goal_templates skipped:", err);
+  }
+
+  try {
+    const existingQuestions = new Set(
+      (await db.select({ question: answerPrompts.question }).from(answerPrompts)).map((p) => p.question)
+    );
+    for (const [i, p] of SEED_ANSWER_PROMPTS.entries()) {
+      if (existingQuestions.has(p.question)) continue;
+      await db.insert(answerPrompts).values({ ...p, sortOrder: i });
+      answerPromptsInserted += 1;
+    }
+  } catch (err) {
+    console.error("seedRichPlatformData: answer_prompts skipped:", err);
+  }
+
+  try {
+    const existingItemTitles = new Set(
+      (await db.select({ title: checklistItems.title }).from(checklistItems)).map((c) => c.title)
+    );
+    for (const [i, c] of SEED_CHECKLIST_ITEMS.entries()) {
+      if (existingItemTitles.has(c.title)) continue;
+      await db.insert(checklistItems).values({ ...c, sortOrder: i });
+      checklistItemsInserted += 1;
+    }
+  } catch (err) {
+    console.error("seedRichPlatformData: checklist_items skipped:", err);
+  }
+
   return {
     storiesInserted,
     visaRequirementsInserted,
     mentorsInserted,
     providersInserted,
+    goalTemplatesInserted,
+    answerPromptsInserted,
+    checklistItemsInserted,
   };
 }
 

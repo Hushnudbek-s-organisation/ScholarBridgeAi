@@ -8,9 +8,9 @@
  * same visual language, and because together they cover the whole PREPARE
  * group of the sidebar.
  */
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { CalendarPlus, Check, Link2, Plus, Trash2 } from "lucide-react";
+import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
@@ -244,6 +244,15 @@ interface TestPlanRow {
 }
 interface TestData {
   testTypes: { key: string; label: string; max: number; skills: string[] }[];
+  /** One-click starter roadmaps served by the API (see STARTER_ROADMAPS). */
+  roadmaps: {
+    id: string;
+    testType: string;
+    targetScore: number;
+    targetInDays: number;
+    milestones: string[];
+    booking: { label: string; url: string }[];
+  }[];
   plans: TestPlanRow[];
   /** University-level catalogue figures that should be verified by programme. */
   catalogueSignals: { testType: string; catalogueFigure: number; universities: string[] }[];
@@ -254,7 +263,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
   const { data, loading, error, reload } = useResource<TestData>(
     useCallback(() => getJson<TestData>(`/api/test-planner?profileId=${profileId}`, t("tpLoadError")), [profileId, t]),
     [profileId],
-    { initial: { testTypes: [], plans: [], catalogueSignals: [] }, errorFallback: t("tpLoadError") }
+    { initial: { testTypes: [], roadmaps: [], plans: [], catalogueSignals: [] }, errorFallback: t("tpLoadError") }
   );
   const [busy, setBusy] = useState(false);
 
@@ -322,6 +331,64 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
           ))}
         </div>
       </JourneyCard>
+
+      {/*
+        One-click starter roadmaps. The empty state below used to be the first
+        thing a new student saw, with no indication of what a realistic plan
+        looks like. Each card creates the plan AND its five milestones.
+      */}
+      {data.roadmaps.length > 0 && (
+        <JourneyCard title={t("tpRoadmapsTitle")} subtitle={t("tpRoadmapsSubtitle")}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.roadmaps.map((r) => {
+              const existing = data.plans.some((p) => p.testType === r.testType);
+              return (
+                <div
+                  key={r.id}
+                  className="flex flex-col rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                >
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {testLabel(r.testType)} · {t("tpRoadmapTarget", { score: r.targetScore })}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    {t("tpRoadmapMilestones", { count: r.milestones.length })}
+                  </p>
+                  <ol className="mt-2 flex-1 space-y-0.5">
+                    {r.milestones.map((m, i) => (
+                      <li key={i} className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                        {i + 1}. {m}
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {r.booking.map((b) => (
+                      <a
+                        key={b.url}
+                        href={b.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                      >
+                        {b.label}
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="mt-2 min-h-11"
+                    variant={existing ? "outline" : "primary"}
+                    disabled={busy}
+                    onClick={() => void save({ testType: r.testType, roadmap: r.id })}
+                  >
+                    {existing ? t("tpRoadmapRefresh") : t("tpRoadmapStart")}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </JourneyCard>
+      )}
 
       {data.plans.length === 0 ? (
         <Empty title={t("tpEmptyTitle")} hint={t("tpEmptyHint")} />
@@ -517,7 +584,20 @@ interface StudyPlanData {
   phaseDefinitions: Omit<Phase, "status" | "pct" | "missing">[];
 }
 
-export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+export function StudyPlanPanel({
+  profileId,
+  onNavigateTab,
+  profile,
+}: {
+  profileId: number;
+  onNavigateTab: (t: string) => void;
+  /**
+   * Session profile. Optional: the panel is also rendered in contexts that have
+   * no profile loaded, and the blueprint must still work (it falls back to
+   * documented defaults rather than blocking).
+   */
+  profile?: { targetMajor?: string | null; preferredCountries?: string | null; needScholarship?: boolean | null } | null;
+}) {
   const t = useTranslations("journey");
   const phaseTitle = (key: string) => t(`spPhase.${key}.title` as never);
   const phaseDescription = (key: string) => t(`spPhase.${key}.description` as never);
@@ -530,19 +610,66 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ title: "", targetMajor: "", targetCountry: "", goalYear: "", fundingGoal: "Not decided" });
 
-  const create = async () => {
-    if (!form.title.trim()) return;
+  /** `preferredCountries` is a JSON array in new rows and a comma list in old ones. */
+  const countriesLabel = useMemo(() => {
+    const raw = profile?.preferredCountries;
+    if (!raw) return "";
+    let list: string[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed.filter((x): x is string => typeof x === "string" && !!x.trim());
+    } catch {
+      // plain comma list
+    }
+    if (list.length === 0) list = raw.split(",").map((v) => v.trim()).filter(Boolean);
+    return list.slice(0, 3).join(" / ");
+  }, [profile?.preferredCountries]);
+
+  /** Next application cycle — a rolling default, not a stored promise. */
+  const nextGoalYear = new Date().getFullYear() + 1;
+
+  /**
+   * Create the plan from whatever was typed, or from a complete default.
+   *
+   * A brand-new student saw an empty five-field form with a disabled button and
+   * no idea what a good plan looks like, so most never created one. The
+   * blueprint button below calls this with every field pre-filled: profile
+   * facts when we have them, documented defaults when we do not.
+   */
+  const create = async (overrides?: Partial<typeof form>) => {
+    const payload = { ...form, ...overrides };
+    if (!payload.title.trim()) return;
     setBusy(true);
     try {
       await sendJson(
         "/api/study-plan",
-        { method: "POST", body: JSON.stringify({ profileId, ...form, goalYear: form.goalYear ? Number(form.goalYear) : null }) },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            profileId,
+            ...payload,
+            goalYear: payload.goalYear ? Number(payload.goalYear) : null,
+          }),
+        },
         t("spSaveError")
       );
       await reload();
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Pre-fill from the profile, then create — one click, no typing. */
+  const loadBlueprint = () => {
+    const blueprint = {
+      title: t("spBlueprintTitle"),
+      targetMajor: profile?.targetMajor?.trim() || "Computer Science & AI",
+      targetCountry: countriesLabel || "Germany / South Korea / USA",
+      goalYear: String(nextGoalYear),
+      fundingGoal: profile?.needScholarship === false ? "Self-funded" : "Full scholarship",
+    };
+    setForm(blueprint);
+    void create(blueprint);
   };
 
   const togglePhase = async (phaseKey: string, done: boolean) => {
@@ -579,9 +706,14 @@ export function StudyPlanPanel({ profileId, onNavigateTab }: { profileId: number
               </select>
             </Field>
           </div>
-          <Button className="mt-3 min-h-12" onClick={create} disabled={busy || !form.title.trim()}>
-            {t("spCreate")}
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button className="min-h-12" onClick={() => void create()} disabled={busy || !form.title.trim()}>
+              {t("spCreate")}
+            </Button>
+            <Button className="min-h-12" variant="outline" onClick={loadBlueprint} disabled={busy}>
+              ⚡ {t("spBlueprintButton")}
+            </Button>
+          </div>
         </JourneyCard>
         <JourneyCard title={t("spWhatYouGet")}>
           <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">

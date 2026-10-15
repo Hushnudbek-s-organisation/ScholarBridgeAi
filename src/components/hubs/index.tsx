@@ -275,7 +275,9 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
       hiddenPanes={hidden}
       note={{ tone: "info", text: td("planning") }}
     >
-      {active === "plan" && <StudyPlanPanel profileId={profile.id} onNavigateTab={navigate} />}
+      {active === "plan" && (
+        <StudyPlanPanel profileId={profile.id} onNavigateTab={navigate} profile={profile} />
+      )}
       {active === "tests" && <TestPlannerPanel profileId={profile.id} />}
       {active === "tools" && <PlanningStudio activeProfile={profile} />}
     </HubPage>

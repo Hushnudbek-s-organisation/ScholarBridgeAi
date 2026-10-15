@@ -34,7 +34,7 @@
  * user's language when the provider is present, in English otherwise.
  */
 import React from "react";
-import { TriangleAlert } from "lucide-react";
+import { Info } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { dictionaries } from "@/i18n/messages";
 import { defaultLocale } from "@/i18n/config";
@@ -52,18 +52,28 @@ export type AppNoteKind =
   | "prototype"
   | "certificate";
 
+/**
+ * One calm caption tone for every kind.
+ *
+ * These notes used to render in amber with a warning triangle, which made a
+ * page of honest small print read as a page of errors — five separate kinds
+ * shouted, so none of them was read. The MESSAGE still differs per kind (see
+ * the `disclaimers` namespace); only the volume changed: muted, 11px, and a
+ * quiet info mark. Every kind is kept in the map so the CSS class list stays
+ * explicit and a new kind cannot silently inherit a shouting style.
+ */
 const TONE: Record<AppNoteKind, string> = {
-  general: "text-slate-500 dark:text-slate-400",
-  ai: "text-amber-700 dark:text-amber-200",
-  catalogue: "text-slate-500 dark:text-slate-400",
-  estimate: "text-amber-700 dark:text-amber-200",
-  money: "text-amber-700 dark:text-amber-200",
-  planning: "text-slate-500 dark:text-slate-400",
-  visa: "text-amber-700 dark:text-amber-200",
-  community: "text-slate-500 dark:text-slate-400",
-  thirdParty: "text-amber-700 dark:text-amber-200",
-  prototype: "text-slate-500 dark:text-slate-400",
-  certificate: "text-slate-500 dark:text-slate-400",
+  general: "text-slate-400 dark:text-slate-500",
+  ai: "text-slate-400 dark:text-slate-500",
+  catalogue: "text-slate-400 dark:text-slate-500",
+  estimate: "text-slate-400 dark:text-slate-500",
+  money: "text-slate-400 dark:text-slate-500",
+  planning: "text-slate-400 dark:text-slate-500",
+  visa: "text-slate-400 dark:text-slate-500",
+  community: "text-slate-400 dark:text-slate-500",
+  thirdParty: "text-slate-400 dark:text-slate-500",
+  prototype: "text-slate-400 dark:text-slate-500",
+  certificate: "text-slate-400 dark:text-slate-500",
 };
 
 export function AppNote({
@@ -83,9 +93,9 @@ export function AppNote({
     <p
       role="note"
       data-app-note={kind}
-      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}text-[11px] leading-relaxed ${TONE[kind]} ${className}`}
+      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}text-[11px] leading-normal ${TONE[kind]} ${className}`}
     >
-      {variant === "block" && <TriangleAlert className="mt-[2px] h-3 w-3 shrink-0" aria-hidden />}
+      {variant === "block" && <Info className="mt-[2px] h-3 w-3 shrink-0 opacity-60" aria-hidden />}
       <span>{text}</span>
     </p>
   );

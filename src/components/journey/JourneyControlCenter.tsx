@@ -114,9 +114,21 @@ export interface JourneyDashboard {
       saved: boolean;
       /** Real fit from the shared match engine — same number as the Explorer. */
       matchScore: number;
+      /**
+       * Positioning index from the QS Top 200 + 5-layer program engine.
+       * Optional: older payloads and the catalogue-free preview do not carry it,
+       * and the panel must render either way.
+       */
+      chanceScore?: number;
+      /** 55% fit + 45% positioning — the order this list is sorted by. */
+      combinedScore?: number;
+      effectiveAcceptRatePct?: number;
+      studentGpaPercentile?: number | null;
+      programGpa50?: number;
       matchReasons: string[];
       matchIssues: string[];
-      matchBreakdown: MatchBreakdown;
+      /** Optional for the same reason as `chanceScore` — the panel tolerates absence. */
+      matchBreakdown?: MatchBreakdown;
     }[];
     scholarships: {
       id: number;
@@ -140,7 +152,8 @@ export interface JourneyDashboard {
       matchScore: number;
       matchReasons: string[];
       matchIssues: string[];
-      matchBreakdown: MatchBreakdown;
+      /** Optional — see the universities list above. */
+      matchBreakdown?: MatchBreakdown;
       /** What we can honestly say about the citizenship rule. */
       countryEligibility: "open-to-all" | "citizenship-match" | "unknown";
     }[];
@@ -236,7 +249,15 @@ export function RecommendedPanel({
     <JourneyCard
       title={t("ccRecommendedTitle")}
       subtitle={t("ccRecommendedSubtitle")}
-      action={<Compass className="h-4 w-4 text-slate-400" aria-hidden />}
+      action={
+        <div className="flex items-center gap-2">
+          {/* Says what the order IS, so "why is this first?" is never a mystery. */}
+          <span className="hidden rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500 sm:inline-block dark:border-slate-700 dark:text-slate-400">
+            {t("ccRecSortPill")}
+          </span>
+          <Compass className="h-4 w-4 text-slate-400" aria-hidden />
+        </div>
+      }
     >
       <div className="space-y-4">
         {!recommended.personalised && (
@@ -275,12 +296,25 @@ export function RecommendedPanel({
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                       {t("ccRecFitChip", { score: u.matchScore })}
                     </span>
-                    <MatchEvidenceBadge
-                      comparedDimensions={u.matchBreakdown.comparedDimensions}
-                      totalDimensions={u.matchBreakdown.totalDimensions}
-                      evidenceCoveragePct={u.matchBreakdown.evidenceCoveragePct}
-                      evidenceLevel={u.matchBreakdown.evidenceLevel}
-                    />
+                    {typeof u.chanceScore === "number" && (
+                      <span
+                        className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200"
+                        title={t("ccRecCombinedHint")}
+                      >
+                        {t("ccRecChanceChip", { score: u.chanceScore })}
+                        {typeof u.effectiveAcceptRatePct === "number"
+                          ? ` · ${t("ccRecAdmitRate", { rate: u.effectiveAcceptRatePct })}`
+                          : ""}
+                      </span>
+                    )}
+                    {u.matchBreakdown && (
+                      <MatchEvidenceBadge
+                        comparedDimensions={u.matchBreakdown.comparedDimensions}
+                        totalDimensions={u.matchBreakdown.totalDimensions}
+                        evidenceCoveragePct={u.matchBreakdown.evidenceCoveragePct}
+                        evidenceLevel={u.matchBreakdown.evidenceLevel}
+                      />
+                    )}
                     {u.saved && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                         {t("ccRecSaved")}
@@ -329,10 +363,10 @@ export function RecommendedPanel({
                       {t("ccRecFitChip", { score: s.matchScore })}
                     </span>
                     <MatchEvidenceBadge
-                      comparedDimensions={s.matchBreakdown.comparedDimensions}
-                      totalDimensions={s.matchBreakdown.totalDimensions}
-                      evidenceCoveragePct={s.matchBreakdown.evidenceCoveragePct}
-                      evidenceLevel={s.matchBreakdown.evidenceLevel}
+                      comparedDimensions={s.matchBreakdown?.comparedDimensions ?? 0}
+                      totalDimensions={s.matchBreakdown?.totalDimensions ?? 0}
+                      evidenceCoveragePct={s.matchBreakdown?.evidenceCoveragePct}
+                      evidenceLevel={s.matchBreakdown?.evidenceLevel}
                     />
                   </div>
                   {s.deadlineDate && (

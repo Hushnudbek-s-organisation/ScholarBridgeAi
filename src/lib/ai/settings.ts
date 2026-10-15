@@ -84,7 +84,7 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   openai: {
     id: "openai",
     label: "OpenAI",
-    defaultModel: "gpt-4o-mini",
+    defaultModel: "gpt-6-luna",
     keyEnvVar: "OPENAI_API_KEY",
     modelEnvVar: "OPENAI_MODEL",
     keyShape: "sk-…",
@@ -130,7 +130,7 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   google: {
     id: "google",
     label: "Google Gemini (chat)",
-    defaultModel: "gemini-3.8-flash",
+    defaultModel: "gemini-2.5-flash",
     keyEnvVar: "GOOGLE_AI_API_KEY",
     modelEnvVar: "GOOGLE_AI_MODEL",
     keyShape: "AIza…",
@@ -212,7 +212,7 @@ export function acceptsReasoningEffort(id: AIProviderId, model: string): boolean
   if (!supportsCapability(id, "reasoning")) return false;
   const m = model.toLowerCase();
   if (id === "groq") return m.includes("gpt-oss") || m.includes("qwen3");
-  if (id === "openai") return /^(o\d|gpt-5)/.test(m);
+  if (id === "openai") return /^(o\d|gpt-5|gpt-6)/.test(m);
   if (id === "google") return /^gemini-(2\.5|[3-9])/.test(m);
   return false;
 }
