@@ -543,11 +543,21 @@ function walk(dir) {
 }
 
 /* One class attribute may wrap over several lines and hold ternaries
-   (`a ? "bg-x text-y" : "bg-z"`), so whole quoted strings are read at once. */
+   (`a ? "bg-x text-y" : "bg-z"`), so whole quoted strings are read at once.
+   Only template literals may span lines, though: an apostrophe in a comment
+   or in JSX prose ("student's", "Don't") is not a string delimiter, and
+   pairing it with the next one used to swallow kilobytes of markup into a
+   single fake "class list" — hiding the real classNames inside it. A '…' or
+   "…" span that crosses a line break is therefore re-scanned one character
+   later. (No class attribute in src/ uses a multi-line '…' or "…" string.) */
 function* quotedChunks(src) {
   const re = /(["'`])(?:(?!\1)[\s\S])*?\1/g;
   let m;
   while ((m = re.exec(src))) {
+    if (m[1] !== "`" && m[0].includes("\n")) {
+      re.lastIndex = m.index + 1;
+      continue;
+    }
     const body = m[0].slice(1, -1);
     if (!/\b(?:text|bg|border|from|ring|divide|stroke)-[a-z]/.test(body)) continue;
     yield { body, index: m.index, line: src.slice(0, m.index).split("\n").length };

@@ -20,6 +20,7 @@ import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
+import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 
 // ===========================================================================
@@ -401,6 +402,9 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
           </Button>
         </div>
       </JourneyCard>
+
+      {/* Embassy model answers — the typed country pre-selects its transcript. */}
+      <VisaModelAnswers countryHint={country} />
 
       <JourneyCard title={t("vcDocsTitle")} subtitle={t("vcDocsSubtitle")}>
         {loading ? (

@@ -38,6 +38,8 @@ import {
   type StudyInterestSelection,
 } from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { SmartAutofillBox } from "@/components/samples/SmartAutofillBox";
+import type { ExtractedKey, ExtractedProfileFields } from "@/lib/profileExtract";
 
 /**
  * Where the student says they are right now (product journey §4.1).
@@ -108,6 +110,18 @@ const choiceCardBase =
 const choiceCardSelected =
   "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/15 shadow-md shadow-indigo-500/10";
 const choiceCardUnselected = "border-slate-200 bg-white hover:border-indigo-300";
+
+/** Values the CV auto-fill may place in this wizard (never the degree chosen in step 2). */
+const AUTOFILL_FIELDS: ExtractedKey[] = [
+  "gpa",
+  "gpaScale",
+  "ieltsScore",
+  "toeflScore",
+  "satScore",
+  "greScore",
+  "workExperienceYears",
+  "researchPublications",
+];
 
 const STEPS = [
   { id: 0, titleKey: "identity", icon: User },
@@ -185,6 +199,24 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  /** Smart auto-fill → the unsaved form. Saving still happens on "Continue". */
+  const applyAutofill = (fields: ExtractedProfileFields): number => {
+    const patch: Partial<FormState> = {};
+    // The wizard offers 4.0 / 5.0 / 10.0 scales only; any other scale stays manual.
+    if (fields.gpa != null && fields.gpaScale != null && [4, 5, 10].includes(fields.gpaScale)) {
+      patch.gpa = String(fields.gpa);
+      patch.gpaScale = `${fields.gpaScale}.0`;
+    }
+    if (fields.ieltsScore != null) patch.ieltsScore = String(fields.ieltsScore);
+    if (fields.toeflScore != null) patch.toeflScore = String(fields.toeflScore);
+    if (fields.satScore != null) patch.satScore = String(fields.satScore);
+    if (fields.greScore != null) patch.greScore = String(fields.greScore);
+    if (fields.workExperienceYears != null) patch.workExperienceYears = String(fields.workExperienceYears);
+    if (fields.researchPublications != null) patch.researchPublications = String(fields.researchPublications);
+    setForm((f) => ({ ...f, ...patch }));
+    return Object.keys(patch).length;
+  };
 
   const selectOnboardingPath = (path: OnboardingPath) => {
     setOnboardingPath(path);
@@ -724,8 +756,10 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           </div>
         )}
 
-        {/* STEP 4 — GPA + scale */}
+        {/* STEP 4 — GPA + scale (with optional CV auto-fill for this and later steps) */}
         {step === 3 && (
+          <div className="space-y-4">
+          <SmartAutofillBox supported={AUTOFILL_FIELDS} onApply={applyAutofill} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>{tOnboarding("gpaLabel")}</label>
@@ -752,6 +786,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 <option value="10.0">{tOnboarding("gpaScaleTen")}</option>
               </select>
             </div>
+          </div>
           </div>
         )}
 

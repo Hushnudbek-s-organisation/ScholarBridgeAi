@@ -56,6 +56,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import {
   classifySpeechError,
   LIVE_SPEAK_WATCHDOG_MS,
@@ -647,6 +648,7 @@ export function VisaSpeakingAssistant({
   activeProfile,
 }: VisaSpeakingAssistantProps) {
   const t = useTranslations("visa");
+  const ts = useTranslations("samples");
   const tCountry = useTranslations("countryNames");
   const locale = useLocale();
 
@@ -2585,6 +2587,14 @@ export function VisaSpeakingAssistant({
               )}
             </div>
           )}
+
+          {/* Gold-standard answers for the same country, scored by the same
+              rubric — shown only when a model transcript exists for it. */}
+          <VisaModelAnswers
+            countryHint={country.code}
+            onlyHinted
+            title={ts("visaCompareTitle", { country: localizedCountryName(country.name) })}
+          />
 
           {/* Practice history (spec §13) — session-by-session progress. The
               last entry is the session that was just analysed. */}

@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, FileText, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import type { RecLetterBrief } from "@/lib/recLetter";
+import type { LorSample } from "@/lib/samples/exemplars";
 
 function briefToText(b: RecLetterBrief, preparationTitle: string, preparationAdvice: string[]): string {
   const lines: string[] = [];
@@ -33,6 +35,7 @@ function briefToText(b: RecLetterBrief, preparationTitle: string, preparationAdv
  */
 export function RecLetterPanel() {
   const t = useTranslations("recLetter");
+  const ts = useTranslations("samples");
   const [brief, setBrief] = useState<RecLetterBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +45,20 @@ export function RecLetterPanel() {
   const [requestedFocus, setRequestedFocus] = useState("");
   const [supportingExample, setSupportingExample] = useState("");
   const [copied, setCopied] = useState(false);
+  const [personalizeOpen, setPersonalizeOpen] = useState(false);
+  const [sampleLoaded, setSampleLoaded] = useState(false);
+
+  /** Fills the brief inputs from a sample letter (respecting each input's limit). */
+  const loadLorSample = (sample: LorSample) => {
+    const f = sample.recLetterFields;
+    setUniversity(f.university.slice(0, 160));
+    setDeadline(f.deadline.slice(0, 80));
+    setRelationshipContext(f.relationshipContext.slice(0, 240));
+    setRequestedFocus(f.requestedFocus.slice(0, 300));
+    setSupportingExample(f.supportingExample.slice(0, 500));
+    setPersonalizeOpen(true);
+    setSampleLoaded(true);
+  };
 
   const fetchBrief = useCallback(async (
     uni: string,
@@ -132,6 +149,19 @@ export function RecLetterPanel() {
         )}
       </div>
 
+      <SampleExemplarBar
+        group="lor"
+        className="mt-3"
+        filter={(sample) => sample.kind !== "requestEmail"}
+        onLoad={loadLorSample}
+        openOnLoad
+      />
+      {sampleLoaded && (
+        <p role="status" className="mt-2 rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-700 dark:border-indigo-500/20">
+          {ts("recLetterLoaded")}
+        </p>
+      )}
+
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <label className="text-[11px] font-semibold text-slate-600">
           {t("universityLabel")}
@@ -168,7 +198,11 @@ export function RecLetterPanel() {
         </button>
       </div>
 
-      <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+      <details
+        className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+        open={personalizeOpen}
+        onToggle={(event) => setPersonalizeOpen((event.currentTarget as HTMLDetailsElement).open)}
+      >
         <summary className="flex min-h-11 cursor-pointer items-center px-1 text-xs font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
           {t("personalizeTitle")}
         </summary>

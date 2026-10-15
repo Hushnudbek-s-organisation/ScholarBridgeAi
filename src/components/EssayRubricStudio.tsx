@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { AppNote } from "@/components/AppNote";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import type { EssaySample } from "@/lib/samples/exemplars";
+import { isUnmodifiedSample } from "@/lib/samples/text";
 
 /**
  * Advanced Essay AI (#8) — the rubric and version-history half.
@@ -140,6 +143,7 @@ export function EssayRubricStudio({
   programName,
 }: EssayRubricStudioProps) {
   const t = useTranslations("ai");
+  const ts = useTranslations("samples");
   const activeProfileId = activeProfile?.id;
   const [text, setText] = useState("");
   const [essayType, setEssayType] = useState("sop");
@@ -151,6 +155,8 @@ export function EssayRubricStudio({
   const [versions, setVersions] = useState<Version[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Gold-standard essay loaded on an explicit click; scored, never auto-saved.
+  const [loadedEssay, setLoadedEssay] = useState<EssaySample | null>(null);
 
   // #18 Scholarship essay adapter — score this essay against saved scholarships
   interface FitMatch {
@@ -234,8 +240,10 @@ export function EssayRubricStudio({
     );
   }
 
-  const scoreDraft = async () => {
-    if (!text.trim()) return;
+  /** Preview-scores the editor — or explicit values, so a just-loaded sample scores in the same click. */
+  const scoreDraft = async (override?: { content: string; essayType: string; targetName: string; wordLimit: string; prompt: string }) => {
+    const draft = override ?? { content: text, essayType, targetName, wordLimit, prompt };
+    if (!draft.content.trim()) return;
     setBusy(true);
     setError("");
     try {
@@ -243,11 +251,11 @@ export function EssayRubricStudio({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: text,
-          essayType,
-          targetName: targetName || undefined,
-          wordLimit: wordLimit ? Number(wordLimit) : undefined,
-          prompt: prompt || undefined,
+          content: draft.content,
+          essayType: draft.essayType,
+          targetName: draft.targetName || undefined,
+          wordLimit: draft.wordLimit ? Number(draft.wordLimit) : undefined,
+          prompt: draft.prompt || undefined,
         }),
       });
       const data = await res.json();
@@ -261,8 +269,30 @@ export function EssayRubricStudio({
     }
   };
 
+  const loadEssaySample = (sample: EssaySample) => {
+    const draft = {
+      content: sample.text,
+      essayType: sample.essayType,
+      targetName: sample.targetName,
+      wordLimit: sample.wordLimit == null ? "" : String(sample.wordLimit),
+      prompt: sample.prompt,
+    };
+    setText(draft.content);
+    setEssayType(draft.essayType);
+    setTargetName(draft.targetName);
+    setWordLimit(draft.wordLimit);
+    setPrompt(draft.prompt);
+    setFeedback(null);
+    setComparison(null);
+    setLoadedEssay(sample);
+    void scoreDraft(draft);
+  };
+
+  // The sample is scored for study, but it is not an essay the student wrote.
+  const textHoldsSample = loadedEssay != null && isUnmodifiedSample(text, loadedEssay.text);
+
   const saveVersion = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || textHoldsSample) return;
     setBusy(true);
     setError("");
     try {
@@ -327,6 +357,13 @@ export function EssayRubricStudio({
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">{t("essayStudioSubtitle")}</p>
 
+        <SampleExemplarBar group="essay" className="mt-3" onLoad={loadEssaySample} loadDisabled={busy} />
+        {loadedEssay && (
+          <p role="status" className="mt-2 rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-700 dark:border-indigo-500/20">
+            {busy ? ts("essayScoring") : ts("essayLoaded")}
+          </p>
+        )}
+
         <div className="mt-3 grid gap-2 sm:grid-cols-4">
           <select
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
@@ -387,13 +424,17 @@ export function EssayRubricStudio({
           </button>
           <button
             onClick={() => void saveVersion()}
-            disabled={busy || !text.trim()}
+            disabled={busy || !text.trim() || textHoldsSample}
+            title={textHoldsSample ? ts("unmodified") : undefined}
             className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {busy ? t("essaySavingVersion") : t("essaySaveVersionButton")}
           </button>
         </div>
+        {textHoldsSample && (
+          <p className="mt-2 text-[11px] leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
+        )}
       </div>
 
       {error && (

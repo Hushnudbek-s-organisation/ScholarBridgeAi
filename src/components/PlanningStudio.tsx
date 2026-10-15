@@ -18,6 +18,8 @@ import type { CvGuidance } from "@/lib/cv";
 import type { PortfolioAdviceKey } from "@/lib/costs";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "@/components/AppNote";
+import { HighlightedText, SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import type { CvBuilderSample } from "@/lib/samples/exemplars";
 
 /**
  * Planning Studio (Phase 3) — cost calculator, scholarship portfolio, CV
@@ -123,6 +125,9 @@ interface PlanningStudioProps {
 export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   const tCv = useTranslations("cvBuilder");
   const tPortfolio = useTranslations("costPlanner");
+  const ts = useTranslations("samples");
+  // A gold-standard CV opened beside the student's own (view/copy only).
+  const [compareCv, setCompareCv] = useState<CvBuilderSample | null>(null);
   const profileId = activeProfile?.id ?? null;
   const [result, setResult] = useState<{ requestKey: string; data: PlanningData } | null>(null);
   const [errorResult, setErrorResult] = useState<{ requestKey: string; message: string } | null>(null);
@@ -389,6 +394,43 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   </button>
                 </div>
               </div>
+
+              <SampleExemplarBar
+                group="cvBuilder"
+                className="print:hidden"
+                loadLabel={ts("cvCompareLoad")}
+                onLoad={(sample) => setCompareCv(sample)}
+              />
+              {compareCv && (
+                <section aria-label={ts("cvCompareTitle")} className="rounded-2xl border border-slate-200 bg-white p-4 print:hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="min-w-0 break-words text-sm font-bold text-slate-900">{ts("cvCompareTitle")}</h4>
+                    <button
+                      type="button"
+                      onClick={() => setCompareCv(null)}
+                      className="inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    >
+                      {ts("cvCompareClose")}
+                    </button>
+                  </div>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{ts("cvYours")}</p>
+                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-800">
+                        {data.cvText}
+                      </pre>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">
+                        {ts("cvSample")} · {ts(`tracks.${compareCv.id}` as never)}
+                      </p>
+                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 font-sans text-xs leading-relaxed text-slate-800 dark:border-indigo-500/20 dark:bg-indigo-950/20">
+                        <HighlightedText text={compareCv.text} />
+                      </pre>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {data.cv.warnings.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">

@@ -19,6 +19,24 @@ import {
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
+import { SmartAutofillBox } from "@/components/samples/SmartAutofillBox";
+import type { ExtractedKey, ExtractedProfileFields } from "@/lib/profileExtract";
+
+/** Every value the CV auto-fill can read has a field in this editor. */
+const AUTOFILL_FIELDS: ExtractedKey[] = [
+  "gpa",
+  "gpaScale",
+  "ieltsScore",
+  "toeflScore",
+  "satScore",
+  "greScore",
+  "actScore",
+  "duolingoScore",
+  "graduationYear",
+  "workExperienceYears",
+  "researchPublications",
+  "degreeLevel",
+];
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -326,6 +344,27 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   const tgOnlyAccount = !isNew && isTelegramPlaceholderEmail(profile?.email);
 
+  /** Smart auto-fill → the unsaved form. Only "Save Profile Changes" persists anything. */
+  const applyAutofill = (fields: ExtractedProfileFields): number => {
+    const patch: Partial<typeof formData> = {};
+    if (fields.gpa != null && fields.gpaScale != null) {
+      patch.gpa = fields.gpa;
+      patch.gpaScale = fields.gpaScale;
+    }
+    if (fields.ieltsScore != null) patch.ieltsScore = fields.ieltsScore;
+    if (fields.toeflScore != null) patch.toeflScore = fields.toeflScore;
+    if (fields.satScore != null) patch.satScore = fields.satScore;
+    if (fields.greScore != null) patch.greScore = fields.greScore;
+    if (fields.actScore != null) patch.actScore = fields.actScore;
+    if (fields.duolingoScore != null) patch.duolingoScore = fields.duolingoScore;
+    if (fields.graduationYear != null) patch.graduationYear = fields.graduationYear;
+    if (fields.workExperienceYears != null) patch.workExperienceYears = fields.workExperienceYears;
+    if (fields.researchPublications != null) patch.researchPublications = fields.researchPublications;
+    if (fields.degreeLevel) patch.degreeLevel = fields.degreeLevel;
+    setFormData((prev) => ({ ...prev, ...patch }));
+    return Object.keys(patch).length;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -540,6 +579,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Award className="h-3.5 w-3.5 text-indigo-600" />
               Academic Credentials & Standardized Scores
             </h3>
+            {/* Paste-a-CV preview → fills the fields below; nothing saves until "Save". */}
+            <SmartAutofillBox supported={AUTOFILL_FIELDS} onApply={applyAutofill} className="mb-5" />
             <div className="mb-5">
               <StudyInterestPicker
                 value={formData.studyInterests}

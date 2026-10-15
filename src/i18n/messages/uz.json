@@ -4740,5 +4740,311 @@
     "description": "Bu funksiyani profilingizda yoqish mumkinligini bilish uchun mavjud tariflarni ko‘rib chiqing.",
     "viewPlans": "Tariflarni ko‘rish",
     "accessNote": "Ruxsat serverda ushbu profil va funksiya uchun tekshiriladi."
+  },
+  "samples": {
+    "eyebrow": "Namunalar kutubxonasi",
+    "trackLabel": "Yo‘nalish",
+    "trackOption": "{n}-yo‘nalish: {label}",
+    "view": "Namunani tahlili bilan ko‘rish",
+    "hide": "Namunani yopish",
+    "load": "Muharrirga yuklash",
+    "copy": "Nusxa olish",
+    "copied": "Nusxalandi!",
+    "copyFailed": "Nusxalab bo‘lmadi — matnni belgilab, qo‘lda nusxalang.",
+    "honesty": "Namunalar to‘qima abituriyentlar haqida. Ulardan tuzilma va dalillar zichligini o‘rganing, so‘ng har bir faktni o‘zingizning haqiqiy yutuqlaringiz bilan almashtiring. O‘xshash gap yozishdan oldin kurs, laboratoriya va professor nomlarini rasmiy sahifalarda tekshiring.",
+    "loading": "Namunalar yuklanmoqda…",
+    "loadError": "Namunalarni yuklab bo‘lmadi.",
+    "retry": "Qayta urinish",
+    "annotatedTitle": "Tahlilli namuna",
+    "paragraph": "{n}-xatboshi",
+    "answerN": "{n}-javob",
+    "whyTitle": "Nega bu qadrlanadi",
+    "words": "{n} so‘z",
+    "evidence": "{n} ta raqamli dalil",
+    "placeholders": "Shablondan foydalanishdan oldin barcha [qavs ichidagi] maydonlarni to‘ldiring — {n} ta maydon qoldi.",
+    "practiceLimit": "Mashq uchun chegara: {n} so‘z — dasturingiz e’lon qilgan chegarani qo‘llang.",
+    "loadedNotice": "Namuna yuklandi, lekin saqlanmadi. Biror narsani saqlashdan oldin uning faktlarini o‘zingizniki bilan almashtiring.",
+    "unmodified": "Bu hali o‘zgartirilmagan namuna. Saqlashdan oldin uni o‘z ma’lumotlaringiz bilan almashtiring.",
+    "versionLabel": "Shablon tili",
+    "versionEnglish": "Inglizcha",
+    "versionUzbek": "O‘zbekcha",
+    "sopLoadedDrafter": "Namuna SOP yozuvchi maydonlariga yuklandi. Saqlanadigan qoralama yaratishdan oldin har bir maydonni o‘z hikoyangiz bilan qayta yozing.",
+    "sopLoadedReviewer": "Namuna tahlil oynasiga yuklandi. AI tahlili qanday ishlashini ko‘rish uchun baholashni ishga tushiring.",
+    "essayLoaded": "Namuna yuklandi va deterministik rubrika bilan baholandi. U versiyalaringizga saqlanmaydi.",
+    "essayScoring": "Namuna baholanmoqda…",
+    "recLetterLoaded": "Namuna ma’lumotlari brif shakliga yuklandi. Ular qanday ishlatilishini ko‘rish uchun brifni yarating.",
+    "lorDrawerTitle": "Professorga so‘rov xati va to‘liq tavsiyanoma namunalari",
+    "lorDrawerHint": "Avval so‘rov xatini nusxalang, keyin tavsiyachingizga to‘liq xat qanday tuzilishini ko‘rsating. Har bir faktni o‘zingizniki bilan almashtiring.",
+    "cvCompareLoad": "Yonma-yon solishtirish",
+    "cvCompareTitle": "Bir sahifali namunaviy CV bilan solishtirish",
+    "cvCompareClose": "Solishtirishni yopish",
+    "cvYours": "Sizning CV (profilingizdan tuzilgan)",
+    "cvSample": "Namunaviy CV",
+    "answerShow": "Namuna javobni ko‘rish",
+    "answerHide": "Namuna javobni yopish",
+    "answerLoad": "Namunani muharrirga yuklash",
+    "answerTitle": "Namuna javob — {category}",
+    "activityLoad": "Namuna faoliyatni formaga yuklash",
+    "activityLoaded": "Namuna formaga yuklandi. Qo‘shishdan oldin uni haqiqatan bajargan faoliyatingiz bilan almashtiring.",
+    "docsTitle": "Rasmiy hujjat shablonlari (Homiylik xati, Cold Email)",
+    "docsHint": "Shablonni nusxalang va har bir [qavs ichidagi] maydonni o‘zingizning tasdiqlangan ma’lumotlaringiz bilan almashtiring.",
+    "visaTitle": "Elchixona suhbati uchun namuna javoblar",
+    "visaHint": "To‘rt davlat uchun besh savolli namunaviy suhbatlar — mashq sessiyalaringizdagi deterministik rubrika bilan baholanadi.",
+    "visaLoad": "Namuna javoblarni yuklash va baholash",
+    "visaLanguageNote": "Konsullar suhbatni mahalliy tilda o‘tkazishi mumkin. Bu namuna javoblar deterministik rubrika o‘qiy olishi uchun ingliz tilida.",
+    "visaScoreTitle": "Rubrika bahosi",
+    "visaOverall": "Umumiy tayyorlik",
+    "visaCeiling": "Bu rubrika beradigan eng yuqori ball — {ceiling}/100: moliyalash, vatan bilan bog‘liqlik va niyat uchun ballar cheklangan, chunki suhbat matni ularni tilga oladi, lekin isbotlay olmaydi.",
+    "visaNoRisks": "Rad etish xavfi belgilari yo‘q",
+    "visaRisks": "{n} ta xavf belgisi",
+    "visaCompareTitle": "{country} uchun namuna javoblar bilan solishtiring",
+    "visaTurnEvidence": "Har bir javobdagi dalillar",
+    "visaScoring": "Baholanmoqda…",
+    "autofillTitle": "CV matnidan aqlli avtoto‘ldirish",
+    "autofillHelp": "CV yoki natijalar hisobotini joylashtiring. Ko‘rib chiqish faqat aniq o‘qilgan qiymatlarni ko‘rsatadi; siz qo‘llamaguningizcha hech narsa o‘zgarmaydi va formani saqlamaguningizcha hech narsa saqlanmaydi.",
+    "autofillInputLabel": "CV matni",
+    "autofillPlaceholder": "CV matnini shu yerga joylashtiring — masalan, “GPA: 3.8 / 4.00 · IELTS Academic: 7.0”",
+    "autofillPreview": "Aniqlangan qiymatlarni ko‘rish",
+    "autofillDetected": "Aniqlangan qiymatlar",
+    "autofillNone": "Qiymat topilmadi. “GPA: 3.8 / 4.00” yoki “IELTS 7.0” kabi yorliqlardan foydalaning.",
+    "autofillApply": "Formaga qo‘llash",
+    "autofillApplied": "{n} ta qiymat formaga qo‘llandi. Ularni tekshiring va saqlang.",
+    "autofillSampleBlocked": "Bu namuna abituriyentning CV’si — uni qo‘llash profilingizni boshqa birovning ballari bilan to‘ldiradi. Qiymatlarni qo‘llash uchun o‘z CV matningizni joylashtiring.",
+    "autofillNotInForm": "bu formada yo‘q",
+    "groups": {
+      "onboardingCv": "Qisqa CV namunalari",
+      "sop": "Motivatsion xat (SOP) namunalari",
+      "essay": "Rubrika uchun insho namunalari",
+      "lor": "Tavsiyanoma namunalari",
+      "cvBuilder": "Bir sahifali CV namunalari",
+      "answerVault": "Namuna javoblar",
+      "activity": "Namuna faoliyatlar",
+      "document": "Rasmiy hujjat shablonlari",
+      "visa": "Elchixona suhbati uchun namuna javoblar"
+    },
+    "roles": {
+      "hook": {
+        "label": "Aniq muammo bilan boshlanish",
+        "why": "Matn bitta aniq va tekshirsa bo‘ladigan lahzadan — joy, sana yoki raqamdan boshlanadi, shuning uchun o‘quvchi tarjimai holdan oldin abituriyentning savolini ko‘radi."
+      },
+      "preparation": {
+        "label": "Akademik tayyorgarlik — kontekst bilan",
+        "why": "Baholar va ballar o‘z konteksti — shkala, reyting va fanlar bilan birga ko‘proq ma’no beradi hamda abituriyent keyingi bosqichga tayyor ekanini ko‘rsatadi."
+      },
+      "evidence": {
+        "label": "Raqamlar bilan isbot",
+        "why": "Abituriyent shaxsan nima qilgani va nima o‘zgargani tavsiyachi tasdiqlay oladigan raqamlar bilan ko‘rsatiladi — o‘quvchilar sifatlardan ko‘ra o‘lchangan natijaga ko‘proq ishonadi."
+      },
+      "gap": {
+        "label": "Halol bo‘shliq → nega aynan shu daraja",
+        "why": "Hozirgi bilim chegarasini tan olish o‘qishni orzu emas, mantiqiy keyingi qadamga aylantiradi."
+      },
+      "fit": {
+        "label": "Dastur va laboratoriyaga moslik",
+        "why": "Bo‘shliqni to‘ldiradigan aniq kurslar, laboratoriyalar yoki professorlar abituriyent aynan shu dasturni o‘rganganini isbotlaydi — bu xatboshini boshqa arizaga ko‘chirib bo‘lmaydi."
+      },
+      "community": {
+        "label": "Jamiyatga hissa",
+        "why": "Abituriyent jamiyatga foyda keltirishi ko‘rsatiladi, raqamlar esa bu harakat ramziy emas, davomli bo‘lganini isbotlaydi."
+      },
+      "impact": {
+        "label": "Bitirgandan keyin O‘zbekistonga ta’sir",
+        "why": "Aniq lavozim, tashkilot va muddat qaytish rejasini ishonchli qiladi — komissiya o‘z sarmoyasi nimaga aylanishini aniq tasavvur qiladi."
+      },
+      "reflection": {
+        "label": "Burilish nuqtasi va xulosa",
+        "why": "Shaxsiy inshoga faqat voqealar emas, fikrdagi o‘zgarish kerak; bu xatboshi abituriyent nimani anglagani va bu uning tanlovlarini qanday o‘zgartirganini ko‘rsatadi."
+      },
+      "leadership": {
+        "label": "Rasmiy vakolatsiz yetakchilik",
+        "why": "Ta’sir avvalo boshqalarning muammosini tushunish orqali qozonilgan — yetakchilik savollari aynan shu xulq-atvorni izlaydi."
+      },
+      "networking": {
+        "label": "Natija uchun hamkorlik tarmog‘i",
+        "why": "Tarmoq muammoni hal qilish uchun tuzilgan, ishtirokchilar va natijalar sanab o‘tilgan, stipendiya tarmog‘idan qanday foydalanilishi ham aytilgan."
+      },
+      "studyPlan": {
+        "label": "Semestrma-semestr o‘quv reja",
+        "why": "Kurslar, laboratoriya va dissertatsiya maqsadi ko‘rsatilgan muddatli reja komissiyaga sarmoya qanday ko‘nikmaga aylanishini aniq ko‘rsatadi."
+      },
+      "letterhead": {
+        "label": "Blanka, sana va qabul qiluvchi",
+        "why": "Rasmiy blanka, sana va aniq komissiya nomi hujjatni tekshirsa bo‘ladigan qiladi va u aynan shu ariza uchun yozilganini ko‘rsatadi."
+      },
+      "relationship": {
+        "label": "Tavsiyachining maqomi va tanishlik darajasi",
+        "why": "Maqtovni baholash uchun o‘quvchi yozuvchi abituriyentni qanchalik yaxshi, qancha vaqt va qaysi rolda bilishini hamda u tengdoshlari orasida qanday o‘rinda ekanini bilishi kerak."
+      },
+      "anecdote": {
+        "label": "Aniq voqea",
+        "why": "Faqat shu tavsiyachi aytib bera oladigan voqea sifatlar ro‘yxatidan ancha ishonarliroq."
+      },
+      "character": {
+        "label": "Fe’l-atvor va boshqalarga ta’sir",
+        "why": "Baholardan tashqari abituriyent boshqalarga qanday munosabatda bo‘lishi va ularni qanday yuksaltirishi aniq natijalar bilan ko‘rsatiladi."
+      },
+      "endorsement": {
+        "label": "Aniq yakuniy tavsiya",
+        "why": "Bir ma’noli yakuniy tavsiya — iloji bo‘lsa reyting yoki “eng yuqori ishtiyoq bilan” iborasi — yozuvchining fikrida shubha qoldirmaydi."
+      },
+      "signature": {
+        "label": "Imzo va tekshiriladigan aloqa",
+        "why": "To‘liq ism, lavozim, tashkilot va e-pochta manzili komissiyaga xat haqiqiy ekanini tasdiqlash imkonini beradi."
+      },
+      "heading": {
+        "label": "Aniq sarlavha yoki mavzu qatori",
+        "why": "Aniq sarlavha yoki mavzu o‘quvchiga hujjat nima ekanini va nima so‘ralayotganini o‘qishni davom ettirishdan oldin aytadi."
+      },
+      "ask": {
+        "label": "Bitta aniq va oson so‘rov",
+        "why": "So‘rov aniq, muddatli va rozilik berish oson; materiallar ilova qilingan, o‘quvchi hech narsa qidirmaydi."
+      },
+      "cvHeader": {
+        "label": "Sarlavha va pozitsiyalash qatori",
+        "why": "Ism, aloqa ma’lumotlari va bir qatorlik pozitsiya o‘quvchiga bir qarashda abituriyent kimligi va nimaga hujjat topshirayotganini aytadi."
+      },
+      "cvEducation": {
+        "label": "Ta’lim — kontekst bilan",
+        "why": "Daraja, sanalar, shkalasi va reytingi bilan GPA hamda tegishli fanlar turli mamlakatlardagi abituriyentlarni adolatli solishtirish imkonini beradi."
+      },
+      "cvExperience": {
+        "label": "Tajriba — natijali bandlar",
+        "why": "Har bir band harakat fe’li bilan boshlanib, natija bilan tugaydi — o‘quvchi vazifalarni emas, natijalarni ko‘radi."
+      },
+      "cvProjects": {
+        "label": "Loyihalar va musobaqalar",
+        "why": "Vositalari, foydalanuvchilari va o‘rinlari ko‘rsatilgan loyihalar abituriyent darsdan tashqarida ham natija bera olishini isbotlaydi."
+      },
+      "cvLeadership": {
+        "label": "Yetakchilik va xizmat",
+        "why": "Yetakchilik raqamlar bilan ko‘rsatiladi — jalb qilingan odamlar, o‘qitilgan o‘quvchilar, erishilgan natijalar."
+      },
+      "cvRecognition": {
+        "label": "Nashrlar va mukofotlar",
+        "why": "Yili, joyi va tanlov darajasi ko‘rsatilgan mukofot va maqolalar tashqi e’tirofni ko‘rsatadi."
+      },
+      "cvSkills": {
+        "label": "Ko‘nikmalar va tillar",
+        "why": "Aniq vositalar va test bilan tasdiqlangan til darajalarini tekshirish va dastur talablari bilan solishtirish oson."
+      },
+      "visaPurpose": {
+        "label": "O‘qish maqsadi",
+        "why": "Konsul aniq yo‘nalish, sabab va karyera bilan bog‘liqlikni eshitadi — noaniq o‘qish maqsadi rad etishning keng tarqalgan sababidir."
+      },
+      "visaChoice": {
+        "label": "Nega aynan shu universitet va davlat",
+        "why": "Dastur xususiyatlarini nomlash va variantlarni solishtirish bu migratsiya yo‘li emas, haqiqiy talaba qarori ekanini ko‘rsatadi."
+      },
+      "visaFunding": {
+        "label": "Aniq raqamlar bilan moliyalash",
+        "why": "Kim to‘laydi, qancha va buni qaysi hujjat isbotlaydi — qabul hujjatlaridagi raqamlarga mos holda."
+      },
+      "visaTies": {
+        "label": "Vatan bilan bog‘liqlik",
+        "why": "Oila, mulk, ish joyi yoki shartnoma majburiyati vatanga qaytish uchun aniq sabablar beradi."
+      },
+      "visaReturn": {
+        "label": "Aniq qaytish rejasi",
+        "why": "Bitirgandan keyingi aniq lavozim va ish beruvchi o‘quv reja O‘zbekistonda yakunlanishini ko‘rsatadi."
+      },
+      "docParties": {
+        "label": "Tomonlar va maqsad",
+        "why": "Har bir shaxs to‘liq ismi va hujjat raqami bilan ko‘rsatiladi, maqsad aytiladi — o‘quvchi buni pasport va qabul xati bilan solishtira oladi."
+      },
+      "docAmount": {
+        "label": "Aniq moliyaviy majburiyat",
+        "why": "Raqam va so‘z bilan yozilgan, yillik va butun dastur uchun summalar ikki xil talqinga o‘rin qoldirmaydi."
+      },
+      "docEvidence": {
+        "label": "Isbotlar ro‘yxati",
+        "why": "Har bir da’vo ilova qilingan hujjatga ishora qiladi — o‘quvchi ishonib emas, tekshirib ko‘ra oladi."
+      },
+      "docBudget": {
+        "label": "Byudjet va o‘quv reja",
+        "why": "Xarajatlar va moliyalash qatorma-qator mos keladi, reja esa dasturni karyera bilan bog‘laydi."
+      },
+      "docSignature": {
+        "label": "Bayonot, imzo va tasdiq",
+        "why": "Ma’lumotlar to‘g‘riligi haqidagi bayonot, imzo, sana va notarial tasdiq hujjatni talab qilingan joyda rasman haqiqiy qiladi."
+      },
+      "answer": {
+        "label": "Isbotli to‘g‘ridan-to‘g‘ri javob",
+        "why": "Savolga birinchi gapdayoq javob beradi va so‘z cheklovi doirasida nomlar va raqamlar bilan asoslaydi."
+      },
+      "activity": {
+        "label": "Faoliyat sarlavhasi",
+        "why": "Nomi, roli, tashkilot va soatlar o‘quvchiga ko‘lam va sadoqatni bir qarashda ko‘rsatadi."
+      }
+    },
+    "tracks": {
+      "onboardingStem": "Magistratura, STEM — qisqa CV (TATU → TUM)",
+      "onboardingBachelor": "Bakalavriat — akademik litsey bitiruvchisining qisqa CV’si",
+      "onboardingEconomics": "Magistratura, iqtisodiyot va siyosat — qisqa CV",
+      "sopTum": "Magistratura, STEM — TUM uchun SOP",
+      "sopKaist": "Bakalavriat, informatika — KAIST uchun SOP",
+      "sopLse": "Magistratura, iqtisodiyot — LSE uchun SOP",
+      "essaySopTum": "SOP · Magistratura, sun’iy intellekt — TUM",
+      "essaySopKaist": "SOP · Bakalavriat, informatika — KAIST",
+      "essaySopLse": "SOP · Magistratura, iqtisodiyot — LSE",
+      "essayPersonalStatement": "Shaxsiy insho · Bakalavriat, muhandislik",
+      "essayChevening": "Stipendiya · Chevening (UCL)",
+      "essayGks": "Stipendiya · Global Korea Scholarship (GKS)",
+      "essayElYurtUmidi": "Stipendiya · El-yurt umidi (Imperial MPH)",
+      "essayDaad": "Stipendiya · DAAD (Frayburg universiteti)",
+      "essayWhyNus": "Nega aynan biz · NUS, informatika",
+      "essaySupplementalEvidence": "Qo‘shimcha insho · Dalillar fikrimni o‘zgartirganda",
+      "lorAcademic": "Professorning akademik tavsiyanomasi (STEM, magistratura)",
+      "lorTeacher": "Litsey o‘qituvchisining tavsiyanomasi (bakalavriat)",
+      "lorEmployer": "Ish beruvchi / rahbar tavsiyanomasi (magistratura, stipendiyalar)",
+      "lorRequestEmail": "Talabadan professorga tavsiyanoma so‘rash xati",
+      "cvAcademicStem": "Akademik STEM tadqiqot CV’si",
+      "cvUndergraduate": "Bakalavriatga abituriyent CV’si",
+      "cvEuropass": "Europass professional CV",
+      "answerGeneral": "Akademik tayyorgarlik va ilmiy qiziqish",
+      "answerMotivation": "Nega aynan shu yo‘nalish va dastur",
+      "answerLeadership": "Bosim ostida jamoa yoki tashabbusni boshqarish",
+      "answerCareer": "Qisqa va uzoq muddatli karyera rejasi",
+      "answerChallenge": "Akademik yoki texnik to‘siqni yengish",
+      "answerCommunity": "Maktab yoki jamiyatga hissa",
+      "activityResearch": "Tadqiqot — aqlli sug‘orish laboratoriyasi",
+      "activityLeadership": "Yetakchilik — CodeForRegions",
+      "activityVolunteering": "Ko‘ngillilik — ikki tilli STEM tarjimasi",
+      "activityCompetition": "Musobaqa — AgroTech xakatoni va ICPC",
+      "docAffidavit": "Homiylik xati (moliyaviy qo‘llab-quvvatlash)",
+      "docColdEmail": "Ilmiy rahbarlik so‘rab professorga xat",
+      "docCoverNote": "Moliyaviy va o‘quv reja bo‘yicha ilova xat",
+      "visaUsF1": "AQSh — F-1 talaba vizasi",
+      "visaGermanyStudent": "Germaniya — talaba vizasi (bloklangan hisob)",
+      "visaKoreaD2": "Janubiy Koreya — D-2 viza (GKS stipendiati)",
+      "visaUkStudent": "Buyuk Britaniya — Student Route (El-yurt umidi stipendiati)"
+    },
+    "fields": {
+      "gpa": "GPA",
+      "gpaScale": "GPA shkalasi",
+      "ieltsScore": "IELTS",
+      "toeflScore": "TOEFL iBT",
+      "satScore": "SAT",
+      "greScore": "GRE",
+      "actScore": "ACT",
+      "duolingoScore": "Duolingo",
+      "graduationYear": "Bitirish yili",
+      "workExperienceYears": "Ish tajribasi (yil)",
+      "researchPublications": "Nashrlar",
+      "degreeLevel": "Maqsadli daraja"
+    },
+    "visaGrounds": {
+      "purposeOfStudy": "O‘qish maqsadi",
+      "funding": "Moliyalash",
+      "homeTies": "Vatan bilan bog‘liqlik",
+      "nonImmigrantIntent": "Qaytish niyati",
+      "specificity": "Aniq tafsilot",
+      "languageClarity": "Nutq ravshanligi"
+    },
+    "visaEvidence": {
+      "purpose": "maqsad",
+      "funding": "moliyalash",
+      "home_ties": "vatan bilan bog‘liqlik",
+      "specific_detail": "aniq tafsilot"
+    }
   }
 }

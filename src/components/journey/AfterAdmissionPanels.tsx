@@ -30,6 +30,7 @@ import {
   inputClass,
 } from "./ui";
 import { AppNote } from "@/components/AppNote";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 // ===========================================================================
@@ -396,6 +397,7 @@ const REC_STATUSES = ["not_requested", "requested", "opened", "submitted"];
 
 export function RecommendationManagerPanel({ profileId, applicationId, universityName }: { profileId: number; applicationId?: number | null; universityName?: string | null }) {
   const t = useTranslations("journey");
+  const ts = useTranslations("samples");
   const { data, loading, error, reload } = useResource<RecData>(
     useCallback(() => getJson<RecData>(`/api/recommendations?profileId=${profileId}`, t("rmLoadError")), [profileId, t]),
     [profileId],
@@ -499,6 +501,23 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
           permission, and you can withdraw it at any time.
         </p>
       </JourneyCard>
+
+      {/* Copyable request e-mail first, then complete letters to show a recommender. */}
+      <details className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 sm:px-5">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
+            <Mail aria-hidden className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 break-words">{ts("lorDrawerTitle")}</span>
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-slate-600">{ts("lorDrawerHint")}</p>
+        <SampleExemplarBar
+          group="lor"
+          className="mt-3"
+          defaultOpen
+          sort={(a, b) => Number(b.kind === "requestEmail") - Number(a.kind === "requestEmail")}
+        />
+      </details>
 
       {data.requests.length === 0 ? (
         <Empty title={t("rmEmptyTitle")} hint={t("rmEmptyHint")} />
