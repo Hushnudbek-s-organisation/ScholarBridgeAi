@@ -25,13 +25,17 @@ import {
   assessAffordability,
   gpaTo40Scale,
   recommend,
+  pickNextCycle,
+  isIsoDate,
   normalizeSubject,
+  type RecommendCycle,
   type RecommendationCatalog,
   type RecommendationInput,
   type RecommendProgram,
   type RecommendUniversity,
   type RecommendScholarship,
 } from "../src/lib/recommend";
+import { compareDegreeLevels } from "../src/lib/degreeLevels";
 
 let passed = 0;
 let failed = 0;
@@ -123,6 +127,35 @@ check("GPA 3.0/5.0 → 2.4 on 4.0 scale", gpaTo40Scale(3.0, 5.0) === 2.4);
 check("GPA 85/100 → 3.4 on 4.0 scale", Math.abs(gpaTo40Scale(85, 100)! - 3.4) < 0.001);
 check("GPA > 4 without a scale → unknown (no assumption)", gpaTo40Scale(8.5, null) === null);
 check("GPA ≤ 4 without a scale compared as-is (safe)", gpaTo40Scale(3.5, null) === 3.5);
+
+// --- Degree-level aliases (defect 1.7) --------------------------------------
+// "Bachelor" vs "Bachelor's"/"BSc"/"Undergraduate" is the SAME level. Raw string
+// equality reported these as mismatches and pushed the right programme down.
+check("degree alias: \"Bachelor\" matches \"Bachelor's\"", compareDegreeLevels("Bachelor", "Bachelor's") === "match");
+check("degree alias: \"Bachelor\" matches \"BSc\" / \"Undergraduate\"", compareDegreeLevels("Bachelor", "BSc") === "match" && compareDegreeLevels("Bachelor", "Undergraduate") === "match");
+check("degree alias: \"Master\" matches \"Master's\" / \"MSc\"", compareDegreeLevels("Master", "Master's") === "match" && compareDegreeLevels("Master", "MSc") === "match");
+check("degree alias: JSON list [\"Master\",\"PhD\"] still matches a Master's applicant", compareDegreeLevels("Master", JSON.stringify(["Master", "PhD"])) === "match");
+check("degree alias: a REAL conflict stays a mismatch (Bachelor ≠ PhD)", compareDegreeLevels("Bachelor", "PhD") === "mismatch");
+check("degree alias: an unreadable label stays unknown, never a mismatch", compareDegreeLevels("Bachelor", "Professional certificate") === "unknown");
+check("degree alias: \"All\" matches anything", compareDegreeLevels("Master", "All") === "match");
+
+// --- Next-cycle selection (defect 1.7) --------------------------------------
+const cycle = (deadline: string | null, academicYear = "2027/2028", status = "verified"): RecommendCycle => ({
+  programId: 1, intake: "Autumn", academicYear, openingDate: null, deadline,
+  applicationUrl: null, sourceUrl: null, lastVerifiedAt: null, verificationStatus: status,
+});
+const TODAY = "2026-10-14";
+check("nextCycle picks the upcoming 2027-01-15 round, not the expired 2025-01-15 one",
+  pickNextCycle([cycle("2027-01-15"), cycle("2025-01-15")], TODAY)?.deadline === "2027-01-15");
+check("nextCycle picks the EARLIEST upcoming round when several are open",
+  pickNextCycle([cycle("2027-06-01"), cycle("2026-12-01"), cycle("2027-01-15")], TODAY)?.deadline === "2026-12-01");
+check("nextCycle falls back to the most recent PAST round when every deadline has passed",
+  pickNextCycle([cycle("2025-01-15"), cycle("2024-01-15")], TODAY)?.deadline === "2025-01-15");
+check("nextCycle never invents a date for undated rows (falls back to newest academic year)",
+  pickNextCycle([cycle(null, "2025/2026"), cycle(null, "2028/2029")], TODAY)?.academicYear === "2028/2029");
+check("nextCycle is null for an empty cycle list", pickNextCycle([], TODAY) === null);
+check("isIsoDate rejects impossible calendar dates (2026-02-30)",
+  isIsoDate("2026-02-30") === false && isIsoDate("2027-01-15") === true && isIsoDate(null) === false);
 check("text requirements carried through, not scored as numbers", (() => {
   const e = assessEligibility({ gpa: 3.8, gpaScale: 4, ielts: 7, sat: 1400 }, baseReqs);
   return e.textRequirements.some((t) => t.kind === "subject" && t.text === "Two math subjects");

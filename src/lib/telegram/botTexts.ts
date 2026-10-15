@@ -65,6 +65,16 @@ type Dict = {
   error: string;
   sessionGone: string;
   unknown: string;
+  /* --- Micro-actions (inline keyboard, 1-tap weekly execution) --- */
+  btnMarkDone: string;
+  btnSnooze: string;
+  btnOpenWorkspace: string;
+  taskDone: (title: string) => string;
+  taskSnoozed: (title: string, date: string) => string;
+  taskActionGone: string;
+  taskNextUp: (title: string) => string;
+  weeklyHeader: string;
+  weeklyEmpty: string;
 };
 
 /** Main-menu entries: each one runs the existing command of the same name. */
@@ -141,6 +151,15 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     error: "Nimadir xato ketdi. Qayta urinib ko'ring.",
     sessionGone: "Bu Telegram endi akkauntga ulanmagan.",
     unknown: "Bu buyruqni tushunmadim. /help — buyruqlar ro'yxati.",
+    btnMarkDone: "✅ Bajarildi",
+    btnSnooze: "⏳ 3 kunga surish",
+    btnOpenWorkspace: "🎯 Ish maydonini ochish",
+    taskDone: (title) => `✅ <b>Bajarildi!</b>\n<i>${escapeHtml(title)}</i> ro'yxatdan chiqarildi.`,
+    taskSnoozed: (title, date) => `⏳ <b>3 kunga surildi.</b>\n<i>${escapeHtml(title)}</i> endi ${escapeHtml(date)} sanasida.`,
+    taskActionGone: "Bu vazifa topilmadi yoki allaqachon yopilgan.",
+    taskNextUp: (title) => `Keyingi vazifa: <b>${escapeHtml(title)}</b>`,
+    weeklyHeader: "🗓 <b>Haftalik reja</b> — shu haftadagi eng muhim qadam:",
+    weeklyEmpty: "Bu hafta shoshilinch vazifa yo'q. Profilingizni to'ldirib boring.",
   },
   ru: {
     linkConfirm: (n, e) =>
@@ -205,6 +224,15 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     error: "Что-то пошло не так. Попробуйте ещё раз.",
     sessionGone: "Этот Telegram больше не подключён к аккаунту.",
     unknown: "Не понял команду. /help — список команд.",
+    btnMarkDone: "✅ Выполнено",
+    btnSnooze: "⏳ Отложить на 3 дня",
+    btnOpenWorkspace: "🎯 Открыть рабочую область",
+    taskDone: (title) => `✅ <b>Выполнено!</b>\n<i>${escapeHtml(title)}</i> закрыто.`,
+    taskSnoozed: (title, date) => `⏳ <b>Отложено на 3 дня.</b>\n<i>${escapeHtml(title)}</i> теперь на ${escapeHtml(date)}.`,
+    taskActionGone: "Задача не найдена или уже закрыта.",
+    taskNextUp: (title) => `Следующая задача: <b>${escapeHtml(title)}</b>`,
+    weeklyHeader: "🗓 <b>План на неделю</b> — главный шаг на этой неделе:",
+    weeklyEmpty: "На этой неделе срочных задач нет. Продолжайте заполнять профиль.",
   },
   en: {
     linkConfirm: (n, e) =>
@@ -269,6 +297,15 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     error: "Something went wrong. Please try again.",
     sessionGone: "This Telegram is no longer connected to an account.",
     unknown: "I didn't understand that command. /help — list of commands.",
+    btnMarkDone: "✅ Mark done",
+    btnSnooze: "⏳ Snooze 3d",
+    btnOpenWorkspace: "🎯 Open workspace",
+    taskDone: (title) => `✅ <b>Done!</b>\n<i>${escapeHtml(title)}</i> is closed.`,
+    taskSnoozed: (title, date) => `⏳ <b>Snoozed 3 days.</b>\n<i>${escapeHtml(title)}</i> is now due ${escapeHtml(date)}.`,
+    taskActionGone: "That task could not be found, or it is already closed.",
+    taskNextUp: (title) => `Next task: <b>${escapeHtml(title)}</b>`,
+    weeklyHeader: "🗓 <b>This week's plan</b> — the single most important step:",
+    weeklyEmpty: "No urgent task this week. Keep filling in your profile.",
   },
 };
 

@@ -16,20 +16,35 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appConfig,
+  applicationRequirements,
   applicationTasks,
+  applications as applicationsTable,
   essayVersions,
+  journeyDeadlines,
+  notificationPreferences,
   notifications,
   savedScholarships,
   savedUniversities,
   scholarships,
   studentProfiles,
+  telegramLinks,
   universities,
 } from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { createNotification, profileLang } from "@/lib/notifications";
-import { NOTIFY_TEXTS, type NotifyLang } from "@/lib/notificationTexts";
+import { NOTIFY_TEXTS, fmtDate, type NotifyLang } from "@/lib/notificationTexts";
+import type { InlineButton } from "@/lib/telegram/api";
+import { escapeHtml } from "@/lib/telegram/core";
 import { calendarDaysUntil, parseReminderDays, reminderBucket, reminderTimezone } from "@/lib/telegram/reminders";
+import {
+  isDigestDay,
+  isoWeekId,
+  localIsoDate,
+  localWeekday,
+  pickTopMicroAction,
+  type MicroActionCandidate,
+} from "@/lib/telegram/weeklyDigest";
 
 async function exists(profileId: number, type: string, link: string): Promise<boolean> {
   const [row] = await db
@@ -245,15 +260,44 @@ export async function runSweepForLinkedUsers(opts: { limit?: number } = {}): Pro
  * reminders for every linked account, bounded retries of failed Telegram
  * deliveries, and pruning of the webhook de-duplication table.
  */
-export async function runScheduledTelegramJobs(): Promise<SweepSummary & { retried: number; retrySent: number; retryDropped: number; skipped?: boolean }> {
+export async function runScheduledTelegramJobs(): Promise<
+  SweepSummary & {
+    retried: number;
+    retrySent: number;
+    retryDropped: number;
+    weekly: WeeklyDigestSummary | null;
+    skipped?: boolean;
+  }
+> {
   const startedAt = new Date().toISOString();
   // One run at a time across all instances (key 0 is never a profile id).
   const result = await withSweepLock(0, () => scheduledJobs());
-  return result ?? { profiles: 0, created: 0, errors: 0, startedAt, finishedAt: new Date().toISOString(), retried: 0, retrySent: 0, retryDropped: 0, skipped: true };
+  return (
+    result ?? {
+      profiles: 0,
+      created: 0,
+      errors: 0,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      retried: 0,
+      retrySent: 0,
+      retryDropped: 0,
+      weekly: null,
+      skipped: true,
+    }
+  );
 }
 
 async function scheduledJobs() {
   const summary = await runSweepForLinkedUsers();
+  // Pillar 5.6: on Mondays (reminder timezone) the same run also sends the
+  // single micro-action check-in. Any other day it returns skipped.
+  let weekly: WeeklyDigestSummary | null = null;
+  try {
+    weekly = await runWeeklyMicroActionDigest();
+  } catch (err) {
+    console.warn("[digest] failed:", err instanceof Error ? err.message : err);
+  }
   let retry = { retried: 0, sent: 0, dropped: 0 };
   try {
     const { retryFailedDeliveries, pruneTelegramUpdates } = await import("@/lib/telegram/service");
@@ -262,7 +306,14 @@ async function scheduledJobs() {
   } catch (err) {
     console.warn("[sweep] telegram maintenance failed:", err instanceof Error ? err.message : err);
   }
-  return { ...summary, retried: retry.retried, retrySent: retry.sent, retryDropped: retry.dropped, finishedAt: new Date().toISOString() };
+  return {
+    ...summary,
+    retried: retry.retried,
+    retrySent: retry.sent,
+    retryDropped: retry.dropped,
+    weekly,
+    finishedAt: new Date().toISOString(),
+  };
 }
 
 async function saversOf(scholarshipId: number): Promise<number[]> {
@@ -315,6 +366,242 @@ export async function notifyScholarshipOpened(sch: { id: number; title: string; 
     }
   }
   return sent;
+}
+
+// ---------------------------------------------------------------------------
+// Pillar 5.6 — Monday micro-action digest
+//
+// One check-in per ISO week (Monday, reminder timezone) naming the single
+// highest-priority task with the same 1-tap buttons the bot's other messages
+// carry. The week id is stored in app_config, so an hourly cron, the
+// in-process scheduler and the admin "Run now" button can all call this and
+// exactly one message goes out per student per week.
+// ---------------------------------------------------------------------------
+
+export const WEEKLY_DIGEST_CONFIG_KEY = "telegram_weekly_digest";
+/** Advisory-lock key for the digest run (profile ids are positive). */
+const WEEKLY_DIGEST_LOCK_KEY = -740222;
+
+export interface WeeklyDigestSummary {
+  week: string;
+  weekday: number;
+  profiles: number;
+  sent: number;
+  quiet: number;
+  errors: number;
+  skipped: "not-digest-day" | "already-sent" | "lock-held" | "no-bot-token" | null;
+}
+
+/** Open rows the Monday nudge can act on, plus whether the account is active. */
+async function digestCandidates(profileId: number): Promise<{ candidates: MicroActionCandidate[]; active: boolean }> {
+  const candidates: MicroActionCandidate[] = [];
+  let active = false;
+  try {
+    const deadlines = await db
+      .select({ id: journeyDeadlines.id, title: journeyDeadlines.title, dueDate: journeyDeadlines.dueDate })
+      .from(journeyDeadlines)
+      .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false)))
+      .limit(200);
+    for (const row of deadlines) {
+      candidates.push({
+        kind: "deadline",
+        id: row.id,
+        title: row.title,
+        dueIso: row.dueDate ? String(row.dueDate).slice(0, 10) : null,
+      });
+    }
+    active = deadlines.length > 0;
+  } catch (err) {
+    console.warn("[digest] deadlines lookup failed:", err instanceof Error ? err.message : err);
+  }
+  try {
+    const rows = await db
+      .select({
+        id: applicationRequirements.id,
+        title: applicationRequirements.title,
+        dueDate: applicationRequirements.dueDate,
+        status: applicationRequirements.status,
+      })
+      .from(applicationRequirements)
+      .innerJoin(applicationsTable, eq(applicationsTable.id, applicationRequirements.applicationId))
+      .where(eq(applicationsTable.profileId, profileId))
+      .limit(200);
+    for (const row of rows) {
+      if (row.status === "done" || row.status === "not_required") continue;
+      active = true;
+      candidates.push({
+        kind: "requirement",
+        id: row.id,
+        title: row.title,
+        dueIso: row.dueDate ? String(row.dueDate).slice(0, 10) : null,
+      });
+    }
+  } catch (err) {
+    console.warn("[digest] requirement lookup failed:", err instanceof Error ? err.message : err);
+  }
+  if (!active) {
+    // A brand-new account with nothing tracked yet gets no Monday nudge.
+    try {
+      const res = await db.execute(
+        sql`SELECT (
+              (SELECT COUNT(*) FROM saved_universities WHERE profile_id = ${profileId}) +
+              (SELECT COUNT(*) FROM saved_scholarships WHERE profile_id = ${profileId}) +
+              (SELECT COUNT(*) FROM applications WHERE profile_id = ${profileId})
+            )::int AS total`
+      );
+      const rows = (res as unknown as { rows?: { total: number }[] }).rows ?? [];
+      active = Number(rows[0]?.total ?? 0) > 0;
+    } catch {
+      active = false;
+    }
+  }
+  return { candidates, active };
+}
+
+/** In-app record of the digest (respects the student's notification prefs). */
+async function recordDigestInApp(profileId: number, week: string, title: string, body: string): Promise<void> {
+  const link = `/tasks?week=${week}`;
+  try {
+    const [prefs] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.profileId, profileId));
+    let enabled = true;
+    if (prefs) {
+      try {
+        const types = JSON.parse(prefs.types || "[]") as string[];
+        enabled = prefs.inApp && (types.includes("weekly_digest") || types.length === 0);
+      } catch {
+        enabled = prefs.inApp;
+      }
+    }
+    if (enabled) {
+      await db.insert(notifications).values({ profileId, type: "weekly_digest", title, body, link }).catch(() => undefined);
+    } else {
+      await db.insert(notifications).values({ profileId, type: "muted:weekly_digest", title, body, link, isRead: true }).catch(() => undefined);
+    }
+  } catch {
+    // The Telegram message is the deliverable; the in-app copy is best effort.
+  }
+}
+
+async function sendWeeklyDigests(
+  week: string,
+  weekday: number,
+  now: Date,
+  opts: { force?: boolean; limit?: number }
+): Promise<WeeklyDigestSummary> {
+  const tz = reminderTimezone();
+  const summary: WeeklyDigestSummary = { week, weekday, profiles: 0, sent: 0, quiet: 0, errors: 0, skipped: null };
+
+  const [row] = await db.select({ value: appConfig.value }).from(appConfig).where(eq(appConfig.key, WEEKLY_DIGEST_CONFIG_KEY)).limit(1);
+  if (row?.value && !opts.force) {
+    try {
+      if ((JSON.parse(row.value) as { week?: string }).week === week) {
+        return { ...summary, skipped: "already-sent" };
+      }
+    } catch {
+      // Unreadable value → treat as "not sent yet".
+    }
+  }
+
+  const { token } = await import("@/lib/telegram/settings").then((m) => m.getBotToken());
+  if (!token) return { ...summary, skipped: "no-bot-token" };
+  const [{ getTelegramSettings }, messaging, { CMD_TEXTS }] = await Promise.all([
+    import("@/lib/telegram/settings"),
+    import("@/lib/telegram/messaging"),
+    import("@/lib/telegram/botTexts"),
+  ]);
+  const settings = await getTelegramSettings();
+  const site = messaging.publicSiteUrl(settings);
+
+  const links = await db
+    .select({
+      profileId: telegramLinks.profileId,
+      chatId: telegramLinks.chatId,
+      languageCode: telegramLinks.languageCode,
+    })
+    .from(telegramLinks)
+    .where(and(eq(telegramLinks.blocked, false), eq(telegramLinks.notifyEnabled, true)))
+    .limit(opts.limit ?? 2000);
+
+  const todayIso = localIsoDate(now, tz);
+  for (const link of links) {
+    summary.profiles++;
+    try {
+      const { candidates, active } = await digestCandidates(link.profileId);
+      if (!active) {
+        summary.quiet++;
+        continue;
+      }
+      const lang = await profileLang(link.profileId);
+      const t = CMD_TEXTS[lang];
+      const chosen = pickTopMicroAction(candidates, todayIso);
+      let html: string;
+      let buttons: InlineButton[][] = [];
+      if (chosen) {
+        const dot = chosen.kind === "deadline" ? "🔴" : "🟡";
+        const due = chosen.dueIso ? `\n⏰ <i>${t.deadline}</i> ${fmtDate(chosen.dueIso)}` : "";
+        html = `${t.weeklyHeader}\n\n${dot} <b>${escapeHtml(chosen.title.slice(0, 120))}</b>${due}`;
+        buttons = [
+          [
+            { text: t.btnMarkDone, callback_data: `act:done:${chosen.id}` },
+            { text: t.btnSnooze, callback_data: `act:snooze:${chosen.id}:3` },
+          ],
+          ...messaging.openAppButton(settings, t.btnOpenApp).map((b) => [b]),
+        ];
+        await recordDigestInApp(link.profileId, week, t.weeklyHeader, `${chosen.title}${chosen.dueIso ? ` — ${chosen.dueIso}` : ""}`);
+      } else {
+        html = `${t.weeklyHeader}\n\n${t.weeklyEmpty}`;
+        buttons = messaging.siteButton(site, lang, "/applications", t.btnOpenApp).map((b) => [b]);
+      }
+      const res = await messaging.sendToChat(
+        token,
+        link.chatId,
+        html,
+        {
+          profileId: link.profileId,
+          kind: "weekly_digest",
+          type: "weekly_digest",
+          preview: html.replace(/<[^>]+>/g, " "),
+          retryPayload: { profileId: link.profileId, type: "weekly_digest", title: t.weeklyHeader, body: html, link: null },
+        },
+        buttons
+      );
+      if (res.ok) summary.sent++;
+      else summary.errors++;
+    } catch (err) {
+      summary.errors++;
+      console.warn(`[digest] profile ${link.profileId} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  const value = JSON.stringify({ ranAt: new Date().toISOString(), ...summary });
+  try {
+    if (row) await db.update(appConfig).set({ value, updatedAt: new Date() }).where(eq(appConfig.key, WEEKLY_DIGEST_CONFIG_KEY));
+    else
+      await db
+        .insert(appConfig)
+        .values({ key: WEEKLY_DIGEST_CONFIG_KEY, value, description: "Last weekly micro-action digest (auto)" })
+        .catch(() => undefined);
+  } catch (err) {
+    console.warn("[digest] could not record the run:", err instanceof Error ? err.message : err);
+  }
+  return summary;
+}
+
+/**
+ * Monday check-in (Pillar 5.6). `force: true` bypasses the weekday and
+ * once-per-week guards — used by the admin "send now" action and by tests.
+ */
+export async function runWeeklyMicroActionDigest(
+  opts: { force?: boolean; now?: Date; limit?: number } = {}
+): Promise<WeeklyDigestSummary> {
+  const now = opts.now ?? new Date();
+  const tz = reminderTimezone();
+  const week = isoWeekId(now, tz);
+  const weekday = localWeekday(now, tz);
+  const idle: WeeklyDigestSummary = { week, weekday, profiles: 0, sent: 0, quiet: 0, errors: 0, skipped: null };
+  if (!opts.force && !isDigestDay(now, tz)) return { ...idle, skipped: "not-digest-day" };
+  const out = await withSweepLock(WEEKLY_DIGEST_LOCK_KEY, () => sendWeeklyDigests(week, weekday, now, opts));
+  return out ?? { ...idle, skipped: "lock-held" };
 }
 
 // ---------------------------------------------------------------------------

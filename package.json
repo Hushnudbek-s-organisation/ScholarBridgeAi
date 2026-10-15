@@ -64,7 +64,10 @@
     "test:calculations": "tsx scripts/check-calculations.ts",
     "test:streak": "tsx scripts/check-streak.ts",
     "test:responsive": "node scripts/check-responsive.mjs",
-    "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs"
+    "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs",
+    "test:samples": "tsx scripts/check-samples.ts",
+    "test:regional": "tsx scripts/check-regional.ts",
+    "test:ui": "tsx scripts/check-ui-system.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

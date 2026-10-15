@@ -4,6 +4,7 @@ import React, { useEffect, useState, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Lock, Crown } from "lucide-react";
 import type { FeatureKey } from "@/lib/entitlements";
+import { useAdminMode } from "@/components/AdminModeContext";
 
 interface PremiumGateProps {
   profileId: number | null;
@@ -13,10 +14,23 @@ interface PremiumGateProps {
   description?: string;
   onUpgrade: () => void;
   children?: ReactNode;
+  /**
+   * Pillar 8 — an admin session is never gated. When true the children render
+   * immediately: no fetch, no "checking" flash, no lock overlay, so the
+   * operator can inspect every section of their own product.
+   */
+  isAdmin?: boolean;
 }
 
-/** Key the stateful gate by profile + feature so a profile switch cannot reuse old access. */
+/**
+ * Key the stateful gate by profile + feature so a profile switch cannot reuse
+ * old access. Admin mode (Pillar 8) short-circuits the gate entirely: the
+ * operator sees the section with no fetch and no lock overlay, while
+ * "Preview as Free/Pro" re-enables the normal behaviour.
+ */
 export function PremiumGate(props: PremiumGateProps) {
+  const { unlocked } = useAdminMode();
+  if (props.isAdmin || unlocked) return <>{props.children}</>;
   return <FeatureGateContent key={`${props.profileId ?? "none"}:${props.feature}`} {...props} />;
 }
 
@@ -39,7 +53,9 @@ function FeatureGateContent({ profileId, feature, title, description, onUpgrade,
       .then((data) => {
         if (cancelled) return;
         // Unknown/missing feature data fails closed; the server remains the source of truth.
-        setIsPremium(data?.features?.[feature] === true);
+        // `plan === "admin"` unlocks even before the per-feature map is read,
+        // so an admin session can never be shown a lock overlay.
+        setIsPremium(data?.plan === "admin" || data?.features?.[feature] === true);
       })
       .catch(() => {
         if (!cancelled) setIsPremium(false);

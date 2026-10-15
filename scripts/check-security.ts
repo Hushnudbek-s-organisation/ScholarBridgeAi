@@ -825,7 +825,15 @@ async function main() {
     const gate = readFileSync(join(ROOT, "src/components/PremiumGate.tsx"), "utf8");
     assert.match(gate, /feature: FeatureKey/);
     assert.match(gate, /data\?\.features\?\.\[feature\]/);
-    assert.match(gate, /setIsPremium\(data\?\.features\?\.\[feature\] === true\)/, "unknown or missing feature access must fail closed");
+    // Pillar 8: an admin session is never gated, so the client also accepts the
+    // server's explicit `plan === "admin"` answer. The fail-closed rule is
+    // unchanged for everyone else: only a literal `true` from the per-feature
+    // map unlocks, and a missing/unknown feature leaves the section unmounted.
+    assert.match(
+      gate,
+      /setIsPremium\(\s*data\?\.plan === "admin"\s*\|\|\s*data\?\.features\?\.\[feature\] === true\s*\)/,
+      "unknown or missing feature access must fail closed (only an explicit server plan === \"admin\" may also unlock)"
+    );
     assert.doesNotMatch(gate, /data\?\.isPremium/, "a general plan flag must not substitute for a feature entitlement");
     const lockedBranch = gate.slice(gate.indexOf("if (isPremium) {"));
     assert.equal((lockedBranch.match(/\{children\}/g) || []).length, 1, "children may only render in the unlocked branch");

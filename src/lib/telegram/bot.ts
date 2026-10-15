@@ -10,9 +10,9 @@
  *   ul:y / ul:n           unlink confirmation
  *   st:n:1|0 / st:r:<p>   notifications on/off, reminder preset
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { telegramLinks } from "@/db/schema";
+import { applicationRequirements, applications as applicationsTable, journeyDeadlines, telegramLinks } from "@/db/schema";
 import { getPremiumStatus } from "@/lib/premium";
 import { fmtDate } from "@/lib/notificationTexts";
 import { tgSendChatAction, type InlineButton, type Keyboard } from "./api";
@@ -298,21 +298,141 @@ async function deadlines(ctx: BotCtx) {
   if (!items.length) return void (await send(ctx, t.deadlinesEmpty, appButtons(ctx)));
   const icon: Record<string, string> = { critical: "🔴", soon: "🟠" };
   const lines = items.slice(0, 10).map((i) => `${icon[i.urgency] ?? "🟡"} <b>${clamp(i.title)}</b>\n   ${fmtDate(i.date)} · ${t.daysLeft(i.daysRemaining)}`);
-  await send(ctx, `${t.deadlinesHeader}\n\n${lines.join("\n")}`, appButtons(ctx));
+  // Micro-actions for the trackable rows (journey tasks carry real row ids in
+  // their `task-<id>` item id), so a reminder can be CLOSED from the chat.
+  const actionRows: InlineButton[][] = items
+    .map((i) => String(i.id ?? ""))
+    .filter((id) => id.startsWith("task-"))
+    .slice(0, 4)
+    .map((id) => microActionRow(ctx, Number(id.slice(5))));
+  await send(ctx, `${t.deadlinesHeader}\n\n${lines.join("\n")}`, [...actionRows, ...appButtons(ctx).map((b) => [b])]);
 }
 
 async function next(ctx: BotCtx) {
   const res = await app.nextActions(who(ctx));
   const fail = failure(ctx, res);
   if (fail) return void (await send(ctx, fail));
-  const body = res.body as { headline?: string; actions?: { title: string; why: string; urgency: string }[] };
+  const body = res.body as { headline?: string; actions?: { id?: string; title: string; why: string; urgency: string }[] };
   const t = T(ctx);
   const actions = body?.actions ?? [];
   if (!actions.length) return void (await send(ctx, t.nextEmpty, appButtons(ctx)));
   const icon: Record<string, string> = { critical: "🔴", high: "🟠", medium: "🟡", low: "🟢" };
   const lines = actions.slice(0, 3).map((a, i) => `${icon[a.urgency] ?? "•"} <b>${i + 1}. ${clamp(a.title, 120)}</b>\n${clamp(a.why, 300)}`);
   const head = body.headline ? `\n<i>${clamp(body.headline, 200)}</i>` : "";
-  await send(ctx, `${t.nextHeader}${head}\n\n${lines.join("\n\n")}`, appButtons(ctx));
+  // The #1 action gets its own 1-tap buttons when it maps to a real row
+  // (`deadline-<journeyDeadlineId>` / `... requirement`), so the biggest
+  // reminder of the week can be finished without leaving the chat.
+  const firstId = String((actions[0] as { id?: string } | undefined)?.id ?? "");
+  const trackable = firstId.startsWith("deadline-") ? Number(firstId.slice("deadline-".length)) : NaN;
+  const actionRows: InlineButton[][] = Number.isInteger(trackable) ? [microActionRow(ctx, trackable)] : [];
+  await send(ctx, `${t.nextHeader}${head}\n\n${lines.join("\n\n")}`, [...actionRows, ...appButtons(ctx).map((b) => [b])]);
+}
+
+/**
+ * 1-TAP MICRO-ACTIONS (inline keyboard).
+ *
+ * WHY: the bot was a read-only notifier — it could TELL a student a deadline was
+ * three days away, but closing it meant leaving Telegram, opening the site and
+ * finding the row. Every reminder ended in a context switch, so the reminders
+ * stopped being acted on.
+ *
+ * `act:done:<id>` and `act:snooze:<id>:<days>` are resolved against the SAME
+ * two tables the workspace uses — `application_requirements` (reached through
+ * the application, so ownership is enforced by the join) and
+ * `journey_deadlines` — always filtered by the linked profile, so a guessed id
+ * can never touch another student's data.
+ */
+async function runTaskAction(
+  ctx: BotCtx,
+  action: "done" | "snooze",
+  id: number,
+  days: number,
+  messageId: number | null
+): Promise<string> {
+  const t = T(ctx);
+  const profileId = ctx.link!.profileId;
+
+  // 1. An application requirement? Ownership comes through the application.
+  const [req] = await db
+    .select({ id: applicationRequirements.id, title: applicationRequirements.title, dueDate: applicationRequirements.dueDate })
+    .from(applicationRequirements)
+    .innerJoin(applicationsTable, eq(applicationsTable.id, applicationRequirements.applicationId))
+    .where(and(eq(applicationRequirements.id, id), eq(applicationsTable.profileId, profileId)))
+    .limit(1);
+
+  if (req) {
+    if (action === "done") {
+      await db.update(applicationRequirements).set({ status: "done" }).where(eq(applicationRequirements.id, id));
+    } else {
+      const next = shiftIsoDate(req.dueDate ? String(req.dueDate).slice(0, 10) : null, days);
+      await db.update(applicationRequirements).set({ dueDate: next }).where(eq(applicationRequirements.id, id));
+    }
+    return confirmTaskAction(ctx, action, req.title, req.dueDate ? String(req.dueDate).slice(0, 10) : null, days, messageId);
+  }
+
+  // 2. A tracked journey deadline (dashboard / Telegram alerts).
+  const [task] = await db
+    .select()
+    .from(journeyDeadlines)
+    .where(and(eq(journeyDeadlines.id, id), eq(journeyDeadlines.profileId, profileId)))
+    .limit(1);
+  if (!task) return t.taskActionGone;
+
+  if (action === "done") {
+    await db.update(journeyDeadlines).set({ isCompleted: true }).where(eq(journeyDeadlines.id, id));
+  } else {
+    await db
+      .update(journeyDeadlines)
+      .set({ dueDate: shiftIsoDate(String(task.dueDate).slice(0, 10), days) })
+      .where(eq(journeyDeadlines.id, id));
+  }
+  return confirmTaskAction(ctx, action, task.title, String(task.dueDate).slice(0, 10), days, messageId);
+}
+
+/** `days` forward from an ISO date (defaults to today when no date is set). */
+function shiftIsoDate(iso: string | null, days: number): string {
+  const base = iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00Z`) : new Date();
+  const valid = Number.isFinite(base.getTime()) ? base : new Date();
+  valid.setUTCDate(valid.getUTCDate() + days);
+  return valid.toISOString().slice(0, 10);
+}
+
+/** Rewrite the message with the confirmation + the student's next open task. */
+async function confirmTaskAction(
+  ctx: BotCtx,
+  action: "done" | "snooze",
+  title: string,
+  dueIso: string | null,
+  days: number,
+  messageId: number | null
+): Promise<string> {
+  const t = T(ctx);
+  const after = action === "done" ? null : shiftIsoDate(dueIso, days);
+  const head =
+    action === "done" ? t.taskDone(title) : t.taskSnoozed(title, fmtDate(after ?? ""));
+
+  // What is left to do — the reward for tapping is knowing what is next.
+  let nextTitle: string | null = null;
+  try {
+    const res = await app.nextActions(who(ctx));
+    const actions = (res.body as { actions?: { title: string }[] })?.actions ?? [];
+    nextTitle = actions[0]?.title ?? null;
+  } catch {
+    nextTitle = null;
+  }
+  const html = `${head}${nextTitle ? `\n\n${t.taskNextUp(nextTitle)}` : ""}`;
+  if (messageId) await editOrSend(ctx.token, ctx.chatId, messageId, html, { kind: "edit" });
+  else await send(ctx, html);
+  return action === "done" ? t.btnMarkDone : t.btnSnooze;
+}
+
+/** The two micro-action buttons for one row, plus the workspace deep link. */
+function microActionRow(ctx: BotCtx, id: number): InlineButton[] {
+  const t = T(ctx);
+  return [
+    { text: t.btnMarkDone, callback_data: `act:done:${id}` },
+    { text: t.btnSnooze, callback_data: `act:snooze:${id}:3` },
+  ];
 }
 
 async function advisor(ctx: BotCtx, question: string) {
@@ -358,7 +478,7 @@ async function settings(ctx: BotCtx, messageId: number | null) {
 // Callbacks
 // ---------------------------------------------------------------------------
 
-const CALLBACK_RE = /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off)|mn:(universities|scholarships|applications|deadlines|next|saved|advisor|profile|settings|account))$/;
+const CALLBACK_RE = /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off)|mn:(universities|scholarships|applications|deadlines|next|saved|advisor|profile|settings|account)|act:(done|snooze):(\d{1,9})(?::(\d{1,3}))?)$/;
 
 /** Handle a button press; returns the toast text for answerCallbackQuery. */
 export async function runCallback(ctx: BotCtx, data: string, messageId: number | null): Promise<string> {
@@ -390,6 +510,10 @@ export async function runCallback(ctx: BotCtx, data: string, messageId: number |
     await unlinkProfile(ctx.link.profileId, "bot", { notify: false });
     await editOrSend(ctx.token, ctx.chatId, messageId, BOT_TEXTS[ctx.lang].unlinked, { kind: "reply", preview: "unlinked" });
     return "";
+  }
+  if (m[11]) {
+    // 1-tap micro-actions: mark a task done, or push it three days out.
+    return runTaskAction(ctx, m[11] as "done" | "snooze", Number(m[12]), m[13] ? Number(m[13]) : 3, messageId);
   }
   if (m[10]) {
     // Menu buttons are shortcuts for the commands — same code path, same

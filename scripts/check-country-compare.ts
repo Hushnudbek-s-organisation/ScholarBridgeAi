@@ -73,6 +73,42 @@ section("4. Work rights are never invented");
 
 check("workRights is always null", de.workRights === null && unknown.workRights === null);
 
+section("4b. Currency is respected and post-study work is only reported when published");
+
+const mixedCurrency: UniInput[] = [
+  { country: "France", annualTuition: 15000, tuitionCurrency: "USD", annualTuitionUsd: null },
+  { country: "France", annualTuition: 12000, tuitionCurrency: "EUR", annualTuitionUsd: null },
+  { country: "France", annualTuitionUsd: 18000, annualLivingEstUsd: 9000, postStudyWorkVisaYears: 2 },
+  { country: "France", annualTuitionUsd: 20000, postStudyWorkVisaYears: 1 },
+];
+const fr = compareCountries("France", mixedCurrency, []);
+check(
+  "a EUR tuition is excluded from the USD average, not converted",
+  fr.tuition.avgUsd === 17667 && fr.tuition.published === 3,
+  `avg=${fr.tuition.avgUsd} published=${fr.tuition.published}`
+);
+check(
+  "the canonical USD column is used when the legacy mirror is empty",
+  fr.living.avgUsd === 9000 && fr.living.published === 1
+);
+const frForeignOnly = compareCountries("France", [{ country: "France", annualTuition: 12000, tuitionCurrency: "GBP" }], []);
+check("a country with only non-USD rows reports null (not 0, not converted)", frForeignOnly.tuition.avgUsd === null && frForeignOnly.tuition.published === 0);
+
+check("post-study work years are averaged from published rows only", fr.postStudyWork.avgYears === 1.5 && fr.postStudyWork.published === 2);
+const noPostStudy = compareCountries("Germany", unis, schs);
+check("no published post-study figure → null, never inferred from reputation", noPostStudy.postStudyWork.avgYears === null && noPostStudy.postStudyWork.published === 0);
+check(
+  "a non-USD award is not counted as dollars",
+  compareCountries("France", [], [{ country: "France", awardAmount: 9000, awardCurrency: "EUR", amountUsdValue: null }]).scholarships.totalUsd === null
+);
+check(
+  "a USD award from either column is counted",
+  compareCountries("France", [], [
+    { country: "France", awardAmount: 9000, awardCurrency: "USD", amountUsdValue: null },
+    { country: "France", amountUsdValue: 1000 },
+  ]).scholarships.totalUsd === 10000
+);
+
 section("5. Country list for the picker");
 
 const list = listCountries(unis);

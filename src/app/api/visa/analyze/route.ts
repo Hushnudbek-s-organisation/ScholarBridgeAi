@@ -65,9 +65,29 @@ export async function POST(req: Request) {
     const history = sanitizeHistory(body?.messages, 40, 2000);
 
     // Deterministic rubric — always computed, model or not.
+    // Phase 2.5 — the profile the student is applying with, used ONLY to flag a
+    // contradiction between an answer and their own record. The client sends
+    // its already-loaded profile; nothing extra is read from the database, and
+    // any absent field stays null (unknown), so it cannot become a penalty.
+    const rawProfile = (body?.profile ?? {}) as Record<string, unknown>;
+    const profileSnapshot = {
+      targetMajor: typeof rawProfile.targetMajor === "string" ? rawProfile.targetMajor.slice(0, 120) : null,
+      degreeLevel: typeof rawProfile.degreeLevel === "string" ? rawProfile.degreeLevel.slice(0, 60) : null,
+      budgetAnnualUsd:
+        typeof rawProfile.budgetAnnualUsd === "number" && Number.isFinite(rawProfile.budgetAnnualUsd)
+          ? rawProfile.budgetAnnualUsd
+          : null,
+      ieltsScore:
+        typeof rawProfile.ieltsScore === "number" && Number.isFinite(rawProfile.ieltsScore)
+          ? rawProfile.ieltsScore
+          : null,
+      name: typeof rawProfile.name === "string" ? rawProfile.name.slice(0, 120) : null,
+    };
+
     const rubric = scoreVisaInterview(history, {
       homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
       destination: country.name,
+      profile: profileSnapshot,
     });
 
     // Practice history (spec §13) and the free practice cap are both keyed on

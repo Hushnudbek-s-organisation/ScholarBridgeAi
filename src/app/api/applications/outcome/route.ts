@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { applicationOutcomes, applications, studentProfiles } from "@/db/schema";
+import { applicationDocuments, applicationOutcomes, applications, pointsLedger, studentProfiles } from "@/db/schema";
 import { requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { hasExplicitOutcomeShareConsent } from "@/lib/similarProfiles";
+import { FLYWHEEL_BADGE, rewardForOutcome, type FlywheelResult } from "@/lib/flywheel";
+import { and, inArray } from "drizzle-orm";
+import { awardPoints } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +84,79 @@ export async function POST(req: Request) {
       })
       .returning();
 
+    // ---- Flywheel (spec §5.5) -------------------------------------------
+    // Rewards for recording a real decision, never for the decision itself:
+    // every result pays the same, and a second record of the same application
+    // pays nothing. Awarding must never fail the student's write, so the whole
+    // block is best-effort and reports what happened instead of throwing.
+    let reward: { points: number; explanation: string; reason: string } | null = null;
+    try {
+      const [already] = await db
+        .select({ id: pointsLedger.id })
+        .from(pointsLedger)
+        .where(
+          and(
+            eq(pointsLedger.profileId, application.profileId),
+            inArray(pointsLedger.reason, ["outcome_recorded", "outcome_verified"]),
+            eq(pointsLedger.relatedEntityId, application.id),
+          ),
+        )
+        .limit(1);
+      // A usable record needs a date or a detail — a bare result is not data.
+      const hasStructuredDetails = Boolean(
+        outcome.decidedAt || outcome.notes || outcome.scholarshipAmountUsd || outcome.scholarshipName,
+      );
+      const evidenceRows = await db
+        .select({ id: applicationDocuments.id })
+        .from(applicationDocuments)
+        .where(
+          and(
+            eq(applicationDocuments.profileId, application.profileId),
+            eq(applicationDocuments.entityType, "university"),
+            // `entityId` is nullable (general documents) but the application's
+            // university id is not, so `eq` is the correct comparison here.
+            eq(applicationDocuments.entityId, application.universityId as number),
+            inArray(applicationDocuments.status, ["uploaded"]),
+          ),
+        )
+        .limit(1);
+      const decision = rewardForOutcome({
+        result: result as FlywheelResult,
+        hasEvidence: evidenceRows.length > 0,
+        hasStructuredDetails,
+        alreadyContributed: Boolean(already),
+      });
+      if (decision) {
+        const award = await awardPoints(
+          application.profileId,
+          decision.points,
+          decision.reason,
+          application.id,
+        );
+        if (decision.badgeCriteria) {
+          // The badge exists in the ledger the same way other badges do; the
+          // criteria key is the identity, so this is safe to call repeatedly.
+          const { badges } = await import("@/db/schema");
+          const [existingBadge] = await db
+            .select({ id: badges.id })
+            .from(badges)
+            .where(eq(badges.criteria, FLYWHEEL_BADGE.criteria))
+            .limit(1);
+          if (!existingBadge) {
+            await db.insert(badges).values({
+              name: FLYWHEEL_BADGE.name,
+              description: FLYWHEEL_BADGE.description,
+              iconUrl: FLYWHEEL_BADGE.iconUrl,
+              criteria: FLYWHEEL_BADGE.criteria,
+            });
+          }
+        }
+        reward = { points: award.points, explanation: decision.explanation, reason: decision.reason };
+      }
+    } catch (err) {
+      console.error("Flywheel reward error:", (err as Error)?.message);
+    }
+
     // Keep the tracker in sync: a decision means the application is decided.
     await db
       .update(applications)
@@ -99,7 +175,7 @@ export async function POST(req: Request) {
         .where(eq(studentProfiles.id, profile.id));
     }
 
-    return NextResponse.json({ outcome });
+    return NextResponse.json({ outcome, reward });
   } catch (error) {
     console.error("POST /api/applications/outcome error:", error);
     return NextResponse.json({ error: "Failed to record result" }, { status: 500 });

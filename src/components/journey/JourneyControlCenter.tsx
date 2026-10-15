@@ -13,6 +13,7 @@
  */
 import React, { useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { WhatIfSimulator } from "@/components/journey/WhatIfSimulator";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
@@ -997,6 +998,8 @@ export function JourneyControlCenter({
           ))}
         </ol>
       </JourneyCard>
+      {/* ---- 6. What-if simulator (Phase 2.3) ---------------------------- */}
+      <WhatIfSimulator profileId={profileId} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   admissionOffers,
@@ -14,7 +14,7 @@ import {
   applicationDocumentLinks,
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
-import { computeWorkspaceProgress, WORKSPACE_TABS } from "@/lib/journey/workspace";
+import { computeWorkspaceProgress, submissionGate, WORKSPACE_TABS } from "@/lib/journey/workspace";
 import { reversePlan } from "@/lib/journey/planning";
 import { summarizeStatuses } from "@/lib/calculations";
 
@@ -104,11 +104,28 @@ export async function GET(req: Request) {
         .from(userDocuments)
         .innerJoin(applicationDocumentLinks, eq(applicationDocumentLinks.documentId, userDocuments.id))
         .where(eq(applicationDocumentLinks.applicationId, applicationId)),
-      db.select().from(essayVersions).where(eq(essayVersions.profileId, profileId)),
-      db.select().from(fundingItems).where(eq(fundingItems.profileId, profileId)),
+      // Scoped to THIS application. Previously every essay and funding item the
+      // student had ever created was listed inside each workspace, so an essay
+      // written for university A appeared under university B. Rows that are not
+      // linked to any application (universityId / applicationId NULL) stay
+      // visible as the student's general library.
+      app.universityId != null
+        ? db
+            .select()
+            .from(essayVersions)
+            .where(and(eq(essayVersions.profileId, profileId), or(eq(essayVersions.universityId, app.universityId), isNull(essayVersions.universityId))))
+        : db.select().from(essayVersions).where(and(eq(essayVersions.profileId, profileId), isNull(essayVersions.universityId))),
+      db
+        .select()
+        .from(fundingItems)
+        .where(and(eq(fundingItems.profileId, profileId), or(eq(fundingItems.applicationId, applicationId), isNull(fundingItems.applicationId)))),
       db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
       db.select().from(journeyDeadlines).where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false))),
     ]);
+
+    const feeItem = requirements.find((r) => r.itemKey === "application.fee");
+    const recommendationsOutstanding = recs.filter((r) => r.status !== "submitted").length;
+    const feeSettledByRow = feeItem ? feeItem.status === "done" || feeItem.status === "not_required" : true;
 
     const progress = computeWorkspaceProgress(
       requirements.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired })),
@@ -116,20 +133,38 @@ export async function GET(req: Request) {
       {
         recommendationsSubmitted: recs.filter((r) => r.status === "submitted").length,
         recommendationsTotal: recs.length,
+        recommendationsOutstanding,
+        feeRequired: feeItem != null,
+        feePaid: app.applicationFeePaid,
+        feeRowStatus: feeItem?.status ?? null,
         submitted: !!app.submittedAt,
       }
     );
 
     // ---- Final submission checklist (spec §22) -----------------------------
-    const feeItem = requirements.find((r) => r.itemKey === "application.fee");
+    //
+    // UNIFIED (2026-10): this list used to invent its own rules — `final.ok`
+    // required `progress.pct >= 100`, so an OPTIONAL open row blocked
+    // submission, and `readyToSubmit: every(...)` therefore disagreed with
+    // `progress.readyToSubmit`. The checklist now reports the same gate the
+    // progress maths and PATCH apply.
+    const gate = submissionGate({
+      sections: progress.sections,
+      missing: progress.missing,
+      recommendationsOutstanding,
+      feeRequired: feeItem != null,
+      feePaid: app.applicationFeePaid,
+      feeRowStatus: feeItem?.status ?? null,
+      submitted: !!app.submittedAt,
+    });
     const submissionChecklist = [
       { key: "documents", label: "Required documents", ok: requirements.filter((r) => r.section === "documents" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
       { key: "essays", label: "Required essays", ok: requirements.filter((r) => r.section === "essays" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "recommendations", label: "Recommendations", ok: recs.length === 0 || recs.every((r) => r.status === "submitted") },
+      { key: "recommendations", label: "Recommendations", ok: recommendationsOutstanding === 0 },
       { key: "tests", label: "Tests", ok: requirements.filter((r) => r.section === "testing" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
       { key: "finance", label: "Financial forms", ok: requirements.filter((r) => r.section === "finance" && r.isRequired).every((r) => r.status === "done" || r.status === "not_required") },
-      { key: "fee", label: "Application fee", ok: app.applicationFeePaid || !feeItem },
-      { key: "final", label: "Final review", ok: progress.pct >= 100 },
+      { key: "fee", label: "Application fee", ok: app.applicationFeePaid || !feeItem || feeSettledByRow },
+      { key: "final", label: "Final review", ok: gate.ready },
     ];
 
     const deadline = app.deadline ? String(app.deadline).slice(0, 10) : null;
@@ -186,7 +221,12 @@ export async function GET(req: Request) {
         .map((d) => ({ id: d.id, title: d.title, dueDate: String(d.dueDate).slice(0, 10), kind: d.kind })),
       offer: offers[0] ?? null,
       submissionChecklist,
-      readyToSubmit: submissionChecklist.every((c) => c.ok),
+      /**
+       * The canonical gate result (identical to `progress.readyToSubmit`).
+       * Optional rows are listed but never block.
+       */
+      readyToSubmit: gate.ready,
+      submitBlockers: gate.blockers,
       reversePlan: deadline ? reversePlan(deadline, "application") : [],
     });
   } catch (err) {
@@ -216,16 +256,48 @@ export async function PATCH(req: Request) {
 
     // ---- Mark as submitted (spec §22) ------------------------------------
     if (b.value.markSubmitted) {
-      const open = await db
-        .select()
-        .from(applicationRequirements)
-        .where(and(eq(applicationRequirements.applicationId, id), eq(applicationRequirements.isRequired, true)));
-      const outstanding = open.filter((r) => r.status !== "done" && r.status !== "not_required");
-      if (outstanding.length > 0) {
+      // ONE gate: the same rule the workspace progress bar and the submission
+      // checklist use. The old version checked ONLY `isRequired` requirement
+      // rows, so an application with an EMPTY checklist — or one whose tracked
+      // recommendation letters were still outstanding — could be marked
+      // submitted while the UI said it was not ready. Optional rows still never
+      // block.
+      const [reqRows, recRows] = await Promise.all([
+        db.select().from(applicationRequirements).where(eq(applicationRequirements.applicationId, id)),
+        db.select().from(recommendationRequests).where(eq(recommendationRequests.applicationId, id)),
+      ]);
+      const feeRow = reqRows.find((r) => r.itemKey === "application.fee") ?? null;
+      const recsOutstanding = recRows.filter((r) => r.status !== "submitted").length;
+      const gateProgress = computeWorkspaceProgress(
+        reqRows.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired })),
+        Object.fromEntries(reqRows.map((r) => [r.itemKey, r.title])),
+        {
+          recommendationsSubmitted: recRows.filter((r) => r.status === "submitted").length,
+          recommendationsTotal: recRows.length,
+          recommendationsOutstanding: recsOutstanding,
+          feeRequired: feeRow != null,
+          feePaid: app.applicationFeePaid,
+          feeRowStatus: feeRow?.status ?? null,
+        }
+      );
+      const gate = submissionGate({
+        sections: gateProgress.sections,
+        missing: gateProgress.missing,
+        recommendationsOutstanding: recsOutstanding,
+        feeRequired: feeRow != null,
+        feePaid: app.applicationFeePaid,
+        feeRowStatus: feeRow?.status ?? null,
+      });
+      const outstanding = reqRows.filter((r) => r.isRequired && r.status !== "done" && r.status !== "not_required");
+      if (!gate.ready) {
         return NextResponse.json(
           {
-            error: `${outstanding.length} required item(s) are still open.`,
+            error:
+              gate.blockers.length > 0
+                ? `${gate.blockers.length} item(s) are still open.`
+                : "This application has no checklist yet — add its requirements before marking it submitted.",
             code: "not_ready",
+            blockers: gate.blockers,
             outstanding: outstanding.map((r) => ({ id: r.id, title: r.title, section: r.section })),
           },
           { status: 409 }

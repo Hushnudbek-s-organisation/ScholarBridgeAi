@@ -10,6 +10,7 @@
  */
 import React, { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { CalendarPlus, Check, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
@@ -36,7 +37,16 @@ interface VaultData {
   summary: { total: number; verified: number; expiring: number; expired: number };
 }
 
-export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+/**
+ * Document vault.
+ *
+ * `applicationId` / `applicationLabel` come from the Materials hub's
+ * application switcher (spec §3.3): a document added while an application is
+ * selected is linked to that application on save, so the workspace and the
+ * vault never disagree about which documents belong to which application.
+ * Without a selection the vault behaves exactly as before.
+ */
+export function DocumentVaultPanel({ profileId, onNavigateTab, applicationId, applicationLabel }: { profileId: number; onNavigateTab: (t: string) => void; applicationId?: number | null; applicationLabel?: string | null }) {
   const t = useTranslations("journey");
   const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<VaultData>(
@@ -46,12 +56,24 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
   );
   const [form, setForm] = useState({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
   const [busy, setBusy] = useState(false);
+  // Phase 7 — official document/email templates (Homiylik xati, professor
+  // outreach). Loaded on click and shown as a reference the student adapts.
+  const [template, setTemplate] = useState<{ title: string; text: string } | null>(null);
 
   const add = async () => {
     if (!form.title.trim()) return;
     setBusy(true);
     try {
-      await sendJson("/api/vault/documents", { method: "POST", body: JSON.stringify({ profileId, ...form }) }, t("dvAddError"));
+      await sendJson(
+        "/api/vault/documents",
+        {
+          method: "POST",
+          // The server links only the student's own applications, so passing a
+          // foreign id is refused rather than silently dropped.
+          body: JSON.stringify({ profileId, ...form, applicationIds: applicationId ? [applicationId] : [] }),
+        },
+        t("dvAddError")
+      );
       setForm({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
       await reload();
     } catch (e) {
@@ -80,6 +102,25 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
         subtitle={t("dvSubtitle")}
         action={
           <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+        {/* Phase 7 — copyable official templates (affidavit of support, cold
+            e-mail to a professor). Nothing is stored: they are references. */}
+        <SampleExemplarBar
+          kind={["document", "email"]}
+          sampleIds={["SAMPLE_SPONSOR_AFFIDAVIT_HOMIYLIK_XATI", "SAMPLE_PROFESSOR_COLD_EMAIL"]}
+          onLoad={(text, sample) => setTemplate({ title: sample.title.en, text })}
+          className="mb-3"
+        />
+        {template && (
+          <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black uppercase tracking-wide text-amber-900 dark:text-amber-200">{template.title}</p>
+              <button type="button" onClick={() => setTemplate(null)} className="min-h-11 rounded-xl border border-amber-400 px-3 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-slate-800">
+                {t("dvTemplateClose")}
+              </button>
+            </div>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-white/80 p-3 text-[11px] leading-relaxed text-slate-800 dark:bg-slate-900/60 dark:text-slate-200">{template.text}</pre>
+          </div>
+        )}
             <Pill tone="slate">{t("dvDocumentsPill", { n: data.summary.total })}</Pill>
             {data.summary.expiring > 0 && <Pill tone="warn">{t("dvExpiringPill", { n: data.summary.expiring })}</Pill>}
             {data.summary.expired > 0 && <Pill tone="bad">{t("dvExpiredPill", { n: data.summary.expired })}</Pill>}
@@ -87,6 +128,14 @@ export function DocumentVaultPanel({ profileId, onNavigateTab }: { profileId: nu
         }
       >
         {error && <ErrorNote message={error} />}
+        {/* Spec §3.3 — say out loud which application a new document will be
+            filed under, so nothing is attached to the wrong one by default. */}
+        {applicationId ? (
+          <p className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-semibold text-indigo-900 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+            {t("dvScopeLinked", { application: applicationLabel ?? `#${applicationId}` })}
+          </p>
+        ) : null}
+
 
         <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Field label={t("dvFieldType")}>
@@ -699,6 +748,17 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
         subtitle="Everything you have done that an application can use. You are the source of truth — we never invent an activity or an achievement for you."
         action={
           <div className="flex flex-wrap gap-2">
+        {/* Phase 7 — one-click "example activity" so the student sees how a
+            role, its hours and quantified achievements are written. */}
+        <SampleExemplarBar
+          kind="portfolio"
+          onLoad={(text) => {
+            const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+            const [first, ...rest] = lines;
+            setForm((f) => ({ ...f, title: f.title || first || f.title, description: rest.join("\n").slice(0, 1200) }));
+          }}
+          className="mb-3"
+        />
             <Pill tone="slate">{data.summary.total}</Pill>
             <Pill tone="brand">{data.summary.totalHours}h</Pill>
             <Pill tone="good">{data.summary.withEvidence} with evidence</Pill>

@@ -115,6 +115,28 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
     }
   };
 
+  /**
+   * Open a notification's destination: mark that one read, close the panel and
+   * let the browser follow the link. A push-update keeps the dot in sync
+   * without refetching the whole list.
+   */
+  const openTarget = async (item: NotificationItem) => {
+    setOpen(false);
+    if (item.isRead || !profileId) return;
+    setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)));
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        // One row, and the server re-checks that the row belongs to this
+        // profile before writing (ids are guessable).
+        body: JSON.stringify({ profileId, notificationId: item.id }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const unreadCount = items.filter((n) => !n.isRead).length;
 
   return (
@@ -187,6 +209,27 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
             <div className="divide-y divide-slate-100">
               {items.map((n) => (
                 <div key={n.id} className={`px-4 py-3 ${n.isRead ? "" : "bg-indigo-50"}`}>
+                  {/* A notification that carries a `link` is a real destination
+                      (deadline, essay, offer…). It used to be dead text, so the
+                      only way to act on it was to hunt the page down. The row
+                      itself is the link — no nested control inside it — and
+                      clicking it closes the panel and clears the unread dot. */}
+                  {n.link ? (
+                    <a
+                      href={n.link}
+                      onClick={() => void openTarget(n)}
+                      className="flex items-start gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800">{n.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{n.body}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {new Date(n.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      {!n.isRead && <span className="h-2 w-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}
+                    </a>
+                  ) : (
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-slate-800">{n.title}</p>
@@ -197,6 +240,7 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
                     </div>
                     {!n.isRead && <span className="h-2 w-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}
                   </div>
+                  )}
                 </div>
               ))}
             </div>

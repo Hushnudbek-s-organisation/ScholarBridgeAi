@@ -46,6 +46,20 @@ const check = (label: string, ok: boolean, detail = "") => {
   }
 };
 
+/**
+ * The expected shape is DERIVED FROM THE CANONICAL FILE, not pinned to a magic
+ * number: a hardcoded count silently rots every time a migration adds a table
+ * (this is exactly how the 93/115 constants went stale while the schema grew
+ * to 95 tables and 117 foreign keys). Deriving it also makes the assertions
+ * strictly stronger — a `CREATE TABLE` that fails to apply is now detected
+ * because the live count no longer matches the file.
+ */
+const EXPECTED_TABLES = new Set(
+  // Both spellings appear in the generated file: `"table"` and `public."table"`.
+  [...SQL.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(?:"?public"?\.)?"?([a-z_]+)"?/g)].map((m) => m[1]),
+).size;
+const EXPECTED_FKS = (SQL.match(/FOREIGN KEY/g) ?? []).length;
+
 const stats = (c: pg.Client) =>
   c.query(`
     SELECT
@@ -91,8 +105,8 @@ const main = async () => {
   console.log("\nFRESH database (empty -> full_schema.sql):");
   await c.query(SQL);
   const fresh = await stats(c);
-  check("creates the full table set (93)", fresh.tables === 93, `got ${fresh.tables}`);
-  check("creates every FK (115)", fresh.fks === 115, `got ${fresh.fks}`);
+  check(`creates the full table set (${EXPECTED_TABLES} declared in the file)`, fresh.tables === EXPECTED_TABLES, `got ${fresh.tables}`);
+  check(`creates every FK (${EXPECTED_FKS} declared in the file)`, fresh.fks === EXPECTED_FKS, `got ${fresh.fks}`);
   check(
     "composite programs(id, university_id) UNIQUE constraint exists",
     await uniqueConstraintOn(c, "programs", ["id", "university_id"]),
@@ -117,7 +131,11 @@ const main = async () => {
        FROM pg_class WHERE relkind='r' AND relnamespace='public'::regnamespace`,
     )
   ).rows[0];
-  check("RLS enabled on all 93 public tables", rls.total === 93 && rls.enabled === 93, `${rls.enabled}/${rls.total}`);
+  check(
+    `RLS enabled on all ${EXPECTED_TABLES} public tables`,
+    rls.total === EXPECTED_TABLES && rls.enabled === EXPECTED_TABLES,
+    `${rls.enabled}/${rls.total}`,
+  );
   check(
     "rate-limit storage table rate_limit_hits exists",
     (await c.query(`SELECT 1 FROM information_schema.tables WHERE table_name='rate_limit_hits'`)).rows.length === 1,
@@ -158,7 +176,7 @@ const main = async () => {
   // Repair with the canonical file.
   await c.query(SQL);
   const repaired = await stats(c);
-  check("repair restores every FK (115)", repaired.fks === 115, `got ${repaired.fks}`);
+  check(`repair restores every FK (${EXPECTED_FKS})`, repaired.fks === EXPECTED_FKS, `got ${repaired.fks}`);
   check(
     "repair backfills the composite FK on application_cycles",
     (

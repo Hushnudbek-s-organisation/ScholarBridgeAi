@@ -53,7 +53,8 @@ export async function runUniversity(
   scopes: RunRequest["scopes"],
   dryRun: boolean,
   progress: ProgressFn,
-  maxPages = AGENT_CONFIG.maxPagesDefault
+  maxPages = AGENT_CONFIG.maxPagesDefault,
+  approvedFields?: string[] | null
 ): Promise<AuditReport> {
   const logId = await logRunStart(universityId, scopes);
   const errors: string[] = [];
@@ -860,7 +861,7 @@ export async function runUniversity(
         );
       }
       if (!dryRun) {
-        const res = await writeUniversity(universityId, uniExtract, evidence, current);
+        const res = await writeUniversity(universityId, uniExtract, evidence, current, approvedFields);
         updatedFields.push(...res.updated);
         skippedFields.push(...res.skipped);
         reviewRequired.push(...res.review);

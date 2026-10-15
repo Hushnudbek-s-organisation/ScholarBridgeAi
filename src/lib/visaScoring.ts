@@ -18,6 +18,31 @@ export interface VisaTurn {
   text: string;
 }
 
+/** Phase 2.5 — one row per officer question, so the student can retry one answer. */
+export interface VisaTurnFeedback {
+  /** Index of the officer turn in the transcript (0-based). */
+  turnIndex: number;
+  question: string;
+  answer: string | null;
+  answerWordCount: number;
+  /** Deterministic positives found in THIS answer. */
+  strengths: string[];
+  /** What is missing or risky in THIS answer, if anything. */
+  flag: string | null;
+  flagCode: "unanswered" | "too_short" | "no_funding" | "no_ties" | "immigrant_intent" | "off_topic" | null;
+}
+
+/** Phase 2.5 — does the spoken answer agree with the application profile? */
+export interface VisaProfileConsistency {
+  checked: boolean;
+  consistent: boolean;
+  /** Which recorded profile facts the answers never mention (not a fault by
+   *  itself — it tells the student what the officer may ask about). */
+  unmentioned: string[];
+  /** Direct contradictions found, each naming the profile fact and the answer. */
+  contradictions: { field: string; profileValue: string; excerpt: string; message: string }[];
+}
+
 export interface VisaRubric {
   /** 0–100 per ground, plus an overall readiness score. */
   scores: {
@@ -35,6 +60,10 @@ export interface VisaRubric {
   unanswered: string[];
   answerCount: number;
   averageAnswerWords: number;
+  /** Phase 2.5 — per-turn coaching breakdown. */
+  turnFeedback: VisaTurnFeedback[];
+  /** Phase 2.5 — profile cross-check; `checked: false` when no profile given. */
+  profileConsistency: VisaProfileConsistency;
 }
 
 export interface VisaScoringOptions {
@@ -42,6 +71,18 @@ export interface VisaScoringOptions {
   homeCountry?: string | null;
   /** Where they plan to study. */
   destination?: string | null;
+  /**
+   * Phase 2.5 — the student's recorded profile. Only these fields are used,
+   * and only to flag a CONTRADICTION or a fact the answers never mention:
+   * a missing field is unknown, never a penalty.
+   */
+  profile?: {
+    targetMajor?: string | null;
+    degreeLevel?: string | null;
+    budgetAnnualUsd?: number | null;
+    ieltsScore?: number | null;
+    name?: string | null;
+  } | null;
 }
 
 // --- Signal patterns -------------------------------------------------------
@@ -115,6 +156,8 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
       unanswered: findUnanswered(turns),
       answerCount: 0,
       averageAnswerWords: 0,
+      turnFeedback: [],
+      profileConsistency: { checked: false, consistent: true, unmentioned: [], contradictions: [] },
     };
   }
 
@@ -211,13 +254,147 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
       languageClarity * 0.1
   );
 
+  // ---- Phase 2.5 — per-turn coaching ------------------------------------
+  const turnFeedback = buildTurnFeedback(turns);
+
+  // ---- Phase 2.5 — profile cross-check ----------------------------------
+  const profileConsistency = checkProfileConsistency(transcript, opts.profile ?? null);
+  for (const c of profileConsistency.contradictions) {
+    risks.push({ code: `contradicts_profile_${c.field}`, message: c.message, severity: "high" });
+  }
+
   return {
     scores: { purposeOfStudy, funding, homeTies, nonImmigrantIntent, specificity, languageClarity, total },
     risks,
     unanswered,
     answerCount,
     averageAnswerWords,
+    turnFeedback,
+    profileConsistency,
   };
+}
+
+/* --------------------------------------------------------------------------
+ * Phase 2.5 helpers — deterministic, pure, no AI
+ * ------------------------------------------------------------------------ */
+
+/** One feedback row per officer question, with the strengths found in it. */
+export function buildTurnFeedback(turns: VisaTurn[]): VisaTurnFeedback[] {
+  const out: VisaTurnFeedback[] = [];
+  turns.forEach((turn, index) => {
+    if (turn.role !== "officer") return;
+    const reply = turns[index + 1]?.role === "user" ? turns[index + 1].text : null;
+    const question = turn.text.trim().replace(/\s+/g, " ");
+    const wordCount = reply ? words(reply).length : 0;
+    const strengths: string[] = [];
+    let flag: string | null = null;
+    let flagCode: VisaTurnFeedback["flagCode"] = null;
+
+    if (!reply) {
+      flag = "This question was not answered. Prepare a specific answer before the interview.";
+      flagCode = "unanswered";
+    } else {
+      if (FUNDING_RE.test(reply)) strengths.push("funding");
+      if (HOME_TIES_RE.test(reply)) strengths.push("home ties");
+      if (PURPOSE_RE.test(reply)) strengths.push("study purpose");
+      if (CONCRETE_RE.test(reply)) strengths.push("concrete numbers");
+      if (wordCount < 12) {
+        flag = `Only ${wordCount} words. A one-line answer reads as evasive — add one concrete detail.`;
+        flagCode = "too_short";
+      } else if (IMMIGRANT_INTENT_RE.test(reply)) {
+        flag = "This answer states an intention to stay. That is a refusal ground on a student visa.";
+        flagCode = "immigrant_intent";
+      } else if (/\b(?:pay|fund|money|cost|tuition|expenses)\b/i.test(question) && !FUNDING_RE.test(reply)) {
+        flag = "The officer asked about money and the answer names no source. Name the sponsor or the account.";
+        flagCode = "no_funding";
+      } else if (/\b(?:return|come back|ties|after (?:your )?studies|plans)\b/i.test(question) && !HOME_TIES_RE.test(reply)) {
+        flag = "The officer asked about your plans and the answer names nothing to return to.";
+        flagCode = "no_ties";
+      }
+    }
+
+    out.push({
+      turnIndex: index,
+      question: question.length > 240 ? `${question.slice(0, 237)}…` : question,
+      answer: reply,
+      answerWordCount: wordCount,
+      strengths,
+      flag,
+      flagCode,
+    });
+  });
+  return out;
+}
+
+/**
+ * Cross-check the spoken answers against the recorded profile.
+ *
+ * HONESTY: a profile field that is null (unknown) is skipped entirely — we
+ * never flag a student for data the app does not have. Only an explicit
+ * contradiction, or a fact the answers never mention, is reported.
+ */
+export function checkProfileConsistency(
+  transcript: string,
+  profile: VisaScoringOptions["profile"]
+): VisaProfileConsistency {
+  if (!profile) return { checked: false, consistent: true, unmentioned: [], contradictions: [] };
+  const text = transcript.toLowerCase();
+  const unmentioned: string[] = [];
+  const contradictions: VisaProfileConsistency["contradictions"] = [];
+
+  const major = profile.targetMajor?.trim();
+  if (major) {
+    const key = major.toLowerCase();
+    const majorWords = key.split(/[^a-z]+/).filter((w) => w.length >= 4);
+    const mentioned = text.includes(key) || majorWords.some((w) => text.includes(w));
+    if (!mentioned) unmentioned.push("targetMajor");
+  }
+
+  const degree = profile.degreeLevel?.trim();
+  if (degree) {
+    const map: Record<string, string[]> = {
+      bachelor: ["bachelor", "undergraduate", "b.sc", "bs "],
+      master: ["master", "m.sc", "msc", "graduate"],
+      phd: ["phd", "doctora", "doctoral"],
+      diploma: ["diploma", "certificate"],
+    };
+    const keys = map[degree.toLowerCase()] ?? [degree.toLowerCase()];
+    const other = Object.entries(map)
+      .filter(([level]) => level !== degree.toLowerCase())
+      .flatMap(([, words]) => words);
+    if (keys.some((k) => text.includes(k))) {
+      // fine — the applicant states the right level
+    } else if (other.some((k) => text.includes(k))) {
+      contradictions.push({
+        field: "degreeLevel",
+        profileValue: degree,
+        excerpt: transcript.slice(0, 160),
+        message: `Your profile records a ${degree} programme but an answer describes a different level. Say the level you are enrolled in.`,
+      });
+    } else {
+      unmentioned.push("degreeLevel");
+    }
+  }
+
+  const budget = profile.budgetAnnualUsd;
+  if (typeof budget === "number" && Number.isFinite(budget) && budget > 0) {
+    const digits = String(Math.round(budget));
+    const relaxed = digits.length >= 5 ? digits.slice(0, 2) : digits;
+    if (!text.includes(digits) && !text.includes(relaxed)) {
+      if (FUNDING_RE.test(transcript)) {
+        unmentioned.push("budgetAnnualUsd");
+      } else {
+        contradictions.push({
+          field: "budgetAnnualUsd",
+          profileValue: String(budget),
+          excerpt: transcript.slice(0, 160),
+          message: `Your profile records a $${budget.toLocaleString()} annual budget, but no answer names a funding source. Officers ask about this first.`,
+        });
+      }
+    }
+  }
+
+  return { checked: true, consistent: contradictions.length === 0, unmentioned, contradictions };
 }
 
 /**

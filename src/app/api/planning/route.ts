@@ -3,12 +3,12 @@ import { db } from "@/db";
 import { savedScholarships, savedUniversities, scholarships, studentProfiles, universities } from "@/db/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
-import { calculateCosts, assessPortfolio, type ScholarshipInput } from "@/lib/costs";
+import { assessPortfolio, calculateCosts, resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts, type ScholarshipInput } from "@/lib/costs";
 import { buildCv, renderCvText } from "@/lib/cv";
 import { localizeCv } from "@/lib/cvI18n";
 import { localeFromRequest } from "@/lib/engineText";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
-import { gpaTo4 } from "@/lib/similarProfiles";
+import { gpaTo40Scale } from "@/lib/gpa";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
@@ -60,7 +60,10 @@ export async function GET(req: Request) {
     // --- Scholarships the student has actually saved ------------------------
     const scholarshipInputs: ScholarshipInput[] = schRows.map((s) => ({
       name: s.title,
-      amountUsd: Number(s.amountUsdValue) || 0,
+      // Currency-safe: an award published only in EUR/GBP is NOT counted as
+      // dollars (0 = "no USD figure known", which the portfolio review then
+      // reports as an unverified amount rather than as real funding).
+      amountUsd: resolvedUsdScholarshipAmount(s).amountUsd ?? 0,
       covers: /full/i.test(s.coverageType || "")
         ? "both"
         : /tuition/i.test(s.coverageType || "")
@@ -79,11 +82,15 @@ export async function GET(req: Request) {
       : uniRows[0];
     const matchProfile = await toMatchProfileWithActivities(profile);
 
+    // Currency-safe resolution of the saved university's published figures:
+    // the legacy USD columns are used when present, the canonical columns only
+    // when their currency is USD, and anything else stays unknown.
+    const targetCosts = resolvedUsdUniversityCosts(target);
     const costs = calculateCosts({
-      annualTuitionUsd: target?.annualTuitionUsd,
-      annualLivingEstUsd: target?.annualLivingEstUsd,
-      accommodationCostUsd: target?.accommodationCostUsd,
-      applicationFeeUsd: target?.applicationFee,
+      annualTuitionUsd: targetCosts.tuitionUsd,
+      annualLivingEstUsd: targetCosts.livingUsd,
+      accommodationCostUsd: targetCosts.accommodationUsd,
+      applicationFeeUsd: targetCosts.applicationFeeUsd,
       country: target?.country,
       city: target?.city,
       years: profile.degreeLevel === "Master" ? 2 : profile.degreeLevel === "PhD" ? 4 : 4,
@@ -136,15 +143,21 @@ export async function GET(req: Request) {
       .groupBy(scholarships.country);
     const schCountByCountry = new Map(countryCounts.map((r) => [r.country, r.n]));
 
-    const compareList: CompareUniversity[] = uniRows.map((u) => ({
+    const compareList: CompareUniversity[] = uniRows.map((u) => {
+      // Currency-safe: the comparison table used to read only the LEGACY USD
+      // columns, so a university whose canonical `annual_tuition` is in USD but
+      // whose legacy mirror is empty showed "not published" next to a match row
+      // that knew the price. Same resolver everywhere.
+      const c = resolvedUsdUniversityCosts(u);
+      return {
       id: u.id,
       name: u.name,
       country: u.country,
       city: u.city,
       worldRanking: u.worldRanking,
       acceptanceRate: u.acceptanceRate,
-      annualTuitionUsd: u.annualTuitionUsd,
-      annualLivingEstUsd: u.annualLivingEstUsd,
+      annualTuitionUsd: c.tuitionUsd,
+      annualLivingEstUsd: c.livingUsd,
       minGpa: u.minGpa,
       minIelts: u.minIelts,
       minSat: u.minSat,
@@ -152,7 +165,8 @@ export async function GET(req: Request) {
       internationalStudentsPercentage: u.internationalStudentsPercentage,
       programMajor: u.programMajor,
       scholarshipCount: schCountByCountry.get(u.country) ?? 0,
-    }));
+      };
+    });
 
     // Personalized headline rows (spec §23): how THIS student fits each
     // university — profile match % and the admission estimate stay two
@@ -184,7 +198,7 @@ export async function GET(req: Request) {
     const comparison = compareUniversities(
       compareList,
       {
-        gpa4: gpaTo4(profile.gpa, profile.gpaScale),
+        gpa4: gpaTo40Scale(profile.gpa, profile.gpaScale),
         ielts: profile.ieltsScore,
         sat: profile.satScore,
         budgetAnnualUsd: profile.budgetAnnualUsd,

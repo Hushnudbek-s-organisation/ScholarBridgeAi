@@ -31,6 +31,19 @@ export async function selectUniversities() {
         minSat: universities.minSat,
         acceptanceRate: universities.acceptanceRate,
         postStudyWorkVisaYears: universities.postStudyWorkVisaYears,
+        // The Public/Private filter and the currency-aware cost resolver both
+        // read these, so the fallback subset must carry them too — otherwise a
+        // degraded read silently drops the filter instead of failing loudly.
+        universityType: universities.universityType,
+        annualTuition: universities.annualTuition,
+        tuitionCurrency: universities.tuitionCurrency,
+        annualLivingEst: universities.annualLivingEst,
+        livingCostCurrency: universities.livingCostCurrency,
+        accommodationCostUsd: universities.accommodationCostUsd,
+        accommodationCost: universities.accommodationCost,
+        accommodationCostCurrency: universities.accommodationCostCurrency,
+        applicationFee: universities.applicationFee,
+        applicationFeeCurrency: universities.applicationFeeCurrency,
         description: universities.description,
         highlights: universities.highlights,
         websiteUrl: universities.websiteUrl,

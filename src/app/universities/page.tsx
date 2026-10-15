@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { PublicCatalogFooter, PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { dictionaries } from "@/i18n/messages";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
@@ -125,13 +126,9 @@ export default async function UniversitiesPage({
   return (
     <LocaleProvider initialLocale={locale}>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-            <GraduationCap className="h-6 w-6 shrink-0 text-blue-600" aria-hidden />
-            {copy.universityHeading}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">{summary}</p>
-        </header>
+        {/* Shared public header: logo + back-to-app link, language and theme
+            switchers, breadcrumb — identical on /scholarships. */}
+        <PublicCatalogHeader locale={locale} heading={copy.universityHeading} intro={summary} Icon={GraduationCap} />
 
         {universities.length === 0 ? (
           <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
@@ -179,9 +176,7 @@ export default async function UniversitiesPage({
 
         <Pagination currentPage={currentPage} totalPages={totalPages} />
 
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
-          {copy.independentGuide}
-        </p>
+        <PublicCatalogFooter locale={locale} />
       </main>
     </LocaleProvider>
   );

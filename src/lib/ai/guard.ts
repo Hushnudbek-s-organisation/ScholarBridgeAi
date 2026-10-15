@@ -81,7 +81,7 @@ export async function guardAiRequest(
         ),
       };
     }
-    const locked = await premiumGate(session.profile.id, opts.feature);
+    const locked = await premiumGate(session.profile.id, opts.feature, Boolean(session.isAdmin));
     if (locked) return { ok: false, response: locked };
   }
 

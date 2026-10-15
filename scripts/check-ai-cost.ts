@@ -460,20 +460,55 @@ async function main() {
     assert.equal(validateConfigValue("ai_budget_provider_daily_usd", "{}"), null);
     assert.notEqual(validateConfigValue("ai_budget_provider_daily_usd", '{"nope":1}'), null);
   });
-  check("the shipped Premium prices are unchanged (no silent price edit)", () => {
-    assert.equal(CONFIG_DEFAULTS.payment_premium_price_uzs, "59000");
-    assert.equal(CONFIG_DEFAULTS.payment_premium_season_price_uzs, "149000");
-    assert.equal(CONFIG_DEFAULTS.payment_premium_yearly_price_uzs, "499000");
+  // The prices are pinned so no one can edit them silently — they are the
+  // input to the unit-economics guarantee asserted below. They were re-based
+  // from 149,000/499,000 to the regionally calibrated 139,000/399,000 in the
+  // 2026-10 pricing review and are pinned again here.
+  check("the shipped Premium prices are the reviewed, regionally calibrated ones", () => {
+    assert.equal(CONFIG_DEFAULTS.payment_premium_price_uzs, "59000", "monthly ≈ US$4.92");
+    assert.equal(CONFIG_DEFAULTS.payment_premium_season_price_uzs, "139000", "90-day admissions pass ≈ US$11.58");
+    assert.equal(CONFIG_DEFAULTS.payment_premium_yearly_price_uzs, "399000", "yearly ≈ US$33.25");
     assert.equal(CONFIG_DEFAULTS.payment_currency, "UZS");
   });
-  check("new AI cost keys exist with conservative defaults", () => {
+  check("the AI allowances are the profitable, regionally calibrated ones", () => {
     assert.equal(CONFIG_DEFAULTS.ai_live_voice_enabled, "true");
     assert.equal(CONFIG_DEFAULTS.ai_free_live_sessions_per_day, "0", "Live voice is a Premium entitlement by default");
     assert.equal(CONFIG_DEFAULTS.ai_live_global_sessions_per_day, "30");
-    assert.equal(CONFIG_DEFAULTS.ai_premium_live_sessions_per_day, "2");
-    assert.equal(CONFIG_DEFAULTS.ai_live_session_max_minutes, "10");
+    assert.equal(CONFIG_DEFAULTS.ai_premium_live_sessions_per_day, "1");
+    assert.equal(CONFIG_DEFAULTS.ai_premium_live_sessions_per_month, "8", "monthly native-audio ceiling");
+    assert.equal(CONFIG_DEFAULTS.ai_live_session_max_minutes, "8");
     assert.equal(CONFIG_DEFAULTS.ai_budget_warn_percent, "80");
-    assert.equal(CONFIG_DEFAULTS.ai_free_requests_per_day, "5", "existing quota default untouched");
+    assert.equal(CONFIG_DEFAULTS.ai_free_requests_per_day, "5");
+    assert.equal(CONFIG_DEFAULTS.ai_free_tokens_per_day, "12000");
+    assert.equal(CONFIG_DEFAULTS.ai_premium_requests_per_day, "40");
+    assert.equal(CONFIG_DEFAULTS.ai_premium_tokens_per_day, "80000");
+  });
+
+  /**
+   * The whole point of the defaults above: a Premium account that maxes out
+   * EVERY allowance must still cost less than the price it pays.
+   *   • text: 80k tokens/day × 30 days at the published gpt-oss-120b-style
+   *     blended rate (~$0.35/1M) ≈ $0.85/month;
+   *   • native audio: 8 sessions × 8 min × $0.023/min ≈ $0.74/month.
+   * At 12,000 UZS/USD the monthly price is ≈ $4.92.
+   */
+  check("worst-case Premium AI cost stays below the Premium price (unit economics)", () => {
+    const usdPerUzs = 1 / 12000;
+    const monthlyPriceUsd = Number(CONFIG_DEFAULTS.payment_premium_price_uzs) * usdPerUzs;
+    const tokensPerMonth = Number(CONFIG_DEFAULTS.ai_premium_tokens_per_day) * 30;
+    const textCostUsd = (tokensPerMonth / 1_000_000) * 0.35;
+    const liveMinutes =
+      Number(CONFIG_DEFAULTS.ai_premium_live_sessions_per_month) * Number(CONFIG_DEFAULTS.ai_live_session_max_minutes);
+    const audioCostUsd = liveMinutes * 0.023;
+    const worstCase = textCostUsd + audioCostUsd;
+    assert.ok(
+      worstCase < monthlyPriceUsd,
+      `worst case $${worstCase.toFixed(2)} must stay below the $${monthlyPriceUsd.toFixed(2)} monthly price`,
+    );
+    // …and the previous defaults must NOT satisfy it, so the guard cannot be
+    // satisfied by accident if the limits are ever loosened again.
+    const oldWorstCase = (500000 * 30 / 1_000_000) * 0.35 + 2 * 10 * 30 * 0.023;
+    assert.ok(oldWorstCase > monthlyPriceUsd, "the old unbounded defaults were a loss per heavy user");
   });
 
   console.log("\nWiring (structural — the code paths the tests above cannot reach without a DB)");

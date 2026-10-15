@@ -41,6 +41,7 @@ import { GoalPlanner } from "@/components/growth/GoalPlanner";
 import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
 import { SuccessStories } from "@/components/growth/SuccessStories";
 import { CareerExplorerPanel, InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
+import { EmbassyChecklistCard, RegionalScholarshipsCard } from "@/components/RegionalSuperpowers";
 import { ArrivalPlanPanel } from "@/components/journey/ArrivalPlanPanel";
 import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
 import {
@@ -152,6 +153,7 @@ export function UniversitiesHub({
   profile,
   pane,
   setPane,
+  navigate,
   hidden,
   savedUniIds,
   onSaveUniversity,
@@ -175,6 +177,7 @@ export function UniversitiesHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "search" && (
@@ -232,16 +235,22 @@ export function ScholarshipsHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "browse" && (
-        <ScholarshipHub
+        <div className="space-y-4">
+          {/* Pillar 5.3 — programmes open to a citizen of Uzbekistan, with the
+              extra documents each one demands. */}
+          <RegionalScholarshipsCard />
+          <ScholarshipHub
           activeProfile={profile}
           savedScholarshipIds={savedScholarshipIds ?? new Set<number>()}
           onSaveScholarship={onSaveScholarship ?? (async () => undefined)}
           onUnsaveScholarship={onUnsaveScholarship ?? (async () => undefined)}
-          autoFocusScholarship={autoFocusScholarship ?? null}
-        />
+            autoFocusScholarship={autoFocusScholarship ?? null}
+          />
+        </div>
       )}
       {active === "recommended" && (
         <ScholarshipAutopilot activeProfile={profile} onSaveScholarship={onSaveScholarship} onNavigate={navigate} />
@@ -271,6 +280,7 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "plan" && <StudyPlanPanel profileId={profile.id} onNavigateTab={navigate} />}
@@ -283,7 +293,7 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
 /* =========================================================================
  * MY PLAN → Tasks & Timeline
  * ====================================================================== */
-export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
+export function TasksHub({ profile, pane, setPane, navigate, hidden }: HubProps) {
   const t = useTranslations("hubs");
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("tasks");
@@ -298,6 +308,7 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
@@ -313,6 +324,7 @@ export function ProfileHub({
   profile,
   pane,
   setPane,
+  navigate,
   hidden,
   onOpenProfileModal,
 }: HubProps) {
@@ -332,6 +344,7 @@ export function ProfileHub({
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "warn", text: td("estimate") }}
     >
       {active === "readiness" && <ProfileStrengthPanel activeProfile={profile} />}
@@ -358,6 +371,7 @@ export function FundingHub({ profile, navigate }: HubProps) {
       primaryLabel={t("primaryScholarships")}
       onPrimary={() => navigate("scholarships")}
       note={{ tone: "warn", text: td("money") }}
+      onHome={() => navigate("dashboard")}
     >
       <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
     </HubPage>
@@ -389,6 +403,7 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "tracker" && <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />}
@@ -417,7 +432,9 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
 
   // The list of applications the student can attach materials to. Local state
   // only — it is a view filter, never a second source of truth.
-  const [applications, setApplications] = useState<{ id: number; universityName: string; programName: string | null }[]>([]);
+  const [applications, setApplications] = useState<
+    { id: number; universityId: number | null; universityName: string; programName: string | null }[]
+  >([]);
   useEffect(() => {
     if (!profileId) return;
     let live = true;
@@ -427,11 +444,14 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
         if (!live) return;
         setApplications(
           Array.isArray(d.applications)
-            ? d.applications.map((a: { id: number; universityName: string; programName: string | null }) => ({
-                id: a.id,
-                universityName: a.universityName,
-                programName: a.programName,
-              }))
+            ? d.applications.map(
+                (a: { id: number; universityId?: number | null; universityName: string; programName: string | null }) => ({
+                  id: a.id,
+                  universityId: a.universityId ?? null,
+                  universityName: a.universityName,
+                  programName: a.programName,
+                })
+              )
             : []
         );
       })
@@ -444,6 +464,12 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
   }, [profileId]);
 
   const effectiveId = workspaceId ?? applications[0]?.id ?? null;
+  // Which application the materials are filed under (spec §3.3). The label is
+  // built from real stored values only — never a placeholder university.
+  const selectedApplication = effectiveId ? applications.find((a) => a.id === effectiveId) ?? null : null;
+  const selectedLabel = selectedApplication
+    ? `${selectedApplication.universityName}${selectedApplication.programName ? ` — ${selectedApplication.programName}` : ""}`
+    : null;
   const selectApplication = useCallback(
     (id: number | null) => {
       setWorkspaceId?.(id);
@@ -498,6 +524,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "warn", text: td("ai") }}
     >
       {context}
@@ -512,7 +539,12 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
       )}
       {active === "documents" && (
         <div className="space-y-4">
-          <DocumentVaultPanel profileId={profile.id} onNavigateTab={navigate} />
+          <DocumentVaultPanel
+            profileId={profile.id}
+            onNavigateTab={navigate}
+            applicationId={effectiveId}
+            applicationLabel={selectedLabel}
+          />
           <AnswerVault activeProfile={profile} />
         </div>
       )}
@@ -527,10 +559,18 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
           >
             <div className="space-y-4">
               <AiSopStudio activeProfile={profile} />
-              <EssayRubricStudio activeProfile={profile} />
+              <EssayRubricStudio
+                activeProfile={profile}
+                universityId={selectedApplication?.universityId ?? null}
+                applicationLabel={selectedLabel}
+              />
             </div>
           </Gated>
-          <RecommendationManagerPanel profileId={profile.id} />
+          <RecommendationManagerPanel
+            profileId={profile.id}
+            applicationId={effectiveId}
+            applicationLabel={selectedLabel}
+          />
         </div>
       )}
       {active === "interviews" && <InterviewCenterPanel onNavigateTab={navigate} />}
@@ -554,6 +594,7 @@ export function OffersHub({ profile, pane, setPane, navigate, hidden }: HubProps
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: t("afterAdmissionNote") }}
     >
       <OffersPanel profileId={profile.id} onNavigateTab={navigate} />
@@ -575,6 +616,7 @@ export function PostAdmissionFundingHub({ profile, navigate }: HubProps) {
       primaryLabel={t("primaryPostAdmissionFunding")}
       onPrimary={() => navigate("funding")}
       note={{ tone: "info", text: t("afterAdmissionNote") }}
+      onHome={() => navigate("dashboard")}
     >
       <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
     </HubPage>
@@ -601,11 +643,15 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "warn", text: td("visa") }}
     >
       {active === "visa" && (
         <div className="space-y-4">
           <VisaCenterPanel profileId={profile.id} onNavigateTab={navigate} />
+          {/* Pillar 5.3 — the document list for the embassy the student is
+              actually visiting (Tashkent: USA, Germany, South Korea, UK). */}
+          <EmbassyChecklistCard />
           <VisaSpeakingAssistant activeProfile={profile} />
         </div>
       )}
@@ -640,18 +686,25 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "warn", text: t("aiDisclaimer") }}
     >
       {active === "mentor" && (
         <div className="space-y-4">
           <AiChatMentor activeProfile={profile} />
-          <AdmissionsAdvisor activeProfile={profile} />
+          {/*
+            The Admissions Advisor is a separate feature and can be switched
+            off from Admin → Navigation ("advisor"). It used to render
+            unconditionally, so hiding it in the admin panel changed nothing.
+          */}
+          {!hidden.includes("advisor") && <AdmissionsAdvisor activeProfile={profile} />}
         </div>
       )}
       {active === "consulting" && (
         <div className="space-y-4">
           <ConsultingSection key={profile.id} activeProfile={profile} />
-          <MentorMarketplace key={profile.id} activeProfile={profile} />
+          {/* Same rule for the mentor marketplace ("mentors"). */}
+          {!hidden.includes("mentors") && <MentorMarketplace key={profile.id} activeProfile={profile} />}
         </div>
       )}
       {active === "faq" && <FaqSection />}
@@ -662,7 +715,7 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
 /* =========================================================================
  * HELP & LEARNING → Community & Learning
  * ====================================================================== */
-export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
+export function CommunityHub({ profile, pane, setPane, navigate, hidden }: HubProps) {
   const t = useTranslations("hubs");
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("community");
@@ -679,6 +732,7 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
+      onHome={() => navigate("dashboard")}
       note={{ tone: "info", text: td("community") }}
     >
       {active === "forum" && <ForumSection activeProfile={profile} isModerator={profile.isAdmin ?? false} />}

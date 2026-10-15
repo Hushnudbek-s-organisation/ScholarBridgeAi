@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { admissionOffers, applications, fundingItems, journeyDeadlines, universities } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { postAdmissionFunding } from "@/lib/journey/funding";
+import { resolvedUsdUniversityCosts } from "@/lib/costs";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,11 @@ export async function GET(req: Request) {
             status: f.status as "planned" | "applied" | "awarded" | "confirmed" | "declined",
             covers: f.covers,
           }));
-        const tuition = Number(o.tuitionCommitment ?? uni?.annualTuition ?? uni?.annualTuitionUsd ?? 0);
+        // The student's own recorded commitment wins; otherwise the published
+        // tuition, resolved currency-safely (a EUR figure is not "US$15,000").
+        const tuition = Number(
+          o.tuitionCommitment ?? resolvedUsdUniversityCosts(uni).tuitionUsd ?? 0
+        );
         return {
           ...o,
           decidedAt: o.decidedAt ? String(o.decidedAt).slice(0, 10) : null,
@@ -73,6 +78,12 @@ export async function GET(req: Request) {
           application: app
             ? { ...app, deadline: app.deadline ? String(app.deadline).slice(0, 10) : null, submittedAt: app.submittedAt }
             : null,
+          // Phase 3.2 — the side-by-side offer matrix needs the university's
+          // PUBLISHED post-study work visa length; null when not published.
+          postStudyWorkVisaYears: uni?.postStudyWorkVisaYears ?? null,
+          scholarshipAwardedUsd: items
+            .filter((i) => (i.kind === "scholarship" || i.kind === "aid") && (i.status === "awarded" || i.status === "confirmed"))
+            .reduce((total, i) => total + (Number.isFinite(i.amountUsd) ? i.amountUsd : 0), 0),
           funding: postAdmissionFunding({
             tuition,
             items,

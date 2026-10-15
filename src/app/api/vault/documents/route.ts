@@ -113,11 +113,11 @@ export async function POST(req: Request) {
   if (!b.ok) return b.response;
   const g = await guardStudent(req, b.value.profileId, { write: true });
   if (!g.ok) return g.response;
-  const { profileId } = g.value;
+  const { profileId, session } = g.value;
   // Checklist metadata is free; uploading a real file is Pro (documents_upload).
   const hasFile = Boolean(text(b.value.fileUrl, 600) || text(b.value.fileName, 240));
   if (hasFile) {
-    const locked = await premiumGate(profileId, "documents_upload");
+    const locked = await premiumGate(profileId, "documents_upload", Boolean(session.isAdmin));
     if (locked) return locked;
   }
   const title = text(b.value.title, 160);

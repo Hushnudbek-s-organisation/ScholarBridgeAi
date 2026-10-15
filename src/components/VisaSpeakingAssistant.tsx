@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 
 /** Whether this page is running inside somebody else's frame (a preview pane,
  *  an LMS embed...). Parent frames must grant `allow="microphone"` — the page's
@@ -707,6 +708,23 @@ export function VisaSpeakingAssistant({
       unanswered: string[];
       answerCount: number;
       averageAnswerWords: number;
+      /** Phase 2.5 — per-question coaching (absent from older responses). */
+      turnFeedback?: {
+        turnIndex: number;
+        question: string;
+        answer: string | null;
+        answerWordCount: number;
+        strengths: string[];
+        flag: string | null;
+        flagCode: string | null;
+      }[];
+      /** Phase 2.5 — contradiction check against the student's own profile. */
+      profileConsistency?: {
+        checked: boolean;
+        consistent: boolean;
+        unmentioned: string[];
+        contradictions: { field: string; profileValue: string; excerpt: string; message: string }[];
+      };
     };
     chanceDisclaimer?: string;
   };
@@ -1800,6 +1818,17 @@ export function VisaSpeakingAssistant({
             messages: messagesRef.current,
             uiLanguage: localeToLanguageName(locale),
             homeCountry: activeProfile?.country || undefined,
+            // Phase 2.5 — the spoken answers are cross-checked against the
+            // student's own record; unknown fields stay null and are skipped.
+            profile: activeProfile
+              ? {
+                  targetMajor: activeProfile.targetMajor ?? null,
+                  degreeLevel: activeProfile.degreeLevel ?? null,
+                  budgetAnnualUsd: activeProfile.budgetAnnualUsd ?? null,
+                  ieltsScore: activeProfile.ieltsScore ?? null,
+                  name: activeProfile.name ?? null,
+                }
+              : null,
             // Saves this session to the student's practice history (spec §13).
             profileId: activeProfile?.id ?? undefined,
           }),
@@ -1972,6 +2001,15 @@ export function VisaSpeakingAssistant({
 
       {screen === "setup" && (
         <div className="space-y-5">
+          {/* Phase 7 — read (and score) gold-standard embassy answers for the
+              four biggest destination countries before practising. */}
+          <SampleExemplarBar
+            kind="visa"
+            onLoad={(sampleText, sample) => {
+              const firstAnswer = sample.blocks[0]?.text.split(/\nA:\s?/)[1] ?? sampleText;
+              setTextAnswer(firstAnswer.trim());
+            }}
+          />
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
             <h2 className="text-base font-bold text-slate-900">
               {t("countryTitle")}
@@ -2524,7 +2562,52 @@ export function VisaSpeakingAssistant({
                 </ul>
               )}
 
-              {analysis.rubric.unanswered.length > 0 && (
+              {/* Phase 2.5 — one row per officer question: what worked, what to
+              retry, and whether the answer contradicts the profile. */}
+          {analysis.rubric.profileConsistency?.contradictions?.length ? (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-500/40 dark:bg-red-500/10">
+              <p className="text-[11px] font-black uppercase tracking-wide text-red-800 dark:text-red-200">
+                {t("turnProfileConflictsTitle")}
+              </p>
+              <ul className="mt-1 space-y-1">
+                {analysis.rubric.profileConsistency.contradictions.map((c) => (
+                  <li key={c.field} className="text-[12px] text-red-900 dark:text-red-200">
+                    {c.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {analysis.rubric.turnFeedback && analysis.rubric.turnFeedback.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{t("turnFeedbackTitle")}</h3>
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t("turnFeedbackSubtitle")}</p>
+              <ul className="mt-2 space-y-2">
+                {analysis.rubric.turnFeedback.map((turn) => (
+                  <li
+                    key={turn.turnIndex}
+                    className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                  >
+                    <p className="text-[12px] font-bold text-slate-800 dark:text-slate-100">{turn.question}</p>
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      {turn.answer
+                        ? t("turnAnswerWords", { count: turn.answerWordCount })
+                        : t("turnNotAnswered")}
+                      {turn.strengths.length > 0 && ` · ${t("turnStrengths", { items: turn.strengths.join(", ") })}`}
+                    </p>
+                    {turn.flag && (
+                      <p className="mt-1 rounded-md bg-amber-50 p-1.5 text-[11px] text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                        {turn.flag}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {analysis.rubric.unanswered.length > 0 && (
                 <p className="mt-3 text-[11px] text-slate-500">
                   Not substantively answered: {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
                 </p>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Navbar, StudentProfile } from "@/components/Navbar";
+import { Compass, X } from "lucide-react";
 import { ProfileModal } from "@/components/ProfileModal";
 import type { SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { PaymentsSection } from "@/components/PaymentsSection";
@@ -10,6 +11,8 @@ import { RewardsSection } from "@/components/RewardsSection";
 import { ParentDashboard } from "@/components/ParentDashboard";
 import { AdminPanel } from "@/components/AdminPanel";
 import { PremiumGate } from "@/components/PremiumGate";
+import { AdminModeProvider, ADMIN_VIEW_STORAGE_KEY, isAdminViewMode, type AdminViewMode } from "@/components/AdminModeContext";
+import { useStoredFlag, writeStoredFlag } from "@/components/useStoredFlag";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
@@ -17,12 +20,7 @@ import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
 import { PageTransition } from "@/components/motion";
-import {
-  DEFAULT_HIDDEN_NAV_ITEMS,
-  isProfileEditorTarget,
-  parseHiddenNav,
-  resolveNavTarget,
-} from "@/lib/navSections";
+import { DEFAULT_HIDDEN_NAV_ITEMS, focusModeHiddenIds, focusModeVisibleIds, isFocusModeActive, isProfileEditorTarget, parseHiddenNav, resolveNavTarget } from "@/lib/navSections";
 import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
 import { TelegramSettings } from "@/components/telegram/TelegramSettings";
@@ -70,6 +68,9 @@ const sessionCopy: Record<Locale, { opening: string; checking: string; unavailab
   uz: { opening: "ScholarBridge ochilmoqda…", checking: "Xavfsiz seansingiz tekshirilmoqda.", unavailable: "Boshqaruv paneli vaqtincha ishlamayapti", retry: "Qayta urinish", signIn: "Kirish sahifasiga o‘tish", details: "Qo‘shimcha ma’lumot" },
   ru: { opening: "Открываем ScholarBridge…", checking: "Проверяем защищённую сессию.", unavailable: "Панель временно недоступна", retry: "Повторить", signIn: "Перейти ко входу", details: "Подробнее" },
 };
+
+/** Focus mode is a per-browser UI preference, never a permission. */
+const FOCUS_MODE_STORAGE_KEY = "sb_focus_mode";
 
 function SessionRestoreLoader() {
   const { locale } = useLocaleContext();
@@ -133,6 +134,7 @@ export function Home({
   /** Locale the server resolved from the cookie — keeps SSR and hydration in one language. */
   initialLocale?: Locale;
 }) {
+  const tFocus = useTranslations("focusMode");
   // The open destination (one of the fourteen) and, inside a multi-tab
   // destination, the open tab. Both live in the URL hash so Back/Forward,
   // bookmarks and Telegram deep links keep working.
@@ -141,6 +143,12 @@ export function Home({
   // Ids an admin has turned off (Admin → Navigation). Hubs honour them too, so
   // a hidden tab is never reachable in the middle of a page.
   const [hiddenNav, setHiddenNav] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  // Pillar 8 — admin "god mode". Default admin_all for an admin session; the
+  // choice is remembered per browser. A non-admin is ALWAYS locked to the
+  // regular configuration, whatever a stored value says.
+  // Pillar 8 — admin "god mode". Default admin_all for an admin session; the
+  // choice is remembered per browser (external store, not an effect, so the
+  // SSR snapshot stays stable and no cascading render happens on mount).
   // "restoring" = checking the HttpOnly session before choosing a screen,
   // "landing"   = visitor with no active session,
   // "wizard"    = step-by-step onboarding for a brand-new user,
@@ -159,6 +167,33 @@ export function Home({
   // `profiles` is used by the picker to show this device's saved accounts.
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<StudentProfile | null>(null);
+  // The session's own admin flag (from /api/auth/session). An admin session
+  // unlocks every destination/pane and every premium section (Pillar 8).
+  const [sessionIsAdmin, setSessionIsAdmin] = useState(false);
+  const isAdminSession = activeProfile?.isAdmin === true || sessionIsAdmin;
+  // Preferred view mode is stored per browser; a non-admin can never reach it
+  // (the guard is re-checked here and again inside AdminModeContext).
+  const adminModePreference = useStoredFlag(ADMIN_VIEW_STORAGE_KEY);
+  const adminViewMode: AdminViewMode =
+    isAdminSession && isAdminViewMode(adminModePreference) ? adminModePreference : "admin_all";
+  const setAdminViewMode = useCallback(
+    (mode: AdminViewMode) => writeStoredFlag(ADMIN_VIEW_STORAGE_KEY, mode),
+    []
+  );
+  const adminUnlocked = isAdminSession && adminViewMode === "admin_all";
+  // Pillar 5.1 — focus mode. A presentation filter over the SAME hidden-id
+  // mechanism Admin → Navigation uses, so every hub keeps working. It is a
+  // per-browser UI preference, never a permission.
+  const focusMode = isFocusModeActive(useStoredFlag(FOCUS_MODE_STORAGE_KEY));
+  const setFocusMode = useCallback(
+    (next: boolean) => writeStoredFlag(FOCUS_MODE_STORAGE_KEY, next ? "1" : "0"),
+    []
+  );
+  // The one place the hidden-navigation list is neutralised for the operator:
+  // badges (not locks) tell the admin which ids regular users cannot see.
+  // Focus mode outranks both: it is the student's own "deep work" choice.
+  const navHidden = focusMode ? focusModeHiddenIds() : adminUnlocked ? [] : hiddenNav;
+  const focusModeVisibleCount = focusModeVisibleIds.length;
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -396,6 +431,7 @@ export function Home({
       if (res.ok && data.profile) {
         const storedId = Number(data.profile.id);
         setActiveProfile(data.profile);
+        setSessionIsAdmin(Boolean(data.session?.isAdmin ?? data.profile.isAdmin));
         rememberProfile(storedId);
         try {
           localStorage.setItem("scholarbridge_active_profile", String(storedId));
@@ -556,6 +592,8 @@ export function Home({
    * If it does not (new browser, expired session, different user), the picker
    * stays open so the person signs in with email + password.
    */
+
+
   const handlePickProfile = async (p: StudentProfile) => {
     try {
       const res = await fetch("/api/auth/session", { cache: "no-store" });
@@ -892,6 +930,7 @@ export function Home({
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
+      <AdminModeProvider isAdminSession={isAdminSession} hiddenForUsers={hiddenNav} mode={adminViewMode} onModeChange={setAdminViewMode}>
       <div className="min-h-screen bg-slate-100 flex flex-col lg:flex-row font-sans">
       <Navbar
         activeTab={activeTab}
@@ -906,6 +945,27 @@ export function Home({
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
+      {/* Pillar 5.1 — focus mode: one control, always in the same place. */}
+      <div className="mx-3 mt-3 flex flex-wrap items-center justify-end gap-2 sm:mx-6 lg:mx-8">
+        {focusMode && (
+          <p role="status" className="mr-auto rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[12px] font-semibold text-indigo-900 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+            {tFocus("active", { count: focusModeVisibleCount })}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => setFocusMode(!focusMode)}
+          aria-pressed={focusMode}
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-bold ${
+            focusMode
+              ? "border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-700"
+              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          }`}
+        >
+          {focusMode ? <X className="h-3.5 w-3.5" aria-hidden="true" /> : <Compass className="h-3.5 w-3.5" aria-hidden="true" />}
+          {focusMode ? tFocus("exit") : tFocus("enter")}
+        </button>
+      </div>
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
         {/* Sections swap with a short cross-fade + lift. The outer profile key
@@ -955,7 +1015,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               savedUniIds={savedUniIds}
               onSaveUniversity={handleSaveUniversity}
               onUnsaveUniversity={handleUnsaveUniversity}
@@ -972,7 +1032,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               savedScholarshipIds={savedScholarshipIds}
               onSaveScholarship={handleSaveScholarship}
               onUnsaveScholarship={handleUnsaveScholarship}
@@ -989,7 +1049,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1001,7 +1061,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1013,7 +1073,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               onOpenProfileModal={openProfileModal}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
@@ -1026,7 +1086,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1039,7 +1099,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1051,7 +1111,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1064,7 +1124,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1076,7 +1136,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1088,7 +1148,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1101,7 +1161,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1113,7 +1173,7 @@ export function Home({
               pane={activePane}
               setPane={openPane}
               navigate={handleNavigateTab}
-              hidden={hiddenNav}
+              hidden={navHidden}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />
@@ -1194,6 +1254,7 @@ export function Home({
       {/* Profile picker — this device's accounts plus email/password sign-in */}
       {profilePicker}
       </div>
+      </AdminModeProvider>
     </LocaleProvider>
   );
 }

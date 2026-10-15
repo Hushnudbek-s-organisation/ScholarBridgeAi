@@ -9,7 +9,8 @@
  * Run: npm run test:costs
  */
 
-import { assessPortfolio, calculateCosts, type ScholarshipInput } from "../src/lib/costs";
+import { assessPortfolio, calculateCosts, resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts, type ScholarshipInput } from "../src/lib/costs";
+import { buildFundingPlan, fundingLinesFromCosts } from "../src/lib/journey/funding";
 
 let passed = 0;
 let failed = 0;
@@ -179,7 +180,67 @@ const unknownFamily = calculateCosts({ annualTuitionUsd: 20000, annualLivingEstU
 check("missing family contribution stays explicitly unknown", unknownFamily.net.familyContributionKnown === false);
 check("missing contribution is not described as affordability", /Add the amount your family has explicitly confirmed/i.test(unknownFamily.verdict));
 
-section("7. Determinism");
+// ---------------------------------------------------------------------------
+section("7. The Funding Plan repeats the SAME total, line for line (defect 1.1/1.2)");
+
+// The /api/funding screen shows the per-line breakdown of the yearly cost. It
+// must sum to the same annual figure the calculator produced — no dropped
+// living estimate, no dropped flights, no phantom zero lines.
+const fundingCosts = calculateCosts({
+  annualTuitionUsd: 22000,
+  annualLivingEstUsd: null,
+  country: "South Korea",
+  years: 1,
+  visaFeeUsd: 500,
+  applicationFeeUsd: 60,
+});
+const fundingBreakdown = fundingLinesFromCosts(fundingCosts);
+check(
+  "the per-line breakdown accounts for 100% of the annual cost",
+  fundingBreakdown.lines.reduce((sum, l) => sum + l.cost, 0) === fundingCosts.annualTotalUsd,
+  `${fundingBreakdown.lines.reduce((sum, l) => sum + l.cost, 0)} vs ${fundingCosts.annualTotalUsd}`
+);
+check("no cost line is silently dropped", fundingBreakdown.unaccountedUsd === 0 && fundingBreakdown.foldedSources.length === 0);
+check(
+  "the living estimate and the flight estimate are present (they used to be zeroed out)",
+  fundingBreakdown.lines.find((l) => l.key === "food")!.cost > 0 &&
+    fundingBreakdown.lines.find((l) => l.key === "flight")!.cost > 0
+);
+const fundedPlan = buildFundingPlan({
+  annualCost: fundingCosts.annualTotalUsd,
+  lines: fundingBreakdown.lines,
+  items: [{ kind: "scholarship", name: "One award", amountUsd: 5000, status: "applied", covers: null }],
+});
+check(
+  "$5,000 of funding never becomes more than $5,000 of line coverage",
+  fundedPlan.byLine.reduce((sum, l) => sum + l.covered, 0) === 5000,
+  `${fundedPlan.byLine.reduce((sum, l) => sum + l.covered, 0)}`
+);
+check("one-off fees stay outside the yearly figure", fundingBreakdown.oneOff.reduce((s, o) => s + o.amountUsd, 0) === 560);
+
+section("8. Currency is never assumed (defect 1.8)");
+
+const foreign = resolvedUsdUniversityCosts({
+  annualTuition: 15000,
+  tuitionCurrency: "EUR",
+  annualLivingEst: 12000,
+  livingCostCurrency: "EUR",
+  annualTuitionUsd: null,
+  annualLivingEstUsd: null,
+});
+check("a EUR figure is NOT spent as USD", foreign.tuitionUsd === null && foreign.livingUsd === null);
+check("the non-USD currency is named", foreign.nonUsdCurrencies.includes("EUR"));
+const usdRow = resolvedUsdUniversityCosts({ annualTuition: 15000, tuitionCurrency: "USD", annualTuitionUsd: null });
+check("a USD figure is used", usdRow.tuitionUsd === 15000);
+const legacyRow = resolvedUsdUniversityCosts({ annualTuitionUsd: 17000, annualTuition: null, tuitionCurrency: "USD" });
+check("the legacy USD column still wins when present", legacyRow.tuitionUsd === 17000);
+check(
+  "a non-USD award is not reported as a dollar amount",
+  resolvedUsdScholarshipAmount({ awardAmount: 9000, awardCurrency: "GBP", amountUsdValue: null }).amountUsd === null &&
+    resolvedUsdScholarshipAmount({ awardAmount: 9000, awardCurrency: "USD", amountUsdValue: null }).amountUsd === 9000
+);
+
+section("9. Determinism");
 
 const a = calculateCosts({ annualTuitionUsd: 25000, country: "Canada", years: 4 });
 const b = calculateCosts({ annualTuitionUsd: 25000, country: "Canada", years: 4 });

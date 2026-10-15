@@ -34,6 +34,12 @@ export async function POST(req: Request) {
       scopes: Array.isArray(body.scopes) && body.scopes.length > 0 ? body.scopes : (AGENT_CONFIG as any).defaultScopes ?? [],
       dryRun: body.dryRun === true,
       maxPages: body.maxPages ? Number(body.maxPages) : undefined,
+      // Approval-queue gate (spec §5.4): a writing run may only apply the
+      // fields a human approved. Missing/empty means "no gate" for backwards
+      // compatibility with the existing dry-run-then-trust workflow.
+      approvedFields: Array.isArray(body.approvedFields)
+        ? body.approvedFields.filter((k: unknown): k is string => typeof k === "string").slice(0, 500)
+        : undefined,
     };
 
     const runId = createRun(ids[0]);

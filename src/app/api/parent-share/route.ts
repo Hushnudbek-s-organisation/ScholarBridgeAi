@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       return noStoreJson({ error: access.error, code: access.code }, { status: access.status });
     }
     // The UI gate is not authorization: every state-changing request is gated here too.
-    const locked = await premiumGate(access.session.profile.id, "parent_dashboard");
+    const locked = await premiumGate(access.session.profile.id, "parent_dashboard", Boolean(access.session.isAdmin));
     if (locked) return noStoreResponse(locked);
 
     const enabled = body.enabled === true;
@@ -122,7 +122,7 @@ export async function PATCH(req: Request) {
     if (!access.ok) {
       return noStoreJson({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "parent_dashboard");
+    const locked = await premiumGate(access.session.profile.id, "parent_dashboard", Boolean(access.session.isAdmin));
     if (locked) return noStoreResponse(locked);
 
     const email = clampString(parsed.body.email, 254);
@@ -165,7 +165,7 @@ export async function GET(req: Request) {
       if (!access.ok) {
         return noStoreJson({ error: access.error, code: access.code }, { status: access.status });
       }
-      const locked = await premiumGate(access.session.profile.id, "parent_dashboard");
+      const locked = await premiumGate(access.session.profile.id, "parent_dashboard", Boolean(access.session.isAdmin));
       if (locked) return noStoreResponse(locked);
 
       const [settings] = await db

@@ -21,7 +21,14 @@ export async function runBatch(
     }
     progress(id, `Starting university #${id}...`);
     try {
-      const report = await runUniversity(id, request.scopes, request.dryRun ?? false, (m) => progress(id, m));
+      const report = await runUniversity(
+        id,
+        request.scopes,
+        request.dryRun ?? false,
+        (m) => progress(id, m),
+        undefined,
+        request.approvedFields ?? null,
+      );
       reports.push(report);
     } catch (err: any) {
       errors.push(`#${id}: ${err?.message || err}`);

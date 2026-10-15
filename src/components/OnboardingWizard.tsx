@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { ProfileAutoFillCard } from "@/components/ProfileAutoFillCard";
 import { useTranslations } from "next-intl";
 import {
   countriesMatch,
@@ -482,6 +483,32 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         {/* STEP 1 — Name, email & password (mandatory on new accounts) */}
         {step === 0 && (
           <div className="space-y-4">
+            {/* Pillar 5.2 — paste a CV / transcript / IELTS report and the
+                fields below are filled after the student confirms them. */}
+            <ProfileAutoFillCard
+              profileId={profile?.id ?? null}
+              onApply={(patch) => {
+                setForm((f) => {
+                  const next = { ...f };
+                  const asText = (v: unknown) => (v == null ? "" : String(v));
+                  if (patch.fullName) next.name = asText(patch.fullName);
+                  if (patch.email && !next.email) next.email = asText(patch.email);
+                  if (patch.degreeLevel) next.degreeLevel = asText(patch.degreeLevel);
+                  if (patch.targetMajor) next.targetMajor = asText(patch.targetMajor);
+                  if (patch.gpa != null) next.gpa = asText(patch.gpa);
+                  if (patch.gpaScale != null) next.gpaScale = asText(patch.gpaScale);
+                  if (patch.ieltsScore != null) next.ieltsScore = asText(patch.ieltsScore);
+                  if (patch.toeflScore != null) next.toeflScore = asText(patch.toeflScore);
+                  if (patch.satScore != null) next.satScore = asText(patch.satScore);
+                  if (patch.greScore != null) next.greScore = asText(patch.greScore);
+                  if (patch.budgetAnnualUsd != null) next.budgetAnnualUsd = asText(patch.budgetAnnualUsd);
+                  if (patch.researchPublications != null) next.researchPublications = asText(patch.researchPublications);
+                  if (patch.extracurriculars) next.extracurriculars = asText(patch.extracurriculars);
+                  if (patch.leadership) next.extracurriculars = [next.extracurriculars, asText(patch.leadership)].filter(Boolean).join("\n");
+                  return next;
+                });
+              }}
+            />
             <div>
               <label className={labelCls} htmlFor="ob-name">{tOnboarding("fullNameLabel")}</label>
               <input

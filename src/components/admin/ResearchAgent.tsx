@@ -11,7 +11,11 @@ import {
   AlertTriangle,
   XCircle,
   FlaskConical,
+  Check,
+  Ban,
+  ListChecks,
 } from "lucide-react";
+import { buildApprovalQueue, type QueueItem } from "@/lib/research-agent/approvalQueue";
 
 interface ResearchAgentProps {
   adminProfileId: number;
@@ -53,6 +57,9 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState<RunProgress | null>(null);
   const [error, setError] = useState("");
+  // ---- Approval queue (spec §5.4) ------------------------------------------
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queueBusy, setQueueBusy] = useState(false);
 
   const searchUnis = async (q: string) => {
     setQuery(q);
@@ -71,6 +78,52 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
 
   const toggleScope = (s: string) => {
     setScopes((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+  };
+
+  /**
+   * Apply the approved fields only.
+   *
+   * The run is still a full extraction (so the report stays an honest preview),
+   * but `approvedFields` limits the write to what the operator ticked. Refusing
+   * to run while proposals are unanswered is the point of the queue.
+   */
+  const applyApproved = async () => {
+    const approved = queue.filter((item) => item.decision === "approved").map((item) => item.id);
+    const pending = queue.filter((item) => item.decision === "pending").length;
+    if (approved.length === 0) {
+      setError("Nothing approved yet — approve at least one field to apply.");
+      return;
+    }
+    if (pending > 0) {
+      setError(`${pending} proposal(s) still have no decision. Approve or reject them all first.`);
+      return;
+    }
+    const universityId = queue.find((item) => item.decision === "approved")?.universityId ?? selected;
+    if (!universityId) return;
+    setError("");
+    setRunning(true);
+    setRun(null);
+    try {
+      const res = await fetch("/api/admin/research-agent/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminProfileId,
+          universityId,
+          scopes,
+          dryRun: false,
+          approvedFields: approved,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start");
+      // Decided items are history once applied.
+      void queueRequest({ clear: true });
+      pollRun(data.runId);
+    } catch (err: any) {
+      setError(err.message || "Failed to start");
+      setRunning(false);
+    }
   };
 
   const runResearch = async () => {
@@ -96,6 +149,45 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
     }
   };
 
+  const queueRequest = async (body: Record<string, unknown>) => {
+    setQueueBusy(true);
+    try {
+      const res = await fetch("/api/admin/research-agent/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminProfileId, ...body }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Queue update failed");
+      setQueue(data.items ?? []);
+    } catch (err: any) {
+      setError(err.message || "Queue update failed");
+    } finally {
+      setQueueBusy(false);
+    }
+  };
+
+  /**
+   * Load the queue once on mount. The fetch is guarded by a mount flag rather
+   * than an effect-local setState, so a slow response cannot land after the
+   * panel is gone (and the effect never sets state synchronously).
+   */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/research-agent/queue?adminProfileId=${adminProfileId}`);
+        const data = await res.json();
+        if (alive && res.ok) setQueue(data.items ?? []);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [adminProfileId]);
+
   const pollRun = (runId: string) => {
     const tick = async () => {
       try {
@@ -107,6 +199,12 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             setTimeout(tick, 1500);
           } else {
             setRunning(false);
+            // Every proposal becomes a queue item; nothing is written until a
+            // human approves it. Idempotent by `<entity>.<field>`.
+            if (data.run.report) {
+              const items = buildApprovalQueue(data.run.report);
+              if (items.length > 0) void queueRequest({ queue: items });
+            }
           }
         } else {
           setRunning(false);
@@ -252,6 +350,117 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
           </div>
         </div>
       )}
+
+      {/* Approval queue (spec §5.4) — field-by-field diff, 1-click decisions */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <ListChecks className="h-3.5 w-3.5" /> Approval queue
+          </p>
+          <div className="flex items-center gap-2 text-[11px] font-bold">
+            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">
+              {queue.filter((i) => i.decision === "pending").length} pending
+            </span>
+            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-emerald-700">
+              {queue.filter((i) => i.decision === "approved").length} approved
+            </span>
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">
+              {queue.filter((i) => i.decision === "rejected").length} rejected
+            </span>
+            <button
+              type="button"
+              onClick={() => void queueRequest({ clear: true })}
+              disabled={queueBusy}
+              className="min-h-9 rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+            >
+              Clear decided
+            </button>
+            <button
+              type="button"
+              onClick={() => void applyApproved()}
+              disabled={queueBusy || running || queue.every((i) => i.decision !== "approved")}
+              className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              Apply approved
+            </button>
+          </div>
+        </div>
+        {queue.length === 0 ? (
+          <p className="px-4 py-6 text-center text-[11px] text-slate-500">
+            No proposals queued. Run the agent for a university — every proposed field change lands here for a decision.
+          </p>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {queue.map((item) => (
+              <div key={item.id} className="flex flex-wrap items-start gap-2 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-extrabold text-slate-800">
+                      {item.entity}.{item.field}
+                    </span>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                      {item.action}
+                    </span>
+                    {item.needsReview && (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                        needs review
+                      </span>
+                    )}
+                    {item.confidence != null && (
+                      <span className="text-[10px] text-slate-400">confidence {(Number(item.confidence) * 100).toFixed(0)}%</span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-600">
+                    {String(item.currentValue ?? "NULL")}
+                    {item.currency ? ` ${item.currency}` : ""} → <b>{String(item.proposedValue ?? "NULL")}</b>
+                    {item.currency ? ` ${item.currency}` : ""}
+                  </p>
+                  <p className="text-[10px] text-slate-400">{item.reason}</p>
+                  {item.sourceUrl && (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-[10px] text-indigo-600 hover:underline"
+                    >
+                      {item.sourceTitle || item.sourceUrl}
+                    </a>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void queueRequest({ id: item.id, decision: "approved" })}
+                    disabled={queueBusy || item.decision === "approved"}
+                    aria-pressed={item.decision === "approved"}
+                    className={`inline-flex min-h-9 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${
+                      item.decision === "approved"
+                        ? "bg-emerald-600 text-white"
+                        : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    } disabled:opacity-60`}
+                  >
+                    <Check className="h-3 w-3" /> Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void queueRequest({ id: item.id, decision: "rejected" })}
+                    disabled={queueBusy || item.decision === "rejected"}
+                    aria-pressed={item.decision === "rejected"}
+                    className={`inline-flex min-h-9 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${
+                      item.decision === "rejected"
+                        ? "bg-slate-700 text-white"
+                        : "border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    } disabled:opacity-60`}
+                  >
+                    <Ban className="h-3 w-3" /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Final report */}
       {report && (

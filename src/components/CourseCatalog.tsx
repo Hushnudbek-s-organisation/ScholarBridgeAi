@@ -41,11 +41,21 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
         const inProgress = course.progressPct > 0 && course.progressPct < 100;
         const done = course.progressPct >= 100;
         return (
-          <div
+          /* The card was a clickable <div> wrapping a <button>: two nested
+             interactive elements, no keyboard focus stop for the card, and a
+             screen reader that only saw the inner button. It is now a card
+             whose single full-size button is a sibling of the content (the
+             stretched-link pattern) — one focus stop, valid markup, same look. */
+          <article
             key={course.id}
-            onClick={() => onOpen(course.id)}
-            className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden hover:shadow-lg hover:border-indigo-300 transition-all cursor-pointer flex flex-col"
+            className="relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg"
           >
+            <button
+              type="button"
+              onClick={() => onOpen(course.id)}
+              aria-label={`${course.title} — ${done ? t("viewCertificate") : inProgress ? t("continueCourse") : t("startCourse")}`}
+              className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+            />
             <div className="relative h-40 bg-gradient-to-br from-indigo-500 via-blue-600 to-violet-600">
               {course.thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -80,18 +90,20 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
                 </div>
               </div>
 
+              {/* Visual affordance only — the card itself is the button, so
+                  this is a span (no nested interactive element). */}
               <div className="mt-auto pt-3">
-                <button
-                  className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    inProgress ? "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600" : done ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-indigo-600 text-white hover:bg-indigo-700"
+                <span
+                  className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-colors ${
+                    inProgress ? "bg-amber-500 text-white sb-ink-on-warm" : done ? "bg-emerald-600 text-white" : "bg-indigo-600 text-white"
                   }`}
                 >
                   <PlayCircle className="h-4 w-4" />
                   {done ? t("viewCertificate") : inProgress ? t("continueCourse") : t("startCourse")}
-                </button>
+                </span>
               </div>
             </div>
-          </div>
+          </article>
         );
       })}
     </div>

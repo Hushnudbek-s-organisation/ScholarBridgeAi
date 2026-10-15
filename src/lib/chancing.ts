@@ -143,8 +143,13 @@ export function countActivities(profile: ChancingProfile): {
     ...parseListColumn(profile.projects),
   ].length;
   const leadership = parseListColumn(profile.leadership).length;
-  const research =
-    parseListColumn(profile.researchExperience).length + Number(profile.researchPublications ?? 0);
+  // A JSON `researchPublications` column can arrive as null (never entered),
+  // as a numeric string, or as NaN from a bad import. Only a finite, positive
+  // count is a record; anything else is "not recorded" — never a negative and
+  // never NaN poisoning the section totals downstream.
+  const pubsRaw = Number(profile.researchPublications);
+  const pubs = Number.isFinite(pubsRaw) ? Math.max(0, pubsRaw) : 0;
+  const research = parseListColumn(profile.researchExperience).length + pubs;
   const saved = profile.savedActivities ?? [];
   const savedLeadership = saved.filter(
     (a) =>
@@ -173,8 +178,16 @@ export function countActivities(profile: ChancingProfile): {
   };
 }
 
-/** 0–1: how much relevant profile information the student has recorded. */
+/**
+ * 0–1: how much relevant profile information the student has recorded.
+ *
+ * The activity / leadership / award checks reuse `countActivities`, which is
+ * also the source of the portfolio summary: the same saved activity now moves
+ * the completeness bar and the strength panel together, instead of one seeing
+ * the profile text columns and the other seeing nothing.
+ */
 export function profileCompletenessRatio(profile: ChancingProfile): number {
+  const act = countActivities(profile);
   const checks = [
     Number(profile.gpa) > 0,
     Number(profile.gpaScale) > 0,
@@ -183,9 +196,9 @@ export function profileCompletenessRatio(profile: ChancingProfile): number {
     Boolean(profile.country),
     Boolean(profile.targetMajor),
     Number(profile.budgetAnnualUsd) > 0 || Number(profile.familyIncomeUsd) > 0 || profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship === true,
-    countActivities(profile).activities > 0,
-    parseListColumn(profile.leadership).length > 0,
-    parseListColumn(profile.awards).length + parseListColumn(profile.olympiads).length > 0,
+    act.activities > 0,
+    act.leadership > 0,
+    act.awards > 0,
     Boolean(profile.careerGoal),
     Number(profile.graduationYear) > 0,
   ];
@@ -288,11 +301,22 @@ export function profileStrength(
 
   const measuredSections = sections.filter((item) => !item.unknown);
   const scoredSections = measuredSections.length;
-  const overallPrecise = measuredSections.length
-    ? roundTo(measuredSections.reduce((sum, item) => sum + item.scorePrecise, 0) / measuredSections.length, 1)
+  // MONOTONICITY (2026-10 fix): the headline coverage index used a denominator
+  // of *measured* sections only, so recording the very first detail of an
+  // optional area dropped the headline percentage — a full academic record
+  // read 100 %, then adding a budget read 78 %. Progress that punishes a
+  // student for telling us more is a lie about progress.
+  //
+  // The headline now runs over a FIXED canonical denominator (every section in
+  // the profile record), and each section contributes a coverage value that can
+  // only rise as details are added. "X of Y sections started" stays honest in
+  // `scoredSections` / `totalSections`; the percentage itself is monotone:
+  // adding any recorded detail never lowers it.
+  const overallPrecise = sections.length
+    ? roundTo(sections.reduce((sum, item) => sum + item.coverage * 100, 0) / sections.length, 1)
     : 0;
   const overall = Math.round(overallPrecise);
-  const basis = "This percentage is average information coverage across sections with at least one recorded detail. Empty optional sections are excluded. It does not measure eligibility, application quality, or admission likelihood.";
+  const basis = `This percentage is average information coverage across all ${sections.length} profile areas, counted against a fixed list so recording one more detail can never lower it. Areas with nothing recorded yet contribute 0 and stay marked as not recorded, not as a penalty. It does not measure eligibility, application quality, or admission likelihood.`;
   return {
     overall,
     overallPrecise,
@@ -310,13 +334,20 @@ export interface ExtracurricularAnalysis {
   awards: number;
 }
 
-/** Counts recorded activity fields; it does not score quality or merit. */
+/**
+ * Counts recorded activity fields; it does not score quality or merit.
+ *
+ * `countActivities` already folds `researchPublications` into `research`; the
+ * previous version added it a second time here, so three publications were
+ * reported as six research records in the strength panel while the section
+ * itself counted three. One profile, one number.
+ */
 export function analyzeExtracurriculars(profile: ChancingProfile): ExtracurricularAnalysis {
   const counts = countActivities(profile);
   return {
     activities: counts.activities,
     leadership: counts.leadership,
-    research: counts.research + Math.max(0, Number(profile.researchPublications ?? 0)),
+    research: counts.research,
     awards: counts.awards,
   };
 }

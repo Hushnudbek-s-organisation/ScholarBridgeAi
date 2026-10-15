@@ -8,7 +8,17 @@
  * Run: npm run test:essays
  */
 
-import { analyzeEssay, compareVersions, countWords, paragraphs, sentences } from "../src/lib/essay";
+import {
+  analyzeAgency,
+  analyzeEssay,
+  analyzeFlow,
+  analyzePromptCoverage,
+  compareVersions,
+  countWords,
+  paragraphs,
+  sentences,
+  splitPromptParts,
+} from "../src/lib/essay";
 
 let passed = 0;
 let failed = 0;
@@ -171,6 +181,99 @@ check("the delta is positive", cmp.delta.total > 0, `delta=${cmp.delta.total}`);
 check("fixed issues are listed", cmp.fixedIssues.length > 0);
 check("word delta is computed", cmp.wordDelta === s.wordCount - w.wordCount);
 check("a rewrite of the same text reports no change", compareVersions(strong, strong).delta.total === 0);
+
+// ---------------------------------------------------------------------------
+
+/** Every clause is checked; the first failure is reported with its reason. */
+function expectAll(name: string, clauses: [boolean, string][]) {
+  const bad = clauses.find(([ok]) => !ok);
+  check(name, !bad, bad ? bad[1] : "");
+}
+
+console.log("\n— paragraph flow, agency and prompt coverage —");
+
+// Paragraphs that share vocabulary and use transitions vs. three unrelated ones.
+const linked = [
+  "I built a machine-learning model to detect soil salinity across the Fergana Valley.",
+  "The model reduced water usage because it predicted root-zone moisture 48 hours ahead.",
+  "This work therefore led to two conference papers at IEEE ICISCT 2025.",
+].join("\n\n");
+
+const jumpy = [
+  "I built a machine-learning model to detect soil salinity across the Fergana Valley.",
+  "My favourite childhood memory is playing chess with my grandfather in Bukhara.",
+  "The capital of Portugal is Lisbon and the weather there is mild in spring.",
+].join("\n\n");
+
+const linkedFlow = analyzeFlow(linked);
+const jumpyFlow = analyzeFlow(jumpy);
+
+expectAll("paragraphs that share ideas and use transitions score above jumping ones", [
+  [linkedFlow.score > jumpyFlow.score, `expected ${linkedFlow.score} > ${jumpyFlow.score}`],
+  [jumpyFlow.abruptJumps.length >= 1, "an unlinked topic change must be reported"],
+  [
+    linkedFlow.connectors.includes("because") || linkedFlow.connectors.includes("therefore"),
+    "transitions must be recognised",
+  ],
+]);
+
+const mixed = analyzeAgency(linked + "\n\nI was involved in a student club and helped with events.");
+
+expectAll("agency separates ownership verbs from passive filler", [
+  [mixed.strongVerbs.some((v) => v.verb === "built"), "built must be counted as ownership"],
+  [mixed.weakPhrases.some((w) => w.phrase === "was involved in"), "the weak phrase must be reported"],
+  [mixed.weakPhrases[0].excerpt.length > 0, "the weak phrase must carry the sentence it appears in"],
+  [mixed.strongCount >= 2, "two ownership verbs are present"],
+]);
+
+const passiveAgency = analyzeAgency("I was involved in several projects and was responsible for reports.");
+const activeAgency = analyzeAgency("I engineered the pipeline, reduced water use and published two papers.");
+
+check(
+  "an all-passive draft scores below an ownership draft",
+  activeAgency.score > passiveAgency.score,
+  `${activeAgency.score} should exceed ${passiveAgency.score}`,
+);
+
+const prompt = "Why this university?\nWhat will you study there and why?\nHow will you fund your studies?";
+const promptParts = splitPromptParts(prompt);
+const partialCoverage = analyzePromptCoverage(
+  "I want to study machine learning at this university because of the vision group.",
+  prompt,
+);
+
+expectAll("prompt coverage checks every sub-question and reports the misses", [
+  [promptParts.length === 3, "three sub-questions must be split out"],
+  [partialCoverage !== null, "coverage must be computed when a prompt is given"],
+  [partialCoverage?.totalParts === 3, "the total must match the split prompt"],
+  [partialCoverage?.covered[0] === true, "the first sub-question is clearly addressed"],
+  [
+    (partialCoverage?.coveredCount ?? 99) < (partialCoverage?.totalParts ?? 0),
+    "funding is not addressed and must be flagged",
+  ],
+  [analyzePromptCoverage("anything", null) === null, "no prompt means no verdict"],
+]);
+
+const withoutPrompt = analyzeEssay(linked, { type: "sop", wordLimit: 500 });
+const withPrompt = analyzeEssay(linked, {
+  type: "sop",
+  wordLimit: 500,
+  prompt: "Why water?\nHow will you fund it?",
+});
+
+expectAll("analyzeEssay carries the three passes and never moves the total by more than 2", [
+  [Boolean(withoutPrompt.flow) && Boolean(withoutPrompt.agency), "flow and agency are always computed"],
+  [withoutPrompt.promptCoverage === null, "no prompt => null coverage"],
+  [Boolean(withPrompt.promptCoverage), "coverage appears when the prompt is supplied"],
+  [
+    Math.abs(withPrompt.scores.total - withoutPrompt.scores.total) <= 2,
+    "adding a prompt may only move the total within the measured correction band",
+  ],
+  [
+    withPrompt.issues.every((issue) => typeof issue.message === "string" && issue.message.length > 0),
+    "every issue keeps a written explanation",
+  ],
+]);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

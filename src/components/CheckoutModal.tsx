@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { X, CreditCard, ArrowRight } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { useFocusTrap } from "./useFocusTrap";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -27,17 +28,13 @@ export function CheckoutModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Escape closes the dialog. Keyboard-only users had no way out except
-  // tabbing to the small × button, and assistive tech could not tell this was
-  // a dialog at all (no role/aria-modal).
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  // Escape closes the dialog, Tab cycles inside it and focus returns to the
+  // "Upgrade" button on close. Keyboard-only users had no way out except
+  // tabbing to the small × button, and could tab past it into the page behind
+  // the overlay; assistive tech could not tell this was a dialog at all before
+  // role/aria-modal were added.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -80,9 +77,11 @@ export function CheckoutModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
+        tabIndex={-1}
         className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4"
       >
         <div className="flex items-center justify-between">

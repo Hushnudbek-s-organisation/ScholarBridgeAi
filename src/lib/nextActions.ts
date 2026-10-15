@@ -12,9 +12,16 @@
  * around these grounded actions; it never decides them.
  */
 
+import {
+  ACTION_SCORE,
+  actionUrgencyFromScore,
+  rankActions,
+  type RankableAction,
+} from "./rankedActions";
+
 export type ActionUrgency = "critical" | "high" | "medium" | "low";
 
-export interface NextAction {
+export interface NextAction extends RankableAction {
   id: string;
   title: string;
   /** One sentence the student can act on. */
@@ -54,12 +61,7 @@ export interface NextActionsContext {
   submittedWithoutOutcome: number;
 }
 
-const urgencyFromScore = (score: number): ActionUrgency => {
-  if (score >= 90) return "critical";
-  if (score >= 60) return "high";
-  if (score >= 30) return "medium";
-  return "low";
-};
+const urgencyFromScore = (score: number): ActionUrgency => actionUrgencyFromScore(score);
 
 /**
  * Build every candidate action with a score. Sorted by score, ties broken by
@@ -93,7 +95,11 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
           : "Confirm the cutoff, time zone, required materials and submission route with the official source; set any personal reminders that suit your situation.",
       urgency: overdue || dueToday ? "critical" : "medium",
       target: deadline.type === "scholarship" ? "scholarships" : "deadlines",
-      score: overdue ? 100 : dueToday ? 95 : 70,
+      score: overdue
+        ? ACTION_SCORE.deadlinePassed
+        : dueToday
+          ? ACTION_SCORE.deadlineToday
+          : ACTION_SCORE.deadlineFuture,
       dueInDays: deadline.daysRemaining,
     });
   }
@@ -223,13 +229,9 @@ export function buildCandidateActions(ctx: NextActionsContext): NextAction[] {
     });
   }
 
-  return actions.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const da = a.dueInDays ?? Number.MAX_SAFE_INTEGER;
-    const db = b.dueInDays ?? Number.MAX_SAFE_INTEGER;
-    if (da !== db) return da - db;
-    return a.id.localeCompare(b.id);
-  });
+  // Ordering comes from src/lib/rankedActions.ts so the dashboard, the roadmap
+  // endpoint and the AI brief can never disagree about which step is first.
+  return rankActions(actions);
 }
 
 export interface NextActionsResult {

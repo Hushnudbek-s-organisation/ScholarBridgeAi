@@ -50,6 +50,7 @@ import {
   hashStartToken,
 } from "../src/lib/telegram/core";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
+import { isDigestDay, isoWeekId, localIsoDate, localWeekday, pickTopMicroAction } from "../src/lib/telegram/weeklyDigest";
 
 let passed = 0;
 const failures: string[] = [];
@@ -436,6 +437,96 @@ check("new UI strings exist in en/uz/ru", () => {
   const miniAppSource = read("src/components/telegram/MiniApp.tsx");
   assert.ok(miniAppSource.includes("dictionaries.en.telegram.miniApp"), "Mini App uses checked-in message dictionaries");
   assert.ok(miniAppSource.includes("formatMessage(t.hello"), "Mini App interpolation uses the shared message formatter");
+});
+
+
+console.log("\nTelegram — weekly micro-action digest (Pillar 5.6)");
+
+check("Monday is decided in the reminder timezone, not on the server clock", () => {
+  const sundayLate = new Date("2026-03-08T20:30:00Z"); // 01:30 Monday in Tashkent
+  assert.equal(localWeekday(sundayLate, "Asia/Tashkent"), 1);
+  assert.equal(isDigestDay(sundayLate, "Asia/Tashkent"), true);
+  assert.equal(isDigestDay(sundayLate, "UTC"), false); // still Sunday in UTC
+  assert.equal(isDigestDay(new Date("2026-03-10T05:00:00Z"), "Asia/Tashkent"), false); // Tuesday
+  assert.equal(localIsoDate(sundayLate, "Asia/Tashkent"), "2026-03-09");
+  assert.equal(localIsoDate(sundayLate, "UTC"), "2026-03-08");
+});
+
+check("one digest per ISO week: the id is stable all week and rolls over on Monday", () => {
+  const mon = isoWeekId(new Date("2026-03-09T05:00:00Z"), "Asia/Tashkent");
+  const sun = isoWeekId(new Date("2026-03-15T05:00:00Z"), "Asia/Tashkent");
+  const nextMon = isoWeekId(new Date("2026-03-16T05:00:00Z"), "Asia/Tashkent");
+  assert.equal(mon, "2026-W11");
+  assert.equal(sun, mon, "Sunday still belongs to the same ISO week");
+  assert.notEqual(nextMon, mon);
+  assert.equal(isoWeekId(new Date("2026-01-01T12:00:00Z"), "UTC"), "2026-W01");
+  assert.equal(isoWeekId(new Date("2025-12-29T12:00:00Z"), "UTC"), "2026-W01", "ISO week-year, not calendar year");
+});
+
+check("the nudge names the most overdue task first", () => {
+  const chosen = pickTopMicroAction(
+    [
+      { kind: "requirement", id: 3, title: "Ask Prof. Alimov for a letter", dueIso: "2026-03-05" },
+      { kind: "deadline", id: 7, title: "DAAD application", dueIso: "2026-03-02" },
+      { kind: "deadline", id: 9, title: "IELTS retake", dueIso: "2026-04-01" },
+    ],
+    "2026-03-09"
+  );
+  assert.equal(chosen?.id, 7);
+  assert.equal(chosen?.kind, "deadline");
+});
+
+check("then today, then the nearest upcoming date", () => {
+  const today = pickTopMicroAction(
+    [
+      { kind: "requirement", id: 1, title: "Transcript", dueIso: "2026-03-09" },
+      { kind: "deadline", id: 2, title: "Scholarship", dueIso: "2026-03-20" },
+    ],
+    "2026-03-09"
+  );
+  assert.equal(today?.id, 1);
+  const soonest = pickTopMicroAction(
+    [
+      { kind: "deadline", id: 5, title: "Far", dueIso: "2026-05-01" },
+      { kind: "deadline", id: 6, title: "Near", dueIso: "2026-03-12" },
+    ],
+    "2026-03-09"
+  );
+  assert.equal(soonest?.id, 6, "nearest upcoming date wins");
+});
+
+check("undated rows rank last, tracked dates before checklist rows", () => {
+  const chosen = pickTopMicroAction(
+    [
+      { kind: "requirement", id: 4, title: "No date row", dueIso: null },
+      { kind: "deadline", id: 8, title: "Tracked, no date", dueIso: null },
+    ],
+    "2026-03-09"
+  );
+  assert.equal(chosen?.id, 8);
+});
+
+check("nothing to nudge → null (the bot sends the calm weekly line instead)", () => {
+  assert.equal(pickTopMicroAction([], "2026-03-09"), null);
+  assert.equal(
+    pickTopMicroAction([{ kind: "deadline", id: 0, title: "bad id", dueIso: null }], "2026-03-09"),
+    null
+  );
+  assert.equal(
+    pickTopMicroAction([{ kind: "deadline", id: 2, title: "   ", dueIso: "2026-03-09" }], "2026-03-09"),
+    null
+  );
+});
+
+check("the digest is wired to the scheduler, the cron route and the admin action", () => {
+  const sweep = read("src/lib/notificationSweep.ts");
+  assert.ok(sweep.includes("runWeeklyMicroActionDigest"), "digest runner exists");
+  assert.ok(/runWeeklyMicroActionDigest\(\)/.test(sweep.split("async function scheduledJobs")[1] ?? ""), "the scheduled job runs it");
+  assert.ok(sweep.includes("isDigestDay"), "weekday guard consulted");
+  assert.ok(sweep.includes("WEEKLY_DIGEST_CONFIG_KEY"), "once-per-week idempotency key");
+  const admin = read("src/app/api/admin/telegram/route.ts");
+  assert.ok(admin.includes('action === "weekly_digest"') && admin.includes("force: true"), "admin can send it now");
+  assert.ok(read("src/app/api/cron/deadline-notifications/route.ts").includes("CRON_SECRET"), "cron alias keeps the secret check");
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

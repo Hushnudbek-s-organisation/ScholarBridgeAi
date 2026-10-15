@@ -17,6 +17,7 @@ import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import { pickBestSource } from "@/lib/sourcePick";
 import { selectUniversities } from "@/lib/universities";
+import { resolvedUsdUniversityCosts } from "@/lib/costs";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 
@@ -110,10 +111,25 @@ export async function GET(req: Request) {
       allUnis = allUnis.filter((u) => supportsDegreeLevel(u.degreeLevel, requestedDegree));
     }
 
-    // Tuition filter: only universities with VERIFIED tuition (NULL excluded, spec §16).
+    // Public / Private filter (spec §16). This used to be read from the query
+    // string and then never applied, so choosing "Private" returned the same
+    // list. Matching is case-insensitive and tolerant of null (a university
+    // whose type is unknown is NOT claimed to be public).
+    if (uniType && uniType !== "All") {
+      const wanted = uniType.trim().toLowerCase();
+      allUnis = allUnis.filter((u) => (u.universityType ?? "").trim().toLowerCase() === wanted);
+    }
+
+    // Tuition filter: only universities with VERIFIED USD tuition (NULL
+    // excluded, spec §16). Currency-safe: a EUR/GBP/KRW figure is not compared
+    // against a USD budget, and the canonical USD column is used when the
+    // legacy USD mirror is empty.
     if (maxTuition && !isNaN(Number(maxTuition))) {
       const maxT = Number(maxTuition);
-      allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
+      allUnis = allUnis.filter((u) => {
+        const tuition = resolvedUsdUniversityCosts(u).tuitionUsd;
+        return tuition != null && tuition <= maxT;
+      });
     }
 
     if (ieltsFilter && !isNaN(Number(ieltsFilter))) {
@@ -257,8 +273,16 @@ export async function GET(req: Request) {
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
+      // Currency-aware USD cost for display/filters, plus the Public/Private
+      // flag the explorer filter needs. Both come from the same resolver the
+      // matcher uses, so cards and filters can never disagree.
+      const usdCosts = resolvedUsdUniversityCosts(uni);
       return {
         ...uni,
+        universityType: uni.universityType ?? null,
+        annualTuitionUsdResolved: usdCosts.tuitionUsd,
+        annualLivingEstUsdResolved: usdCosts.livingUsd,
+        nonUsdCurrencies: usdCosts.nonUsdCurrencies,
         programFields: progFields,
         matchScore: matchInfo.matchScore,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
@@ -275,19 +299,18 @@ export async function GET(req: Request) {
     });
 
     // ---------- Sorting (NULL tuition sorts after verified values) ----------
-    if (sort === "tuition_asc") {
+    if (sort === "tuition_asc" || sort === "tuition_desc") {
+      // Sorted on the RESOLVED USD figure (canonical column included, foreign
+      // currencies excluded) so rows with no comparable price sort last instead
+      // of pretending to be free.
+      const dir = sort === "tuition_asc" ? 1 : -1;
       results.sort((a, b) => {
-        if (a.annualTuitionUsd == null && b.annualTuitionUsd == null) return 0;
-        if (a.annualTuitionUsd == null) return 1;
-        if (b.annualTuitionUsd == null) return -1;
-        return a.annualTuitionUsd - b.annualTuitionUsd;
-      });
-    } else if (sort === "tuition_desc") {
-      results.sort((a, b) => {
-        if (a.annualTuitionUsd == null && b.annualTuitionUsd == null) return 0;
-        if (a.annualTuitionUsd == null) return 1;
-        if (b.annualTuitionUsd == null) return -1;
-        return b.annualTuitionUsd - a.annualTuitionUsd;
+        const av = a.annualTuitionUsdResolved;
+        const bv = b.annualTuitionUsdResolved;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir;
       });
     } else if (sort === "name_asc") {
       results.sort((a, b) => a.name.localeCompare(b.name));

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import type { SampleExemplar } from "@/lib/samples/exemplars";
 import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
@@ -44,11 +46,32 @@ interface Issue {
 }
 
 interface Feedback {
-  scores: Scores;
+  scores: { hook: number; structure: number; specificity: number; language: number; fit: number; total: number };
   wordCount: number;
-  issues: Issue[];
+  issues: { code: string; message: string; severity: "blocker" | "warning" | "info"; excerpt?: string }[];
   cliches: { phrase: string; count: number }[];
   readingTimeSec: number;
+  /** Phase 2.4 — optional passes (absent from older responses). */
+  flow?: {
+    cohesionPct: number;
+    abruptJumps: { afterParagraph: number; excerpt: string }[];
+    connectors: string[];
+    score: number;
+  };
+  agency?: {
+    strongVerbs: { verb: string; count: number }[];
+    weakPhrases: { phrase: string; excerpt: string }[];
+    strongCount: number;
+    weakCount: number;
+    score: number;
+  };
+  promptCoverage?: {
+    parts: string[];
+    covered: boolean[];
+    coveredCount: number;
+    totalParts: number;
+    score: number;
+  } | null;
 }
 
 interface Comparison {
@@ -107,14 +130,23 @@ const SEVERITY_LABEL_KEY: Record<Issue["severity"], string> = {
 
 interface EssayRubricStudioProps {
   activeProfile: StudentProfile | null;
+  /**
+   * Spec §3.3 — the application the Materials hub is scoped to. When present,
+   * a saved version is filed against that application's university, so the
+   * workspace and the essay list agree on which essay belongs where.
+   */
+  universityId?: number | null;
+  applicationLabel?: string | null;
 }
 
-export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
+export function EssayRubricStudio({ activeProfile, universityId, applicationLabel }: EssayRubricStudioProps) {
   const t = useTranslations("ai");
   const [text, setText] = useState("");
   const [essayType, setEssayType] = useState("sop");
   const [targetName, setTargetName] = useState("");
   const [wordLimit, setWordLimit] = useState("");
+  // Phase 2.4 — the programme prompt, when the student has one.
+  const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -134,6 +166,21 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
   const [fitBusy, setFitBusy] = useState(false);
   const [fitError, setFitError] = useState("");
   const [adapted, setAdapted] = useState<Record<number, { text: string | null; source: string }>>({});
+
+  /**
+   * Phase 7 — one click fills the rubric studio with a real exemplar: the
+   * essay type and the word limit the sample was written for, plus the text.
+   * The deterministic rubric then scores it immediately, so a student sees
+   * what a 90+/100 structure looks like before rewriting it in their own words.
+   */
+  const loadSample = (sampleText: string, sample: SampleExemplar) => {
+    setText(sampleText);
+    setWordLimit(String(sample.wordCount));
+    if (sample.kind === "scholarship") setEssayType("scholarship");
+    else if (sample.kind === "essay") setEssayType("personal_statement");
+    else setEssayType("sop");
+    setFeedback(null);
+  };
   const [adaptingId, setAdaptingId] = useState<number | null>(null);
 
   const analyzeFit = async () => {
@@ -213,6 +260,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           essayType,
           targetName: targetName || undefined,
           wordLimit: wordLimit ? Number(wordLimit) : undefined,
+          prompt: prompt.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -225,6 +273,13 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
       setBusy(false);
     }
   };
+
+  /** Visible scope note — never silent about where a version is filed. */
+  const scopeNote = applicationLabel ? (
+    <p className="mt-2 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+      {t("essayScopeLinked", { application: applicationLabel })}
+    </p>
+  ) : null;
 
   const saveVersion = async () => {
     if (!text.trim()) return;
@@ -240,6 +295,8 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           essayType,
           targetName: targetName || undefined,
           wordLimit: wordLimit ? Number(wordLimit) : undefined,
+          prompt: prompt.trim() || undefined,
+          universityId: universityId ?? undefined,
         }),
       });
       const data = await res.json();
@@ -310,12 +367,34 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
           </div>
         </div>
 
+        {/* Phase 7 — exemplars for this studio: annotated view + 1-click load
+            into the editor, which immediately runs the deterministic rubric. */}
+        <SampleExemplarBar
+          kind={["sop", "essay", "scholarship"]}
+          className="mt-3"
+          onLoad={loadSample}
+        />
+
         <textarea
           className="mt-3 min-h-[280px] w-full rounded-xl border border-slate-200 p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none"
           placeholder={t("essayTextPlaceholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
+
+        <div className="mt-3">
+          <label className="mb-1 block text-xs font-bold text-slate-700" htmlFor="essay-prompt">
+            {t("essayPromptField")}
+          </label>
+          <textarea
+            id="essay-prompt"
+            rows={2}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={t("essayPromptPlaceholder")}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -334,6 +413,7 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
             {busy ? t("essaySavingVersion") : t("essaySaveVersionButton")}
           </button>
         </div>
+        {scopeNote}
       </div>
 
       {error && (
@@ -415,6 +495,62 @@ export function EssayRubricStudio({ activeProfile }: EssayRubricStudioProps) {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* Phase 2.4 — flow, agency and prompt coverage (deterministic). */}
+          {(feedback.flow || feedback.agency || feedback.promptCoverage) && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {feedback.flow && (
+                <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{t("essayFlowTitle")}</p>
+                  <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                    {t("essayFlowCohesion", { pct: feedback.flow.cohesionPct })}
+                  </p>
+                  {feedback.flow.connectors.length > 0 && (
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {t("essayFlowConnectors", { items: feedback.flow.connectors.slice(0, 6).join(", ") })}
+                    </p>
+                  )}
+                  {feedback.flow.abruptJumps.slice(0, 2).map((jump) => (
+                    <p key={jump.afterParagraph} className="mt-1 rounded-md bg-amber-50 p-1.5 text-[11px] text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                      {t("essayFlowJump", { n: jump.afterParagraph + 1, excerpt: jump.excerpt })}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {feedback.agency && (
+                <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{t("essayAgencyTitle")}</p>
+                  <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                    {t("essayAgencyStrong", { count: feedback.agency.strongCount })}
+                  </p>
+                  {feedback.agency.weakCount > 0 && (
+                    <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300">
+                      {t("essayAgencyWeak", { count: feedback.agency.weakCount })}
+                    </p>
+                  )}
+                </div>
+              )}
+              {feedback.promptCoverage && (
+                <div className="rounded-xl border border-slate-200 p-3 sm:col-span-2 dark:border-slate-700">
+                  <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{t("essayCoverageTitle")}</p>
+                  <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                    {t("essayCoverageLine", {
+                      covered: feedback.promptCoverage.coveredCount,
+                      total: feedback.promptCoverage.totalParts,
+                    })}
+                  </p>
+                  {feedback.promptCoverage.parts
+                    .filter((_, i) => !feedback.promptCoverage!.covered[i])
+                    .slice(0, 3)
+                    .map((part) => (
+                      <p key={part} className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                        {t("essayCoverageMissing", { part: part.slice(0, 140) })}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </div>
           )}
 
           {feedback.cliches.length > 0 && (

@@ -19,14 +19,27 @@ import { referralPremiumActive } from "@/lib/referrals";
 
 export interface PremiumStatus {
   isPremium: boolean;
-  source: "subscription" | "referral" | "none";
+  source: "subscription" | "referral" | "admin" | "none";
   premiumUntil: Date | string | null;
   plan: Plan;
 }
 
 const PLAN_LEVEL: Record<Plan, number> = { free: 0, premium: 1, admin: 2 };
 
-export async function getPremiumStatus(profileId: number): Promise<PremiumStatus> {
+/**
+ * Premium status of a profile.
+ *
+ * ADMIN IS UNCONDITIONALLY UNLOCKED (Pillar 8 — "god mode"):
+ *  - an admin profile with no paid subscription row still counts as Premium
+ *    (`source: "admin"`, `plan: "admin"`), so no client check on `isPremium`
+ *    can lock the operator out of their own product;
+ *  - when an ADMIN session inspects a STUDENT profile (`sessionIsAdmin`), the
+ *    result is unlocked as well — previewing a student's screen must not be
+ *    blocked by that student's entitlements.
+ * The paid paths are untouched: a subscription is still its own source and its
+ * own period end, and a referral grant keeps premium_until as its bound.
+ */
+export async function getPremiumStatus(profileId: number, sessionIsAdmin = false): Promise<PremiumStatus> {
   const sub = await findActiveSubscription(profileId);
   const subscriptionActive = subscriptionIsActive(sub);
   const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
@@ -34,8 +47,15 @@ export async function getPremiumStatus(profileId: number): Promise<PremiumStatus
   // Only when there is no active subscription is the profile window treated as
   // the referral/admin-gift side of the union.
   const profileWindowActive = profile ? referralPremiumActive(profile) : false;
-  const isPremium = subscriptionActive || profileWindowActive;
-  const source = subscriptionActive ? "subscription" : profileWindowActive ? "referral" : "none";
+  const isAdmin = Boolean(profile?.isAdmin || sessionIsAdmin);
+  const isPremium = isAdmin || subscriptionActive || profileWindowActive;
+  const source: PremiumStatus["source"] = subscriptionActive
+    ? "subscription"
+    : profileWindowActive
+      ? "referral"
+      : isAdmin
+        ? "admin"
+        : "none";
   return {
     isPremium,
     source,
@@ -46,15 +66,17 @@ export async function getPremiumStatus(profileId: number): Promise<PremiumStatus
         : null,
     // premium_until only bounds referral grants — a paid subscription carries
     // its own period end, so it must not be cut short by an old referral date.
-    plan: profile
-      ? profilePlan({ isAdmin: profile.isAdmin, isPremium, premiumUntil: source === "referral" ? profile.premiumUntil : null })
-      : "free",
+    plan: isAdmin
+      ? "admin"
+      : profile
+        ? profilePlan({ isAdmin: profile.isAdmin, isPremium, premiumUntil: source === "referral" ? profile.premiumUntil : null })
+        : "free",
   };
 }
 
 /** May this profile use the feature? (config-driven plan mapping, real premium status) */
-export async function hasFeature(profileId: number, feature: FeatureKey): Promise<boolean> {
-  const [{ plan }, required] = await Promise.all([getPremiumStatus(profileId), featurePlan(feature)]);
+export async function hasFeature(profileId: number, feature: FeatureKey, sessionIsAdmin = false): Promise<boolean> {
+  const [{ plan }, required] = await Promise.all([getPremiumStatus(profileId, sessionIsAdmin), featurePlan(feature)]);
   return PLAN_LEVEL[plan] >= PLAN_LEVEL[required];
 }
 
@@ -67,8 +89,8 @@ export const PREMIUM_REQUIRED_CODE = "premium_required";
  * this, otherwise a free account can use the feature by calling the API
  * directly. Returns null when allowed, otherwise the 403 response to send.
  */
-export async function premiumGate(profileId: number, feature: FeatureKey): Promise<NextResponse | null> {
-  if (await hasFeature(profileId, feature)) return null;
+export async function premiumGate(profileId: number, feature: FeatureKey, sessionIsAdmin = false): Promise<NextResponse | null> {
+  if (await hasFeature(profileId, feature, sessionIsAdmin)) return null;
   return NextResponse.json(
     { error: "This feature is part of Premium.", code: PREMIUM_REQUIRED_CODE, feature },
     { status: 403 }
@@ -76,9 +98,13 @@ export async function premiumGate(profileId: number, feature: FeatureKey): Promi
 }
 
 /** Which gated features this profile may use — lets the website lock exactly what the API locks. */
-export async function featureAccess(profileId: number, features: readonly FeatureKey[]): Promise<Record<string, boolean>> {
+export async function featureAccess(
+  profileId: number,
+  features: readonly FeatureKey[],
+  sessionIsAdmin = false
+): Promise<Record<string, boolean>> {
   const [{ plan }, required] = await Promise.all([
-    getPremiumStatus(profileId),
+    getPremiumStatus(profileId, sessionIsAdmin),
     Promise.all(features.map((f) => featurePlan(f))),
   ]);
   return Object.fromEntries(features.map((f, i) => [f, PLAN_LEVEL[plan] >= PLAN_LEVEL[required[i]]]));
@@ -97,7 +123,7 @@ export async function requireFeatureSession(
   if (!auth.ok) {
     return { ok: false, response: NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status }) };
   }
-  const locked = await premiumGate(auth.session.profile.id, feature);
+  const locked = await premiumGate(auth.session.profile.id, feature, Boolean(auth.session.isAdmin));
   if (locked) return { ok: false, response: locked };
   return { ok: true, session: auth.session };
 }

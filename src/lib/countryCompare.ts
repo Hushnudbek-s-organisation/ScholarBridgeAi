@@ -14,17 +14,21 @@
  */
 
 import { countriesMatch, countryTranslationKey, normalizeCountryAlias } from "@/lib/countries";
+import { resolvedUsdScholarshipAmount, usdAmountOf, type UniversityCostSource } from "@/lib/costs";
 
-export interface UniInput {
+export interface UniInput extends UniversityCostSource {
   country: string | null;
-  annualTuitionUsd?: number | null;
-  annualLivingEstUsd?: number | null;
   minIelts?: number | null;
+  /** Published post-study work visa length in years, when the row carries it. */
+  postStudyWorkVisaYears?: number | null;
 }
 
 export interface SchInput {
   country: string | null;
   amountUsdValue?: number | null;
+  awardAmount?: number | null;
+  awardCurrency?: string | null;
+  awardPeriod?: string | null;
 }
 
 export interface CountryComparison {
@@ -34,6 +38,12 @@ export interface CountryComparison {
   living: { avgUsd: number | null; published: number };
   minIelts: { avg: number | null; published: number };
   scholarships: { count: number; avgUsd: number | null; totalUsd: number | null };
+  /**
+   * Average published post-study work-visa length, with the number of rows it
+   * was computed from. `avgYears` is null when no row publishes it — it is
+   * never inferred from a country's general reputation.
+   */
+  postStudyWork: { avgYears: number | null; published: number };
   /** Not present in the database — reported as null, never filled in. */
   workRights: null;
 }
@@ -53,11 +63,25 @@ export function compareCountries(country: string, unis: UniInput[], schs: SchInp
   const inCountry = unis.filter((u) => countriesMatch(u.country, country));
   const inSchs = schs.filter((s) => countriesMatch(s.country, country));
 
-  const tuition = inCountry.map((u) => u.annualTuitionUsd).filter((n): n is number => n != null && Number.isFinite(n));
-  const living = inCountry.map((u) => u.annualLivingEstUsd).filter((n): n is number => n != null && Number.isFinite(n));
+  // Currency-safe: each row is resolved through the ONE shared rule, so a
+  // non-USD tuition (EUR, GBP, KRW, UZS) is EXCLUDED from the average and
+  // counted as unpublished rather than silently averaged as if it were dollars.
+  //
+  // `allowZero` is on for averages: 0 is a PUBLISHED figure here (public
+  // universities in Germany and the Nordics really are tuition-free), whereas
+  // in a cost plan the same 0 means "not published, use an estimate".
+  const tuition = inCountry
+    .map((u) => usdAmountOf(u.annualTuitionUsd, "USD", { allowZero: true }) ?? usdAmountOf(u.annualTuition, u.tuitionCurrency, { allowZero: true }))
+    .filter((n): n is number => n != null && Number.isFinite(n));
+  const living = inCountry
+    .map((u) => usdAmountOf(u.annualLivingEstUsd, "USD", { allowZero: true }) ?? usdAmountOf(u.annualLivingEst, u.livingCostCurrency, { allowZero: true }))
+    .filter((n): n is number => n != null && Number.isFinite(n));
   const ielts = inCountry.map((u) => u.minIelts).filter((n): n is number => n != null && Number.isFinite(n));
   const amounts = inSchs
-    .map((s) => s.amountUsdValue)
+    .map((s) => resolvedUsdScholarshipAmount(s).amountUsd)
+    .filter((n): n is number => n != null && Number.isFinite(n) && n > 0);
+  const postStudy = inCountry
+    .map((u) => u.postStudyWorkVisaYears)
     .filter((n): n is number => n != null && Number.isFinite(n) && n > 0);
 
   return {
@@ -71,6 +95,7 @@ export function compareCountries(country: string, unis: UniInput[], schs: SchInp
       avgUsd: average(amounts),
       totalUsd: amounts.length ? amounts.reduce((a, b) => a + b, 0) : null,
     },
+    postStudyWork: { avgYears: postStudy.length ? oneDecimal(postStudy) : null, published: postStudy.length },
     workRights: null,
   };
 }

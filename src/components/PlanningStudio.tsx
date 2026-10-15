@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import { PrintHeader, PrintSummaryButton } from "@/components/PrintSummaryButton";
 import {
   AlertTriangle,
   Calculator,
@@ -126,6 +128,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   const [errorResult, setErrorResult] = useState<{ requestKey: string; message: string } | null>(null);
   const [universityId, setUniversityId] = useState<number | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("cost");
+  // Phase 7 — the gold-standard CV the student compares against (reference
+  // only: the generated CV is never replaced by sample text).
+  const [cvReference, setCvReference] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}`;
   const data = result?.requestKey === requestKey ? result.data : null;
@@ -357,6 +362,36 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* --------------------------- CV --------------------------- */}
           {tab === "cv" && (
             <div className="space-y-3">
+              <PrintHeader title={tCv("cvTitle")} subtitle={activeProfile?.name ?? null} />
+              {/* Phase 7 — the gold-standard 1-page academic / Europass CV to
+                  compare the generated CV against. Loading shows it as a
+                  REFERENCE (the generated CV above is never overwritten). */}
+              <SampleExemplarBar
+                kind="cv"
+                onLoad={(text) => setCvReference(text)}
+              />
+              {cvReference && (
+                <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-black uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                      {tCv("referenceTitle")}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setCvReference(null)}
+                      className="min-h-11 rounded-xl border border-amber-400 px-3 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-slate-800"
+                    >
+                      {tCv("referenceClose")}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+                    {tCv("referenceNote")}
+                  </p>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-white/80 p-3 text-[11px] leading-relaxed text-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+                    {cvReference}
+                  </pre>
+                </section>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">{tCv("cvTitle")}</h3>
@@ -371,6 +406,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   <Copy className="h-3.5 w-3.5" />
                   {copied ? tCv("copied") : tCv("copy")}
                 </button>
+                <PrintSummaryButton label={tCv("printSummary")} />
               </div>
 
               {data.cv.warnings.length > 0 && (

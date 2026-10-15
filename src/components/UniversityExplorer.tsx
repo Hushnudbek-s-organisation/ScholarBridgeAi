@@ -115,6 +115,9 @@ export function UniversityExplorer({
   // Filters
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("All");
+  // Public / Private — the catalogue API has always accepted `type`, but no
+  // control ever sent it, so the filter was dead code. (Pillar: honest filters.)
+  const [selectedType, setSelectedType] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
   const [maxTuition, setMaxTuition] = useState<number>(70000);
 
@@ -166,6 +169,7 @@ export function UniversityExplorer({
     const params = new URLSearchParams();
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
     if (selectedCountry !== "All") params.set("country", selectedCountry);
+    if (selectedType !== "All") params.set("type", selectedType);
     // For an active student, the catalogue is always locked to the degree
     // selected in their profile. Guests may still use the level filter.
     const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
@@ -222,7 +226,7 @@ export function UniversityExplorer({
     const t = setTimeout(() => fetchUniversities(), 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedLevel, maxTuition, search, sortBy, page, perPage]);
+  }, [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedType, selectedLevel, maxTuition, search, sortBy, page, perPage]);
 
   const filteredUniversities = universities;
 
@@ -309,7 +313,7 @@ export function UniversityExplorer({
         </div>
 
         {/* Filter Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {/* Text Search */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -340,6 +344,20 @@ export function UniversityExplorer({
                   </option>
                 );
               })}
+            </select>
+          </div>
+
+          {/* Ownership Filter — Public / Private (catalogue field) */}
+          <div>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              aria-label={t("exTypeAria")}
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="All">{t("exTypeAll")}</option>
+              <option value="Public">{t("exTypePublic")}</option>
+              <option value="Private">{t("exTypePrivate")}</option>
             </select>
           </div>
 
@@ -413,8 +431,28 @@ export function UniversityExplorer({
 
       {/* University Cards Grid */}
       {loading ? (
-        <div className="p-12 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
-          {t("exLoading")}
+        /* Skeleton cards (spec §4 UI/UX). Before this the grid collapsed to a
+           single "Loading…" line, so the page jumped ~800px when the results
+           landed and the student lost their place. The skeleton holds the
+           layout, is announced once to assistive tech, and never fakes data:
+           every block is an empty shape, not a placeholder number. */
+        <div aria-busy="true" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p role="status" className="sr-only">
+            {t("exLoading")}
+          </p>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" aria-hidden>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <div key={n} className="overflow-hidden rounded-2xl border border-slate-200">
+                <div className="h-40 animate-pulse bg-slate-100 dark:bg-slate-800" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-9 w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : fetchError ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-red-200">

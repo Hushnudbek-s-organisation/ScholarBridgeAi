@@ -19,6 +19,7 @@
  */
 
 import { majorSimilarity, normalizedGpa, parseListColumn } from "./chancing";
+import { ENGLISH_CONCORDANCE_CAVEAT, englishTestLabel, recordedEnglishTest } from "./englishTests";
 import { subjectSimilarity } from "./subjectAffinity";
 
 export interface EssayInput {
@@ -45,6 +46,8 @@ export interface AdapterProfile {
   gpaScale?: number | null;
   ieltsScore?: number | null;
   toeflScore?: number | null;
+  /** Duolingo English Test — recorded, but with no official IELTS equivalence. */
+  duolingoScore?: number | null;
 }
 
 export interface WordLimit {
@@ -297,14 +300,15 @@ export function scoreEssayFit(essay: EssayInput, sh: ScholarshipInput, profile: 
     gaps.push(`GPA ${gpa4.toFixed(2)}/4.0 is below the ${sh.minGpa} minimum`);
   }
 
-  // 6. English (0–15). TOEFL is converted the same way the rest of the
-  // product does: (t − 40) / 12.
-  const english =
-    profile.ieltsScore != null && profile.ieltsScore > 0
-      ? profile.ieltsScore
-      : profile.toeflScore != null && profile.toeflScore > 0
-        ? (profile.toeflScore - 40) / 12
-        : null;
+  // 6. English (0–15).
+  //
+  // FIX (2026-10): the old conversion was the linear rule `(t − 40) / 12`, so a
+  // PERFECT TOEFL 120 became IELTS 6.67 and "failed" every 7.0/7.5 award while
+  // a TOEFL 100 became 5.0. TOEFL now converts through the official ETS
+  // concordance table (src/lib/englishTests.ts), and a score recorded in a test
+  // we cannot officially map (Duolingo) is NOT scored either way — it produces
+  // an explicit "check the accepted-test policy" note instead.
+  const english = recordedEnglishTest(profile);
   if (sh.minIelts == null) {
     fit += 12;
     matched.push("no English minimum published");
@@ -312,12 +316,29 @@ export function scoreEssayFit(essay: EssayInput, sh: ScholarshipInput, profile: 
     fit += 5;
     codes.push("english_missing");
     gaps.push(`English minimum is IELTS ${sh.minIelts} but no test score is on file`);
-  } else if (english >= sh.minIelts) {
+  } else if (english.ieltsEquivalent == null) {
+    // A real score on file, no official equivalence — never a penalty.
+    fit += 8;
+    codes.push("english_alternative_recorded");
+    gaps.push(
+      `You recorded ${englishTestLabel(english.kind, english.score)}; the award lists IELTS ${sh.minIelts}. ` +
+        `No official IELTS equivalence is published for this test — check whether the provider accepts it. ${ENGLISH_CONCORDANCE_CAVEAT}`
+    );
+  } else if (english.ieltsEquivalent >= sh.minIelts) {
     fit += 15;
-    matched.push(`English ${english.toFixed(1)} (IELTS equivalent) meets the ${sh.minIelts} minimum`);
+    matched.push(
+      english.approximated
+        ? `${englishTestLabel(english.kind, english.score)} compares to IELTS ${english.ieltsEquivalent.toFixed(1)} (published concordance), at or above the ${sh.minIelts} figure — verify the provider accepts this test`
+        : `English ${english.ieltsEquivalent.toFixed(1)} meets the ${sh.minIelts} minimum`
+    );
+    if (english.approximated) codes.push("english_concordance_used");
   } else {
     codes.push("english_below_min");
-    gaps.push(`English ${english.toFixed(1)} (IELTS equivalent) is below the ${sh.minIelts} minimum`);
+    gaps.push(
+      english.approximated
+        ? `${englishTestLabel(english.kind, english.score)} compares to IELTS ${english.ieltsEquivalent.toFixed(1)} on the published concordance, below the ${sh.minIelts} figure — confirm the accepted tests and cut-off on the official page`
+        : `English ${english.ieltsEquivalent.toFixed(1)} is below the ${sh.minIelts} minimum`
+    );
   }
 
   return {

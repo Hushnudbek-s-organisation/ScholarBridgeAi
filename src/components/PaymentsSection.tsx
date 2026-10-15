@@ -17,8 +17,12 @@ interface PlanPackage {
   id: "monthly" | "season" | "yearly";
   label: string;
   labelUz?: string;
+  /** Who the tier is for, in one line (server-provided, never hardcoded). */
+  taglineUz?: string;
   priceUzs: number;
   days: number;
+  /** Like-for-like monthly rate, so the tiers can be compared honestly. */
+  perMonthUzs?: number;
   currency: string;
   badge?: string;
 }
@@ -193,8 +197,14 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                     {pack.labelUz || pack.label}
                   </p>
-                  <p className="mt-1 text-lg font-extrabold text-slate-900">{formatUzs(pack.priceUzs)}</p>
+                  <p className="mt-1 text-lg font-extrabold tabular-nums text-slate-900">{formatUzs(pack.priceUzs)}</p>
                   <p className="text-[11px] text-slate-500">{pack.days} kun</p>
+                  {pack.perMonthUzs != null && pack.days > 31 && (
+                    <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-emerald-700">
+                      ≈ {formatUzs(pack.perMonthUzs)} / oy
+                    </p>
+                  )}
+                  {pack.taglineUz && <p className="mt-1 text-[11px] leading-snug text-slate-500">{pack.taglineUz}</p>}
                 </button>
               );
             })}
@@ -202,10 +212,13 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
             <div>
-              <p className="text-sm font-bold text-slate-900">
+              <p className="text-sm font-bold tabular-nums text-slate-900">
                 {selected ? formatUzs(selected.priceUzs) : "—"}{" "}
                 <span className="text-xs font-medium text-slate-500">
                   / {selected?.days ?? 30} kun
+                  {selected?.perMonthUzs != null && (selected.days ?? 0) > 31
+                    ? ` (≈ ${formatUzs(selected.perMonthUzs)} / oy)`
+                    : ""}
                 </span>
               </p>
               <p className="text-[11px] text-slate-500">Ota-onalar ham to&apos;lashi mumkin — oila qaror va pulni boshqaradi.</p>

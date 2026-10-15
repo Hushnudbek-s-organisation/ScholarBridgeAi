@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
-    const locked = await premiumGate(access.session.profile.id, "courses_full");
+    const locked = await premiumGate(access.session.profile.id, "courses_full", Boolean(access.session.isAdmin));
     if (locked) return locked;
 
     if (!quizId || !profileId || !Array.isArray(answers)) {

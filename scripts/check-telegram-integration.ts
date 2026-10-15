@@ -646,6 +646,98 @@ async function main() {
   }
 
   // ===========================================================================
+  section("Weekly micro-action digest (Pillar 5.6)");
+  // ===========================================================================
+  {
+    const elena = await P("Elena Rakhimova", "elena@example.com");
+    const a = await startLink(elena.id);
+    await service.handleUpdate(msg(9101, `/start link_${a.token}`));
+    await service.handleUpdate(cb(9101, buttonsOf(lastTo(9101)).find((b) => String(b.callback_data).startsWith("lk:y:")).callback_data));
+    const link = await linkOf(elena.id);
+    check("digest target linked, notifications on", link?.blocked === false && link?.notifyEnabled === true);
+
+    const [overdue] = await db
+      .insert(schema.journeyDeadlines)
+      .values({ profileId: elena.id, kind: "university", title: "TUM application deadline", dueDate: "2026-03-02" } as any)
+      .returning();
+    const [upcoming] = await db
+      .insert(schema.journeyDeadlines)
+      .values({ profileId: elena.id, kind: "test", title: "IELTS retake", dueDate: "2026-04-01" } as any)
+      .returning();
+
+    const monday = new Date("2026-03-09T05:00:00Z"); // Monday 10:00 in Asia/Tashkent
+    const notMonday = await sweep.runWeeklyMicroActionDigest({ now: new Date("2026-03-10T05:00:00Z") });
+    check("outside Monday the digest sends nothing", notMonday.skipped === "not-digest-day" && notMonday.sent === 0);
+
+    let m = mark();
+    const first = await sweep.runWeeklyMicroActionDigest({ now: monday });
+    const mine = since(m).filter((c) => String(c.body.chat_id) === "9101");
+    check("Monday run sends exactly one check-in", mine.length === 1, String(mine.length));
+    const text = String(mine[0]?.body.text ?? "");
+    check("the check-in names the overdue task, not the later one", /TUM application deadline/.test(text) && !/IELTS retake/.test(text));
+    check("…with its real due date and the weekly header", /02\.03\.2026/.test(text) && /This week's plan/.test(text));
+    const flat = buttonsOf(mine[0]);
+    check(
+      "…and the 1-tap [done] / [snooze 3d] buttons for that exact row",
+      flat.some((b) => b.callback_data === `act:done:${overdue.id}`) && flat.some((b) => b.callback_data === `act:snooze:${overdue.id}:3`),
+      JSON.stringify(flat.map((b) => b.callback_data))
+    );
+    check("the digest is recorded in-app too", Boolean(first.sent >= 1));
+    const inApp = (await db.select().from(schema.notifications).where(eq(schema.notifications.profileId, elena.id))).find((n: any) => n.type === "weekly_digest");
+    check("in-app weekly_digest row written", Boolean(inApp) && /week=2026-W11/.test(String(inApp?.link)));
+
+    const again = await sweep.runWeeklyMicroActionDigest({ now: new Date("2026-03-09T18:00:00Z") });
+    check("a second run in the same ISO week is skipped", again.skipped === "already-sent" && again.sent === 0);
+
+    // The button really closes the row (same handler as /next).
+    m = mark();
+    await service.handleUpdate(cb(9101, `act:done:${overdue.id}`));
+    const closed = (await db.select().from(schema.journeyDeadlines).where(eq(schema.journeyDeadlines.id, overdue.id)))[0];
+    check("tapping [✅ done] completes the tracked deadline", closed?.isCompleted === true);
+    check("…and the chat message is rewritten with the confirmation", since(m).some((c) => c.method === "editMessageText" && /Done!/.test(String(c.body.text))));
+
+    m = mark();
+    const next = await sweep.runWeeklyMicroActionDigest({ force: true, now: monday });
+    const nextMsg = since(m).find((c) => String(c.body.chat_id) === "9101");
+    check(
+      "the next check-in moves on to the remaining task",
+      /IELTS retake/.test(String(nextMsg?.body.text ?? "")) && buttonsOf(nextMsg).some((b) => b.callback_data === `act:done:${upcoming.id}`)
+    );
+
+    // Snooze pushes the tracked date three days out and confirms in chat.
+    m = mark();
+    await service.handleUpdate(cb(9101, `act:snooze:${upcoming.id}:3`));
+    const snoozed = (await db.select().from(schema.journeyDeadlines).where(eq(schema.journeyDeadlines.id, upcoming.id)))[0];
+    check("tapping [⏳ snooze] moves the due date 3 days", String(snoozed?.dueDate).slice(0, 10) === "2026-04-04");
+    check("snooze confirms with the new date", since(m).some((c) => /04\.04\.2026/.test(String(c.body.text))));
+
+    // Another student's row can never be touched by a guessed id.
+    const [foreign] = await db
+      .insert(schema.journeyDeadlines)
+      .values({ profileId: aziza.id, kind: "other", title: "Not yours", dueDate: "2026-03-05" } as any)
+      .returning();
+    await service.handleUpdate(cb(9101, `act:done:${foreign.id}`));
+    const untouched = (await db.select().from(schema.journeyDeadlines).where(eq(schema.journeyDeadlines.id, foreign.id)))[0];
+    check("a guessed id from another account changes nothing", untouched?.isCompleted === false);
+
+    // Telegram off → no digest at all.
+    await db.update(schema.telegramLinks).set({ notifyEnabled: false }).where(eq(schema.telegramLinks.profileId, elena.id));
+    m = mark();
+    await sweep.runWeeklyMicroActionDigest({ force: true, now: monday });
+    check("notifications off → the digest skips that account", since(m).filter((c) => String(c.body.chat_id) === "9101").length === 0);
+    await db.update(schema.telegramLinks).set({ notifyEnabled: true }).where(eq(schema.telegramLinks.profileId, elena.id));
+
+    // A brand-new account with nothing tracked is left alone (no empty nudge).
+    const silent = await P("Silent Newcomer", "silent@example.com");
+    const b = await startLink(silent.id);
+    await service.handleUpdate(msg(9102, `/start link_${b.token}`));
+    await service.handleUpdate(cb(9102, buttonsOf(lastTo(9102)).find((x) => String(x.callback_data).startsWith("lk:y:")).callback_data));
+    m = mark();
+    const quietRun = await sweep.runWeeklyMicroActionDigest({ force: true, now: monday });
+    check("an account with nothing tracked gets no Monday nudge", since(m).filter((c) => String(c.body.chat_id) === "9102").length === 0 && quietRun.quiet >= 1);
+  }
+
+  // ===========================================================================
   section("Deep links + misc");
   // ===========================================================================
   {

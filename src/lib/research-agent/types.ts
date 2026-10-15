@@ -19,6 +19,12 @@ export interface RunRequest {
   dryRun?: boolean;
   /** Optional page cap per university (cost control, spec §21). */
   maxPages?: number;
+  /**
+   * Approval-queue allow-list (spec §5.4). When present, ONLY these
+   * `<entity>.<field>` keys may be written; the run still reports every
+   * proposal, so nothing is hidden — it simply is not applied.
+   */
+  approvedFields?: string[];
 }
 
 export interface SourceEvidence {

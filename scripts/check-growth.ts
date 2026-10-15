@@ -18,6 +18,22 @@ process.env.DATABASE_URL = "postgresql://x:x@localhost:5432/x"; // dummy — no 
 process.env.SESSION_SECRET = "test-session-secret-that-is-long-enough-1234567890";
 
 import assert from "node:assert/strict";
+import {
+  FLYWHEEL_BADGE_CRITERIA,
+  FLYWHEEL_POINTS,
+  FLYWHEEL_REASON,
+  flywheelStanding,
+  rewardForOutcome,
+} from "../src/lib/flywheel";
+import {
+  approvedFieldKeys,
+  buildApprovalQueue,
+  decideQueueItem,
+  fieldIsApproved,
+  mergeQueues,
+  queueSummary,
+} from "../src/lib/research-agent/approvalQueue";
+import type { AuditReport } from "../src/lib/research-agent/types";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -330,6 +346,206 @@ check("a fully filled profile reaches 100", () =>
   assert.equal(profileCompleteness(richProfile), 100));
 check("more data never scores lower than less data", () =>
   assert.ok(profileCompleteness(sparseProfile) < profileCompleteness(richProfile)));
+
+/* ==========================================================================
+ * Admission-outcome flywheel (spec §5.5)
+ * ======================================================================== */
+
+check("recording a decision pays the same for every result", () => {
+  const base = { hasEvidence: false, hasStructuredDetails: true, alreadyContributed: false } as const;
+  const accepted = rewardForOutcome({ ...base, result: "accepted" });
+  const rejected = rewardForOutcome({ ...base, result: "rejected" });
+  const waitlisted = rewardForOutcome({ ...base, result: "waitlisted" });
+  assert.equal(accepted?.points, FLYWHEEL_POINTS.recorded);
+  assert.equal(rejected?.points, accepted?.points);
+  assert.equal(waitlisted?.points, accepted?.points);
+  assert.equal(rejected?.reason, FLYWHEEL_REASON.recorded);
+});
+
+check("a decision document doubles the reward and unlocks the badge", () => {
+  const verified = rewardForOutcome({
+    result: "rejected",
+    hasEvidence: true,
+    hasStructuredDetails: true,
+    alreadyContributed: false,
+  });
+  assert.equal(verified?.points, FLYWHEEL_POINTS.verified);
+  assert.equal(verified?.reason, FLYWHEEL_REASON.verified);
+  assert.equal(verified?.badgeCriteria, FLYWHEEL_BADGE_CRITERIA);
+  assert.ok(verified && verified.points === FLYWHEEL_POINTS.recorded * 2);
+});
+
+check("a withdrawal earns nothing and a second record cannot be farmed", () => {
+  assert.equal(
+    rewardForOutcome({
+      result: "withdrawn",
+      hasEvidence: true,
+      hasStructuredDetails: true,
+      alreadyContributed: false,
+    }),
+    null,
+  );
+  assert.equal(
+    rewardForOutcome({
+      result: "accepted",
+      hasEvidence: true,
+      hasStructuredDetails: true,
+      alreadyContributed: true,
+    }),
+    null,
+  );
+});
+
+check("a bare result with no date or detail is not treated as a contribution", () => {
+  assert.equal(
+    rewardForOutcome({
+      result: "accepted",
+      hasEvidence: false,
+      hasStructuredDetails: false,
+      alreadyContributed: false,
+    }),
+    null,
+  );
+});
+
+check("the standing copy never invents a count it does not have", () => {
+  const none = flywheelStanding(0, 0);
+  assert.equal(none.contributed, 0);
+  assert.match(none.note, /No decisions recorded/);
+  const three = flywheelStanding(3, 2);
+  assert.equal(three.contributed, 3);
+  assert.equal(three.verified, 2);
+  assert.equal(three.nextMilestone, 5);
+  // verified can never exceed the number of contributed records
+  assert.equal(flywheelStanding(1, 9).verified, 1);
+  // negatives and NaN are clamped, not displayed
+  assert.equal(flywheelStanding(-4, Number.NaN).contributed, 0);
+});
+
+/* ==========================================================================
+ * Research-agent approval queue (spec §5.4)
+ * ======================================================================== */
+
+const queueReport = {
+  universityId: 7,
+  universityName: "Example University",
+  dryRun: true,
+  updatedFields: [
+    {
+      field: "annual_tuition",
+      action: "update",
+      dbValue: 24000,
+      newValue: 26500,
+      currency: "USD",
+      period: "year",
+      sourceUrl: "https://example.edu/tuition",
+      sourceTitle: "Tuition",
+      reason: "newer official page",
+      confidence: 0.9,
+    },
+    {
+      field: "founded_year",
+      action: "write",
+      dbValue: null,
+      newValue: 1962,
+      sourceUrl: "https://example.edu/about",
+      reason: "not recorded",
+    },
+  ],
+  insertedPrograms: [],
+  updatedRequirements: [],
+  insertedCycles: [],
+  insertedScholarships: [],
+  insertedEntities: [],
+  newSources: [],
+  skippedFields: [],
+  reviewRequired: [
+    {
+      field: "acceptance_rate",
+      action: "review",
+      dbValue: null,
+      newValue: 0.42,
+      sourceUrl: "https://example.edu/admissions",
+      reason: "single unverified source",
+    },
+    "two sources disagree on the deadline",
+  ],
+  rejectedSources: [],
+  discoveryOnly: [],
+  debug: {},
+  errors: [],
+  sourcesReadBack: 0,
+  duplicatesPrevented: 0,
+} as unknown as AuditReport;
+
+check("every proposed change becomes one queue item, keyed by entity.field", () => {
+  const items = buildApprovalQueue(queueReport);
+  assert.equal(items.length, 3, "two updates + one review proposal");
+  assert.deepEqual(
+    items.map((i) => i.id),
+    ["university.annual_tuition", "university.founded_year", "university.acceptance_rate"]
+  );
+  assert.equal(items.every((i) => i.decision === "pending"), true);
+  assert.equal(items[2].needsReview, true);
+  assert.equal(items[0].currency, "USD");
+});
+
+check("the queue never invents a value: NULL stays NULL", () => {
+  const items = buildApprovalQueue(queueReport);
+  const founded = items.find((i) => i.field === "founded_year")!;
+  assert.equal(founded.currentValue, null);
+  assert.equal(founded.proposedValue, 1962);
+});
+
+check("deciding an item copies the proposal verbatim", () => {
+  const items = buildApprovalQueue(queueReport);
+  const approved = decideQueueItem(items, "university.annual_tuition", "approved");
+  const target = approved.find((i) => i.id === "university.annual_tuition")!;
+  assert.equal(target.decision, "approved");
+  assert.equal(target.proposedValue, 26500);
+  assert.deepEqual(approvedFieldKeys(approved), ["university.annual_tuition"]);
+  assert.equal(fieldIsApproved(approvedFieldKeys(approved), "university", "annual_tuition"), true);
+  assert.equal(fieldIsApproved(approvedFieldKeys(approved), "university", "founded_year"), false);
+  assert.equal(fieldIsApproved([], "university", "annual_tuition"), false, "an empty list gates everything");
+  assert.equal(fieldIsApproved(null, "university", "annual_tuition"), false);
+});
+
+check("an unresolved proposal blocks the apply step", () => {
+  let items = buildApprovalQueue(queueReport);
+  items = decideQueueItem(items, "university.annual_tuition", "approved");
+  assert.equal(queueSummary(items).readyToApply, false);
+  items = decideQueueItem(items, "university.founded_year", "rejected");
+  items = decideQueueItem(items, "university.acceptance_rate", "rejected");
+  const summary = queueSummary(items);
+  assert.equal(summary.pending, 0);
+  assert.equal(summary.approved, 1);
+  assert.equal(summary.rejected, 2);
+  assert.equal(summary.readyToApply, true);
+  assert.deepEqual(approvedFieldKeys(items), ["university.annual_tuition"]);
+});
+
+check("re-running the agent keeps decisions and drops nothing", () => {
+  let items = buildApprovalQueue(queueReport);
+  items = decideQueueItem(items, "university.acceptance_rate", "rejected");
+  const rerun = buildApprovalQueue(queueReport);
+  const merged = mergeQueues(items, rerun);
+  assert.equal(merged.length, 3);
+  assert.equal(merged.find((i) => i.field === "acceptance_rate")!.decision, "rejected");
+  assert.equal(merged.find((i) => i.field === "annual_tuition")!.decision, "pending");
+});
+
+check("the queue API is admin-guarded and the run route honours approvedFields", () => {
+  const queueRoute = readFileSync("src/app/api/admin/research-agent/queue/route.ts", "utf8");
+  assert.match(queueRoute, /requireAdmin\(req\)/);
+  assert.equal((queueRoute.match(/requireAdmin\(/g) ?? []).length, 2, "both GET and POST are guarded");
+  const runRoute = readFileSync("src/app/api/admin/research-agent/run/route.ts", "utf8");
+  assert.match(runRoute, /approvedFields/);
+  const persist = readFileSync("src/lib/research-agent/persist.ts", "utf8");
+  assert.match(persist, /fieldIsApproved\(approvedFields/);
+  const ui = readFileSync("src/components/admin/ResearchAgent.tsx", "utf8");
+  assert.match(ui, /Approval queue/);
+  assert.match(ui, /applyApproved/);
+});
 
 if (failures.length) {
   console.log(`\ngrowth test FAILED: ${failures.length} failure(s)`);

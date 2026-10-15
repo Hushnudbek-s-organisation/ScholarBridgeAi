@@ -66,6 +66,8 @@ const INTEGER_KEYS = new Set([
   "ai_premium_tokens_per_day",
   "ai_free_live_sessions_per_day",
   "ai_premium_live_sessions_per_day",
+  // Monthly native-audio ceiling (unit economics): 8 sessions × 8 min.
+  "ai_premium_live_sessions_per_month",
   "ai_live_global_sessions_per_day",
   "free_saved_universities",
   "free_saved_scholarships",

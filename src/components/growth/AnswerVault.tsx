@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { Archive, Check, ChevronDown, Copy, Lightbulb, Loader2, Save } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
@@ -105,6 +106,18 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
   return (
     <div className="space-y-4">
       <PageHeader icon={Archive} title={t("title")} subtitle={t("subtitle")} accent="sky" />
+
+      {/* Phase 7 — five high-scoring example answers (motivation, leadership,
+          career plan, challenge, community) as a structure reference. */}
+      <SampleExemplarBar
+        kind="vault"
+        onLoad={(sampleText) => {
+          // Fill the first prompt's editor with the matching example answer;
+          // the student edits it into their own words before saving.
+          const first = items?.[0]?.promptId;
+          if (first) setDrafts((prev) => ({ ...prev, [first]: sampleText.split("\n\n")[0] ?? sampleText }));
+        }}
+      />
 
       {error && <ErrorNote message={error} />}
       {!items && !error && <LoadingBlock label={t("loading")} />}

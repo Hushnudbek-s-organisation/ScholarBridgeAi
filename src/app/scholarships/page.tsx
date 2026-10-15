@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { PublicCatalogFooter, PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { dictionaries } from "@/i18n/messages";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
@@ -40,6 +41,12 @@ interface ScholarshipRow {
   amount_usd_value: number | null;
   deadline: string | null;
   website_url: string | null;
+  /** Canonical award columns — shown when the legacy USD mirror is empty. */
+  award_amount: number | null;
+  award_currency: string | null;
+  award_period: string | null;
+  award_basis: string | null;
+  deadline_date: string | null;
 }
 
 // Next.js 15+: `searchParams` is async and must be awaited.
@@ -51,6 +58,25 @@ function formatDate(value: string, locale: string): string {
   const parsed = new Date(`${value}T12:00:00Z`);
   if (!Number.isFinite(parsed.getTime())) return value;
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
+}
+
+/**
+ * An award in its PUBLISHED currency. No conversion ever happens here: a
+ * €10,000 award is displayed as €10,000, because inventing an exchange rate
+ * would state a number the provider never published.
+ */
+function formatAward(value: unknown, currency: string | null, locale: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  const code = (currency ?? "").trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) {
+    try {
+      return new Intl.NumberFormat(locale, { style: "currency", currency: code, maximumFractionDigits: 0 }).format(n);
+    } catch {
+      return `${n.toLocaleString(locale)} ${code}`;
+    }
+  }
+  return n.toLocaleString(locale);
 }
 
 export default async function ScholarshipsPage({
@@ -87,6 +113,14 @@ export default async function ScholarshipsPage({
         amountUsdValue: scholarshipsTable.amountUsdValue,
         deadline: scholarshipsTable.deadline,
         websiteUrl: scholarshipsTable.websiteUrl,
+        // Canonical award fields. The legacy USD mirror is empty for a large
+        // part of the catalogue, and the public page only ever read it — so
+        // awards whose amount IS published showed no figure at all.
+        awardAmount: scholarshipsTable.awardAmount,
+        awardCurrency: scholarshipsTable.awardCurrency,
+        awardPeriod: scholarshipsTable.awardPeriod,
+        awardBasis: scholarshipsTable.awardBasis,
+        deadlineDate: scholarshipsTable.deadlineDate,
       })
       .from(scholarshipsTable)
       .where(eq(scholarshipsTable.isActive, true))
@@ -102,6 +136,11 @@ export default async function ScholarshipsPage({
       amount_usd_value: scholarship.amountUsdValue,
       deadline: scholarship.deadline,
       website_url: scholarship.websiteUrl,
+      award_amount: scholarship.awardAmount,
+      award_currency: scholarship.awardCurrency,
+      award_period: scholarship.awardPeriod,
+      award_basis: scholarship.awardBasis,
+      deadline_date: scholarship.deadlineDate ? String(scholarship.deadlineDate).slice(0, 10) : null,
     }));
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
@@ -137,17 +176,20 @@ export default async function ScholarshipsPage({
     currency: "USD",
     maximumFractionDigits: 0,
   });
+  /** "per year" / "one-off" / "total" — localised, never guessed from context. */
+  const awardPeriodLabel = (period: string): string => {
+    const key = period.trim().toLowerCase();
+    if (key === "year" || key === "annual" || key === "yearly" || key === "per year") return `· ${copy.awardPeriodYear}`;
+    if (key === "month" || key === "monthly" || key === "per month") return `· ${copy.awardPeriodMonthly}`;
+    if (key === "one-off" || key === "one_off" || key === "oneoff" || key === "once") return `· ${copy.awardPeriodOneOff}`;
+    if (key === "total") return `· ${copy.awardPeriodTotal}`;
+    return `· ${period}`;
+  };
 
   return (
     <LocaleProvider initialLocale={locale}>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-            <Award className="h-6 w-6 shrink-0 text-amber-500" aria-hidden />
-            {copy.scholarshipHeading}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">{summary}</p>
-        </header>
+        <PublicCatalogHeader locale={locale} heading={copy.scholarshipHeading} intro={summary} Icon={Award} />
 
         {scholarships.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
@@ -155,7 +197,9 @@ export default async function ScholarshipsPage({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6">
-            {scholarships.map((scholarship) => (
+            {scholarships.map((scholarship) => {
+              const publishedDeadline = scholarship.deadline_date ?? scholarship.deadline;
+              return (
               <article
                 key={scholarship.id}
                 className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
@@ -176,17 +220,51 @@ export default async function ScholarshipsPage({
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                     <span className="break-words">{scholarship.country}</span>
                   </p>
-                  {scholarship.deadline && (
+                  {/* Deadline: the canonical date column wins, the legacy
+                      `deadline` text is the fallback. An unpublished deadline
+                      says so instead of silently disappearing. */}
+                  {publishedDeadline ? (
                     <p className="flex items-start gap-1.5">
                       <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                       <span className="break-words">
-                        {formatMessage(copy.deadline, { date: formatDate(scholarship.deadline, locale) })}
+                        {formatMessage(copy.deadline, { date: formatDate(publishedDeadline, locale) })}
                       </span>
                     </p>
+                  ) : (
+                    <p className="flex items-start gap-1.5 text-slate-500">
+                      <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="break-words">{copy.deadlineNotPublished}</span>
+                    </p>
                   )}
-                  {typeof scholarship.amount_usd_value === "number" && (
+
+                  {/* Award: a verified USD figure when there is one, otherwise
+                      the canonical amount WITH its published currency and
+                      period — never silently converted, never dropped. */}
+                  {typeof scholarship.amount_usd_value === "number" ? (
                     <p className="break-words font-semibold text-emerald-800">
                       {amount.format(scholarship.amount_usd_value)}
+                      {scholarship.award_period && (
+                        <span className="ml-1 font-normal text-emerald-700">
+                          {awardPeriodLabel(scholarship.award_period)}
+                        </span>
+                      )}
+                    </p>
+                  ) : scholarship.award_amount != null && Number.isFinite(Number(scholarship.award_amount)) ? (
+                    <p className="break-words font-semibold text-emerald-800">
+                      {formatAward(scholarship.award_amount, scholarship.award_currency, locale)}
+                      {scholarship.award_period && (
+                        <span className="ml-1 font-normal text-emerald-700">
+                          {awardPeriodLabel(scholarship.award_period)}
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="break-words text-slate-500">{copy.amountNotPublished}</p>
+                  )}
+
+                  {scholarship.award_basis && (
+                    <p className="break-words text-slate-500">
+                      {copy.awardBasisLabel}: {scholarship.award_basis}
                     </p>
                   )}
                 </div>
@@ -203,15 +281,14 @@ export default async function ScholarshipsPage({
                   </Link>
                 )}
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
 
         <Pagination currentPage={currentPage} totalPages={totalPages} />
 
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
-          {copy.independentGuide}
-        </p>
+        <PublicCatalogFooter locale={locale} />
       </main>
     </LocaleProvider>
   );

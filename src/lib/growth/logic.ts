@@ -4,6 +4,7 @@
  */
 import type { JourneyCheck } from "./defaults";
 import { profileCompletenessRatio, type ChancingProfile } from "../chancing";
+import { gpaTo40Scale } from "../gpa";
 
 // ---------------------------------------------------------------------------
 // Small parsing helpers
@@ -205,10 +206,18 @@ function tokenOverlap(a: string | null | undefined, b: string | null | undefined
   return hit / Math.min(ta.size, tb.size);
 }
 
+/**
+ * GPA normalisation for the "admission twin" comparison.
+ *
+ * This module used to keep its own copy that DEFAULTED A MISSING SCALE TO 4
+ * and clamped the result, so a bare 85 (a 100-point mark, scale unknown) came
+ * out as a perfect 4.0 — the exact fabrication the matcher refuses to make.
+ * It now delegates to the one canonical rule in `src/lib/gpa.ts`: an explicit
+ * scale converts proportionally, a bare value ≤ 4 is comparable, anything else
+ * is unknown (null) and the comparison is simply skipped.
+ */
 export function gpaTo4(gpa: number | null | undefined, scale: number | null | undefined): number | null {
-  if (gpa == null || !Number.isFinite(gpa) || gpa <= 0) return null;
-  const s = scale && Number.isFinite(scale) && scale > 0 ? scale : 4;
-  return Math.max(0, Math.min(4, (gpa / s) * 4));
+  return gpaTo40Scale(gpa, scale);
 }
 
 /**

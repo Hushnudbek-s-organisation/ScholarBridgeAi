@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Loader2, Lock, Minus, Plus, RefreshCw, Target } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
+import { WhatIfSimulator } from "./journey/WhatIfSimulator";
 
 /**
  * A live comparison of saved profile details with available university
@@ -87,6 +88,11 @@ export function ChancingPanel({ activeProfile, universityId, compact }: Chancing
           {t("refresh")}
         </button>
       </div>
+
+      {/* Phase 2.3 — the shortlist page owns the what-if simulator too, so a
+          student comparing programmes can test a hypothetical figure without
+          leaving the comparison. The panel never returns a chance. */}
+      <WhatIfSimulator profileId={profileId ?? null} />
 
       <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
         <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />

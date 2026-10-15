@@ -18,7 +18,7 @@ import {
 import { broadcast, getLinkByProfile, linkedUsers, recentMessages, sendToChat, telegramStats, unlinkProfile } from "@/lib/telegram/service";
 import { miniAppUrl, miniAppUrlFor, publicSiteUrl } from "@/lib/telegram/messaging";
 import { appUrlSource, configuredAppUrl } from "@/lib/appUrl";
-import { lastSweep, recordSweep, runScheduledTelegramJobs } from "@/lib/notificationSweep";
+import { lastSweep, recordSweep, runScheduledTelegramJobs, runWeeklyMicroActionDigest } from "@/lib/notificationSweep";
 import { getBotToken, getTelegramSettings, saveBotToken, saveTelegramSettings, webhookSecret } from "@/lib/telegram/settings";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
 
@@ -239,6 +239,15 @@ export async function POST(req: Request) {
       const summary = await runScheduledTelegramJobs();
       await recordSweep(summary, "admin");
       return NextResponse.json({ summary });
+    }
+
+    // Pillar 5.6 — send the Monday micro-action check-in now (ignores the
+    // weekday + once-per-week guards so an admin can verify the copy).
+    if (action === "weekly_digest") {
+      const rl = await checkSharedRateLimit(`admin:tg-digest:${g.session.profile.id}`, { limit: 6, windowMs: 60 * 60_000 });
+      if (!rl.ok) return rateLimitedResponse(rl.retryAfterSec);
+      const weekly = await runWeeklyMicroActionDigest({ force: true, limit: 200 });
+      return NextResponse.json({ weekly });
     }
 
     if (action === "broadcast") {

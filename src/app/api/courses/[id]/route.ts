@@ -31,7 +31,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         { status: access.status }
       );
     }
-    const fullAccess = await hasFeature(access.session.profile.id, "courses_full");
+    const fullAccess = await hasFeature(access.session.profile.id, "courses_full", Boolean(access.session.isAdmin));
 
     const [course] = await db
       .select()

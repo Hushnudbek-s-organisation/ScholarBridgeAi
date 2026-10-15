@@ -765,3 +765,30 @@ html:not(.dark) .text-slate-500 {
     min-height: 44px;
   }
 }
+
+/*  Print / PDF export (Phase 3.4) --------------------------------------------
+    The browser's print dialog is the PDF export: no server rendering, so the
+    printed page can never disagree with what the student saw on screen.
+    `.no-print` hides chrome and controls; `.print-only` shows a block that is
+    invisible on screen (used for the print header). Cards keep their borders
+    but lose their shadows and page-breaking is avoided inside a card.        */
+.no-print { }
+.print-only { display: none; }
+
+@media print {
+  .no-print,
+  nav,
+  aside,
+  header { display: none !important; }
+  .print-only { display: block !important; }
+  main { padding: 0 !important; }
+  .sb-card-hover,
+  .rounded-2xl,
+  .rounded-xl {
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  body { background: #fff !important; color: #0f172a !important; }
+  a[href]::after { content: ""; }
+}

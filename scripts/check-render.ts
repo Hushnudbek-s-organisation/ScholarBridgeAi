@@ -41,6 +41,7 @@ import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter
 import { DailyStreakCard } from "../src/components/DailyStreakCard";
 import { TaskRoadmap } from "../src/components/TaskRoadmap";
 import { MatchBreakdownStrip } from "../src/components/MatchBreakdownStrip";
+import { evidenceConfidence, type MatchBreakdown } from "../src/lib/matching";
 import { SimilarProfiles } from "../src/components/SimilarProfiles";
 import { ArrivalPlanPanel } from "../src/components/journey/ArrivalPlanPanel";
 import { FaqSection } from "../src/components/FaqSection";
@@ -904,23 +905,33 @@ check(
 // ---------------------------------------------------------------------------
 section("10. Fit-score breakdown strip — the arithmetic, not just the number");
 
-const breakdownFixture = {
+const breakdownFixture: MatchBreakdown = {
   rawScore: 97.8,
   comparedDimensions: 7,
   totalDimensions: 8,
+  // Evidence coverage + confidence tier ship with every breakdown (defect 4.1):
+  // a 78% fit built on 1 of 8 dimensions must be labelled differently from one
+  // built on 7 of 8. Derived with the engine's own helper, so the fixture can
+  // never drift from the rules.
+  ...evidenceConfidence(7, 8),
   components: [
-    { key: "base" as const, code: null, points: 70, compared: true },
-    { key: "gpa" as const, code: "gpa_above", points: 15, compared: true },
-    { key: "english" as const, code: "ielts_above", points: 8, compared: true },
-    { key: "standardised_test" as const, code: null, points: 0, compared: false },
-    { key: "field" as const, code: "major_strong", points: 12, compared: true },
-    { key: "country" as const, code: "country_preferred", points: 8, compared: true },
-    { key: "cost" as const, code: "budget_fits", points: 8, compared: true },
-    { key: "income" as const, code: null, points: -15.2, compared: true },
-    { key: "funding_requirement" as const, code: "full_funding_required", points: -8, compared: true },
+    { key: "base", code: null, points: 70, compared: true },
+    { key: "gpa", code: "gpa_above", points: 15, compared: true },
+    { key: "english", code: "ielts_above", points: 8, compared: true },
+    { key: "standardised_test", code: null, points: 0, compared: false },
+    { key: "field", code: "major_strong", points: 12, compared: true },
+    { key: "country", code: "country_preferred", points: 8, compared: true },
+    { key: "cost", code: "budget_fits", points: 8, compared: true },
+    { key: "income", code: null, points: -15.2, compared: true },
+    { key: "funding_requirement", code: "full_funding_required", points: -8, compared: true },
   ],
 };
 const sum = Math.round(breakdownFixture.components.reduce((total, c) => total + c.points, 0) * 10) / 10;
+// Evidence coverage + confidence tier ship with every breakdown (defect 4.1):
+// a 78% fit built on 1 of 8 dimensions must be labelled differently from one
+// built on 7 of 8. Derived here with the engine's own helper so the fixture can
+// never drift from the rules.
+
 check(
   "the fixture is arithmetically honest (components sum to rawScore)",
   Math.abs(sum - breakdownFixture.rawScore) <= 0.06,
@@ -945,6 +956,24 @@ check(
 check(
   "the strip states how much of the score rests on real data",
   /7 of 8 dimensions measured/.test(strip.html)
+);
+check(
+  "the strip shows the evidence-coverage badge and its confidence tier (defect 4.1)",
+  /7 of 8 dimensions compared/.test(strip.html) && /High evidence/i.test(strip.html),
+  strip.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300)
+);
+const thin = renderLocalized("en", React.createElement(MatchBreakdownStrip, {
+  breakdown: {
+    ...breakdownFixture,
+    comparedDimensions: 1,
+    totalDimensions: 8,
+    ...evidenceConfidence(1, 8),
+  },
+}));
+check(
+  "a score resting on 1 of 8 dimensions is labelled LOW evidence, not presented as strong",
+  /Low evidence/i.test(thin.html) && /1 of 8 dimensions compared/.test(thin.html),
+  thin.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300)
 );
 check(
   "no strip is rendered when there is nothing to break down",

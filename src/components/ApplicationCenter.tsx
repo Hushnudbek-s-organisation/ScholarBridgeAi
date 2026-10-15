@@ -89,6 +89,10 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
   const [reporting, setReporting] = useState<number | null>(null);
   const [result, setResult] = useState("accepted");
   const [scholarship, setScholarship] = useState("");
+  /** The date the decision arrived — a record without it cannot be compared. */
+  const [decidedAt, setDecidedAt] = useState("");
+  /** Set by the flywheel when the reward was paid; shown once, never invented. */
+  const [rewardNote, setRewardNote] = useState("");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   // Analytics extras (spec §33): upcoming deadlines + scholarship matches.
@@ -203,6 +207,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         body: JSON.stringify({
           applicationId: reporting,
           result,
+          decidedAt: decidedAt || null,
           scholarshipAmountUsd: scholarship ? Number(scholarship) : null,
           shareConsent: consent,
         }),
@@ -211,7 +216,10 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       if (!res.ok) throw new Error(data.error || t("resultError"));
       setReporting(null);
       setScholarship("");
+      setDecidedAt("");
       setConsent(false);
+      // The server decides the reward; the client only repeats what it sent.
+      setRewardNote(typeof data?.reward?.explanation === "string" ? data.reward.explanation : "");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("resultError"));
@@ -448,6 +456,17 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             ))}
           </div>
 
+          <label htmlFor="app-decided-at" className="mt-3 block text-xs font-bold text-slate-600">
+            {t("formDecidedAt")}
+          </label>
+          <input
+            id="app-decided-at"
+            type="date"
+            className="mt-1 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={decidedAt}
+            onChange={(e) => setDecidedAt(e.target.value)}
+          />
+
           <label htmlFor="app-scholarship" className={srLabel}>
             {t("formScholarship")}
           </label>
@@ -486,6 +505,16 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               {t("cancel")}
             </button>
           </div>
+        </div>
+      )}
+
+      {rewardNote && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs leading-relaxed text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100"
+        >
+          <Trophy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>{rewardNote}</span>
         </div>
       )}
 

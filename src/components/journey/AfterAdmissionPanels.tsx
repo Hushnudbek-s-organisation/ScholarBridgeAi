@@ -30,6 +30,8 @@ import {
   inputClass,
 } from "./ui";
 import { AppNote } from "@/components/AppNote";
+import { PrintHeader, PrintSummaryButton } from "@/components/PrintSummaryButton";
+import { OfferComparisonMatrix, type MatrixOffer } from "@/components/journey/OfferComparisonMatrix";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
@@ -97,6 +99,9 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
 
   return (
     <div className="space-y-4">
+      {/* Phase 3.2 — once there are two offers, compare them on the numbers
+          that decide: net cost, deposit, deadline, post-study work rights. */}
+      <OfferComparisonMatrix offers={data.offers as unknown as MatrixOffer[]} />
       <JourneyCard
         title={t("opTitle")}
         subtitle={t("opSubtitle")}
@@ -268,7 +273,15 @@ interface RecData {
 
 const REC_STATUSES = ["not_requested", "requested", "opened", "submitted"];
 
-export function RecommendationManagerPanel({ profileId }: { profileId: number }) {
+/**
+ * Letters of recommendation.
+ *
+ * `applicationId` comes from the Materials hub's application switcher
+ * (spec §3.3): the list is filtered to the selected application and a new
+ * request is pre-filled with it, so a letter can never be requested against
+ * the wrong university. With no selection the panel shows everything.
+ */
+export function RecommendationManagerPanel({ profileId, applicationId, applicationLabel }: { profileId: number; applicationId?: number | null; applicationLabel?: string | null }) {
   const t = useTranslations("journey");
   const { data, loading, error, reload } = useResource<RecData>(
     useCallback(() => getJson<RecData>(`/api/recommendations?profileId=${profileId}`, t("rmLoadError")), [profileId, t]),
@@ -279,21 +292,30 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
   const [copied, setCopied] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ applicationId: "", recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
+  // The switcher is the default target; the form can still override it.
+  const effectiveApplicationId = applicationId ?? null;
 
   const applications = [...new Map(data.requests.map((r) => [r.applicationId, r.application])).entries()].filter(
     (e): e is [number, NonNullable<RecRow["application"]>] => e[1] != null
   );
+  // Application-scoped view: the switcher narrows the list, and the request
+  // form starts on the selected application instead of an empty select.
+  const visibleRequests = effectiveApplicationId
+    ? data.requests.filter((r) => r.applicationId === effectiveApplicationId)
+    : data.requests;
 
   const add = async () => {
-    if (!form.applicationId || !form.recommenderName.trim()) return;
+    const targetApplicationId = Number(form.applicationId || effectiveApplicationId || 0);
+    if (!targetApplicationId || !form.recommenderName.trim()) return;
     setBusy(true);
     try {
       await sendJson(
         "/api/recommendations",
-        { method: "POST", body: JSON.stringify({ profileId, ...form, applicationId: Number(form.applicationId) }) },
+        { method: "POST", body: JSON.stringify({ profileId, ...form, applicationId: targetApplicationId }) },
         t("rmAddError")
       );
       setForm({ applicationId: "", recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" });
+      if (targetApplicationId) setAdding(false);
       setAdding(false);
       await reload();
     } catch (e) {
@@ -369,11 +391,11 @@ export function RecommendationManagerPanel({ profileId }: { profileId: number })
         </p>
       </JourneyCard>
 
-      {data.requests.length === 0 ? (
+      {visibleRequests.length === 0 ? (
         <Empty title={t("rmEmptyTitle")} hint={t("rmEmptyHint")} />
       ) : (
         <div className="grid gap-2 lg:grid-cols-2">
-          {data.requests.map((r) => (
+          {visibleRequests.map((r) => (
             <div key={r.id} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -554,13 +576,20 @@ export function FinancialPlanPanel({ profileId, onNavigateTab }: { profileId: nu
 
   return (
     <div className="space-y-4">
+      <PrintHeader
+        title={t("fpTitle")}
+        subtitle={data.application ? `${data.application.universityName}` : t("fpNoApplication")}
+      />
       <JourneyCard
         title={t("fpTitle")}
         subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : t("fpNoApplication")}
         action={
-          <div className="text-right">
-            <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">${data.annualCost.toLocaleString()}</p>
-            <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
+          <div className="flex items-center gap-3 text-right">
+            <PrintSummaryButton />
+            <div>
+              <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">${data.annualCost.toLocaleString()}</p>
+              <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
+            </div>
           </div>
         }
       >

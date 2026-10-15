@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    const locked = await premiumGate(access.session.profile.id, "ai_essay", Boolean(access.session.isAdmin));
     if (locked) return locked;
 
     const type = searchParams.get("essayType");
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    const locked = await premiumGate(access.session.profile.id, "ai_essay", Boolean(access.session.isAdmin));
     if (locked) return locked;
 
     const content = clampString(body.content, MAX_CHARS);
@@ -95,6 +95,9 @@ export async function POST(req: Request) {
       type: essayType,
       wordLimit,
       targetName,
+      // Phase 2.4 — when the student pastes the programme's prompt, the rubric
+      // checks every sub-question of it. Absent prompt = no coverage verdict.
+      prompt: clampString(body.prompt, 4000) || null,
     });
 
     const [last] = await db
@@ -148,7 +151,7 @@ export async function PUT(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    const locked = await premiumGate(access.session.profile.id, "ai_essay", Boolean(access.session.isAdmin));
     if (locked) return locked;
     const parsed = await readJsonBody<Record<string, any>>(req, 256 * 1024);
     if (!parsed.ok) {
@@ -164,6 +167,9 @@ export async function PUT(req: Request) {
       type: parseType(body.essayType),
       wordLimit: parseWordLimit(body.wordLimit),
       targetName: clampString(body.targetName, 200) || null,
+      // Phase 2.4 — the preview scorer accepts the prompt too, so "check my
+      // essay" gives the same coverage verdict as saving a version.
+      prompt: clampString(body.prompt, 4000) || null,
     });
 
     return NextResponse.json({ feedback, wordCount: countWords(content) });
@@ -190,7 +196,7 @@ export async function DELETE(req: Request) {
         { status: rowAccess.status }
       );
     }
-    const locked = await premiumGate(rowAccess.session.profile.id, "ai_essay");
+    const locked = await premiumGate(rowAccess.session.profile.id, "ai_essay", Boolean(rowAccess.session.isAdmin));
     if (locked) return locked;
 
     await db.delete(essayVersions).where(eq(essayVersions.id, id));
@@ -216,7 +222,7 @@ export async function PATCH(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    const locked = await premiumGate(access.session.profile.id, "ai_essay", Boolean(access.session.isAdmin));
     if (locked) return locked;
     const me = access.session.profile.id;
     const parsed = await readJsonBody<Record<string, unknown>>(req);

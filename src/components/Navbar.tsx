@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { ADMIN_MODE_HINT_KEY, ADMIN_MODE_LABEL_KEY, ADMIN_VIEW_MODES, useAdminMode } from "@/components/AdminModeContext";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -155,6 +156,8 @@ interface NavItem {
   /** Palette-only rows (panes) never render in the sidebar. */
   pane?: boolean;
   hint?: string;
+  /** Admin god-mode: this row is hidden for regular users right now. */
+  hiddenForUsers?: boolean;
 }
 
 /** Icon per destination id (labels come from i18n, groups from navSections). */
@@ -329,10 +332,24 @@ export function Navbar({
   const tm = useTranslations("meta");
   const th = useTranslations("navHints");
   const tp = useTranslations("navPanes");
+  const tAdmin = useTranslations("adminMode");
 
-  // Admin → Navigation: ids hidden for EVERYONE (admin included). Hiding a
-  // destination removes it from the sidebar; hiding a pane removes that tab.
+  // Admin → Navigation: ids hidden for regular users. Hiding a destination
+  // removes it from the sidebar; hiding a pane removes that tab.
   const [hiddenItems, setHiddenItems] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  // Pillar 8 — an admin in "Admin mode" sees the FULL menu. The configured
+  // hidden ids are still known ({hiddenItems}) and each affected row gets a
+  // "hidden for users" badge instead of disappearing, so the operator can both
+  // inspect every section and see what regular students are missing.
+  const { unlocked: adminUnlocked, mode: adminViewMode, setMode: setAdminViewMode, isAdminSession } = useAdminMode();
+  // Memoized: both the effect (re-applying the hidden ids when config changes)
+  // and the row memo depend on these, and an inline arrow would rebuild the
+  // whole sidebar on every render.
+  const effectiveHidden = useMemo(() => (adminUnlocked ? [] : hiddenItems), [adminUnlocked, hiddenItems]);
+  const isHiddenForUsers = useCallback(
+    (id: string) => hiddenItems.includes(id) || hiddenItems.includes(id.split("/")[0]),
+    [hiddenItems]
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchKey, setSearchKey] = useState(0);
@@ -379,10 +396,10 @@ export function Navbar({
   // If the admin hides the destination the user is currently on, land them back
   // on the dashboard instead of leaving a nav-less page.
   useEffect(() => {
-    if (activeTab !== "dashboard" && activeTab !== "admin" && hiddenItems.includes(activeTab)) {
+    if (activeTab !== "dashboard" && activeTab !== "admin" && effectiveHidden.includes(activeTab)) {
       setActiveTab("dashboard");
     }
-  }, [hiddenItems, activeTab, setActiveTab]);
+  }, [effectiveHidden, activeTab, setActiveTab]);
 
   const openSearch = useCallback(() => {
     setDrawerOpen(false);
@@ -466,19 +483,20 @@ export function Navbar({
 
   const visibleDestinations = useMemo(
     () =>
-      NAV_SECTIONS.filter((s) => !hiddenItems.includes(s.id)).map((s) => ({
+      NAV_SECTIONS.filter((s) => !effectiveHidden.includes(s.id)).map((s) => ({
         id: s.id,
         label: labelFor(s.id),
         icon: ICONS[s.id] ?? Sparkles,
         group: s.group,
         premium: !!s.premium,
         isNew: !!s.isNew && isNewBadgeActive(),
+        hiddenForUsers: isHiddenForUsers(s.id),
       })) as NavItem[],
-    [hiddenItems, labelFor]
+    [effectiveHidden, isHiddenForUsers, labelFor]
   );
 
   const utilityItems = useMemo(() => {
-    const list: NavItem[] = NAV_UTILITY_SECTIONS.filter((u) => !hiddenItems.includes(u.id) && (!u.adminOnly || isAdmin)).map((u) => ({
+    const list: NavItem[] = NAV_UTILITY_SECTIONS.filter((u) => !effectiveHidden.includes(u.id) && (!u.adminOnly || isAdmin)).map((u) => ({
       id: u.id,
       label: labelFor(u.id),
       icon: ICONS[u.id] ?? Sparkles,
@@ -486,17 +504,18 @@ export function Navbar({
       premium: !!u.premium,
       isNew: !!u.isNew && isNewBadgeActive(),
       hint: hintFor(u.id),
+      hiddenForUsers: isHiddenForUsers(u.id),
     }));
     return list;
-  }, [hiddenItems, isAdmin, labelFor, hintFor]);
+  }, [effectiveHidden, isAdmin, isHiddenForUsers, labelFor, hintFor]);
 
   /* Populated on demand — panes are searchable so "Answer Vault" still lands
      on Application Materials → Documents & saved answers. */
   const paneItems: PaletteItem[] = useMemo(() => {
     const out: PaletteItem[] = [];
     for (const section of NAV_SECTIONS) {
-      if (hiddenItems.includes(section.id)) continue;
-      for (const pane of visiblePanes(section.id, hiddenItems)) {
+      if (effectiveHidden.includes(section.id)) continue;
+      for (const pane of visiblePanes(section.id, effectiveHidden)) {
         out.push({
           id: `${section.id}/${pane.id}`,
           label: `${labelFor(section.id)} → ${tp(pane.id as never)}`,
@@ -508,7 +527,7 @@ export function Navbar({
       }
     }
     return out;
-  }, [hiddenItems, labelFor, tp, t]);
+  }, [effectiveHidden, labelFor, tp, t]);
 
   const paletteItems: PaletteItem[] = useMemo(
     () => [
@@ -588,6 +607,14 @@ export function Navbar({
         {item.premium && !isActive && (
           <span className="relative rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
             {t("proBadge")}
+          </span>
+        )}
+        {item.hiddenForUsers && (
+          <span
+            className="relative shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+            title={tm("adminHiddenForUsers")}
+          >
+            {tm("adminHiddenForUsers")}
           </span>
         )}
       </button>
@@ -747,6 +774,41 @@ export function Navbar({
     </div>
   );
 
+  // ---- Admin view-mode switcher (Pillar 8) --------------------------------
+  // Only rendered for an admin session. Switching to Preview as Pro / Free
+  // re-applies the hidden-navigation config and the premium gates so the
+  // operator can see exactly what a student sees; Admin mode shows everything
+  // and badges the rows that regular users cannot see.
+  const AdminModeSwitch = isAdminSession ? (
+    <div
+      className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-2 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+      role="group"
+      aria-label={tAdmin("switchLabel")}
+    >
+      <div className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+        {tAdmin("switchLabel")}
+      </div>
+      <div className="flex gap-1">
+        {ADMIN_VIEW_MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setAdminViewMode(m)}
+            aria-pressed={adminViewMode === m}
+            title={tAdmin(ADMIN_MODE_HINT_KEY[m] as never)}
+            className={`min-h-9 flex-1 rounded-lg px-1.5 py-1 text-[11px] font-bold transition-colors ${
+              adminViewMode === m
+                ? "bg-indigo-600 text-white"
+                : "bg-white text-indigo-700 hover:bg-indigo-100 dark:bg-slate-800 dark:text-indigo-200 dark:hover:bg-slate-700"
+            }`}
+          >
+            {tAdmin(ADMIN_MODE_LABEL_KEY[m] as never)}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   // The bottom bar only offers groups that still have a visible destination.
   const bottomItems = BOTTOM_BAR_GROUPS.filter((b) => visibleDestinations.some((d) => d.group === b.group));
   const activeInBottomBar = bottomItems.some((b) => b.group === activeGroup);
@@ -771,6 +833,7 @@ export function Navbar({
           {renderUtility("nav-active-desktop")}
         </nav>
         <div className="shrink-0 space-y-2.5 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
+          {AdminModeSwitch}
           {renderProfileCard()}
           {SettingsRow}
         </div>
@@ -887,6 +950,7 @@ export function Navbar({
               </div>
               <div className="space-y-2.5 px-3 pt-3">
                 {renderProfileCard(true)}
+                {AdminModeSwitch}
                 {SearchButton}
               </div>
               <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label={t("mainNav")}>

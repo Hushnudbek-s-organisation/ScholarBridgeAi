@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { AlertTriangle, Check, Copy, FileText, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
@@ -42,6 +43,15 @@ export function RecLetterPanel() {
   const [requestedFocus, setRequestedFocus] = useState("");
   const [supportingExample, setSupportingExample] = useState("");
   const [copied, setCopied] = useState(false);
+
+  /**
+   * Phase 7 — load the recommendation-letter request email (or the employer /
+   * academic exemplar) into the brief form, so the student sees exactly what a
+   * professor-friendly request contains before writing their own.
+   */
+  const loadSample = (sampleText: string) => {
+    setRelationshipContext(sampleText);
+  };
 
   const fetchBrief = useCallback(async (
     uni: string,
@@ -113,6 +123,9 @@ export function RecLetterPanel() {
   };
 
   return (
+    <div className="space-y-3">
+      {/* Phase 7 — the request email + professor/employer exemplars */}
+      <SampleExemplarBar kind={["email", "lor"]} onLoad={loadSample} />
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -298,6 +311,7 @@ export function RecLetterPanel() {
       )}
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="ai" className="mt-2" />
+    </div>
     </div>
   );
 }

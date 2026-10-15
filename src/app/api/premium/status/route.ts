@@ -46,48 +46,65 @@ export async function GET(req: Request) {
         getConfigNumber("payment_premium_yearly_days", Number(CONFIG_DEFAULTS.payment_premium_yearly_days)),
       ]);
 
+    /**
+     * The three regional pricing tiers. `perMonthUzs` lets the checkout show
+     * the like-for-like monthly rate (the season and yearly passes are
+     * discounted packages, and a student comparing them deserves the same unit).
+     * `taglineUz` explains WHO each tier is for, in the app's primary market.
+     */
     const packages = [
       {
         id: "monthly",
         label: "Monthly",
         labelUz: "Oylik",
+        taglineUz: "Sinab ko'rish uchun — istagan paytda to'xtatasiz",
         priceUzs: monthlyPrice,
         days: monthlyDays,
+        perMonthUzs: monthlyPrice,
         currency: PREMIUM_CURRENCY,
       },
       {
         id: "season",
         label: "Application season",
-        labelUz: "Ariza mavsumi (3 oy)",
+        labelUz: "Qabul mavsumi (3 oy)",
+        taglineUz: "Qabul mavsumi uchun eng foydali tanlov",
         priceUzs: seasonPrice,
         days: seasonDays,
+        perMonthUzs: Math.round(seasonPrice / Math.max(1, Math.round(seasonDays / 30))),
         currency: PREMIUM_CURRENCY,
-        badge: "Best for applicants",
+        badge: "Eng ommabop",
       },
       {
         id: "yearly",
         label: "Yearly",
         labelUz: "Yillik",
+        taglineUz: "Bir yillik tayyorgarlik: eng past oylik narx",
         priceUzs: yearlyPrice,
         days: yearlyDays,
+        perMonthUzs: Math.round(yearlyPrice / Math.max(1, Math.round(yearlyDays / 30))),
         currency: PREMIUM_CURRENCY,
-        badge: "Save more",
+        badge: "Eng tejamkor",
       },
     ];
 
+    // Pillar 8 — an admin session is never locked, not even before a profile is
+    // selected (the dashboard briefly has no active profile while switching).
+    const sessionIsAdmin = Boolean(access.session?.isAdmin);
     if (!profileId) {
       return NextResponse.json({
-        isPremium: false,
-        plan: "free",
-        features: {},
-        caps: null,
+        isPremium: sessionIsAdmin,
+        plan: sessionIsAdmin ? "admin" : "free",
+        source: sessionIsAdmin ? "admin" : "none",
+        premiumUntil: null,
+        features: sessionIsAdmin ? Object.fromEntries(FEATURES.map((f) => [f, true])) : {},
+        caps: sessionIsAdmin ? { unlimited: true, caps: {} } : null,
         packages,
       });
     }
 
     const [status, features, caps] = await Promise.all([
-      getPremiumStatus(profileId),
-      featureAccess(profileId, FEATURES),
+      getPremiumStatus(profileId, sessionIsAdmin),
+      featureAccess(profileId, FEATURES, sessionIsAdmin),
       planCapsSnapshot(profileId),
     ]);
     return NextResponse.json({ ...status, features, caps, packages });

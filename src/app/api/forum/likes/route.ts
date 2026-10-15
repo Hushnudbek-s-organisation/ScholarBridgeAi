@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         { status: access.status }
       );
     }
-    const locked = await premiumGate(access.session.profile.id, "forum_write");
+    const locked = await premiumGate(access.session.profile.id, "forum_write", Boolean(access.session.isAdmin));
     if (locked) return locked;
     const writeLimit = checkRateLimit(`forum:${access.session.profile.id}`, LIMITS.forumWrite);
     if (!writeLimit.ok) return rateLimitedResponse(writeLimit.retryAfterSec);

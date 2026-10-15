@@ -24,12 +24,19 @@ import { logAIUsage } from "@/lib/ai/usage";
 import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit, reserveSharedSlot, sharedHitCount } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
+import { db } from "@/db";
+import { aiUsage } from "@/db/schema";
+import { and, eq, gte, sql } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
 const DEFAULT_LIVE_MODEL = "gemini-3.1-flash-live-preview";
 const DEFAULT_API_VERSION = "v1beta";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MONTH_MS = 30 * DAY_MS;
+
+/** Codes the browser keys its fallback messages on (see VisaSpeakingAssistant). */
+const LIVE_MONTHLY_CODE = "live_monthly_cap_reached";
 
 /** Codes the browser keys its fallback messages on (see VisaSpeakingAssistant). */
 const LIVE_QUOTA_CODE = "live_quota_exceeded";
@@ -79,6 +86,43 @@ async function liveSessionAllowance(isPremium: boolean): Promise<number> {
   return getConfigNumber(
     isPremium ? "ai_premium_live_sessions_per_day" : "ai_free_live_sessions_per_day",
     isPremium ? 2 : 0,
+  );
+}
+
+/**
+ * Native-audio live sessions this account has opened in the last 30 days.
+ *
+ * Counted from `ai_usage` (one row per admitted session, taskType
+ * "visa_live"): the daily allowance is a rate-limit bucket, which cannot
+ * answer "how much have I used this month?". Read-only, no schema change.
+ */
+async function liveSessionsInLast30Days(profileId: number): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(aiUsage)
+    .where(
+      and(
+        eq(aiUsage.profileId, profileId),
+        eq(aiUsage.taskType, "visa_live"),
+        gte(aiUsage.createdAt, new Date(Date.now() - MONTH_MS)),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
+function liveMonthlyCapResponse(limit: number, used: number) {
+  return NextResponse.json(
+    {
+      error:
+        "You have used this month's native-voice Live sessions. Standard voice and text mock interviews are still unlimited — continue there, or add a Live Voice Top-Up Pack.",
+      code: LIVE_MONTHLY_CODE,
+      plan: "premium",
+      limit,
+      used,
+      retryAfterSec: Math.ceil(30 / 24) * 24 * 60 * 60,
+      alternatives: ["standard_voice", "text"],
+    },
+    { status: 429 },
   );
 }
 
@@ -166,6 +210,8 @@ export async function POST(req: Request) {
     // (no key, Gemini error) does not use up the allowance.
     const dayKey = `visa:live-day:${profileId}`;
     let quota: { limit: number | null; remaining: number | null } = { limit: null, remaining: null };
+    /** Monthly native-audio allowance state (null for admins / non-Premium). */
+    let monthly: { limit: number; used: number; remaining: number } | null = null;
     let liveAllowance: number | null = null;
     let livePlan: "free" | "premium" = "free";
     if (!session.isAdmin) {
@@ -188,6 +234,31 @@ export async function POST(req: Request) {
       }
       const pre = await sharedHitCount(dayKey, DAY_MS);
       if (pre.count >= allowance) return liveQuotaResponse(plan, allowance, pre.oldest);
+
+      // MONTHLY ceiling on NATIVE AUDIO (unit economics, 2026-10 fix): the
+      // daily allowance alone let a heavy Premium user open 60 sessions of
+      // native audio a month (~$13.80 of Gemini Live audio against a $4.92
+      // price). Text and standard browser-voice interviews cost under
+      // $0.002/session and stay UNLIMITED — only the paid audio path is capped.
+      if (isPremium) {
+        const monthlyCap = await getConfigNumber("ai_premium_live_sessions_per_month", 8);
+        if (monthlyCap <= 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Native-voice Live practice is paused. Standard voice and text mock interviews remain available.",
+              code: LIVE_QUOTA_CODE,
+              plan,
+              limit: 0,
+            },
+            { status: 403 },
+          );
+        }
+        const used = await liveSessionsInLast30Days(profileId);
+        if (used >= monthlyCap) return liveMonthlyCapResponse(monthlyCap, used);
+        monthly = { limit: monthlyCap, used, remaining: Math.max(0, monthlyCap - used) };
+      }
+
       quota = { limit: allowance, remaining: Math.max(0, allowance - pre.count) };
     }
 
@@ -332,6 +403,8 @@ export async function POST(req: Request) {
       newSessionExpireTime,
       maxSessionSeconds: maxSessionMinutes * 60,
       liveQuota: quota,
+      /** Native-audio allowance for the last 30 days (null = not applicable). */
+      liveMonthlyQuota: monthly,
     });
   } catch (err) {
     console.error("Visa Live error:", errorDetail(err));

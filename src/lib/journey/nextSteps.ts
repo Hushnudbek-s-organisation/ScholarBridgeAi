@@ -14,7 +14,14 @@
 
 export type StepUrgency = "critical" | "high" | "medium" | "low";
 
-export interface NextStep {
+import {
+  deadlineScore,
+  dedupeRanked,
+  rankActions,
+  type RankableAction,
+} from "../rankedActions";
+
+export interface NextStep extends RankableAction {
   id: string;
   /** Translation key in journey.nextStepTitle, unless rawTitleKind is set. */
   titleKey: string;
@@ -63,12 +70,12 @@ function urgencyOf(days: number | null): { urgency: StepUrgency; dot: string } {
  * A tracked date changes ordering only by being past, today, or in the future.
  * The exact calendar-day difference breaks ties; no generic preparation window
  * is assumed for every programme or document.
+ *
+ * The bands come from src/lib/rankedActions.ts, which `buildNextActions`
+ * (roadmap endpoint + AI brief) uses too — one definition, one order.
  */
 function baseScore(days: number | null): number {
-  if (days == null) return 30;
-  if (days < 0) return 100;
-  if (days === 0) return 95;
-  return 75;
+  return deadlineScore(days);
 }
 
 export function computeNextActions(input: NextStepsInput, limit = 5): NextStep[] {
@@ -226,21 +233,10 @@ export function computeNextActions(input: NextStepsInput, limit = 5): NextStep[]
     });
   }
 
-  const seen = new Set<string>();
-  return steps
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const aDue = a.dueInDays ?? Number.MAX_SAFE_INTEGER;
-      const bDue = b.dueInDays ?? Number.MAX_SAFE_INTEGER;
-      return aDue - bDue || a.id.localeCompare(b.id);
-    })
-    .filter((step) => {
-      const key = step.rawTitle ?? `${step.titleKey}:${JSON.stringify(step.values ?? {})}`;
-      if (seen.has(key.toLowerCase())) return false;
-      seen.add(key.toLowerCase());
-      return true;
-    })
-    .slice(0, limit);
+  return dedupeRanked(
+    rankActions(steps),
+    (step) => step.rawTitle ?? `${step.titleKey}:${JSON.stringify(step.values ?? {})}`,
+  ).slice(0, limit);
 }
 
 function labelFor(testType: string): string {

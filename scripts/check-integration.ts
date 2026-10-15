@@ -2301,10 +2301,44 @@ async function main() {
     await setConfig("ai_live_global_sessions_per_day", "30");
 
     const premiumUntil = new Date(Date.now() + 7 * 86400000);
+    // Raise the PREMIUM daily allowance above the free one so this asserts the
+    // plan distinction rather than the number: the account is not blocked by
+    // the free plan's cap.
+    await setConfig("ai_premium_live_sessions_per_day", "3");
+    await setConfig("ai_premium_live_sessions_per_month", "8");
     await db.update(schema.studentProfiles).set({ isPremium: true, premiumUntil }).where(eq(schema.studentProfiles.id, liveAcct.id));
     const premiumLive = await liveCall(liveCookie);
     check("voice: a Premium account is not blocked by the free allowance (reaches the key check)",
       premiumLive.status === 503 && (await premiumLive.json()).code === "live_unavailable");
+
+    // --- Monthly native-audio ceiling (unit economics) ---------------------
+    // The monthly cap is read from the account's admitted sessions in `ai_usage`
+    // (one row per minted token), not from the daily rate-limit bucket.
+    await db.insert(schema.aiUsage).values({
+      profileId: liveAcct.id,
+      taskType: "visa_live",
+      provider: "gemini",
+      model: "gemini-live-test",
+      status: "success",
+      costStatus: "usage_unreported",
+    });
+    await setConfig("ai_premium_live_sessions_per_month", "1");
+    const monthlyCapped = await liveCall(liveCookie);
+    const monthlyBody = await monthlyCapped.json();
+    check(
+      "voice: the monthly native-audio ceiling refuses further Live sessions (429 live_monthly_cap_reached)",
+      monthlyCapped.status === 429 && monthlyBody.code === "live_monthly_cap_reached" && monthlyBody.limit === 1,
+      JSON.stringify(monthlyBody)
+    );
+    check(
+      "voice: the monthly refusal points at the unlimited alternatives (standard voice / text)",
+      Array.isArray(monthlyBody.alternatives) && monthlyBody.alternatives.includes("text"),
+      JSON.stringify(monthlyBody.alternatives)
+    );
+
+    await db.delete(schema.aiUsage).where(eq(schema.aiUsage.taskType, "visa_live"));
+    await setConfig("ai_premium_live_sessions_per_month", "8");
+    await setConfig("ai_premium_live_sessions_per_day", "1");
     await db.update(schema.studentProfiles).set({ isPremium: false, premiumUntil: null }).where(eq(schema.studentProfiles.id, liveAcct.id));
 
     const liveUsage = await db.select().from(schema.aiUsage).where(eq(schema.aiUsage.taskType, "visa_live"));

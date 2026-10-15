@@ -50,6 +50,7 @@ import {
   SECTION_WEIGHTS,
   computeWorkspaceProgress,
   rowIsDone,
+  submissionGate,
   type WorkspaceRow,
 } from "../src/lib/journey/workspace";
 import {
@@ -58,14 +59,19 @@ import {
   type ReadinessInput,
 } from "../src/lib/journey/readiness";
 import { computeNextActions, type NextStepsInput } from "../src/lib/journey/nextSteps";
+import { buildNextActions, type NextActionsContext } from "../src/lib/nextActions";
+import { ACTION_SCORE, compareRanked, deadlineScore } from "../src/lib/rankedActions";
 import { PLAN_PHASES, buildPhaseProgress, reversePlan } from "../src/lib/journey/planning";
 import {
   COST_LINES,
   FUNDING_KIND_LABELS,
   buildFundingPlan,
+  canonicalCostLineKey,
+  fundingLinesFromCosts,
   postAdmissionFunding,
   type FundingItemLike,
 } from "../src/lib/journey/funding";
+import { calculateCosts } from "../src/lib/costs";
 import {
   LEARNING_METRICS,
   isLearningMetric,
@@ -74,6 +80,7 @@ import {
   summarizeProviders,
 } from "../src/lib/journey/providers";
 import { ALL_MAJORS, CAREER_PATHS } from "../src/lib/journey/careers";
+import { applyWhatIfChange, simulateScoreChange } from "../src/lib/whatIf";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
   isProfileEditorTarget,
@@ -82,6 +89,12 @@ import {
   NAV_SECTIONS,
   parseHiddenNav,
   resolveNavTarget,
+  COMPONENT_LEVEL_HIDDEN_IDS,
+  FOCUS_MODE_KEEP_IDS,
+  focusModeHiddenIds,
+  focusModeVisibleIds,
+  isFocusModeActive,
+  NAV_DESTINATION_IDS,
   visiblePanes,
 } from "../src/lib/navSections";
 
@@ -510,6 +523,91 @@ check("an incomplete application is not ready to submit and lists its blockers",
   assert.ok(p.blockers.some((b) => /transcript/i.test(b)), p.blockers.join(" | "));
 });
 
+// --- Defect 1.9: section progress can never exceed 100% ---------------------
+check("a section with BOTH requirement rows and tracked extras never exceeds 100%", () => {
+  const withRows = computeWorkspaceProgress(
+    [
+      { section: "recommendations", status: "done", isRequired: true, key: "rec.req" },
+      { section: "finance", status: "not_done", isRequired: true, key: "fin.req" },
+    ],
+    {},
+    { recommendationsTotal: 3, recommendationsSubmitted: 1, financeTotal: 2, financeDone: 1 }
+  );
+  for (const s of withRows.sections) {
+    assert.ok(s.done <= s.total, `${s.key}: ${s.done}/${s.total}`);
+    assert.ok(s.pct <= 100, `${s.key}: ${s.pct}%`);
+  }
+  const rec = withRows.sections.find((x) => x.key === "recommendations")!;
+  assert.equal(rec.done, 2, "1 requirement row + 1 submitted request");
+  assert.equal(rec.total, 4, "1 requirement row + 3 requests");
+  assert.equal(rec.pct, 50);
+
+  // Exhaustive: no combination of extras may push a section over 100%.
+  for (const rows of [[], [{ section: "recommendations", status: "not_done", isRequired: true, key: "r" }]]) {
+    for (let total = 0; total <= 3; total++) {
+      for (let done = 0; done <= 4; done++) {
+        const p = computeWorkspaceProgress(rows as WorkspaceRow[], {}, { recommendationsTotal: total, recommendationsSubmitted: done });
+        for (const s of p.sections) assert.ok(s.pct <= 100, `${s.key} ${s.done}/${s.total} = ${s.pct}%`);
+        assert.ok(p.pct <= 100);
+      }
+    }
+  }
+});
+
+check("extras that overshoot their own total are clamped, not trusted", () => {
+  const p = computeWorkspaceProgress([], {}, { recommendationsTotal: 2, recommendationsSubmitted: 9 });
+  const rec = p.sections.find((x) => x.key === "recommendations")!;
+  assert.equal(rec.done, 2);
+  assert.equal(rec.pct, 100);
+});
+
+// --- Defect 1.9: ONE submission gate ---------------------------------------
+check("the submission gate ignores optional rows and blocks on real ones", () => {
+  const optional = computeWorkspaceProgress(
+    [
+      { section: "documents", status: "done", isRequired: true, key: "passport" },
+      { section: "essays", status: "not_done", isRequired: false, key: "extra" },
+    ],
+    { extra: "Optional extra essay" },
+    { submitted: false }
+  );
+  assert.equal(optional.readyToSubmit, true, "an optional open row must never block");
+  assert.equal(optional.blockers.length, 0);
+});
+
+check("outstanding recommendation requests block submission in the gate", () => {
+  const p = computeWorkspaceProgress(
+    [{ section: "documents", status: "done", isRequired: true, key: "passport" }],
+    {},
+    { recommendationsTotal: 2, recommendationsSubmitted: 1, recommendationsOutstanding: 1 }
+  );
+  assert.equal(p.readyToSubmit, false);
+  assert.ok(p.blockers.some((b) => /recommendation/i.test(b)), p.blockers.join(" | "));
+});
+
+check("an unpaid required application fee blocks submission; paid or waived clears it", () => {
+  const base = [{ section: "documents", status: "done", isRequired: true, key: "passport" }] as WorkspaceRow[];
+  const unpaid = computeWorkspaceProgress(base, {}, { feeRequired: true, feePaid: false });
+  assert.equal(unpaid.readyToSubmit, false);
+  assert.ok(unpaid.blockers.some((b) => /fee/i.test(b)));
+  assert.equal(computeWorkspaceProgress(base, {}, { feeRequired: true, feePaid: true }).readyToSubmit, true);
+  assert.equal(computeWorkspaceProgress(base, {}, { feeRequired: true, feeRowStatus: "done" }).readyToSubmit, true);
+  assert.equal(computeWorkspaceProgress(base, {}, { feeRequired: false, feePaid: false }).readyToSubmit, true);
+});
+
+check("submissionGate is the single rule used by the workspace route", () => {
+  const rows = [
+    { key: "a", section: "documents", title: "A", isRequired: true, status: "not_done" },
+  ];
+  const g = submissionGate({ sections: [{ key: "documents", label: "Documents", done: 0, total: 1, pct: 0, missing: [] }], missing: rows });
+  assert.equal(g.ready, false);
+  assert.deepEqual(g.blockers, ["A"]);
+  const empty = submissionGate({ sections: [], missing: [] });
+  assert.equal(empty.ready, false, "an empty checklist is never submittable");
+  const submitted = submissionGate({ sections: [], missing: [], submitted: true });
+  assert.equal(submitted.ready, true, "an already-submitted application is past the gate");
+});
+
 check("an empty application is 0% and blocked, never accidentally submittable", () => {
   const p = computeWorkspaceProgress([], {});
   assert.equal(p.pct, 0);
@@ -649,6 +747,16 @@ check("test comparison describes catalogue figures, not admissions outcomes", ()
   assert.equal(noScore.catalogueFigure, 7.5);
 });
 
+check("the public/private catalogue filter is wired end to end", () => {
+  const route = readFileSync("src/app/api/universities/route.ts", "utf8");
+  assert.match(route, /searchParams\.get\("type"\)/);
+  assert.match(route, /allUnis\.filter\(\(u\) => \(u\.universityType/);
+  const explorer = readFileSync("src/components/UniversityExplorer.tsx", "utf8");
+  assert.match(explorer, /params\.set\("type", selectedType\)/, "the UI must send the filter it shows");
+  assert.match(explorer, /const \[selectedType, setSelectedType\] = useState\("All"\)/);
+  assert.match(explorer, /selectedType, selectedLevel, maxTuition/, "changing the filter must refetch");
+});
+
 // ---------------------------------------------------------------------------
 section("Next actions");
 // ---------------------------------------------------------------------------
@@ -683,6 +791,107 @@ check("a distant tracked date remains visible without a fixed preparation window
   const steps = computeNextActions(nextInput({ deadlines: [{ id: "distant", title: "Future application", daysRemaining: 200 }] }));
   assert.equal(steps[0]?.id, "deadline-distant");
   assert.equal(steps[0]?.dueInDays, 200);
+});
+
+check("the selected application is passed down to every materials panel", () => {
+  const hub = readFileSync("src/components/hubs/index.tsx", "utf8");
+  // The switcher's selection is resolved once, from the applications the server
+  // returned (never from a placeholder).
+  assert.match(hub, /const selectedApplication = effectiveId \? applications\.find/);
+  assert.match(hub, /applicationId=\{effectiveId\}/);
+  assert.match(hub, /applicationLabel=\{selectedLabel\}/);
+  assert.match(hub, /universityId=\{selectedApplication\?\.universityId \?\? null\}/);
+  // Documents: the vault links what it creates to that application.
+  const vault = readFileSync("src/components/journey/PreparePanels.tsx", "utf8");
+  assert.match(vault, /applicationIds: applicationId \? \[applicationId\] : \[\]/);
+  assert.match(vault, /dvScopeLinked/);
+  // Letters of recommendation: the list narrows and the new request is pre-filled.
+  const rec = readFileSync("src/components/journey/AfterAdmissionPanels.tsx", "utf8");
+  assert.match(rec, /visibleRequests = effectiveApplicationId/);
+  assert.match(rec, /const targetApplicationId = Number\(form\.applicationId \|\| effectiveApplicationId \|\| 0\)/);
+  // Essays: a saved version carries the selected university.
+  const essayUi = readFileSync("src/components/EssayRubricStudio.tsx", "utf8");
+  assert.match(essayUi, /universityId: universityId \?\? undefined/);
+  assert.match(essayUi, /essayScopeLinked/);
+  const essayRoute = readFileSync("src/app/api/essays/route.ts", "utf8");
+  assert.match(essayRoute, /universityId: positiveInt\(body\.universityId\)/);
+});
+
+check("the dashboard engine and the roadmap engine share one ordering brain", () => {
+  const deadlines = [
+    { id: "past", title: "Scholarship", daysRemaining: -3, type: "scholarship" },
+    { id: "soon", title: "Application", daysRemaining: 12, type: "application" },
+  ];
+  const dashboardSteps = computeNextActions(nextInput({ deadlines }), 10);
+
+  const roadmapContext: NextActionsContext = {
+    deadlines: deadlines.map((d) => ({ id: d.id, title: d.title, type: d.type, daysRemaining: d.daysRemaining })),
+    applications: [],
+    recommendationApplicationIds: [],
+    savedUniversityCount: 0,
+    savedScholarshipCount: 0,
+    openTaskCount: 0,
+    requiresFullScholarship: false,
+    submittedWithoutOutcome: 0,
+  };
+  const roadmap = buildNextActions(roadmapContext, 10).actions;
+
+  const dashboardOverdue = dashboardSteps.find((step) => step.id === "deadline-past");
+  const roadmapOverdue = roadmap.find((action) => action.id === "deadline-past");
+  const roadmapUpcoming = roadmap.find((action) => action.id === "deadline-soon");
+
+  // The roadmap engine uses the raw band; the dashboard adds its own row
+  // offsets — but the GAP between two tracked dates is the same band gap in
+  // both, which is what keeps the two lists from disagreeing.
+  assert.equal(roadmapOverdue?.score, ACTION_SCORE.deadlinePassed);
+  assert.equal(roadmapUpcoming?.score, ACTION_SCORE.deadlineFuture);
+  const dashPastScore = computeNextActions(
+    nextInput({ deadlines: [{ id: "p", title: "P", daysRemaining: -3 }] }),
+    10,
+  )[0].score;
+  const dashFutureScore = computeNextActions(
+    nextInput({ deadlines: [{ id: "f", title: "F", daysRemaining: 12 }] }),
+    10,
+  )[0].score;
+  assert.equal(
+    dashPastScore - dashFutureScore,
+    deadlineScore(-3) - deadlineScore(12),
+    "the same band gap must separate a passed date from an upcoming one in both engines",
+  );
+  assert.ok(dashboardOverdue, "the dashboard list still carries the passed date");
+
+  // Deleting a day from the calendar moves both engines together.
+  assert.equal(deadlineScore(-1), ACTION_SCORE.deadlinePassed);
+  assert.equal(deadlineScore(0), ACTION_SCORE.deadlineToday);
+  assert.equal(deadlineScore(4), ACTION_SCORE.deadlineFuture);
+  assert.equal(deadlineScore(null), ACTION_SCORE.deadlineUndated);
+
+  // And the comparator both engines now call reproduces each engine's output.
+  const dashboardOrder = [...dashboardSteps].sort(compareRanked).map((step) => step.id);
+  assert.deepEqual(dashboardOrder, dashboardSteps.map((step) => step.id));
+  const roadmapOrder = [...roadmap].sort(compareRanked).map((action) => action.id);
+  assert.deepEqual(roadmapOrder, roadmap.map((action) => action.id));
+
+  // A passed date outranks an upcoming one in both engines.
+  assert.ok(
+    dashboardSteps.findIndex((step) => step.id === "deadline-past") <
+      dashboardSteps.findIndex((step) => step.id === "deadline-soon") || !dashboardSteps.some((step) => step.id === "deadline-soon"),
+    "the passed date leads the dashboard list",
+  );
+  assert.ok(
+    roadmap.indexOf(roadmapOverdue!) < roadmap.indexOf(roadmapUpcoming!),
+    "the passed date leads the roadmap list",
+  );
+});
+
+check("both next-action engines call the shared ranking module", () => {
+  const journeySource = readFileSync("src/lib/journey/nextSteps.ts", "utf8");
+  const actionSource = readFileSync("src/lib/nextActions.ts", "utf8");
+  for (const [name, source] of [["journey/nextSteps.ts", journeySource], ["nextActions.ts", actionSource]] as const) {
+    assert.match(source, /from "\.\.\/rankedActions"|from "\.\/rankedActions"/, `${name} must import the shared ranking module`);
+    assert.match(source, /rankActions\(/, `${name} must rank with rankActions()`);
+    assert.doesNotMatch(source, /b\.score - a\.score/, `${name} must not keep a private copy of the comparator`);
+  }
 });
 
 check("recommendation records use no fabricated lead time", () => {
@@ -914,6 +1123,103 @@ check("a fully funded year is reported as covered, with the items to prove it", 
   assert.equal(p.isCovered, true);
 });
 
+// --- Defect 1.2: per-line coverage can never multiply a single item --------
+check("an item with no declared coverage is never counted on every line at once", () => {
+  const p = buildFundingPlan({ annualCost: 120000, lines, items: [item({ amountUsd: 5000 })] });
+  const total = p.byLine.reduce((s, l) => s + l.covered, 0);
+  assert.equal(total, 5000, `$5,000 of money produced $${total} of coverage`);
+  assert.ok(total <= p.projectedTotal, "line coverage exceeds the money that exists");
+});
+
+check("a multi-line item spends its balance once, across the lines it names", () => {
+  const p = buildFundingPlan({
+    annualCost: 120000,
+    lines,
+    items: [item({ amountUsd: 12000, covers: JSON.stringify(["tuition", "accommodation"]) })],
+  });
+  const total = p.byLine.reduce((s, l) => s + l.covered, 0);
+  assert.equal(total, 12000, `$12,000 of money produced $${total} of coverage`);
+  assert.ok(total <= p.projectedTotal);
+  assert.equal(p.byLine.find((l) => l.key === "tuition")!.covered, 12000, "the first named line takes it first");
+  assert.equal(p.byLine.find((l) => l.key === "accommodation")!.covered, 0, "the balance is already spent");
+});
+
+check("line coverage never exceeds the money that exists, whatever the covers list says", () => {
+  const cases: FundingItemLike[][] = [
+    [],
+    [item({ amountUsd: 10000 })],
+    [item({ amountUsd: 10000, covers: JSON.stringify(["tuition", "accommodation", "food"]) })],
+    [item({ amountUsd: 30000, covers: JSON.stringify(["tuition"]) }), item({ amountUsd: 7000 })],
+    [item({ amountUsd: 9000, status: "declined" }), item({ amountUsd: 4000, status: "confirmed" })],
+    // Legacy/unknown coverage keys must not silently attach to unrelated lines.
+    [item({ amountUsd: 6000, covers: JSON.stringify(["flights"]) })],
+    [item({ amountUsd: 6000, covers: JSON.stringify(["something_we_do_not_track"]) })],
+  ];
+  for (const items of cases) {
+    const p = buildFundingPlan({ annualCost: 120000, lines, items });
+    const total = p.byLine.reduce((s, l) => s + l.covered, 0);
+    assert.ok(total <= p.projectedTotal + 0.001, `coverage $${total} > money $${p.projectedTotal}`);
+    assert.equal(p.allocatedTotal, total);
+    assert.equal(p.allocatedTotal + p.unallocatedTotal, p.projectedTotal);
+  }
+});
+
+check("legacy coverage keys resolve to the canonical line", () => {
+  assert.equal(canonicalCostLineKey("flights"), "flight");
+  assert.equal(canonicalCostLineKey("flight"), "flight");
+  assert.equal(canonicalCostLineKey("visa_fee"), "visa");
+  assert.equal(canonicalCostLineKey("living"), "food");
+  assert.equal(canonicalCostLineKey("housing"), "accommodation");
+  assert.equal(canonicalCostLineKey("application_fee"), "other");
+  assert.equal(canonicalCostLineKey("nonsense"), null);
+  const p = buildFundingPlan({ annualCost: 120000, lines, items: [item({ amountUsd: 6000, covers: JSON.stringify(["flights"]) })] });
+  assert.equal(p.byLine.find((l) => l.key === "flight")!.covered, 6000, "\"flights\" covers the flight line");
+});
+
+// --- Defect 1.1: the per-line breakdown accounts for 100% of the yearly cost
+check("every calculateCosts line lands on exactly one funding line (no dropped living/flights)", () => {
+  const costs = calculateCosts({
+    annualTuitionUsd: 24000,
+    annualLivingEstUsd: null,
+    country: "Germany",
+    city: "Berlin",
+    years: 1,
+    flightsPerYearUsd: 1400,
+    insurancePerYearUsd: 1200,
+    booksPerYearUsd: 900,
+    visaFeeUsd: 500,
+    applicationFeeUsd: 75,
+  });
+  const b = fundingLinesFromCosts(costs);
+  const total = b.lines.reduce((s, l) => s + l.cost, 0);
+  assert.equal(total, costs.annualTotalUsd, `lines total ${total} vs annualCost ${costs.annualTotalUsd}`);
+  assert.equal(b.unaccountedUsd, 0);
+  assert.deepEqual(b.foldedSources, []);
+  const keys = b.lines.map((l) => l.key);
+  for (const key of ["tuition", "food", "insurance", "books", "flight"]) {
+    assert.ok(keys.includes(key), `${key} line is missing`);
+  }
+  assert.ok(b.lines.find((l) => l.key === "food")!.cost > 0, "the living estimate must not be dropped");
+  assert.ok(b.lines.find((l) => l.key === "flight")!.cost === 1400, "the flight estimate must not be dropped");
+  // One-off fees are separated, not folded into a yearly line.
+  assert.deepEqual(b.oneOff.map((o) => o.key).sort(), ["application_fee", "visa_fee"]);
+  assert.equal(b.oneOff.reduce((s, o) => s + o.amountUsd, 0), 575);
+});
+
+check("a cost line the mapping has never seen is folded into Other, never dropped", () => {
+  const b = fundingLinesFromCosts({
+    lines: [
+      { key: "tuition", label: "Tuition", annualUsd: 10000, totalUsd: 40000 },
+      { key: "living", label: "Living", annualUsd: 8000, totalUsd: 32000 },
+      { key: "brand_new_line", label: "Brand new", annualUsd: 1500, totalUsd: 6000 },
+    ],
+    annualTotalUsd: 19500,
+  });
+  assert.equal(b.lines.reduce((s, l) => s + l.cost, 0), 19500);
+  assert.deepEqual(b.foldedSources, ["brand_new_line"]);
+  assert.equal(b.lines.find((l) => l.key === "other")!.cost, 1500);
+});
+
 check("every funding kind has a human label and every cost line a key", () => {
   for (const l of COST_LINES) assert.ok(l.key && l.label, l.key);
   for (const k of ["scholarship", "aid", "family", "savings", "loan", "other"] as const) {
@@ -934,6 +1240,27 @@ check("post-admission funding states the deposit, the payee and what is left", (
   assert.equal(f.payableNow.payee, "MIT");
   assert.ok(f.explanation.some((e) => /60,000/.test(e)), f.explanation.join(" | "));
   assert.ok(f.explanation.some((e) => /48,000/.test(e)), "the remaining balance must be explicit");
+});
+
+check("the offer matrix reads confirmed funding and a floored net cost", () => {
+  const f = postAdmissionFunding({
+    tuition: 60000,
+    items: [
+      item({ amountUsd: 12000, status: "confirmed" }),
+      item({ amountUsd: 30000, status: "planned" }),
+    ],
+    universityName: "MIT",
+  });
+  assert.equal(f.secured, 12000, "only awarded/confirmed money counts as secured");
+  assert.equal(f.netAnnualUsd, 48000);
+  // Confirmed funding larger than tuition must never produce a negative cost.
+  const over = postAdmissionFunding({
+    tuition: 10000,
+    items: [item({ amountUsd: 18000, status: "awarded" })],
+    universityName: "MIT",
+  });
+  assert.equal(over.netAnnualUsd, 0);
+  assert.equal(over.secured, 18000);
 });
 
 check("no confirmed funding is stated plainly, not softened into 'full funding'", () => {
@@ -1194,6 +1521,35 @@ check("profile editing stays in a modal instead of a separate navigation pane", 
   }
 });
 
+check("a legacy hidden id hides the PANE it now names (defect 1.10)", () => {
+  // "compare" is the legacy id for the universities/countries pane. Hiding it
+  // used to hide nothing at all, because visibility is decided on pane ids.
+  const hidden = parseHiddenNav(JSON.stringify(["compare", "advisor", "mentors", "opportunities"]));
+  assert.ok(hidden.includes("compare") && hidden.includes("countries"), "compare → countries");
+  // "advisor" / "mentors" gate a COMPONENT inside a shared pane, so they must
+  // NOT blank the pane that also holds the AI mentor chat / consulting.
+  assert.ok(hidden.includes("advisor") && !hidden.includes("mentor"), "advisor is component-level");
+  assert.ok(hidden.includes("mentors") && !hidden.includes("consulting"), "mentors is component-level");
+  assert.ok(COMPONENT_LEVEL_HIDDEN_IDS.includes("advisor") && COMPONENT_LEVEL_HIDDEN_IDS.includes("mentors"));
+  assert.ok(hidden.includes("opportunities"), "opportunities is already a pane id");
+  assert.ok(!visiblePanes("universities", hidden).some((p) => p.id === "countries"), "the countries pane is still visible");
+  assert.ok(visiblePanes("guidance", hidden).some((p) => p.id === "mentor"), "the mentor pane (AI chat) must stay");
+  // Raw (unparsed) config behaves the same way, so no caller can bypass it.
+  assert.ok(!visiblePanes("universities", ["compare"]).some((p) => p.id === "countries"));
+  // The default config hides the country comparison by default.
+  assert.ok(!visiblePanes("universities", parseHiddenNav(null)).some((p) => p.id === "countries"));
+});
+
+check("a destination never loses every tab even if every pane is hidden", () => {
+  for (const s of NAV_SECTIONS) {
+    if (s.panes.length === 0) continue; // single-screen destination: no tabs
+    const all = s.panes.map((p) => p.id);
+    const visible = visiblePanes(s.id, all);
+    assert.ok(visible.length >= 1, `${s.id} rendered nothing`);
+    assert.equal(visible[0].id, s.panes[0].id, `${s.id} fell back to the wrong tab`);
+  }
+});
+
 check("hiding a pane never removes the destination it belongs to", () => {
   for (const s of NAV_SECTIONS) {
     assert.ok(visiblePanes(s.id, []).length === s.panes.length, s.id);
@@ -1365,6 +1721,100 @@ check("the database migration is additive — it only creates journey tables", (
   const created = [...ddl.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/gi)].map((m) => m[1]);
   assert.ok(created.length >= 10, `expected the journey tables, found ${created.length}`);
   for (const t of created) assert.ok(/^(?!users|student_profiles$)/.test(t), `${t} would recreate an existing table`);
+});
+
+// ---------------------------------------------------------------------------
+// WHAT-IF SIMULATOR (Phase 2.3)
+
+section("what-if simulator (Phase 2.3)");
+
+check("only the student's own numbers may change, and nulls are ignored", () => {
+  const base = { gpa: 3.5, gpaScale: 5, ieltsScore: 6.5, satScore: 1300 };
+  assert.deepEqual(applyWhatIfChange(base, { ieltsScore: 7.5 }), { ...base, ieltsScore: 7.5 });
+  assert.deepEqual(applyWhatIfChange(base, { ieltsScore: null, toeflScore: undefined }), base);
+  // A string that is not a number is dropped, not coerced to NaN.
+  assert.deepEqual(applyWhatIfChange(base, { ieltsScore: Number("abc") }), base);
+});
+
+check("a higher IELTS turns only the english requirement from not_met to met", () => {
+  const uni = { id: 1, name: "Test University", minIelts: 7, minGpa: 4.5, minSat: 1450 };
+  const res = simulateScoreChange({
+    universities: [uni],
+    profile: { gpa: 4.5, gpaScale: 5, ieltsScore: 6.5, satScore: 1450 },
+    change: { ieltsScore: 7.5 },
+  });
+  const keys = res.unlocked.map((f) => f.itemKey);
+  assert.deepEqual(keys, ["english.ielts"]);
+  assert.equal(res.broken.length, 0);
+  assert.equal(res.scanned, 1);
+  assert.deepEqual(res.applied, { ieltsScore: 7.5 });
+  assert.ok(res.unlocked[0].detail && res.unlocked[0].detail.length > 0, "the engine's own comparison line is kept");
+});
+
+check("lowering a score reports the requirement it breaks", () => {
+  const uni = { id: 2, name: "Second University", minIelts: 6.5 };
+  const res = simulateScoreChange({
+    universities: [uni],
+    profile: { ieltsScore: 7 },
+    change: { ieltsScore: 6 },
+  });
+  assert.equal(res.unlocked.length, 0);
+  assert.deepEqual(res.broken.map((f) => f.itemKey), ["english.ielts"]);
+});
+
+check("unknown requirements stay unknown — no invented verdicts", () => {
+  const res = simulateScoreChange({
+    universities: [{ id: 3, name: "No Published Numbers" }],
+    profile: { gpa: 4, gpaScale: 5 },
+    change: { gpa: 4.5 },
+  });
+  assert.equal(res.unlocked.length, 0);
+  assert.equal(res.broken.length, 0);
+  // A university that publishes no requirement numbers produces no score items
+  // at all — the simulator reports nothing rather than inventing a verdict.
+  assert.equal(res.unchanged, 0);
+  assert.equal(res.scanned, 1);
+});
+
+check("the same change on the same university is deterministic", () => {
+  const uni = { id: 4, name: "Deterministic University", minIelts: 7, minGpa: 4.2 };
+  const args = {
+    universities: [uni],
+    profile: { ieltsScore: 6.5, gpa: 4 },
+    change: { ieltsScore: 7, gpa: 4.5 },
+  };
+  assert.deepEqual(simulateScoreChange(args), simulateScoreChange(args));
+});
+
+// ---------------------------------------------------------------------------
+// FOCUS MODE (Pillar 5.1)
+
+section("focus mode (Pillar 5.1)");
+
+check("focus mode is a presentation filter over known destination ids", () => {
+  const hidden = focusModeHiddenIds();
+  const visible = focusModeVisibleIds();
+  assert.equal(hidden.length + visible.length, NAV_DESTINATION_IDS.length);
+  for (const id of visible) assert.ok(!hidden.includes(id), `${id} cannot be both kept and hidden`);
+  assert.deepEqual(visible.filter((id) => !NAV_DESTINATION_IDS.includes(id)), [], "keep-set names a destination that no longer exists");
+  assert.ok(visible.includes("dashboard") && visible.includes("tasks") && visible.includes("applications"), "the three deadline-moving destinations must survive");
+  assert.ok(FOCUS_MODE_KEEP_IDS.length <= 8, "focus mode must stay a short list, not the full navigation");
+});
+
+check("focus mode is off unless the student turned it on", () => {
+  assert.equal(isFocusModeActive(null), false);
+  assert.equal(isFocusModeActive(""), false);
+  assert.equal(isFocusModeActive("0"), false);
+  assert.equal(isFocusModeActive("yes"), false);
+  assert.equal(isFocusModeActive("1"), true);
+  assert.equal(isFocusModeActive("true"), true);
+  // An admin kill-switch always wins.
+  assert.equal(isFocusModeActive("1", true), false);
+});
+
+check("focus mode never invents an id that is not a destination", () => {
+  assert.equal(focusModeHiddenIds([]).length, 0);
+  assert.deepEqual(focusModeVisibleIds(["tasks", "visa"]), ["tasks", "visa"]);
 });
 
 // ---------------------------------------------------------------------------

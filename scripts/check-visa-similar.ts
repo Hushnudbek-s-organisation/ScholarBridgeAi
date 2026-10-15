@@ -11,7 +11,13 @@
  * Run: npm run test:visa
  */
 
-import { scoreVisaInterview, visaChanceDisclaimer, type VisaTurn } from "../src/lib/visaScoring";
+import {
+  buildTurnFeedback,
+  checkProfileConsistency,
+  scoreVisaInterview,
+  visaChanceDisclaimer,
+  type VisaTurn,
+} from "../src/lib/visaScoring";
 import { getVisaCountry, nextScriptedQuestion, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
 import {
   classifySpeechError,
@@ -455,6 +461,111 @@ check(
   ),
   messages.map((m) => m.micRetry).join(" | ")
 );
+
+// ---------------------------------------------------------------------------
+
+/** Every clause is checked; the first failure is reported with its reason. */
+function expectAll(name: string, clauses: [boolean, string][]) {
+  const bad = clauses.find(([ok]) => !ok);
+  check(name, !bad, bad ? bad[1] : "");
+}
+
+console.log("\n— visa interview: per-turn coaching (Phase 2.5) —");
+
+const fundedTurns: VisaTurn[] = [
+  { role: "officer", text: "Why did you choose this university?" },
+  {
+    role: "user",
+    text:
+      "I chose the M.Sc. in Computer Science at Arizona State University because of its embedded-systems lab, which matches my research on water-sensor telemetry.",
+  },
+  { role: "officer", text: "How will you pay for your studies?" },
+  {
+    role: "user",
+    text:
+      "My I-20 shows $34,500 a year. I have a $14,500 merit scholarship and my father sponsors the rest from a bank account in Tashkent.",
+  },
+  { role: "officer", text: "What are your plans after graduation?" },
+  {
+    role: "user",
+    text:
+      "I will return to Tashkent to work as an IoT engineer at the Ministry of Agriculture water centre; my family and our business are both there.",
+  },
+];
+
+const fundedRows = buildTurnFeedback(fundedTurns);
+
+expectAll("per-turn feedback lists one row per officer question with strengths", [
+  [fundedRows.length === 3, `expected 3 officer turns, got ${fundedRows.length}`],
+  [fundedRows[0].answerWordCount > 10, "the first answer must be counted in words"],
+  [fundedRows[1].strengths.includes("funding"), "the funding answer must be recognised"],
+  [fundedRows[1].strengths.includes("concrete numbers"), "the amounts must be recognised"],
+  [fundedRows[2].strengths.includes("home ties"), "the return plan must be recognised"],
+  [fundedRows.every((row) => row.flag === null), "a strong transcript must not be flagged"],
+]);
+
+const thinRows = buildTurnFeedback([
+  { role: "officer", text: "How will you pay for your studies?" },
+  { role: "user", text: "I will manage it." },
+  { role: "officer", text: "What ties bind you to your country?" },
+]);
+
+expectAll("a one-line or missing answer is flagged on its own turn", [
+  [thinRows[0].flagCode === "too_short", "a four-word answer is too short"],
+  [Boolean(thinRows[0].flag && /words/.test(thinRows[0].flag)), "the flag explains the word count"],
+  [thinRows[1].flagCode === "unanswered", "an unanswered question is flagged as such"],
+  [thinRows[1].answer === null, "a missing answer is not invented"],
+]);
+
+const fundedRubric = scoreVisaInterview(fundedTurns, { destination: "USA" });
+
+expectAll("the rubric carries the per-turn rows and the consistency verdict", [
+  [fundedRubric.turnFeedback.length === 3, "every officer turn is present in the rubric"],
+  [fundedRubric.profileConsistency.checked === false, "no profile supplied => not checked"],
+  [fundedRubric.profileConsistency.consistent === true, "nothing is claimed against an absent profile"],
+]);
+
+const contradictory = scoreVisaInterview(
+  [
+    { role: "officer", text: "What will you study?" },
+    {
+      role: "user",
+      text: "I am enrolled in a PhD in Physics and I intend to settle in the United States permanently.",
+    },
+  ],
+  { profile: { degreeLevel: "Master", targetMajor: "Computer Science", budgetAnnualUsd: null } },
+);
+
+expectAll("profile consistency flags a contradiction and ignores unknown fields", [
+  [contradictory.profileConsistency.checked === true, "a supplied profile is checked"],
+  [contradictory.profileConsistency.consistent === false, "the degree-level contradiction is found"],
+  [
+    contradictory.profileConsistency.contradictions.some((c) => c.field === "degreeLevel"),
+    "the field is named",
+  ],
+  [
+    contradictory.risks.some((r) => r.code.startsWith("contradicts_profile_")),
+    "a contradiction must also surface as a risk",
+  ],
+  [
+    contradictory.profileConsistency.contradictions.every((c) => c.field !== "budgetAnnualUsd"),
+    "an unknown (null) budget is skipped, never treated as a zero",
+  ],
+]);
+
+const noProfile = checkProfileConsistency("I will study abroad.", null);
+const unmentionedProfile = checkProfileConsistency("I will study computer science there.", {
+  degreeLevel: "Master",
+  targetMajor: "Computer Science",
+});
+
+expectAll("checkProfileConsistency is honest: no profile means nothing is claimed", [
+  [noProfile.checked === false, "no profile => not checked"],
+  [noProfile.contradictions.length === 0, "no fabricated contradictions"],
+  [noProfile.unmentioned.length === 0, "no fabricated omissions"],
+  [unmentionedProfile.unmentioned.includes("degreeLevel"), "an unmentioned fact is listed, not scored"],
+  [unmentionedProfile.contradictions.length === 0, "an omission is not a contradiction"],
+]);
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;

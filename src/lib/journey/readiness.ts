@@ -169,8 +169,14 @@ export function profileReadiness(input: ReadinessInput): {
     ),
     make(
       "application",
-      Number(input.applicationsSubmitted ?? 0),
-      Math.max(0, Number(input.applicationsStarted ?? 0)),
+      // Milestones, not a ratio: starting an application is real progress, so a
+      // started-but-unsubmitted application counts 0.5 and a submitted one
+      // counts 1.0. The previous form used `submitted / started`, which meant
+      // creating your FIRST application turned a previously-excluded section
+      // into a 0 % one and dropped the headline score. Both counts are
+      // non-decreasing, so the category — and the overall — can only rise.
+      Math.min(1, 0.5 * Math.max(0, Number(input.applicationsStarted ?? 0)) + 0.5 * Math.max(0, Number(input.applicationsSubmitted ?? 0))),
+      1,
       [input.applicationsStarted > input.applicationsSubmitted ? "applicationsPending" : "noApplications"],
       "applications",
       Number(input.applicationsStarted ?? 0) === 0,
@@ -187,12 +193,25 @@ export function profileReadiness(input: ReadinessInput): {
     ),
   ];
 
-  const measured = categories.filter((category) => !category.unknown);
-  const totalWeight = measured.reduce((sum, category) => sum + READINESS_WEIGHTS[category.key], 0);
+  // MONOTONICITY (2026-10 fix): `overall` used to be rebuilt on a denominator
+  // of *measured* categories only, so recording the first detail in a new area
+  // could cut the headline figure (a student with academics + tests at 100 %
+  // read 100 %; adding a budget then read 78 %). The overall now uses the fixed
+  // canonical weight list — every category contributes, empty ones contribute 0
+  // and stay reported as unknown — so adding any recorded fact preserves or
+  // raises the number. `weakest` still looks only at measured categories,
+  // because listing "unknown" as a weakness would be a penalty for silence.
+  const totalWeight = (Object.keys(READINESS_WEIGHTS) as ReadinessKey[]).reduce(
+    (sum, key) => sum + READINESS_WEIGHTS[key],
+    0,
+  );
   const overallPrecise = totalWeight
-    ? roundTo(measured.reduce((sum, category) => sum + category.precise * READINESS_WEIGHTS[category.key], 0) / totalWeight, 1)
+    ? roundTo(categories.reduce((sum, category) => sum + category.precise * READINESS_WEIGHTS[category.key], 0) / totalWeight, 1)
     : 0;
-  const weakest = [...measured].sort((a, b) => a.pct - b.pct).slice(0, 3);
+  const weakest = categories
+    .filter((category) => !category.unknown)
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 3);
 
   return {
     categories,

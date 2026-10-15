@@ -24,6 +24,7 @@ import { compareAndDecide } from "./compare";
 import { rejectSourceReason, isResearchSourceUrl } from "./urlFilter";
 import { isMeaningfulSourceTitle } from "./extract";
 import type { FieldDecision } from "./types";
+import { fieldIsApproved } from "./approvalQueue";
 import type {
   ExtractedUniversity,
   ExtractedProgram,
@@ -224,16 +225,21 @@ export async function writeUniversity(
   universityId: number,
   extracted: ExtractedUniversity,
   evidence: SourceEvidence[],
-  current: CurrentState
+  current: CurrentState,
+  /** Approval-queue allow-list; empty/undefined = no gate (unchanged behaviour). */
+  approvedFields?: string[] | null
 ): Promise<{ updated: FieldDecision[]; skipped: FieldDecision[]; review: FieldDecision[] }> {
   if (!current.university) return { updated: [], skipped: [], review: [] };
   const decisions = decideUniversityFields(extracted, evidence, current);
+  const gated = Array.isArray(approvedFields) && approvedFields.length > 0;
 
   const patch: Record<string, any> = {};
   for (const d of decisions) {
     if (d.action !== "write" && d.action !== "update") continue;
     const spec = UNIVERSITY_FIELD_MAP.find((s) => s.evField === d.field);
     if (!spec) continue;
+    // A gated run applies only what a human approved in the queue.
+    if (gated && !fieldIsApproved(approvedFields, d.entity ?? "university", d.field)) continue;
     patch[spec.dbField] = d.newValue;
     // Currency/period travel with the amount (only when the evidence has them).
     const money = MONEY_FIELD_COLUMNS[d.field];

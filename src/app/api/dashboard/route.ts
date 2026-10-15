@@ -33,7 +33,8 @@ import { countriesMatch } from "@/lib/countries";
 import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
 import { buildFundingPlan } from "@/lib/journey/funding";
-import { calculateCosts } from "@/lib/costs";
+import { calculateCosts, resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/costs";
+import { gpaTo40Scale } from "@/lib/gpa";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
 import { summarizeApplications } from "@/lib/journey/applicationSummary";
@@ -169,11 +170,14 @@ export async function GET(req: Request) {
     if (acceptedApp?.universityId) {
       const [uni] = await db.select().from(universities).where(eq(universities.id, acceptedApp.universityId)).limit(1);
       if (uni) {
+        // Currency-safe: a EUR/GBP/KRW figure resolves to null ("unknown")
+        // rather than being spent as if it were USD.
+        const uniCosts = resolvedUsdUniversityCosts(uni);
         const costs = calculateCosts({
-          annualTuitionUsd: num(uni.annualTuition ?? uni.annualTuitionUsd),
-          annualLivingEstUsd: num(uni.annualLivingEst ?? uni.annualLivingEstUsd),
-          accommodationCostUsd: num(uni.accommodationCost ?? uni.accommodationCostUsd),
-          applicationFeeUsd: num(uni.applicationFee),
+          annualTuitionUsd: uniCosts.tuitionUsd,
+          annualLivingEstUsd: uniCosts.livingUsd,
+          accommodationCostUsd: uniCosts.accommodationUsd,
+          applicationFeeUsd: uniCosts.applicationFeeUsd,
           country: uni.country,
           city: uni.city,
           years: 1,
@@ -186,8 +190,10 @@ export async function GET(req: Request) {
             .map((f) => ({
               name: f.name,
               amountUsd: f.amountUsd,
+              // `calculateCosts` reads `covers` only; the old `probability: 1|0.3`
+              // here was dead data that implied a likelihood the engine does not
+              // compute (spec §"no fabricated probabilities").
               covers: "both" as const,
-              probability: f.status === "confirmed" || f.status === "awarded" ? 1 : 0.3,
             })),
         });
         annualCost = costs.annualTotalUsd;
@@ -568,6 +574,9 @@ async function recommendedFor(
   const countries = parseList(profile.preferredCountries);
   const major = (profile.targetMajor ?? "").trim();
   const gpa = profile.gpa ?? null;
+  const gpaScale = profile.gpaScale ?? null;
+  /** Same normalisation the matcher uses (4.0 scale, else unknown — never a guess). */
+  const normGpa = gpaTo40Scale(gpa, gpaScale);
   const degreeLevel = profile.degreeLevel ?? null;
   const applicantCountry = profile.country ?? null;
 
@@ -686,6 +695,13 @@ async function recommendedFor(
       awardCurrency: s.awardCurrency,
       awardPeriod: s.awardPeriod,
       awardBasis: s.awardBasis,
+      /**
+       * USD figure the UI may show, resolved with the shared currency rule:
+       * the legacy USD column wins, otherwise the canonical award is used only
+       * when its currency says USD. A EUR-denominated award stays null rather
+       * than being displayed as dollars.
+       */
+      awardAmountUsd: resolvedUsdScholarshipAmount(s).amountUsd,
       degreeLevels: s.degreeLevels,
       deadlineDate: s.deadlineDate,
       minGpa: s.minGpa,
@@ -697,8 +713,13 @@ async function recommendedFor(
       matchScore: match.matchScore,
       matchReasons: translateReasons(locale, "scholarship", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "scholarship", match.issueDetails, match.potentialIssues),
-      gpaOk: s.minGpa == null || gpa == null || gpa >= s.minGpa,
-      gpaProvided: gpa != null,
+      // Compare like with like: the profile GPA is normalised exactly as the
+      // matcher normalises it. A raw 4.0 on a 5.0 scale is 3.2/4.0, so it must
+      // NOT read as satisfying a 3.5 minimum while the match reasons say the
+      // opposite on the same card.
+      gpaOk: s.minGpa == null || normGpa == null || normGpa >= s.minGpa,
+      gpaProvided: normGpa != null,
+      gpaNormalized: normGpa,
       /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */
       countryEligibility: scholarshipCountryVerdict(s.eligibleCountries, applicantCountry),
     }));

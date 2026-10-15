@@ -22,12 +22,30 @@ export async function GET(req: Request) {
       db
         .select({
           country: universities.country,
+          // Legacy USD mirrors AND the canonical currency-aware columns: the
+          // shared resolver decides which one is usable as dollars.
           annualTuitionUsd: universities.annualTuitionUsd,
           annualLivingEstUsd: universities.annualLivingEstUsd,
+          accommodationCostUsd: universities.accommodationCostUsd,
+          annualTuition: universities.annualTuition,
+          tuitionCurrency: universities.tuitionCurrency,
+          annualLivingEst: universities.annualLivingEst,
+          livingCostCurrency: universities.livingCostCurrency,
+          accommodationCost: universities.accommodationCost,
+          accommodationCostCurrency: universities.accommodationCostCurrency,
           minIelts: universities.minIelts,
+          postStudyWorkVisaYears: universities.postStudyWorkVisaYears,
         })
         .from(universities),
-      db.select({ country: scholarships.country, amountUsdValue: scholarships.amountUsdValue }).from(scholarships),
+      db
+        .select({
+          country: scholarships.country,
+          amountUsdValue: scholarships.amountUsdValue,
+          awardAmount: scholarships.awardAmount,
+          awardCurrency: scholarships.awardCurrency,
+          awardPeriod: scholarships.awardPeriod,
+        })
+        .from(scholarships),
     ]);
 
     let wanted: string[];

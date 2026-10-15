@@ -8,6 +8,7 @@ import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { X, Save, Sparkles, DollarSign, BookOpen, Globe, Award, User, Trophy, Target } from "lucide-react";
 import { formatNumber } from "@/lib/format";
+import { useFocusTrap } from "./useFocusTrap";
 import { StudyInterestPicker } from "@/components/StudyInterestPicker";
 import {
   compatibilityTargetMajor,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/studyInterests";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { ProfileAutoFillCard } from "@/components/ProfileAutoFillCard";
+import { UzbekGradeConverterCard } from "@/components/RegionalSuperpowers";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -274,17 +277,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     }
   }, [isOpen]);
 
-  // Escape closes the dialog — a keyboard user otherwise has to tab through
-  // the whole form to reach the × button. A half-filled form is discarded
-  // either way (the × does the same), so the behaviour is consistent.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+  // Escape closes the dialog, Tab cycles inside it and focus returns to the
+  // opener on close — a keyboard user otherwise had to tab through the whole
+  // form to reach the × button, and could tab out of the dialog entirely into
+  // the (visually inert) page behind it. A half-filled form is discarded either
+  // way (the × does the same), so the behaviour is consistent.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -380,9 +379,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-modal-title"
+        tabIndex={-1}
         className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
       >
         {/* Header */}
@@ -413,6 +414,29 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               {errorMsg}
             </div>
           )}
+          {/* Pillar 5.2 — 10-second auto-fill from a CV / transcript / IELTS
+              report. Only the fields the student ticks are applied. */}
+          <ProfileAutoFillCard
+            profileId={profile?.id ?? null}
+            onApply={(patch) => {
+              setFormData((prev) => {
+                const next = { ...prev };
+                const asText = (v: unknown) => (v == null ? "" : String(v));
+                if (patch.fullName) next.name = asText(patch.fullName);
+                if (patch.email && !next.email) next.email = asText(patch.email);
+                if (patch.degreeLevel) next.degreeLevel = asText(patch.degreeLevel);
+                if (patch.targetMajor) next.targetMajor = asText(patch.targetMajor);
+                if (patch.gpa != null) next.gpa = Number(patch.gpa);
+                if (patch.gpaScale != null) next.gpaScale = Number(patch.gpaScale);
+                if (patch.ieltsScore != null) next.ieltsScore = Number(patch.ieltsScore);
+                if (patch.toeflScore != null) next.toeflScore = Number(patch.toeflScore);
+                if (patch.satScore != null) next.satScore = Number(patch.satScore);
+                if (patch.greScore != null) next.greScore = Number(patch.greScore);
+                if (patch.extracurriculars) next.extracurriculars = asText(patch.extracurriculars);
+                return next;
+              });
+            }}
+          />
           {/* Basic Info */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
@@ -598,6 +622,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   </select>
                 </div>
               </div>
+              {/* Pillar 5.3 — while entering a grade, show both readings
+                  (proportional and letter-grade) instead of one silent number. */}
+              <UzbekGradeConverterCard className="sm:col-span-2 mt-2" initialValue={formData.gpa} initialScale={formData.gpaScale} />
             </div>
 
             {/* Test Scores */}

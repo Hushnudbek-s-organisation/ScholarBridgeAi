@@ -2,7 +2,8 @@
   "meta": {
     "appName": "ScholarBridge",
     "aiBadge": "AI",
-    "tagline": "Global Admissions & Scholarship Discovery"
+    "tagline": "Global Admissions & Scholarship Discovery",
+    "adminHiddenForUsers": "hidden"
   },
   "publicCatalog": {
     "universitiesMetaTitle": "Universities",
@@ -21,7 +22,17 @@
     "coverageNotSpecified": "Coverage not specified",
     "universitiesLoadError": "Universities are temporarily unavailable. Please try again later.",
     "scholarshipsLoadError": "Scholarships are temporarily unavailable. Please try again later.",
-    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying."
+    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying.",
+    "home": "Home",
+    "breadcrumbLabel": "Breadcrumb",
+    "awardPeriodYear": "per year",
+    "awardPeriodOneOff": "one-off",
+    "awardPeriodTotal": "total",
+    "awardPeriodMonthly": "per month",
+    "awardBasisLabel": "Basis",
+    "deadlineDateLabel": "Application deadline",
+    "deadlineNotPublished": "Deadline not published — check the official page",
+    "amountNotPublished": "Award amount not published"
   },
   "pagination": {
     "aria": "Pagination",
@@ -188,7 +199,9 @@
     "points": "points",
     "level": "Level",
     "search": "Search",
-    "optional": "optional"
+    "optional": "optional",
+    "printSummary": "Download / Print summary",
+    "printedOn": "Printed on {date}"
   },
   "forum": {
     "title": "Community Forum",
@@ -516,7 +529,20 @@
     "chatPrompt1": "Where can I verify current post-study work rules?",
     "chatPrompt2": "How should I request a recommendation letter from my professor?",
     "chatPrompt3": "Help me compare verified tuition data for my saved universities.",
-    "chatPrompt4": "How can I prepare for a student visa interview using official requirements?"
+    "chatPrompt4": "How can I prepare for a student visa interview using official requirements?",
+    "essayPromptField": "Programme prompt (optional)",
+    "essayPromptPlaceholder": "Paste the prompt or question the programme asks. The rubric will check that every part of it is answered.",
+    "essayFlowTitle": "Paragraph flow",
+    "essayFlowCohesion": "Idea overlap between paragraphs: {pct}%",
+    "essayFlowConnectors": "Transitions found: {items}",
+    "essayFlowJump": "Paragraph {n} starts a new idea with nothing linking it: “{excerpt}”",
+    "essayAgencyTitle": "Who is doing the doing",
+    "essayAgencyStrong": "{count} ownership verbs (engineered, led, reduced, …)",
+    "essayAgencyWeak": "{count} passive or weak phrases — rewrite them with what YOU did",
+    "essayCoverageTitle": "Prompt coverage",
+    "essayCoverageLine": "{covered} of {total} parts of the prompt are addressed",
+    "essayCoverageMissing": "Not yet addressed: “{part}”",
+    "essayScopeLinked": "This version will be filed under {application}."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -773,7 +799,13 @@
     "interrupted": "Playback stopped. You can continue answering.",
     "practiceHistory": "Practice history",
     "session": "Session",
-    "trendUp": "Up {delta} points over {n} sessions"
+    "trendUp": "Up {delta} points over {n} sessions",
+    "turnFeedbackTitle": "Question-by-question coaching",
+    "turnFeedbackSubtitle": "Each officer question with what your answer did and what to fix before the real interview.",
+    "turnAnswerWords": "{count} words",
+    "turnNotAnswered": "not answered",
+    "turnStrengths": "covers: {items}",
+    "turnProfileConflictsTitle": "Your answers conflict with your application record"
   },
   "strength": {
     "title": "Profile information coverage",
@@ -865,7 +897,11 @@
       "noEvidence": "No project, research or recognition details are recorded. Add verifiable examples if relevant to your target application; these items are not required in every CV.",
       "length": "This draft is approximately {pages} pages by a rough line count. Length and format expectations vary; check the target programme or institution’s current instructions.",
       "manyEntries": "This draft lists {count} entries. Review them for relevance, accuracy and repetition; there is no universal entry-count target."
-    }
+    },
+    "referenceTitle": "Gold-standard reference CV",
+    "referenceClose": "Close reference",
+    "referenceNote": "Reference only — this is a structural model (action verb + method + quantified result). Your generated CV above is built from your own verified profile facts and is never replaced by this text.",
+    "printSummary": "Print this CV"
   },
   "recLetter": {
     "title": "Recommendation letter brief",
@@ -1840,7 +1876,9 @@
       "other": "Other"
     },
     "ccAddAnnualCostsToCalculateGap": "Add annual study costs to calculate the gap. A zero value is not treated as a verified cost.",
-    "ccEstimatedCostNote": "Some cost lines are estimates. Review the assumptions and the university’s current official costs before relying on this figure."
+    "ccEstimatedCostNote": "Some cost lines are estimates. Review the assumptions and the university’s current official costs before relying on this figure.",
+    "dvTemplateClose": "Close template",
+    "dvScopeLinked": "New documents are filed under {application}."
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -2699,7 +2737,10 @@
     "sweepDone": "Done: {profiles} accounts, {created} reminders, {retried} retries delivered.",
     "appUrlFrom": "Canonical URL (APP_URL): {url} — from {source}.",
     "appUrlMissing": "APP_URL is not set: links use the address saved here. Set APP_URL when you move hosts.",
-    "appUrlMismatch": "The saved address differs from APP_URL. Re-register the webhook, otherwise the bot keeps linking to the old domain."
+    "appUrlMismatch": "The saved address differs from APP_URL. Re-register the webhook, otherwise the bot keeps linking to the old domain.",
+    "weeklyRun": "Send weekly check-in now",
+    "weeklyHint": "Sends the Monday micro-action message immediately (ignores the once-per-week guard) so you can read exactly what students get.",
+    "weeklySent": "Weekly check-in sent"
   },
   "adminOwnership": {
     "title": "Platform ownership",
@@ -3015,7 +3056,16 @@
       "funding_coverage": "Funding coverage",
       "merit": "Merit"
     },
-    "catalogueRequirementsScope": "These catalogue-level figures are not universal rules for every degree. Requirements, accepted tests, alternatives and waivers vary by programme; verify the current official page for the programme you plan to apply to."
+    "catalogueRequirementsScope": "These catalogue-level figures are not universal rules for every degree. Requirements, accepted tests, alternatives and waivers vary by programme; verify the current official page for the programme you plan to apply to.",
+    "exEvidenceHigh": "High evidence",
+    "exEvidenceMedium": "Medium evidence",
+    "exEvidenceLow": "Low evidence",
+    "exConfidenceCompared": "{compared} of {total} dimensions compared",
+    "exConfidenceHint": "More compared dimensions mean the Fit score rests on more of your real data.",
+    "exTypeAll": "All types",
+    "exTypePublic": "Public",
+    "exTypePrivate": "Private",
+    "exTypeAria": "Filter by university type"
   },
   "recommend": {
     "title": "Program Recommender",
@@ -3207,7 +3257,9 @@
     "outlookExplain": "Admission outlook is shown next to the requirements it comes from. It describes how your profile compares with published requirements — it is never a probability and never a guarantee.",
     "openWorkspace": "Open workspace",
     "essayPremiumTitle": "AI writing tools are part of Premium",
-    "essayPremiumDescription": "Check the available plans and feature access before continuing."
+    "essayPremiumDescription": "Check the available plans and feature access before continuing.",
+    "breadcrumbLabel": "Breadcrumb",
+    "breadcrumbHome": "Dashboard"
   },
   "disclaimers": {
     "general": "ScholarBridgeAI is an independent guide — it is not affiliated with any university, scholarship provider or government. AI output and catalogue data can be wrong or out of date; always confirm the details at the official source.",
@@ -3274,7 +3326,8 @@
       "waitlisted": "Waitlisted",
       "deferred": "Deferred",
       "withdrawn": "Withdrawn"
-    }
+    },
+    "formDecidedAt": "Date of the decision (optional, but it makes the record comparable)"
   },
   "studyInterest": {
     "title": "Fields of interest",
@@ -3561,7 +3614,8 @@
       "financial_plan_missing": "You marked financial aid as needed, but this university has no verified full-cost figure",
       "financial_budget_missing": "Add your annual budget so we can compare this cost with your funding plan",
       "income_below_cost": "Recorded family income ${income}/yr is below the estimated ${cost} annual cost",
-      "income_supports_cost": "Recorded family income ${income}/yr covers the estimated annual cost"
+      "income_supports_cost": "Recorded family income ${income}/yr covers the estimated annual cost",
+      "english_alternative_recorded": "You recorded {test}; the catalogue lists IELTS {min}. Check the programme's accepted tests and English threshold — the comparison uses the published TOEFL↔IELTS concordance"
     },
     "scholarship": {
       "gpa_well_above": "Your profile GPA {gpa} is above this scholarship’s listed figure {min}; verify the award’s official conditions",
@@ -3583,7 +3637,8 @@
       "financial_need_unknown": "This award is need-based — add your financial-aid need to assess the fit",
       "full_funding_match": "Coverage appears compatible with your full-scholarship requirement",
       "full_funding_unclear": "You require full funding — this award's coverage may not cover tuition and living costs",
-      "merit_based": "Merit-based — strong academic record / publications"
+      "merit_based": "Merit-based — strong academic record / publications",
+      "english_alternative_recorded": "You recorded {test}; the catalogue lists IELTS {min}. Check the programme's accepted tests and English threshold — the comparison uses the published TOEFL↔IELTS concordance"
     }
   },
   "profile": {
@@ -4536,5 +4591,323 @@
     "description": "Review the available plans to see whether this feature can be enabled for your profile.",
     "viewPlans": "View plans",
     "accessNote": "Access is checked by the server for this profile and feature."
+  },
+  "adminMode": {
+    "switchLabel": "Admin view",
+    "modeAdminAll": "Admin mode",
+    "modeAdminAllHint": "Everything unlocked: all destinations, panes and premium sections, with badges on rows regular users cannot see.",
+    "modePro": "Preview as Pro",
+    "modeProHint": "See exactly what a Premium student sees.",
+    "modeFree": "Preview as Free",
+    "modeFreeHint": "See exactly what a free student sees, locks included."
+  },
+  "samples": {
+    "barLabel": "Gold-standard sample library",
+    "pill": "Gold-standard sample",
+    "chooseSample": "Choose a sample",
+    "viewSample": "View annotated sample",
+    "hideSample": "Hide annotated sample",
+    "loadSample": "Load into editor",
+    "copyTemplate": "Copy template",
+    "copied": "Copied",
+    "annotatedTitle": "Structure, block by block",
+    "whyThisWorks": "Why this works",
+    "integrityNote": "Samples are teaching material: always replace every detail with your own verified facts before submitting."
+  },
+  "profileAutoFill": {
+    "title": "10-second auto-fill from CV / transcript / IELTS",
+    "badge": "10 sec",
+    "intro": "Paste your CV, transcript or IELTS/TOEFL score report (or drop a .txt/.pdf). We detect the facts, you confirm them — nothing is saved until you press Apply.",
+    "pasteLabel": "Paste document text",
+    "pastePlaceholder": "Paste text here (CV, transcript summary, IELTS TRF details, SAT/GRE report)…",
+    "chooseFile": "Choose file",
+    "trySample": "Try with sample CV / IELTS",
+    "extract": "Extract facts",
+    "extracting": "Extracting…",
+    "privacyNote": "Files are read in your browser. Only the text you submit here is sent for extraction.",
+    "reviewTitle": "Review extracted facts",
+    "reviewHint": "Extracted facts will appear here for confirmation.",
+    "applySelected": "Apply selected to my profile",
+    "applied": "Applied to the form below — review and save.",
+    "sourceAi": "Detected by AI + rules, verified against your text.",
+    "sourceLocal": "Detected by rules only (AI unavailable), verified against your text.",
+    "strippedNote": "Not found in your text, so removed: {fields}.",
+    "nothingFound": "No profile facts were recognised. Try pasting the education / test-scores section.",
+    "fileTooLarge": "That file is larger than 2 MB. Paste the relevant section instead.",
+    "fileReadFailed": "Could not read that file. Copy the text and paste it instead.",
+    "needMoreText": "Paste at least a few lines before extracting.",
+    "extractFailed": "Extraction failed. Please try again.",
+    "premiumLocked": "This feature is part of Premium.",
+    "rateLimited": "Too many requests. Try again in a few minutes.",
+    "selectAtLeastOne": "Tick at least one field to apply.",
+    "fieldFullName": "Name",
+    "fieldEmail": "Email",
+    "fieldPhone": "Phone",
+    "fieldCountry": "Country",
+    "fieldDegreeLevel": "Degree level",
+    "fieldTargetMajor": "Target major",
+    "fieldGpa": "GPA",
+    "fieldGpaScale": "GPA scale",
+    "fieldIelts": "IELTS",
+    "fieldToefl": "TOEFL",
+    "fieldSat": "SAT",
+    "fieldGre": "GRE",
+    "fieldGmat": "GMAT",
+    "fieldDuolingo": "Duolingo",
+    "fieldPublications": "Research publications",
+    "fieldBudget": "Annual budget (USD)",
+    "fieldLeadership": "Leadership",
+    "fieldAwards": "Awards",
+    "fieldExtracurriculars": "Extracurriculars"
+  },
+  "regionalScholarships": {
+    "eyuf": {
+      "name": "El-yurt umidi Foundation Scholarship (Uzbekistan Presidential)",
+      "provider": "El-yurt umidi Foundation under the Agency for Presidential Educational Institutions",
+      "note": "Requires a return-service commitment: the grant is repayable if you do not return to work in Uzbekistan. Verify the current call and the service contract on eyuf.uz.",
+      "doc0": "Shahodatnoma / diploma with official English translation",
+      "doc1": "Official transcript (ilova) with grading scale explained",
+      "doc2": "IELTS/TOEFL or programme language certificate",
+      "doc3": "Admission or conditional admission letter from the host university",
+      "doc4": "Return-service contract and employer/ministry endorsement",
+      "essay0": "Why this programme serves Uzbekistan's priority sectors",
+      "essay1": "Your five-year plan after returning (role, employer, measurable target)",
+      "essay2": "How your study plan uses the host institution's specific labs or courses",
+      "milestone0": "Register on eyuf.uz and confirm eligibility",
+      "milestone1": "Upload the education documents and language certificate",
+      "milestone2": "Attach the admission letter and the return-service contract"
+    },
+    "gks": {
+      "name": "Global Korea Scholarship (GKS / KGSP)",
+      "provider": "National Institute for International Education (NIIED), Republic of Korea",
+      "note": "Choose Embassy Track or University Track — you cannot apply through both. Apostilled birth certificate and proof of your parents' citizenship are mandatory.",
+      "doc0": "Application form (Embassy or University Track)",
+      "doc1": "Apostilled birth certificate and parents' citizenship proof",
+      "doc2": "Study plan and personal statement (NIIED forms)",
+      "doc3": "Two recommendation letters (sealed)",
+      "doc4": "Apostilled diploma and transcript, plus TOPIK/IELTS if available",
+      "essay0": "Study plan: research question, method, expected outcome in Korea",
+      "essay1": "Personal statement: academic path and why Korea",
+      "essay2": "Contribution plan: how you will connect Korea and Central Asia",
+      "milestone0": "Confirm Embassy Track vs University Track deadline",
+      "milestone1": "Apostille your diploma, transcript, birth certificate",
+      "milestone2": "Submit the sealed recommendation letters before the deadline"
+    },
+    "hungaricum": {
+      "name": "Stipendium Hungaricum (Hungary)",
+      "provider": "Tempus Public Foundation, Hungary",
+      "note": "Uzbek applicants must apply through the sending partner (Ministry of Higher Education, Science and Innovations) AND on the Hungarian portal — two applications, both required.",
+      "doc0": "Sending-partner (Ministry) application reference",
+      "doc1": "Online application on stipendiumhungaricum.hu",
+      "doc2": "Motivation letter (programme-specific)",
+      "doc3": "Medical certificate and vaccination record",
+      "doc4": "Language certificate or proof of the programme language",
+      "essay0": "Motivation letter: why this Hungarian programme, which courses",
+      "essay1": "Study plan for the chosen degree level",
+      "essay2": "Career plan in Uzbekistan after graduation",
+      "milestone0": "Register with the Ministry sending partner",
+      "milestone1": "Shortlist up to two programmes on the Hungarian portal",
+      "milestone2": "Upload the medical certificate before the deadline"
+    },
+    "daad": {
+      "name": "DAAD — EPOS / Master studies for all academic disciplines",
+      "provider": "German Academic Exchange Service (DAAD)",
+      "note": "Most EPOS courses expect at least two years of professional experience and an employer reference. Europass CV format is standard.",
+      "doc0": "Europass CV (reverse chronological, no photo required)",
+      "doc1": "Letter of motivation (course-specific, 1–2 pages)",
+      "doc2": "Employer reference confirming relevant work experience",
+      "doc3": "Degree certificates and transcripts (certified translation)",
+      "doc4": "APS certificate (Uzbekistan is an APS country) or uni-assist VPD",
+      "essay0": "Letter of motivation: the development problem you will work on",
+      "essay1": "How the specific DAAD course modules map to your job",
+      "essay2": "Your transfer-of-knowledge plan after returning",
+      "milestone0": "Check the EPOS course list and its specific requirements",
+      "milestone1": "Prepare the Europass CV and the employer reference",
+      "milestone2": "Start the APS/uni-assist documentation early"
+    },
+    "turkiye": {
+      "name": "Türkiye Bursları (Turkey Scholarships)",
+      "provider": "Republic of Türkiye, Ministry of National Education",
+      "note": "One application covers up to 12 programme choices. Interviews are held in Tashkent; prepare a 2-minute self-introduction in Turkish or English.",
+      "doc0": "Online application on turkiyeburslari.gov.tr",
+      "doc1": "Diploma/transcript with certified translation",
+      "doc2": "Letter of intent",
+      "doc3": "One or two reference letters",
+      "doc4": "Passport or national ID, and a health report if requested",
+      "essay0": "Letter of intent: academic goal and programme choices",
+      "essay1": "Why Türkiye, and what you will bring back to Uzbekistan",
+      "essay2": "A short research or project idea (PhD applicants)",
+      "milestone0": "Submit the online application before the deadline",
+      "milestone1": "Rank up to 12 programme choices carefully",
+      "milestone2": "Prepare the interview self-introduction"
+    },
+    "chevening": {
+      "name": "Chevening Scholarship (UK)",
+      "provider": "UK Foreign, Commonwealth & Development Office",
+      "note": "Four mandatory essays of about 500 words: Leadership, Networking, Studying in the UK, Career Plan. The 2,800-hour work-experience rule needs a reference letter.",
+      "doc0": "Four 500-word essays (Leadership, Networking, Studying in the UK, Career Plan)",
+      "doc1": "Work-experience tracker with the 2,800-hour reference",
+      "doc2": "Three UK university choices (one must be unconditional before the deadline)",
+      "doc3": "Reference letters for the work-experience claim",
+      "doc4": "Passport and degree certificates",
+      "essay0": "Leadership: one decision you led and its measured result",
+      "essay1": "Networking: how you build and use professional relationships",
+      "essay2": "Career plan: the role you will take and the change you will drive",
+      "milestone0": "Draft all four essays and check the word limits",
+      "milestone1": "Verify you meet the 2,800 hours of work experience",
+      "milestone2": "Submit three UK programme applications in time"
+    },
+    "fulbright": {
+      "name": "Fulbright Foreign Student Program (USA, Tashkent)",
+      "provider": "US Embassy Tashkent / IIE",
+      "note": "The embassy competition requires a Study/Research Objective, a Personal Statement and three recommendation letters; interviews are held at the US Embassy in Tashkent.",
+      "doc0": "Online application (embassy announcement cycle)",
+      "doc1": "Study/research objective",
+      "doc2": "Personal statement",
+      "doc3": "Three recommendation letters (academic or professional)",
+      "doc4": "Transcripts and degree certificates in English",
+      "essay0": "Study objective: the exact research or degree goal and why in the USA",
+      "essay1": "Personal statement: background, leadership, community contribution",
+      "essay2": "Return plan: the institution and role you will join in Uzbekistan",
+      "milestone0": "Confirm the current embassy deadline and eligibility",
+      "milestone1": "Ask three recommenders early and give them your CV",
+      "milestone2": "Prepare for the Tashkent embassy interview"
+    },
+    "erasmus": {
+      "name": "Erasmus Mundus Joint Masters (EU)",
+      "provider": "European Commission / EMJM consortia",
+      "note": "You apply to a consortium, not a single university: list your preferred partner universities in the motivation letter and check each consortium's own deadline.",
+      "doc0": "Consortium application form (per EMJM programme)",
+      "doc1": "Motivation letter tailored to that consortium's mobility path",
+      "doc2": "Two reference letters and a CV",
+      "doc3": "Degree certificates and transcripts in English",
+      "doc4": "Language certificate if the consortium requires one",
+      "essay0": "Motivation letter: why this consortium's mobility path fits your goal",
+      "essay1": "Which partner university you want for each semester",
+      "essay2": "Career plan connecting both European and Uzbek institutions",
+      "milestone0": "Shortlist 2–3 EMJM programmes and note each deadline",
+      "milestone1": "Adapt the motivation letter per consortium",
+      "milestone2": "Prepare certified English translations"
+    }
+  },
+  "visaChecklist": {
+    "USA": {
+      "name": "US Embassy Tashkent — F-1 student visa",
+      "sourceNote": "Requirements change: confirm every item on the official embassy page before your appointment.",
+      "item0": "Form I-20 from the school (SEVIS record)",
+      "item1": "SEVIS I-901 fee receipt",
+      "item2": "DS-160 confirmation page and MRV fee payment",
+      "item3": "Liquid bank statement plus sponsor affidavit (Homiylik xati)",
+      "item4": "Proof of property, business or employment ties in Uzbekistan",
+      "item5": "Academic documents: diplomas, transcripts, admission and funding letters"
+    },
+    "Germany": {
+      "name": "German Embassy Tashkent (Visametric) — national student visa",
+      "sourceNote": "Requirements change: confirm every item on the official embassy page before your appointment.",
+      "item0": "Admission letter (Zulassungsbescheid) or uni-assist VPD",
+      "item1": "Blocked account (Sperrkonto) confirmation — statutory annual amount",
+      "item2": "APS certificate (Uzbekistan is an APS country)",
+      "item3": "Proof of health insurance (TK/AOK or travel cover for the first days)",
+      "item4": "Certified translations of diplomas and transcripts",
+      "item5": "Motivation letter and CV in German or English"
+    },
+    "South Korea": {
+      "name": "Korean Embassy Tashkent (KVAC) — D-2 student visa",
+      "sourceNote": "Requirements change: confirm every item on the official embassy page before your appointment.",
+      "item0": "Certificate of Admission (COA) from the Korean university",
+      "item1": "Apostilled diploma and final transcript",
+      "item2": "Certificate of bank balance with 6-month transaction history",
+      "item3": "Proof of tuition payment or scholarship confirmation",
+      "item4": "Tuberculosis screening result (designated clinic)",
+      "item5": "Study plan and financial sponsor documents"
+    },
+    "UK": {
+      "name": "UK Student Route — TLScontact Tashkent",
+      "sourceNote": "Requirements change: confirm every item on the official embassy page before your appointment.",
+      "item0": "CAS statement from the university",
+      "item1": "Maintenance funds held continuously for 28 consecutive days",
+      "item2": "TB certificate from an IOM-approved clinic in Tashkent",
+      "item3": "ATAS certificate (if your course or nationality requires it)",
+      "item4": "IELTS/SELT or the university's English confirmation",
+      "item5": "Passport, photographs and the online application receipt"
+    }
+  },
+  "regionalSuperpowers": {
+    "blueprintsTitle": "Regional scholarship blueprints (Uzbekistan & Central Asia)",
+    "blueprintsSubtitle": "Programmes a citizen of Uzbekistan can actually apply to, with the extra document each one demands. Deadlines, quotas and selection decisions live on the official page — never here.",
+    "docsLabel": "Documents required",
+    "essaysLabel": "What you must write",
+    "stepsLabel": "How to start",
+    "officialLink": "Official page",
+    "honestyNote": "No deadline, quota or selection chance is stored here: they change every cycle. Always confirm on the official page.",
+    "checklistTitle": "Tashkent embassy document checklist",
+    "checklistSubtitle": "What to bring to your appointment at the destination you are applying to.",
+    "checklistEmpty": "No checklist for this destination yet.",
+    "converterTitle": "Uzbek grade → international GPA",
+    "converterSubtitle": "The 5-point scale and the 100-point rating system, read two ways: proportionally, and by the letter-grade mapping most international offices apply.",
+    "scaleLabel": "Scale",
+    "scaleFive": "5-point (shahodatnoma, diploma)",
+    "scaleHundred": "100-point (university rating)",
+    "valueLabel": "Your grade",
+    "proportional": "Proportional",
+    "letter": "Letter grade",
+    "ects": "ECTS hint",
+    "unknown": "unknown",
+    "noteFive": "On the 5-point scale both readings are shown because universities differ: 4.5 and above is the A band, 3.5–4.49 the B band, 2.5–3.49 the C band. Send an official transcript with the scale explained — never a bare number.",
+    "noteHundred": "On the 100-point rating system the bands are 86–100 (5/A), 71–85 (4/B) and 55–70 (3/C). A score below 55 is the failing band and is NOT converted to a passing grade.",
+    "noteUnknown": "That value is outside the selected scale, so nothing is converted. Check what your document actually shows.",
+    "converterHint": "Enter your grade to see both readings.",
+    "platformValue": "The platform stores this as {value} on the 4.0 comparison scale."
+  },
+  "focusMode": {
+    "enter": "Focus mode",
+    "exit": "Exit focus mode",
+    "active": "Focus mode: only the {count} destinations that move your next deadline forward are shown. Account tools stay reachable."
+  },
+  "whatIf": {
+    "title": "What-if simulator",
+    "subtitle": "Try hypothetical numbers and see which PUBLISHED requirements of your saved universities would change. Nothing is predicted and nothing is saved.",
+    "ielts": "IELTS",
+    "toefl": "TOEFL",
+    "sat": "SAT",
+    "gpa": "GPA",
+    "run": "Run simulation",
+    "running": "Simulating…",
+    "needValue": "Enter at least one value to simulate.",
+    "failed": "Could not run the simulation.",
+    "rateLimited": "Too many simulations. Try again shortly.",
+    "unlockedTitle": "Requirements that would be met ({count})",
+    "brokenTitle": "Requirements that would no longer be met ({count})",
+    "noChanges": "Nothing changes across the {scanned} universities we examined: your saved universities publish no academic numbers that these values would move.",
+    "honesty": "This compares official requirement numbers with your own numbers. It is not an admission probability, and only the university decides."
+  },
+  "offerMatrix": {
+    "title": "Compare your offers side by side",
+    "subtitle": "The numbers a decision actually turns on. Every cell is what you recorded or what the university published — nothing is estimated.",
+    "field": "Item",
+    "tuition": "Tuition commitment",
+    "confirmedFunding": "Confirmed scholarship / aid",
+    "netAnnual": "Net annual cost payable",
+    "deposit": "Deposit",
+    "depositDue": "Deposit due",
+    "payableNow": "Payable now",
+    "responseDeadline": "Response deadline",
+    "postStudyWork": "Post-study work visa",
+    "years": "{count} yr",
+    "notRecorded": "not recorded",
+    "statusPending": "pending",
+    "statusAccepted": "accepted",
+    "statusRejected": "rejected",
+    "statusWaitlisted": "waitlisted",
+    "statusDeferred": "deferred",
+    "honesty": "This table organises your own records; it does not rank the offers or tell you which to accept. Confirm every figure against your offer letter."
+  },
+  "visaAssistant": {
+    "turnFeedbackTitle": "Question-by-question coaching",
+    "turnFeedbackSubtitle": "Each officer question with what your answer did and what to fix before the real interview.",
+    "turnAnswerWords": "{count} words",
+    "turnNotAnswered": "not answered",
+    "turnStrengths": "covers: {items}",
+    "turnProfileConflictsTitle": "Your answers conflict with your application record"
   }
 }

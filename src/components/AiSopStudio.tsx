@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import { SAMPLE_SOP_MASTERS_AI_FIELDS, type SampleExemplar } from "@/lib/samples/exemplars";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
@@ -51,6 +53,29 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
 
   // Copy state
   const [copied, setCopied] = useState(false);
+
+  /**
+   * Phase 7 — load a gold-standard SOP into whichever tab is open. The drafter
+   * fills the six structure fields (hook / evidence / fit / impact), the
+   * reviewer gets the finished text so the rubric can be exercised in one
+   * click. The fields are only prefilled after the student presses the button.
+   */
+  const loadSample = (text: string, sample: SampleExemplar) => {
+    if (activeTab === "reviewer") {
+      setExistingDraft(text);
+      return;
+    }
+    if (sample.id === "SAMPLE_SOP_MASTERS_AI") {
+      setTargetUni(SAMPLE_SOP_MASTERS_AI_FIELDS.targetUni);
+      setTargetProgram(SAMPLE_SOP_MASTERS_AI_FIELDS.targetProgram);
+      setPersonalHook(SAMPLE_SOP_MASTERS_AI_FIELDS.personalHook);
+      setExperienceExample(SAMPLE_SOP_MASTERS_AI_FIELDS.experienceExample);
+      setProgramEvidence(SAMPLE_SOP_MASTERS_AI_FIELDS.programEvidence);
+      setCareerGoals(SAMPLE_SOP_MASTERS_AI_FIELDS.careerGoals);
+      return;
+    }
+    setPersonalHook(text.split("\n\n")[0] ?? text);
+  };
 
   const handleGenerateSop = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +168,8 @@ export function AiSopStudio({ activeProfile }: AiSopStudioProps) {
 
   return (
     <div className="space-y-6">
+      {/* Phase 7 — gold-standard SOP exemplars (annotated view + 1-click load) */}
+      <SampleExemplarBar kind="sop" onLoad={loadSample} />
       {/* Studio Header */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>

@@ -147,10 +147,34 @@ check("GPA 3.2 vs 3.5 minimum → gpa_below_min", lowGpa.codes.includes("gpa_bel
 const noEnglish = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null });
 check("no English score on file → english_missing", noEnglish.codes.includes("english_missing"));
 
-const toeflHigh = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 130 });
-check("TOEFL 130 ≈ IELTS 7.5 passes a 7.0 minimum", !toeflHigh.codes.some((c) => c.startsWith("english_")), toeflHigh.codes.join(","));
-const toeflLow = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 108 });
-check("TOEFL 108 ≈ IELTS 5.7 fails a 7.0 minimum", toeflLow.codes.includes("english_below_min"));
+// TOEFL conversion uses the published ETS concordance, NOT the old linear
+// (t − 40) / 12 rule that turned a perfect 120 into IELTS 6.67 and failed
+// every 7.0/7.5 award.
+const toeflPerfect = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 120 });
+check(
+  "TOEFL 120 (100%) satisfies a 7.0 minimum via the concordance (≈ IELTS 9.0)",
+  !toeflPerfect.codes.includes("english_below_min") &&
+    toeflPerfect.matched.some((m) => /IELTS 9\.0/.test(m)),
+  toeflPerfect.codes.join(",") + " | " + toeflPerfect.matched.join(" | ")
+);
+const toefl100 = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 100 });
+check(
+  "TOEFL 100 satisfies a 7.0 minimum (≈ IELTS 7.0), not the old 5.0",
+  !toefl100.codes.includes("english_below_min") && toefl100.matched.some((m) => /IELTS 7\.0/.test(m)),
+  toefl100.codes.join(",") + " | " + toefl100.matched.join(" | ")
+);
+const toefl108 = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 108 });
+check("TOEFL 108 ≈ IELTS 7.5 still clears a 7.0 minimum", !toefl108.codes.includes("english_below_min"), toefl108.codes.join(","));
+const toeflLow = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 79 });
+check("TOEFL 79 ≈ IELTS 6.5 fails a 7.0 minimum (a real shortfall, not a conversion artifact)", toeflLow.codes.includes("english_below_min"));
+const toeflInvalid = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: 130 });
+check("an out-of-range TOEFL total (130) is unknown — never read as a pass or a fail", !toeflInvalid.codes.includes("english_below_min") && toeflInvalid.codes.includes("english_alternative_recorded"), toeflInvalid.codes.join(","));
+const detOnly = scoreEssayFit(essay, fullMatch, { ...strongProfile, ieltsScore: null, toeflScore: null, duolingoScore: 130 });
+check(
+  "a Duolingo score with no published IELTS equivalence is flagged for verification, never scored as a fail",
+  detOnly.codes.includes("english_alternative_recorded") && !detOnly.codes.includes("english_below_min"),
+  detOnly.codes.join(",")
+);
 
 const noLimit = scoreEssayFit(essay, { ...fullMatch, requirements: "Describe your goals." }, strongProfile);
 check("no published limit → neutral, not a failure", noLimit.matched.some((m) => m.includes("no word limit published")), noLimit.matched.join(" | "));

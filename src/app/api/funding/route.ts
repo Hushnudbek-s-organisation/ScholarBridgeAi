@@ -3,8 +3,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { applications, fundingItems, savedScholarships, scholarships, studentProfiles, universities } from "@/db/schema";
 import { guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
-import { buildFundingPlan, COST_LINES, FUNDING_KIND_LABELS, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
-import { calculateCosts } from "@/lib/costs";
+import { buildFundingPlan, COST_LINES, FUNDING_KIND_LABELS, fundingLinesFromCosts, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
+import { calculateCosts, resolvedUsdUniversityCosts } from "@/lib/costs";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +48,15 @@ export async function GET(req: Request) {
       : null;
 
     // Cost lines: published university data + the extras the spec lists.
+    //
+    // Currency-safe: a EUR/GBP/KRW published figure resolves to null
+    // ("not published in USD") instead of being spent as if it were dollars.
+    const uniCosts = resolvedUsdUniversityCosts(uni);
     const costs = calculateCosts({
-      annualTuitionUsd: num(uni?.annualTuition ?? uni?.annualTuitionUsd),
-      annualLivingEstUsd: num(uni?.annualLivingEst ?? uni?.annualLivingEstUsd),
-      accommodationCostUsd: num(uni?.accommodationCost ?? uni?.accommodationCostUsd),
-      applicationFeeUsd: num(uni?.applicationFee),
+      annualTuitionUsd: uniCosts.tuitionUsd,
+      annualLivingEstUsd: uniCosts.livingUsd,
+      accommodationCostUsd: uniCosts.accommodationUsd,
+      applicationFeeUsd: uniCosts.applicationFeeUsd,
       country: uni?.country ?? profile?.country ?? null,
       city: uni?.city ?? null,
       years: 1,
@@ -60,20 +64,18 @@ export async function GET(req: Request) {
       insurancePerYearUsd: 1200,
       booksPerYearUsd: 900,
       visaFeeUsd: 500,
-      familyContributionUsd: profile?.familyIncomeUsd ?? null,
+      // Income is NOT a contribution commitment. `familyIncomeUsd` was passed
+      // here as if the whole household income were cash set aside for tuition,
+      // which the calculation audit explicitly banned. Confirmed contributions
+      // live in `funding_items` (kind "family" / "savings") and are applied by
+      // `buildFundingPlan` below.
+      familyContributionUsd: null,
     });
 
-    const lines = [
-      { key: "tuition", label: "Tuition", cost: costs.lines.find((l) => l.key === "tuition")?.annualUsd ?? 0 },
-      { key: "accommodation", label: "Accommodation", cost: costs.lines.find((l) => l.key === "accommodation")?.annualUsd ?? 0 },
-      { key: "food", label: "Food", cost: costs.lines.find((l) => l.key === "food")?.annualUsd ?? 0 },
-      { key: "insurance", label: "Insurance", cost: costs.lines.find((l) => l.key === "insurance")?.annualUsd ?? 0 },
-      { key: "visa", label: "Visa", cost: costs.lines.find((l) => l.key === "visa")?.annualUsd ?? 0 },
-      { key: "flight", label: "Flight", cost: costs.lines.find((l) => l.key === "flight")?.annualUsd ?? 0 },
-      { key: "books", label: "Books", cost: costs.lines.find((l) => l.key === "books")?.annualUsd ?? 0 },
-      { key: "transport", label: "Transport", cost: costs.lines.find((l) => l.key === "transport")?.annualUsd ?? 0 },
-      { key: "other", label: "Other", cost: costs.lines.find((l) => l.key === "other")?.annualUsd ?? 0 },
-    ];
+    // ONE canonical mapping from `calculateCosts` output to funding lines, so
+    // the per-line breakdown always accounts for 100% of the yearly cost.
+    const breakdown = fundingLinesFromCosts(costs);
+    const lines = breakdown.lines;
 
     const rows = await db
       .select()
@@ -124,6 +126,27 @@ export async function GET(req: Request) {
       annualCost: costs.annualTotalUsd,
       /** Which numbers are published and which are our estimates. */
       estimatedLines: costs.lines.filter((l) => l.estimated).map((l) => l.label),
+      /**
+       * One-off fees (visa, application) are NOT part of the yearly cost and
+       * are reported separately instead of being hidden inside an annual line.
+       */
+      oneOffLines: breakdown.oneOff,
+      oneOffTotalUsd: breakdown.oneOff.reduce((s, l) => s + l.amountUsd, 0),
+      /**
+       * Proof for the client: the recurring lines above add up to the yearly
+       * cost, line for line. `difference` is 0 in normal operation.
+       */
+      coverageCheck: {
+        linesTotalUsd: breakdown.recurringTotalUsd,
+        annualCostUsd: costs.annualTotalUsd,
+        difference: costs.annualTotalUsd - breakdown.recurringTotalUsd,
+        foldedSources: breakdown.foldedSources,
+      },
+      /**
+       * Published amounts that are not in USD, so they are not compared with a
+       * USD budget: the number exists, we just cannot convert it honestly.
+       */
+      nonUsdCurrencies: uniCosts.nonUsdCurrencies,
       plan,
       items: rows.map((r) => ({ ...r, kindLabel: FUNDING_KIND_LABELS[(r.kind as FundingKind) in FUNDING_KIND_LABELS ? (r.kind as FundingKind) : "other"] })),
       // "Find scholarships for remaining gap" — the CTA the spec asks for.

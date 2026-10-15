@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
-    const locked = await premiumGate(access.session.profile.id, "courses_full");
+    const locked = await premiumGate(access.session.profile.id, "courses_full", Boolean(access.session.isAdmin));
     if (locked) return locked;
 
     const rows = await db

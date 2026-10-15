@@ -16,18 +16,32 @@ export interface ConfigDefaults {
 export const CONFIG_DEFAULTS: ConfigDefaults = {
   // Payment (spec §18 — no hardcoded amounts)
   // Monthly default; season (3 mo) and yearly are discounted packages.
+  // Regional pricing, calibrated for Uzbekistan (1 USD ≈ 12,000 UZS):
+  //   monthly     59,000 UZS ≈ $4.92
+  //   season      139,000 UZS ≈ $11.58 (90-day admissions pass — best value)
+  //   yearly      399,000 UZS ≈ $33.25
+  // The unit-economics rule behind these numbers: the WORST-CASE AI cost of a
+  // Premium account must stay below its price. See the audit in
+  // docs/AI_COST_AUDIT_2026-10-14.md and `src/lib/ai/quota.ts`.
   payment_premium_price_uzs: "59000",
   payment_premium_days: "30",
-  payment_premium_season_price_uzs: "149000",
+  payment_premium_season_price_uzs: "139000",
   payment_premium_season_days: "90",
-  payment_premium_yearly_price_uzs: "499000",
+  payment_premium_yearly_price_uzs: "399000",
   payment_premium_yearly_days: "365",
   payment_currency: "UZS",
-  // AI limits (spec §16) — free keeps 3–5/day so the helper is useful, not endless
+  // AI limits (spec §16).
+  //
+  // PROFITABILITY (2026-10 fix). The old defaults allowed 500,000 premium
+  // tokens/day (15M/month) plus 2 live sessions/day at 10 minutes — a
+  // worst-case cost of ≈$12.53/month against a $4.92 monthly price, i.e. a
+  // −$7.61 loss on a heavy user. The numbers below cap a heavy Premium user at
+  // roughly $1.60/month of AI cost: 80k text tokens/day ≈ $0.85/month worst
+  // case, plus 8 native-audio sessions/month ≈ $0.74.
   ai_free_requests_per_day: "5",
-  ai_premium_requests_per_day: "200",
-  ai_free_tokens_per_day: "20000",
-  ai_premium_tokens_per_day: "500000",
+  ai_free_tokens_per_day: "12000",
+  ai_premium_requests_per_day: "40",
+  ai_premium_tokens_per_day: "80000",
   // AI cost control (Admin → AI → Cost & budgets). See lib/ai/pricing + budget.
   // Prices are NOT shipped: "{}" means every cost is "no price configured".
   ai_model_pricing: "{}",
@@ -46,8 +60,12 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   // than the Premium price per active account (docs/AI_COST_AUDIT_2026-10-14.md).
   // Placeholders — the administrator sets the final values.
   ai_free_live_sessions_per_day: "0",
-  ai_premium_live_sessions_per_day: "2",
-  ai_live_session_max_minutes: "10",
+  ai_premium_live_sessions_per_day: "1",
+  // Monthly ceiling on NATIVE-AUDIO live sessions. Standard browser-voice and
+  // text mock interviews stay unlimited for Pro (< $0.002/session), so hitting
+  // the native-audio ceiling never blocks interview practice.
+  ai_premium_live_sessions_per_month: "8",
+  ai_live_session_max_minutes: "8",
   // Platform-wide cap on Live sessions per day (all accounts). Live audio cost
   // is not visible to the token budget, so this is the control that bounds it.
   ai_live_global_sessions_per_day: "30",

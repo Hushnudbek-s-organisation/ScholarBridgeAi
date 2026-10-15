@@ -35,6 +35,7 @@
 
 import { ADMISSION_PROBABILITY } from "./chancing";
 import { gpaTo40Scale } from "./gpa";
+import { compareDegreeLevels } from "./degreeLevels";
 import { isStaleVerified } from "./provenance";
 import { undergraduateTestApplies } from "./degreeLevels";
 
@@ -357,7 +358,10 @@ export function assessAffordability(
     let levelOk: boolean;
     if (s.degreeLevels.length === 0) levelOk = false;
     else if (s.degreeLevels.includes("All")) levelOk = true;
-    else levelOk = input.degreeLevel != null && s.degreeLevels.some((l) => l.toLowerCase() === input.degreeLevel!.toLowerCase());
+    // Alias-aware: "Master's", "MSc", "магистратура" are the same level as the
+    // catalogue's "Master". Raw string equality silently dropped awards whose
+    // label merely differed in spelling.
+    else levelOk = input.degreeLevel != null && compareDegreeLevels(input.degreeLevel, s.degreeLevels.join("/")) === "match";
     const majorOk =
       !s.eligibleMajors.length ||
       s.eligibleMajors.includes("All") ||
@@ -432,10 +436,47 @@ export interface RecommendationResult {
   cycleStale: boolean;
 }
 
+/**
+ * Which application cycle should the student be shown?
+ *
+ *   1. the EARLIEST cycle whose deadline has not yet passed (that is the one
+ *      they can still act on);
+ *   2. otherwise the most recent past cycle — reported as such, so the UI can
+ *      say "the last catalogued round closed on …" instead of implying an
+ *      open door;
+ *   3. otherwise (no dated rows at all) the newest academic year.
+ *
+ * Rows the catalogue never dated are never presented as an upcoming deadline.
+ */
+export function pickNextCycle(cycles: RecommendCycle[], todayIso: string): RecommendCycle | null {
+  if (!cycles.length) return null;
+  const dated = cycles.filter((c) => isIsoDate(c.deadline));
+  const upcoming = dated
+    .filter((c) => c.deadline! >= todayIso)
+    .sort((a, b) => a.deadline!.localeCompare(b.deadline!));
+  if (upcoming.length) return upcoming[0];
+  const past = [...dated].sort((a, b) => b.deadline!.localeCompare(a.deadline!));
+  if (past.length) return past[0];
+  const byYear = [...cycles].sort((a, b) =>
+    (b.academicYear ?? "").localeCompare(a.academicYear ?? "")
+  );
+  return byYear[0] ?? null;
+}
+
+/** True only for a real calendar date in yyyy-mm-dd form (2026-02-30 is not). */
+export function isIsoDate(value: string | null | undefined): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 export function recommend(
   input: RecommendationInput,
   catalog: RecommendationCatalog,
-  limit = 24
+  limit = 24,
+  /** Reference date (ISO yyyy-mm-dd) for "is this cycle still upcoming?".
+   *  Injectable so the behaviour is testable and deterministic. */
+  todayIso: string = new Date().toISOString().slice(0, 10)
 ): RecommendationResult[] {
   const results: RecommendationResult[] = [];
 
@@ -483,25 +524,28 @@ export function recommend(
     // only worth -4 on the score, so it could still be ranked FIRST when its
     // subject fit was good. It now carries an explicit relation, is pushed below
     // every matching/unknown programme, and says so in the considerations.
-    const degreeLevelMatch: "match" | "mismatch" | "unknown" =
-      !input.degreeLevel || !program.degreeLevel
-        ? "unknown"
-        : input.degreeLevel.trim().toLowerCase() === program.degreeLevel.trim().toLowerCase()
-          ? "match"
-          : "mismatch";
+    // Alias-aware comparison (src/lib/degreeLevels.ts): "Bachelor" matches
+    // "Bachelor's"/"BSc"/"Undergraduate", "Master" matches "Master's"/"MSc".
+    // Raw string equality used to report those as a MISMATCH, pushing a
+    // correctly-chosen programme below unrelated ones and telling the student
+    // their level was wrong.
+    const degreeLevelMatch: "match" | "mismatch" | "unknown" = compareDegreeLevels(
+      input.degreeLevel,
+      program.degreeLevel
+    );
     if (degreeLevelMatch === "match") {
       score += 4;
     }
     const matchScore = Math.max(0, Math.min(100, Math.round(score)));
 
     // ---- Next cycle (only real rows; verified vs unverified) -------------
-    const nextCycle =
-      cycles.length > 0
-        ? (() => {
-            const c = cycles[cycles.length - 1];
-            return { ...c, isEstimated: c.verificationStatus !== "verified" };
-          })()
-        : null;
+    //
+    // FIX (2026-10): the route sorts cycles by deadline DESCENDING and this
+    // line then read `cycles[cycles.length - 1]` — i.e. the OLDEST row. A
+    // programme holding a closed 2025-01-15 round and an open 2027-01-15 round
+    // advertised the expired one. Selection is now explicit and date-aware.
+    const picked = pickNextCycle(cycles, todayIso);
+    const nextCycle = picked ? { ...picked, isEstimated: picked.verificationStatus !== "verified" } : null;
 
     // ---- Missing inputs (what would improve THIS assessment) -------------
     const missing: string[] = [];

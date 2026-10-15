@@ -79,6 +79,121 @@ export interface CostBreakdown {
   verdict: string;
 }
 
+// --- Currency-safe catalogue resolution ------------------------------------
+
+/**
+ * A published amount is only usable as a USD comparison when the currency
+ * column actually says USD.
+ *
+ * `null`/empty currency follows the legacy convention of the catalogue (the
+ * column defaults to "USD" and older rows were imported without it), but ANY
+ * other currency — EUR, GBP, KRW, UZS — resolves to `null`, i.e. "unknown to
+ * us". We do not hold a verified FX feed, and turning €15,000 into $16,200 by
+ * assuming a rate would be fabricating a number a student then plans a year of
+ * their life around.
+ */
+export function usdAmountOf(
+  value: unknown,
+  currency: string | null | undefined,
+  opts: { allowZero?: boolean } = {}
+): number | null {
+  if (currency && currency.trim() && currency.trim().toUpperCase() !== "USD") return null;
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  // 0 means two different things depending on where it sits:
+  //   • in a COST PLAN it means "the university did not publish this figure"
+  //     (costs.ts convention) → not usable, fall back to an estimate;
+  //   • in a published CATALOGUE AVERAGE it is a real figure (Germany's public
+  //     universities really are tuition-free) → `allowZero` keeps it.
+  if (n === 0) return opts.allowZero ? 0 : null;
+  return n;
+}
+
+export interface UniversityCostSource {
+  /** Legacy explicit-USD columns (kept in the catalogue; DO NOT drop). */
+  annualTuitionUsd?: number | null;
+  annualLivingEstUsd?: number | null;
+  accommodationCostUsd?: number | null;
+  /** Canonical currency-aware columns. */
+  annualTuition?: number | null;
+  tuitionCurrency?: string | null;
+  annualLivingEst?: number | null;
+  livingCostCurrency?: string | null;
+  accommodationCost?: number | null;
+  accommodationCostCurrency?: string | null;
+  applicationFee?: number | null;
+  applicationFeeCurrency?: string | null;
+}
+
+export interface ResolvedUniversityCosts {
+  tuitionUsd: number | null;
+  livingUsd: number | null;
+  accommodationUsd: number | null;
+  applicationFeeUsd: number | null;
+  /** Published but NOT in USD — the number exists, we just cannot compare it. */
+  nonUsdCurrencies: string[];
+}
+
+/**
+ * ONE resolver for "what does this university cost per year, in USD?".
+ *
+ * Every cost surface (dashboard, funding plan, planning studio, offers,
+ * country comparison, the matcher) reads the same rows, so they must read them
+ * with the same currency rule. Before this helper, some call sites did
+ * `num(uni.annualTuition ?? uni.annualTuitionUsd)` — which silently spent €18,000
+ * as if it were $18,000 — while the matcher correctly refused to compare.
+ */
+export function resolvedUsdUniversityCosts(uni: UniversityCostSource | null | undefined): ResolvedUniversityCosts {
+  const nonUsdCurrencies: string[] = [];
+  const note = (currency: string | null | undefined) => {
+    const c = (currency ?? "").trim().toUpperCase();
+    if (c && c !== "USD" && !nonUsdCurrencies.includes(c)) nonUsdCurrencies.push(c);
+  };
+  if (!uni) return { tuitionUsd: null, livingUsd: null, accommodationUsd: null, applicationFeeUsd: null, nonUsdCurrencies };
+
+  const tuitionUsd =
+    usdAmountOf(uni.annualTuitionUsd, "USD") ?? usdAmountOf(uni.annualTuition, uni.tuitionCurrency);
+  if (tuitionUsd == null && usdAmountOf(uni.annualTuition, "USD") == null && Number(uni.annualTuition ?? 0) > 0) {
+    note(uni.tuitionCurrency);
+  }
+  const livingUsd =
+    usdAmountOf(uni.annualLivingEstUsd, "USD") ?? usdAmountOf(uni.annualLivingEst, uni.livingCostCurrency);
+  if (livingUsd == null && Number(uni.annualLivingEst ?? 0) > 0) note(uni.livingCostCurrency);
+  const accommodationUsd =
+    usdAmountOf(uni.accommodationCostUsd, "USD") ??
+    usdAmountOf(uni.accommodationCost, uni.accommodationCostCurrency);
+  if (accommodationUsd == null && Number(uni.accommodationCost ?? 0) > 0) note(uni.accommodationCostCurrency);
+  const applicationFeeUsd = usdAmountOf(uni.applicationFee, uni.applicationFeeCurrency);
+  if (applicationFeeUsd == null && Number(uni.applicationFee ?? 0) > 0) note(uni.applicationFeeCurrency);
+
+  return { tuitionUsd, livingUsd, accommodationUsd, applicationFeeUsd, nonUsdCurrencies };
+}
+
+export interface ScholarshipAmountSource {
+  amountUsdValue?: number | null;
+  awardAmount?: number | null;
+  awardCurrency?: string | null;
+  awardPeriod?: string | null;
+}
+
+/**
+ * A scholarship's award in USD, or `null` when the catalogue only publishes it
+ * in another currency. `awardPeriod` is returned untouched so callers can say
+ * "per year" vs "one-off" instead of silently annualising it.
+ */
+export function resolvedUsdScholarshipAmount(
+  sch: ScholarshipAmountSource | null | undefined
+): { amountUsd: number | null; period: string | null; currency: string | null } {
+  if (!sch) return { amountUsd: null, period: null, currency: null };
+  const legacy = usdAmountOf(sch.amountUsdValue, "USD");
+  const canonicalCurrency = (sch.awardCurrency ?? "").trim().toUpperCase();
+  if (legacy != null) return { amountUsd: legacy, period: sch.awardPeriod ?? null, currency: "USD" };
+  const canonical = usdAmountOf(sch.awardAmount, sch.awardCurrency);
+  if (canonical != null) return { amountUsd: canonical, period: sch.awardPeriod ?? null, currency: canonicalCurrency || "USD" };
+  return { amountUsd: null, period: sch.awardPeriod ?? null, currency: canonicalCurrency || null };
+}
+
 // --- Defaults, with their reasoning kept visible ---------------------------
 
 /**

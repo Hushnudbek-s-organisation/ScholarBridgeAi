@@ -160,15 +160,15 @@ async function main() {
   check(
     "the three packages carry the documented default prices and lengths",
     byId.monthly.priceUzs === 59000 && byId.monthly.days === 30 && byId.monthly.purpose === "premium" &&
-      byId.season.priceUzs === 149000 && byId.season.days === 90 && byId.season.purpose === "premium_season" &&
-      byId.yearly.priceUzs === 499000 && byId.yearly.days === 365 && byId.yearly.purpose === "premium_yearly",
+      byId.season.priceUzs === 139000 && byId.season.days === 90 && byId.season.purpose === "premium_season" &&
+      byId.yearly.priceUzs === 399000 && byId.yearly.days === 365 && byId.yearly.purpose === "premium_yearly",
     JSON.stringify(defaults)
   );
   check(
     "an amount identifies its package",
     (await packageForAmountUzs(59000))?.id === "monthly" &&
-      (await packageForAmountUzs(149000))?.id === "season" &&
-      (await packageForAmountUzs(499000))?.id === "yearly"
+      (await packageForAmountUzs(139000))?.id === "season" &&
+      (await packageForAmountUzs(399000))?.id === "yearly"
   );
   check("an amount that matches no package resolves to null", (await packageForAmountUzs(12345)) === null);
   check("a non-numeric amount resolves to null", (await packageForAmountUzs(Number.NaN)) === null);
@@ -178,7 +178,7 @@ async function main() {
   await setConfig("payment_premium_season_days", "120", "test: longer season");
   check(
     "an admin reprice changes the accepted amount immediately",
-    (await packageForAmountUzs(175000))?.id === "season" && (await packageForAmountUzs(149000)) === null,
+    (await packageForAmountUzs(175000))?.id === "season" && (await packageForAmountUzs(139000)) === null,
     JSON.stringify(await allPremiumPackages())
   );
   check(
@@ -575,6 +575,77 @@ async function main() {
     "paying never shortens a longer window the student already had",
     daysBetween(after.premiumUntil!) >= 699,
     `${daysBetween(after.premiumUntil!)} days left`
+  );
+
+  // -------------------------------------------------------------------------
+  section("10. Admin god-mode (Pillar 8) — the operator is never gated");
+
+  const adminRow = await makeProfile("siteadmin");
+  await db.update(schema.studentProfiles).set({ isAdmin: true }).where(eq(schema.studentProfiles.id, adminRow.id));
+  const plain = await makeProfile("plainstudent");
+  const { hasFeature, premiumGate, featureAccess } = await import("../src/lib/premium");
+
+  const adminStatus = await getPremiumStatus(adminRow.id);
+  check(
+    "an admin without any paid row is Premium, plan 'admin', source 'admin'",
+    adminStatus.isPremium && adminStatus.plan === "admin" && adminStatus.source === "admin",
+    JSON.stringify(adminStatus)
+  );
+  check("…and has no premium window to show (nothing was bought)", adminStatus.premiumUntil === null);
+
+  const plainStatus = await getPremiumStatus(plain.id);
+  check(
+    "a student with nothing bought stays free (no accidental unlock)",
+    !plainStatus.isPremium && plainStatus.plan === "free" && plainStatus.source === "none",
+    JSON.stringify(plainStatus)
+  );
+
+  const inspected = await getPremiumStatus(plain.id, true);
+  check(
+    "an ADMIN session inspecting a student profile sees everything unlocked",
+    inspected.isPremium && inspected.plan === "admin" && inspected.source === "admin"
+  );
+
+  check(
+    "premiumGate blocks a free student on a Premium feature…",
+    (await premiumGate(plain.id, "ai_essay"))?.status === 403
+  );
+  check(
+    "…and passes the same call for an admin session (god-mode)",
+    (await premiumGate(plain.id, "ai_essay", true)) === null
+  );
+  check(
+    "hasFeature: free student false, admin session true",
+    (await hasFeature(plain.id, "parent_dashboard")) === false &&
+      (await hasFeature(plain.id, "parent_dashboard", true)) === true
+  );
+  const access = await featureAccess(plain.id, ["ai_essay", "parent_dashboard", "visa_unlimited"], true);
+  check(
+    "featureAccess returns every requested feature for an admin session",
+    Object.values(access).every((v) => v === true) && Object.keys(access).length === 3,
+    JSON.stringify(access)
+  );
+
+  // A paid admin keeps the paid provenance: the admin flag must not hide the
+  // real period end (the receipt the student/operator sees).
+  const [adminPay] = await db
+    .insert(schema.payments)
+    .values({
+      profileId: adminRow.id,
+      provider: "gift",
+      providerTransactionId: "",
+      amount: 0,
+      currency: "UZS",
+      status: "pending",
+      purpose: "premium",
+    })
+    .returning();
+  await activateSubscription(adminPay.id, adminRow.id);
+  const adminPaid = await getPremiumStatus(adminRow.id);
+  check(
+    "a paying admin reports the subscription (its own source and period end)",
+    adminPaid.isPremium && adminPaid.source === "subscription" && adminPaid.premiumUntil !== null,
+    JSON.stringify(adminPaid)
   );
 
   // -------------------------------------------------------------------------

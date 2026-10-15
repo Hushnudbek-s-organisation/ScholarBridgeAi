@@ -363,10 +363,42 @@ export const DEFAULT_HIDDEN_NAV_ITEMS = [
   "parent",
 ];
 
+/**
+ * Expand a hidden-id list to include the PANE a legacy id now points at.
+ *
+ * `DEFAULT_HIDDEN_NAV_ITEMS` names features that used to be destinations and
+ * are now tabs ("compare" → universities/countries, "advisor" →
+ * guidance/mentor). Pane visibility is decided by comparing pane ids, so a
+ * stored "compare" used to hide NOTHING — the country comparison stayed
+ * visible while the config said it was hidden. Both spellings are kept, so old
+ * and new configs behave identically.
+ */
+function expandHiddenIds(ids: string[]): string[] {
+  const out = new Set<string>();
+  for (const id of ids) {
+    out.add(id);
+    // These two name a FEATURE INSIDE a shared pane (the Admissions Advisor
+    // sits next to the AI mentor chat; the mentor marketplace sits next to
+    // consulting). Hiding them must not blank the whole pane — the components
+    // themselves read the flag.
+    if (COMPONENT_LEVEL_HIDDEN_IDS.includes(id)) continue;
+    const target = resolveNavTarget(id);
+    if (target && !target.utility && target.pane) out.add(target.pane);
+  }
+  return [...out];
+}
+
+/**
+ * Hidden ids that gate an individual COMPONENT rather than a whole pane.
+ * Read directly from the hidden list by the component that owns the feature
+ * (see GuidanceHub in `src/components/hubs/index.tsx`).
+ */
+export const COMPONENT_LEVEL_HIDDEN_IDS: readonly string[] = ["advisor", "mentors"];
+
 /** Parse the stored config value into a list of hidden ids. */
 export function parseHiddenNav(raw: string | null | undefined): string[] {
   const stripUnavailable = (ids: string[]) =>
-    ids.filter((id) => id !== "details" && !UNHIDEABLE_NAV_ITEMS.includes(id));
+    expandHiddenIds(ids.filter((id) => id !== "details" && !UNHIDEABLE_NAV_ITEMS.includes(id)));
   if (!raw) return stripUnavailable([...DEFAULT_HIDDEN_NAV_ITEMS]);
   try {
     const parsed = JSON.parse(raw);
@@ -543,11 +575,22 @@ export function groupOfSection(id: string): NavGroupId | null {
   return NAV_SECTIONS.find((s) => s.id === resolved.section)?.group ?? null;
 }
 
-/** Panes of a destination, minus the ids an admin has hidden. */
+/**
+ * Panes of a destination, minus the ids an admin has hidden.
+ *
+ * The hidden list is run through `expandHiddenIds` first, so a caller that
+ * passes raw config (`["compare"]`) hides the same pane as one that passes a
+ * parsed list (`["compare","countries"]`).
+ */
 export function visiblePanes(sectionId: string, hidden: string[]): NavPaneMeta[] {
   const section = NAV_SECTIONS.find((s) => s.id === sectionId);
   if (!section) return [];
-  return section.panes.filter((p) => !hidden.includes(p.id));
+  const hide = new Set(expandHiddenIds(hidden));
+  const visible = section.panes.filter((p) => !hide.has(p.id));
+  // A destination WITH tabs must never lose every tab: hiding all panes would
+  // leave a section that renders nothing. Keep the first pane as the fallback.
+  if (section.panes.length === 0) return visible;
+  return visible.length > 0 ? visible : section.panes.slice(0, 1);
 }
 
 /** Destination id → key in the `nav` i18n namespace for its label. */
@@ -572,3 +615,45 @@ export const NAV_SECTION_LABEL_KEYS: Record<string, string> = {
   parent: "parent",
   admin: "adminPanel",
 };
+
+/* ==========================================================================
+ * FOCUS MODE (Pillar 5.1) — "deep work" navigation.
+ *
+ * A student three days before a deadline does not need fourteen destinations;
+ * they need the three things that move the application forward. Focus mode is
+ * a pure presentation filter: it hides the other destinations with the SAME
+ * mechanism Admin → Navigation already uses (`hidden` id lists), so every hub,
+ * pane and deep link keeps working, and the account cluster (notifications,
+ * payments, admin tools) stays reachable so nobody gets trapped.
+ *
+ * The keep-set is deliberately small and journey-ordered.
+ * ========================================================================== */
+export const FOCUS_MODE_KEEP_IDS: readonly string[] = [
+  "dashboard",
+  "tasks",
+  "applications",
+  "materials",
+  "visa",
+  "profile",
+];
+
+/** True while focus mode is on (a stored flag plus an admin kill-switch). */
+export function isFocusModeActive(stored: string | null | undefined, adminDisabled = false): boolean {
+  if (adminDisabled) return false;
+  return stored === "1" || stored === "true";
+}
+
+/**
+ * The hidden-id list focus mode needs: every destination that is not in the
+ * keep-set. Unknown ids in `allIds` are preserved (hidden) rather than shown.
+ */
+export function focusModeHiddenIds(allIds: readonly string[] = NAV_DESTINATION_IDS): string[] {
+  const keep = new Set(FOCUS_MODE_KEEP_IDS);
+  return allIds.filter((id) => !keep.has(id));
+}
+
+/** Focus-mode destinations in journey order, filtered to ids that exist. */
+export function focusModeVisibleIds(allIds: readonly string[] = NAV_DESTINATION_IDS): string[] {
+  const known = new Set(allIds);
+  return FOCUS_MODE_KEEP_IDS.filter((id) => known.has(id));
+}

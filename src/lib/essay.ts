@@ -28,6 +28,12 @@ export interface RubricScores {
 export interface EssayFeedback {
   scores: RubricScores;
   wordCount: number;
+  /** Phase 2.4 — paragraph-to-paragraph flow (deterministic). */
+  flow?: FlowAnalysis;
+  /** Phase 2.4 — strong-verb vs weak/passive agency (deterministic). */
+  agency?: AgencyAnalysis;
+  /** Phase 2.4 — prompt sub-question coverage; null when no prompt was given. */
+  promptCoverage?: PromptCoverage | null;
   /** Each item is something the student can act on. */
   issues: { code: string; message: string; severity: "blocker" | "warning" | "info"; excerpt?: string }[];
   /** Words that weaken the essay — with where they appear. */
@@ -41,6 +47,11 @@ export interface EssayOptions {
   wordLimit?: number | null;
   /** The university or programme the essay is addressed to. */
   targetName?: string | null;
+  /**
+   * Phase 2.4 — the prompt the essay must answer. When present, each of its
+   * sub-questions is checked for coverage; nothing is invented when it is not.
+   */
+  prompt?: string | null;
 }
 
 // --- Text helpers ----------------------------------------------------------
@@ -414,12 +425,47 @@ export function analyzeEssay(text: string, opts: EssayOptions = {}): EssayFeedba
     });
   }
 
-  // Weighted writing rubric — prompt fit and evidence carry more weight than style.
-  const total = clamp(
-    hook.score * 0.15 + structure.score * 0.2 + specificity.score * 0.3 + language.score * 0.15 + fit.score * 0.2,
-    0,
-    100
-  );
+  // ---- Phase 2.4 — flow, agency and prompt coverage -------------------
+  const flow = analyzeFlow(text);
+  const agency = analyzeAgency(text);
+  const promptCoverage = analyzePromptCoverage(text, opts.prompt);
+
+  // Actionable issues from the three new passes (excerpts included so the
+  // student knows exactly which sentence to rewrite).
+  if (flow.abruptJumps.length > 0) {
+    issues.push({
+      code: "paragraph_jump",
+      message: `Paragraph ${flow.abruptJumps[0].afterParagraph + 1} starts a new idea without a link to the previous one. Add a transition sentence or move it.`,
+      severity: "warning",
+      excerpt: flow.abruptJumps[0].excerpt,
+    });
+  }
+  if (agency.weakCount > 0 && agency.weakCount >= agency.strongCount) {
+    issues.push({
+      code: "weak_agency",
+      message: `${agency.weakCount} sentence(s) describe you passively ("${agency.weakPhrases[0].phrase}"). Say what you did: choose a verb and name the result.`,
+      severity: "info",
+      excerpt: agency.weakPhrases[0].excerpt,
+    });
+  }
+  if (promptCoverage && promptCoverage.coveredCount < promptCoverage.totalParts) {
+    const missing = promptCoverage.parts.filter((_, i) => !promptCoverage.covered[i]);
+    issues.push({
+      code: "prompt_gap",
+      message: `${missing.length} of ${promptCoverage.totalParts} parts of the prompt are not addressed — starting with: "${missing[0].slice(0, 120)}".`,
+      severity: "warning",
+    });
+  }
+
+  // Weighted writing rubric — prompt fit and evidence carry more weight than
+  // style. The three Phase 2.4 passes are folded in as a small correction so a
+  // draft can never LOSE points for being measured (they can only lift or
+  // hold the total): their average is compared against the rubric average.
+  const baseTotal =
+    hook.score * 0.15 + structure.score * 0.2 + specificity.score * 0.3 + language.score * 0.15 + fit.score * 0.2;
+  const passes = [flow.score, agency.score, ...(promptCoverage ? [promptCoverage.score] : [])];
+  const passAverage = passes.reduce((a, b) => a + b, 0) / passes.length;
+  const total = clamp(baseTotal + clamp((passAverage - baseTotal) * 0.1, -2, 2), 0, 100);
 
   return {
     scores: {
@@ -431,6 +477,9 @@ export function analyzeEssay(text: string, opts: EssayOptions = {}): EssayFeedba
       total,
     },
     wordCount,
+    flow,
+    agency,
+    promptCoverage,
     issues,
     cliches: language.cliches,
     readingTimeSec: Math.round((wordCount / 200) * 60),
@@ -464,5 +513,190 @@ export function compareVersions(previous: string, current: string) {
     wordDelta: after.wordCount - before.wordCount,
     fixedIssues: fixedCodes,
     newIssues: newCodes,
+  };
+}
+
+/* ==========================================================================
+ * PHASE 2.4 — paragraph flow, agency and prompt coverage
+ *
+ * The five-dimension rubric above answers "is this good writing?". These three
+ * deterministic passes answer the questions a reviewer actually asks:
+ *   • does each paragraph follow from the last, or does the draft jump?
+ *   • who is doing the doing — the applicant, or an unnamed passive voice?
+ *   • did the applicant answer every part of the prompt they were given?
+ *
+ * All three are pure functions over the text (no AI, no network) so the same
+ * draft always produces the same result.
+ * ========================================================================== */
+
+export interface FlowAnalysis {
+  /** Content-word overlap between consecutive paragraphs, 0–100. */
+  cohesionPct: number;
+  /** Paragraph pairs whose overlap is below the "abrupt jump" threshold. */
+  abruptJumps: { afterParagraph: number; excerpt: string }[];
+  /** Discourse markers found ("however", "because", …). */
+  connectors: string[];
+  /** 0–100: connectors are present and no paragraph pair jumps. */
+  score: number;
+}
+
+export interface AgencyAnalysis {
+  /** Verb phrases that show ownership ("engineered", "designed", …). */
+  strongVerbs: { verb: string; count: number }[];
+  /** Passive / weak constructions with the sentence they appear in. */
+  weakPhrases: { phrase: string; excerpt: string }[];
+  strongCount: number;
+  weakCount: number;
+  /** 0–100: the share of ownership signals in the draft. */
+  score: number;
+}
+
+export interface PromptCoverage {
+  /** The prompt broken into the sub-questions it asks. */
+  parts: string[];
+  /** Which of those parts the draft touches (keyword overlap). */
+  covered: boolean[];
+  coveredCount: number;
+  totalParts: number;
+  score: number;
+}
+
+const STOP = new Set([
+  "the","and","for","with","that","this","from","have","has","had","was","were","are","but","not","you","your","they","their",
+  "his","her","its","our","ours","about","into","over","when","what","which","while","will","would","there","then","than","them",
+  "been","being","also","such","very","more","most","much","many","some","any","all","can","could","should","may","might","must",
+  "because","however","therefore","also","after","before","between","during","through","under","above","below","again","further",
+]);
+
+function contentWords(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of text.toLowerCase().match(/[a-z\u0400-\u04ff']{4,}/g) ?? []) {
+    if (!STOP.has(raw)) out.add(raw);
+  }
+  return out;
+}
+
+const CONNECTORS = [
+  "however","therefore","because","moreover","furthermore","consequently","in addition","for example","for instance",
+  "as a result","nevertheless","meanwhile","similarly","instead","although","while","since","thus","hence","before","after",
+];
+
+const STRONG_VERBS = [
+  "engineered","designed","built","led","launched","founded","published","automated","analysed","analyzed","implemented",
+  "developed","improved","reduced","increased","spearheaded","initiated","organised","organized","coordinated","mentored",
+  "trained","delivered","measured","validated","optimised","optimized","architected","supervised","negotiated","scaled",
+];
+
+const WEAK_PHRASES = [
+  "was involved in","were involved in","helped with","helped to","participated in","assisted in","was responsible for",
+  "took part in","was part of","did some","tried to","attempted to","responsible for",
+];
+
+/** Split a prompt into the distinct things it asks the applicant to do. */
+export function splitPromptParts(prompt: string): string[] {
+  const cleaned = prompt.trim();
+  if (!cleaned) return [];
+  const lines = cleaned
+    .split(/\n+/)
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+    .filter((l) => l.length > 12);
+  if (lines.length > 1) return lines.slice(0, 8);
+  return cleaned
+    .split(/(?<=\?)\s+|\s*;\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 12)
+    .slice(0, 8);
+}
+
+function sentenceContaining(text: string, needle: string): string {
+  const lower = text.toLowerCase();
+  const at = lower.indexOf(needle.toLowerCase());
+  if (at < 0) return "";
+  const start = Math.max(0, text.lastIndexOf(".", at) + 1);
+  const end = text.indexOf(".", at + needle.length);
+  const sentence = text.slice(start, end === -1 ? Math.min(text.length, at + 160) : end + 1).trim();
+  return sentence.length > 180 ? `${sentence.slice(0, 177)}…` : sentence;
+}
+
+/** Paragraph-to-paragraph cohesion: shared content words vs abrupt jumps. */
+export function analyzeFlow(text: string): FlowAnalysis {
+  const paras = paragraphs(text);
+  const connectors = CONNECTORS.filter((c) => new RegExp(`\\b${c}\\b`, "i").test(text));
+  if (paras.length < 2) {
+    return {
+      cohesionPct: paras.length === 1 ? 50 : 0,
+      abruptJumps: [],
+      connectors,
+      score: paras.length === 1 ? 45 : 0,
+    };
+  }
+  const jumps: FlowAnalysis["abruptJumps"] = [];
+  let shared = 0;
+  let compared = 0;
+  for (let i = 1; i < paras.length; i += 1) {
+    const a = contentWords(paras[i - 1]);
+    const b = contentWords(paras[i]);
+    if (a.size === 0 || b.size === 0) continue;
+    let common = 0;
+    for (const word of b) if (a.has(word)) common += 1;
+    const ratio = common / Math.min(a.size, b.size);
+    shared += ratio;
+    compared += 1;
+    // A pair with almost no shared ideas reads as a topic jump unless the
+    // second paragraph opens with an explicit connector ("However, …").
+    const opensWithConnector = CONNECTORS.some((c) =>
+      paras[i].trim().toLowerCase().startsWith(c)
+    );
+    if (ratio < 0.12 && !opensWithConnector) {
+      jumps.push({
+        afterParagraph: i,
+        excerpt: paras[i].trim().slice(0, 140) + (paras[i].trim().length > 140 ? "…" : ""),
+      });
+    }
+  }
+  const cohesionPct = compared > 0 ? Math.round((shared / compared) * 100) : 0;
+  const connectorBonus = Math.min(20, connectors.length * 5);
+  const score = clamp(Math.round(Math.min(cohesionPct * 2.2, 80)) + connectorBonus - jumps.length * 10, 0, 100);
+  return { cohesionPct, abruptJumps: jumps, connectors, score };
+}
+
+/** Who owns the action: strong verbs vs passive/weak constructions. */
+export function analyzeAgency(text: string): AgencyAnalysis {
+  const lower = text.toLowerCase();
+  const strongVerbs = STRONG_VERBS
+    .map((verb) => ({ verb, count: (lower.match(new RegExp(`\\b${verb}\\b`, "g")) ?? []).length }))
+    .filter((v) => v.count > 0);
+  const strongCount = strongVerbs.reduce((n, v) => n + v.count, 0);
+  const weakPhrases: AgencyAnalysis["weakPhrases"] = [];
+  for (const phrase of WEAK_PHRASES) {
+    const hits = lower.split(phrase).length - 1;
+    for (let i = 0; i < hits; i += 1) {
+      weakPhrases.push({ phrase, excerpt: sentenceContaining(text, phrase) });
+    }
+  }
+  const weakCount = weakPhrases.length;
+  const total = strongCount + weakCount;
+  const score = total === 0 ? 50 : clamp(Math.round((strongCount / total) * 100), 0, 100);
+  return { strongVerbs, weakPhrases, strongCount, weakCount, score };
+}
+
+/** Did the draft answer each part of the prompt it was given? */
+export function analyzePromptCoverage(text: string, prompt: string | null | undefined): PromptCoverage | null {
+  const parts = prompt ? splitPromptParts(prompt) : [];
+  if (parts.length === 0) return null;
+  const body = contentWords(text);
+  const covered = parts.map((part) => {
+    const words = [...contentWords(part)];
+    if (words.length === 0) return false;
+    const hits = words.filter((w) => body.has(w)).length;
+    return hits / words.length >= 0.3;
+  });
+  const coveredCount = covered.filter(Boolean).length;
+  return {
+    parts,
+    covered,
+    coveredCount,
+    totalParts: parts.length,
+    score: Math.round((coveredCount / parts.length) * 100),
   };
 }

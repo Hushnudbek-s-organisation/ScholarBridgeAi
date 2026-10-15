@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const locked = await premiumGate(access.session.profile.id, "ai_essay");
+    const locked = await premiumGate(access.session.profile.id, "ai_essay", Boolean(access.session.isAdmin));
     if (locked) return locked;
     const profileId = access.targetId!;
     let body: Record<string, any>;

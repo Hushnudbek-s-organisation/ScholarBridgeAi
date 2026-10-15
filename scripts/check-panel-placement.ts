@@ -17,6 +17,7 @@
  * Run: npm run test:panel-placement
  */
 
+import { readFileSync } from "node:fs";
 import { computePanelGeometry, type TriggerRect, type Viewport } from "../src/lib/panelPlacement";
 
 let passed = 0;
@@ -241,6 +242,28 @@ check(
     return true;
   })(),
   "a viewport ≥ 400px tall always has room for the clamped panel"
+);
+
+// ---------------------------------------------------------------------------
+section("Phase 2.3 — the what-if simulator is mounted where students decide");
+
+const chancingPanel = readFileSync("src/components/ChancingPanel.tsx", "utf8");
+
+check(
+  "ChancingPanel imports and renders the WhatIfSimulator",
+  /import\s*\{[^}]*WhatIfSimulator[^}]*\}\s*from\s*"\.\/journey\/WhatIfSimulator"/.test(chancingPanel) &&
+    /<WhatIfSimulator\s+profileId=/.test(chancingPanel),
+  "the shortlist comparison must offer the hypothetical-figure simulator",
+);
+check(
+  "the simulator is given the active profile id (null-safe)",
+  /<WhatIfSimulator\s+profileId=\{profileId \?\? null\}\s*\/>/.test(chancingPanel),
+  "the panel must not invent a profile id",
+);
+check(
+  "the simulator is not rendered for a signed-out visitor",
+  chancingPanel.indexOf("if (!activeProfile)") < chancingPanel.indexOf("<WhatIfSimulator"),
+  "the signed-out early return must come first",
 );
 
 // ---------------------------------------------------------------------------

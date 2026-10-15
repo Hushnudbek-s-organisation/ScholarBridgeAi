@@ -1,5 +1,7 @@
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
 import { gpaTo40Scale } from "./gpa";
+import { usdAmountOf } from "./costs";
+import { ENGLISH_CONCORDANCE_CAVEAT, englishTestLabel, recordedEnglishTest } from "./englishTests";
 import { clamp, interpolate, meets, ratio, roundTo, saturatingCurve, shortfall } from "./scoring";
 import { canonicalSubjectTokens, subjectAffinity, subjectTokens } from "./subjectAffinity";
 
@@ -240,11 +242,11 @@ function activityFacts(profile: StudentProfileData) {
   return { activities, leadership, research, awards };
 }
 
-function usdCost(value: number | null | undefined, currency: string | null | undefined): number | null {
-  if (currency && currency.toUpperCase() !== "USD") return null;
-  if (value != null && Number.isFinite(Number(value)) && Number(value) > 0) return Number(value);
-  return null;
-}
+/**
+ * Local alias for the ONE currency rule (src/lib/costs.ts) — a non-USD figure
+ * is never compared against a USD budget, and null keeps meaning "unknown".
+ */
+const usdCost = usdAmountOf;
 
 /**
  * Fit scoring — a comparison of recorded profile details with available
@@ -314,6 +316,18 @@ export interface MatchBreakdown {
    */
   comparedDimensions: number;
   totalDimensions: number;
+  /**
+   * Share of the engine's dimensions that actually had data behind them, 0–100.
+   *
+   * A 78 % fit built from ONE of eight dimensions is a very different claim
+   * from a 78 % fit built from seven of eight, and the badge alone could not
+   * tell them apart. This is the number the UI shows next to it.
+   */
+  evidenceCoveragePct: number;
+  /** Coarse band for the badge: >= 70 high, 40–69 medium, < 40 low. */
+  confidenceTier: "high" | "medium" | "low";
+  /** One-line, localisable explanation of what is missing (never a penalty). */
+  confidenceNote: string;
 }
 
 function component(
@@ -325,14 +339,40 @@ function component(
   return { key, code, points: roundTo(compared ? points : 0, 2), compared };
 }
 
+/**
+ * How much EVIDENCE stands behind a score, in one place.
+ *
+ * This is not a probability and not a grade: it says how many of the engine's
+ * dimensions could be compared at all. A student with one recorded fact gets a
+ * `low` badge even when the resulting percentage is high, which is the honest
+ * reading of "78 % fit" in that situation.
+ */
+export function evidenceConfidence(compared: number, total: number): {
+  evidenceCoveragePct: number;
+  confidenceTier: MatchBreakdown["confidenceTier"];
+  confidenceNote: string;
+} {
+  const coverage = total > 0 ? Math.round((compared / total) * 100) : 0;
+  const tier: MatchBreakdown["confidenceTier"] = coverage >= 70 ? "high" : coverage >= 40 ? "medium" : "low";
+  const note =
+    total === 0
+      ? "No comparable data was published for this record."
+      : coverage >= 70
+        ? `${compared} of ${total} dimensions compared.`
+        : `${compared} of ${total} dimensions compared — add the missing profile details to make this comparison meaningful.`;
+  return { evidenceCoveragePct: coverage, confidenceTier: tier, confidenceNote: note };
+}
+
 /** `comparedDimensions` / `totalDimensions` never count the neutral base. */
 function breakdownOf(rawScore: number, components: MatchComponent[]): MatchBreakdown {
   const evidence = components.filter((c) => c.key !== "base");
+  const compared = evidence.filter((c) => c.compared).length;
   return {
     rawScore,
     components,
-    comparedDimensions: evidence.filter((c) => c.compared).length,
+    comparedDimensions: compared,
     totalDimensions: evidence.length,
+    ...evidenceConfidence(compared, evidence.length),
   };
 }
 
@@ -390,7 +430,28 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   if (uni.minIelts != null) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      components.push(component("english", 0, null, false));
+      // CROSS-TEST AWARENESS (defect 4.1): most applicants from Uzbekistan sit
+      // TOEFL iBT or Duolingo, not IELTS. Previously an IELTS-only catalogue
+      // figure with a recorded TOEFL produced a silent "not compared" — the
+      // student saw a lower score with no explanation. There is still NO
+      // scoring here (universities set their own accepted tests), but the
+      // alternative evidence is now surfaced as an explicit, non-penalising
+      // informational signal.
+      const alt = recordedEnglishTest(profile);
+      if (alt && alt.kind !== "ielts") {
+        reasons.push({
+          code: "english_alternative_recorded",
+          params: { test: englishTestLabel(alt.kind, alt.score), min: uni.minIelts },
+          text:
+            `You recorded ${englishTestLabel(alt.kind, alt.score)}; the catalogue lists IELTS ${uni.minIelts}. ` +
+            `Check the programme's accepted tests and English threshold. ${ENGLISH_CONCORDANCE_CAVEAT}`,
+          weight: 0,
+          points: 0,
+        });
+        components.push(component("english", 0, "english_alternative_recorded", false));
+      } else {
+        components.push(component("english", 0, null, false));
+      }
     } else {
       // 0.5 above the bar earns the full +8; each 0.5 band is worth the same
       // step, so a 7.5 against a 6.5 bar is worth strictly more than a 7.0.
@@ -686,7 +747,24 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   if (scholarship.minIelts && scholarship.minIelts > 0) {
     const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
     if (!hasIelts) {
-      components.push(component("english", 0, null, false));
+      // Same cross-test signal as the university matcher: a recorded TOEFL /
+      // Duolingo score is real evidence the award may accept — surfaced, with
+      // its caveat, and scored 0 either way.
+      const alt = recordedEnglishTest(profile);
+      if (alt && alt.kind !== "ielts") {
+        reasons.push({
+          code: "english_alternative_recorded",
+          params: { test: englishTestLabel(alt.kind, alt.score), min: scholarship.minIelts },
+          text:
+            `You recorded ${englishTestLabel(alt.kind, alt.score)}; the award lists IELTS ${scholarship.minIelts}. ` +
+            `Check the provider's accepted tests. ${ENGLISH_CONCORDANCE_CAVEAT}`,
+          weight: 0,
+          points: 0,
+        });
+        components.push(component("english", 0, "english_alternative_recorded", false));
+      } else {
+        components.push(component("english", 0, null, false));
+      }
     } else {
       const ieltsDiff = profile.ieltsScore! - scholarship.minIelts;
       const points = ieltsDiff >= 0 ? meets(ieltsDiff, 0, 0.5, 10, 0) : shortfall(ieltsDiff, 0, 1.5, 20);

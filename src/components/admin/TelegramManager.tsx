@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
+  CalendarClock,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -205,6 +206,22 @@ export function TelegramManager() {
   };
 
   const sendTest = () => run("test", () => api("/api/admin/telegram", { method: "POST", body: JSON.stringify({ action: "test" }) }), t("testSent"));
+
+  /**
+   * Pillar 5.6 — the Monday micro-action check-in also has a manual trigger,
+   * so an admin can read the exact message the students will get (it ignores
+   * the weekday and once-per-week guards).
+   */
+  const sendWeeklyDigest = () =>
+    run(
+      "digest",
+      () =>
+        api<{ weekly: { week: string; sent: number; skipped: string | null } }>("/api/admin/telegram", {
+          method: "POST",
+          body: JSON.stringify({ action: "weekly_digest" }),
+        }),
+      t("weeklySent")
+    );
 
   const sendBroadcast = async () => {
     const r = await run("broadcast", () =>
@@ -454,13 +471,21 @@ export function TelegramManager() {
         <p className="mt-1 text-[11px] text-slate-500">
           {data.miniAppUrl ? t("miniAppReady", { url: data.miniAppUrl }) : t("miniAppNeedsHttps")}
         </p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={runSweep}
             disabled={!configured || busy === "sweep"}
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {busy === "sweep" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t("sweepRun")}
+          </button>
+          <button
+            onClick={sendWeeklyDigest}
+            disabled={!configured || busy === "digest"}
+            title={t("weeklyHint")}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {busy === "digest" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />} {t("weeklyRun")}
           </button>
         </div>
       </Card>

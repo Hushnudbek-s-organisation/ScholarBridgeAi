@@ -1,6 +1,7 @@
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { computeDailyStreak } from "@/lib/streak";
+import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import {
   userPoints,
   pointsLedger,
@@ -89,27 +90,40 @@ export interface CompletenessInput {
   extracurriculars: string | null;
   workExperienceYears: number | null;
   researchPublications: number | null;
+  /** Optional, read when the caller has the full profile row. */
+  country?: string | null;
+  actScore?: number | null;
+  duolingoScore?: number | null;
+  needScholarship?: boolean | null;
+  needsFinancialAid?: boolean | null;
+  requiresFullScholarship?: boolean | null;
+  familyIncomeUsd?: number | null;
+  careerGoal?: string | null;
+  graduationYear?: number | null;
+  leadership?: string | null;
+  awards?: string | null;
+  olympiads?: string | null;
+  competitions?: string | null;
+  certificates?: string | null;
+  volunteering?: string | null;
+  sports?: string | null;
+  clubs?: string | null;
+  projects?: string | null;
+  researchExperience?: string | null;
+  savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
 }
 
+/**
+ * 0–100 profile completeness.
+ *
+ * DELEGATES to `profileCompletenessRatio` (src/lib/chancing.ts). This module
+ * used to run its own 14-check list that demanded IELTS **and** TOEFL **and**
+ * SAT **and** GRE before the `profile:complete` badge could fire, and counted
+ * `researchPublications = 0` — the database default for "none recorded" — as a
+ * completed achievement. One profile, one number, everywhere.
+ */
 export function computeProfileCompleteness(profile: CompletenessInput): number {
-  const checks = [
-    !!profile.name,
-    !!profile.email,
-    !!profile.targetMajor,
-    !!profile.degreeLevel,
-    (profile.gpa ?? 0) > 0,
-    (profile.gpaScale ?? 0) > 0,
-    profile.ieltsScore != null,
-    profile.toeflScore != null,
-    profile.satScore != null,
-    profile.greScore != null,
-    (profile.budgetAnnualUsd ?? 0) > 0,
-    !!profile.extracurriculars,
-    profile.workExperienceYears != null,
-    profile.researchPublications != null,
-  ];
-  const filled = checks.filter(Boolean).length;
-  return Math.round((filled / checks.length) * 100);
+  return Math.round(profileCompletenessRatio(profile as ChancingProfile) * 100);
 }
 
 interface AwardResult {

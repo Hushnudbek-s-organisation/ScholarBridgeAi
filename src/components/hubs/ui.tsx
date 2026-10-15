@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { ArrowRight, ChevronRight, TriangleAlert } from "lucide-react";
 import { isNewBadgeActive } from "@/lib/navSections";
 import { JourneyCard } from "@/components/journey/ui";
 
@@ -119,6 +119,68 @@ export function HubTabs({
   );
 }
 
+/**
+ * Breadcrumb bar (spec §4 UI/UX): Home › Destination › Section.
+ *
+ * Every destination page is reached from the sidebar, and the section tabs are
+ * a second level. Without a trail a student who deep-links (Telegram link, a
+ * "Continue" button, a shared URL) had no way to see where they had landed or
+ * how to go up a level. The trail is navigation, not decoration: "Home" is a
+ * real button, the current page is not clickable, and `aria-current` tells
+ * assistive tech which crumb is the current one.
+ */
+export function HubBreadcrumb({
+  title,
+  sectionLabel,
+  onHome,
+}: {
+  title: string;
+  /** Active tab label — omitted when the destination has no sections. */
+  sectionLabel?: string | null;
+  onHome?: () => void;
+}) {
+  const t = useTranslations("hubs");
+  return (
+    <nav aria-label={t("breadcrumbLabel")} className="mb-2">
+      <ol className="flex flex-wrap items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <li>
+          {onHome ? (
+            <button
+              type="button"
+              onClick={onHome}
+              className="rounded px-0.5 transition-colors hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300"
+            >
+              {t("breadcrumbHome")}
+            </button>
+          ) : (
+            <span>{t("breadcrumbHome")}</span>
+          )}
+        </li>
+        <li aria-hidden className="text-slate-400 dark:text-slate-500">
+          <ChevronRight className="h-3 w-3" />
+        </li>
+        <li className="min-w-0">
+          <span aria-current={sectionLabel ? undefined : "page"} className="break-words">
+            {title}
+          </span>
+        </li>
+        {sectionLabel && (
+          <>
+            <li aria-hidden className="text-slate-400 dark:text-slate-500">
+              <ChevronRight className="h-3 w-3" />
+            </li>
+            <li className="min-w-0">
+              <span aria-current="page" className="break-words text-slate-700 dark:text-slate-200">
+                {sectionLabel}
+              </span>
+            </li>
+          </>
+        )}
+      </ol>
+    </nav>
+  );
+}
+
 export function HubPanel({
   id,
   active,
@@ -159,6 +221,7 @@ export function HubPage({
   hiddenPanes = [],
   tabListLabel,
   note,
+  onHome,
   children,
 }: {
   title: string;
@@ -171,6 +234,8 @@ export function HubPage({
   hiddenPanes?: string[];
   tabListLabel?: string;
   note?: { tone: "info" | "warn"; text: string };
+  /** Where "Home" in the breadcrumb goes; omitted when there is no dashboard. */
+  onHome?: () => void;
   children: React.ReactNode;
 }) {
   const t = useTranslations("hubs");
@@ -191,6 +256,11 @@ export function HubPage({
   return (
     <div className="space-y-4">
       <JourneyCard tone="hero">
+        <HubBreadcrumb
+          title={title}
+          sectionLabel={visibleTabPanes.find((pane) => pane.id === activePane)?.label ?? null}
+          onHome={onHome}
+        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
