@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import {
@@ -405,7 +406,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
         <div className="absolute inset-0 bg-black/10" />
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row items-start gap-5">
-            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-white shadow-2xl border border-white/30 overflow-hidden flex items-center justify-center shrink-0">
+            <div className="sb-logo-well h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-white shadow-2xl border overflow-hidden flex items-center justify-center shrink-0">
               {uni.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -414,9 +415,9 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                   className="h-full w-full object-contain p-2"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center gap-1 text-slate-700">
+                <div className="sb-ink-on-bright flex flex-col items-center justify-center gap-1">
                   <span className="text-2xl leading-none">{uni.flagEmoji}</span>
-                  <Building2 className="h-7 w-7 text-amber-500" />
+                  <Building2 className="h-7 w-7 text-amber-500 dark:text-amber-600" />
                 </div>
               )}
             </div>
@@ -433,7 +434,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                   <div className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-emerald-400/15 backdrop-blur-md border border-emerald-300/30 px-3 py-1.5">
                     <Target className="h-4 w-4 text-emerald-300" />
                     <span className="text-xs font-bold">
-                      {t("fitBadge", { score: match.score })}
+                      {t("fitBadge", { score: match.score, category: t(`fitTier.${fitTier(match.score)}` as never) })}
                     </span>
                   </div>
                   <p className="max-w-xl text-[11px] leading-snug text-indigo-100/90">
@@ -465,7 +466,7 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
                         href={site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50"
+                        className="sb-ink-on-bright inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50 dark:bg-white dark:text-slate-900 dark:hover:bg-indigo-200"
                       >
                         <Globe className="h-3.5 w-3.5" /> {t("officialWebsite")}
                       </a>

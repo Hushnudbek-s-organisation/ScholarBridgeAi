@@ -76,7 +76,7 @@ export function CheckoutModal({
         tabIndex={-1}
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
-        className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4"
+        className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4 dark:border-slate-700"
       >
         <div className="flex items-center justify-between">
           <h3 id="checkout-modal-title" className="font-bold text-slate-900 text-lg">{t("checkout")}</h3>
@@ -110,12 +110,11 @@ export function CheckoutModal({
               key={provider}
               onClick={() => startCheckout(provider)}
               disabled={loading || price === null}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gradient-to-r text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-              style={{
-                backgroundImage: `linear-gradient(to right, ${
-                  provider === "payme" ? "#2563eb, #1d4ed8" : "#7c3aed, #9333ea"
-                })`,
-              }}
+              // Solid, theme-safe fills (no inline gradient that ignores the
+              // theme). sky-700 / indigo-600 keep white copy above 4.5:1.
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50 ${
+                provider === "payme" ? "bg-sky-700 hover:bg-sky-800" : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
             >
               <span className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />

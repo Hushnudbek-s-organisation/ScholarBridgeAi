@@ -121,7 +121,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {/* Applies the saved theme before first paint — no light/dark flash. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
       </head>
-      <body className="bg-slate-100 text-slate-900 antialiased">
+      <body className="bg-slate-50 text-slate-900 antialiased">
         <ThemeProvider defaultTheme={initialTheme}>
           <MotionProvider>
             {/* Anonymous, first-party traffic counter for Admin → Analytics. */}

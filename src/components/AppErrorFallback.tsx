@@ -96,14 +96,14 @@ export function AppErrorFallback({
 
   if (!fullPage) {
     return (
-      <main role="alert" className="grid min-h-screen place-items-center bg-slate-100 px-4 dark:bg-slate-950">
+      <main role="alert" className="grid min-h-screen place-items-center bg-slate-50 px-4 dark:bg-slate-950">
         {card}
       </main>
     );
   }
   return (
     <html lang={locale}>
-      <body className="bg-slate-100 text-slate-900 antialiased">
+      <body className="bg-slate-50 text-slate-900 antialiased">
         <main role="alert" className="grid min-h-screen place-items-center px-4">
           {card}
         </main>

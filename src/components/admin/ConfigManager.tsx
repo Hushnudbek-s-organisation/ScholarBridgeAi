@@ -117,8 +117,8 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {(["logo", "favicon"] as const).map((kind) => (
-            <div key={kind} className="flex items-center gap-3 rounded-xl border border-white bg-white p-3 shadow-xs">
-              <div className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+            <div key={kind} className="flex items-center gap-3 rounded-xl border border-white bg-white p-3 shadow-xs dark:border-slate-700">
+              <div className="sb-logo-well h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                 {branding[kind] ? (
                   <Image
                     src={branding[kind]}
@@ -262,7 +262,7 @@ function ReferralRewardsCard({
           const dirty = current !== stored;
           const valid = /^\d{1,12}$/.test(current) && Number(current) >= field.min && Number(current) <= field.max;
           return (
-            <div key={field.key} className="rounded-xl border border-white bg-white p-3 shadow-xs">
+            <div key={field.key} className="rounded-xl border border-white bg-white p-3 shadow-xs dark:border-slate-700">
               <label className="text-xs font-extrabold text-slate-700" htmlFor={`cfg-${field.key}`}>
                 {t(field.labelKey)}
               </label>

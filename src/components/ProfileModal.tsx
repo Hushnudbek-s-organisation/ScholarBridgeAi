@@ -19,6 +19,24 @@ import {
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
+import { SmartAutofillBox } from "@/components/samples/SmartAutofillBox";
+import type { ExtractedKey, ExtractedProfileFields } from "@/lib/profileExtract";
+
+/** Every value the CV auto-fill can read has a field in this editor. */
+const AUTOFILL_FIELDS: ExtractedKey[] = [
+  "gpa",
+  "gpaScale",
+  "ieltsScore",
+  "toeflScore",
+  "satScore",
+  "greScore",
+  "actScore",
+  "duolingoScore",
+  "graduationYear",
+  "workExperienceYears",
+  "researchPublications",
+  "degreeLevel",
+];
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -326,6 +344,27 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   const tgOnlyAccount = !isNew && isTelegramPlaceholderEmail(profile?.email);
 
+  /** Smart auto-fill → the unsaved form. Only "Save Profile Changes" persists anything. */
+  const applyAutofill = (fields: ExtractedProfileFields): number => {
+    const patch: Partial<typeof formData> = {};
+    if (fields.gpa != null && fields.gpaScale != null) {
+      patch.gpa = fields.gpa;
+      patch.gpaScale = fields.gpaScale;
+    }
+    if (fields.ieltsScore != null) patch.ieltsScore = fields.ieltsScore;
+    if (fields.toeflScore != null) patch.toeflScore = fields.toeflScore;
+    if (fields.satScore != null) patch.satScore = fields.satScore;
+    if (fields.greScore != null) patch.greScore = fields.greScore;
+    if (fields.actScore != null) patch.actScore = fields.actScore;
+    if (fields.duolingoScore != null) patch.duolingoScore = fields.duolingoScore;
+    if (fields.graduationYear != null) patch.graduationYear = fields.graduationYear;
+    if (fields.workExperienceYears != null) patch.workExperienceYears = fields.workExperienceYears;
+    if (fields.researchPublications != null) patch.researchPublications = fields.researchPublications;
+    if (fields.degreeLevel) patch.degreeLevel = fields.degreeLevel;
+    setFormData((prev) => ({ ...prev, ...patch }));
+    return Object.keys(patch).length;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -433,7 +472,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="e.g. Alex Chen"
                 />
               </div>
@@ -444,7 +483,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   required={!tgOnlyAccount}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="alex@university.edu"
                 />
                 {tgOnlyAccount && (
@@ -462,7 +501,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     minLength={8}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                     placeholder="At least 8 characters"
                     autoComplete="new-password"
                   />
@@ -478,7 +517,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                     placeholder="Leave empty to keep the current one"
                     autoComplete="new-password"
                   />
@@ -503,7 +542,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   type="text"
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="Uzbekistan"
                 />
               </div>
@@ -515,7 +554,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="99"
                   value={formData.age || ""}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="18"
                 />
               </div>
@@ -527,7 +566,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="2040"
                   value={formData.graduationYear || ""}
                   onChange={(e) => setFormData({ ...formData, graduationYear: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="2027"
                 />
               </div>
@@ -540,6 +579,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Award className="h-3.5 w-3.5 text-indigo-600" />
               Academic Credentials & Standardized Scores
             </h3>
+            {/* Paste-a-CV preview → fills the fields below; nothing saves until "Save". */}
+            <SmartAutofillBox supported={AUTOFILL_FIELDS} onApply={applyAutofill} className="mb-5" />
             <div className="mb-5">
               <StudyInterestPicker
                 value={formData.studyInterests}
@@ -561,7 +602,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 <select
                   value={degreeControlValue}
                   onChange={(e) => setFormData({ ...formData, degreeLevel: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 >
                   <option value="Bachelor"><DegreeLevelLabel value="Bachelor" /></option>
                   <option value="Master"><DegreeLevelLabel value="Master" /></option>
@@ -584,7 +625,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     max="100"
                     value={formData.gpa}
                     onChange={(e) => setFormData({ ...formData, gpa: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
-                    className="min-h-11 w-2/3 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-2/3 rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   />
                   <select
                     value={formData.gpaScale}
@@ -594,7 +635,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                         gpaScale: e.target.value === "" ? "" : parseFloat(e.target.value),
                       })
                     }
-                    className="min-h-11 w-1/3 px-2 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-1/3 rounded-lg border px-2 py-2 text-xs text-slate-900 focus:outline-none"
                   >
                     <option value="">—</option>
                     <option value={4.0}>/ 4.0</option>
@@ -617,7 +658,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="9.0"
                   value={formData.ieltsScore || ""}
                   onChange={(e) => setFormData({ ...formData, ieltsScore: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 7.5"
                 />
               </div>
@@ -629,7 +670,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="120"
                   value={formData.toeflScore || ""}
                   onChange={(e) => setFormData({ ...formData, toeflScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 100"
                 />
               </div>
@@ -641,7 +682,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="1600"
                   value={formData.satScore || ""}
                   onChange={(e) => setFormData({ ...formData, satScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 1420"
                 />
               </div>
@@ -653,7 +694,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="340"
                   value={formData.greScore || ""}
                   onChange={(e) => setFormData({ ...formData, greScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 320"
                 />
               </div>
@@ -665,7 +706,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="36"
                   value={formData.actScore || ""}
                   onChange={(e) => setFormData({ ...formData, actScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 32"
                 />
               </div>
@@ -677,7 +718,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="160"
                   value={formData.duolingoScore || ""}
                   onChange={(e) => setFormData({ ...formData, duolingoScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="e.g. 120"
                 />
               </div>
@@ -691,7 +732,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   type="text"
                   value={formData.apCourses}
                   onChange={(e) => setFormData({ ...formData, apCourses: e.target.value })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="Calculus AB, Physics C"
                 />
               </div>
@@ -701,7 +742,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   type="text"
                   value={formData.ibCourses}
                   onChange={(e) => setFormData({ ...formData, ibCourses: e.target.value })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="Math HL, English HL"
                 />
               </div>
@@ -711,7 +752,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   type="text"
                   value={formData.aLevelSubjects}
                   onChange={(e) => setFormData({ ...formData, aLevelSubjects: e.target.value })}
-                  className="min-h-11 w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="Maths, Physics"
                 />
               </div>
@@ -740,7 +781,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                       const raw = e.target.value;
                       setFormData({ ...formData, budgetAnnualUsd: raw === "" ? "" : Number(raw) });
                     }}
-                    className="min-h-11 w-full pl-7 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
@@ -777,7 +818,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     min="0"
                     value={formData.familyIncomeUsd || ""}
                     onChange={(e) => setFormData({ ...formData, familyIncomeUsd: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                    className="min-h-11 w-full pl-7 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
                     placeholder="12000"
                   />
                 </div>
@@ -861,7 +902,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 <select
                   value={formData.workExperienceYears}
                   onChange={(e) => setFormData({ ...formData, workExperienceYears: parseInt(e.target.value, 10) })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 >
                   <option value={0}>0 Years (Fresh Graduate)</option>
                   <option value={1}>1 Year</option>
@@ -878,7 +919,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   min="0"
                   value={formData.researchPublications}
                   onChange={(e) => setFormData({ ...formData, researchPublications: parseInt(e.target.value, 10) || 0 })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 />
               </div>
             </div>
@@ -889,7 +930,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 rows={2}
                 value={formData.extracurriculars}
                 onChange={(e) => setFormData({ ...formData, extracurriculars: e.target.value })}
-                className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 placeholder="e.g. Hackathon winner, Vice President of Tech Club, Peer Tutor in Data Structures..."
               />
             </div>
@@ -916,7 +957,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                    className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                     placeholder={placeholder}
                   />
                 </div>
@@ -943,7 +984,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                    className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                     placeholder={placeholder}
                   />
                 </div>
@@ -964,7 +1005,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   type="text"
                   value={formData.targetUniversities}
                   onChange={(e) => setFormData({ ...formData, targetUniversities: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="TUM, Purdue"
                 />
               </div>
@@ -974,7 +1015,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   rows={2}
                   value={formData.careerGoal}
                   onChange={(e) => setFormData({ ...formData, careerGoal: e.target.value })}
-                  className="min-h-11 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="ML engineer working on healthcare AI"
                 />
               </div>

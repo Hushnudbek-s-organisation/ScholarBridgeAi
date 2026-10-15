@@ -3160,6 +3160,12 @@
     "reqVariesByProgram": "Ranges span this university’s catalogued programmes — the programme you apply to sets its own minimums (see each programme below).",
     "fitBadge": "Profile fit: {score}% • {category}",
     "fitNotChance": "Fit compares your profile with published requirements — it is not an admission chance.",
+    "fitTier": {
+      "strong": "Strong fit",
+      "moderate": "Moderate fit",
+      "weak": "Limited fit",
+      "none": "Not scored"
+    },
     "exScoreBreakdown": "Score breakdown",
     "exDimensionsMeasured": "{measured} of {total} dimensions measured",
     "exDimensionUnknown": "No data for this dimension yet — it scores 0 and is not counted as measured",
@@ -4734,5 +4740,311 @@
     "description": "Review the available plans to see whether this feature can be enabled for your profile.",
     "viewPlans": "View plans",
     "accessNote": "Access is checked by the server for this profile and feature."
+  },
+  "samples": {
+    "eyebrow": "Gold-standard samples",
+    "trackLabel": "Track",
+    "trackOption": "Track {n}: {label}",
+    "view": "View annotated sample",
+    "hide": "Hide sample",
+    "load": "Load into editor",
+    "copy": "Copy text",
+    "copied": "Copied!",
+    "copyFailed": "Copy failed — select the text and copy it manually.",
+    "honesty": "Samples describe fictional applicants. Use them to learn structure and evidence density, then replace every fact with your own real achievements. Verify course, lab and professor names on official pages before writing a similar sentence.",
+    "loading": "Loading samples…",
+    "loadError": "The samples could not be loaded.",
+    "retry": "Try again",
+    "annotatedTitle": "Annotated sample",
+    "paragraph": "Paragraph {n}",
+    "answerN": "Answer {n}",
+    "whyTitle": "Why readers reward this",
+    "words": "{n, plural, one {# word} other {# words}}",
+    "evidence": "{n, plural, one {# evidence figure} other {# evidence figures}}",
+    "placeholders": "Fill in every [bracketed] field before using this template — {n} to complete.",
+    "practiceLimit": "Practice limit: {n} words — use the limit your programme publishes.",
+    "loadedNotice": "Sample loaded, not saved. Replace its facts with your own before you save anything.",
+    "unmodified": "This is still the unchanged sample. Replace it with your own details before saving.",
+    "versionLabel": "Template language",
+    "versionEnglish": "English",
+    "versionUzbek": "O‘zbekcha",
+    "sopLoadedDrafter": "Sample loaded into the drafter fields. Rewrite each field with your own story before you generate a draft to keep.",
+    "sopLoadedReviewer": "Sample loaded into the reviewer. Run the review to see how the AI feedback works.",
+    "essayLoaded": "Sample loaded and scored by the deterministic rubric. It is not saved to your versions.",
+    "essayScoring": "Scoring the sample…",
+    "recLetterLoaded": "Sample details loaded into the brief form. Generate the brief to see how they are used.",
+    "lorDrawerTitle": "Professor request email & full LOR samples",
+    "lorDrawerHint": "Copy the request email first, then show your recommender how a complete letter is built. Replace every fact with your own.",
+    "cvCompareLoad": "Compare side by side",
+    "cvCompareTitle": "Compare with a gold-standard 1-page CV",
+    "cvCompareClose": "Close comparison",
+    "cvYours": "Your CV (built from your profile)",
+    "cvSample": "Gold-standard sample",
+    "answerShow": "Show example answer",
+    "answerHide": "Hide example answer",
+    "answerLoad": "Load example into editor",
+    "answerTitle": "Example answer — {category}",
+    "activityLoad": "Load example activity into the form",
+    "activityLoaded": "Example loaded into the form. Replace it with an activity you really did before adding it.",
+    "docsTitle": "Official document templates (Homiylik xati, cold email)",
+    "docsHint": "Copy a template and replace every [bracketed] field with your own verified details.",
+    "visaTitle": "Embassy model answers",
+    "visaHint": "Five-question model interviews for four countries, scored by the same deterministic rubric as your practice sessions.",
+    "visaLoad": "Load and score model answers",
+    "visaLanguageNote": "Officers may interview in the local language. These model answers are in English so the deterministic rubric can read them.",
+    "visaScoreTitle": "Rubric score",
+    "visaOverall": "Overall readiness",
+    "visaCeiling": "{ceiling}/100 is the highest total this rubric awards: funding, home ties and intent have fixed caps, because a transcript can mention them but cannot prove them.",
+    "visaNoRisks": "No refusal-risk flags",
+    "visaRisks": "{n, plural, one {# risk flag} other {# risk flags}}",
+    "visaCompareTitle": "Compare with the model answers for {country}",
+    "visaTurnEvidence": "Evidence in each answer",
+    "visaScoring": "Scoring…",
+    "autofillTitle": "Smart auto-fill from CV text",
+    "autofillHelp": "Paste your CV or a score report. The preview lists only values it can read with certainty; nothing changes until you apply them, and nothing is saved until you save the form.",
+    "autofillInputLabel": "CV text",
+    "autofillPlaceholder": "Paste CV text here — for example “GPA: 3.8 / 4.00 · IELTS Academic: 7.0”",
+    "autofillPreview": "Preview detected values",
+    "autofillDetected": "Detected values",
+    "autofillNone": "No values detected. Use labels such as “GPA: 3.8 / 4.00” or “IELTS 7.0”.",
+    "autofillApply": "Apply to the form",
+    "autofillApplied": "{n, plural, one {Applied # value} other {Applied # values}} to the form. Review them, then save.",
+    "autofillSampleBlocked": "This is a sample applicant's CV — applying it would fill your profile with someone else's scores. Paste your own CV text to apply values.",
+    "autofillNotInForm": "not on this form",
+    "groups": {
+      "onboardingCv": "CV snapshot samples",
+      "sop": "SOP samples",
+      "essay": "Rubric essay samples",
+      "lor": "Recommendation letter samples",
+      "cvBuilder": "1-page CV samples",
+      "answerVault": "Example answers",
+      "activity": "Example activities",
+      "document": "Official document templates",
+      "visa": "Embassy model answers"
+    },
+    "roles": {
+      "hook": {
+        "label": "Concrete problem hook",
+        "why": "It opens on one specific, checkable moment — a place, a date, a number — so the reader meets the applicant's question before the biography."
+      },
+      "preparation": {
+        "label": "Academic preparation in context",
+        "why": "Grades and scores count for more next to their context — scale, rank, coursework — which shows the reader the applicant is ready for the next level."
+      },
+      "evidence": {
+        "label": "Quantified evidence & metrics",
+        "why": "It shows what the applicant personally did and what changed, with figures a referee could confirm — readers trust measured results more than adjectives."
+      },
+      "gap": {
+        "label": "Honest gap → why this degree",
+        "why": "Naming the limit of current skills turns the degree into a logical next step instead of a wish."
+      },
+      "fit": {
+        "label": "Programme & lab fit",
+        "why": "Named courses, labs or faculty that answer the gap prove the applicant researched this programme — the paragraph could not be pasted into another application."
+      },
+      "community": {
+        "label": "Community contribution",
+        "why": "It shows the applicant gives back, with numbers proving the effort was sustained rather than symbolic."
+      },
+      "impact": {
+        "label": "Post-graduation impact in Uzbekistan",
+        "why": "A concrete role, institution and timeline make the return plan credible — the committee can picture exactly what its investment will build."
+      },
+      "reflection": {
+        "label": "Turning point & reflection",
+        "why": "A personal statement needs a change in thinking, not only events; this paragraph shows what the applicant learned and how it changed their choices."
+      },
+      "leadership": {
+        "label": "Leadership without formal authority",
+        "why": "Influence earned by understanding other people's problems first — the behaviour leadership questions are designed to find."
+      },
+      "networking": {
+        "label": "Networking for impact",
+        "why": "The network was built to solve a problem, participants and outcomes are counted, and the paragraph says how the scholarship network will be used."
+      },
+      "studyPlan": {
+        "label": "Semester-by-semester study plan",
+        "why": "A dated plan with courses, a lab and a thesis target shows the committee exactly how its investment turns into skills."
+      },
+      "letterhead": {
+        "label": "Letterhead, date & addressee",
+        "why": "Official letterhead, a date and a named committee make the document verifiable and show it was written for this application."
+      },
+      "relationship": {
+        "label": "Recommender's standing & relationship",
+        "why": "Praise can be weighed only when the reader knows how well, for how long and in what role the writer knows the applicant — and how the applicant compares with peers."
+      },
+      "anecdote": {
+        "label": "Specific anecdote",
+        "why": "A story only this recommender could tell persuades far more than a list of adjectives."
+      },
+      "character": {
+        "label": "Character & impact on others",
+        "why": "It moves beyond grades to how the applicant treats and lifts other people, backed by concrete outcomes."
+      },
+      "endorsement": {
+        "label": "Clear closing endorsement",
+        "why": "An unambiguous final recommendation — ideally with a ranking or “highest enthusiasm” — leaves no doubt about the writer's view."
+      },
+      "signature": {
+        "label": "Signature & verifiable contact",
+        "why": "Full name, title, institution and an e-mail address let the committee confirm the letter is genuine."
+      },
+      "heading": {
+        "label": "Clear title or subject line",
+        "why": "A precise title or subject tells the reader what the document is and what is being asked before they read further."
+      },
+      "ask": {
+        "label": "One clear, easy request",
+        "why": "The request is specific, time-bound and easy to say yes to, with materials attached so the reader never has to search."
+      },
+      "cvHeader": {
+        "label": "Header & positioning line",
+        "why": "Name, contact details and a one-line positioning statement tell the reader at a glance who the applicant is and what they are applying for."
+      },
+      "cvEducation": {
+        "label": "Education with context",
+        "why": "Degree, dates, GPA with its scale and rank, and relevant coursework let a reader compare applicants fairly across countries."
+      },
+      "cvExperience": {
+        "label": "Experience as achievement bullets",
+        "why": "Each bullet starts with an action verb and ends with a result, so the reader sees outcomes rather than duties."
+      },
+      "cvProjects": {
+        "label": "Projects & competitions",
+        "why": "Named projects with tools, users and placements prove the applicant delivers outside the classroom."
+      },
+      "cvLeadership": {
+        "label": "Leadership & service",
+        "why": "Leadership is shown through numbers — people recruited, students taught, outcomes reached."
+      },
+      "cvRecognition": {
+        "label": "Publications & awards",
+        "why": "Awards and papers with the year, the venue and the level of selection show external validation."
+      },
+      "cvSkills": {
+        "label": "Skills & languages",
+        "why": "Concrete tools and test-backed language levels are easy to verify and to match against programme requirements."
+      },
+      "visaPurpose": {
+        "label": "Purpose of study",
+        "why": "The officer hears a specific field, a reason and a career link — an unclear study purpose is a common refusal ground."
+      },
+      "visaChoice": {
+        "label": "Why this university and country",
+        "why": "Naming programme features and comparing options shows a genuine student decision rather than a route to migration."
+      },
+      "visaFunding": {
+        "label": "Funding with exact figures",
+        "why": "Who pays, how much and which document proves it — matching the figures on the admission documents."
+      },
+      "visaTies": {
+        "label": "Home ties",
+        "why": "Family, property, employment or a contract obligation give concrete reasons to return home."
+      },
+      "visaReturn": {
+        "label": "Concrete return plan",
+        "why": "A named role and employer after graduation show that the study plan ends in Uzbekistan."
+      },
+      "docParties": {
+        "label": "Parties & purpose",
+        "why": "Every person is identified by full name and document number and the purpose is stated, so the reader can match it to passports and admission letters."
+      },
+      "docAmount": {
+        "label": "Exact financial commitment",
+        "why": "Amounts in figures and in words, per year and for the whole programme, leave no room for ambiguity."
+      },
+      "docEvidence": {
+        "label": "Evidence listed",
+        "why": "Each claim points to an attached document, so the reader can verify instead of trusting."
+      },
+      "docBudget": {
+        "label": "Budget & study plan",
+        "why": "Costs and funding add up line by line, and the plan connects the programme to a career."
+      },
+      "docSignature": {
+        "label": "Declaration, signature & certification",
+        "why": "A truthfulness declaration, signature, date and notary certification make the document formally valid where it is required."
+      },
+      "answer": {
+        "label": "Direct answer with evidence",
+        "why": "It answers the question in the first sentence and backs it with names and numbers within the word limit."
+      },
+      "activity": {
+        "label": "Activity header",
+        "why": "Title, role, organisation and hours give the reader scale and commitment at a glance."
+      }
+    },
+    "tracks": {
+      "onboardingStem": "Master's STEM — CV snapshot (TUIT → TUM)",
+      "onboardingBachelor": "Bachelor's — Academic Lyceum CV snapshot",
+      "onboardingEconomics": "Master's Economics & Policy — CV snapshot",
+      "sopTum": "Master's STEM — TUM SOP",
+      "sopKaist": "Bachelor's CS — KAIST SOP",
+      "sopLse": "Master's Economics — LSE SOP",
+      "essaySopTum": "SOP · Master's AI — TUM",
+      "essaySopKaist": "SOP · Bachelor's CS — KAIST",
+      "essaySopLse": "SOP · Master's Economics — LSE",
+      "essayPersonalStatement": "Personal statement · Bachelor's engineering",
+      "essayChevening": "Scholarship · Chevening (UCL)",
+      "essayGks": "Scholarship · Global Korea Scholarship",
+      "essayElYurtUmidi": "Scholarship · El-yurt umidi (Imperial MPH)",
+      "essayDaad": "Scholarship · DAAD (University of Freiburg)",
+      "essayWhyNus": "Why us · NUS Computer Science",
+      "essaySupplementalEvidence": "Supplemental · When evidence changed my mind",
+      "lorAcademic": "Professor's academic LOR (STEM, Master's)",
+      "lorTeacher": "Lyceum teacher's LOR (Bachelor's)",
+      "lorEmployer": "Employer / supervisor LOR (Master's, scholarships)",
+      "lorRequestEmail": "Student-to-professor LOR request email",
+      "cvAcademicStem": "Academic STEM research CV",
+      "cvUndergraduate": "Undergraduate applicant CV",
+      "cvEuropass": "Europass professional CV",
+      "answerGeneral": "Academic background & intellectual curiosity",
+      "answerMotivation": "Why this field & programme",
+      "answerLeadership": "Leading a team or initiative under pressure",
+      "answerCareer": "Short- and long-term career plan",
+      "answerChallenge": "Overcoming an academic or technical obstacle",
+      "answerCommunity": "Contribution to school or community",
+      "activityResearch": "Research — Smart Irrigation lab",
+      "activityLeadership": "Leadership — CodeForRegions",
+      "activityVolunteering": "Volunteering — bilingual STEM translation",
+      "activityCompetition": "Competition — AgroTech hackathon & ICPC",
+      "docAffidavit": "Affidavit of financial support (Homiylik xati)",
+      "docColdEmail": "Research supervision cold email",
+      "docCoverNote": "Financial & study plan cover note",
+      "visaUsF1": "USA — F-1 student visa",
+      "visaGermanyStudent": "Germany — student visa (blocked account)",
+      "visaKoreaD2": "South Korea — D-2 visa (GKS scholar)",
+      "visaUkStudent": "UK — Student Route (El-yurt umidi scholar)"
+    },
+    "fields": {
+      "gpa": "GPA",
+      "gpaScale": "GPA scale",
+      "ieltsScore": "IELTS",
+      "toeflScore": "TOEFL iBT",
+      "satScore": "SAT",
+      "greScore": "GRE",
+      "actScore": "ACT",
+      "duolingoScore": "Duolingo",
+      "graduationYear": "Graduation year",
+      "workExperienceYears": "Work experience (years)",
+      "researchPublications": "Publications",
+      "degreeLevel": "Target degree"
+    },
+    "visaGrounds": {
+      "purposeOfStudy": "Purpose of study",
+      "funding": "Funding",
+      "homeTies": "Home ties",
+      "nonImmigrantIntent": "Intent to return",
+      "specificity": "Specific detail",
+      "languageClarity": "Language clarity"
+    },
+    "visaEvidence": {
+      "purpose": "purpose",
+      "funding": "funding",
+      "home_ties": "home ties",
+      "specific_detail": "specific detail"
+    }
   }
 }

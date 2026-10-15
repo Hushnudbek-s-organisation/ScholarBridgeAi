@@ -15,6 +15,10 @@ import { getJson, sendJson, useResource } from "./useResource";
 import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
+import type { ActivitySample } from "@/lib/samples/exemplars";
+import { isUnmodifiedSample } from "@/lib/samples/text";
 
 // ===========================================================================
 // DOCUMENT VAULT (spec §7)
@@ -129,6 +133,8 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
           <Plus className="h-3.5 w-3.5" /> {t("dvAdd")}
         </Button>
       </JourneyCard>
+
+      <DocumentTemplatesCard />
 
       {data.documents.length === 0 ? (
         <Empty title={t("dvEmptyTitle")} hint={t("dvEmptyHint")} />
@@ -691,6 +697,7 @@ interface ActivityData {
 }
 
 export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
+  const ts = useTranslations("samples");
   const { data, loading, error, reload } = useResource<ActivityData>(
     useCallback(() => getJson<ActivityData>(`/api/activities?profileId=${profileId}`, "Could not load your activities"), [profileId]),
     [profileId],
@@ -698,9 +705,31 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
   );
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
+  // SPEC §14: never fabricate activities. An example may fill the form on an
+  // explicit click, but it cannot be added until its claims are replaced.
+  const [loadedActivity, setLoadedActivity] = useState<ActivitySample | null>(null);
+  const formHoldsSample =
+    loadedActivity != null &&
+    (isUnmodifiedSample(form.title, loadedActivity.activity.title) ||
+      isUnmodifiedSample(form.description, loadedActivity.activity.description) ||
+      isUnmodifiedSample(form.achievements, loadedActivity.activity.achievements));
+
+  const loadActivitySample = (sample: ActivitySample) => {
+    const a = sample.activity;
+    setForm({
+      category: a.category,
+      title: a.title,
+      role: a.role,
+      organization: a.organization,
+      hours: String(a.hours),
+      description: a.description,
+      achievements: a.achievements,
+    });
+    setLoadedActivity(sample);
+  };
 
   const add = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || formHoldsSample) return;
     setBusy(true);
     try {
       await sendJson(
@@ -709,6 +738,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
         "Could not save"
       );
       setForm({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
+      setLoadedActivity(null);
       await reload();
     } finally {
       setBusy(false);
@@ -736,6 +766,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
         }
       >
         {error && <ErrorNote message={error} />}
+        <SampleExemplarBar group="activity" className="mb-3" loadLabel={ts("activityLoad")} onLoad={loadActivitySample} />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Category">
             <select className={inputClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -769,7 +800,12 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
             </Field>
           </div>
         </div>
-        <Button className="mt-3" onClick={add} disabled={busy || !form.title.trim()}>
+        {loadedActivity && (
+          <p role="status" className={`mt-3 text-xs leading-relaxed ${formHoldsSample ? "font-semibold text-violet-800 dark:text-violet-200" : "text-slate-600"}`}>
+            {formHoldsSample ? ts("activityLoaded") : ts("loadedNotice")}
+          </p>
+        )}
+        <Button className="mt-3" onClick={add} disabled={busy || !form.title.trim() || formHoldsSample}>
           <Plus className="h-3.5 w-3.5" /> Add activity
         </Button>
       </JourneyCard>

@@ -103,7 +103,8 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
     }
   };
 
-  const header = <PageHeader icon={Send} accent="sky" title={t("pageTitle")} subtitle={t("pageSubtitle")} />;
+  // #notifications is a standalone screen (no HubPage hero), so this header owns the <h1>.
+  const header = <PageHeader level="h1" icon={Send} accent="sky" title={t("pageTitle")} subtitle={t("pageSubtitle")} />;
 
   if (!activeProfile) return <div className="space-y-5">{header}</div>;
   if (loading) return <div className="space-y-5">{header}<LoadingBlock label={t("loading")} /></div>;

@@ -75,7 +75,7 @@ function SessionRestoreLoader() {
   const { locale } = useLocaleContext();
   const text = sessionCopy[locale];
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center dark:bg-slate-950">
+    <main className="grid min-h-screen place-items-center bg-slate-50 px-4 text-center dark:bg-slate-950">
       <div role="status" aria-live="polite" className="space-y-4">
         <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
         <div>
@@ -91,7 +91,7 @@ function SessionRestoreError({ error, onRetry, onSignIn }: { error: string | nul
   const { locale } = useLocaleContext();
   const text = sessionCopy[locale];
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-100 px-4 text-center dark:bg-slate-950">
+    <main className="grid min-h-screen place-items-center bg-slate-50 px-4 text-center dark:bg-slate-950">
       <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">{text.unavailable}</h1>
         {error && <details className="mt-3 text-left text-sm text-slate-600 dark:text-slate-300"><summary className="cursor-pointer font-medium">{text.details}</summary><p className="mt-2 break-words">{error}</p></details>}
@@ -879,7 +879,7 @@ export function Home({
   if (view === "wizard") {
     return (
       <LocaleProvider initialLocale={initialLocale}>
-        <div className="min-h-screen bg-slate-100 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
+        <div className="min-h-screen bg-slate-50 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
           <OnboardingWizard
             profile={null}
             onCreated={handleWizardCreated}
@@ -892,7 +892,7 @@ export function Home({
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <div className="min-h-screen bg-slate-100 flex flex-col lg:flex-row font-sans">
+      <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}

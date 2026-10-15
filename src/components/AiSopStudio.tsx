@@ -20,6 +20,9 @@ import {
 import { toPlainText } from "@/lib/ai/format-reply";
 import { AiFormattedText } from "./AiFormattedText";
 import { AppNote } from "@/components/AppNote";
+import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
+import type { SopSample } from "@/lib/samples/exemplars";
+import { isUnmodifiedSample } from "@/lib/samples/text";
 
 interface AiSopStudioProps {
   activeProfile: StudentProfile | null;
@@ -31,6 +34,7 @@ interface AiSopStudioProps {
 
 export function AiSopStudio({ activeProfile, applicationId, universityId, universityName, programName }: AiSopStudioProps) {
   const t = useTranslations("ai");
+  const ts = useTranslations("samples");
   const [activeTab, setActiveTab] = useState<"drafter" | "reviewer">("drafter");
 
   // Drafter State. The selected application supplies context, not an inferred
@@ -59,6 +63,42 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
 
   // Copy state
   const [copied, setCopied] = useState(false);
+
+  // Gold-standard sample loaded on an explicit click (never saved on its own).
+  const [loadedSop, setLoadedSop] = useState<SopSample | null>(null);
+  const [sampleNotice, setSampleNotice] = useState<"drafter" | "reviewer" | null>(null);
+
+  const loadSopSample = (sample: SopSample) => {
+    if (activeTab === "drafter") {
+      setTargetUni(sample.fields.targetUni);
+      setTargetProgram(sample.fields.targetProgram);
+      setPersonalHook(sample.fields.personalHook);
+      setExperienceExample(sample.fields.experienceExample);
+      setProgramEvidence(sample.fields.programEvidence);
+      setCareerGoals(sample.fields.careerGoals);
+      setGeneratedSop(null);
+      setVersionSaved(false);
+      setDraftError("");
+    } else {
+      setExistingDraft(sample.text);
+      setReviewUni(sample.fields.targetUni);
+      setSopReview(null);
+      setReviewError("");
+    }
+    setLoadedSop(sample);
+    setSampleNotice(activeTab);
+  };
+
+  // A draft generated from untouched sample inputs is the sample's story, not
+  // the student's — it can be read and copied, but not saved as their version.
+  const drafterHoldsSample =
+    loadedSop != null &&
+    isUnmodifiedSample(targetUni, loadedSop.fields.targetUni) &&
+    isUnmodifiedSample(targetProgram, loadedSop.fields.targetProgram) &&
+    isUnmodifiedSample(personalHook, loadedSop.fields.personalHook) &&
+    isUnmodifiedSample(experienceExample, loadedSop.fields.experienceExample) &&
+    isUnmodifiedSample(programEvidence, loadedSop.fields.programEvidence) &&
+    isUnmodifiedSample(careerGoals, loadedSop.fields.careerGoals);
 
   const handleGenerateSop = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +137,7 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
   };
 
   const saveGeneratedDraft = async () => {
-    if (!activeProfile || !generatedSop) return;
+    if (!activeProfile || !generatedSop || drafterHoldsSample) return;
     setSavingVersion(true);
     setVersionSaveError("");
     try {
@@ -211,6 +251,16 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
             🔍 AI Essay Reviewer
           </button>
         </div>
+      </div>
+
+      {/* Gold-standard samples — fill the active tab on an explicit click. */}
+      <div className="space-y-2">
+        <SampleExemplarBar group="sop" onLoad={loadSopSample} />
+        {sampleNotice && (
+          <p role="status" className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-700 dark:border-indigo-500/20">
+            {sampleNotice === "drafter" ? ts("sopLoadedDrafter") : ts("sopLoadedReviewer")}
+          </p>
+        )}
       </div>
 
       {/* DRAFTER MODE */}
@@ -333,7 +383,8 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                     <button
                       type="button"
                       onClick={() => void saveGeneratedDraft()}
-                      disabled={savingVersion || versionSaved || !activeProfile}
+                      disabled={savingVersion || versionSaved || !activeProfile || drafterHoldsSample}
+                      title={drafterHoldsSample ? ts("unmodified") : undefined}
                       className="flex min-h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
                     >
                       {savingVersion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -346,6 +397,11 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
               {draftError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{draftError}</p>}
               {versionSaveError && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{versionSaveError}</p>}
               {versionSaved && <p role="status" className="mb-3 text-xs font-semibold text-emerald-700">{t("sopVersionSaved")}</p>}
+              {generatedSop && drafterHoldsSample && (
+                <p className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-900 dark:border-violet-500/30 dark:text-violet-100">
+                  {ts("unmodified")}
+                </p>
+              )}
               {generatedSop ? (
                 <>
                   <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">

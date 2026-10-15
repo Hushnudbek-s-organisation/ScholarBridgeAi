@@ -59,6 +59,7 @@ import {
 import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
 import { VisaSpeakingAssistant } from "@/components/VisaSpeakingAssistant";
 import { HubPage, HubEmpty, usePaneSelection, type HubPaneDef } from "./ui";
+import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 
@@ -361,6 +362,8 @@ export function FundingHub({ profile, navigate }: HubProps) {
       note={{ tone: "warn", text: td("money") }}
     >
       <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+      {/* Sponsor affidavit (Homiylik xati) and the funding cover note. */}
+      <DocumentTemplatesCard kinds={["affidavit", "coverNote"]} className="mt-4" />
     </HubPage>
   );
 }

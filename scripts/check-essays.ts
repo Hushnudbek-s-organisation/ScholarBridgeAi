@@ -9,6 +9,7 @@
  */
 
 import { analyzeEssay, compareVersions, countWords, paragraphs, sentences } from "../src/lib/essay";
+import { ESSAY_RUBRIC_SAMPLES, SOP_SAMPLES } from "../src/lib/samples/exemplars";
 
 let passed = 0;
 let failed = 0;
@@ -197,6 +198,60 @@ check("the delta is positive", cmp.delta.total > 0, `delta=${cmp.delta.total}`);
 check("fixed issues are listed", cmp.fixedIssues.length > 0);
 check("word delta is computed", cmp.wordDelta === s.wordCount - w.wordCount);
 check("a rewrite of the same text reports no change", compareVersions(strong, strong).delta.total === 0);
+
+section("10. Gold-standard exemplars (src/lib/samples/exemplars.ts) on the same rubric");
+
+// Scored exactly as the Essay Rubric Studio scores them after "Load into editor":
+// the sample's own type, target, practice word limit and prompt.
+const AUTHORED_TARGET = 88; // the brief's acceptance bar
+// Verbatim brief essays are reported, never tuned to the rubric. They must
+// still be blocker-free and clear a floor, so a regression is visible.
+const BRIEF_FLOOR = 60;
+const exemplarOptions = (sample: (typeof ESSAY_RUBRIC_SAMPLES)[number]) => ({
+  type: sample.essayType,
+  targetName: sample.targetName || null,
+  wordLimit: sample.wordLimit,
+  prompt: sample.prompt || null,
+});
+const exemplarRows = ESSAY_RUBRIC_SAMPLES.map((sample) => ({ sample, result: analyzeEssay(sample.text, exemplarOptions(sample)) }));
+
+for (const { sample, result } of exemplarRows) {
+  const blockers = result.issues.filter((issue) => issue.severity === "blocker").map((issue) => issue.code);
+  check(`${sample.id}: 0 blocker issues`, blockers.length === 0, blockers.join(", "));
+  if (sample.origin === "authored") {
+    check(`${sample.id}: authored exemplar scores ≥ ${AUTHORED_TARGET} (got ${result.scores.total})`, result.scores.total >= AUTHORED_TARGET);
+  } else {
+    check(`${sample.id}: verbatim brief text scores ≥ ${BRIEF_FLOOR} (got ${result.scores.total})`, result.scores.total >= BRIEF_FLOOR);
+  }
+  check(`${sample.id}: no cliché detected`, result.cliches.length === 0, result.cliches.map((c) => c.phrase).join(", "));
+  check(
+    `${sample.id}: stays inside its practice word limit`,
+    sample.wordLimit == null || result.wordCount <= sample.wordLimit,
+    `${result.wordCount} > ${sample.wordLimit}`
+  );
+}
+check("all five essay types have an exemplar", new Set(ESSAY_RUBRIC_SAMPLES.map((sample) => sample.essayType)).size === 5);
+check(
+  "scholarship exemplars cover El-yurt umidi, Chevening, GKS and DAAD",
+  ["essayElYurtUmidi", "essayChevening", "essayGks", "essayDaad"].every((id) =>
+    ESSAY_RUBRIC_SAMPLES.some((sample) => sample.id === id && sample.essayType === "scholarship")
+  )
+);
+check(
+  "every SOP drafter track is also scoreable in the rubric studio (one shared text)",
+  SOP_SAMPLES.every((sop) => ESSAY_RUBRIC_SAMPLES.some((essay) => essay.text === sop.text && essay.essayType === "sop"))
+);
+check(
+  "exemplar scores are deterministic",
+  exemplarRows.every(({ sample, result }) => JSON.stringify(analyzeEssay(sample.text, exemplarOptions(sample)).scores) === JSON.stringify(result.scores))
+);
+
+console.log("\n  Exemplar scores (src/lib/essay.ts, deterministic):");
+for (const { sample, result } of exemplarRows) {
+  console.log(
+    `    ${sample.id.padEnd(27)} ${sample.essayType.padEnd(18)} ${sample.origin.padEnd(8)} ${String(result.scores.total).padStart(3)}/100  ${String(result.wordCount).padStart(3)} words`
+  );
+}
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

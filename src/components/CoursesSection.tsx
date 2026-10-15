@@ -37,15 +37,15 @@ export function CoursesSection({ activeProfile }: CoursesSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white rounded-3xl p-6 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
-            <GraduationCap className="h-6 w-6 text-amber-300" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold">{t("title")}</h1>
-            <p className="text-xs text-slate-300 mt-0.5">{t("subtitle")}</p>
-          </div>
+      {/* Section toolbar, not a second hero: the Community destination
+          (HubPage) already owns this screen's hero and <h1>. */}
+      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
+          <GraduationCap className="h-5 w-5 text-indigo-600" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">{t("title")}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">{t("subtitle")}</p>
         </div>
       </div>
 

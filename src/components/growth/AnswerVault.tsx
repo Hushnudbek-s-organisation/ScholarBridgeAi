@@ -7,6 +7,9 @@ import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
 import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "./ui";
+import { SampleInlineCard } from "../samples/SampleExemplarBar";
+import { useSampleLibrary } from "../samples/useSampleLibrary";
+import { isUnmodifiedSample } from "@/lib/samples/text";
 
 interface VaultItem {
   promptId: number;
@@ -28,7 +31,13 @@ const countWords = (s: string) => (s.trim().match(/\S+/g) ?? []).length;
  */
 export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile | null }) {
   const t = useTranslations("vault");
+  const ts = useTranslations("samples");
   const tr = useSeedText();
+  const { lib: sampleLib } = useSampleLibrary();
+  // Example answers: shown per prompt on request; a loaded example is never
+  // autosaved and cannot be saved until the student has rewritten it.
+  const [exampleOpen, setExampleOpen] = useState<Record<number, boolean>>({});
+  const [loadedExample, setLoadedExample] = useState<Record<number, string>>({});
   const [items, setItems] = useState<VaultItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("all");
@@ -61,6 +70,10 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
 
   const persist = async (promptId: number, answer: string) => {
     if (!profileId) return;
+    if (isUnmodifiedSample(answer, loadedExample[promptId])) {
+      showToast(ts("unmodified"));
+      return;
+    }
     setSaving(promptId);
     try {
       await api("/api/vault", { method: "PUT", body: JSON.stringify({ profileId, promptId, answer }) });
@@ -139,6 +152,8 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
               const over = i.wordLimit != null && words > i.wordLimit;
               const isOpen = open === i.promptId;
               const done = draft.trim().length > 0;
+              const example = sampleLib?.ANSWER_VAULT_SAMPLES.find((sample) => sample.category === i.category) ?? null;
+              const holdsExample = isUnmodifiedSample(draft, loadedExample[i.promptId]);
               return (
                 <li key={i.promptId} className={`overflow-hidden rounded-2xl border bg-white ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200"}`}>
                   <button
@@ -168,6 +183,33 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                           <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {tr(i.hint)}
                         </p>
                       )}
+                      {example && (
+                        <div className="mb-2">
+                          <button
+                            type="button"
+                            aria-expanded={Boolean(exampleOpen[i.promptId])}
+                            onClick={() => setExampleOpen((o) => ({ ...o, [i.promptId]: !o[i.promptId] }))}
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
+                          >
+                            <Lightbulb className="h-3.5 w-3.5" aria-hidden />
+                            {exampleOpen[i.promptId] ? ts("answerHide") : ts("answerShow")}
+                          </button>
+                          {exampleOpen[i.promptId] && (
+                            <div className="mt-2">
+                              <SampleInlineCard
+                                sample={example}
+                                title={ts("answerTitle", { category: catLabel(i.category) })}
+                                loadLabel={ts("answerLoad")}
+                                onLoad={() => {
+                                  setDrafts((d) => ({ ...d, [i.promptId]: example.text }));
+                                  setSavedAt((st) => ({ ...st, [i.promptId]: false }));
+                                  setLoadedExample((l) => ({ ...l, [i.promptId]: example.text }));
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <textarea
                         value={draft}
                         onChange={(e) => onType(i.promptId, e.target.value)}
@@ -176,6 +218,9 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                         placeholder={t("placeholder")}
                         className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                       />
+                      {holdsExample && (
+                        <p className="mt-2 text-[11px] leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
+                      )}
                       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <span className={`text-[11px] font-semibold ${over ? "text-rose-600" : "text-slate-500"}`}>
                           {i.wordLimit ? t("wordsOf", { n: words, max: i.wordLimit }) : t("words", { n: words })}
@@ -191,7 +236,9 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                           </span>
                           <button
                             onClick={() => void persist(i.promptId, draft)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                            disabled={holdsExample}
+                            title={holdsExample ? ts("unmodified") : undefined}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                           >
                             <Save className="h-3.5 w-3.5" /> {t("save")}
                           </button>

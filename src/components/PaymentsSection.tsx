@@ -102,15 +102,17 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 sb-ink-on-warm rounded-3xl p-6 shadow-xl">
+      {/* The one hero on this screen: the shared indigo journey surface with a
+          gold crown accent — not a neon banner competing with the whole app. */}
+      <div className="sb-journey-hero relative overflow-hidden rounded-3xl border p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <Crown className="h-6 w-6 text-white sb-ink-on-warm" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 ring-1 ring-amber-500/30">
+              <Crown className="h-6 w-6 text-amber-600 dark:text-amber-300" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 sb-ink-on-warm">{t("title")}</h1>
-              <p className="text-xs text-slate-800 sb-ink-on-warm mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">{t("title")}</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
                 Bepul — ishni boshlash uchun. Pro — vaqt tejash, sifat va cheksizlik.
               </p>
             </div>

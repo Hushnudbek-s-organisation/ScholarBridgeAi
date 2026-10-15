@@ -1,423 +1,569 @@
 @import "tailwindcss";
 
 /* ===========================================================================
-   THEMING — light / dark
+   THEMING — light ("Oq fon") / dark ("Qora fon")
    ---------------------------------------------------------------------------
-   The app has ~25k lines of markup written against Tailwind's default light
-   palette (`bg-white`, `text-slate-900`, `border-slate-200`, …). Rewriting
-   every component with `dark:` variants is not realistic, and doing it piecemeal
-   would leave the UI half-themed for months.
+   ~25k lines of markup are written against Tailwind's default light palette
+   (`bg-white`, `text-slate-900`, `border-slate-200`, …). Rather than hand-write
+   a `dark:` variant on every element, the theme is applied at the TOKEN layer:
 
-   Instead the theme is applied at the *token* layer:
+     Tailwind 4 compiles `bg-slate-100` to `background-color: var(--color-slate-100)`
+     and `bg-indigo-50/60` to `color-mix(in oklab, var(--color-indigo-50) 60%, …)`.
+     Redefining those variables under `.dark` re-themes every component at once.
 
-     Tailwind 4 compiles `bg-slate-100` to `background-color: var(--color-slate-100)`.
-     Redefining those variables under `.dark` therefore re-themes every existing
-     component at once — cards, borders, body text, headings, hover states.
+   1. TOKENS (`:root` / `.dark` below)
+      • The neutral slate ramp is INVERTED in dark mode (50 = darkest canvas,
+        900 = brightest ink). Right for text, borders and "subtle fill" surfaces.
+      • The pale accent shades (`indigo-50/100`, `emerald-50/100`, …) become
+        translucent jewel-toned washes, so `bg-indigo-50`, `bg-indigo-50/60`,
+        `hover:bg-indigo-100` and friends all turn into glass tints — in
+        proportion to their light-mode opacity, with no per-class rules.
+      • `--sb-*` tokens name the four surface tiers, the text ramp and the
+        field styles. Every pin below references them.
 
-   Two rules make it work:
+          Tier 0  canvas          light #f8fafc   dark #090e1a
+          Tier 1  card / shell    light #ffffff   dark #111a2e
+          Tier 2  inner well      light #f1f5f9   dark #17233b
+          Tier 3  hover / control light #e2e8f0   dark #1f2f4d
 
-     1. The neutral ramp is *inverted* in dark mode: `slate-50` (lightest
-        surface) becomes the darkest, `slate-900` (darkest ink) becomes the
-        lightest. That is exactly right for TEXT, and for backgrounds that mean
-        "page"/"card"/"subtle fill".
+   2. PINS (`@layer utilities` block)
+      Some classes mean the OPPOSITE of the inverted ramp — `bg-white` is "a
+      card", `bg-slate-900` is "a deliberately dark panel" — and every `dark:`
+      slate utility (`dark:bg-slate-900`, `dark:border-slate-700`) was written
+      against Tailwind's real palette, NOT the inverted one. Unpinned, those
+      resolve to near-white fills and glowing borders. Each is pinned to its tier.
 
-     2. A handful of classes mean the opposite — `bg-slate-900` is "this is a
-        deliberately dark panel", `bg-white` is "this is a card". Those are
-        pinned back to dark surfaces with explicit `.dark .bg-*` rules below.
+      The pins live INSIDE `@layer utilities`, after Tailwind's generated rules,
+      with deliberately low specificity:
+        • base pins are `:where(.dark) .x` → (0,1,0): they beat the plain
+          utility by source order, but LOSE to `hover:`, `focus:`, `disabled:`
+          and `dark:hover:` variants (0,2,0) — interaction states keep working;
+        • base pins step aside (`:where(:not([class*="dark:bg-"]))`) when the
+          element declares its own `dark:` value, so explicit dark intent wins.
+      Never hand-write a `dark:` slate utility without a matching pin below —
+      `npm run test:dark` fails on unpinned ones.
 
-   The inversion is per-COLOUR, not per-role, so anything structural has to be
-   pinned too, or a "surface" turns into ink and the copy on it vanishes:
+   3. SEMANTIC HELPERS (unlayered, after the block): `.sb-ink-on-bright`,
+      `.sb-logo-well`, `.sb-field`, `.sb-journey-hero` — they always win.
 
-     • backgrounds/borders/strokes at `slate-600…950`  → dark surfaces,
-     • gradient stops that are pale surfaces (`from-indigo-50 to-white`, …)   → dark,
-     • fills that are *meant* to stay bright (amber CTAs, green ticks, sky
-       buttons) keep their fill and take `.sb-ink-on-bright` / `.sb-ink-on-warm`
-       for their copy — white on those fills is 2.0–2.7:1 in BOTH themes.
-
-   Because these rules sit outside `@layer utilities` they win over the plain
-   utility classes. Do NOT hand-write `dark:` variants on an element that also
-   uses a remapped class — the remap will take precedence. Use the semantic
-   helpers at the bottom of this file instead.
-
-   `npm run test:dark` (scripts/dark-audit.mjs) resolves every fill/ink pair in
-   the markup against these rules and fails when one is too low-contrast to
-   read. Run it after touching a theme rule or a component's colours.
+   `npm run test:dark` (scripts/dark-audit.mjs) parses THIS file, replays the
+   cascade for every fill/ink pair in the markup in both themes, and fails on an
+   unreadable pair or an unpinned `dark:` slate utility. Run it after touching a
+   theme rule or a component's colours.
    =========================================================================== */
 
 /* Class-based dark mode (a `dark` class on <html>), not OS media query. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*  Neutral ramp — inverted for dark mode ---------------------------------- */
+/* Tier 1 elevation: a crisp, cool-tinted ambient shadow instead of a grey smudge. */
+@theme {
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.04), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+}
+
+/*  Tokens — light ----------------------------------------------------------- */
+:root {
+  --sb-canvas: #f8fafc;
+  --sb-surface: #ffffff;
+  --sb-well: #f1f5f9;
+  --sb-control: #e2e8f0;
+  --sb-border: rgb(226 232 240 / 0.9);
+  --sb-focus: #6366f1;
+  --sb-field-bg: #ffffff;
+  --sb-field-border: #cbd5e1;
+  --sb-field-border-hover: #94a3b8;
+  --sb-field-ring: rgb(99 102 241 / 0.16);
+  --sb-field-disabled: #f1f5f9;
+  --sb-field-placeholder: #64748b;
+}
+
+/*  Tokens — dark ------------------------------------------------------------ */
 .dark {
   color-scheme: dark;
 
-  --color-slate-50: #0b1220; /* app background      */
-  --color-slate-100: #111a2e; /* raised surface      */
-  --color-slate-200: #22304d; /* borders, dividers   */
-  --color-slate-300: #33425f; /* strong borders      */
-  --color-slate-400: #8496b3; /* dimmest text        */
-  --color-slate-500: #a3b1c9; /* muted text          */
-  --color-slate-600: #cbd5e1; /* body text           */
-  --color-slate-700: #dde5ef; /* strong body text    */
-  --color-slate-800: #eaf0f8; /* headings            */
-  --color-slate-900: #f5f8fc; /* display text        */
+  /* Surface tiers (obsidian navy) */
+  --sb-canvas: #090e1a;          /* Tier 0 — app canvas                  */
+  --sb-surface: #111a2e;         /* Tier 1 — cards, sidebar, header      */
+  --sb-surface-rgb: 17 26 46;
+  --sb-surface-hero: #0c1324;    /* deliberately dark hero panels        */
+  --sb-surface-hero-rgb: 12 19 36;
+  --sb-well: #17233b;            /* Tier 2 — inner wells, chips, inputs  */
+  --sb-well-rgb: 23 35 59;
+  --sb-control: #1f2f4d;         /* Tier 3 — hover / selected control    */
+  --sb-control-rgb: 31 47 77;
+  --sb-control-strong: #26375a;
+  --sb-scrim-rgb: 2 6 23;        /* modal backdrops                      */
+
+  /* Hairlines */
+  --sb-border-subtle: #1b2842;
+  --sb-border: #24324f;
+  --sb-border-rgb: 36 50 79;
+  --sb-border-strong: #33425f;
+  --sb-border-stronger: #5b6b88; /* ≥3:1 on Tier 1 — checkbox outlines  */
+
+  /* Text ramp — every step ≥ 4.5:1 on Tier 1 (#111a2e) and Tier 2 (#17233b) */
+  --sb-ink-display: #f8fafc;     /* 16.6:1 */
+  --sb-ink-heading: #f1f5f9;     /* 15.8:1 */
+  --sb-ink-body: #e2e8f0;        /* 14.1:1 */
+  --sb-ink-secondary: #cbd5e1;   /* 11.7:1 */
+  --sb-ink-muted: #94a3b8;       /*  6.8:1 */
+  --sb-ink-dim: #8496b3;         /*  5.8:1 */
+  --sb-ink-faint: #64748b;       /*  decorative icons only (3.6:1)     */
+
+  /* Royal indigo for dark controls written as `bg-slate-900` */
+  --sb-control-indigo: #3730a3;
+  --sb-control-indigo-hover: #4338ca;
+
+  /* Fields */
+  --sb-focus: #6366f1;
+  --sb-field-bg: #0d1526;
+  --sb-field-border: #2a3a5c;
+  --sb-field-border-hover: #3b4f78;
+  --sb-field-ring: rgb(99 102 241 / 0.22);
+  --sb-field-disabled: #17233b;
+  --sb-field-placeholder: #8496b3;
+
+  /* Inverted neutral ramp */
+  --color-slate-50: #090e1a;   /* = Tier 0 canvas      */
+  --color-slate-100: #17233b;  /* = Tier 2 well        */
+  --color-slate-200: #24324f;  /* borders, tracks      */
+  --color-slate-300: #33425f;  /* strong borders       */
+  --color-slate-400: #8496b3;  /* captions             */
+  --color-slate-500: #94a3b8;  /* metadata             */
+  --color-slate-600: #cbd5e1;  /* secondary copy       */
+  --color-slate-700: #e2e8f0;  /* body copy            */
+  --color-slate-800: #f1f5f9;  /* headings             */
+  --color-slate-900: #f8fafc;  /* display              */
   --color-slate-950: #ffffff;
+
+  /* Pale accent shades → translucent jewel washes. `/NN` alpha variants
+     multiply on top (bg-emerald-50/60 → 9% emerald), so a faint light-mode
+     tint stays faint instead of turning into a grey fog. */
+  --color-indigo-50: rgb(99 102 241 / 0.15);   --color-indigo-100: rgb(99 102 241 / 0.22);
+  --color-violet-50: rgb(139 92 246 / 0.15);   --color-violet-100: rgb(139 92 246 / 0.22);
+  --color-purple-50: rgb(168 85 247 / 0.15);   --color-purple-100: rgb(168 85 247 / 0.22);
+  --color-blue-50: rgb(59 130 246 / 0.15);     --color-blue-100: rgb(59 130 246 / 0.22);
+  --color-sky-50: rgb(14 165 233 / 0.15);      --color-sky-100: rgb(14 165 233 / 0.22);
+  --color-cyan-50: rgb(6 182 212 / 0.15);      --color-cyan-100: rgb(6 182 212 / 0.22);
+  --color-teal-50: rgb(20 184 166 / 0.15);     --color-teal-100: rgb(20 184 166 / 0.22);
+  --color-emerald-50: rgb(16 185 129 / 0.15);  --color-emerald-100: rgb(16 185 129 / 0.22);
+  --color-green-50: rgb(34 197 94 / 0.15);     --color-green-100: rgb(34 197 94 / 0.22);
+  --color-lime-50: rgb(132 204 22 / 0.15);     --color-lime-100: rgb(132 204 22 / 0.22);
+  --color-yellow-50: rgb(234 179 8 / 0.15);    --color-yellow-100: rgb(234 179 8 / 0.22);
+  --color-amber-50: rgb(245 158 11 / 0.15);    --color-amber-100: rgb(245 158 11 / 0.22);
+  --color-orange-50: rgb(249 115 22 / 0.15);   --color-orange-100: rgb(249 115 22 / 0.22);
+  --color-red-50: rgb(239 68 68 / 0.15);       --color-red-100: rgb(239 68 68 / 0.22);
+  --color-rose-50: rgb(244 63 94 / 0.15);      --color-rose-100: rgb(244 63 94 / 0.22);
+  --color-pink-50: rgb(236 72 153 / 0.15);     --color-pink-100: rgb(236 72 153 / 0.22);
+  --color-fuchsia-50: rgb(217 70 239 / 0.15);  --color-fuchsia-100: rgb(217 70 239 / 0.22);
 }
 
-/*  Surfaces that must stay dark regardless of the inverted ramp ------------
-    `bg-slate-800/900/950` means "a dark panel" (hero blocks, the AI mentor
-    console, modals). Left to the ramp they would turn into near-white bands. */
-.dark .bg-slate-800 { background-color: #16213a; }
-.dark .bg-slate-900 { background-color: #0d1424; }
-.dark .bg-slate-950 { background-color: #060b16; }
-/* `bg-slate-600/700` is never used as a *light-theme* fill in this app — it
-   only ever appears as `dark:bg-slate-700`, meaning "a subtle raised surface":
-   a progress track, a selected chip, a thin divider. Left to the inverted ramp
-   it becomes a near-white block (`slate-700` → #dde5ef) and the copy sitting on
-   it disappears. Pin both to the dark equivalent of the light-theme value. */
-.dark .bg-slate-700 { background-color: #33425f; }
-.dark .bg-slate-600 { background-color: #3d4d6d; }
-/* A dark *control* (primary button, selected tab, the sliding nav pill) sits
-   on a dark card in dark mode; lift it so the selected state still reads. */
-.dark button.bg-slate-900,
-.dark a.bg-slate-900,
-.dark span.bg-slate-900 {
-  background-color: #2a3a5c;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+@layer utilities {
+  /* ---- Tier 1 · cards and shells --------------------------------------- */
+  :where(.dark) .bg-white:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface); }
+  :where(.dark) .bg-white\/95:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
+  :where(.dark) .bg-white\/90:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
+  :where(.dark) .bg-white\/85:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.85); }
+  :where(.dark) .bg-white\/80:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
+  :where(.dark) .bg-white\/70:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.7); }
+  /* Low-opacity whites (`bg-white/10`, `/20`) are glass chips on coloured
+     heroes and read correctly in both themes — they are left alone. */
+
+  /* ---- Tier 2 · inner wells -------------------------------------------- */
+  /* `bg-slate-50` is the canvas on the page, but a recessed well inside a card:
+     there it lifts to Tier 2 instead of punching a black hole into the card. */
+  :where(.dark :is(.bg-white, .dark\:bg-slate-900)) .bg-slate-50:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
+  /* Translucent neutral wells (`bg-slate-50/60`, `bg-slate-100/50`). */
+  :where(.dark) :is([class^="bg-slate-50/"], [class*=" bg-slate-50/"], [class^="bg-slate-100/"], [class*=" bg-slate-100/"]):where(:not([class*="dark:bg-"])) {
+    background-color: rgb(var(--sb-well-rgb) / 0.75);
+  }
+
+  /* ---- Deliberately dark panels and scrims ------------------------------ */
+  :where(.dark) .bg-slate-950:where(:not([class*="dark:bg-"])) { background-color: var(--sb-canvas); }
+  :where(.dark) .bg-slate-900:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface-hero); }
+  :where(.dark) .bg-slate-800:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
+  :where(.dark) .bg-slate-700:where(:not([class*="dark:bg-"])) { background-color: var(--sb-control); }
+  :where(.dark) .bg-slate-600:where(:not([class*="dark:bg-"])) { background-color: var(--sb-border-strong); }
+  /* Alpha variants are separate classes: unpinned, `bg-slate-950/50` resolves
+     to the inverted (white) token — a modal backdrop of white fog. */
+  :where(.dark) :is(.bg-slate-950\/40, .bg-slate-900\/40) { background-color: rgb(var(--sb-scrim-rgb) / 0.4); }
+  :where(.dark) :is(.bg-slate-950\/50, .bg-slate-900\/50) { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
+  :where(.dark) :is(.bg-slate-950\/60, .bg-slate-900\/60) { background-color: rgb(var(--sb-scrim-rgb) / 0.6); }
+  :where(.dark) :is(.bg-slate-950\/70, .bg-slate-900\/70) { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
+  :where(.dark) :is(.bg-slate-950\/80, .bg-slate-900\/80) { background-color: rgb(var(--sb-scrim-rgb) / 0.8); }
+  :where(.dark) :is(.bg-slate-950\/90, .bg-slate-900\/90) { background-color: rgb(var(--sb-scrim-rgb) / 0.9); }
+  :where(.dark) .bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
+  :where(.dark) .bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
+  :where(.dark) .bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
+  :where(.dark) .bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
+
+  /* A dark CONTROL (primary button, badge) written as `bg-slate-900` would melt
+     into a dark card; in dark mode it becomes an authoritative royal indigo. */
+  :where(.dark) :is(button, a, span).bg-slate-900:where(:not([class*="dark:bg-"])) {
+    background-color: var(--sb-control-indigo);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000);
+  }
+
+  /* ---- `dark:` slate utilities ------------------------------------------
+     Written against Tailwind's REAL palette ("slate-900 = dark card"), so they
+     are pinned to the matching tier instead of the inverted token.          */
+  :where(.dark) .dark\:bg-slate-950 { background-color: var(--sb-canvas); }
+  :where(.dark) .dark\:bg-slate-900 { background-color: var(--sb-surface); }
+  :where(.dark) .dark\:bg-slate-800 { background-color: var(--sb-well); }
+  :where(.dark) .dark\:bg-slate-700 { background-color: var(--sb-control); }
+  :where(.dark) .dark\:bg-slate-600 { background-color: var(--sb-border-strong); }
+  :where(.dark) .dark\:bg-slate-500 { background-color: #64748b; }
+  :where(.dark) .dark\:bg-slate-400 { background-color: #94a3b8; }
+  :where(.dark) .dark\:bg-slate-300 { background-color: #cbd5e1; }
+  :where(.dark) .dark\:bg-slate-200 { background-color: #e2e8f0; }
+  :where(.dark) .dark\:bg-slate-100 { background-color: #f1f5f9; }
+  :where(.dark) .dark\:bg-slate-50 { background-color: #f8fafc; }
+  :where(.dark) .dark\:bg-slate-950\/50 { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
+  :where(.dark) .dark\:bg-slate-950\/70 { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
+  :where(.dark) .dark\:bg-slate-900\/95 { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
+  :where(.dark) .dark\:bg-slate-900\/90 { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
+  :where(.dark) .dark\:bg-slate-900\/80 { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
+  :where(.dark) .dark\:bg-slate-900\/60 { background-color: rgb(var(--sb-surface-rgb) / 0.6); }
+  :where(.dark) .dark\:bg-slate-900\/50 { background-color: rgb(var(--sb-surface-rgb) / 0.5); }
+  :where(.dark) .dark\:bg-slate-900\/40 { background-color: rgb(var(--sb-surface-rgb) / 0.4); }
+  :where(.dark) .dark\:bg-slate-900\/20 { background-color: rgb(var(--sb-surface-rgb) / 0.2); }
+  :where(.dark) .dark\:bg-slate-900\/10 { background-color: rgb(var(--sb-surface-rgb) / 0.1); }
+  :where(.dark) .dark\:bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
+  :where(.dark) .dark\:bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
+  :where(.dark) .dark\:bg-slate-800\/70 { background-color: rgb(var(--sb-well-rgb) / 0.7); }
+  :where(.dark) .dark\:bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
+  :where(.dark) .dark\:bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
+  :where(.dark) .dark\:bg-slate-800\/40 { background-color: rgb(var(--sb-well-rgb) / 0.4); }
+  :where(.dark) .dark\:bg-slate-700\/60 { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+  :where(.dark) .dark\:bg-slate-700\/50 { background-color: rgb(var(--sb-control-rgb) / 0.5); }
+
+  :where(.dark) .dark\:text-slate-50 { color: var(--sb-ink-display); }
+  :where(.dark) .dark\:text-slate-100 { color: var(--sb-ink-heading); }
+  :where(.dark) .dark\:text-slate-200 { color: var(--sb-ink-body); }
+  :where(.dark) .dark\:text-slate-300 { color: var(--sb-ink-secondary); }
+  :where(.dark) .dark\:text-slate-400 { color: var(--sb-ink-muted); }
+  :where(.dark) .dark\:text-slate-500 { color: var(--sb-ink-dim); }
+  :where(.dark) .dark\:text-slate-600 { color: var(--sb-ink-faint); }
+  /* 700–950 are dark inks, only ever meaningful on a light `dark:` fill. */
+  :where(.dark) .dark\:text-slate-700 { color: #334155; }
+  :where(.dark) .dark\:text-slate-800 { color: #1e293b; }
+  :where(.dark) .dark\:text-slate-900 { color: #0f172a; }
+  :where(.dark) .dark\:text-slate-950 { color: #020617; }
+
+  :where(.dark) .dark\:border-slate-950 { border-color: #0b1222; }
+  :where(.dark) .dark\:border-slate-900 { border-color: #131d33; }
+  :where(.dark) .dark\:border-slate-800 { border-color: var(--sb-border-subtle); }
+  :where(.dark) .dark\:border-slate-700 { border-color: var(--sb-border); }
+  :where(.dark) .dark\:border-slate-600 { border-color: var(--sb-border-strong); }
+  :where(.dark) .dark\:border-slate-500 { border-color: var(--sb-border-stronger); }
+  :where(.dark) .dark\:border-slate-400 { border-color: #94a3b8; }
+  :where(.dark) .dark\:border-slate-300 { border-color: #cbd5e1; }
+  :where(.dark) .dark\:border-slate-200 { border-color: #e2e8f0; }
+  :where(.dark) .dark\:border-slate-100 { border-color: #f1f5f9; }
+  :where(.dark) .dark\:border-slate-50 { border-color: #f8fafc; }
+  :where(.dark) .dark\:border-slate-800\/60 { border-color: rgb(27 40 66 / 0.6); }
+  :where(.dark) .dark\:border-slate-700\/80 { border-color: rgb(var(--sb-border-rgb) / 0.8); }
+  :where(.dark) .dark\:border-slate-700\/70 { border-color: rgb(var(--sb-border-rgb) / 0.7); }
+  :where(.dark) .dark\:border-slate-700\/60 { border-color: rgb(var(--sb-border-rgb) / 0.6); }
+  :where(.dark) .dark\:border-slate-700\/50 { border-color: rgb(var(--sb-border-rgb) / 0.5); }
+
+  /* Divide utilities are zero-specificity in Tailwind 4 (`:where(& > …)`), so
+     the pin is too — a child's own border colour still wins. */
+  :where(.dark .dark\:divide-slate-800 > :not(:last-child)) { border-color: var(--sb-border-subtle); }
+  :where(.dark .dark\:divide-slate-700 > :not(:last-child)) { border-color: var(--sb-border); }
+  :where(.dark .dark\:divide-slate-600 > :not(:last-child)) { border-color: var(--sb-border-strong); }
+  :where(.dark) .dark\:ring-slate-800 { --tw-ring-color: var(--sb-border-subtle); }
+  :where(.dark) .dark\:ring-slate-700 { --tw-ring-color: var(--sb-border); }
+  :where(.dark) .dark\:ring-slate-600 { --tw-ring-color: var(--sb-border-strong); }
+  :where(.dark) .dark\:stroke-slate-800 { stroke: var(--sb-border-subtle); }
+  :where(.dark) .dark\:stroke-slate-700 { stroke: var(--sb-border); }
+  :where(.dark) .dark\:stroke-slate-600 { stroke: var(--sb-border-strong); }
+  :where(.dark) .dark\:from-slate-950 { --tw-gradient-from: var(--sb-canvas); }
+  :where(.dark) .dark\:from-slate-900 { --tw-gradient-from: var(--sb-surface); }
+  :where(.dark) .dark\:from-slate-800 { --tw-gradient-from: var(--sb-well); }
+  :where(.dark) .dark\:via-slate-900 { --tw-gradient-via: var(--sb-surface); }
+  :where(.dark) .dark\:via-slate-800 { --tw-gradient-via: var(--sb-well); }
+  :where(.dark) .dark\:to-slate-950 { --tw-gradient-to: var(--sb-canvas); }
+  :where(.dark) .dark\:to-slate-900 { --tw-gradient-to: var(--sb-surface); }
+  :where(.dark) .dark\:to-slate-800 { --tw-gradient-to: var(--sb-well); }
+  /* A focus ring's offset gap must match the surface it sits on. */
+  :where(.dark) :is(.dark\:ring-offset-slate-900, .dark\:ring-offset-slate-100) { --tw-ring-offset-color: var(--sb-surface); }
+  :where(.dark) .dark\:ring-offset-slate-950 { --tw-ring-offset-color: var(--sb-canvas); }
+  :where(.dark) :is(.dark\:focus-visible\:ring-offset-slate-900, .dark\:focus-visible\:ring-offset-slate-100):focus-visible { --tw-ring-offset-color: var(--sb-surface); }
+  :where(.dark) .dark\:focus-visible\:ring-offset-slate-950:focus-visible { --tw-ring-offset-color: var(--sb-canvas); }
+  :where(.dark) .focus-visible\:ring-offset-white:focus-visible:where(:not([class*="dark:focus-visible:ring-offset-"])) { --tw-ring-offset-color: var(--sb-surface); }
+  :where(.dark) :is(.dark\:placeholder\:text-slate-400, .dark\:placeholder\:text-slate-500)::placeholder { color: var(--sb-field-placeholder); }
+  /* `dark:` state variants of slate. */
+  :where(.dark) .dark\:open\:bg-slate-900:is([open], :popover-open) { background-color: var(--sb-surface); }
+  :where(.dark) .dark\:open\:bg-slate-800:is([open], :popover-open) { background-color: var(--sb-well); }
+  :where(.dark) .dark\:disabled\:bg-slate-900:disabled { background-color: var(--sb-surface); }
+  :where(.dark) .dark\:disabled\:bg-slate-800:disabled { background-color: var(--sb-well); }
+  @media (hover: hover) {
+    :where(.dark) .dark\:hover\:bg-slate-900:hover { background-color: var(--sb-surface); }
+    :where(.dark) .dark\:hover\:bg-slate-800:hover { background-color: var(--sb-control); }
+    :where(.dark) .dark\:hover\:bg-slate-800\/80:hover { background-color: rgb(var(--sb-control-rgb) / 0.8); }
+    :where(.dark) .dark\:hover\:bg-slate-800\/60:hover { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+    :where(.dark) .dark\:hover\:bg-slate-700:hover { background-color: var(--sb-control-strong); }
+    :where(.dark) .dark\:hover\:text-slate-100:hover { color: var(--sb-ink-heading); }
+    :where(.dark) .dark\:hover\:text-slate-200:hover { color: var(--sb-ink-body); }
+    :where(.dark) .dark\:hover\:text-slate-300:hover { color: var(--sb-ink-secondary); }
+    :where(.dark) .dark\:hover\:border-slate-600:hover { border-color: var(--sb-border-strong); }
+    :where(.dark) .dark\:hover\:border-slate-500:hover { border-color: var(--sb-border-stronger); }
+  }
+
+  /* ---- Light-surface state variants -------------------------------------
+     Inverted, `hover:bg-slate-50` would be the canvas colour: a row would
+     DARKEN on hover. Pale hovers lift to Tier 3 instead.                    */
+  @media (hover: hover) {
+    :where(.dark) :is(.hover\:bg-slate-50, .hover\:bg-slate-100, .hover\:bg-white):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
+    :where(.dark) .hover\:bg-slate-50\/60:hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+    :where(.dark) :is(.hover\:bg-white\/70, .hover\:bg-white\/80):hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(255 255 255 / 0.06); }
+    :where(.dark) :is(.hover\:bg-slate-700, .hover\:bg-slate-800, .hover\:bg-slate-900):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
+    :where(.dark) :is(button, a).bg-slate-900:is(.hover\:bg-slate-700, .hover\:bg-slate-800):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control-indigo-hover); }
+  }
+  :where(.dark) .disabled\:bg-slate-600:disabled { background-color: var(--sb-border-strong); }
+  :where(.dark) .disabled\:bg-slate-800:disabled { background-color: var(--sb-control-strong); }
+  :where(.dark) .open\:bg-white:is([open], :popover-open):where(:not([class*="dark:open:bg-"])) { background-color: var(--sb-surface); }
+
+  /* ---- Gradient stops ----------------------------------------------------
+     Tailwind reads `var(--tw-gradient-from)` on the same element, so pinning
+     the stop variable is enough. Pale stops are SURFACES (the card itself),
+     so they get opaque tints of Tier 1 rather than translucent washes.      */
+  :where(.dark) .from-slate-900:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface-hero); }
+  :where(.dark) .via-slate-900:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface-hero); }
+  :where(.dark) .to-slate-900:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface-hero); }
+  :where(.dark) .from-slate-900\/85 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.85); }
+  :where(.dark) .from-slate-900\/80 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.8); }
+  :where(.dark) .to-slate-900\/85 { --tw-gradient-to: rgb(var(--sb-surface-hero-rgb) / 0.85); }
+  :where(.dark) .via-slate-900\/20 { --tw-gradient-via: rgb(var(--sb-surface-hero-rgb) / 0.2); }
+  :where(.dark) .from-slate-800 { --tw-gradient-from: var(--sb-well); }
+  :where(.dark) .to-slate-800 { --tw-gradient-to: var(--sb-well); }
+  :where(.dark) .from-white:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface); }
+  :where(.dark) .via-white:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface); }
+  :where(.dark) .to-white:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface); }
+  :where(.dark) :is(.from-slate-50, .from-slate-100):where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-well); }
+  :where(.dark) :is(.via-slate-50, .via-slate-100):where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-well); }
+  :where(.dark) :is(.to-slate-50, .to-slate-100):where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-well); }
+  :where(.dark) .from-indigo-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #1b2547; }
+  :where(.dark) .via-indigo-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #1b2547; }
+  :where(.dark) .to-indigo-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #1b2547; }
+  :where(.dark) .from-violet-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #23244c; }
+  :where(.dark) .via-violet-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #23244c; }
+  :where(.dark) .to-violet-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #23244c; }
+  :where(.dark) .from-blue-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #172a4c; }
+  :where(.dark) .via-blue-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #172a4c; }
+  :where(.dark) .to-blue-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #172a4c; }
+  :where(.dark) .from-sky-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #14203a; }
+  :where(.dark) .via-sky-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #14203a; }
+  :where(.dark) .to-sky-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #14203a; }
+  :where(.dark) .from-teal-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #113240; }
+  :where(.dark) .via-teal-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #113240; }
+  :where(.dark) .to-teal-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #113240; }
+  :where(.dark) .from-emerald-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #11323a; }
+  :where(.dark) .via-emerald-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #11323a; }
+  :where(.dark) .to-emerald-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #11323a; }
+  :where(.dark) .from-amber-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a2114; }
+  :where(.dark) .via-amber-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a2114; }
+  :where(.dark) .to-amber-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a2114; }
+  :where(.dark) .from-orange-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a1b14; }
+  :where(.dark) .via-orange-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a1b14; }
+  :where(.dark) .to-orange-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a1b14; }
+  :where(.dark) .from-rose-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #332035; }
+  :where(.dark) .via-rose-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #332035; }
+  :where(.dark) .to-rose-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #332035; }
+  /* The rank-2 leaderboard badge is silver; keep it metallic, not paper-white. */
+  :where(.dark) .from-slate-300 { --tw-gradient-from: #3d4d6d; }
+
+  /* ---- Light copy on dark panels ---------------------------------------- */
+  :where(.dark) .text-slate-50:where(:not([class*="dark:text-"])) { color: var(--sb-ink-display); }
+  :where(.dark) .text-slate-100:where(:not([class*="dark:text-"])) { color: var(--sb-ink-heading); }
+  :where(.dark) .text-slate-200:where(:not([class*="dark:text-"])) { color: var(--sb-ink-body); }
+  :where(.dark) .text-slate-300:where(:not([class*="dark:text-"])) { color: var(--sb-ink-secondary); }
+  /* The accent 50/100 tokens are washes now; as TEXT they are light copy on a
+     dark hero (`text-indigo-100`, `text-cyan-50`) and keep their real value. */
+  :where(.dark) :is(.text-indigo-50, .text-indigo-100, [class^="text-indigo-100/"], [class*=" text-indigo-100/"], .dark\:text-indigo-50, .dark\:text-indigo-100) { color: #e0e7ff; }
+  :where(.dark) :is(.text-violet-50, .text-violet-100, [class^="text-violet-100/"], [class*=" text-violet-100/"], .dark\:text-violet-50, .dark\:text-violet-100) { color: #ede9fe; }
+  :where(.dark) :is(.text-purple-50, .text-purple-100, [class^="text-purple-100/"], [class*=" text-purple-100/"], .dark\:text-purple-50, .dark\:text-purple-100) { color: #f3e8ff; }
+  :where(.dark) :is(.text-blue-50, .text-blue-100, [class^="text-blue-100/"], [class*=" text-blue-100/"], .dark\:text-blue-50, .dark\:text-blue-100) { color: #dbeafe; }
+  :where(.dark) :is(.text-sky-50, .text-sky-100, [class^="text-sky-100/"], [class*=" text-sky-100/"], .dark\:text-sky-50, .dark\:text-sky-100) { color: #e0f2fe; }
+  :where(.dark) :is(.text-cyan-50, .text-cyan-100, [class^="text-cyan-100/"], [class*=" text-cyan-100/"], .dark\:text-cyan-50, .dark\:text-cyan-100) { color: #cffafe; }
+  :where(.dark) :is(.text-teal-50, .text-teal-100, [class^="text-teal-100/"], [class*=" text-teal-100/"], .dark\:text-teal-50, .dark\:text-teal-100) { color: #ccfbf1; }
+  :where(.dark) :is(.text-emerald-50, .text-emerald-100, [class^="text-emerald-100/"], [class*=" text-emerald-100/"], .dark\:text-emerald-50, .dark\:text-emerald-100) { color: #d1fae5; }
+  :where(.dark) :is(.text-green-50, .text-green-100, [class^="text-green-100/"], [class*=" text-green-100/"], .dark\:text-green-50, .dark\:text-green-100) { color: #dcfce7; }
+  :where(.dark) :is(.text-amber-50, .text-amber-100, [class^="text-amber-100/"], [class*=" text-amber-100/"], .dark\:text-amber-50, .dark\:text-amber-100) { color: #fef3c7; }
+  :where(.dark) :is(.text-yellow-50, .text-yellow-100, [class^="text-yellow-100/"], [class*=" text-yellow-100/"], .dark\:text-yellow-50, .dark\:text-yellow-100) { color: #fef9c3; }
+  :where(.dark) :is(.text-orange-50, .text-orange-100, [class^="text-orange-100/"], [class*=" text-orange-100/"], .dark\:text-orange-50, .dark\:text-orange-100) { color: #ffedd5; }
+  :where(.dark) :is(.text-red-50, .text-red-100, [class^="text-red-100/"], [class*=" text-red-100/"], .dark\:text-red-50, .dark\:text-red-100) { color: #fee2e2; }
+  :where(.dark) :is(.text-rose-50, .text-rose-100, [class^="text-rose-100/"], [class*=" text-rose-100/"], .dark\:text-rose-50, .dark\:text-rose-100) { color: #ffe4e6; }
+
+  @media (hover: hover) {
+    :where(.dark) :is(.dark\:hover\:text-indigo-50, .dark\:hover\:text-indigo-100):hover { color: #e0e7ff; }
+    :where(.dark) :is(.dark\:hover\:text-sky-50, .dark\:hover\:text-sky-100):hover { color: #e0f2fe; }
+    :where(.dark) :is(.dark\:hover\:text-emerald-50, .dark\:hover\:text-emerald-100):hover { color: #d1fae5; }
+    :where(.dark) :is(.dark\:hover\:text-amber-50, .dark\:hover\:text-amber-100):hover { color: #fef3c7; }
+  }
+
+  /* ---- Accent inks and hairlines -----------------------------------------
+     On a dark surface the light-mode inks (600–900) collapse into the fill;
+     they become the matching pastel. Solid accent FILLS (`bg-indigo-600`) are
+     deliberately untouched, so buttons and gradients keep their brand colour. */
+  :where(.dark) :is(.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900):where(:not([class*="dark:text-"])) { color: #a5b4fc; }
+  :where(.dark) :is(.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900):where(:not([class*="dark:text-"])) { color: #c4b5fd; }
+  :where(.dark) :is(.text-purple-500, .text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900):where(:not([class*="dark:text-"])) { color: #d8b4fe; }
+  :where(.dark) :is(.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900):where(:not([class*="dark:text-"])) { color: #93c5fd; }
+  :where(.dark) :is(.text-sky-500, .text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900):where(:not([class*="dark:text-"])) { color: #7dd3fc; }
+  :where(.dark) :is(.text-cyan-500, .text-cyan-600, .text-cyan-700, .text-cyan-800, .text-cyan-900):where(:not([class*="dark:text-"])) { color: #67e8f9; }
+  :where(.dark) :is(.text-teal-500, .text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900):where(:not([class*="dark:text-"])) { color: #5eead4; }
+  :where(.dark) :is(.text-emerald-500, .text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900):where(:not([class*="dark:text-"])) { color: #6ee7b7; }
+  :where(.dark) :is(.text-green-500, .text-green-600, .text-green-700, .text-green-800, .text-green-900):where(:not([class*="dark:text-"])) { color: #86efac; }
+  :where(.dark) :is(.text-lime-500, .text-lime-600, .text-lime-700, .text-lime-800, .text-lime-900):where(:not([class*="dark:text-"])) { color: #bef264; }
+  :where(.dark) :is(.text-yellow-500, .text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900):where(:not([class*="dark:text-"])) { color: #fde047; }
+  :where(.dark) :is(.text-amber-500, .text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900):where(:not([class*="dark:text-"])) { color: #fcd34d; }
+  :where(.dark) :is(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900):where(:not([class*="dark:text-"])) { color: #fdba74; }
+  :where(.dark) :is(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .text-red-900):where(:not([class*="dark:text-"])) { color: #fca5a5; }
+  :where(.dark) :is(.text-rose-500, .text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900):where(:not([class*="dark:text-"])) { color: #fda4af; }
+  :where(.dark) :is(.text-pink-500, .text-pink-600, .text-pink-700, .text-pink-800, .text-pink-900):where(:not([class*="dark:text-"])) { color: #f9a8d4; }
+  :where(.dark) :is(.text-fuchsia-500, .text-fuchsia-600, .text-fuchsia-700, .text-fuchsia-800, .text-fuchsia-900):where(:not([class*="dark:text-"])) { color: #f0abfc; }
+
+  :where(.dark) :is(.border-indigo-200, .border-indigo-300, [class^="border-indigo-200/"], [class*=" border-indigo-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(99 102 241 / 0.35); }
+  :where(.dark) :is(.border-violet-200, .border-violet-300, [class^="border-violet-200/"], [class*=" border-violet-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(139 92 246 / 0.35); }
+  :where(.dark) :is(.border-purple-200, .border-purple-300, [class^="border-purple-200/"], [class*=" border-purple-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(168 85 247 / 0.35); }
+  :where(.dark) :is(.border-blue-200, .border-blue-300, [class^="border-blue-200/"], [class*=" border-blue-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(59 130 246 / 0.35); }
+  :where(.dark) :is(.border-sky-200, .border-sky-300, [class^="border-sky-200/"], [class*=" border-sky-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(14 165 233 / 0.35); }
+  :where(.dark) :is(.border-cyan-200, .border-cyan-300, [class^="border-cyan-200/"], [class*=" border-cyan-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(6 182 212 / 0.35); }
+  :where(.dark) :is(.border-teal-200, .border-teal-300, [class^="border-teal-200/"], [class*=" border-teal-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(20 184 166 / 0.35); }
+  :where(.dark) :is(.border-emerald-200, .border-emerald-300, [class^="border-emerald-200/"], [class*=" border-emerald-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(16 185 129 / 0.35); }
+  :where(.dark) :is(.border-green-200, .border-green-300, [class^="border-green-200/"], [class*=" border-green-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(34 197 94 / 0.35); }
+  :where(.dark) :is(.border-yellow-200, .border-yellow-300, [class^="border-yellow-200/"], [class*=" border-yellow-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(234 179 8 / 0.35); }
+  :where(.dark) :is(.border-amber-200, .border-amber-300, [class^="border-amber-200/"], [class*=" border-amber-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(245 158 11 / 0.35); }
+  :where(.dark) :is(.border-orange-200, .border-orange-300, [class^="border-orange-200/"], [class*=" border-orange-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(249 115 22 / 0.35); }
+  :where(.dark) :is(.border-red-200, .border-red-300, [class^="border-red-200/"], [class*=" border-red-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(239 68 68 / 0.35); }
+  :where(.dark) :is(.border-rose-200, .border-rose-300, [class^="border-rose-200/"], [class*=" border-rose-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(244 63 94 / 0.35); }
+  :where(.dark) :is(.ring-indigo-200, .ring-indigo-300) { --tw-ring-color: rgb(99 102 241 / 0.4); }
+  :where(.dark) :is(.ring-violet-200, .ring-violet-300) { --tw-ring-color: rgb(139 92 246 / 0.4); }
+  :where(.dark) :is(.ring-emerald-200, .ring-emerald-300) { --tw-ring-color: rgb(16 185 129 / 0.4); }
+  :where(.dark) :is(.ring-amber-200, .ring-amber-300) { --tw-ring-color: rgb(245 158 11 / 0.4); }
+  :where(.dark) :is(.ring-orange-200, .ring-orange-300) { --tw-ring-color: rgb(249 115 22 / 0.4); }
+  :where(.dark) :is(.ring-rose-200, .ring-rose-300) { --tw-ring-color: rgb(244 63 94 / 0.4); }
+  :where(.dark) :is(.ring-sky-200, .ring-sky-300) { --tw-ring-color: rgb(14 165 233 / 0.4); }
+  /* State hairlines: a pale `hover:border-indigo-300` would flash a glowing
+     outline on a dark card; it becomes a slightly stronger wash instead. */
+  @media (hover: hover) {
+    :where(.dark) :is(.hover\:border-indigo-200, .hover\:border-indigo-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(99 102 241 / 0.55); }
+    :where(.dark) :is(.hover\:border-violet-200, .hover\:border-violet-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(139 92 246 / 0.55); }
+    :where(.dark) :is(.hover\:border-purple-200, .hover\:border-purple-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(168 85 247 / 0.55); }
+    :where(.dark) :is(.hover\:border-blue-200, .hover\:border-blue-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(59 130 246 / 0.55); }
+    :where(.dark) :is(.hover\:border-sky-200, .hover\:border-sky-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(14 165 233 / 0.55); }
+    :where(.dark) :is(.hover\:border-emerald-200, .hover\:border-emerald-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(16 185 129 / 0.55); }
+    :where(.dark) :is(.hover\:border-amber-200, .hover\:border-amber-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(245 158 11 / 0.55); }
+    :where(.dark) :is(.hover\:border-rose-200, .hover\:border-rose-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(244 63 94 / 0.55); }
+  }
+  /* Accent link hovers DARKEN in light mode (`text-indigo-700 hover:text-indigo-900`).
+     On a dark surface that would sink the link into the card, so they BRIGHTEN
+     to the family's 200 pastel instead — the mirror image of the light theme. */
+  @media (hover: hover) {
+    :where(.dark) :is(.hover\:text-indigo-500, .hover\:text-indigo-600, .hover\:text-indigo-700, .hover\:text-indigo-800, .hover\:text-indigo-900, .hover\:text-indigo-950):hover:where(:not([class*="dark:hover:text-"])) { color: #c7d2fe; }
+    :where(.dark) :is(.hover\:text-violet-500, .hover\:text-violet-600, .hover\:text-violet-700, .hover\:text-violet-800, .hover\:text-violet-900):hover:where(:not([class*="dark:hover:text-"])) { color: #ddd6fe; }
+    :where(.dark) :is(.hover\:text-purple-500, .hover\:text-purple-600, .hover\:text-purple-700, .hover\:text-purple-800, .hover\:text-purple-900):hover:where(:not([class*="dark:hover:text-"])) { color: #e9d5ff; }
+    :where(.dark) :is(.hover\:text-blue-500, .hover\:text-blue-600, .hover\:text-blue-700, .hover\:text-blue-800, .hover\:text-blue-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bfdbfe; }
+    :where(.dark) :is(.hover\:text-sky-500, .hover\:text-sky-600, .hover\:text-sky-700, .hover\:text-sky-800, .hover\:text-sky-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bae6fd; }
+    :where(.dark) :is(.hover\:text-teal-500, .hover\:text-teal-600, .hover\:text-teal-700, .hover\:text-teal-800, .hover\:text-teal-900):hover:where(:not([class*="dark:hover:text-"])) { color: #99f6e4; }
+    :where(.dark) :is(.hover\:text-emerald-500, .hover\:text-emerald-600, .hover\:text-emerald-700, .hover\:text-emerald-800, .hover\:text-emerald-900):hover:where(:not([class*="dark:hover:text-"])) { color: #a7f3d0; }
+    :where(.dark) :is(.hover\:text-amber-500, .hover\:text-amber-600, .hover\:text-amber-700, .hover\:text-amber-800, .hover\:text-amber-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fde68a; }
+    :where(.dark) :is(.hover\:text-orange-500, .hover\:text-orange-600, .hover\:text-orange-700, .hover\:text-orange-800, .hover\:text-orange-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fed7aa; }
+    :where(.dark) :is(.hover\:text-red-500, .hover\:text-red-600, .hover\:text-red-700, .hover\:text-red-800, .hover\:text-red-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecaca; }
+    :where(.dark) :is(.hover\:text-rose-500, .hover\:text-rose-600, .hover\:text-rose-700, .hover\:text-rose-800, .hover\:text-rose-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecdd3; }
+  }
+  :where(.dark) :is(.focus\:border-indigo-200, .focus\:border-indigo-300):focus:where(:not([class*="dark:focus:border-"])) { border-color: rgb(129 140 248 / 0.8); }
+  :where(.dark) .open\:border-indigo-200:is([open], :popover-open):where(:not([class*="dark:open:border-"])) { border-color: rgb(99 102 241 / 0.55); }
+  :where(.dark) :is(.focus\:ring-indigo-200, .focus\:ring-indigo-300):focus:where(:not([class*="dark:focus:ring-"])) { --tw-ring-color: rgb(99 102 241 / 0.45); }
+
+  /* ---- Neutral safety net -------------------------------------------------
+     Gray/neutral/zinc are independent Tailwind 4 tokens, not aliases for
+     slate. Keep their ink readable and their pale fills on Tier 1. */
+  :where(.dark) :is([class~="text-black"], [class*="text-black/"], [class*="text-gray-"], [class*="text-neutral-"], [class*="text-zinc-"]) { color: var(--sb-ink-display); }
+  :where(.dark) :is([class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"], [class~="bg-neutral-50"], [class~="bg-neutral-100"], [class~="bg-neutral-200"], [class~="bg-zinc-50"], [class~="bg-zinc-100"], [class~="bg-zinc-200"]) { background-color: var(--sb-surface); }
+
+  /* ---- Fields — recessed wells (dark) -------------------------------------
+     A text field written as a light card (`bg-white border-slate-300`) sits a
+     step BELOW its card in dark mode. (0,1,1): above the base pins, below
+     `focus:` / `hover:` variants. `.sb-field` (below) is the full treatment. */
+  :where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.bg-white, .bg-slate-50, .bg-slate-100, .dark\:bg-slate-800, .dark\:bg-slate-900, .dark\:bg-slate-950) {
+    background-color: var(--sb-field-bg);
+  }
+  :where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.border-slate-200, .border-slate-300, .dark\:border-slate-600, .dark\:border-slate-700) {
+    border-color: var(--sb-field-border);
+  }
+
+  /* Field text fallback for inputs without a text utility (0,0,1). */
+  :where(.dark) :is(input, textarea, select) { color: var(--sb-ink-display); }
+
+  /* ---- Light mode ---------------------------------------------------------
+     Slate 400/500 are below 4.5:1 on the pale surfaces, so body copy and
+     labels use slate-600 in light mode. Layered + (0,1,0): a `hover:text-*`
+     variant still recolours the element. */
+  :where(html:not(.dark)) :is(.text-slate-400, .text-slate-500) { color: #475569; }
+  /* …except on a deliberately dark banner, where #475569 is 2.4:1 against
+     slate-900. There muted copy is a light slate (12:1). */
+  :where(html:not(.dark) :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class^="from-slate-900"], [class*=" from-slate-900"], [class^="from-[#12143a]"], [class*=" from-[#12143a]"], [class^="from-[#161b38]"], [class*=" from-[#161b38]"])) :is(.text-slate-300, .text-slate-400, .text-slate-500),
+  :where(html:not(.dark)) :where(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class^="from-slate-900"], [class*=" from-slate-900"], [class^="from-[#12143a]"], [class*=" from-[#12143a]"], [class^="from-[#161b38]"], [class*=" from-[#161b38]"]):is(.text-slate-300, .text-slate-400, .text-slate-500) {
+    color: #cbd5e1;
+  }
+  /* A light card nested inside such a banner gets the regular muted ink back. */
+  :where(html:not(.dark) :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class^="from-slate-900"], [class*=" from-slate-900"]) :is(.bg-white, .bg-slate-50, .bg-slate-100)) :is(.text-slate-400, .text-slate-500) { color: #475569; }
 }
-.dark .hover\:bg-slate-700:hover { background-color: #24334f; }
-.dark .hover\:bg-slate-800:hover { background-color: #1d2b47; }
-.dark .hover\:bg-slate-900:hover { background-color: #16213a; }
-/* …and the pale hovers need the mirror-image treatment: inverted, `hover:bg-slate-50`
-   would resolve to the page colour, so a row would *darken* on hover instead
-   of lifting. Map them to the same subtle raised tone as `hover:bg-slate-700`. */
-.dark .hover\:bg-slate-50:hover,
-.dark .hover\:bg-slate-100:hover { background-color: #1b2740; }
-.dark .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #22304d; }
-.dark .border-slate-800,
-.dark .border-slate-900 { border-color: #22304d; }
-/* Structural hairlines follow the same rule as `bg-slate-600/700` above: the
-   inverted ramp turns these into near-white, which reads as a glowing outline
-   rather than a divider (input borders, the progress-ring track). */
-.dark .border-slate-700 { border-color: #33425f; }
-.dark .border-slate-600 { border-color: #3d4d6d; }
-.dark .stroke-slate-700 { stroke: #33425f; }
-.dark .stroke-slate-600 { stroke: #3d4d6d; }
-.dark .ring-slate-700 { --tw-ring-color: #33425f; }
 
-/*  Dark gradient stops -------------------------------------------------------
-    `from-slate-900` / `to-slate-900` build the deliberately dark hero banners.
-    The gradient reads `var(--tw-gradient-from)` on the same element, so
-    overriding the stop variable here is enough — no need to touch `stops`. */
-.dark .from-slate-900 { --tw-gradient-from: #0d1424; }
-.dark .to-slate-900 { --tw-gradient-to: #0d1424; }
-.dark .from-slate-900\/85 { --tw-gradient-from: rgb(13 20 36 / 0.85); }
-.dark .from-slate-900\/80 { --tw-gradient-from: rgb(13 20 36 / 0.8); }
-.dark .to-slate-900\/85 { --tw-gradient-to: rgb(13 20 36 / 0.85); }
-.dark .via-slate-900\/20 { --tw-gradient-via: rgb(13 20 36 / 0.2); }
+/* ===========================================================================
+   SEMANTIC HELPERS — unlayered, so they win over every utility and pin.
+   =========================================================================== */
 
-/*  Soft "tinted surface" gradients -------------------------------------------
-    `from-indigo-50 to-white`, `from-amber-50 to-orange-50` and friends are
-    surface gradients, not decoration: the card itself. The inverted ramp does
-    not touch `--tw-gradient-*` stops, so they used to stay pale in dark mode
-    while the copy inside them flipped to a light slate value — white text on a
-    white gradient. They resolve to the dark equivalents of the same tints. */
-.dark .from-white { --tw-gradient-from: #131c31; }
-.dark .via-white { --tw-gradient-via: #131c31; }
-.dark .to-white { --tw-gradient-to: #131c31; }
-.dark .from-indigo-50 { --tw-gradient-from: #1b2547; }
-.dark .via-indigo-50 { --tw-gradient-via: #1b2547; }
-.dark .to-indigo-50 { --tw-gradient-to: #1b2547; }
-.dark .from-sky-50 { --tw-gradient-from: #14203a; }
-.dark .via-sky-50 { --tw-gradient-via: #14203a; }
-.dark .to-sky-50 { --tw-gradient-to: #14203a; }
-.dark .from-amber-50 { --tw-gradient-from: #2a2114; }
-.dark .via-amber-50 { --tw-gradient-via: #2a2114; }
-.dark .to-amber-50 { --tw-gradient-to: #2a2114; }
-.dark .to-orange-50 { --tw-gradient-to: #2a1b14; }
-.dark .from-orange-50 { --tw-gradient-from: #2a1b14; }
-/* The rank-2 leaderboard badge is a silver gradient; keep it metallic, not
-   paper-white, by darkening the light-mode start. */
-.dark .from-slate-300 { --tw-gradient-from: #3d4d6d; }
-
-/*  Light text on dark panels ------------------------------------------------
-    `text-slate-100/200/300` is used almost exclusively as light copy on the
-    deliberately dark panels above (hero cards, the AI console). The inverted
-    ramp would turn it into dark-on-dark, so it is pinned to light values. */
-.dark .text-slate-100 { color: #eef2f7; }
-.dark .text-slate-200 { color: #d5dde8; }
-.dark .text-slate-300 { color: #b4c0d3; }
-
-/*  Cards -------------------------------------------------------------------
-    `bg-white` is the card background. Low-opacity whites (`bg-white/10`) are
-    translucent overlays on top of coloured gradients and are left alone. */
-.dark .bg-white { background-color: #131c31; }
-.dark .bg-white\/95 { background-color: rgb(19 28 49 / 0.95); }
-.dark .bg-white\/90 { background-color: rgb(19 28 49 / 0.9); }
-.dark .bg-white\/85 { background-color: rgb(19 28 49 / 0.85); }
-.dark .hover\:bg-white:hover { background-color: #22304d; }
-
-/*  Neutral text safety net --------------------------------------------------
-    Gray/neutral/zinc are independent Tailwind 4 tokens, not aliases for
-    slate. Without an explicit dark rule their default dark ink disappears
-    on dark surfaces. Keep those utilities readable, including dark variants. */
-.dark :is(
-  [class~="text-black"], [class~="text-gray-950"], [class~="text-gray-900"],
-  [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"],
-  [class~="text-gray-500"], [class~="text-gray-400"], [class~="text-gray-300"],
-  [class~="text-gray-200"], [class~="text-gray-100"], [class~="text-gray-50"],
-  [class~="text-neutral-950"], [class~="text-neutral-900"], [class~="text-neutral-800"],
-  [class~="text-neutral-700"], [class~="text-neutral-600"], [class~="text-neutral-500"],
-  [class~="text-neutral-400"], [class~="text-neutral-300"], [class~="text-neutral-200"],
-  [class~="text-neutral-100"], [class~="text-neutral-50"],
-  [class~="text-zinc-950"], [class~="text-zinc-900"], [class~="text-zinc-800"],
-  [class~="text-zinc-700"], [class~="text-zinc-600"], [class~="text-zinc-500"],
-  [class~="text-zinc-400"], [class~="text-zinc-300"], [class~="text-zinc-200"],
-  [class~="text-zinc-100"], [class~="text-zinc-50"],
-  [class~="dark:text-black"], [class~="dark:text-gray-950"], [class~="dark:text-gray-900"],
-  [class~="dark:text-gray-800"], [class~="dark:text-gray-700"], [class~="dark:text-gray-600"],
-  [class~="dark:text-gray-500"], [class~="dark:text-gray-400"], [class~="dark:text-gray-300"],
-  [class~="dark:text-gray-200"], [class~="dark:text-gray-100"], [class~="dark:text-gray-50"],
-  [class~="dark:text-neutral-950"], [class~="dark:text-neutral-900"], [class~="dark:text-neutral-800"],
-  [class~="dark:text-neutral-700"], [class~="dark:text-neutral-600"], [class~="dark:text-neutral-500"],
-  [class~="dark:text-neutral-400"], [class~="dark:text-neutral-300"], [class~="dark:text-neutral-200"],
-  [class~="dark:text-neutral-100"], [class~="dark:text-neutral-50"],
-  [class~="dark:text-zinc-950"], [class~="dark:text-zinc-900"], [class~="dark:text-zinc-800"],
-  [class~="dark:text-zinc-700"], [class~="dark:text-zinc-600"], [class~="dark:text-zinc-500"],
-  [class~="dark:text-zinc-400"], [class~="dark:text-zinc-300"], [class~="dark:text-zinc-200"],
-  [class~="dark:text-zinc-100"], [class~="dark:text-zinc-50"],
-  [class*="text-black/"], [class*="text-gray-"], [class*="text-neutral-"], [class*="text-zinc-"]
-) { color: #f5f8fc; }
-
-.dark :is(
-  [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"],
-  [class~="bg-neutral-50"], [class~="bg-neutral-100"], [class~="bg-neutral-200"],
-  [class~="bg-zinc-50"], [class~="bg-zinc-100"], [class~="bg-zinc-200"]
-) { background-color: #111a2e; }
-
-.dark :is(input, textarea, select)::placeholder { color: #a3b1c9; opacity: 1; }
-.dark :is(input, textarea, select) { color: #f5f8fc; }
-
-/* Some components intentionally add a dark slate panel at 60% opacity. The
-   generated dark utility still uses the pale inverted slate-800 token, so pin
-   its alpha variant to the dark panel ramp instead of washing the parent card. */
-.dark [class~="dark:bg-slate-800/60"] {
-  background-color: rgb(22 33 58 / 0.6);
-}
-
-/* The slate aliases are explicit as well, protecting against a component's
-   dark variant winning the cascade with a low-contrast value. */
-.dark .text-slate-400 { color: #c3cede; }
-.dark .text-slate-500 { color: #cbd5e1; }
-.dark .text-slate-600 { color: #d6deea; }
-.dark .text-slate-700 { color: #e1e8f2; }
-.dark .text-slate-800 { color: #edf2f8; }
-.dark .text-slate-900 { color: #f8fafc; }
-
-/*  Accent hover tints -------------------------------------------------------
-    `hover:bg-{accent}-50/100` is a pale wash on light cards; in dark mode it
-    would flash a near-white block, so map it to a translucent accent tint. */
-.dark .hover\:bg-indigo-50:hover,
-.dark .hover\:bg-indigo-50\/40:hover,
-.dark .enabled\:hover\:bg-indigo-50\/40:enabled:hover,
-.dark .hover\:bg-indigo-100:hover { background-color: rgba(99,102,241, 0.2); }
-.dark .hover\:bg-violet-50:hover,
-.dark .hover\:bg-violet-50\/40:hover,
-.dark .enabled\:hover\:bg-violet-50\/40:enabled:hover,
-.dark .hover\:bg-violet-100:hover { background-color: rgba(139,92,246, 0.2); }
-.dark .hover\:bg-emerald-50:hover,
-.dark .hover\:bg-emerald-50\/40:hover,
-.dark .enabled\:hover\:bg-emerald-50\/40:enabled:hover,
-.dark .hover\:bg-emerald-100:hover { background-color: rgba(16,185,129, 0.2); }
-.dark .hover\:bg-amber-50:hover,
-.dark .hover\:bg-amber-50\/40:hover,
-.dark .enabled\:hover\:bg-amber-50\/40:enabled:hover,
-.dark .hover\:bg-amber-100:hover { background-color: rgba(245,158,11, 0.2); }
-.dark .hover\:bg-rose-50:hover,
-.dark .hover\:bg-rose-50\/40:hover,
-.dark .enabled\:hover\:bg-rose-50\/40:enabled:hover,
-.dark .hover\:bg-rose-100:hover { background-color: rgba(244,63,94, 0.2); }
-.dark .hover\:bg-red-50:hover,
-.dark .hover\:bg-red-50\/40:hover,
-.dark .enabled\:hover\:bg-red-50\/40:enabled:hover,
-.dark .hover\:bg-red-100:hover { background-color: rgba(239,68,68, 0.2); }
-.dark .hover\:bg-sky-50:hover,
-.dark .hover\:bg-sky-50\/40:hover,
-.dark .enabled\:hover\:bg-sky-50\/40:enabled:hover,
-.dark .hover\:bg-sky-100:hover { background-color: rgba(14,165,233, 0.2); }
-
-/*  Accent tints -------------------------------------------------------
-    `bg-indigo-50` is a pale chip behind coloured text on a light card;
-    in dark mode the same chip must be a translucent accent wash, not a
-    pale block. Solid accent fills (`bg-indigo-600`) are deliberately NOT
-    touched, so primary buttons and gradients keep their brand colour. */
-
-  .dark .bg-indigo-50,
-  .dark .bg-indigo-100 { background-color: rgba(99,102,241, 0.16); }
-  .dark .border-indigo-100,
-  .dark .border-indigo-200,
-  .dark .border-indigo-300 { border-color: rgba(99,102,241, 0.38); }
-  .dark .text-indigo-500,
-  .dark .text-indigo-600,
-  .dark .text-indigo-700,
-  .dark .text-indigo-800,
-  .dark .text-indigo-900 { color: #a5b4fc; }
-
-  .dark .bg-violet-50,
-  .dark .bg-violet-100 { background-color: rgba(139,92,246, 0.16); }
-  .dark .border-violet-100,
-  .dark .border-violet-200,
-  .dark .border-violet-300 { border-color: rgba(139,92,246, 0.38); }
-  .dark .text-violet-500,
-  .dark .text-violet-600,
-  .dark .text-violet-700,
-  .dark .text-violet-800,
-  .dark .text-violet-900 { color: #c4b5fd; }
-
-  .dark .bg-purple-50,
-  .dark .bg-purple-100 { background-color: rgba(168,85,247, 0.16); }
-  .dark .border-purple-100,
-  .dark .border-purple-200,
-  .dark .border-purple-300 { border-color: rgba(168,85,247, 0.38); }
-  .dark .text-purple-500,
-  .dark .text-purple-600,
-  .dark .text-purple-700,
-  .dark .text-purple-800,
-  .dark .text-purple-900 { color: #d8b4fe; }
-
-  .dark .bg-blue-50,
-  .dark .bg-blue-100 { background-color: rgba(59,130,246, 0.16); }
-  .dark .border-blue-100,
-  .dark .border-blue-200,
-  .dark .border-blue-300 { border-color: rgba(59,130,246, 0.38); }
-  .dark .text-blue-500,
-  .dark .text-blue-600,
-  .dark .text-blue-700,
-  .dark .text-blue-800,
-  .dark .text-blue-900 { color: #93c5fd; }
-
-  .dark .bg-sky-50,
-  .dark .bg-sky-100 { background-color: rgba(14,165,233, 0.16); }
-  .dark .border-sky-100,
-  .dark .border-sky-200,
-  .dark .border-sky-300 { border-color: rgba(14,165,233, 0.38); }
-  .dark .text-sky-500,
-  .dark .text-sky-600,
-  .dark .text-sky-700,
-  .dark .text-sky-800,
-  .dark .text-sky-900 { color: #7dd3fc; }
-
-  .dark .bg-emerald-50,
-  .dark .bg-emerald-100 { background-color: rgba(16,185,129, 0.16); }
-  .dark .border-emerald-100,
-  .dark .border-emerald-200,
-  .dark .border-emerald-300 { border-color: rgba(16,185,129, 0.38); }
-  .dark .text-emerald-500,
-  .dark .text-emerald-600,
-  .dark .text-emerald-700,
-  .dark .text-emerald-800,
-  .dark .text-emerald-900 { color: #6ee7b7; }
-
-  .dark .bg-green-50,
-  .dark .bg-green-100 { background-color: rgba(34,197,94, 0.16); }
-  .dark .border-green-100,
-  .dark .border-green-200,
-  .dark .border-green-300 { border-color: rgba(34,197,94, 0.38); }
-  .dark .text-green-500,
-  .dark .text-green-600,
-  .dark .text-green-700,
-  .dark .text-green-800,
-  .dark .text-green-900 { color: #86efac; }
-
-  .dark .bg-teal-50,
-  .dark .bg-teal-100 { background-color: rgba(20,184,166, 0.16); }
-  .dark .border-teal-100,
-  .dark .border-teal-200,
-  .dark .border-teal-300 { border-color: rgba(20,184,166, 0.38); }
-  .dark .text-teal-500,
-  .dark .text-teal-600,
-  .dark .text-teal-700,
-  .dark .text-teal-800,
-  .dark .text-teal-900 { color: #5eead4; }
-
-  .dark .bg-amber-50,
-  .dark .bg-amber-100,
-  .dark [class~="bg-amber-50/50"] { background-color: rgba(245,158,11, 0.16); }
-  .dark .border-amber-100,
-  .dark .border-amber-200,
-  .dark .border-amber-300 { border-color: rgba(245,158,11, 0.38); }
-  .dark .text-amber-500,
-  .dark .text-amber-600,
-  .dark .text-amber-700,
-  .dark .text-amber-800,
-  .dark .text-amber-900 { color: #fcd34d; }
-
-  .dark .bg-yellow-50,
-  .dark .bg-yellow-100 { background-color: rgba(234,179,8, 0.16); }
-  .dark .border-yellow-100,
-  .dark .border-yellow-200,
-  .dark .border-yellow-300 { border-color: rgba(234,179,8, 0.38); }
-  .dark .text-yellow-500,
-  .dark .text-yellow-600,
-  .dark .text-yellow-700,
-  .dark .text-yellow-800,
-  .dark .text-yellow-900 { color: #fde047; }
-
-  .dark .bg-orange-50,
-  .dark .bg-orange-100 { background-color: rgba(249,115,22, 0.16); }
-  .dark .border-orange-100,
-  .dark .border-orange-200,
-  .dark .border-orange-300 { border-color: rgba(249,115,22, 0.38); }
-  .dark .text-orange-500,
-  .dark .text-orange-600,
-  .dark .text-orange-700,
-  .dark .text-orange-800,
-  .dark .text-orange-900 { color: #fdba74; }
-
-  .dark .bg-red-50,
-  .dark .bg-red-100 { background-color: rgba(239,68,68, 0.16); }
-  .dark .border-red-100,
-  .dark .border-red-200,
-  .dark .border-red-300 { border-color: rgba(239,68,68, 0.38); }
-  .dark .text-red-500,
-  .dark .text-red-600,
-  .dark .text-red-700,
-  .dark .text-red-800,
-  .dark .text-red-900 { color: #fca5a5; }
-
-  .dark .bg-rose-50,
-  .dark .bg-rose-100 { background-color: rgba(244,63,94, 0.16); }
-  .dark .border-rose-100,
-  .dark .border-rose-200,
-  .dark .border-rose-300 { border-color: rgba(244,63,94, 0.38); }
-  .dark .text-rose-500,
-  .dark .text-rose-600,
-  .dark .text-rose-700,
-  .dark .text-rose-800,
-  .dark .text-rose-900 { color: #fda4af; }
+.dark :is(input, textarea, select)::placeholder { color: var(--sb-field-placeholder); opacity: 1; }
 
 /*  Ink for deliberately BRIGHT fills -----------------------------------------
-    Amber CTAs, the "Apply now" button, the green tick badges, the sky-coloured
-    Telegram buttons: these fills stay bright in dark mode (they are the accent,
-    not a surface), and white copy on them lands at 2.0–2.7:1 in *both* themes.
-    A `dark:` variant cannot fix this — the remap above outranks it — so the
-    bright-fill ink is a class of its own, applied in both themes.
-
-    Use it on the element that carries the copy (label, number, icon), never on
-    the fill itself.                                                         */
+    Amber CTAs, the "Apply now" button, the green tick badges: these fills stay
+    bright in dark mode (they are the accent, not a surface), and white copy on
+    them lands at 2.0–2.7:1 in *both* themes. Use the class on the element that
+    carries the copy (label, number, icon), never on the fill itself.        */
 .sb-ink-on-bright { color: #1a1405; }
 .dark .sb-ink-on-bright { color: #0b1220; }
 /* Same idea for a bright fill that needs a warmer ink (amber/yellow/orange). */
 .sb-ink-on-warm { color: #241704; }
 .dark .sb-ink-on-warm { color: #0b1220; }
 
-/*  The journey hero — its own colour identity --------------------------------
-    "Your Study Abroad Journey" is the one block on the dashboard that should
-    not look like every other card. In light mode it is a pale indigo wash; in
-    dark mode the generic `slate-900` gradient would flatten it into a black
-    band, so it gets a deep indigo→violet of its own that sits *with* the dark
-    palette instead of shouting over it. The eyebrow label gets a dedicated
-    indigo as well, deeper than the washed `text-indigo-500` remap.           */
+/*  Logo wells ----------------------------------------------------------------
+    University crests and the brand mark are drawn for a white backdrop (dark
+    letters, transparent PNGs). A `bg-white` frame turns navy in dark mode and
+    the logo vanishes — a logo well stays white in both themes.              */
+.sb-logo-well {
+  background-color: #ffffff !important;
+  border-color: rgb(226 232 240 / 0.9) !important;
+}
+
+/*  Form fields ---------------------------------------------------------------
+    One field treatment for both themes: crisp white + slate-300 hairline in
+    light, a recessed #0d1526 well in dark, and the same indigo focus halo.   */
+.sb-field {
+  background-color: var(--sb-field-bg);
+  border-color: var(--sb-field-border);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.sb-field::placeholder { color: var(--sb-field-placeholder); opacity: 1; }
+@media (hover: hover) {
+  .sb-field:hover:not(:focus):not(:disabled) { border-color: var(--sb-field-border-hover); }
+}
+.sb-field:focus,
+.sb-field:focus-visible {
+  border-color: var(--sb-focus);
+  box-shadow: 0 0 0 3px var(--sb-field-ring);
+  outline: none;
+}
+.sb-field:disabled { background-color: var(--sb-field-disabled); cursor: not-allowed; }
+.sb-field[aria-invalid="true"] { border-color: #f43f5e; }
+
+/*  The journey hero — the one hero surface per screen --------------------------
+    Every destination's header (HubPage), the dashboard journey card and the
+    Premium page share it: a pale indigo wash on light, a deep indigo→violet on
+    dark that sits WITH the obsidian palette instead of shouting over it.     */
 .sb-journey-hero {
   background-image: linear-gradient(135deg, #eef2ff 0%, #ffffff 45%, #f0f9ff 100%);
   border-color: rgb(199 210 254 / 0.7);
@@ -441,7 +587,7 @@
     `color-scheme` (set above) already darkens form controls and scrollbars;
     these finish the job for custom-styled scroll areas. */
 .dark ::-webkit-scrollbar { width: 10px; height: 10px; }
-.dark ::-webkit-scrollbar-track { background: #0b1220; }
+.dark ::-webkit-scrollbar-track { background: var(--sb-canvas); }
 .dark ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 9999px; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #3a4d75; }
 .dark ::selection { background: rgb(99 102 241 / 0.4); color: #f5f8fc; }
@@ -743,15 +889,6 @@ html.theme-transition *::after {
   animation: sb-fade-in 0.4s ease-out both;
 }
 
-/* Slate 400/500 are intentionally muted in Tailwind's default palette, but
-   they fall below 4.5:1 on the pale surfaces used throughout the student UI.
-   Use the existing slate-700 ink for body copy and labels in light mode; the
-   dedicated dark-theme mappings below remain unchanged. */
-html:not(.dark) .text-slate-400,
-html:not(.dark) .text-slate-500 {
-  color: #475569;
-}
-
 /* Phone and tablet controls need a stable touch target even when a feature's
    desktop utility classes are only 32–40px tall. Keep text and spacing intact;
    these minimums let controls grow when translated labels wrap. */
@@ -774,6 +911,16 @@ html:not(.dark) .text-slate-500 {
   body { font-size: 10pt; }
   .dark {
     color-scheme: light !important;
+    /* Every dark pin references a token, so resetting the tokens prints light. */
+    --sb-canvas: #ffffff; --sb-surface: #ffffff; --sb-surface-rgb: 255 255 255;
+    --sb-surface-hero: #ffffff; --sb-surface-hero-rgb: 255 255 255;
+    --sb-well: #f8fafc; --sb-well-rgb: 248 250 252; --sb-control: #f1f5f9; --sb-control-rgb: 241 245 249;
+    --sb-control-strong: #e2e8f0; --sb-scrim-rgb: 255 255 255;
+    --sb-border-subtle: #e2e8f0; --sb-border: #cbd5e1; --sb-border-rgb: 203 213 225; --sb-border-strong: #94a3b8; --sb-border-stronger: #64748b;
+    --sb-ink-display: #0f172a; --sb-ink-heading: #0f172a; --sb-ink-body: #1e293b; --sb-ink-secondary: #334155;
+    --sb-ink-muted: #475569; --sb-ink-dim: #475569; --sb-ink-faint: #64748b;
+    --sb-control-indigo: #3730a3; --sb-control-indigo-hover: #3730a3;
+    --sb-field-bg: #ffffff; --sb-field-border: #cbd5e1; --sb-field-disabled: #f1f5f9; --sb-field-placeholder: #64748b;
     --color-slate-50: #ffffff;
     --color-slate-100: #f8fafc;
     --color-slate-200: #e2e8f0;
@@ -786,10 +933,10 @@ html:not(.dark) .text-slate-500 {
     --color-slate-900: #0f172a;
     --color-slate-950: #020617;
   }
-  .dark .bg-white, .dark .bg-slate-900, .dark .bg-slate-800, .dark .bg-slate-700,
+  .dark :is(.bg-white, .bg-slate-900, .bg-slate-800, .bg-slate-700, .dark\:bg-slate-900, .dark\:bg-slate-800, .dark\:bg-slate-950),
   .sb-journey-hero { background: #fff !important; background-image: none !important; }
-  .dark .border-slate-700, .dark .border-slate-800, .dark .border-slate-900 { border-color: #cbd5e1 !important; }
-  .dark .text-white, .dark .text-slate-100, .dark .text-slate-200, .dark .text-slate-300 { color: #0f172a !important; }
+  .dark :is(.border-slate-700, .border-slate-800, .border-slate-900, .dark\:border-slate-700, .dark\:border-slate-800) { border-color: #cbd5e1 !important; }
+  .dark :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300, .dark\:text-white) { color: #0f172a !important; }
   .print\:hidden, nav, aside, button, .sticky, [role="tablist"], .sb-aurora { display: none !important; }
   section, article, .rounded-2xl { box-shadow: none !important; break-inside: avoid-page; }
   h1, h2, h3 { break-after: avoid-page; }
