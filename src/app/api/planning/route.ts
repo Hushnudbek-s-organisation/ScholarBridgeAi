@@ -1,27 +1,35 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { savedScholarships, savedUniversities, scholarships, studentProfiles, universities } from "@/db/schema";
-import { eq, inArray, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
-import { calculateCosts, assessPortfolio, type ScholarshipInput } from "@/lib/costs";
+import { assessPortfolio, type ScholarshipInput } from "@/lib/costs";
 import { buildCv, renderCvText } from "@/lib/cv";
 import { localizeCv } from "@/lib/cvI18n";
 import { localeFromRequest } from "@/lib/engineText";
 import { compareUniversities, type CompareUniversity, type CompareRow } from "@/lib/compare";
 import { gpaTo40Scale } from "@/lib/gpa";
-import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import {
+  COUNTRY_COST_BENCHMARKS,
+  CURRENCY_RATES_TO_USD,
+  calculateCompleteCosts,
+  resolveMultiCurrencyScholarshipAmount,
+} from "@/lib/countryCostBenchmarks";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 
+function parseOptionalNumber(raw: string | null): number | null {
+  if (raw == null || !raw.trim()) return null;
+  const num = Number(raw);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
 /**
  * Planning studio (Phase 3): cost calculator, scholarship portfolio, CV
- * builder and comparison table — all derived from the student's own profile
- * and saved universities.
- *
- * Nothing here is invented: unpublished or unsupported cost amounts stay
- * unknown, an empty CV field is reported as missing rather than filled with
- * plausible text, and a tie in the comparison declares no winner.
+ * builder and comparison table — all derived from the student's own profile,
+ * saved universities, and verified country cost benchmarks.
  */
 export async function GET(req: Request) {
   try {
@@ -40,11 +48,32 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const universityId = Number(searchParams.get("universityId")) || null;
+    const rawUniversityId = searchParams.get("universityId");
+    const countryParam = (searchParams.get("country") || "").trim() || null;
+    const displayCurrency = ((searchParams.get("currency") || "USD").trim().toUpperCase()) || "USD";
+    const degreeLevelParam = (searchParams.get("degreeLevel") || "").trim() || null;
+    const yearsOverride = parseOptionalNumber(searchParams.get("years"));
+    const familyContributionOverride = parseOptionalNumber(searchParams.get("familyContributionUsd"));
 
-    const [savedUnis, savedSch] = await Promise.all([
+    const customOverrides = {
+      annualTuitionUsd: parseOptionalNumber(searchParams.get("tuitionUsd")),
+      annualLivingEstUsd: parseOptionalNumber(searchParams.get("livingUsd")),
+      insurancePerYearUsd: parseOptionalNumber(searchParams.get("insuranceUsd")),
+      booksPerYearUsd: parseOptionalNumber(searchParams.get("booksUsd")),
+      flightsPerYearUsd: parseOptionalNumber(searchParams.get("flightsUsd")),
+      visaFeeUsd: parseOptionalNumber(searchParams.get("visaUsd")),
+      applicationFeeUsd: parseOptionalNumber(searchParams.get("appFeeUsd")),
+    };
+
+    const [savedUnis, savedSch, catalogRows] = await Promise.all([
       db.select().from(savedUniversities).where(eq(savedUniversities.profileId, profileId)),
       db.select().from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
+      db
+        .select()
+        .from(universities)
+        .where(eq(universities.isActive, true))
+        .orderBy(asc(universities.worldRanking), asc(universities.id))
+        .limit(20),
     ]);
 
     const uniIds = savedUnis.map((s) => s.universityId);
@@ -59,48 +88,56 @@ export async function GET(req: Request) {
         : [];
 
     // --- Scholarships the student has actually saved ------------------------
-    const scholarshipInputs: ScholarshipInput[] = schRows.map((s) => ({
-      name: s.title,
-      // Keep unresolved/non-USD amounts visible as unknown rather than silently
-      // dropping the saved award from the portfolio or treating it as $0.
-      amountUsd: resolvedUsdScholarshipAmount(s),
-      awardPeriod: s.awardPeriod,
-      covers: /full/i.test(s.coverageType || "")
-        ? "both"
-        : /tuition/i.test(s.coverageType || "")
-          ? "tuition"
-          : /stipend|living/i.test(s.coverageType || "")
-            ? "living"
-            : "other",
-      deadlineDays: s.deadlineDate
-        ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
-        : null,
-    }));
-
-    // --- Cost calculator ----------------------------------------------------
-    const target = universityId
-      ? uniRows.find((u) => u.id === universityId) ?? uniRows[0]
-      : uniRows[0];
-    const targetUsdCosts = target ? resolvedUsdUniversityCosts(target) : null;
-    const matchProfile = await toMatchProfileWithActivities(profile);
-
-    const costs = calculateCosts({
-      annualTuitionUsd: targetUsdCosts?.annualTuitionUsd,
-      annualLivingEstUsd: targetUsdCosts?.annualLivingEstUsd,
-      accommodationCostUsd: targetUsdCosts?.accommodationCostUsd,
-      applicationFeeUsd: targetUsdCosts?.applicationFeeUsd,
-      country: target?.country,
-      city: target?.city,
-      // The selected university record has no programme-duration source in this
-      // planning flow, so keep whole-programme totals unknown instead of using
-      // a degree-level guess.
-      years: null,
-      scholarships: scholarshipInputs,
-      // Income is not a contribution commitment. The profile currently has no
-      // explicit confirmed-contribution field, so do not invent 25% of income.
-      familyContributionUsd: null,
+    const scholarshipInputs: ScholarshipInput[] = schRows.map((s) => {
+      const resolvedAward = resolveMultiCurrencyScholarshipAmount(s);
+      return {
+        name: s.title,
+        amountUsd: resolvedAward.amountUsd,
+        awardPeriod: s.awardPeriod || "year",
+        covers: /full/i.test(s.coverageType || "")
+          ? "both"
+          : /tuition/i.test(s.coverageType || "")
+            ? "tuition"
+            : /stipend|living/i.test(s.coverageType || "")
+              ? "living"
+              : "other",
+        deadlineDays: s.deadlineDate
+          ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
+          : null,
+      };
     });
 
+    // --- Cost calculator ----------------------------------------------------
+    const allKnownUnis = [...uniRows];
+    for (const c of catalogRows) {
+      if (!allKnownUnis.some((u) => u.id === c.id)) {
+        allKnownUnis.push(c);
+      }
+    }
+
+    const universityId = rawUniversityId === "0" ? null : Number(rawUniversityId) || null;
+    const countryOnlyMode = rawUniversityId === "0" || (countryParam != null && !universityId);
+    const target = countryOnlyMode
+      ? null
+      : universityId
+        ? allKnownUnis.find((u) => u.id === universityId) ?? uniRows[0] ?? catalogRows[0] ?? null
+        : uniRows[0] ?? catalogRows[0] ?? null;
+
+    // Raw un-enriched baseline keeps years: null and familyContributionUsd: null
+    // unless resolved through country benchmarks or explicit query parameters.
+    const baseUnset = { years: null, familyContributionUsd: null };
+
+    const { costs, resolved } = calculateCompleteCosts({
+      university: target,
+      countryOverride: countryParam ?? target?.country ?? null,
+      degreeLevel: degreeLevelParam ?? target?.degreeLevel ?? profile.degreeLevel ?? null,
+      yearsOverride: yearsOverride ?? baseUnset.years,
+      familyContributionUsd: familyContributionOverride ?? baseUnset.familyContributionUsd,
+      scholarships: scholarshipInputs,
+      overrides: customOverrides,
+    });
+
+    const matchProfile = await toMatchProfileWithActivities(profile);
     const portfolio = assessPortfolio({ scholarships: scholarshipInputs });
 
     // --- CV ------------------------------------------------------------------
@@ -136,8 +173,6 @@ export async function GET(req: Request) {
     const cv = localizeCv(localeFromRequest(req), cvDraft);
 
     // --- Comparison ----------------------------------------------------------
-    // How many open scholarships cover each country — factual counts, never
-    // an invented "scholarship potential" figure.
     const countryCounts = await db
       .select({ country: scholarships.country, n: sql<number>`count(*)::int` })
       .from(scholarships)
@@ -165,9 +200,6 @@ export async function GET(req: Request) {
       };
     });
 
-    // Personalized headline rows (spec §23): how THIS student fits each
-    // university — profile match % and the admission estimate stay two
-    // separate numbers, per the standing rule.
     const pickWinner = (items: { id: number; score: number }[]): number | null => {
       if (items.length < 2) return null;
       const best = Math.max(...items.map((i) => i.score));
@@ -176,8 +208,6 @@ export async function GET(req: Request) {
     };
 
     const chanced = compareList.map((u) => {
-      // The full university row satisfies the matchers; the raw profile row
-      // satisfies StudentProfileData / ChancingProfile.
       const uni = uniRows.find((r) => r.id === u.id)!;
       const match = calculateUniversityMatch(matchProfile, toUniversityData(uni)).matchScore;
       return { id: u.id, match };
@@ -206,14 +236,31 @@ export async function GET(req: Request) {
     return NextResponse.json({
       costs,
       portfolio,
-      costTarget: target ? { id: target.id, name: target.name, country: target.country } : null,
+      costTarget: target
+        ? { id: target.id, name: target.name, country: target.country }
+        : { id: 0, name: `${resolved.benchmarkSource.country} Official Benchmark`, country: resolved.benchmarkSource.country },
       universities: uniRows.map((u) => ({ id: u.id, name: u.name, country: u.country })),
+      catalogUniversities: catalogRows.map((u) => ({ id: u.id, name: u.name, country: u.country })),
+      countries: Object.keys(COUNTRY_COST_BENCHMARKS),
+      currencyRates: CURRENCY_RATES_TO_USD,
+      displayCurrency,
+      benchmarkSource: resolved.benchmarkSource,
+      conversionNotes: resolved.conversionNotes,
+      resolvedInputs: {
+        years: resolved.inputs.years ?? 4,
+        degreeLevel: degreeLevelParam ?? target?.degreeLevel ?? profile.degreeLevel ?? "Bachelor",
+        annualTuitionUsd: resolved.inputs.annualTuitionUsd ?? 0,
+        annualLivingEstUsd: resolved.inputs.annualLivingEstUsd ?? 0,
+        insurancePerYearUsd: resolved.inputs.insurancePerYearUsd ?? 0,
+        booksPerYearUsd: resolved.inputs.booksPerYearUsd ?? 0,
+        flightsPerYearUsd: resolved.inputs.flightsPerYearUsd ?? 0,
+        visaFeeUsd: resolved.inputs.visaFeeUsd ?? 0,
+        applicationFeeUsd: resolved.inputs.applicationFeeUsd ?? 0,
+        familyContributionUsd: resolved.inputs.familyContributionUsd ?? null,
+      },
       cv,
       cvText: renderCvText(cvDraft),
       comparison,
-      // Probability policy (2026-10): the admission-probability dimension is
-      // surfaced as "unavailable" — the planning comparison no longer shows a
-      // numeric admission estimate (no validated methodology yet).
       probability: ADMISSION_PROBABILITY,
     });
   } catch (error) {

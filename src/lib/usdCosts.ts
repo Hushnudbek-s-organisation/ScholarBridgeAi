@@ -4,9 +4,9 @@
  * deliberately incomparable with the student's USD budget and remains null.
  */
 
-type MaybeNumber = number | string | null | undefined;
+export type MaybeNumber = number | string | null | undefined;
 
-type UniversityCostFields = {
+export type UniversityCostFields = {
   annualTuition?: MaybeNumber;
   tuitionCurrency?: string | null;
   tuitionPeriod?: string | null;

@@ -85,8 +85,21 @@ export async function GET(req: Request) {
       readings as Parameters<typeof summarizeProviders>[2]
     );
 
+    const configMap = new Map<string, Record<string, string>>();
+    for (const p of providers) {
+      try {
+        configMap.set(p.providerKey, JSON.parse(p.config || "{}") as Record<string, string>);
+      } catch {
+        configMap.set(p.providerKey, {});
+      }
+    }
+
     return NextResponse.json({
       ...summary,
+      providers: summary.providers.map((sp) => ({
+        ...sp,
+        meta: configMap.get(sp.providerKey) ?? {},
+      })),
       metrics: LEARNING_METRICS,
       /** Adapters compiled into this build. Empty in the current release. */
       adapters: listLearningAdapters().map((a) => ({ providerKey: a.providerKey, displayName: a.displayName })),

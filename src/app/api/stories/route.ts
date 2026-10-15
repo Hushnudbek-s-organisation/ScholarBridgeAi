@@ -8,6 +8,7 @@ import { guardStudent, guardTables, idParam, jsonError, readBody, serverError } 
 import { parseList, twinScore, type TwinProfile } from "@/lib/growth/logic";
 import { publicStory, storyValues } from "@/lib/growth/stories";
 import { countriesMatch } from "@/lib/countries";
+import { ensureOutcomesAndStoriesSeeded } from "@/db/seedOutcomesAndStories";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const t = await guardTables();
   if (t) return t;
+  await ensureOutcomesAndStoriesSeeded();
   try {
     const url = new URL(req.url);
     const auth = await authenticate(req);

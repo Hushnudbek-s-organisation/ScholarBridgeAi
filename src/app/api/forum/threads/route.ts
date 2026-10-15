@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategories } from "@/db/schema";
+import { seedForum } from "@/db/seed";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
 import { notifyAdminsLocalized } from "@/lib/notifications";
@@ -11,12 +12,17 @@ import { clampString, readJsonBody } from "@/lib/request";
 import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 
 const PAGE_SIZE = 10;
+let forumSeededOnce = false;
 
 export async function GET(req: Request) {
   try {
     // Reading the forum is free; writing is gated by forum_write (Pro).
     const member = await requireFeatureSession(req, "forum");
     if (!member.ok) return member.response;
+    if (!forumSeededOnce) {
+      await seedForum().catch(() => {});
+      forumSeededOnce = true;
+    }
     const { searchParams } = new URL(req.url);
     const categoryIdStr = searchParams.get("categoryId");
     const authorIdStr = searchParams.get("authorId");

@@ -11,6 +11,8 @@ import {
   type OutcomeRecord,
   type ProfileVector,
 } from "@/lib/similarProfiles";
+import { matchQsUniversityBenchmark, type QsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { ensureOutcomesAndStoriesSeeded } from "@/db/seedOutcomesAndStories";
 
 /**
  * GET /api/similar-profiles — opt-in historical outcome examples only.
@@ -31,6 +33,8 @@ export async function GET(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+
+    await ensureOutcomesAndStoriesSeeded();
 
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
     if (!profile) {
@@ -73,12 +77,29 @@ export async function GET(req: Request) {
 
     const uniIds = [...new Set(rows.map((row) => row.universityId).filter((id): id is number => id !== null))];
     const uniNames = new Map<number, string>();
+    const uniBenchmarksByName: Record<string, QsUniversityBenchmark> = {};
     if (uniIds.length > 0) {
       const uniRows = await db
-        .select({ id: universities.id, name: universities.name })
+        .select({
+          id: universities.id,
+          name: universities.name,
+          canonicalName: universities.canonicalName,
+          shortName: universities.shortName,
+          country: universities.country,
+          worldRanking: universities.worldRanking,
+          acceptanceRate: universities.acceptanceRate,
+          minGpa: universities.minGpa,
+          minIelts: universities.minIelts,
+          minSat: universities.minSat,
+          websiteUrl: universities.websiteUrl,
+          officialWebsiteUrl: universities.officialWebsiteUrl,
+        })
         .from(universities)
         .where(inArray(universities.id, uniIds));
-      uniRows.forEach((university) => uniNames.set(university.id, university.name));
+      uniRows.forEach((university) => {
+        uniNames.set(university.id, university.name);
+        uniBenchmarksByName[university.name] = matchQsUniversityBenchmark(university);
+      });
     }
 
     // The application's own name is a fallback only when there is no linked
@@ -93,14 +114,22 @@ export async function GET(req: Request) {
       appRows.forEach((application) => appNames.set(application.id, application.universityName));
     }
 
+    const decisionFilter = (searchParams.get("decision") ?? "").trim().toLowerCase();
+    const universityFilter = (searchParams.get("university") ?? "").trim().toLowerCase();
+
     const outcomes: OutcomeRecord[] = rows.flatMap((row) => {
       // Legacy or malformed statuses are unknown; never turn them into a rejection.
       const result = normalizeOutcomeResult(row.result);
       if (!result) return [];
+      if (decisionFilter && result !== decisionFilter) return [];
 
       const universityName = (
         (row.universityId !== null ? uniNames.get(row.universityId) : null) ?? appNames.get(row.applicationId) ?? null
       )?.trim() || null;
+
+      if (universityFilter && (!universityName || !universityName.toLowerCase().includes(universityFilter))) {
+        return [];
+      }
 
       return [{
         profile: {
@@ -123,6 +152,21 @@ export async function GET(req: Request) {
     const rawLimit = Number(searchParams.get("limit"));
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 10;
     const result = findSimilarProfiles(me, outcomes, { limit });
+
+    if (searchParams.get("includeBenchmarks") === "1") {
+      const benchmarks: Record<string, QsUniversityBenchmark> = {};
+      for (const match of result.matches) {
+        if (!match.universityName) continue;
+        const b =
+          uniBenchmarksByName[match.universityName] ??
+          matchQsUniversityBenchmark({ name: match.universityName });
+        benchmarks[match.universityName] = b;
+      }
+      return NextResponse.json({
+        ...result,
+        benchmarks,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

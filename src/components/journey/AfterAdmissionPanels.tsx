@@ -32,6 +32,11 @@ import {
 import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { formatMoney, formatNumber } from "@/lib/format";
+import {
+  COUNTRY_COST_BENCHMARKS,
+  CURRENCY_RATES_TO_USD,
+  formatCurrencyAmount,
+} from "@/lib/countryCostBenchmarks";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
@@ -631,20 +636,29 @@ interface FundingData {
   };
   items: { id: number; kind: string; kindLabel: string; name: string; amountUsd: number; status: string; covers: string | null; notes: string | null }[];
   gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null }[]; tab: string; cta: string };
+  benchmarkSource?: { country: string; name: string; url: string; notes: string; defaultCurrency: string };
+  countries?: string[];
+  displayCurrency?: string;
 }
 
 const FUNDING_KINDS = ["scholarship", "aid", "family", "savings", "loan", "other"];
 const FUNDING_STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"];
+const FUNDING_CURRENCY_CODES = Object.keys(CURRENCY_RATES_TO_USD);
+const FUNDING_COUNTRIES = Object.keys(COUNTRY_COST_BENCHMARKS);
 
 export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
+  const [countryOverride, setCountryOverride] = useState<string>("");
+  const [displayCurrency, setDisplayCurrency] = useState<string>("USD");
   const { data, loading, error, reload } = useResource<FundingData>(
     useCallback(() => {
       const params = new URLSearchParams({ profileId: String(profileId) });
       if (applicationId != null) params.set("applicationId", String(applicationId));
+      if (countryOverride) params.set("country", countryOverride);
+      if (displayCurrency) params.set("currency", displayCurrency);
       return getJson<FundingData>(`/api/funding?${params.toString()}`, t("fpLoadError"));
-    }, [profileId, applicationId, t]),
-    [profileId, applicationId],
+    }, [profileId, applicationId, countryOverride, displayCurrency, t]),
+    [profileId, applicationId, countryOverride, displayCurrency],
     {
       initial: {
         costLines: [],
@@ -713,6 +727,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
     : data.annualCost > 0
       ? Math.round((data.plan.securedTotal / data.annualCost) * 100)
       : 0;
+  const activeCountry = countryOverride || data.benchmarkSource?.country || data.university?.country || "United States";
 
   return (
     <div className="space-y-4">
@@ -723,9 +738,13 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="text-right">
               <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">
-                {data.annualCost == null ? t("fpAmountUnknown") : `$${data.annualCost.toLocaleString()}`}
+                {data.annualCost == null ? t("fpAmountUnknown") : formatCurrencyAmount(data.annualCost, displayCurrency)}
               </p>
-              <p className="text-[10px] font-bold uppercase text-slate-500">{t("fpPerYear")}</p>
+              <p className="text-[10px] font-bold uppercase text-slate-500">
+                {displayCurrency !== "USD" && data.annualCost != null
+                  ? `$${data.annualCost.toLocaleString()} · ${t("fpPerYear")}`
+                  : t("fpPerYear")}
+              </p>
             </div>
             <Button
               size="sm"
@@ -742,15 +761,59 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
       >
         {error && <ErrorNote message={error} />}
 
+        <div className="mb-3 grid gap-2 sm:grid-cols-2">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Benchmark Country
+            </label>
+            <select
+              aria-label="Benchmark country"
+              className={inputClass}
+              value={activeCountry}
+              onChange={(e) => setCountryOverride(e.target.value)}
+            >
+              {(data.countries ?? FUNDING_COUNTRIES).map((c) => (
+                <option key={c} value={c}>
+                  {c} ({COUNTRY_COST_BENCHMARKS[c]?.defaultCurrency ?? "USD"})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Display Currency
+            </label>
+            <select
+              aria-label="Display currency"
+              className={inputClass}
+              value={displayCurrency}
+              onChange={(e) => setDisplayCurrency(e.target.value)}
+            >
+              {FUNDING_CURRENCY_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {CURRENCY_RATES_TO_USD[code].label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {data.university && (
           <p className="mb-3 text-[11px] text-slate-500">
             Published costs for {data.university.name}, {data.university.city}, {data.university.country} ·{" "}
             <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
           </p>
         )}
+        {data.benchmarkSource && (
+          <p className="mb-3 text-[11px] text-slate-500">
+            Official {data.benchmarkSource.country} student cost benchmark:{" "}
+            <SourceTag url={data.benchmarkSource.url} name={data.benchmarkSource.name} lastVerified="2026-10-01" />{" "}
+            — {data.benchmarkSource.notes}
+          </p>
+        )}
         {data.estimatedLines.length > 0 && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-            These lines are estimates, not published figures: {data.estimatedLines.join(", ")}. Verify them with the university before using them in a budget.
+            These lines use official country benchmarks or estimates, not university-specific published figures: {data.estimatedLines.join(", ")}. Verify them with the university before using them in a budget.
           </p>
         )}
         {data.unknownLines.length > 0 && (
@@ -953,7 +1016,7 @@ interface LearningReading {
 }
 interface LearningData {
   connected: boolean;
-  providers: { providerKey: string; name: string; kind: string; status: string; linked: boolean; externalUserRef: string | null; lastSyncedAt: string | null; metrics: LearningReading[] }[];
+  providers: { providerKey: string; name: string; kind: string; status: string; linked: boolean; externalUserRef: string | null; lastSyncedAt: string | null; meta?: Record<string, string>; metrics: LearningReading[] }[];
   suggestedTargets: { metric: string; value: number; sourceName: string }[];
   metrics: { key: string; label: string; unit?: string }[];
   adapters: { providerKey: string; displayName: string }[];
@@ -991,8 +1054,19 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
                   <li key={p.providerKey} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{p.name}</p>
-                      <Pill tone={p.linked ? "good" : "slate"}>{p.status}</Pill>
+                      <div className="flex items-center gap-1.5">
+                        {p.meta?.city && <Pill tone="brand">{p.meta.city}</Pill>}
+                        <Pill tone={p.linked ? "good" : "slate"}>{p.status}</Pill>
+                      </div>
                     </div>
+                    {p.meta?.description && (
+                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{p.meta.description}</p>
+                    )}
+                    {p.meta?.url && (
+                      <div className="mt-1.5">
+                        <SourceTag url={p.meta.url} name={p.name} lastVerified={p.meta.lastVerifiedAt ?? "2026-10-01"} />
+                      </div>
+                    )}
                     {p.metrics.length > 0 && (
                       <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
                         {p.metrics.map((m) => (

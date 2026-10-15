@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { opportunities, studentProfiles } from "@/db/schema";
+import { seedOpportunities } from "@/db/seedOpportunities";
 import { authenticate } from "@/lib/auth";
 import { countByType, rankOpportunities } from "@/lib/opportunities";
 
 export const dynamic = "force-dynamic";
+
+let opportunitiesSeededOnce = false;
 
 /**
  * #26/#27/#28 — Personalized opportunities feed.
@@ -18,6 +21,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   try {
+    if (!opportunitiesSeededOnce) {
+      await seedOpportunities().catch(() => {});
+      opportunitiesSeededOnce = true;
+    }
     const url = new URL(req.url);
     const type = url.searchParams.get("type")?.trim();
     const sort = url.searchParams.get("sort")?.trim() || "match";

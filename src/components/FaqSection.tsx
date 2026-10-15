@@ -16,6 +16,16 @@ export function FaqSection() {
       { question: t("items.scores.question"), answer: t("items.scores.answer") },
       { question: t("items.scholarship.question"), answer: t("items.scholarship.answer") },
       { question: t("items.costs.question"), answer: t("items.costs.answer") },
+      { question: t("items.gpaConversion.question"), answer: t("items.gpaConversion.answer") },
+      { question: t("items.multiCurrency.question"), answer: t("items.multiCurrency.answer") },
+      { question: t("items.elYurtUmidi.question"), answer: t("items.elYurtUmidi.answer") },
+      { question: t("items.gksKorea.question"), answer: t("items.gksKorea.answer") },
+      { question: t("items.sperrkontoGermany.question"), answer: t("items.sperrkontoGermany.answer") },
+      { question: t("items.sponsorAffidavit.question"), answer: t("items.sponsorAffidavit.answer") },
+      { question: t("items.englishWaivers.question"), answer: t("items.englishWaivers.answer") },
+      { question: t("items.visaMockInterview.question"), answer: t("items.visaMockInterview.answer") },
+      { question: t("items.documentApostille.question"), answer: t("items.documentApostille.answer") },
+      { question: t("items.proPlanValue.question"), answer: t("items.proPlanValue.answer") },
     ],
   };
   const faqSchema = {

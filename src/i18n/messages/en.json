@@ -2452,6 +2452,46 @@
       "costs": {
         "question": "Can I rely on the costs and deadlines shown here?",
         "answer": "Use them for planning, not as a substitute for an official fee schedule or application portal. Costs, exchange rates and deadlines can change; check the university or award provider's current source before making a payment or submitting an application."
+      },
+      "gpaConversion": {
+        "question": "How do I convert an Uzbek 5-point or 100-point GPA to the 4.0 scale?",
+        "answer": "Enter your exact official GPA and select your original scale (5.0, 100, or 4.0) in your ScholarBridge profile. Our converter normalizes your score for eligibility comparisons while preserving your original scale on your CV and application records—never overwrite your official transcript grade with an unofficial self-conversion."
+      },
+      "multiCurrency": {
+        "question": "How does the multi-currency Cost Calculator handle EUR, GBP, KRW, CAD, and UZS?",
+        "answer": "ScholarBridge converts published university tuition and living figures across 24 currencies (including USD, UZS, EUR, GBP, KRW, CAD, AUD, CHF, JPY, and SGD) and fills any unpublished insurance, books, flights from Tashkent, and visa fee lines using verified 2026 government benchmarks clearly badged as country benchmarks."
+      },
+      "elYurtUmidi": {
+        "question": "How does the El-Yurt Umidi Foundation scholarship work for Uzbek students?",
+        "answer": "The El-Yurt Umidi Foundation under the President of the Republic of Uzbekistan funds Bachelor, Master, and PhD study abroad—covering tuition, living stipend, health insurance, and annual flights—for Uzbek citizens admitted to top-ranked global universities (especially QS/THE/ARWU Top 300) who commit to returning and contributing to Uzbekistan after graduation."
+      },
+      "gksKorea": {
+        "question": "What is the difference between GKS Embassy Track and University Track in South Korea?",
+        "answer": "Through the Embassy Track (Embassy of the Republic of Korea in Tashkent), you apply to 3 universities including at least one Type B regional university. Through the University Track, you apply directly to 1 Korean university (such as KAIST, POSTECH, UNIST, or SNU). GKS covers 100% tuition, round-trip airfare, a monthly stipend, and 1 year of Korean language training."
+      },
+      "sperrkontoGermany": {
+        "question": "How much money is required in a German Blocked Account (Sperrkonto) for 2026–2027?",
+        "answer": "For the 2026–2027 academic year, the German Embassy in Tashkent requires proof of €11,904 per year (€992 per month for 12 months) in an approved Sperrkonto (such as Expatrio or Fintiba), unless you hold a recognized full public scholarship like DAAD or El-Yurt Umidi."
+      },
+      "sponsorAffidavit": {
+        "question": "What financial documents do my parents need to sponsor my student visa?",
+        "answer": "Embassies require an official stamped bank balance statement in the sponsor’s name, a signed Affidavit or Letter of Financial Support, your translated birth certificate proving the parent-child relationship, and official annual income and tax payment certificates (which can be downloaded with a QR code via my.gov.uz / soliq.uz in Uzbekistan)."
+      },
+      "englishWaivers": {
+        "question": "Can I get an IELTS or TOEFL waiver if my Bachelor degree in Uzbekistan was taught in English?",
+        "answer": "Many graduate programs in Europe, the US, and the UK grant an English test waiver if you completed a full degree taught 100% in English at an accredited international university (such as WIUT, INHA University in Tashkent, Webster, or New Uzbekistan University) and submit an official Medium of Instruction (MOI) certificate. Always verify the specific program’s waiver rule first."
+      },
+      "visaMockInterview": {
+        "question": "How should I prepare for my US F-1, UK Student Route, or German Embassy visa interview in Tashkent?",
+        "answer": "Focus on four pillars: (1) why you selected your specific university and curriculum, (2) how your academic background prepared you, (3) exact knowledge of your annual Cost of Attendance, scholarship coverage, and sponsor income, and (4) your concrete career plan in Uzbekistan after graduation. Use our Visa Prep hub to practice country-specific checklists."
+      },
+      "documentApostille": {
+        "question": "How and when do I get a Hague Apostille on my Uzbek diploma and transcripts?",
+        "answer": "Destination countries such as South Korea, Germany, Italy, Hungary, Turkey, and Poland require a Hague Apostille on your original high school attestat or university diploma. In Uzbekistan, apply for an official e-Apostille through my.gov.uz or the Ministry of Justice / Ministry of Foreign Affairs before completing your notarized translation."
+      },
+      "proPlanValue": {
+        "question": "What is free on ScholarBridge and what does Pro unlock?",
+        "answer": "University discovery, scholarship matching, multi-currency cost calculation, deadline tracking, task roadmaps, and reading the community forum are free. Pro unlocks unlimited AI Statement of Purpose and essay coaching, 24/7 AI Counselor deep reviews, Scholarship Autopilot drafting, and posting new threads in the community."
       }
     }
   },
@@ -2553,7 +2593,47 @@
     "g4s4": "Share it only in formats accepted by the programme",
     "g6s4": "Confirm availability and track submission status",
     "g7s4": "Describe verified learning or outcomes without overstatement",
-    "c13d": "Explore a SIM card, banking or transport options if useful; availability, fees and rules vary."
+    "c13d": "Explore a SIM card, banking or transport options if useful; availability, fees and rules vary.",
+    "g8t": "Prepare your academic transcript and grading scale legend",
+    "g8d": "International universities evaluate your grades in the context of your official grading scale (5.0, 100-point or 4.0) and any required apostille or credential evaluation.",
+    "g8s0": "Request an official transcript and grading scale legend from your school or university",
+    "g8s1": "Verify whether target countries require a Hague Apostille (e.g. via my.gov.uz) or WES evaluation",
+    "g8s2": "Arrange certified English or destination-language translations where required",
+    "g8s3": "Check that course names, credit hours and graduation dates match across all documents",
+    "g9t": "Draft a Master’s or scholarship research pre-proposal",
+    "g9d": "Scholarships such as DAAD, MEXT, ETH ESOP and GKS Graduate require a structured study plan or research proposal aligned with host faculty.",
+    "g9s0": "Identify a specific research question or applied problem in your field",
+    "g9s1": "Review recent publications from 2–3 potential host laboratories or departments",
+    "g9s2": "Outline your methodology, datasets and semester-by-semester study plan",
+    "g9s3": "Have a professor or mentor review the draft for technical clarity and feasibility",
+    "g10t": "Document community or civic impact with verifiable evidence",
+    "g10d": "Scholarships like Chevening, Global UGRAD, Pearson and El-Yurt Umidi value sustained, verifiable contribution to your school or local community.",
+    "g10s0": "Select an ongoing community, tutoring or civic initiative you actively support",
+    "g10s1": "Keep a factual log of hours, dates, collaborators and concrete deliverables",
+    "g10s2": "Gather a supervisor reference or official certificate confirming your role",
+    "g10s3": "Connect what you learned to your post-graduation career plan",
+    "g11t": "Build a multi-currency funding and scholarship portfolio",
+    "g11d": "Combine institutional financial aid, bilateral government scholarships and national grants so your annual tuition and living costs are fully covered.",
+    "g11s0": "Calculate total annual cost of attendance in the destination currency and USD",
+    "g11s1": "Shortlist 3–5 scholarships whose eligibility, degree level and citizenship rules match your profile",
+    "g11s2": "Prepare required financial documents (tax certificates, sponsor affidavit or CSS Profile)",
+    "g11s3": "Track each scholarship deadline at least 6 weeks before the portal closes",
+    "p8q": "Why did you choose this specific university and programme?",
+    "p8h": "Name 2–3 concrete courses, professors or labs and link them to your prior preparation.",
+    "p9q": "How will your degree contribute to Uzbekistan’s development upon your return?",
+    "p9h": "Name the specific sector, institution or reform where you will apply your skills in years 1–5.",
+    "p10q": "Describe a time you built a network or partnership to solve a problem.",
+    "p10h": "Essential for Chevening and GKS: show how you brought different people or groups together.",
+    "p11q": "Explain any financial need or family circumstances relevant to your scholarship application.",
+    "p11h": "State factual income, household dependents and confirmed family contribution clearly.",
+    "c14t": "Complete Hague Apostille and certified translations",
+    "c14d": "If your destination requires apostilled diplomas, transcripts or birth certificates (e.g. via my.gov.uz), complete them before your embassy appointment.",
+    "c15t": "Prepare sponsor affidavit and income tax certificates",
+    "c15d": "When parents or sponsors fund your studies, gather stamped bank statements, birth certificate relationship proof and official tax/income certificates.",
+    "c16t": "Save dormitory or lease proof of address for visa filing",
+    "c16d": "Many embassies require an official university dormitory placement letter or signed accommodation contract before issuing a study visa.",
+    "c17t": "Activate student health insurance and municipal address registration",
+    "c17d": "Complete mandatory post-arrival steps such as SEVIS check-in (US), Anmeldung & Girokonto activation (Germany), ARC (Korea) or BRP/eVisa check (UK)."
   },
   "bell": {
     "title": "Notifications",
