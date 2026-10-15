@@ -108,8 +108,24 @@ check("editing a profile preserves an unanswered financial-aid choice", /needsFi
 check("university catalogue requirements carry a programme-specific verification caveat", /catalogueRequirementsScope/.test(source.university));
 check("key catalogue cards wrap names, majors and descriptions", /break-words font-bold text-base/.test(source.explorer) && /break-words text-xs leading-relaxed/.test(source.explorer));
 check("global reduced-motion preference remains respected", /prefers-reduced-motion:\s*reduce/.test(source.globals));
-check("translucent dark slate panels use a dark fill", source.globals.includes('[class~="dark:bg-slate-800/60"]') && source.globals.includes("background-color: rgb(22 33 58 / 0.6);"));
-check("translucent amber panels use a dark-mode accent wash", source.globals.includes('[class~="bg-amber-50/50"]') && source.globals.includes("rgba(245,158,11, 0.16)"));
+// The dark-mode tokens are read from the `.dark { … }` block and judged by
+// value, so a palette tweak does not need a test edit — a light fill does fail.
+const darkBlock = source.globals.match(/\n\.dark \{([\s\S]*?)\n\}/)?.[1] ?? "";
+const darkToken = (name) => darkBlock.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim() ?? "";
+const relLuminance = (rgbTriplet) => {
+  const [r, g, b] = rgbTriplet.split(/\s+/).map(Number).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+check("translucent dark slate panels use a dark fill", source.globals.includes(":where(.dark) .dark\\:bg-slate-800\\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }") && /^\d+ \d+ \d+$/.test(darkToken("--sb-well-rgb")) && relLuminance(darkToken("--sb-well-rgb")) < 0.05);
+check("translucent amber panels use a dark-mode accent wash", (() => {
+  // `bg-amber-50/50` is `color-mix(var(--color-amber-50) 50%, transparent)`: the
+  // token itself must become a translucent amber wash under `.dark`.
+  const m = darkToken("--color-amber-50").match(/^rgb\(245 158 11 \/ (0?\.\d+)\)$/);
+  return Boolean(m) && Number(m[1]) > 0 && Number(m[1]) <= 0.3;
+})());
 
 const locales = {};
 for (const locale of ["en", "uz", "ru"]) {

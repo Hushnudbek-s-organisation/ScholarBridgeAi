@@ -88,9 +88,12 @@ export function HubTabs({
             onClick={() => onChange(pane.id)}
             onKeyDown={(e) => onKeyDown(e, pane.id)}
             className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-colors sm:text-[13px] ${
+              // Active = royal indigo in BOTH themes, so the selected tab reads
+              // as part of the indigo hero instead of a dead-black pill (light)
+              // or a washed-out grey one (dark).
               isActive
-                ? "bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                ? "border border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
+                : "border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
             }`}
           >
             {pane.label}
@@ -98,7 +101,7 @@ export function HubTabs({
               <span
                 aria-hidden="true"
                 className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                  isActive ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                  isActive ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                 }`}
               >
                 {tn("newBadge")}
@@ -107,7 +110,7 @@ export function HubTabs({
             {pane.premium && (
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                  isActive ? "bg-white/20 text-white dark:bg-slate-900/10 dark:text-slate-900" : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                  isActive ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                 }`}
               >
                 {tn("proBadge")}
@@ -233,7 +236,7 @@ export function HubPage({
           className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-[13px] ${
             note.tone === "warn"
               ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-              : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+              : "border-slate-200 bg-white text-slate-700 shadow-xs dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
           }`}
           role="note"
         >

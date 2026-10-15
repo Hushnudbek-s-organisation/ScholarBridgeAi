@@ -167,7 +167,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-[72px] w-[min(1160px,92%)] items-center justify-between gap-2">
           <a href="#top" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl text-base font-extrabold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:gap-2.5 sm:text-lg" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            <span className="grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <span className="sb-logo-well grid h-[34px] w-[34px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
               <BrandingImage alt={t("logoAlt")} className="h-[34px] w-[34px] object-cover" />
             </span>
             <span className="min-w-0 break-words whitespace-normal text-[15px] leading-tight sm:text-lg">{tm("appName")}</span>
@@ -321,7 +321,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
                       destinations and account cluster the app renders. */}
                   <aside className="hidden border-r border-slate-200 bg-white p-2.5 sm:block">
                     <div className="mb-2 flex items-center gap-1.5 px-1">
-                      <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-md ring-1 ring-slate-200">
+                      <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-md ring-1 ring-slate-200">
                         <BrandingImage alt={t("logoAlt")} className="h-6 w-6 object-cover" />
                       </span>
                       <span className="text-[11px] font-extrabold text-slate-800">ScholarBridge</span>
@@ -443,7 +443,7 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
             <div className="mx-auto mb-11 max-w-[700px] text-center">
               <div className="text-[11px] font-black uppercase tracking-[1.5px] text-indigo-400">{t("featEyebrow")}</div>
               <h2 className="mt-2.5 text-3xl font-extrabold leading-tight tracking-[-0.02em] sm:text-[42px]">{t("featTitle")}</h2>
-              <p className="mt-3 text-base text-slate-400">{t("featText")}</p>
+              <p className="mt-3 text-base text-slate-300">{t("featText")}</p>
             </div>
             <RevealGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((f) => (

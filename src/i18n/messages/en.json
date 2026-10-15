@@ -3160,6 +3160,12 @@
     "reqVariesByProgram": "Ranges span this university’s catalogued programmes — the programme you apply to sets its own minimums (see each programme below).",
     "fitBadge": "Profile fit: {score}% • {category}",
     "fitNotChance": "Fit compares your profile with published requirements — it is not an admission chance.",
+    "fitTier": {
+      "strong": "Strong fit",
+      "moderate": "Moderate fit",
+      "weak": "Limited fit",
+      "none": "Not scored"
+    },
     "exScoreBreakdown": "Score breakdown",
     "exDimensionsMeasured": "{measured} of {total} dimensions measured",
     "exDimensionUnknown": "No data for this dimension yet — it scores 0 and is not counted as measured",

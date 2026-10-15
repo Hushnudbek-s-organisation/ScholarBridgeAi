@@ -15,6 +15,7 @@ import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
+import { fitBadgeClass } from "@/lib/fitBadge";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "./AppNote";
 import {
@@ -455,7 +456,9 @@ export function UniversityExplorer({
             const isSaved = savedUniIds.has(uni.id);
             const isCompared = compareIds.includes(uni.id);
 
-            const matchBadgeColor = "bg-blue-100 text-blue-800 border-blue-200";
+            // Semantic tier (emerald / indigo / amber / neutral) — not one
+            // hardcoded blue for a 99% and a 41% alike.
+            const matchBadgeColor = fitBadgeClass(uni.matchScore);
 
             let highlightsList: string[] = [];
             try {
@@ -501,7 +504,6 @@ export function UniversityExplorer({
                         totalDimensions={uni.matchBreakdown.totalDimensions}
                         evidenceCoveragePct={uni.matchBreakdown.evidenceCoveragePct}
                         evidenceLevel={uni.matchBreakdown.evidenceLevel}
-                        className="bg-white/95"
                       />
                     )}
                   </div>

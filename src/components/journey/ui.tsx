@@ -176,8 +176,8 @@ export function Button({
   title?: string;
 }) {
   const variants: Record<string, string> = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300",
-    success: "bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300",
+    primary: "bg-indigo-600 text-white hover:bg-indigo-700",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700",
     ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
     outline: "border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800",
     danger: "border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300",
@@ -491,8 +491,9 @@ export function Field({
   );
 }
 
-export const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:focus:ring-indigo-900";
+/** Colours, hover and the indigo focus halo come from `.sb-field` (globals.css),
+ *  identical in both themes: white + slate-300 on light, a recessed well on dark. */
+export const inputClass = "sb-field w-full rounded-lg border px-3 py-2 text-sm text-slate-900 outline-none";
 
 /** "in 4 days" / "today" / "3 days ago" — the format the spec asks for. */
 export function daysLabel(days: number | null, locale: string = "en"): string {

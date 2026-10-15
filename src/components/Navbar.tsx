@@ -650,7 +650,7 @@ export function Navbar({
 
   const Logo = (
     <div className="flex items-center gap-2.5 min-w-0">
-      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md shadow-indigo-200 dark:border-slate-700">
+      <div className="sb-logo-well h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md shadow-indigo-200 dark:shadow-black/40">
         <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
       </div>
       <div className="min-w-0">
@@ -789,7 +789,7 @@ export function Navbar({
             <Menu className="h-5 w-5" />
           </button>
           <button className="flex min-h-11 min-w-0 items-center gap-2" onClick={() => go("dashboard")}>
-            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700">
+            <div className="sb-logo-well h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
               <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
             </div>
             <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>

@@ -3160,6 +3160,12 @@
     "reqVariesByProgram": "Diapazonlar universitetning katalogdagi dasturlari bo‘yicha — ariza topshiradigan dasturingiz o‘z minimumlarini belgilaydi (quyidagi dasturlarga qarang).",
     "fitBadge": "Profil mosligi: {score}% • {category}",
     "fitNotChance": "Moslik profilingizni e'lon qilingan talablar bilan solishtiradi — bu qabul ehtimoli emas.",
+    "fitTier": {
+      "strong": "Kuchli moslik",
+      "moderate": "O‘rtacha moslik",
+      "weak": "Cheklangan moslik",
+      "none": "Baholanmagan"
+    },
     "exScoreBreakdown": "Ball taqsimoti",
     "exDimensionsMeasured": "{total} o‘lchovdan {measured} tasi o‘lchangan",
     "exDimensionUnknown": "Bu o‘lchov uchun ma’lumot yo‘q — 0 ball, o‘lchangan deb hisoblanmaydi",

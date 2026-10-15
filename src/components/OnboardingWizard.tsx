@@ -120,8 +120,9 @@ const STEPS = [
   { id: 7, titleKey: "experience", icon: Trophy },
 ];
 
+// Field colours, hover and the indigo focus halo come from `.sb-field` (globals.css).
 const inputCls =
-  "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 transition-[border-color,box-shadow] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-100 motion-reduce:transition-none";
+  "sb-field min-h-11 w-full rounded-xl border px-4 py-3 text-sm text-slate-800 focus:outline-none motion-reduce:transition-none";
 const labelCls = "block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5";
 
 export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
