@@ -382,15 +382,6 @@ export function ChancingPanel({
         </button>
       </div>
 
-      {/* Honest Methodology Notice */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 flex items-start gap-2.5">
-        <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-        <div>
-          <span className="font-semibold text-slate-800">{t("unavailableTitle")}</span>{" "}
-          {t("unavailableBody")}
-        </div>
-      </div>
-
       {/* 1. University & Program Explorer / Switcher Bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1106,6 +1097,21 @@ export function ChancingPanel({
       )}
 
       <p className="text-[11px] text-slate-400 leading-relaxed">{t("footnote")}</p>
+
+      {/*
+        The methodology disclosure lives here, at the foot of the page, instead
+        of as a banner above the results. The wording is unchanged — it is just
+        no longer the first thing a student reads, and it stays one click away.
+      */}
+      <details className="text-[11px] text-slate-400 dark:text-slate-500">
+        <summary className="inline-flex cursor-pointer items-center gap-1 hover:underline">
+          <Info className="h-3 w-3 shrink-0" aria-hidden />
+          {t("methodologyNoteLabel")}
+        </summary>
+        <p className="mt-1 max-w-3xl leading-relaxed">
+          <span className="font-semibold">{t("unavailableTitle")}</span> {t("unavailableBody")}
+        </p>
+      </details>
     </div>
   );
 }

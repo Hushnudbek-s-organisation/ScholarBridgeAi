@@ -22,6 +22,8 @@ import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
 import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { INTERVIEW_TRACKS, interviewText } from "@/lib/journey/interviewTracks";
+import { Mic } from "lucide-react";
 
 // ===========================================================================
 // CAREER & MAJOR EXPLORER (spec §15)
@@ -482,42 +484,245 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
 
 export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
+  const reduceMotion = useReducedMotion();
+  const { locale } = useLocaleContext();
+  const [trackId, setTrackId] = useState(INTERVIEW_TRACKS[0].id);
+  const track = INTERVIEW_TRACKS.find((x) => x.id === trackId) ?? INTERVIEW_TRACKS[0];
+  const tx = (v: Parameters<typeof interviewText>[0]) => interviewText(v, locale);
+
+  /*
+   * Timed-video practice. Asynchronous interviews (Kira Talent, Toronto OSP,
+   * Waterloo) give you a fixed prep window then record a fixed answer window,
+   * with no second take — so the only useful way to train is against a clock
+   * that behaves the same way.
+   */
+  const [phase, setPhase] = useState<"idle" | "prep" | "record">("idle");
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const prepSec = track.questions[questionIndex]?.prepSeconds ?? 60;
+  const recSec = track.questions[questionIndex]?.responseSeconds ?? 120;
+
+  useEffect(() => {
+    if (phase === "idle") return;
+    // The tick owns the rollover. Handling expiry inline in the effect body
+    // wrote state during render, which cascades a second render per second and
+    // made this the only place the timer could desync from the clock.
+    const id = window.setTimeout(() => {
+      if (secondsLeft > 1) {
+        setSecondsLeft(secondsLeft - 1);
+      } else if (phase === "prep") {
+        setPhase("record");
+        setSecondsLeft(recSec);
+      } else {
+        setPhase("idle");
+        setSecondsLeft(0);
+      }
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [phase, secondsLeft, recSec]);
+
+  const startTimer = () => {
+    setQuestionIndex(0);
+    setPhase("prep");
+    setSecondsLeft(prepSec);
+  };
+
   return (
     <div className="space-y-4">
       <JourneyCard
         title={t("icTitle")}
         subtitle={t("icSubtitle")}
+        action={
+          // The simulator is the one place that scores a spoken answer, so it
+          // stays one click away from every track.
+          <Button onClick={() => onNavigateTab("visa")}>
+            <Mic className="h-3.5 w-3.5" /> {t("icLaunchSim")}
+          </Button>
+        }
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-            <p className="text-base" aria-hidden>
-              🎓
-            </p>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icUniTitle")}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {t("icUniText")}
-            </p>
-            <Button className="mt-3" onClick={() => onNavigateTab("visa")}>
-              {t("icUniBtn")}
-            </Button>
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t("icStudioIntro")}</p>
+
+          {/* Track picker */}
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={t("icTracksLabel")}>
+            {INTERVIEW_TRACKS.map((tr) => {
+              const active = tr.id === track.id;
+              return (
+                <button
+                  key={tr.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setTrackId(tr.id);
+                    setPhase("idle");
+                    setQuestionIndex(0);
+                  }}
+                  className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                    active
+                      ? "border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-100"
+                      : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  <span aria-hidden className="mr-1.5">{tr.emoji}</span>
+                  {tx(tr.title)}
+                </button>
+              );
+            })}
           </div>
-          <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-            <p className="text-base" aria-hidden>
-              🛂
-            </p>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icVisaTitle")}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {t("icVisaText")}
-            </p>
-            <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa")}>
-              {t("icVisaBtn")}
-            </Button>
+
+          {/* Selected track header */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                <span aria-hidden className="mr-1.5">{track.emoji}</span>
+                {tx(track.title)}
+              </h3>
+              <Pill>{t("icQuestionsCount", { count: track.questions.length })}</Pill>
+              {track.timed && <Pill>{t("icTimedBadge")}</Pill>}
+            </div>
+            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">{tx(track.audience)}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{tx(track.format)}</p>
+            {track.institutions.length > 0 && (
+              <p className="mt-2 flex flex-wrap gap-1.5">
+                {track.institutions.map((i) => (
+                  <span
+                    key={i}
+                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                  >
+                    {i}
+                  </span>
+                ))}
+              </p>
+            )}
+          </div>
+
+          {/* Built-in countdown for the timed-video track */}
+          {track.timed && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/30">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
+                    {t("icTimerTitle")}
+                  </h4>
+                  <p className="mt-0.5 text-[11px] text-indigo-800/80 dark:text-indigo-200/70">
+                    {t("icTimerHint", { prep: prepSec, record: recSec })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-xl px-3 py-2 font-mono text-lg font-black tabular-nums ${
+                      phase === "record"
+                        ? "bg-rose-600 text-white"
+                        : phase === "prep"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-slate-500 dark:bg-slate-900 dark:text-slate-300"
+                    }`}
+                    aria-live="polite"
+                  >
+                    {phase === "idle"
+                      ? `${prepSec}s / ${recSec}s`
+                      : `${phase === "prep" ? t("icPrep") : t("icRecord")} ${secondsLeft}s`}
+                  </span>
+                  <Button onClick={startTimer} variant={phase === "idle" ? "primary" : "outline"}>
+                    {phase === "idle" ? t("icStartTimer") : t("icRestartTimer")}
+                  </Button>
+                </div>
+              </div>
+              {phase !== "idle" && !reduceMotion && (
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-800">
+                  <motion.div
+                    className={`h-full ${phase === "record" ? "bg-rose-500" : "bg-indigo-500"}`}
+                    initial={false}
+                    animate={{
+                      width: `${Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          (secondsLeft / (phase === "prep" ? prepSec : recSec)) * 100,
+                        ),
+                      )}%`,
+                    }}
+                    transition={{ duration: reduceMotion ? 0 : 0.9, ease: "linear" }}
+                  />
+                </div>
+              )}
+              {phase === "idle" && track.rubric && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
+                    {t("icSelfCheck")}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {track.rubric.map((r, i) => (
+                      <li key={i} className="text-[11px] text-indigo-900/90 dark:text-indigo-200/80">
+                        ☐ {tx(r)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Questions + model answers */}
+          <ol className="space-y-3">
+            {track.questions.map((q, qi) => (
+              <li
+                key={q.id}
+                className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <span className="mr-1.5 text-slate-400">{qi + 1}.</span>
+                    {tx(q.question)}
+                  </p>
+                  {q.responseSeconds && (
+                    <Pill>{t("icSecondsChip", { seconds: q.responseSeconds })}</Pill>
+                  )}
+                </div>
+                <p className="mt-1.5 text-[11px] italic text-slate-500 dark:text-slate-400">
+                  {t("icWhy")} {tx(q.why)}
+                </p>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
+                    {t("icShowModel")}
+                  </summary>
+                  <ul className="mt-1.5 space-y-1">
+                    {q.modelAnswer.map((a, ai) => (
+                      <li key={ai} className="flex gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                        <span aria-hidden className="text-emerald-600 dark:text-emerald-400">✓</span>
+                        <span>{tx(a)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ))}
+          </ol>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-base" aria-hidden>🎓</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icUniTitle")}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icUniText")}</p>
+              <Button className="mt-3" onClick={() => onNavigateTab("visa")}>
+                {t("icUniBtn")}
+              </Button>
+            </div>
+            <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-base" aria-hidden>🛂</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icVisaTitle")}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icVisaText")}</p>
+              <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa")}>
+                {t("icVisaBtn")}
+              </Button>
+            </div>
           </div>
         </div>
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-          {t("icNote")}
-        </p>
       </JourneyCard>
+
+      <VisaModelAnswers />
+      <AppNote kind="estimate" />
     </div>
   );
 }

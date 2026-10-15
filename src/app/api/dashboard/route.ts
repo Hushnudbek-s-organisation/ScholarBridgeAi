@@ -27,6 +27,8 @@ import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/re
 import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { hasUndergraduateAdmission, supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
@@ -556,6 +558,9 @@ async function recommendedFor(
   const applicantCountry = profile.country ?? null;
 
   const matchProfile = await toMatchProfileWithActivities(profile);
+  // The 5-layer positioning engine reads the same person, so it gets the same
+  // profile (including the Activities pane) — never a second, divergent copy.
+  const chancingProfile = await chancingProfileWithActivities(profile);
 
   // Which profile facts exist, and which would unlock a better list.
   const basis: string[] = [];
@@ -585,7 +590,20 @@ async function recommendedFor(
     ).map((s) => s.universityId)
   );
 
-  let scored: { uni: typeof universities.$inferSelect; match: ReturnType<typeof calculateUniversityMatch> }[] = [];
+  /**
+   * One row per candidate university: the fit (catalogue match) AND the
+   * positioning score from the QS Top 200 / program engine. Both are kept:
+   * `matchScore` stays the number the Explorer shows, `chanceScore` adds the
+   * department-level cohort view, and `combinedScore` is what the list is
+   * ordered by (55% fit / 45% positioning — a documented, deterministic weight,
+   * not a hidden ranking).
+   */
+  let scored: {
+    uni: typeof universities.$inferSelect;
+    match: ReturnType<typeof calculateUniversityMatch>;
+    chance: ReturnType<typeof evaluateUniversityAndProgramChance>;
+    combinedScore: number;
+  }[] = [];
   if (hasBasis) {
     const pool = await db
       .select()
@@ -603,12 +621,38 @@ async function recommendedFor(
         if (major && u.programMajor) return similar(u.programMajor, major);
         return true;
       })
-      .map((u) => ({ uni: u, match: calculateUniversityMatch(matchProfile, toUniversityData(u)) }))
-      .sort((a, b) => b.match.matchScore - a.match.matchScore)
+      .map((u) => {
+        const match = calculateUniversityMatch(matchProfile, toUniversityData(u));
+        const qsBenchmark = matchQsUniversityBenchmark(u);
+        // A synthetic programme row: the dashboard never loads the program
+        // catalogue, so it evaluates the stated major against this university's
+        // own benchmark band instead of inventing a specific programme id.
+        const chance = evaluateUniversityAndProgramChance(
+          chancingProfile,
+          u,
+          {
+            id: u.id,
+            universityId: u.id,
+            name: major || u.programMajor || "General Studies",
+            degreeLevel: degreeLevel || u.degreeLevel || "Bachelor",
+            field: major || u.programMajor || null,
+          },
+          null,
+          [],
+          qsBenchmark
+        );
+        return {
+          uni: u,
+          match,
+          chance,
+          combinedScore: Math.round(match.matchScore * 0.55 + chance.compositeProgramFitScore * 0.45),
+        };
+      })
+      .sort((a, b) => b.combinedScore - a.combinedScore || b.match.matchScore - a.match.matchScore)
       .slice(0, uniLimit);
   }
 
-  const universitiesOut = scored.map(({ uni: u, match }) => {
+  const universitiesOut = scored.map(({ uni: u, match, chance, combinedScore }) => {
     const usdCosts = resolvedUsdUniversityCosts(u);
     return {
       id: u.id,
@@ -634,6 +678,16 @@ async function recommendedFor(
       sourceUrl: u.sourceUrl,
       saved: savedIds.has(u.id),
       matchScore: match.matchScore,
+      /**
+       * Positioning from the QS Top 200 + 5-layer program engine. `matchScore`
+       * alone cannot see department selectivity or the admitted-cohort GPA band,
+       * so the panel shows both side by side.
+       */
+      chanceScore: chance.compositeProgramFitScore,
+      combinedScore,
+      effectiveAcceptRatePct: chance.effectiveProgramAcceptRatePct,
+      studentGpaPercentile: chance.studentGpaPercentile,
+      programGpa50: chance.programGpa50,
       matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
       matchBreakdown: match.breakdown,

@@ -23,11 +23,14 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   payment_premium_yearly_price_uzs: "499000",
   payment_premium_yearly_days: "365",
   payment_currency: "UZS",
-  // AI limits (spec §16) — free keeps 3–5/day so the helper is useful, not endless
+  // AI limits (spec §16) — free keeps 3–5/day so the helper is useful, not endless.
+  // Pro quotas are sized against the 2026 routing mix (gpt-6-luna for chat, and
+  // gemini-2.5-flash for evaluation/extraction) so a heavy Pro account stays
+  // inside the UZS subscription price. All four remain admin-editable.
   ai_free_requests_per_day: "5",
-  ai_premium_requests_per_day: "200",
-  ai_free_tokens_per_day: "20000",
-  ai_premium_tokens_per_day: "500000",
+  ai_premium_requests_per_day: "60",
+  ai_free_tokens_per_day: "15000",
+  ai_premium_tokens_per_day: "120000",
   // AI cost control (Admin → AI → Cost & budgets). See lib/ai/pricing + budget.
   // Prices are NOT shipped: "{}" means every cost is "no price configured".
   ai_model_pricing: "{}",

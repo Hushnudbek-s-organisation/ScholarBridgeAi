@@ -33,8 +33,15 @@ import {
   studyInterestDisplayTerms,
   studyInterestRecommendationTerms,
 } from "@/lib/studyInterests";
+import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { resolveProgramDepartmentProfile } from "@/lib/programChancing";
 
 export const dynamic = "force-dynamic";
+
+/** Local clamp so the band math matches the chancing engine without exporting it. */
+function clampNum(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 /**
  * POST /api/programs/recommend — the subject-to-program recommender.
@@ -251,6 +258,14 @@ export async function POST(req: Request) {
   // ---- Load the catalog (any failure = 503, never mock data) -------------
   let catalog: RecommendationCatalog;
   let totalPrograms = 0;
+  /**
+   * QS benchmark per university id, filled while the catalog loads and read
+   * when the results are serialised. The card used to carry a fourth column
+   * that only ever said "Admission probability: unavailable"; it now carries
+   * these measurements instead. Same benchmark the chancing engine reads, so
+   * the two screens cannot disagree, and no tier vocabulary is exposed.
+   */
+  const benchmarkByUniId = new Map<number, ReturnType<typeof matchQsUniversityBenchmark>>();
   try {
     const [programRows, uniRows, reqRows, cycleRows, scholarshipRows] = await Promise.all([
       db
@@ -268,6 +283,7 @@ export async function POST(req: Request) {
 
     const unis = new Map<number, RecommendUniversity>();
     for (const u of uniRows) {
+      benchmarkByUniId.set(u.id, matchQsUniversityBenchmark(u));
       unis.set(u.id, {
         id: u.id,
         name: u.name,
@@ -406,7 +422,27 @@ export async function POST(req: Request) {
   const results = recommend(input, catalog, limit);
 
   return NextResponse.json({
-    results,
+    results: results.map((r) => {
+      const benchmark = benchmarkByUniId.get(r.university.id);
+      if (!benchmark) return r;
+      // The department shifts the university band by its own selectivity — the
+      // same shift `evaluateUniversityAndProgramChance` applies.
+      const dept = resolveProgramDepartmentProfile(r.program.name, r.program.field);
+      const gpa25 = Math.round(clampNum(benchmark.gpa25 + dept.gpaShift, 2.4, 3.94) * 100) / 100;
+      const gpa50 = Math.round(clampNum(benchmark.gpa50 + dept.gpaShift, gpa25 + 0.05, 3.98) * 100) / 100;
+      const gpa75 = Math.round(clampNum(benchmark.gpa75 + dept.gpaShift, gpa50 + 0.03, 4.0) * 100) / 100;
+      return {
+        ...r,
+        positioning: {
+          qsRank: benchmark.qsRank,
+          universityAcceptRatePct: Number.isFinite(benchmark.acceptRatePct) ? benchmark.acceptRatePct : null,
+          departmentLabel: dept.label,
+          gpa25,
+          gpa50,
+          gpa75,
+        },
+      };
+    }),
     totalProgramsScanned: totalPrograms,
     // Probability policy (2026-10): the dimension is surfaced as unavailable —
     // no fit score below is an admission probability.

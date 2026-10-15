@@ -125,6 +125,18 @@ interface RecommendResult {
     scholarshipMatches: { id: number; title: string; coverageType: string | null; needBased: boolean }[];
   };
   probability: { available: boolean };
+  /**
+   * QS + department positioning for this university/programme. Optional — an
+   * un-benchmarked university simply omits it, and the card renders without it.
+   */
+  positioning?: {
+    qsRank: number;
+    universityAcceptRatePct: number | null;
+    departmentLabel: string;
+    gpa25: number;
+    gpa50: number;
+    gpa75: number;
+  };
   matchScore: number;
   rankingFactors: string[];
   missingInputs: string[];
@@ -1054,14 +1066,48 @@ export function RecommendationStudio({
                             </ul>
                           </div>
 
-                          {/* 4 — Admission probability (always unavailable) */}
+                          {/* 4 — QS & department positioning (was an empty
+                              "probability unavailable" box; the same caption
+                              now sits once, quietly, at the page foot). */}
                           <div>
-                            <DimHeading icon={<Scale className="h-3.5 w-3.5" />}>{t("probabilityLabel")}</DimHeading>
+                            <DimHeading icon={<Scale className="h-3.5 w-3.5" />}>{t("positioningLabel")}</DimHeading>
                             <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
-                              <Badge tone="slate">
-                                <HelpCircle className="h-3 w-3" /> {t("unavailable")}
-                              </Badge>
-                              <p className="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">{t("probabilityUnavailable")}</p>
+                              {r.positioning ? (
+                                <dl className="space-y-1 text-[11px] leading-snug">
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningQsRank")}</dt>
+                                    <dd className="font-semibold text-slate-800 dark:text-slate-100">QS #{r.positioning.qsRank}</dd>
+                                  </div>
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningSelectivity")}</dt>
+                                    <dd className="text-right font-semibold text-slate-800 dark:text-slate-100">
+                                      {r.positioning.departmentLabel}
+                                    </dd>
+                                  </div>
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningGpaBand")}</dt>
+                                    <dd className="font-semibold text-slate-800 dark:text-slate-100">
+                                      {t("positioningGpaRange", {
+                                        low: r.positioning.gpa25.toFixed(2),
+                                        median: r.positioning.gpa50.toFixed(2),
+                                        high: r.positioning.gpa75.toFixed(2),
+                                      })}
+                                    </dd>
+                                  </div>
+                                  {r.positioning.universityAcceptRatePct != null && (
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <dt className="text-slate-500 dark:text-slate-400">{t("positioningAcceptRate")}</dt>
+                                      <dd className="font-semibold text-slate-800 dark:text-slate-100">
+                                        {t("positioningAcceptRateValue", { rate: r.positioning.universityAcceptRatePct })}
+                                      </dd>
+                                    </div>
+                                  )}
+                                </dl>
+                              ) : (
+                                <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                                  {t("positioningNotBenchmarked")}
+                                </p>
+                              )}
                             </div>
 
                             {/* Next application cycle */}
@@ -1152,6 +1198,13 @@ export function RecommendationStudio({
           </>
         )}
       </div>
+      {/*
+        One quiet caption for the whole page instead of the same grey box
+        repeated inside every card. The wording is unchanged.
+      */}
+      <p className="mt-4 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-400 dark:border-slate-800 dark:text-slate-500">
+        {t("probabilityUnavailable")}
+      </p>
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="estimate" className="mt-2" />
     </section>

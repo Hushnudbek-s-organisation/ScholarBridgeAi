@@ -15,7 +15,7 @@
  * feedback; the server's message is what the admin sees when it rejects.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Save, Zap } from "lucide-react";
 
 interface ConfigRow {
   key: string;
@@ -74,6 +74,36 @@ const PRICING_TEMPLATE = `{
     "<model-id>": { "inputPerMTok": 0.0, "outputPerMTok": 0.0 }
   }
 }`;
+
+/**
+ * Official 2026 list prices for the routing mix this app ships with.
+ *
+ * This is a CONVENIENCE FILL, not a shipped default: `CONFIG_DEFAULTS.ai_model_pricing`
+ * stays `"{}"` so the app never invents a price on its own (see
+ * scripts/check-ai-cost.ts). An admin clicks this, reviews the numbers against
+ * the current provider price list, then saves.
+ */
+const PRICING_2026_PRESET = JSON.stringify(
+  {
+    openai: {
+      "gpt-6-luna": { inputPerMTok: 0.1, cachedInputPerMTok: 0.01, outputPerMTok: 0.5 },
+      "gpt-4o-mini": { inputPerMTok: 0.15, cachedInputPerMTok: 0.075, outputPerMTok: 0.6 },
+    },
+    openrouter: {
+      "openai/gpt-6-luna": { inputPerMTok: 0.1, cachedInputPerMTok: 0.01, outputPerMTok: 0.5 },
+      "meta-llama/llama-3.3-70b-instruct": { inputPerMTok: 0.12, cachedInputPerMTok: 0.06, outputPerMTok: 0.3 },
+    },
+    google: {
+      "gemini-2.5-flash": { inputPerMTok: 0.3, cachedInputPerMTok: 0.075, outputPerMTok: 2.5 },
+      "gemini-2.5-flash-lite": { inputPerMTok: 0.1, cachedInputPerMTok: 0.025, outputPerMTok: 0.4 },
+    },
+    groq: {
+      "openai/gpt-oss-120b": { inputPerMTok: 0.15, cachedInputPerMTok: 0.075, outputPerMTok: 0.6 },
+    },
+  },
+  null,
+  2
+);
 
 function fmtUsd(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -431,7 +461,16 @@ export function AiCostPanel() {
           placeholder={PRICING_TEMPLATE}
           aria-label="Model price table (JSON)"
         />
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => setDraft("ai_model_pricing", PRICING_2026_PRESET)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Load official 2026 model price table (GPT-6 Luna / Gemini 2.5 / Groq)
+          </button>
           <button
             type="button"
             disabled={busy !== null}
@@ -444,6 +483,10 @@ export function AiCostPanel() {
           </button>
           {msg("pricing")}
         </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          The preset fills the editor only — nothing is saved until you press <em>Save prices</em>. Verify each figure against your
+          provider&apos;s current price list first.
+        </p>
       </section>
 
       {/* ---------------- Quotas & voice ---------------- */}
