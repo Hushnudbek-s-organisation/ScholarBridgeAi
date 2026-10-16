@@ -22,6 +22,15 @@ import { eq, and, inArray, like } from "drizzle-orm";
 let passed = 0;
 let failed = 0;
 
+/**
+ * On GitHub Actions the failure is ALSO emitted as an annotation, so the
+ * assertion that broke is readable from the checks API without downloading the
+ * job log (`gh api …/check-runs/<id>/annotations`).
+ */
+function annotate(message: string) {
+  if (process.env.GITHUB_ACTIONS) console.log(`::error::${message.replace(/\r?\n/g, " ").slice(0, 900)}`);
+}
+
 function check(name: string, condition: boolean, detail = "") {
   if (condition) {
     passed++;
@@ -29,6 +38,7 @@ function check(name: string, condition: boolean, detail = "") {
   } else {
     failed++;
     console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
+    annotate(`${name}${detail ? ` — ${detail}` : ""}`);
   }
 }
 
@@ -2480,6 +2490,7 @@ main()
     console.error("\nFATAL:", e?.message?.slice(0, 900) ?? e);
     const cause = e?.cause;
     if (cause) console.error("CAUSE:", String(cause.message ?? cause).slice(0, 500));
+    annotate(`integration suite crashed before finishing — FATAL: ${e?.message ?? e}${cause ? ` | CAUSE: ${cause.message ?? cause}` : ""}`);
     process.exitCode = 1;
   })
   .finally(async () => {
