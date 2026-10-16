@@ -2,8 +2,8 @@ import { db } from "./index";
 import { seedProgramCatalog } from "./seedProgramCatalog";
 import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
 import { seedOpportunities } from "./seedOpportunities";
-import { seedRichPlatformData } from "./seedRichPlatformData";
-import { seedOutcomesAndStories } from "./seedOutcomesAndStories";
+import { seedRichPlatformData, ensureRichPlatformDataSeeded } from "./seedRichPlatformData";
+import { seedOutcomesAndStories, ensureOutcomesAndStoriesSeeded } from "./seedOutcomesAndStories";
 import { ensureGrowthTables } from "@/lib/growth/db";
 import { ensureJourneyTables } from "@/lib/journey/db";
 import {
@@ -52,7 +52,50 @@ async function currentPlatformOwnerId(): Promise<number | null> {
   }
 }
 
-export async function seedDatabase() {
+/**
+ * Process-level memoization for `seedDatabase()`.
+ *
+ * Before this guard every catalogue read ran the whole seed from scratch:
+ * `GET /api/universities` and `GET /api/scholarships` each issued 150+ queries
+ * (admin lookup, referral backfill, program catalogue, scholarship cycles,
+ * opportunities, growth/journey DDL, rich platform data, outcomes & stories,
+ * forum, courses, gamification) on EVERY filter change, search keystroke and
+ * pagination click. The first call in a process now performs the real work;
+ * every later call returns immediately (or awaits the in-flight run so two
+ * concurrent cold requests never duplicate the writes).
+ */
+let seedDatabaseCompleted = false;
+let seedDatabasePromise: Promise<void> | null = null;
+
+/** Test/dev hook: forget the memoized seed so the next call runs again. */
+export function resetSeedDatabaseCache() {
+  seedDatabaseCompleted = false;
+  seedDatabasePromise = null;
+}
+
+export async function seedDatabase(options?: { force?: boolean }): Promise<void> {
+  if (!options?.force) {
+    if (seedDatabaseCompleted) return;
+    if (seedDatabasePromise) return seedDatabasePromise;
+  }
+
+  const run = runSeedDatabase()
+    .then(() => {
+      seedDatabaseCompleted = true;
+      seedDatabasePromise = null;
+    })
+    .catch((err) => {
+      // A failed run must not be remembered as "done" — the next request
+      // retries (a database that came up a second later still bootstraps).
+      seedDatabasePromise = null;
+      console.error("Error seeding database:", err);
+    });
+
+  seedDatabasePromise = run;
+  return run;
+}
+
+async function runSeedDatabase() {
   try {
     // Bootstrap admin account — configured ONLY through env (no personal
     // defaults in code, so a new owner/host never inherits someone's email):
@@ -144,8 +187,14 @@ export async function seedDatabase() {
     //    onboardingStep stays 0 / onboardingCompleted false), so they are
     //    NOT touched here and the step-by-step wizard shows for them.
     try {
-      const allProfiles = await db.select().from(studentProfiles);
-      for (const p of allProfiles) {
+      // Only profiles that actually need a code are read — pulling every row
+      // (with password hashes and financial fields) on each catalogue request
+      // was pure overhead once every profile already had one.
+      const profilesMissingReferral = await db
+        .select()
+        .from(studentProfiles)
+        .where(sql`${studentProfiles.referralCode} IS NULL OR ${studentProfiles.referralCode} = ''`);
+      for (const p of profilesMissingReferral) {
         if (!p.referralCode) {
           let code = makeReferralCode();
           for (let i = 0; i < 5; i++) {
@@ -190,15 +239,21 @@ export async function seedDatabase() {
         console.error("Opportunities catalogue top-up failed:", err);
       }
       try {
-        await ensureGrowthTables();
-        await ensureJourneyTables();
-        await seedRichPlatformData();
-        await seedOutcomesAndStories();
-        await seedForum();
-        await seedCourses();
-        await seedGamification();
+        // Independent top-ups run concurrently; each one is individually
+        // idempotent and guarded by its own process cache.
+        await Promise.all([
+          ensureGrowthTables(),
+          ensureJourneyTables(),
+          ensureRichPlatformDataSeeded(),
+          ensureOutcomesAndStoriesSeeded(),
+        ]);
       } catch (err) {
         console.error("Rich platform data top-up failed:", err);
+      }
+      try {
+        await Promise.all([seedForum(), seedCourses(), seedGamification()]);
+      } catch (err) {
+        console.error("Catalogue top-up failed:", err);
       }
       return;
     }
@@ -717,6 +772,8 @@ export async function seedDatabase() {
     await seedOpportunities();
     await ensureGrowthTables();
     await ensureJourneyTables();
+    // Cold-install path (runs once per process): keep the raw writers so a
+    // fresh deployment always receives the full catalogue, exactly as before.
     await seedRichPlatformData();
     await seedOutcomesAndStories();
     await seedForum();
@@ -1966,6 +2023,838 @@ const COURSE_CATALOG_SPECS: CourseSeedSpec[] = [
                   "Buying a car",
                   "Applying for citizenship",
                   "Retaking the IELTS exam",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------------
+  // Practical "how-to" walkthroughs (added 2026) — the courses students
+  // actually follow step-by-step while a portal is open in another tab.
+  // Idempotent: `seedCourses()` skips any title that already exists, so an
+  // installation with the earlier five courses simply gains these four.
+  // ------------------------------------------------------------------
+  {
+    title: "How to Use Common App & CSS Profile: Step-by-Step US Application Guide",
+    description:
+      "Open commonapp.org next to this course and follow along: account setup, the 10-activity list, the counselor/recommender portal, and the CSS Profile in UZS for Uzbek families.",
+    instructorName: "Jasur Toshmatov (MIT Admitted Scholar & Counselor)",
+    level: "Beginner",
+    thumbnailUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=800&auto=format&fit=crop",
+    modules: [
+      {
+        title: "Common App Account Setup, College List & Activities Section",
+        description: "Create the account, sign the FERPA waiver, add universities and fill the activity list correctly",
+        lessons: [
+          {
+            title: "Creating Your Common App Account, FERPA Waiver & Adding Universities",
+            videoUrl: "https://www.youtube.com/watch?v=rM2x2j03haU",
+            durationSeconds: 720,
+            content:
+`### What you need before you start (10 minutes of prep)
+
+Gather these before opening the portal — every one of them is asked for in the Profile and Education tabs:
+
+- Passport (exact spelling of your name as printed on it)
+- School name as written on your **shahodatnoma / attestat** (Latin script)
+- Your family's basic information (parents' names, occupations, education)
+- Test dates: IELTS/TOEFL, SAT/Duolingo, and your expected graduation month
+
+### Step 1 — Create the account at commonapp.org
+
+1. Go to https://www.commonapp.org/apply and choose **First-year student**.
+2. Register with an email you will still read in two years. Use one address only — a second account splits your applications.
+3. Confirm the verification email, then log in to https://apply.commonapp.org.
+
+### Step 2 — Sign the FERPA Release Authorization
+
+1. Open **My Colleges → Recommenders and FERPA** for any university.
+2. Read the FERPA block and choose **I waive my right** — waiving is what makes a recommendation letter credible, and it does not hide the letter from you in practice.
+3. Sign it with your full legal name exactly as on the passport.
+
+### Step 3 — Complete the Profile and Education tabs
+
+- **Profile:** name, address, contact, citizenship, and **Common App fee waiver** eligibility (this is where international students with financial need request the waiver).
+- **Education:** your current school, the curriculum, and the **date you will graduate**. For Uzbek schools pick *Other* curriculum and describe it: "11-year national curriculum, grades in a 5-point system".
+- **Testing:** enter every score you want universities to see; self-reported scores are fine at this stage.
+
+### Step 4 — Build the college list (My Colleges)
+
+1. Add universities with **College Search**, and group them: 2–3 Reach, 4–5 Match, 2 Safety (including at least one financially safe option).
+2. Check each university's **Writing Supplement** and deadline *before* adding it — some need an extra essay or an earlier date.
+
+### Step 5 — Know the fee reality
+
+- The Common App fee waiver covers application fees at member universities, but **not** the CSS Profile fee or test-score sending.
+- Deadlines you must never miss: **Early Decision/Action ≈ 1 November**, **Regular Decision ≈ 1 January**.
+
+> Always confirm the current requirements on the official university page — the portal changes every cycle, and ScholarBridge shows the same information with its verification date.`,
+            quizQuestions: [
+              {
+                question: "Why is the FERPA release authorization worth signing, and what does 'waiving your right' mean?",
+                options: [
+                  "Waiving the right to read the recommendation means you trusted the recommender — it is what makes the letter credible to admissions officers",
+                  "It hides your transcript from admissions officers",
+                  "It cancels your application fee automatically",
+                  "It replaces the need for an IELTS score",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "Which fee does the Common App fee waiver NOT cover for an international applicant?",
+                options: [
+                  "The CSS Profile fee charged by the College Board and test-score sending fees",
+                  "It covers every fee in the process",
+                  "It covers the CSS Profile but not the university application fee",
+                  "It covers nothing, including the university application fee",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+          {
+            title: "Mastering the 10-Activity List (150-Character Formula) & 5 Honors",
+            videoUrl: "https://www.youtube.com/watch?v=BuFfLdSUjHM",
+            durationSeconds: 840,
+            content:
+`### Why this section decides a lot
+
+The Activities section is the only place where an admissions officer sees **what you did**, in your own words, all year. Each entry gives you a title (50 characters) and a description (150 characters) — they reward precision, not adjectives.
+
+### The structure that works
+
+Use this for every one of the 10 activity slots:
+
+1. **Position / Leadership** — your exact role: "Founder", "Team Captain", "Regional Finalist".
+2. **Organization** — the real name: "Nukus Regional Debate League", "IT Park Summer School".
+3. **What you actually did, with numbers** — "Ran 14 weekly sessions for 46 students; built a Telegram study bot used by 900 pupils."
+4. **Impact or outcome** — "raised 12 mln UZS for the town library", "Top 5 of 320 teams".
+
+Then answer the three extra fields honestly:
+
+- **Participation grade levels:** 9, 10, 11, 12
+- **Timing:** during school year / break / all year
+- **Hours per week and weeks per year:** keep them realistic. Two activities with 15 h/week for 40 weeks are checked against each other, and impossible totals damage your credibility.
+
+### Ordering strategy
+
+- Order by **importance to your narrative and to your planned major first**, then by prestige, then by chronology.
+- Activity #1 should be the thing you would talk about for ten minutes without preparation.
+
+### The 5 Honors slots
+
+- This is where **Republican and International Olympiads** go: name the olympiad, the level (school / regional / republican / international), the subject, and the year.
+- Put a certification you earned beside it if you have one (IELTS 7.5 can be listed as an honor when it is genuinely above your cohort's level).
+- If a slot is empty, leave it empty — never invent an award.
+
+### Common mistakes from Uzbek applicants
+
+- Copy-pasting "Activities: football, reading, volunteering" — no evidence, no numbers.
+- Writing a full sentence with an unnecessary "I" that costs 5 of your 150 characters.
+- Listing 20 minor certificates instead of 10 quantified commitments.
+
+> Reference: https://www.commonapp.org/apply/first-year-students`,
+            quizQuestions: [
+              {
+                question: "How should the 10 activity slots be ordered?",
+                options: [
+                  "By importance to your story and planned major, then prestige, then chronology — with the strongest commitment first",
+                  "Alphabetically by organization name",
+                  "By the amount of money involved",
+                  "Chronologically is irrelevant — order never matters",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "Which description is strongest for a 150-character activity entry?",
+                options: [
+                  "Position, organization, quantified action and impact (e.g. ran 14 sessions for 46 students, Top 5 of 320 teams)",
+                  "Three adjectives about your passion",
+                  "A list of hobbies separated by commas",
+                  "The name of your school repeated twice",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "School Counselor Portal & Submitting Uzbek Transcripts (Shahodatnoma / Litsey)",
+        description: "How your school in Uzbekistan can send transcripts, the school profile and teacher recommendations",
+        lessons: [
+          {
+            title: "How Your School Counselor Uploads Transcripts, School Profile & Teacher LORs",
+            videoUrl: "https://www.youtube.com/watch?v=ChaW1wkgwrc",
+            durationSeconds: 660,
+            content:
+`### The two sides of Common App
+
+Your side (**My Colleges → Recommenders and FERPA**) is only half of the application. The other half belongs to your school: the **Counselor** section, the school profile, and the teacher recommendations.
+
+### Step 1 — Invite the counselor and two teachers
+
+1. In **Recommenders and FERPA**, add your counselor's name and school email, and at least two academic teachers.
+2. Use institutional school email addresses where they exist; an official school domain matters more than a personal inbox.
+3. Do this in **September**. Uzbek schools write letters by hand during a busy term — an invitation sent in December usually produces a weak letter, or none.
+
+### Step 2 — Get the transcript right
+
+- For Uzbek schools the document is the **shahodatnoma** (11th grade) or **attestat**. Academic lyceums and Presidential schools issue their own grade sheets.
+- Ask the school for a **transcript with translated grade scale**: how the 5-point national scale maps onto your coursework, and the subject list per year.
+- If your school has no seal-translated document, the school can upload a **signed and stamped** version with the official translation attached — the counselor's upload is what gives it weight.
+
+### Step 3 — Fill the School Profile with your counselor
+
+The profile is the school's context document: size, curriculum, graduation requirements, grading scale, and — very important for Uzbek applicants — how many students continue to higher education and which universities they enter. A strong profile explains to an admissions officer why your "4" means what it means.
+
+### Step 4 — Track completion like a deadline
+
+1. Check the status list: *Not started → Started → Submitted*.
+2. Remind your teachers once every two weeks — politely, with a fixed date.
+3. Final check before the **1 January** deadline: counselor form, school profile, both letters, and your transcript all show **Submitted**.
+
+> Ask your counselor to open https://www.commonapp.org/apply today and confirm they received the invitation email — every year some invitations land in spam.`,
+            quizQuestions: [
+              {
+                question: "What is the most reliable way to make an Uzbek transcript credible to a US university?",
+                options: [
+                  "Have the school upload an official, sealed transcript with the national 5-point grade scale explained, plus a certified translation when needed",
+                  "Translate a photocopy yourself and email it as a PDF",
+                  "Report the grades only in the activities list",
+                  "Send the original diploma by regular post to every university",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "When should you invite your counselor and teachers to Common App?",
+                options: [
+                  "September — well before the busy winter deadline period, so they have time to write",
+                  "The day of the deadline",
+                  "After you receive an admission decision",
+                  "Only if the university asks you by email",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "Filling Out the CSS Profile & IDOC for Uzbekistan Families",
+        description: "Reporting parental income in UZS, attaching soliq.uz and my.gov.uz certificates, and the Special Circumstances statement",
+        lessons: [
+          {
+            title: "Step-by-Step CSS Profile in UZS & Translating Soliq.uz Tax Certificates",
+            videoUrl: "https://www.youtube.com/watch?v=jZGUgFOmEeI",
+            durationSeconds: 780,
+            content:
+`### The CSS Profile is not the Common App
+
+It is a **separate financial-aid form** run by the College Board. Only some universities require it, but those universities (including many private US universities and several scholarship programs) use it to award their own institutional aid. Check each university's financial-aid page, then register at https://cssprofile.collegeboard.org/.
+
+### Step 1 — Register correctly
+
+1. Create the College Board account **with the student's information** (a parent account is created later if the form requests a noncustodial parent).
+2. Add the universities one by one — every institution costs a submission fee, and international fee waivers exist but are limited.
+
+### Step 2 — Report income in UZS honestly and in full
+
+- Convert with the rate you used consistently and state the rate in the notes field. **Report the currency as UZS**; never round up to dollars just because it looks smaller.
+- Report **both parents'** income: salary, pension, business profit, rental income, and remittances.
+- Family size and the number of siblings studying at the same time materially reduce your expected contribution — report them exactly.
+
+### Step 3 — Attach the documents Uzbek families actually have
+
+1. **Employment and salary:** a certificate from the employer (*ish joyidan maosh haqida ma'lumotnoma*) showing monthly salary for the last 12 months.
+2. **Soliq.uz:** the tax declaration or a certificate of taxes paid from https://soliq.uz.
+3. **my.gov.uz:** officially issued certificates (marriage/divorce, disability, dependents) can be ordered online at https://my.gov.uz — these are what you attach to prove special circumstances.
+4. **Bank statements:** 3–6 months, stamped by the bank, for every account reported.
+5. Translate every document into English with a certified translation (notarization added when the university asks for it).
+
+### Step 4 — Write the Special Circumstances section (about 2,000 characters)
+
+This is the only narrative part of a financial form, so use it as a structured explanation, not a plea:
+
+1. The situation: "Father's monthly income dropped from X to Y in March 2025 because…"
+2. The evidence: name the certificate you attached.
+3. The consequence: "Our expected contribution would be Z, while our verifiable annual income is W."
+4. What you are doing about it: student earnings, sibling support, savings.
+
+### Step 5 — IDOC
+
+Many universities ask you to upload the same documents to **IDOC** (College Board's document service). Upload the translated, stamped versions — a blurry phone photo of an untranslated stamp is the most common rejection.
+
+> Verify current fees and requirements at https://cssprofile.collegeboard.org/ before you submit — the fee and the required documents change year to year.`,
+            quizQuestions: [
+              {
+                question: "How should a family in Uzbekistan report parental income on the CSS Profile?",
+                options: [
+                  "Report it in UZS with a stated exchange rate, including both parents' salary, pension, business profit and remittances",
+                  "Report an estimated round dollar figure and skip small incomes",
+                  "Report only the father's salary because the mother's income is small",
+                  "Leave income empty and let the university calculate it",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "What makes the Special Circumstances section effective?",
+                options: [
+                  "Stating the situation, naming the attached official document, explaining the financial consequence and what the family does about it",
+                  "Writing that you are a good student and deserve help",
+                  "Copying a template found online without any documents",
+                  "Repeating the income numbers from the previous section",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: "European University Portals: uni-assist VPD, TUMonline, DreamApply & Sperrkonto",
+    description:
+      "The application route from Uzbekistan into Germany and the EU: a VPD on uni-assist, TUM's curricular analysis, a blocked account, DreamApply for Stipendium Hungaricum and the Uzbek ministry portal.",
+    instructorName: "Sardorbek Rakhimov (TUM Munich & DAAD Scholar)",
+    level: "Intermediate",
+    thumbnailUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop",
+    modules: [
+      {
+        title: "Applying to German Universities: uni-assist VPD & TUM Curricular Analysis",
+        description: "Documents, the €75 VPD, deadline discipline and the module-by-module ECTS analysis",
+        lessons: [
+          {
+            title: "How to Apply for a VPD on uni-assist.de & Upload Certified Documents",
+            videoUrl: "https://www.youtube.com/watch?v=ChGgpa89_E4",
+            durationSeconds: 720,
+            content:
+`### What the VPD actually is
+
+Many German universities do not evaluate foreign documents themselves. They ask **uni-assist** (https://www.uni-assist.de/en/how-to-apply/) to check your certificates and issue a **VPD** (Vorprüfungsdokumentation) — a preliminary review stating your recognised grade and whether you meet the formal requirements. The VPD is valid for one admission cycle and can be sent to several universities.
+
+### Step 1 — Create a My assist account
+
+1. Register at https://www.uni-assist.de/ with the email you check daily.
+2. Fill your personal data exactly as in the passport (including all names in the correct order).
+3. Enter your **complete education history**, including school and every year of university.
+
+### Step 2 — Prepare the documents
+
+- Apostilled diploma/attestat **and** the academic transcript (see the e-Apostille lesson in the Uzbekistan grants course).
+- Certified translations into German or English.
+- Passport copy, and language certificates (IELTS/TestDaF) if you have them; some universities accept them later.
+- Digital copies must be **legible scans**, not phone photos. File names should identify the document.
+
+### Step 3 — Request the VPD
+
+1. Choose the target universities, then add the documents uni-assist requests for each.
+2. Pay the processing fee (around **€75 for the first application, less for each additional one** — confirm the current amount on the site).
+3. Submit before the university's deadline. The VPD itself takes **4–6 weeks** during peak season, so start in October for a January deadline.
+
+### Step 4 — Watch the status and respond fast
+
+- Statuses move through *received → in processing → documents missing → VPD created*.
+- If a document is missing, uni-assist emails you a deadline: respond within it, or the application is closed and the fee is not refunded.
+
+> Check both pages: uni-assist publishes the VPD rules, and each university publishes its own deadline (often earlier than the VPD processing time suggests).`,
+            quizQuestions: [
+              {
+                question: "What is the main purpose of a VPD on uni-assist?",
+                options: [
+                  "It is a preliminary check of your foreign certificates that universities use instead of evaluating them themselves",
+                  "It is a visa issued by the German embassy",
+                  "It is a language exam certificate",
+                  "It is a scholarship application",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "How early should you request a VPD for a January deadline?",
+                options: [
+                  "In October — processing takes about 4–6 weeks during the peak season",
+                  "On the deadline day, because processing is instant",
+                  "After you receive the admission letter",
+                  "Only after you have a visa",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+          {
+            title: "TUMonline Application, ECTS Credit Conversion & Opening a €11,904 Sperrkonto",
+            videoUrl: "https://www.youtube.com/watch?v=5R3DfQ6O4KY",
+            durationSeconds: 840,
+            content:
+`### Two different documents, two different jobs
+
+- **TUMonline** (https://www.tum.de/en/studies/application) is the university portal where you apply for a specific Master's programme.
+- **Sperrkonto** is a German blocked account you open with a bank or provider for the **visa**, not for the university.
+
+### Step 1 — TUMonline application in the right order
+
+1. Create an account on https://campus.tum.de, then open **Application → Apply for a degree programme**.
+2. Upload the **VPD** when the programme requires it (many TUM Master's programmes require a VPD for international applicants).
+3. Upload the transcript, diploma, language certificate, CV and motivation letter as separate files.
+
+### Step 2 — The Curricular Analysis is the part people fail
+
+TUM asks you to fill a table map of **your modules against the required modules of the programme**:
+
+1. List each prerequisite area (for example *Mathematics*, *Algorithms*, *Statistics*).
+2. For every area, list the exact courses you took, with **ECTS or credit hours, hours per week, and the grade**.
+3. Convert credits correctly: Uzbek universities report credit hours, not ECTS. A common conversion is **1 ECTS ≈ 25–30 hours of total student workload** — show the arithmetic in the notes column so the reviewer can follow it.
+4. Attach the syllabus/course description where your transcript alone does not prove the content. Without syllabi, a 5-point "4" in a relevant course is not evidence.
+
+### Step 3 — Open the blocked account
+
+1. Compare providers: **Expatrio** and **Fintiba** are the ones Uzbek students use most; a German bank such as Deutsche Bank is another route.
+2. The required amount for a student visa is set once per year (about **€11,904 for 2025**, paid as ~€992 per month). **Verify the current figure** on the German embassy's page before you transfer.
+3. Fund the account, receive the **blocked amount confirmation**, and attach that document to your visa application.
+4. On arrival, complete the **Anmeldung** (city registration) so the bank can start paying out the monthly amount.
+
+### Step 4 — Timeline that works
+
+1. October–November: VPD request and TUMonline documents.
+2. January 15 (summer semester) or May 31 (winter semester): the usual TUM deadlines — confirm for your programme.
+3. February–March: admission, blocked account, health insurance, visa appointment in Tashkent.
+
+> Amounts, portal names and deadlines all change — always confirm on https://www.tum.de and the German embassy's official page.`,
+            quizQuestions: [
+              {
+                question: "What does TUM's curricular analysis require from an applicant?",
+                options: [
+                  "A module-by-module mapping of your completed courses to the programme's prerequisites, with credits/ECTS, hours and grades",
+                  "Only the overall GPA",
+                  "A letter from your school principal",
+                  "Nothing — TUM evaluates transcripts automatically",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "What is a Sperrkonto and who needs it?",
+                options: [
+                  "A blocked account holding one year of living costs, needed for the German student visa — the university does not require it",
+                  "A university tuition deposit",
+                  "A scholarship account opened by DAAD",
+                  "A German tax account",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "DreamApply (Stipendium Hungaricum) & Universitaly (Italy DSU Grant)",
+        description: "Dual registration, the Uzbek sending-partner portal, and document checklists that survive both systems",
+        lessons: [
+          {
+            title: "Dual Registration for Stipendium Hungaricum: DreamApply + Uzbek Ministry Portal",
+            videoUrl: "",
+            durationSeconds: 600,
+            content:
+`### Yes — there are two applications
+
+For the Hungarian government scholarship **Stipendium Hungaricum** (https://stipendiumhungaricum.hu/) an applicant from Uzbekistan must be present in **two** systems:
+
+1. **DreamApply** — the university-side portal where you list up to two programmes in priority order.
+2. **The Uzbek sending partner portal** — the nomination route managed by the Ministry of Higher Education, Science and Innovations. Without a nomination, the DreamApply application is not considered.
+
+### Step 1 — DreamApply
+
+1. Register at the DreamApply link published on the Stipendium Hungaricum site for the current cycle.
+2. Choose **two programmes**, first and second preference, and keep the order you would genuinely accept.
+3. Upload: passport, attested and translated secondary school certificate/diploma, transcripts, **medical certificate**, language certificate, motivation letter, and the school-leaving exam results.
+4. The **medical certificate** is a specific form in the current call — download the latest file, do not reuse an old one.
+
+### Step 2 — The Uzbek ministry portal
+
+1. Register on the official ministry portal in the announced window (the opening is published on official channels and is usually open only a few weeks).
+2. Upload the same document set, plus the **recommendation** required by the Uzbek side.
+3. Make sure the **programme names and codes** match what you entered in DreamApply — a mismatch between the two systems is the most common reason a strong applicant disappears from the ranking.
+
+### Step 3 — Documents that must be apostilled
+
+- Secondary school certificate / diploma (with the apostille from https://my.gov.uz)
+- Academic transcript
+- Birth certificate (when requested)
+- Translation into Hungarian or English for anything not issued in English
+
+### Step 4 — After submission
+
+1. Universities rank you on the DreamApply side; the scholarship board applies its own criteria.
+2. Interviews (online, sometimes in Hungarian/English) are part of several programmes — prepare a 3-minute answer to "why this programme in Hungary".
+3. Keep both dashboards open until the final result: changes requested by one system are frequently not visible in the other.
+
+> Similar dual-registration patterns exist for other ministries — always read the official call of the current year before applying.`,
+            quizQuestions: [
+              {
+                question: "What must a Stipendium Hungaricum applicant from Uzbekistan do beyond applying in DreamApply?",
+                options: [
+                  "Also register and apply through the Uzbek sending-partner (ministry) portal — without a nomination the application is not considered",
+                  "Nothing — DreamApply alone is sufficient",
+                  "Send the documents by physical mail to Budapest",
+                  "Pay a tuition deposit first",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "Which mismatch most often harms an otherwise strong application?",
+                options: [
+                  "Programme names/codes not matching between the ministry portal and DreamApply",
+                  "Using the same email in both systems",
+                  "Uploading documents in English",
+                  "Applying to two programmes",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Uzbekistan Flagship Grants & Documents: El-yurt umidi, GKS Korea, Türkiye Bursları & e-Apostille",
+    description:
+      "Get the paperwork done in Uzbekistan first: the e-Apostille on my.gov.uz and notarised translations, then the El-yurt umidi, GKS and Türkiye Bursları portals.",
+    instructorName: "Gulnoza Mirzayeva (Oxford & El-yurt umidi Scholar)",
+    level: "Beginner",
+    thumbnailUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=800&auto=format&fit=crop",
+    modules: [
+      {
+        title: "Getting an Official e-Apostille on my.gov.uz & Notarized Translations",
+        description: "The document step every grant and every visa application is waiting for",
+        lessons: [
+          {
+            title: "Step-by-Step e-Apostille Guide for Diplomas, Transcripts & Birth Certificates",
+            videoUrl: "",
+            durationSeconds: 540,
+            content:
+`### Why the apostille blocks everything else
+
+Apostille is the international confirmation that a signature and stamp on your Uzbek document are genuine (Hague Convention). Without it, foreign universities, scholarship boards and embassies treat your diploma as an unverified copy. Everything on this course — and every visa in the platform — waits on this step, so do it first.
+
+### Step 1 — Apply online at my.gov.uz
+
+1. Create or log in to your account on https://my.gov.uz.
+2. Choose the **Apostille** service (search "Apostille"), and select the service type — apostille of education documents, civil status documents, or other.
+3. Fill the form with exactly the data printed on the document.
+4. Choose the agency and the pickup method, and pay the state fee online.
+5. Typical processing is **3–5 business days** for education documents; regions and civil-status documents can differ.
+
+### Step 2 — Know which documents you will need
+
+- **Diploma / attestat / shahodatnoma** — education document apostille
+- **Academic transcript** — apostille each sheet if it carries a separate signature and stamp
+- **Birth certificate and marriage certificate** — civil status apostille (needed for sponsor relationship proof at visa stage)
+- **Criminal record certificate, when asked** — for some long-stay visas and scholarships
+
+### Step 3 — Translate and notarise in the right order
+
+1. Apostille the **original** first.
+2. Then translate the document **and** the apostille block itself — a translation that omits the apostille text is rejected.
+3. Notarise the translation. Keep both: the original with the apostille and the notarised translation.
+4. Scan everything at 300 dpi and store the PDFs in your document vault — you will upload them a dozen times.
+
+### Common mistakes that cost a whole cycle
+
+- Laminating the original so no apostille can be placed (do not laminate).
+- Apostilling a photocopy — apostille only ever confirms an original.
+- Ordering the apostille in parallel with the translation and ending up with a translation made *before* the apostille (the apostille reference number in the translation will not match).
+- Sending the only original abroad by post instead of certified scans through the portal.
+
+> Fees and processing times are published on https://my.gov.uz — check the current service page before you pay.`,
+            quizQuestions: [
+              {
+                question: "What is the correct order of document preparation?",
+                options: [
+                  "Apostille the original document first, then translate the document together with the apostille and have the translation notarised",
+                  "Translate first, laminate the original, then apostille",
+                  "Apostille a colour photocopy",
+                  "Notarise a self-made translation and skip the apostille",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "How long does an education-document e-Apostille normally take through my.gov.uz?",
+                options: [
+                  "About 3–5 business days",
+                  "About 6 months",
+                  "Instant, at any hour",
+                  "It can only be obtained abroad",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "El-yurt umidi Foundation, GKS Korea & Türkiye Bursları Portals",
+        description: "The three flagships most Uzbek students apply to — portals, contracts and interviews",
+        lessons: [
+          {
+            title: "El-yurt umidi Foundation Online Portal, Tripartite Contract & Commission Interview",
+            videoUrl: "https://www.youtube.com/watch?v=ydnv6tyXZ78",
+            durationSeconds: 780,
+            content:
+`### What the fund pays for
+
+The **"El-yurt umidi" Foundation** finances study at foreign universities for Uzbek citizens who are admitted (or conditionally admitted) to ranked foreign institutions — typically **QS Top 100 / Top 300** programmes. It covers tuition within a set cap, stipend, and travel, in exchange for a **return obligation** to work in Uzbekistan.
+
+### Step 1 — The one thing to understand before you apply
+
+You need an **admission or conditional admission letter** from a currently operating foreign university. The fund does not search for universities for you: the ranking and the programme determine your eligibility tier and the funding cap.
+
+### Step 2 — Online application on the fund portal
+
+1. Open the fund's application platform (published for each competition on https://eyuf.uz and its official channels).
+2. Register, then complete every field: personal data, education, the exact programme and university, and the intended return plan.
+3. Upload: passport, diploma and transcript (**apostilled**, with notarised translation), admission/conditional letter, language certificate, and your motivation document.
+4. Register **within the announced window** — the competition opens and closes on fixed dates published for that round.
+
+### Step 3 — Selection rounds
+
+1. **Document screening** against the published criteria.
+2. **Additional tests** on intellectual, analytical and creative ability.
+3. **Interview in Uzbek** with the commission: your programme, why this university, the funding needed, and the return plan.
+
+### Step 4 — The tripartite contract and the 5-year return roadmap
+
+- The contract is signed between the scholar, the foundation and the employing organisation — the structure is published for each competition.
+- Prepare a concrete return plan: the sector, the type of organisation, and the role you intend to take in Uzbekistan. "I will come back and work" is not a plan; "I will return to X and work on Y, using the Z skills from this programme" is.
+- Know your own numbers: tuition the fund will pay, monthly stipend, and the remaining cost you must cover.
+
+### Step 5 — Before the interview
+
+1. Re-read your own application top to bottom — every claim is fair game.
+2. Be ready to answer in Uzbek, clearly and briefly, why this programme cannot be replaced by one available in Uzbekistan.
+3. Bring the document set as instructed for verification.
+
+> Competition rules, funding caps and the return obligation are published per round — always read the current official announcement.`,
+            quizQuestions: [
+              {
+                question: "What is the minimum document an El-yurt umidi applicant must already have?",
+                options: [
+                  "An admission or conditional admission letter from a foreign university that is currently operating",
+                  "A visa for the destination country",
+                  "A signed employment contract in Uzbekistan",
+                  "A completed Master's degree abroad",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "What makes a strong answer to the return-plan question in the commission interview?",
+                options: [
+                  "A concrete sector, employer type and role in Uzbekistan, connected to the skills of the chosen programme",
+                  "Saying you will decide later",
+                  "Promising to stay abroad permanently",
+                  "Repeating the university ranking",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+          {
+            title: "GKS (StudyInKorea) Document Checklist & Türkiye Bursları (TBBS) Portal Walkthrough",
+            videoUrl: "https://www.youtube.com/watch?v=x_ZhO5a6cTw",
+            durationSeconds: 840,
+            content:
+`### Two governments, two very different application shapes
+
+- **GKS (Global Korea Scholarship)** — run by NIIED, applied through **either** the Korean embassy in your country (Embassy Track) **or** one university (University Track). You choose one; applying through both invalidates the application.
+- **Türkiye Bursları** — applied through the **TBBS** portal at https://tbbs.turkiyeburslari.gov.tr/, with a single online form and a video interview stage.
+
+### GKS: the document checklist that decides everything
+
+1. Application form (the current year's NIIED form — never an old one).
+2. Personal statement and study plan (the two essays, with the required word ranges).
+3. **Two recommendation letters** in the prescribed format.
+4. Diploma/graduation certificate and full transcript — **apostilled**, with English translation.
+5. Proof of citizenship for the applicant **and for parents** — apostilled birth certificates and passport copies. This is where Uzbek applicants most often lose time: order the apostilles first.
+6. GKS applicant agreement, personal medical assessment, and the checklist page itself.
+7. Language: TOPIK or English proficiency (the requirement depends on the chosen programme track).
+
+### GKS: Embassy Track vs University Track
+
+- **Embassy Track:** documents go to the Korean embassy, which ranks candidates and forwards a limited number of files to NIIED. Competitive, but the university placement is decided centrally.
+- **University Track:** you apply directly to one university, which selects its own candidates. Placement research matters more here.
+- Never submit to both tracks: GKS rejects duplicates.
+
+### Türkiye Bursları: the TBBS portal
+
+1. Register at https://tbbs.turkiyeburslari.gov.tr/ **before** the deadline closes — the system closes exactly on the announced date.
+2. Choose up to 12 programmes across the levels you are eligible for.
+3. Upload diploma/transcript, exam results, passport, and the **letter of intent** — the intent letter is short and decisive; make it specific to the first programme you selected.
+4. Documents that are not in Turkish or English must be translated.
+5. Interviews for shortlisted candidates run online or at the embassy — clarity and honest self-presentation matter more than perfect accent.
+
+### Timeline discipline
+
+- Both competitions open once a year and close hard. Put the opening and closing dates in your deadline tracker, and prepare apostilled documents **one month before** the window opens — that is the only part completely in your control.
+
+> Requirements change every cycle: verify on https://www.studyinkorea.go.kr and https://tbbs.turkiyeburslari.gov.tr/ before submitting.`,
+            quizQuestions: [
+              {
+                question: "What happens if you apply to GKS through both the Embassy Track and the University Track?",
+                options: [
+                  "The application is treated as invalid — you must choose exactly one track",
+                  "You get two chances to be selected",
+                  "The embassy track automatically wins",
+                  "Nothing, both applications are evaluated separately",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "Which supporting documents consistently slow down Uzbek GKS applicants, and should be apostilled first?",
+                options: [
+                  "Apostilled proof of citizenship for the applicant and both parents, plus the apostilled diploma/transcript",
+                  "The recommendation letters",
+                  "The TOPIK certificate",
+                  "The applicant agreement form",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: "How to Use ScholarBridge AI: Complete Platform Walkthrough",
+    description:
+      "A guided tour of the platform: onboarding and smart auto-fill, QS Top 200 program chancing, multi-currency cost planning, the AI SOP Studio, the deterministic essay rubric, and the AI visa interview simulator.",
+    instructorName: "ScholarBridge AI Team",
+    level: "Beginner",
+    thumbnailUrl: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=800&auto=format&fit=crop",
+    modules: [
+      {
+        title: "From 10-Second Onboarding to Submitting Your Applications",
+        description: "Everything the platform does for you, screen by screen",
+        lessons: [
+          {
+            title: "Using Smart Auto-Fill, QS Top 200 Program Chancing & Multi-Currency Cost Calculator",
+            videoUrl: "",
+            durationSeconds: 600,
+            content:
+`### Step 1 — Onboarding and smart auto-fill
+
+1. Create your profile and paste (or upload) your CV, transcript or IELTS result into the auto-fill box.
+2. The platform extracts the fields it can read — **always review them**: auto-fill proposes, you confirm. Anything it cannot read stays empty and is shown as "not provided yet" rather than guessed.
+3. Complete your financial flags honestly (budget, who pays, existing scholarships). They change which universities are realistically affordable for you.
+
+### Step 2 — University Explorer
+
+- Filter by country, public/private, level and **your committed tuition ceiling**; the quick chips give you Top 50 QS, low tuition, and IELTS-friendly lists in one click.
+- Every card shows a match score with its exact arithmetic (the breakdown strip under the reasons) and the **source link with its verification date** — if a number has no verified source, the card says so instead of showing an unverified figure.
+- Save universities to your shortlist; comparison of up to three at a time is available from the same screen.
+
+### Step 3 — Program-level chancing (QS Top 200)
+
+1. Open **Outlook / Chancing** and pick a university.
+2. The panel positions you against the programme's published profile: where you stand relative to the 25th/50th/75th percentile of the reference cohort, and which requirement is the binding constraint.
+3. Read the requirement list **with its caveat**: programme requirements are verified per year; anything unverified says so.
+4. Use the what-if scenario fields (GPA, IELTS, budget) to see how a better score changes your position — nothing you type in a scenario is saved to your profile.
+
+### Step 4 — Multi-currency cost calculator
+
+- Costs are converted to USD, UZS, EUR and KRW from the catalogue currency and period first — a stale USD mirror never overrides the canonical value.
+- Lines that come from a national benchmark (for example German living costs from DAAD) are explicitly marked **estimated**, and published lines show their source.
+- Tuition + living + insurance + flights + visa fees give the real annual number you must fund.
+
+### Step 5 — Deadlines and applications
+
+- Add the programmes you will actually apply to; the tracker then computes days remaining and highlights the next urgent action.
+- Submit through the official portal — the platform prepares and tracks; it never submits on your behalf.
+
+> Rule of the platform: nothing is fabricated. Empty fields stay empty, and every important number keeps its source and verification date.`,
+            quizQuestions: [
+              {
+                question: "What should you do right after the smart auto-fill reads your CV?",
+                options: [
+                  "Review every extracted field and confirm it — auto-fill proposes values, you remain responsible for them",
+                  "Accept everything and submit applications immediately",
+                  "Ignore empty fields because the platform fills them later with estimates",
+                  "Delete the auto-filled data and type everything again",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "How does the cost calculator treat a missing living-cost figure?",
+                options: [
+                  "As unknown — it is never silently treated as zero, and benchmarked lines are explicitly marked estimated",
+                  "As zero to keep the total low",
+                  "It invents an average value without saying so",
+                  "It removes the cost line entirely",
+                ],
+                correctOptionIndex: 0,
+              },
+            ],
+          },
+          {
+            title: "AI SOP Studio, Deterministic Essay Rubric & Circular AI Visa Interview Simulator",
+            videoUrl: "",
+            durationSeconds: 660,
+            content:
+`### The writing tools, in the order that actually helps
+
+**1. Gather source material first.** Fill your activity portfolio and upload the documents you will reference. The AI uses your own material as the only source of facts, so the richer your portfolio, the more specific the draft.
+
+**2. AI SOP Studio**
+
+- Pick the target programme and open the studio. Start from the structure it proposes (why this field → why this programme → why this country → your plan).
+- Load a **gold-standard exemplar** to see the level of specificity expected — then write your own. Never submit a draft that claims things you did not do.
+- Ask for a critique, not for a rewrite: "what is vague in paragraph 2?" produces usable feedback.
+
+**3. Deterministic essay rubric**
+
+- The rubric scores structure, evidence, specificity, clarity and honesty with fixed rules — the same essay always receives the same score.
+- Use it to find the weakest dimension, fix it, and re-score. Aim for 90+/100 on **your own** content.
+- The score explains itself: every deducted point names the rule it came from.
+
+**4. AI visa interview simulator**
+
+- Choose the country and start a live session: the AI interviewer asks the real consular questions in a natural voice.
+- Answer **out loud** (microphone) or type — the text bar is always available, and you can load a model answer to see the level of detail expected.
+- After each answer you get an honest evaluation across purpose, funding, ties, intent and clarity — with the risk flags used by consular officers, not invented ones.
+- Practise until you can speak the numbers (cost of attendance, scholarship amount, sponsor's income) without looking.
+
+### A realistic 6-week plan using the platform
+
+1. Week 1: profile + documents + activity portfolio.
+2. Week 2: university and programme shortlist with the chancing panel.
+3. Weeks 3–4: SOP and essays through the rubric.
+4. Week 5: visa interview practice, twice per country, recorded.
+5. Week 6: submit through the official portals and track everything here.
+
+> The simulator evaluates your answers; it does not decide your visa. Only the consular officer does — treat the feedback as preparation, not as a prediction.`,
+            quizQuestions: [
+              {
+                question: "What is the right way to use the AI SOP Studio?",
+                options: [
+                  "Provide your own source material, use exemplars to understand the expected specificity, and ask for critique rather than submitting a rewrite",
+                  "Generate a full essay and submit it unchanged",
+                  "Let the AI invent achievements to make the essay stronger",
+                  "Avoid exemplars because they replace your work",
+                ],
+                correctOptionIndex: 0,
+              },
+              {
+                question: "How should the visa interview simulator's feedback be treated?",
+                options: [
+                  "As preparation with explicit scoring dimensions and risk flags — only a consular officer decides the visa",
+                  "As a guaranteed prediction of the visa result",
+                  "As a reason to memorise a script word for word",
+                  "As something only needed after a rejection",
                 ],
                 correctOptionIndex: 0,
               },

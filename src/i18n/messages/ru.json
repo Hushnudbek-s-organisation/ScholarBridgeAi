@@ -291,7 +291,35 @@
     "totalDuration": "Длительность",
     "back": "Назад",
     "loading": "Загрузка...",
-    "submitFailed": "Не удалось отправить тест. Попробуйте ещё раз."
+    "submitFailed": "Не удалось отправить тест. Попробуйте ещё раз.",
+    "markCompleteBtn": "Завершить урок",
+    "nextLessonBtn": "Следующий урок",
+    "lessonCompleted": "Урок завершён",
+    "noVideoYet": "К этому уроку видео пока не добавлено",
+    "searchCourses": "Поиск курсов, преподавателей или тем…",
+    "clearSearch": "Очистить поиск",
+    "noTrackMatches": "По этим фильтрам курсы не найдены.",
+    "trackAll": "Все курсы",
+    "trackPortals": "Пошаговые порталы",
+    "trackScholarships": "Стипендии",
+    "trackDocuments": "Эссе и документы",
+    "trackExams": "Экзамены и виза",
+    "videoGuideBadge": "Видеогид",
+    "durationHourShort": " ч",
+    "durationMinuteShort": " мин",
+    "syncSeed": "Синхронизировать 9 встроенных курсов",
+    "syncSeedHint": "Восстанавливает встроенные практические руководства (Common App, uni-assist, El-yurt umidi, гид по платформе…). Существующие курсы не перезаписываются.",
+    "syncSeedDone": "Встроенные курсы синхронизированы.",
+    "syncSeedFailed": "Не удалось синхронизировать курсы. Попробуйте снова.",
+    "videoUrlLabel": "Ссылка на видео (YouTube, YouTube Shorts, Vimeo, Loom или прямой .mp4)",
+    "videoUrlHint": "Подойдёт: youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…, vimeo.com/…, loom.com/share/… или прямая ссылка .mp4/.webm.",
+    "videoPreview": "Живой предпросмотр",
+    "videoUnsupported": "Эта ссылка пока не поддерживается — проверьте адрес.",
+    "autoThumbnail": "Подставить обложку из YouTube",
+    "autoThumbnailDone": "Ссылка обложки взята из видео YouTube.",
+    "autoThumbnailUnavailable": "Сначала добавьте ссылку YouTube — публичная обложка есть только у него.",
+    "thumbnailUrlLabel": "Ссылка на изображение обложки",
+    "quickVideoHelper": "Быстрый помощник видеурока"
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",
@@ -899,7 +927,11 @@
       "high": "Важно",
       "medium": "Проверить",
       "low": "Примечание"
-    }
+    },
+    "loadModelAnswer": "Загрузить образец ответа 95/100",
+    "modelAnswerHint": "Посмотрите ожидаемую глубину ответа и ответьте своими словами.",
+    "modelAnswerTip": "Теперь перепишите его своими словами — заученный текст быстрее всего подрывает доверие.",
+    "modelAnswerLoaded": "Образец ответа загружен в поле — прочитайте и перепишите по-своему."
   },
   "strength": {
     "title": "Заполненность профиля данными",
@@ -3349,7 +3381,13 @@
       "limited": "Мало данных",
       "partial": "Частичное покрытие",
       "broad": "Широкое покрытие"
-    }
+    },
+    "exQuickTop50": "Топ 50 QS",
+    "exQuickLowTuition": "Дешёвое обучение (≤ $5,000/год)",
+    "exQuickIelts": "IELTS ≤ 6.5",
+    "exResetFilters": "Сбросить фильтры",
+    "exRefreshing": "Обновляем…",
+    "exDismiss": "Закрыть"
   },
   "recommend": {
     "title": "Подбор программ",

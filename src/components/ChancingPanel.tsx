@@ -296,7 +296,9 @@ export function ChancingPanel({
   );
 
   useEffect(() => {
-    load();
+    // Started in a microtask: the effect body itself must not call setState
+    // synchronously (React's rule for effects — `load` sets `loading` first).
+    void Promise.resolve().then(() => load());
   }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const availableCountries = useMemo(() => {

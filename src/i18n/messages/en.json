@@ -291,7 +291,35 @@
     "totalDuration": "Duration",
     "back": "Back",
     "loading": "Loading...",
-    "submitFailed": "Could not submit the quiz. Please try again."
+    "submitFailed": "Could not submit the quiz. Please try again.",
+    "markCompleteBtn": "Mark Lesson Complete",
+    "nextLessonBtn": "Next Lesson",
+    "lessonCompleted": "Lesson completed",
+    "noVideoYet": "No video attached to this lesson yet",
+    "searchCourses": "Search courses, instructors or topics…",
+    "clearSearch": "Clear search",
+    "noTrackMatches": "No course matches these filters yet.",
+    "trackAll": "All courses",
+    "trackPortals": "Portal walkthroughs",
+    "trackScholarships": "Scholarships",
+    "trackDocuments": "Essays & documents",
+    "trackExams": "Exams & visa",
+    "videoGuideBadge": "Video guide",
+    "durationHourShort": "h",
+    "durationMinuteShort": "m",
+    "syncSeed": "Sync built-in 9 courses",
+    "syncSeedHint": "Restores the built-in practical walkthroughs (Common App, uni-assist, El-yurt umidi, platform guide…). Existing courses are never overwritten.",
+    "syncSeedDone": "Built-in courses synced.",
+    "syncSeedFailed": "Could not sync the built-in courses. Please try again.",
+    "videoUrlLabel": "Video URL (YouTube link, YouTube Shorts, Vimeo, Loom share link, or direct .mp4 URL)",
+    "videoUrlHint": "Paste any of: youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…, vimeo.com/…, loom.com/share/…, or a direct .mp4/.webm link.",
+    "videoPreview": "Live preview",
+    "videoUnsupported": "This link is not a supported video yet — check the URL.",
+    "autoThumbnail": "Auto-fill thumbnail from YouTube",
+    "autoThumbnailDone": "Thumbnail URL filled from the YouTube video.",
+    "autoThumbnailUnavailable": "Add a YouTube link first — only YouTube exposes a public thumbnail.",
+    "thumbnailUrlLabel": "Thumbnail image URL",
+    "quickVideoHelper": "Quick video lesson helper"
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",
@@ -899,7 +927,11 @@
       "high": "Priority",
       "medium": "Review",
       "low": "Note"
-    }
+    },
+    "loadModelAnswer": "Load a 95/100 model answer",
+    "modelAnswerHint": "See the depth expected, then answer in your own words.",
+    "modelAnswerTip": "Now rewrite it in your own words — a memorised script is the fastest way to lose credibility.",
+    "modelAnswerLoaded": "Model answer loaded into the text box — read it, then make it yours."
   },
   "strength": {
     "title": "Profile information coverage",
@@ -3349,7 +3381,13 @@
       "limited": "Limited coverage",
       "partial": "Partial coverage",
       "broad": "Broad coverage"
-    }
+    },
+    "exQuickTop50": "Top 50 QS",
+    "exQuickLowTuition": "Low tuition (≤ $5,000/yr)",
+    "exQuickIelts": "IELTS ≤ 6.5",
+    "exResetFilters": "Reset filters",
+    "exRefreshing": "Updating…",
+    "exDismiss": "Dismiss"
   },
   "recommend": {
     "title": "Program Recommender",

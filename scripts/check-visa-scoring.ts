@@ -17,6 +17,7 @@ import { scoreVisaInterview, type VisaTurn } from "../src/lib/visaScoring";
 import { VISA_COUNTRIES } from "../src/lib/visa-interview";
 import { VISA_INTERVIEW_QA_SAMPLES } from "../src/lib/samples/exemplars";
 import { VISA_RUBRIC_CEILING, VISA_SAMPLE_ID_BY_COUNTRY, visaSampleCountryFor, type VisaSampleCountry } from "../src/lib/samples/visa";
+import { modelAnswerForTurn, samplePairs } from "../src/lib/samples/modelAnswers";
 
 let passed = 0;
 let failed = 0;
@@ -114,6 +115,28 @@ const germany = rows.find(({ sample }) => sample.countryCode === "DE")!.sample.t
 const uk = rows.find(({ sample }) => sample.countryCode === "UK")!.sample.text;
 check("Germany: blocked account of €11,904 releasing €992 a month (2026 rate)", /11,904 euros/.test(germany) && /992 euros per month/.test(germany));
 check("UK: El-yurt umidi's three-year return obligation after a master's", /work in Uzbekistan for 3 years after a master's degree/.test(uk));
+
+// ---------------------------------------------------------------------------
+section("5. The 1-click model answer in the interview panel");
+
+const withSample = VISA_COUNTRIES.filter((c) => visaSampleCountryFor(c.code) !== null);
+const withoutSample = VISA_COUNTRIES.filter((c) => visaSampleCountryFor(c.code) === null);
+check("the four authored destinations are the ones the panel can load", withSample.length === 4, `got ${withSample.length}`);
+check("the other destinations offer texts, not a fabricated script", withoutSample.length > 0 && withoutSample.every((c) => modelAnswerForTurn(VISA_INTERVIEW_QA_SAMPLES, c.code, "Why?", 0) === null));
+
+for (const country of withSample) {
+  const sampleRow = rows.find(({ sample }) => sample.countryCode === visaSampleCountryFor(country.code));
+  const pairs = sampleRow ? samplePairs(sampleRow.sample) : [];
+  check(`${country.code}: five officer questions are available to load`, pairs.length >= 5, `got ${pairs.length}`);
+  if (pairs.length < 3) continue;
+  const fromQuestion = modelAnswerForTurn(VISA_INTERVIEW_QA_SAMPLES, country.code, pairs[2].question, 0);
+  check(`${country.code}: the answer matches the QUESTION the officer asked`, fromQuestion === pairs[2].answer);
+  const fromIndex = modelAnswerForTurn(VISA_INTERVIEW_QA_SAMPLES, country.code, "Tell me something entirely different", 1);
+  check(`${country.code}: the turn index is the fallback when the officer paraphrases`, fromIndex === pairs[1].answer);
+  check(`${country.code}: the last question never runs off the end of the sample`, Boolean(modelAnswerForTurn(VISA_INTERVIEW_QA_SAMPLES, country.code, null, 99)));
+  const loaded = modelAnswerForTurn(VISA_INTERVIEW_QA_SAMPLES, country.code, pairs[0].question, 0)!;
+  check(`${country.code}: the loaded answer is scored by the real rubric, not a claim`, scoreVisaInterview([{ role: "officer", text: pairs[0].question }, { role: "user", text: loaded }]).scores.total > 0);
+}
 
 console.log("\n  Model transcript scores (src/lib/visaScoring.ts, deterministic):");
 for (const { sample, rubric } of rows) {

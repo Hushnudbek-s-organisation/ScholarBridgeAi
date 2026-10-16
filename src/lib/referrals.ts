@@ -68,10 +68,12 @@ export async function referralRules(): Promise<ReferralRules> {
  * The completeness number the referral gate uses.
  *
  * It MUST be the same number the student sees as "Profile completeness" on the
- * profile page — `profileStrength().completeness` (src/lib/chancing.ts). The
- * gamification module has its own 14-field percentage, and using it here meant
- * a referral card could say "52%" about the very profile whose header said
- * "58%". One engine, one number.
+ * profile page / journey bar — `profileCompletenessRatio` (src/lib/chancing.ts),
+ * the one definition shared by the growth dashboard (`profileCompleteness` in
+ * src/lib/growth/logic.ts) and the referral gate. The gamification module has
+ * its own 14-field percentage, and using it here meant a referral card could
+ * say "52%" about the very profile whose header said "58%". One engine, one
+ * number — scripts/check-growth.ts keeps it that way.
  */
 export function referralCompleteness(profile: ChancingProfile): number {
   return Math.round(profileCompletenessRatio(profile) * 100);

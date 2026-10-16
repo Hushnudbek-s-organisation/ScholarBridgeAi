@@ -353,7 +353,9 @@ async function main() {
     const log = console.log;
     console.log = () => undefined;
     try {
-      await seedDatabase();
+      // `force` — the whole point of this check is that a REAL seed run
+      // never re-promotes a transferred-away ADMIN_EMAIL.
+      await seedDatabase({ force: true });
     } finally {
       console.log = log;
     }

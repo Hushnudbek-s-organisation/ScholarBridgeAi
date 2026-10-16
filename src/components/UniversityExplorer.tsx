@@ -36,7 +36,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
-  Eye
+  Eye,
+  RefreshCw
 } from "lucide-react";
 
 export interface University {
@@ -113,14 +114,29 @@ export function UniversityExplorer({
 
   const [universities, setUniversities] = useState<University[]>([]);
   const [fetchError, setFetchError] = useState("");
+  // `loading` is the FIRST load (skeleton cards); `refreshing` is every later
+  // filter/page change, where the current cards stay on screen — the grid must
+  // not collapse and reflow the page on every click.
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState("");
 
   // Filters
   const [search, setSearch] = useState("");
+  // Only the text box is debounced (220 ms). Dropdowns, chips, page clicks and
+  // the committed slider value fire immediately — the old 300 ms setTimeout on
+  // EVERY fetch was a constant, needless lag on initial open and pagination.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
+  // `maxTuition` drives the live label; `committedMaxTuition` is what the
+  // request uses, so dragging the slider doesn't fire a request per pixel.
   const [maxTuition, setMaxTuition] = useState<number>(70000);
+  const [committedMaxTuition, setCommittedMaxTuition] = useState<number>(70000);
+  // Quick-filter chips that map onto existing API filters.
+  const [maxRank, setMaxRank] = useState<number | null>(null);
+  const [ieltsMax, setIeltsMax] = useState<number | null>(null);
 
   // Compare List
   const [compareIds, setCompareIds] = useState<number[]>([]);
@@ -153,11 +169,67 @@ export function UniversityExplorer({
   const [comparePool, setComparePool] = useState<University[] | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
 
+  // Debouncing lives in the INPUT HANDLERS, not in an effect: typing schedules
+  // one commit 220 ms later, dragging the slider schedules one 200 ms later,
+  // and releasing the handle commits immediately. The state writes therefore
+  // happen in response to a user action (React's own rule for effects), while
+  // the network request still fires exactly once per settled value.
+  const searchDebounceRef = useRef<number | null>(null);
+  const tuitionDebounceRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+      if (tuitionDebounceRef.current !== null) window.clearTimeout(tuitionDebounceRef.current);
+    },
+    [],
+  );
+
+  const onSearchInput = (value: string) => {
+    setSearch(value);
+    if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      searchDebounceRef.current = null;
+      setDebouncedSearch(value);
+    }, 220);
+  };
+
+  const onTuitionInput = (value: number) => {
+    // The label follows the handle immediately; only the request waits.
+    setMaxTuition(value);
+    if (tuitionDebounceRef.current !== null) window.clearTimeout(tuitionDebounceRef.current);
+    tuitionDebounceRef.current = window.setTimeout(() => {
+      tuitionDebounceRef.current = null;
+      setCommittedMaxTuition(value);
+    }, 200);
+  };
+
+  const commitTuition = (value: number) => {
+    if (tuitionDebounceRef.current !== null) {
+      window.clearTimeout(tuitionDebounceRef.current);
+      tuitionDebounceRef.current = null;
+    }
+    setMaxTuition(value);
+    setCommittedMaxTuition(value);
+  };
+
   // Restart numbering from page 1 whenever the result-set identity changes
   // (filters, search, sort, profile, or page size). Adjusted during render
-  // (the React-endorsed alternative to a reset effect), so the debounced
-  // fetch below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedType, selectedLevel, maxTuition, search, sortBy, perPage].join("|");
+  // (the React-endorsed alternative to a reset effect), so the fetch below
+  // always fires once - already with the correct page.
+  const resultKey = [
+    activeProfile?.id,
+    activeProfile?.degreeLevel,
+    selectedCountry,
+    selectedType,
+    selectedLevel,
+    committedMaxTuition,
+    debouncedSearch,
+    sortBy,
+    maxRank,
+    ieltsMax,
+    perPage,
+  ].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -175,22 +247,30 @@ export function UniversityExplorer({
     // selected in their profile. Guests may still use the level filter.
     const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
     if (effectiveLevel !== "All") params.set("degreeLevel", effectiveLevel);
-    if (maxTuition < 70000) params.set("maxTuition", maxTuition.toString());
-    if (search.trim()) params.set("search", search.trim());
+    if (committedMaxTuition < 70000) params.set("maxTuition", committedMaxTuition.toString());
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     if (sortBy !== "rank") params.set("sort", sortBy);
+    if (maxRank != null) params.set("maxRank", maxRank.toString());
+    if (ieltsMax != null) params.set("ielts", ieltsMax.toString());
     return params;
   };
 
-  const fetchUniversities = async () => {
-    setLoading(true);
+  // True once a response has been rendered — from then on the existing cards
+  // stay mounted during a refresh instead of being replaced by a placeholder.
+  const hasLoadedRef = useRef(false);
+
+  const fetchUniversities = async (signal?: AbortSignal) => {
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
     setFetchError("");
     try {
       const params = buildFilterParams();
       params.set("page", page.toString());
       params.set("perPage", perPage.toString());
 
-      const res = await fetch(`/api/universities?${params.toString()}`);
+      const res = await fetch(`/api/universities?${params.toString()}`, { signal });
       const data = await res.json();
+      hasLoadedRef.current = true;
       if (!res.ok) {
         // Show the real server error instead of a misleading empty message.
         if (data?.error?.includes("does not exist") || data?.error?.includes("column") || data?.error?.includes("out of date")) {
@@ -216,18 +296,41 @@ export function UniversityExplorer({
         }
       }
     } catch (err: any) {
+      // An aborted request is a superseded request, not a failure: the newer
+      // one is already in flight and will render the correct slice.
+      if (err?.name === "AbortError") return;
       console.error("Error fetching universities:", err);
       setFetchError(err?.message || t("exLoadError"));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // Fire immediately on every committed change; the previous in-flight request
+  // is aborted so a slow response can never overwrite a newer one.
   useEffect(() => {
-    const t = setTimeout(() => fetchUniversities(), 300);
-    return () => clearTimeout(t);
+    const controller = new AbortController();
+    // Started in a microtask: the effect body itself must not call setState
+    // synchronously (React's rule for effects — the first state write is the
+    // "refreshing" flag at the top of the fetch).
+    void Promise.resolve().then(() => fetchUniversities(controller.signal));
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, activeProfile?.degreeLevel, selectedCountry, selectedLevel, maxTuition, search, sortBy, page, perPage]);
+  }, [
+    activeProfile?.id,
+    activeProfile?.degreeLevel,
+    selectedCountry,
+    selectedType,
+    selectedLevel,
+    committedMaxTuition,
+    debouncedSearch,
+    sortBy,
+    maxRank,
+    ieltsMax,
+    page,
+    perPage,
+  ]);
 
   const filteredUniversities = universities;
 
@@ -237,13 +340,55 @@ export function UniversityExplorer({
         return prev.filter((item) => item !== id);
       } else {
         if (prev.length >= 3) {
-          alert(t("exCompareLimit"));
+          // No native alert(): an inline, dismissible banner tells the student
+          // the same thing without freezing the page.
+          setNotice(t("exCompareLimit"));
           return prev;
         }
         return [...prev, id];
       }
     });
   };
+
+  // Quick-filter chips -------------------------------------------------------
+  const quickFiltersActive =
+    maxRank != null ||
+    ieltsMax != null ||
+    committedMaxTuition !== 70000 ||
+    selectedCountry !== "All" ||
+    selectedType !== "All" ||
+    selectedLevel !== "All" ||
+    debouncedSearch.trim() !== "" ||
+    sortBy !== "rank";
+
+  const resetFilters = () => {
+    if (searchDebounceRef.current !== null) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+    commitTuition(70000);
+    setSearch("");
+    setDebouncedSearch("");
+    setSelectedCountry("All");
+    setSelectedType("All");
+    setSelectedLevel("All");
+    setMaxRank(null);
+    setIeltsMax(null);
+    setSortBy("rank");
+    setNotice("");
+  };
+
+  const setLowTuition = () => {
+    commitTuition(5000);
+    setMaxRank(null);
+  };
+
+  // Auto-dismiss the compare notice so it never lingers over the results.
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(""), 6000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   const handlePageChange = (nextPage: number) => {
     setPage(nextPage);
@@ -293,13 +438,24 @@ export function UniversityExplorer({
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            {/* h2, not h1: the hub shell above already renders the single <h1>
+                for this screen, and two stacked h1s broke the outline. */}
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Search className="h-5 w-5 text-indigo-600" />
               {t("exTitle")}
-            </h1>
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {t("exFilteredBy", { profile: activeProfile?.name || t("exProfileFallback") })}
             </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {refreshing && (
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                {t("exRefreshing")}
+              </span>
+            )}
           </div>
 
           {compareIds.length > 0 && (
@@ -321,8 +477,9 @@ export function UniversityExplorer({
             <input
               type="text"
               placeholder={t("exSearchPlaceholder")}
+              aria-label={t("exSearchPlaceholder")}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => onSearchInput(e.target.value)}
               className="min-h-11 w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
@@ -410,11 +567,96 @@ export function UniversityExplorer({
               max="70000"
               step="5000"
               value={maxTuition}
-              onChange={(e) => setMaxTuition(Number(e.target.value))}
+              onChange={(e) => onTuitionInput(Number(e.target.value))}
+              // Releasing the handle commits at once — no need to wait out the
+              // debounce once the student has stopped dragging.
+              onMouseUp={(e) => commitTuition(Number((e.target as HTMLInputElement).value))}
+              onTouchEnd={(e) => commitTuition(Number((e.target as HTMLInputElement).value))}
+              onKeyUp={(e) => commitTuition(Number((e.target as HTMLInputElement).value))}
               className="w-full accent-indigo-600 cursor-pointer h-1.5 mt-1"
             />
           </div>
         </div>
+
+        {/* One-click quick filters + reset */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMaxRank((prev) => (prev === 50 ? null : 50));
+              setIeltsMax(null);
+            }}
+            aria-pressed={maxRank === 50}
+            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+              maxRank === 50
+                ? "border-indigo-500 bg-indigo-600 text-white"
+                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
+            }`}
+          >
+            🏆 {t("exQuickTop50")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLowTuition();
+            }}
+            aria-pressed={committedMaxTuition === 5000}
+            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+              committedMaxTuition === 5000
+                ? "border-emerald-500 bg-emerald-600 text-white"
+                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700"
+            }`}
+          >
+            💰 {t("exQuickLowTuition")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIeltsMax((prev) => (prev === 6.5 ? null : 6.5));
+              setMaxRank(null);
+            }}
+            aria-pressed={ieltsMax === 6.5}
+            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+              ieltsMax === 6.5
+                ? "border-sky-500 bg-sky-600 text-white"
+                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-300 hover:text-sky-700"
+            }`}
+          >
+            🗣️ {t("exQuickIelts")}
+          </button>
+          {quickFiltersActive && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="flex min-h-9 items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100"
+            >
+              <X className="h-3.5 w-3.5" />
+              {t("exResetFilters")}
+            </button>
+          )}
+        </div>
+
+        {/* Inline, dismissible replacement for alert() — comparing more than
+            three universities is a limit, not an error worth a browser popup. */}
+        {notice && (
+          <div
+            role="status"
+            className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800"
+          >
+            <span className="flex items-start gap-1.5">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {notice}
+            </span>
+            <button
+              type="button"
+              onClick={() => setNotice("")}
+              aria-label={t("exDismiss")}
+              className="rounded-lg p-1 text-amber-700 hover:bg-amber-100"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Results Count & Active Info */}
@@ -432,15 +674,31 @@ export function UniversityExplorer({
 
       {/* University Cards Grid */}
       {loading ? (
-        <div className="p-12 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
-          {t("exLoading")}
+        // First load: a skeleton grid that matches the real card footprint, so
+        // the page never jumps when the data lands.
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[420px] animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+            >
+              <div className="h-40 w-full rounded-t-2xl bg-slate-200 dark:bg-slate-700" />
+              <div className="space-y-3 p-4">
+                <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-20 w-full rounded-xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-3 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+              </div>
+            </div>
+          ))}
+          <span className="sr-only">{t("exLoading")}</span>
         </div>
       ) : fetchError ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-red-200">
           <p className="text-xs font-bold text-red-700 mb-2">{t("exLoadFailed")}</p>
           <p className="text-[11px] text-slate-600 break-all">{fetchError}</p>
           <button
-            onClick={fetchUniversities}
+            onClick={() => void fetchUniversities()}
             className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
           >
             {t("exTryAgain")}
@@ -451,7 +709,14 @@ export function UniversityExplorer({
           {t("exEmpty")}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        // Refreshing keeps the current cards mounted (dimmed + inert) instead
+        // of collapsing the page into a placeholder box.
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-150 ${
+            refreshing ? "pointer-events-none opacity-60" : ""
+          }`}
+          aria-busy={refreshing}
+        >
           {filteredUniversities.map((uni) => {
             const isSaved = savedUniIds.has(uni.id);
             const isCompared = compareIds.includes(uni.id);

@@ -56,6 +56,10 @@ import {
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
 import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
+// The picker is pure and lives in lib; the exemplar library itself stays in a
+// lazy chunk (a static value import of it is forbidden by check-samples.ts).
+import { modelAnswerForTurn } from "@/lib/samples/modelAnswers";
+import { visaSampleCountryFor } from "@/lib/samples/visa";
 import { AiOrbFaceAvatar } from "@/components/visa/AiOrbFaceAvatar";
 import {
   classifySpeechError,
@@ -598,6 +602,8 @@ export function VisaSpeakingAssistant({
   );
   const [micBlocked, setMicBlocked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadedModelAnswer, setLoadedModelAnswer] = useState(false);
+  const [loadingModelAnswer, setLoadingModelAnswer] = useState(false);
   /**
    * A page embedded in someone else's frame needs the PARENT to grant
    * `allow="microphone"` — the app cannot grant it for itself. Detect it so the
@@ -743,6 +749,31 @@ export function VisaSpeakingAssistant({
     .reverse()
     .find((m) => m.role === "officer");
   const userTurns = messages.filter((m) => m.role === "user").length;
+  // Whether this destination has an authored model answer at all. The samples
+  // themselves stay in a lazy chunk and are only fetched when the student taps.
+  const hasModelAnswer = visaSampleCountryFor(countryCode) !== null;
+
+  async function loadModelAnswer(): Promise<void> {
+    if (!hasModelAnswer) return;
+    setLoadingModelAnswer(true);
+    try {
+      const { VISA_INTERVIEW_QA_SAMPLES } = await import("@/lib/samples/exemplars");
+      const answer = modelAnswerForTurn(
+        VISA_INTERVIEW_QA_SAMPLES,
+        countryCode,
+        lastOfficer?.text ?? null,
+        userTurns,
+      );
+      if (!answer) return;
+      setTextAnswer(answer);
+      setLoadedModelAnswer(true);
+      setNotice(t("modelAnswerLoaded"));
+    } catch (err) {
+      console.warn("Visa model answer failed to load:", err);
+    } finally {
+      setLoadingModelAnswer(false);
+    }
+  }
   const showTextFallback = engineMode === "fallback" && (!sttSupported || micBlocked);
   const reactorStatus: "LISTENING" | "THINKING" | "SPEAKING" | "IDLE" =
     officerState === "speaking"
@@ -2048,9 +2079,11 @@ export function VisaSpeakingAssistant({
               <Radio className="h-3.5 w-3.5" />
               {t("aiSimulatorBadge")}
             </div>
-            <h1 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl">
+            {/* h2: the hub shell that hosts this panel already renders the
+                screen's single <h1>. */}
+            <h2 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl">
               🎙️ {t("title")}
-            </h1>
+            </h2>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 sm:text-sm dark:text-slate-300">
               {t("subtitle")}
             </p>
@@ -2514,6 +2547,30 @@ export function VisaSpeakingAssistant({
                     {t("send")}
                   </button>
                 </div>
+
+                {/* 1-click model answer: fills the box with the authored
+                    answer for THIS question so the student can see the level
+                    of detail expected, then edit it into their own words. */}
+                {hasModelAnswer && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadModelAnswer()}
+                      disabled={loadingModelAnswer || officerState !== "idle"}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+                    >
+                      {loadingModelAnswer ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <span aria-hidden>🎯</span>
+                      )}
+                      {t("loadModelAnswer")}
+                    </button>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {loadedModelAnswer ? t("modelAnswerTip") : t("modelAnswerHint")}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

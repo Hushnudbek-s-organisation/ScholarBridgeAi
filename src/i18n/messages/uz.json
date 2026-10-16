@@ -291,7 +291,35 @@
     "totalDuration": "Davomiyligi",
     "back": "Orqaga",
     "loading": "Yuklanmoqda...",
-    "submitFailed": "Testni yuborib bo'lmadi. Qaytadan urinib ko'ring."
+    "submitFailed": "Testni yuborib bo'lmadi. Qaytadan urinib ko'ring.",
+    "markCompleteBtn": "Darsni yakunlash",
+    "nextLessonBtn": "Keyingi dars",
+    "lessonCompleted": "Dars yakunlandi",
+    "noVideoYet": "Bu darsga hali video biriktirilmagan",
+    "searchCourses": "Kurslar, o'qituvchilar yoki mavzularni qidirish…",
+    "clearSearch": "Qidiruvni tozalash",
+    "noTrackMatches": "Bu filtrlarga mos kurs topilmadi.",
+    "trackAll": "Barcha kurslar",
+    "trackPortals": "Portal bo'yicha qo'llanmalar",
+    "trackScholarships": "Grantlar",
+    "trackDocuments": "Hujjat va essaylar",
+    "trackExams": "Imtihon va viza",
+    "videoGuideBadge": "Video qo'llanma",
+    "durationHourShort": " soat",
+    "durationMinuteShort": " daq",
+    "syncSeed": "9 ta ichki kursni sinxronlash",
+    "syncSeedHint": "Ichki amaliy qo'llanmalarni tiklaydi (Common App, uni-assist, El-yurt umidi, platforma qo'llanmasi…). Mavjud kurslar o'zgartirilmaydi.",
+    "syncSeedDone": "Ichki kurslar sinxronlandi.",
+    "syncSeedFailed": "Ichki kurslarni sinxronlab bo'lmadi. Qayta urinib ko'ring.",
+    "videoUrlLabel": "Video havolasi (YouTube, YouTube Shorts, Vimeo, Loom havolasi yoki to'g'ridan-to'g'ri .mp4)",
+    "videoUrlHint": "Quyidagilardan birini qo'ying: youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…, vimeo.com/…, loom.com/share/… yoki .mp4/.webm havolasi.",
+    "videoPreview": "Jonli ko'rinish",
+    "videoUnsupported": "Bu havola hali qo'llab-quvvatlanmaydi — manzilni tekshiring.",
+    "autoThumbnail": "YouTube'dan muqovani avtomatik olish",
+    "autoThumbnailDone": "Muqova YouTube videosidan olindi.",
+    "autoThumbnailUnavailable": "Avval YouTube havolasini kiriting — faqat YouTube ommaviy muqova beradi.",
+    "thumbnailUrlLabel": "Muqova rasmi havolasi",
+    "quickVideoHelper": "Tez video dars yordamchisi"
   },
   "payments": {
     "title": "ScholarBridgeAI Premium",
@@ -899,7 +927,11 @@
       "high": "Muhim",
       "medium": "Tekshiring",
       "low": "Izoh"
-    }
+    },
+    "loadModelAnswer": "95/100 namuna javobni yuklash",
+    "modelAnswerHint": "Kutilgan batafsil darajani ko'ring, so'ng o'z so'zlaringiz bilan javob bering.",
+    "modelAnswerTip": "Endi uni o'z so'zlaringiz bilan qayta yozing — yodlangan matn ishonchni tez yo'qotadi.",
+    "modelAnswerLoaded": "Namuna javob matn maydoniga yuklandi — o'qib, o'zingizga moslashtiring."
   },
   "strength": {
     "title": "Profil ma’lumotlari qamrovi",
@@ -3349,7 +3381,13 @@
       "limited": "Cheklangan qamrov",
       "partial": "Qisman qamrov",
       "broad": "Keng qamrov"
-    }
+    },
+    "exQuickTop50": "QS Top 50",
+    "exQuickLowTuition": "Arzon o'qish (≤ $5,000/yil)",
+    "exQuickIelts": "IELTS ≤ 6.5",
+    "exResetFilters": "Filtrlarni tiklash",
+    "exRefreshing": "Yangilanmoqda…",
+    "exDismiss": "Yopish"
   },
   "recommend": {
     "title": "Dasturlar tanlovi",

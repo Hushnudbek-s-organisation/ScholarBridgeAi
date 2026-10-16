@@ -241,7 +241,7 @@ async function main() {
     const quiet = console.log;
     console.log = () => undefined;
     try {
-      await seedDatabase();
+      await seedDatabase({ force: true });
     } finally {
       console.log = quiet;
     }

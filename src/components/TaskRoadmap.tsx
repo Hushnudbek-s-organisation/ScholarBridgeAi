@@ -162,10 +162,11 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
       <div className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            {/* h2 — the Deadline hub owns this screen's single <h1>. */}
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <CheckSquare className="h-5 w-5 text-indigo-600" />
               {tr("title")}
-            </h1>
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {tr("subtitle")}
             </p>

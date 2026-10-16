@@ -100,6 +100,7 @@ async function main() {
   } = await import("../src/lib/referrals");
   const { activateSubscription } = await import("../src/lib/payments");
   const { getPremiumStatus } = await import("../src/lib/premium");
+  const { profileCompleteness } = await import("../src/lib/growth/logic");
 
   const activated0 = referralCompleteness;
 
@@ -220,10 +221,20 @@ async function main() {
     .select()
     .from(schema.studentProfiles)
     .where(eq(schema.studentProfiles.id, invited.id));
+  // Three things at once: the referral engine reads the ONE shared
+  // completeness definition (the journey bar / dashboard use it too — see the
+  // "single definition" section of scripts/check-growth.ts), that number is
+  // above the configured bar for this wizard-filled profile, and the metric
+  // itself is pinned. The literal is the shared 13-check ratio on this fixture
+  // (7 of 13 recorded-information checks = 53.8 → 54); a change to the
+  // checklist must be a deliberate edit here, not a silent move of the bar.
   check(
     "the bar is measured with the same completeness number the profile page shows",
-    activated0(invitedRow) === 58 && configured.activationCompleteness === 50,
-    `${activated0(invitedRow)}% vs bar ${configured.activationCompleteness}%`
+    activated0(invitedRow) === profileCompleteness(invitedRow) &&
+      activated0(invitedRow) === 54 &&
+      activated0(invitedRow) > configured.activationCompleteness &&
+      configured.activationCompleteness === 50,
+    `referral ${activated0(invitedRow)}% vs profile page ${profileCompleteness(invitedRow)}%, bar ${configured.activationCompleteness}%`
   );
 
   // A student who entered only a couple of fields is still below the bar.

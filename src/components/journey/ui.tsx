@@ -471,6 +471,47 @@ export function ErrorNote({ message }: { message: string }) {
   );
 }
 
+/**
+ * Inline, dismissible failure banner.
+ *
+ * Replaces native `alert()` in the journey panels: a browser popup freezes the
+ * whole page (and is blocked entirely in some embedded webviews), while the
+ * failure itself is almost always "the save didn't go through — try again".
+ * The caller keeps the message in state and clears it on retry.
+ */
+export function InlineAlert({
+  message,
+  onDismiss,
+  className = "",
+}: {
+  message: string;
+  onDismiss?: () => void;
+  className?: string;
+}) {
+  if (!message) return null;
+  return (
+    <div
+      role="alert"
+      className={`flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300 ${className}`}
+    >
+      <span className="flex items-start gap-1.5">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        {message}
+      </span>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="rounded-lg p-0.5 text-rose-700 transition-colors hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-900/50"
+        >
+          <XCircle className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Field({
   label,
   children,

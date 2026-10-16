@@ -100,10 +100,12 @@ export async function GET(req: Request) {
         .sort((a, b) => a.sortOrder - b.sortOrder);
       let lessonCount = 0;
       let completedLessons = 0;
+      let totalDurationSeconds = 0;
       for (const mod of courseModules) {
         const courseLessons = lessonsByModule.get(mod.id) ?? [];
         lessonCount += courseLessons.length;
         completedLessons += courseLessons.filter((l) => completedLessonIds.has(l.id)).length;
+        totalDurationSeconds += courseLessons.reduce((sum, l) => sum + (l.durationSeconds || 0), 0);
       }
       const progress = completionSummary(completedLessons, lessonCount);
       return {
@@ -112,6 +114,13 @@ export async function GET(req: Request) {
         completedLessons: progress.done,
         progressPct: progress.pct,
         progress,
+        // The catalogue shows the shape of a course before it is opened:
+        // how many modules, how long it runs, and whether it is a video guide.
+        moduleCount: courseModules.length,
+        totalDurationSeconds,
+        hasVideo: moduleRows.some(
+          (m) => m.courseId === course.id && (lessonsByModule.get(m.id) ?? []).some((l) => Boolean(l.videoUrl)),
+        ),
       };
     });
 

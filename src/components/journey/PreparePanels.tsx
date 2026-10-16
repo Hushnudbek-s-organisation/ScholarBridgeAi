@@ -12,7 +12,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
-import { Button, Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
+import { Button, Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
@@ -50,6 +50,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
   );
   const [form, setForm] = useState({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const add = async () => {
     if (!form.title.trim()) return;
@@ -63,7 +64,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
       setForm({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("dvAddError"));
+      setActionError(e instanceof Error ? e.message : t("dvAddError"));
     } finally {
       setBusy(false);
     }
@@ -105,6 +106,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
         }
       >
         {error && <ErrorNote message={error} />}
+        <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
 
         <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Field label={t("dvFieldType")}>

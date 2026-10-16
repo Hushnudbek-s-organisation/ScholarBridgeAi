@@ -228,7 +228,8 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
             <Sparkles className="h-3.5 w-3.5" />
             AI SOP & Application Essay Suite
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Statement of Purpose & Essay Studio</h1>
+          {/* h2 — the Materials hub owns the single <h1> for this screen. */}
+          <h2 className="text-xl font-bold text-slate-900">Statement of Purpose & Essay Studio</h2>
           <p className="text-xs text-slate-500 mt-1">{t("sopStudioSubtitle")}</p>
         </div>
 

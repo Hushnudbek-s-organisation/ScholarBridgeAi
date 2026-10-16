@@ -1,25 +1,14 @@
 import { NextResponse } from "next/server";
 import { authenticate } from "@/lib/auth";
-import { db } from "@/db";
-import {
-  universities,
-  studentProfiles,
-  universityPrograms,
-  universitySources,
-  sources,
-} from "@/db/schema";
 import { calculateUniversityMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
+import { getCachedUniversitiesBundle, getCachedProfileForMatching } from "@/lib/catalogCache";
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
-import { pickBestSource } from "@/lib/sourcePick";
-import { selectUniversities } from "@/lib/universities";
-import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
-import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 /**
  * University discovery API (spec §16).
@@ -42,12 +31,11 @@ export async function GET(req: Request) {
     const minRank = searchParams.get("minRank") ? Number(searchParams.get("minRank")) : null;
     const maxRank = searchParams.get("maxRank") ? Number(searchParams.get("maxRank")) : null;
 
-    let allUnis = (await selectUniversities()).map((uni) => ({
-      ...uni,
-      // Compatibility USD fields are derived from the canonical currency and
-      // period first; stale USD mirrors never drive filters or displays.
-      ...resolvedUsdUniversityCosts(uni),
-    }));
+    // One cached read of the base catalogue (all universities + program fields
+    // + source links) instead of 3 full joins per filter change; the returned
+    // array/map are copies, so filtering and sorting below are unaffected.
+    const bundle = await getCachedUniversitiesBundle();
+    let allUnis = [...bundle.unis];
 
     // Get profile for match calculation if provided. The same mapping is used
     // by Explorer, Chancing and the dashboard, including the structured
@@ -61,35 +49,20 @@ export async function GET(req: Request) {
       // silently receives the public, unpersonalised list.
       const auth = await authenticate(req);
       if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
-        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-        if (p) {
-          profileData = p;
-          matchProfile = await toMatchProfileWithActivities(p);
+        // 15 s memo of the derived match inputs — the profile and its
+        // activity portfolio are edited far less often than they are read.
+        const cached = await getCachedProfileForMatching(pId);
+        if (cached) {
+          profileData = cached.profileData;
+          matchProfile = cached.matchProfile;
         }
       }
     }
 
-    // ---------- Pre-fetch program fields per university ----------
+    // ---------- Program fields per university (from the cached bundle) ----------
     // Needed for career/major filtering and for enriching the response so the
     // client can do synonym-aware matching without a second round-trip.
-    const programFieldsByUni = new Map<number, string[]>();
-    try {
-      const uniIdsForProg = allUnis.map((u) => u.id);
-      if (uniIdsForProg.length > 0) {
-        const progRows = await db
-          .select({ universityId: universityPrograms.universityId, field: universityPrograms.field })
-          .from(universityPrograms)
-          .where(inArray(universityPrograms.universityId, uniIdsForProg));
-        for (const r of progRows) {
-          if (!r.field) continue;
-          const arr = programFieldsByUni.get(r.universityId) ?? [];
-          arr.push(r.field);
-          programFieldsByUni.set(r.universityId, arr);
-        }
-      }
-    } catch {
-      // programs table missing or query failed — major filter will fall back to programMajor only
-    }
+    const programFieldsByUni = bundle.programFieldsByUni;
 
     // ---------- Filtering (NULL values excluded from numeric filters) ----------
     if (search) {
@@ -140,11 +113,10 @@ export async function GET(req: Request) {
     // Program search: universities offering a program in the searched field (exact).
     const programFilter = searchParams.get("program");
     if (programFilter && programFilter !== "All") {
-      const programRows = await db
-        .select({ universityId: universityPrograms.universityId })
-        .from(universityPrograms)
-        .where(inArray(universityPrograms.field, [programFilter]));
-      const uniIds = new Set(programRows.map((r) => r.universityId));
+      const uniIds = new Set<number>();
+      for (const [uniId, fields] of programFieldsByUni) {
+        if (fields.includes(programFilter)) uniIds.add(uniId);
+      }
       allUnis = allUnis.filter(u => uniIds.has(u.id));
     }
 
@@ -187,72 +159,10 @@ export async function GET(req: Request) {
       });
     }
 
-    // ---------- Fetch source signals (university_sources -> sources) ----------
-    // Map: universityId -> { sourceUrl, lastVerifiedAt }
-    const sourceMap = new Map<number, { sourceUrl: string | null; lastVerifiedAt: string | null; sourceTitle: string | null }>();
-    try {
-      const uniIds = allUnis.map((u) => u.id);
-      if (uniIds.length > 0) {
-        const links = await db
-          .select()
-          .from(universitySources)
-          .where(inArray(universitySources.universityId, uniIds));
-
-        const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
-        let srcById = new Map<number, { id: number; url: string; title: string; accessedAt: Date | null }>();
-        if (srcIds.length > 0) {
-          try {
-            const srcRows = await db
-              .select({ id: sources.id, url: sources.url, title: sources.title, accessedAt: sources.accessedAt })
-              .from(sources)
-              .where(inArray(sources.id, srcIds));
-            srcById = new Map(srcRows.map((r) => [r.id, r]));
-          } catch {
-            // sources table shape differs — leave empty, UI will show pending
-          }
-        }
-
-        // Group links per university and pick most recent accessedAt
-        const grouped = new Map<number, typeof links>();
-        for (const link of links) {
-          const arr = grouped.get(link.universityId) || [];
-          arr.push(link);
-          grouped.set(link.universityId, arr);
-        }
-
-        for (const [uniId, uniLinks] of grouped) {
-          const best = pickBestSource(uniLinks, srcById);
-          if (best?.url) {
-            sourceMap.set(uniId, {
-              sourceUrl: best.url,
-              lastVerifiedAt: best.accessedAt ? best.accessedAt.toISOString() : null,
-              sourceTitle: best.title,
-            });
-          }
-        }
-
-        // Fallback: if a university has no entry in university_sources but has
-        // a direct sourceUrl / lastVerifiedAt on the universities row itself,
-        // do NOT use it as a fabricated source — the task requires showing
-        // \"pending verification\" when there is no linked source record.
-        // We still keep the university's own lastVerifiedAt as a secondary
-        // date if a linked source exists but lacks accessedAt.
-        for (const uni of allUnis) {
-          const existing = sourceMap.get(uni.id);
-          if (existing) {
-            if (!existing.lastVerifiedAt) {
-              const fallback = (uni as any).lastVerifiedAt ? new Date((uni as any).lastVerifiedAt).toISOString() : null;
-              if (fallback) {
-                sourceMap.set(uni.id, { ...existing, lastVerifiedAt: fallback });
-              }
-            }
-          }
-        }
-      }
-    } catch {
-      // If university_sources table is missing or query fails, we simply
-      // return universities without source signals — UI shows pending.
-    }
+    // ---------- Source signals (university_sources -> sources) ----------
+    // Served from the cached bundle: the same "most recently accessed" pick,
+    // with the university's own lastVerifiedAt only used as a date fallback.
+    const sourceMap = bundle.sourceMap;
 
     // ---------- Map match scores + source signals ----------
     const results = allUnis.map((uni) => {

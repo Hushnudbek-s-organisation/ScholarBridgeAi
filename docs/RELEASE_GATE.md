@@ -10,11 +10,17 @@ This document separates two things that are easy to confuse:
    repository can force those; this page lists the exact settings so an
    operator can apply them in minutes.
 
-> **Status note (2026-10):** the workflow file is committed, but the first
-> GitHub Actions run has **not been executed in this session** (no push was
-> made). The exact operator steps to make the gate live are in
-> [Activate the gate](#activate-the-gate). Do not claim "CI is green" until
-> the Actions run exists for the commit in question.
+> **Status note (2026-10-16):** the workflow is live and runs on every pull
+> request. Until this date it never got past its first step: `npm audit
+> --audit-level=high` failed on every branch, including `main`, because
+> GHSA-vfj7-8cjw-p6xm (dev-toolchain `braces`, no released fix) is unpatched —
+> so the other 22 gates never executed and every run looked like a red build.
+> The audit is now split into a hard production-dependency gate and a
+> reviewed-exception gate (see the table above and `audit-exceptions.json`);
+> the exception list can only shrink, because the gate fails on a stale entry.
+> Still read CI status off the Actions run for the commit in question. The
+> operator steps to make the gate *blocking* are in
+> [Activate the gate](#activate-the-gate).
 
 ---
 
@@ -22,7 +28,8 @@ This document separates two things that are easy to confuse:
 
 | Step | Command | What it protects |
 | --- | --- | --- |
-| Dependency audit (high+) | `npm audit --audit-level=high` | Known high/critical vulns in dependencies |
+| Dependency audit — production (high+) | `npm audit --omit=dev --audit-level=high` | Known high/critical vulns in **shipped** dependencies. No exceptions, no `continue-on-error`. |
+| Dependency audit — all deps (high+) | `npm run audit:check` | High/critical vulns anywhere, including the dev toolchain. Fails on any advisory that is not listed in the committed `audit-exceptions.json`, and fails again when a listed exception is no longer needed. Every finding is printed, excepted or not. |
 | Typecheck | `npm run typecheck` | Compile errors |
 | Security regression tests | `npm run test:security` | Auth, rate limits, quotas, injection, SSRF (68 assertions) |
 | AI settings tests | `npm run test:ai-settings` | Provider config, key encryption, defaults (83) |

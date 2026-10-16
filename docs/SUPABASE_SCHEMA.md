@@ -513,6 +513,9 @@ Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes insid
 | `essay_type` | text |  | yes |  |
 | `title` | text |  | yes |  |
 | `content` | text |  | yes |  |
+| `prompt` | text | yes | — | Ariza so'rovi (scoring konteksti uchun saqlanadi) |
+| `target_name` | text | yes | — | Maqsad nomi (universitet/stipendiya), ixtiyoriy |
+| `word_limit` | integer | yes | — | So'ralgan so'z chegarasi; noma'lum bo'lsa NULL |
 | `word_count` | integer |  | yes |  |
 | `char_count` | integer |  | yes |  |
 | `version_number` | integer |  | yes |  |
