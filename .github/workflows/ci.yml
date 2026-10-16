@@ -25,8 +25,16 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
 
-      - name: Dependency audit (high+)
-        run: npm audit --audit-level=high
+      # Two steps on purpose. Shipped dependencies have NO exceptions and must
+      # stay clean; the second gate covers the dev toolchain and only ignores an
+      # advisory that a reviewed entry in audit-exceptions.json documents (the
+      # first gate would otherwise fail forever on GHSA-vfj7-8cjw-p6xm, which has
+      # no released fix, and hide the 22 gates that come after it).
+      - name: Dependency audit — production dependencies (high+, no exceptions)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Dependency audit — all dependencies (high+, reviewed exceptions)
+        run: npm run audit:check
 
       - name: Typecheck
         run: npm run typecheck
