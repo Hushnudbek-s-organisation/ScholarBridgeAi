@@ -20,6 +20,7 @@ import {
 import { toPlainText } from "@/lib/ai/format-reply";
 import { AiFormattedText } from "./AiFormattedText";
 import { AppNote } from "@/components/AppNote";
+import { SopStructureBar } from "./SopStructureBar";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import type { SopSample } from "@/lib/samples/exemplars";
 import { isUnmodifiedSample } from "@/lib/samples/text";
@@ -408,6 +409,15 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                   <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
                     {draftUsedAi ? t("sopDraftAiNotice") : t("sopDraftOutlineNotice")}
                   </p>
+                  {/* Priority 4.4 — does the draft actually contain the five
+                      blocks an admissions reader looks for? Deterministic, and
+                      it quotes the sentence that proved each block. */}
+                  <SopStructureBar
+                    text={toPlainText(generatedSop)}
+                    universityName={targetUni}
+                    programName={targetProgram}
+                    className="mb-3"
+                  />
                   <div className="max-h-[600px] overflow-y-auto pr-2">
                     <AiFormattedText text={generatedSop} className="text-xs sm:text-sm text-slate-700" />
                   </div>
@@ -457,6 +467,14 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                   className="w-full p-3 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">Word Count: {existingDraft.trim().split(/\s+/).filter(Boolean).length} words</p>
+                {/* Priority 4.4 — structure feedback while the draft is still on
+                    the left, before the reader spends a review on it. */}
+                <SopStructureBar
+                  text={existingDraft}
+                  universityName={reviewUni}
+                  programName={activeProfile?.targetMajor ?? null}
+                  className="mt-2"
+                />
               </div>
 
               <button

@@ -227,7 +227,7 @@ function issueExcerpt(text: string, max = 180): string {
 }
 
 /** Words that make an essay sound like everyone else's. */
-const CLICHE_PATTERNS: { phrase: string; re: RegExp }[] = [
+export const CLICHE_PATTERNS: { phrase: string; re: RegExp }[] = [
   { phrase: "since I was a child", re: /\bsince (?:i was|my) (?:a )?child\b|\bsince childhood\b/gi },
   { phrase: "passionate about", re: /\bpassionate about\b/gi },
   { phrase: "broaden my horizons", re: /\bbroaden(?:ing)? (?:my |our )?horizons?\b/gi },
@@ -243,14 +243,14 @@ const CLICHE_PATTERNS: { phrase: string; re: RegExp }[] = [
 ];
 
 /** Claims with no evidence attached. */
-const VAGUE_CLAIMS = [
+export const VAGUE_CLAIMS = [
   /\bi am (?:very )?(?:hardworking|hard-working|dedicated|motivated|ambitious)\b/gi,
   /\bi have (?:a )?(?:strong|great) (?:passion|interest) for\b/gi,
   /\bi (?:really )?love (?:to )?(?:learn|study|help)\b/gi,
 ];
 
 /** Concrete evidence markers — numbers, proper nouns, named things. */
-const CONCRETE_MARKERS = [
+export const CONCRETE_MARKERS = [
   /\b\d+(?:\.\d+)?\s?(?:%|percent|hours?|weeks?|months?|years?|students?|projects?|people|users?|kg|km|usd|\$)\b/gi,
   /\b(?:first|second|third|1st|2nd|3rd)[ -]place\b/gi,
 ];
@@ -260,7 +260,7 @@ const PASSIVE_RE = /\b(?:is|are|was|were|be|been|being)\s+\w+(?:ed|en)\b/gi;
 const FLOW_TRANSITIONS = /^(?:however|therefore|as a result|for example|for instance|in addition|more importantly|by contrast|on the other hand|because of this|building on that|in turn|consequently|then|next|finally|meanwhile|likewise)\b/i;
 const FLOW_REFERENCES = /\b(?:this experience|that experience|this project|that project|these skills|those lessons|as a result|because of this|building on that|this work)\b/i;
 
-const ACTIVE_VERBS: { verb: string; re: RegExp }[] = [
+export const ACTIVE_VERBS: { verb: string; re: RegExp }[] = [
   { verb: "built", re: /\b(?:built|builds|building)\b/gi },
   { verb: "designed", re: /\b(?:designed|designs|designing)\b/gi },
   { verb: "engineered", re: /\b(?:engineered|engineers|engineering)\b/gi },
@@ -299,7 +299,7 @@ const ACTIVE_VERBS: { verb: string; re: RegExp }[] = [
   { verb: "advocated", re: /\b(?:advocated|advocates|advocating)\b/gi },
   { verb: "evaluated", re: /\b(?:evaluated|evaluates|evaluating)\b/gi },
 ];
-const WEAK_VERBS: { phrase: string; re: RegExp }[] = [
+export const WEAK_VERBS: { phrase: string; re: RegExp }[] = [
   { phrase: "was responsible for", re: /\b(?:was|am|were|is) responsible for\b/gi },
   { phrase: "helped", re: /\b(?:helped|helps|helping)\b/gi },
   { phrase: "participated in", re: /\bparticipat(?:ed|es|ing)\b/gi },

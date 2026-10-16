@@ -25,12 +25,15 @@ import {
   Bookmark,
   BookmarkCheck,
   Target,
+  Zap,
 } from "lucide-react";
 import { formatMoney, formatCount, formatNumber } from "@/lib/format";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { isStaleVerified } from "@/lib/provenance";
 import { AppNote } from "@/components/AppNote";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
+import { DecisionPillStrip } from "./DecisionPillStrip";
+import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
 
 interface UniversityDetailData {
@@ -175,8 +178,16 @@ interface SourceData {
 
 interface UniversityDetailProps {
   universityId: number;
-  activeProfile?: { id: number; country?: string | null } | null;
+  /**
+   * The scores and budget the decision strip compares against. Every field is
+   * optional: an anonymous visitor or a profile that has not recorded a GPA
+   * still gets the strip, with honest "not provided" pills instead of a guess.
+   */
+  activeProfile?: ({ id: number; country?: string | null } & DecisionProfileInput) | null;
   onBack: () => void;
+  /** Priority 4.1 — where the hub wants to go after an application is created. */
+  onNavigate?: (id: string) => void;
+  onApplicationStarted?: (applicationId: number, universityName: string) => void;
 }
 
 /** Stable sentinels for missing values (spec §19: NULL is never shown as a
@@ -244,7 +255,13 @@ function Field({ label, value, icon }: { label: string; value: string; icon?: Re
   );
 }
 
-export function UniversityDetail({ universityId, activeProfile, onBack }: UniversityDetailProps) {
+export function UniversityDetail({
+  universityId,
+  activeProfile,
+  onBack,
+  onNavigate,
+  onApplicationStarted,
+}: UniversityDetailProps) {
   const t = useTranslations("university");
   const { locale } = useLocaleContext();
   // Translate missing-value sentinels for values rendered OUTSIDE <Field>
@@ -268,6 +285,55 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
   // Saved programs (spec §24) — programId -> saved-row id, for save/unsave.
   const [savedProgramIds, setSavedProgramIds] = useState<Record<number, number>>({});
   const [savingProgramId, setSavingProgramId] = useState<number | null>(null);
+  // Priority 4.1 — one-click application launcher, shared with the explorer card.
+  const [startingApplication, setStartingApplication] = useState(false);
+  const [startAppError, setStartAppError] = useState("");
+  const [startAppDone, setStartAppDone] = useState(false);
+
+  /**
+   * Create the application row for this university and hand the workspace to the
+   * hub. The server seeds the checklist from the published requirements, so
+   * nothing here invents a to-do list.
+   */
+  const startApplication = async () => {
+    if (!uni || !activeProfile?.id) {
+      setStartAppError(t("startAppNeedsProfile"));
+      return;
+    }
+    if (startingApplication) return;
+    setStartingApplication(true);
+    setStartAppError("");
+    setStartAppDone(false);
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          universityId: uni.id,
+          universityName: uni.name,
+          status: "preparing",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStartAppError(
+          typeof data?.error === "string" && data.error.trim() ? data.error : t("startAppFailed")
+        );
+        return;
+      }
+      setStartAppDone(true);
+      const applicationId = Number(data?.application?.id);
+      if (Number.isInteger(applicationId) && applicationId > 0) {
+        onApplicationStarted?.(applicationId, uni.name);
+        onNavigate?.("applications/workspace");
+      }
+    } catch {
+      setStartAppError(t("startAppFailed"));
+    } finally {
+      setStartingApplication(false);
+    }
+  };
 
   useEffect(() => {
     if (!activeProfile?.id) return;
@@ -487,6 +553,58 @@ export function UniversityDetail({ universityId, activeProfile, onBack }: Univer
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ===== INSTANT DECISION (Priority 4.1) =====
+          The three comparisons that decide whether this university is worth an
+          application fee — the same engine, and therefore the same answer, as
+          the pill strip on the explorer card. */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Target className="h-4 w-4 text-indigo-600" /> {t("decisionTitle")}
+            </h2>
+            <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-slate-500">
+              {t("decisionSubtitle")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void startApplication()}
+            disabled={startingApplication || !activeProfile?.id}
+            title={activeProfile?.id ? t("startAppHint", { name: uni.name }) : t("startAppNeedsProfile")}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {startingApplication ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Zap className="h-3.5 w-3.5" aria-hidden />}
+            {startAppDone ? t("startAppDoneShort") : t("startApp")}
+          </button>
+        </div>
+
+        <DecisionPillStrip university={uni} profile={activeProfile ?? null} className="mt-3" />
+
+        {/* The published numbers behind the pills, so a verdict can be checked
+            rather than trusted. NULL stays "not specified" (spec §19). */}
+        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <Field label={t("pillFactGpa")} value={uni.minGpa != null ? `${formatNumber(uni.minGpa, { decimals: 2 })} / 4.0` : NOT_SPECIFIED} />
+          <Field label={t("pillFactIelts")} value={uni.minIelts != null ? formatNumber(uni.minIelts, { decimals: 1 }) : NOT_SPECIFIED} />
+          <Field
+            label={t("pillFactTuition")}
+            value={fmtMoney(money?.annualTuition ?? uni.annualTuitionUsd, money?.tuitionCurrency ?? "USD", money?.tuitionPeriod ?? "year")}
+          />
+          <Field label={t("pillFactWorkVisa")} value={uni.postStudyWorkVisaYears != null ? t("pswYears", { years: uni.postStudyWorkVisaYears }) : NOT_SPECIFIED} />
+        </div>
+
+        {startAppError && (
+          <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            {startAppError}
+          </p>
+        )}
+        {startAppDone && !startAppError && (
+          <p role="status" className="mt-3 break-words rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {t("startAppDone", { name: uni.name })}
+          </p>
+        )}
       </div>
 
       {/* ===== ADMISSIONS / APPLICATION CYCLES (spec §2, §3, §12) ===== */}

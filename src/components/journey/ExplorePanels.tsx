@@ -20,6 +20,7 @@ import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
 import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
+import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { INTERVIEW_TRACKS, interviewText } from "@/lib/journey/interviewTracks";
@@ -472,6 +473,13 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
           </ul>
         </JourneyCard>
       )}
+      {/* Priority 5.4 — the visa requirements above say WHAT must be shown;
+          this says by WHICH DATE it has to exist: the e-Apostille and certified
+          translation lead time, and the exact bank-statement window (UK 28
+          consecutive days, closed within 31 days of the application).
+          Re-keyed on the country picker so both panels always agree. */}
+      <ApostilleReadinessCard key={`apostille-${country || "none"}`} profileId={profileId} defaultCountry={country || null} />
+
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="visa" className="mt-2" />
     </div>

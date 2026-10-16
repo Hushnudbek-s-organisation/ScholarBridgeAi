@@ -90,6 +90,9 @@ jobs:
       - name: Opportunities feed tests (embedded Postgres)
         run: npm run test:opportunities
 
+      - name: Differentiator tests — pills, waivers, outreach, timeline, apostille, twin
+        run: npm run test:differentiators
+
       - name: i18n message parity
         run: npm run check:i18n
 

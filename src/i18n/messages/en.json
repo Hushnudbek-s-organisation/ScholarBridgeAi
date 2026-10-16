@@ -620,7 +620,57 @@
     "sopSaveToVersions": "Save to essay versions",
     "sopSavingVersion": "Saving…",
     "sopVersionSaved": "Saved to essay versions",
-    "sopSaveVersionError": "Could not save this draft as a version. Please try again."
+    "sopSaveVersionError": "Could not save this draft as a version. Please try again.",
+    "essayHighlightOn": "Hide highlights",
+    "essayHighlightOff": "Highlight issues",
+    "essayHighlightStrongPct": "{pct}% of sentences carry evidence",
+    "essayHighlightLegend": {
+      "cliche": "{count, plural, one {# cliché} other {# clichés}}",
+      "weak": "{count, plural, one {# weak sentence} other {# weak sentences}}",
+      "strong": "{count, plural, one {# strong sentence} other {# strong sentences}}"
+    },
+    "essayHighlightWhy": {
+      "cliche": "Cliché or banned opening: {detail}",
+      "weak": "Weak, unquantified construction: {detail}",
+      "strong": "Strong evidence: {detail}",
+      "neutral": ""
+    },
+    "sopStructureTitle": "Five-block SOP structure",
+    "sopStructureScore": "{met} of {total} blocks present",
+    "sopStructureNext": "Add these blocks next: {blocks}",
+    "sopStructureComplete": "All five blocks are present. Now check that each one carries a number, a name or a date.",
+    "sopBlocks": {
+      "problem_hook": {
+        "label": "Problem hook",
+        "hint": "Open on the concrete problem you want to solve, not on a biography.",
+        "missing": "No problem hook found in the opening quarter of the draft.",
+        "found": "Proved by: {evidence}"
+      },
+      "academic_rigor": {
+        "label": "Academic rigor",
+        "hint": "Show the hardest academic work you have actually completed.",
+        "missing": "No evidence of academic rigor — name a course, thesis or method.",
+        "found": "Proved by: {evidence}"
+      },
+      "quantified_evidence": {
+        "label": "Quantified research",
+        "hint": "At least one result with a number, a sample size or a dataset.",
+        "missing": "Nothing is quantified. Add a number: accuracy, sample size, budget, users.",
+        "found": "Proved by: {evidence}"
+      },
+      "specific_fit": {
+        "label": "Faculty / course fit",
+        "hint": "Name the supervisor, lab, module or facility you want to work with.",
+        "missing": "No specific fit — name a professor, lab or course at the target university.",
+        "found": "Proved by: {evidence}"
+      },
+      "return_plan": {
+        "label": "Return career plan",
+        "hint": "Say what you will do with the degree, and where.",
+        "missing": "No return career plan in the closing third. Say what happens after graduation.",
+        "found": "Proved by: {evidence}"
+      }
+    }
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -3387,7 +3437,65 @@
     "exQuickIelts": "IELTS ≤ 6.5",
     "exResetFilters": "Reset filters",
     "exRefreshing": "Updating…",
-    "exDismiss": "Dismiss"
+    "exDismiss": "Dismiss",
+    "decisionTitle": "Is this worth an application fee?",
+    "decisionSubtitle": "Three comparisons, computed from the published requirements and your own profile. Anything that cannot be checked says so instead of guessing.",
+    "pillFactGpa": "Published minimum GPA",
+    "pillFactIelts": "Published minimum IELTS",
+    "pillFactTuition": "Annual tuition",
+    "pillFactWorkVisa": "Post-study work visa",
+    "startApp": "Start Application",
+    "startAppHint": "Create an application for {name} and open its workspace with a seeded checklist",
+    "startAppNeedsProfile": "Sign in and select a profile to start an application",
+    "startAppFailed": "We could not create the application. Open the tracker and try again.",
+    "startAppDone": "Application created for {name} — its checklist is waiting in the workspace.",
+    "startAppDoneShort": "Application started",
+    "pills": {
+      "eligibility": {
+        "fallback": "Eligibility",
+        "notPublished": "No published minimums",
+        "notPublishedHint": "Our catalogue holds no GPA, IELTS or SAT minimum for this university. Check its admissions page before assuming you qualify.",
+        "short_gpa": "GPA short by {shortfall}",
+        "short_gpaHint": "Your GPA is {mine}; the published minimum is {required}.",
+        "short_ielts": "IELTS short by {shortfall}",
+        "short_ieltsHint": "Your IELTS is {mine}; the published minimum is {required}. The shortfall is rounded up to the next half band.",
+        "short_sat": "SAT short by {shortfall}",
+        "short_satHint": "Your SAT is {mine}; the published minimum is {required}.",
+        "allMet": "Meets {count} published minimums",
+        "allMetHint": "Every minimum this university publishes is met by your recorded scores. Programme-level requirements can still be higher — confirm on the official page.",
+        "met_gpa": "Meets the GPA minimum",
+        "met_ielts": "Meets the IELTS minimum",
+        "met_sat": "Meets the SAT minimum",
+        "differentTest": "IELTS required — you have TOEFL",
+        "differentTestHint": "The published minimum is IELTS {required}. We never convert TOEFL into IELTS bands; check whether this university accepts your TOEFL score.",
+        "unknown_gpa": "GPA not recorded",
+        "unknown_gpaHint": "The published minimum is {required}. Add your GPA and its scale to your profile to see whether you meet it.",
+        "unknown_ielts": "IELTS not recorded",
+        "unknown_ieltsHint": "The published minimum is {required}. Add an IELTS score to your profile to see whether you meet it.",
+        "unknown_sat": "SAT not recorded",
+        "unknown_satHint": "The published minimum is {required}. Add an SAT score to your profile to see whether you meet it.",
+        "partiallyKnown": "Partly checked",
+        "partiallyKnownHint": "{met, plural, one {# published minimum is met} other {# published minimums are met}}; {unknown, plural, one {# cannot be checked yet} other {# cannot be checked yet}} because the score is not on your profile."
+      },
+      "budget": {
+        "fallback": "Budget",
+        "tuitionUnknown": "Tuition not published",
+        "tuitionUnknownHint": "No tuition figure is published for this university, so it cannot be compared with your budget.",
+        "budgetUnknown": "Budget not set",
+        "budgetUnknownHint": "Tuition is about {tuition} a year. Set your annual budget on your profile to see the gap.",
+        "within": "Fits your budget",
+        "withinHint": "Tuition {tuition} against your budget {budget} — about {headroom} of headroom. Living costs are not included.",
+        "gap": "Over budget by {gap}",
+        "gapHint": "Tuition {tuition} against your budget {budget}. Living costs come on top of this gap."
+      },
+      "workVisa": {
+        "fallback": "Work visa",
+        "unknown": "Work visa not published",
+        "unknownHint": "We hold no post-study work visa length for this country. Check the official immigration page before you count on staying.",
+        "years": "{years, plural, one {# year work visa} other {# years work visa}}",
+        "yearsHint": "Graduates can stay and work for {years, plural, one {# year} other {# years}} after this programme, according to the published rules."
+      }
+    }
   },
   "recommend": {
     "title": "Program Recommender",
@@ -3894,7 +4002,86 @@
     "awardVariable": "Variable award; see details",
     "awardNotSpecified": "Not specified",
     "perYear": " / year",
-    "perMonth": " / month"
+    "perMonth": " / month",
+    "dismiss": "Dismiss",
+    "fundingAdd": "Add to My Funding Plan",
+    "fundingAdded": "In your funding plan",
+    "fundingAddHint": "Put “{title}” into your funding plan as a planned scholarship",
+    "fundingAddedHint": "This award is already in your funding plan",
+    "fundingNeedsProfile": "Sign in and select a profile to build a funding plan",
+    "fundingFailed": "We could not add this award to your funding plan. Try again from the Funding tab.",
+    "reqPillsSummary": {
+      "clear": "Every published requirement is met",
+      "gaps": "{gaps, plural, one {# published requirement is not met} other {# published requirements are not met}}",
+      "incomplete": "Some requirements could not be checked from your profile"
+    },
+    "reqPills": {
+      "gpa": {
+        "label": "GPA",
+        "met": "GPA {mine} ≥ {required}",
+        "metHint": "Your GPA of {mine} on the 4.0 scale meets this award's published minimum of {required}.",
+        "not_met": "GPA {mine} < {required}",
+        "not_metHint": "This award publishes a minimum GPA of {required}; yours converts to {mine}, a gap of {shortfall}.",
+        "unknown_profile": "GPA not recorded",
+        "unknown_profileHint": "This award requires a GPA of at least {required}. Add your GPA and its scale to see whether you qualify.",
+        "different_test": "GPA cannot be compared",
+        "different_testHint": "This award requires a GPA of at least {required}.",
+        "not_published": "No GPA minimum",
+        "not_publishedHint": "This award publishes no GPA minimum."
+      },
+      "ielts": {
+        "label": "IELTS",
+        "met": "IELTS {mine} ≥ {required}",
+        "metHint": "Your IELTS of {mine} meets this award's published minimum of {required}.",
+        "not_met": "IELTS {mine} < {required}",
+        "not_metHint": "This award requires IELTS {required}; you have {mine}. The next half band above the minimum is {nextBand}.",
+        "unknown_profile": "IELTS not recorded",
+        "unknown_profileHint": "This award requires IELTS {required}. Add a score to see whether you qualify.",
+        "different_test": "IELTS required — you have TOEFL",
+        "different_testHint": "This award publishes an IELTS minimum of {required}. We do not convert TOEFL into IELTS bands; check whether the provider accepts TOEFL.",
+        "not_published": "No IELTS minimum",
+        "not_publishedHint": "This award publishes no IELTS minimum."
+      },
+      "degree": {
+        "label": "Degree level",
+        "met": "Open to {mine}",
+        "metHint": "This award is open to {required}; your level is {mine}.",
+        "not_met": "Not open to {mine}",
+        "not_metHint": "This award is only open to {required}; your level is {mine}.",
+        "unknown_profile": "Level not recorded",
+        "unknown_profileHint": "This award is open to {required}. Set your degree level to see whether you qualify.",
+        "different_test": "Level could not be compared",
+        "different_testHint": "This award lists {required}, which could not be matched with your recorded level.",
+        "not_published": "Any degree level",
+        "not_publishedHint": "This award publishes no degree-level restriction."
+      },
+      "major": {
+        "label": "Field of study",
+        "met": "Field matches: {mine}",
+        "metHint": "This award lists {required}; your field is {mine}.",
+        "not_met": "Field not listed",
+        "not_metHint": "This award lists {required}; your field is {mine}. Word-based matching — check the official page if your field is close.",
+        "unknown_profile": "Field not recorded",
+        "unknown_profileHint": "This award is limited to {required}. Set your target major to see whether you qualify.",
+        "different_test": "Field could not be compared",
+        "different_testHint": "This award lists {required}.",
+        "not_published": "Any field of study",
+        "not_publishedHint": "This award publishes no field-of-study restriction."
+      },
+      "country": {
+        "label": "Destination",
+        "met": "{required} is on your list",
+        "metHint": "This award funds study in {required}, which is one of your {count} recorded destinations.",
+        "not_met": "Not your destination",
+        "not_metHint": "This award funds study in {required}; your recorded destinations are {mine}.",
+        "unknown_profile": "Destination not recorded",
+        "unknown_profileHint": "This award funds study in {required}. Add your preferred countries to see whether it fits your plan.",
+        "different_test": "Destination could not be compared",
+        "different_testHint": "This award funds study in {required}.",
+        "not_published": "Destination not listed",
+        "not_publishedHint": "This award does not publish a destination country."
+      }
+    }
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",
@@ -5248,6 +5435,592 @@
       "funding": "funding",
       "home_ties": "home ties",
       "specific_detail": "specific detail"
+    }
+  },
+  "feeWaiver": {
+    "title": "Fee Waiver & $0-Application Finder",
+    "subtitle": "Which of your universities are free to apply to, which share one fee across several choices, and where you have a recorded reason to ask for a waiver.",
+    "savingTotal": "Up to {amount} keepable",
+    "loading": "Checking your shortlist…",
+    "loadError": "We could not load your shortlist. Open the University Explorer and save a few universities, then come back.",
+    "empty": "No universities to check yet. Save universities in the Explorer (or start an application) and this panel will show what each one charges to apply.",
+    "catalogueSourceNote": "You have not saved any universities yet, so this shows the top-ranked institutions in your preferred destination. Save your own shortlist to make it personal.",
+    "eligibilityTitle": "Your waiver indicators",
+    "noIndicators": "No indicator on file",
+    "missingIndicator": "Add: {name}",
+    "eligibilityDisclaimer": "An indicator means you have a recorded reason to ASK — never that a waiver is granted. Each office decides on its own criteria, which change every cycle. The screening threshold used here is {threshold} of household income a year.",
+    "eligibility": {
+      "none": "Nothing on your profile indicates financial hardship yet. Add your household income or the financial-aid flag to see which waivers you could ask for.",
+      "needs_financial_aid": "You have recorded that you need financial aid — that is the indicator most waiver forms ask for first.",
+      "requires_full_scholarship": "You have recorded that you can only attend with a full scholarship — a strong reason to request a fee waiver.",
+      "needs_scholarship": "You have recorded that you need a scholarship, which most offices accept as grounds to ask for a waiver.",
+      "income_below_threshold": "Your recorded household income is below the screening threshold, which is what need-based waiver forms test for."
+    },
+    "indicators": {
+      "needs_financial_aid": "Needs financial aid",
+      "needs_financial_aidHint": "Recorded on your profile as needing financial aid.",
+      "requires_full_scholarship": "Needs a full scholarship",
+      "requires_full_scholarshipHint": "Recorded on your profile as only able to attend with a full scholarship.",
+      "needs_scholarship": "Needs a scholarship",
+      "needs_scholarshipHint": "Recorded on your profile as needing scholarship funding.",
+      "income_below_threshold": "Income below threshold",
+      "income_below_thresholdHint": "Household income recorded below the screening threshold."
+    },
+    "categories": {
+      "zero_fee": {
+        "title": "Free to apply",
+        "short": "{count, plural, one {# at $0} other {# at $0}}",
+        "explain": "This route publishes no application fee for international applicants."
+      },
+      "shared_fee": {
+        "title": "One fee covers several choices",
+        "short": "{count, plural, one {# shared fee} other {# shared fees}}",
+        "explain": "A single portal fee covers multiple choices, so each extra university costs less than applying separately."
+      },
+      "waiver_likely": {
+        "title": "Published fee — waiver route open to you",
+        "short": "{count, plural, one {# waiver route} other {# waiver routes}}",
+        "explain": "This university charges a fee, but a waiver route reaches it and you have an indicator on file. You still have to ask, and they still decide."
+      },
+      "published_fee": {
+        "title": "Published fee, no cheaper route on file",
+        "short": "{count, plural, one {# pays a fee} other {# pay a fee}}",
+        "explain": "The catalogue holds a published fee for this university and no $0 or shared-fee route for its country."
+      },
+      "fee_unknown": {
+        "title": "Fee not published",
+        "short": "{count, plural, one {# fee unknown} other {# fees unknown}}",
+        "explain": "No application fee is published for this university. It is not $0 — check the portal before you budget."
+      }
+    },
+    "feeZero": "$0",
+    "feeUnknown": "Not published",
+    "avoidable": "Save up to {amount}",
+    "publishedFeeTotal": "Published fees total {amount}",
+    "officialSource": "Official source",
+    "routes": {
+      "uk-ucas": {
+        "name": "UCAS Hub",
+        "desc": "One UCAS application covers up to five choices for a single published fee — not $0, but far cheaper per university than five direct applications."
+      },
+      "uk-direct-postgraduate": {
+        "name": "Direct postgraduate application",
+        "desc": "Most UK postgraduate applications go straight to the university; many publish no application fee for international candidates, and some waive it on request. Confirm on the programme page."
+      },
+      "de-uni-assist": {
+        "name": "uni-assist",
+        "desc": "uni-assist charges one fee for the first application and a smaller fee for each additional one in the same semester, and many public universities reimburse or waive it."
+      },
+      "de-direct-public": {
+        "name": "Direct application to a public university",
+        "desc": "A large share of German public universities charge no application fee at all when you apply through their own portal."
+      },
+      "hu-dreamapply": {
+        "name": "DreamApply (Hungary)",
+        "desc": "Hungarian universities using DreamApply commonly publish no application fee for international applicants."
+      },
+      "tr-tbbs": {
+        "name": "Türkiye Bursları (TBBS)",
+        "desc": "The Turkish government scholarship application through TBBS carries no application fee."
+      },
+      "kr-gks-embassy": {
+        "name": "GKS via the embassy track",
+        "desc": "The Global Korea Scholarship embassy track has no application fee; the visa-side balance certificate is a separate cost."
+      },
+      "kr-kaist": {
+        "name": "KAIST admission",
+        "desc": "KAIST publishes no application fee for international applicants and funds most admitted students."
+      },
+      "uz-elyurt-umidi": {
+        "name": "El-yurt umidi",
+        "desc": "The Uzbek state programme covers the application and admission costs of the universities it sends students to."
+      }
+    },
+    "programs": {
+      "common-app": {
+        "name": "Common App fee waiver",
+        "desc": "The Common App fee waiver needs a school counselor or principal to confirm your situation. It covers the Common App fee at participating US universities."
+      },
+      "css-profile": {
+        "name": "CSS Profile fee waiver",
+        "desc": "Automatic for eligible students — including those whose family income qualifies — when they submit the CSS Profile."
+      },
+      "sat-fee-waiver": {
+        "name": "SAT fee waiver",
+        "desc": "A College Board SAT fee waiver also removes application fees at many US universities that accept it."
+      },
+      "duolingo-english-test": {
+        "name": "Duolingo English Test waiver",
+        "desc": "Not an application-fee waiver: a waived English test removes one of the costs that sits in front of every application."
+      }
+    },
+    "templates": {
+      "request": "My waiver request",
+      "attestation": "Counselor attestation"
+    },
+    "letterTitle": "Generate the letters",
+    "letterSubtitle": "Two ready-to-send texts: your own request, and the third-person financial-hardship attestation your school counselor signs. Placeholders in brackets are values your profile does not hold.",
+    "letterUniversityLabel": "University",
+    "letterUniversityPlaceholder": "e.g. Technical University of Munich",
+    "counselorNameLabel": "Counselor name",
+    "counselorNamePlaceholder": "e.g. Dilnoza Karimova",
+    "counselorTitleLabel": "Counselor title",
+    "counselorTitlePlaceholder": "e.g. Head of International Office",
+    "schoolNameLabel": "School / university",
+    "schoolNamePlaceholder": "e.g. Tashkent Presidential School",
+    "letterSubject": "Subject",
+    "copySubject": "Copy subject",
+    "copyBody": "Copy letter",
+    "placeholders": "{count, plural, one {# field still needs filling in:} other {# fields still need filling in:}}",
+    "letterDisclaimer": "A template is a starting point, not legal or financial advice. Send it only after checking the office's own waiver criteria and the current cycle's rules.",
+    "letterEmpty": "Choose a university above to generate the letter. Everything is filled from your own profile — nothing is sent anywhere."
+  },
+  "outreach": {
+    "title": "Professor Cold-Email Outreach Studio",
+    "subtitle": "Build the first email to a supervisor from the paper you actually read, then grade any draft 0–100 on the things that decide whether it gets an answer.",
+    "factsTitle": "The facts this email is built from",
+    "attachmentsTitle": "What you attach",
+    "buildButton": "Build the email",
+    "resetButton": "Clear the draft",
+    "missingFacts": "{count, plural, one {# fact is still missing:} other {# facts are still missing:}}",
+    "profileFacts": "From your profile: {name} · {level} · {major}",
+    "unknownFact": "not recorded",
+    "subjectLabel": "Subject line",
+    "subjectPlaceholder": "Prospective MSc student — your 2024 paper on X",
+    "bodyLabel": "Email body (aim for {min}–{max} words)",
+    "bodyPlaceholder": "Paste an existing draft to grade it, or build one from the facts on the left…",
+    "copyAll": "Copy subject + body",
+    "copySubject": "Copy subject",
+    "copyBody": "Copy body",
+    "openInMail": "Open in my mail app",
+    "openInMailHint": "Opens your own mail client with the subject and body filled in. The recipient stays empty — we never store a professor's address.",
+    "rubricTitle": "Why this score",
+    "wordCount": "{words, plural, one {# word} other {# words}}",
+    "fixFirst": "Fix this first: {item}",
+    "allChecksPassed": "Every check passes. Send it, then follow up once after 10–14 days if there is no reply.",
+    "penaltiesTitle": "{count, plural, one {# mass-mail tell removed points} other {# mass-mail tells removed points}}",
+    "bands": {
+      "strong": "Strong — send it",
+      "solid": "Solid — one more pass",
+      "needs_work": "Needs work",
+      "weak": "Weak — rewrite"
+    },
+    "fields": {
+      "professorName": "Professor's name",
+      "professorNamePlaceholder": "e.g. Prof. Anna Weber",
+      "universityName": "Their university",
+      "universityNamePlaceholder": "e.g. TU München",
+      "labName": "Lab or group",
+      "labNamePlaceholder": "e.g. Computational Mechanics Lab",
+      "paperTitle": "Paper you read",
+      "paperTitlePlaceholder": "Exact title of a paper of theirs you actually read",
+      "paperInsight": "What you took from it",
+      "paperInsightPlaceholder": "One specific finding, method or limitation — not a compliment",
+      "projectTitle": "Your project or thesis",
+      "projectTitlePlaceholder": "e.g. Cotton-leaf disease classifier",
+      "projectMetric": "Its quantified result",
+      "projectMetricPlaceholder": "e.g. 94.2% accuracy on 1,200 labelled samples",
+      "methods": "Methods and tools",
+      "methodsPlaceholder": "e.g. Python, PyTorch, transfer learning",
+      "targetLevel": "Level you are applying for",
+      "targetLevelPlaceholder": "e.g. MSc, PhD, summer research",
+      "targetIntake": "Intake",
+      "targetIntakePlaceholder": "e.g. Fall 2027"
+    },
+    "checks": {
+      "length": "Length is in the 130–210 word band a busy professor will read",
+      "subject_specific": "Subject line names the professor's work or your level, not “Question”",
+      "paper_or_lab_cited": "You cite a specific paper, lab or research group of theirs",
+      "quantified_metric": "Your own work carries a number, not just an adjective",
+      "attachment_mentioned": "You say what is attached (CV, transcript, portfolio)",
+      "clear_ask": "There is one clear ask — a short call, supervision, or a question about openings",
+      "salutation_and_signoff": "Correct salutation and a sign-off with your name",
+      "lengthDetail": "({words, plural, one {# word} other {# words}} — aim for {min}–{max})",
+      "paragraphDetail": "(longest paragraph: {words, plural, one {# word} other {# words}}, keep it under {max})"
+    },
+    "penalties": {
+      "dear_sir_madam": "“Dear Sir/Madam” — find the name",
+      "no_name_professor": "“Dear Professor,” with no surname",
+      "passionate_filler": "“I am passionate about” says nothing",
+      "cliche_delve": "AI cliché (delve, tapestry, testament, realm of…)",
+      "do_the_needful": "“Do the needful” / “kindly revert” reads as a mass mail",
+      "funding_first": "Asking about funding before showing any work",
+      "shouting": "Multiple exclamation marks or ALL CAPS",
+      "mass_mail": "“Any university”, “your esteemed institution” — no specific target",
+      "wall_paragraph": "One paragraph too long to read on a phone"
+    }
+  },
+  "timeline": {
+    "title": "Smart Backwards Timeline",
+    "subtitle": "Working back from every dated deadline: what must be finished at D-90, D-60, D-45, D-14 and D-3 for it to be reachable. An exam booked less than {examLead} days before a deadline cannot deliver a score report in time, and a deadline inside {tight} days has no room for this plan at all.",
+    "loading": "Building your backwards plan…",
+    "loadError": "We could not load your deadlines. Try again, or add a deadline in the tracker first.",
+    "untitledDeadline": "Untitled deadline",
+    "noDate": "No date on file",
+    "empty": "No dated deadline yet. Add an application or scholarship deadline and the backwards plan appears here.",
+    "emptyUndated": "{count, plural, one {# deadline has no date on file} other {# deadlines have no date on file}} — a backwards plan needs a real date to count back from.",
+    "noConflicts": "No contradictions in {count, plural, one {# dated deadline} other {# dated deadlines}}: every exam leaves enough time for its score report.",
+    "daysLeft": "{days, plural, one {# day left} other {# days left}}",
+    "daysAgo": "{days, plural, one {# day ago} other {# days ago}}",
+    "overdueSteps": "{count, plural, one {# step is already overdue} other {# steps are already overdue}}",
+    "overdueBy": "{days, plural, one {# day overdue} other {# days overdue}}",
+    "showSteps": "Show {count, plural, one {# step} other {# steps}}",
+    "hideSteps": "Hide steps",
+    "showAllPlans": "Show {count, plural, one {# more plan} other {# more plans}}",
+    "sync": "Sync to My Tasks",
+    "synced": "{count, plural, one {# task added} other {# tasks added}}",
+    "syncedNone": "Already in your tasks",
+    "syncHint": "Write these dated steps into your task list. Steps you already have are skipped, so syncing twice never duplicates them.",
+    "syncPartial": "Only {written} of {total} steps were saved. Open your task list to check what is missing.",
+    "syncError": "We could not sync these steps. Check your task list and try again.",
+    "nextUpTitle": "What is due next, across every deadline",
+    "openTasks": "Open my task list",
+    "counts": {
+      "deadlines": "{count, plural, one {# deadline} other {# deadlines}}",
+      "steps": "{count, plural, one {# planned step} other {# planned steps}}",
+      "overdue": "{count, plural, one {# overdue} other {# overdue}}"
+    },
+    "conflicts": {
+      "exam_too_close": "{test} on {examDate} leaves only {gapDays, plural, one {# day} other {# days}} before {deadline} on {deadlineDate} — less than the {minimumDays} days a score report needs. Move the exam earlier or extend the deadline.",
+      "exam_after_deadline": "{test} on {examDate} sits AFTER {deadline} on {deadlineDate}. The score cannot exist in time; book an earlier sitting.",
+      "exam_in_past": "{test} on {examDate} has already passed. If you do not hold the score, book the next sitting.",
+      "deadline_in_past": "{deadline} was on {deadlineDate} — {daysOverdue, plural, one {# day} other {# days}} ago. Check whether a later round is still open.",
+      "apostille_overdue": "The apostille step for {deadline} was due {milestoneDate} ({daysOverdue, plural, one {# day} other {# days}} ago) and my.gov.uz needs about {offsetDays} days. Order it today.",
+      "tight_deadline": "{deadline} on {deadlineDate} is only {gapDays, plural, one {# day} other {# days}} away — inside the {minimumDays} days the backwards plan needs. Apply only if every document already exists."
+    },
+    "milestones": {
+      "rec_letters": {
+        "label": "Recommendation letters requested",
+        "why": "A referee who is asked 90 days ahead writes a real letter; one asked a week ahead writes a paragraph.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "shortlist_final": {
+        "label": "Shortlist frozen",
+        "why": "Every later step is per university. Changing the list after this point re-opens work you already finished.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "english_test": {
+        "label": "English test sat, score delivered",
+        "why": "IELTS and TOEFL results take several days, and a retake needs another sitting. This is the date the score must be in your hands, not the date you book.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "apostille": {
+        "label": "Diploma and transcript apostilled",
+        "why": "The e-Apostille on my.gov.uz plus a certified translation takes about two weeks, and it must be done on the ORIGINAL before any copy is made.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "vpd": {
+        "label": "uni-assist VPD issued",
+        "why": "German universities require a Vorprüfungsdokumentation (VPD) from uni-assist, which is issued only after your documents are reviewed — weeks, not days.",
+        "skipped": {
+          "not_germany": "Germany only — skipped for this destination.",
+          "country_unknown": "Germany only — the destination country is not recorded for this deadline."
+        }
+      },
+      "sop_draft": {
+        "label": "SOP and essays drafted",
+        "why": "A statement of purpose needs at least two rounds of revision and one reader who knows the field.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "bank_statement": {
+        "label": "Bank statement issued",
+        "why": "The UK requires the balance held for 28 consecutive days and the statement closed within 31 days of the application. Issued too early, it is expired; too late, the history is missing.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      },
+      "final_buffer": {
+        "label": "Submitted, with three days of slack",
+        "why": "Portals fail, payment gateways reject foreign cards and upload limits appear on the last day. Submitting three days early is the cheapest insurance there is.",
+        "skipped": {
+          "not_germany": "Not applicable to this destination.",
+          "country_unknown": "Applies once the destination country is known."
+        }
+      }
+    },
+    "taskTitle": {
+      "rec_letters": "Request recommendation letters — {deadline}",
+      "shortlist_final": "Freeze the final shortlist — {deadline}",
+      "english_test": "Have the English test score in hand — {deadline}",
+      "apostille": "Apostille diploma and transcript — {deadline}",
+      "vpd": "Obtain the uni-assist VPD — {deadline}",
+      "sop_draft": "Finish the SOP and essay drafts — {deadline}",
+      "bank_statement": "Issue the bank statement — {deadline}",
+      "final_buffer": "Submit the application — {deadline}"
+    }
+  },
+  "apostille": {
+    "title": "e-Apostille & Bank-Statement Readiness",
+    "subtitle": "Pick a destination and the date you plan to apply for the visa. This turns them into the exact dates your apostille, your certified translation and your bank statement have to exist by — with the official rule behind each figure.",
+    "portalButton": "my.gov.uz e-Apostille",
+    "countryLabel": "Destination",
+    "yourDestination": "your destination",
+    "dateLabel": "Planned visa application date",
+    "ukAreaLegend": "Where in the UK?",
+    "ukAreas": {
+      "london": "London",
+      "outsideLondon": "Outside London"
+    },
+    "noDate": "No date set",
+    "fundsTitle": "The published funds rule",
+    "fundsNoPublishedAmount": "No national figure is published",
+    "fundsNoRule": "We hold no published funds rule for this destination. Check the embassy or consulate page before you plan.",
+    "basisLabel": "How the figure is built",
+    "consecutiveDays": "{days, plural, one {# consecutive day} other {# consecutive days}} in the account",
+    "statementValidity": "statement closing date within {days, plural, one {# day} other {# days}} of the application",
+    "estimatedFigure": "This is a living-cost benchmark, not a published visa minimum — treat it as a planning floor and confirm with the embassy.",
+    "tuitionSeparate": "Unpaid first-year tuition must be shown on top of this amount.",
+    "scholarshipLetterAccepted": "An official full-scholarship award letter may replace the bank proof.",
+    "windowTitle": "Your statement window",
+    "windowNeedsDate": "Enter the date you plan to apply for the visa and this card will compute the exact statement window and the apostille dates.",
+    "windowExplain": "The money must already be in the account on {date, select, undefined {} other {}}{date} at the latest — {days, plural, one {# consecutive day} other {# consecutive days}} of history — and the statement's closing date must fall inside the {validity, plural, one {# day} other {# days}} before you apply.",
+    "window": {
+      "fundsInPlaceBy": "Money in place by",
+      "statementNotBefore": "Statement not before",
+      "statementNotAfter": "Statement not after",
+      "earliestWindowStart": "Earliest possible start"
+    },
+    "windowReasons": {
+      "no_country": "Choose a destination to see its funds rule.",
+      "no_date": "Enter your planned visa application date to compute the window.",
+      "no_rule": "This destination publishes no day-count rule, so there is no window to compute — the amount above is what has to be available.",
+      "no_published_window": "No published window for this destination: the amount must simply be available when you apply."
+    },
+    "stepsTitle": "Document preparation schedule",
+    "stepsNeedDate": "Set your planned application date above to turn these into real dates.",
+    "leadDays": "Plan {days, plural, one {# day} other {# days}} for the apostille and the certified translation together",
+    "overdueBy": "{days, plural, one {# day overdue} other {# days overdue}}",
+    "steps": {
+      "collect_documents": {
+        "label": "Originals collected",
+        "why": "Diploma, transcript and the civil-registry documents, in original form — the apostille is applied to the original, never to a photocopy."
+      },
+      "order_apostille": {
+        "label": "e-Apostille ordered on my.gov.uz",
+        "why": "The state portal issues the Uzbek e-Apostille; ordering late is the single most common reason a document pack misses a deadline."
+      },
+      "certified_translation": {
+        "label": "Certified translation finished",
+        "why": "Translation is done AFTER the apostille, on the apostilled document, by a sworn or certified translator."
+      },
+      "submit_file": {
+        "label": "Document file submitted",
+        "why": "Upload or hand in the complete set with three days of slack for a rejected scan or a missing page."
+      }
+    },
+    "issuingAuthority": {
+      "ministryJustice": "Apostille issued through the Ministry of Justice (my.gov.uz)",
+      "ministryHigherEducation": "Academic documents are verified by the Ministry of Higher Education before apostille"
+    },
+    "matrixTitle": "What {country} asks for, document by document",
+    "documents": {
+      "diploma": "Diploma",
+      "transcript": "Transcript",
+      "birth_certificate": "Birth certificate",
+      "police_clearance": "Police clearance",
+      "marriage_certificate": "Marriage certificate",
+      "medical": "Medical certificate",
+      "bank_statement": "Bank statement",
+      "passport": "Passport"
+    },
+    "apostilleNeeds": {
+      "required": "Apostille required",
+      "accepted": "Apostille accepted",
+      "verify": "Check case by case",
+      "not_applicable": "Not apostilled"
+    },
+    "translationNeeds": {
+      "sworn": "Sworn translation",
+      "certified": "Certified translation",
+      "verify": "Translation: check",
+      "not_required": "No translation needed"
+    },
+    "fundsRules": {
+      "uk_28_day": {
+        "summary": "UK Student Route: unpaid first-year tuition plus nine months of living costs, held for 28 consecutive days, with the closing balance dated no more than 31 days before the online application."
+      },
+      "blocked_account": {
+        "summary": "Germany: a blocked account (Sperrkonto) with the published annual amount, or a blocking confirmation from a recognised provider such as Expatrio or Fintiba."
+      },
+      "balance_certificate": {
+        "summary": "South Korea (D-2): a bank balance certificate for the published amount, issued for the visa application through the KVAC or the embassy."
+      },
+      "gic_or_liquid": {
+        "summary": "Canada: the IRCC living-cost figure plus tuition and travel, held in liquid funds. A Guaranteed Investment Certificate (GIC) from a participating Canadian bank is accepted."
+      },
+      "i20_amount": {
+        "summary": "United States (F-1): there is no national figure. The amount is set by your own Form I-20, issued by the school; the MRV fee and the SEVIS fee are separate."
+      },
+      "liquid_available": {
+        "summary": "No visa minimum is published for this destination, so the figure shown is our annual living-cost benchmark for it — a planning floor, not an official requirement."
+      }
+    },
+    "matrixNotes": {
+      "united_kingdom": "The UK does not require an apostille on academic documents for the Student Route, but UKVI does require a certified translation of anything not in English, and the financial evidence is where applications fail.",
+      "united_states": "US schools set their own document rules: many accept a certified translation without an apostille, while some require an apostilled diploma for credential evaluation (WES, ECE). Ask the graduate school in writing.",
+      "germany": "German universities and uni-assist generally require an apostille plus a sworn translation into German or English. Order the apostille on the ORIGINAL diploma before any copy is certified.",
+      "south_korea": "Korean universities and the visa office accept apostilled documents with a certified translation; the balance certificate is issued by your bank specifically for the visa file.",
+      "canada": "Canada joined the Apostille Convention in January 2024, so a Uzbek e-Apostille is now accepted in place of consular legalisation for most documents.",
+      "italy": "Italy requires an apostille plus a certified Italian translation, and a Declaration of Value (or CIMEA) for the diploma — start this before the pre-enrolment on Universitaly closes.",
+      "hungary": "Hungary accepts apostilled documents with a certified translation; several universities additionally ask for the original at enrolment, so keep the apostilled set unbound."
+    }
+  },
+  "twin": {
+    "title": "You vs. your admitted twin",
+    "subtitle": "The admitted student whose public record overlaps yours most, compared row by row — then the gap turned into at most three actions.",
+    "loading": "Finding your closest admitted twin…",
+    "loadError": "We could not load the admitted-student stories. Try again in a moment.",
+    "overlapScore": "{score}% overlap",
+    "anonymousTwin": "An admitted student",
+    "unknownUniversity": "University not published",
+    "intakeYear": "intake {year}",
+    "notProvided": "not recorded",
+    "insufficientNoTwin": "No admitted-student record overlaps yours yet. The more you record — GPA and its scale, an English score, your field, your projects — the closer a twin can be matched.",
+    "insufficientWithTwin": "We found a twin, but nothing on either side can be compared honestly yet. Record your GPA (with its scale), an English score and your field of study to unlock the row-by-row gap.",
+    "twinScholarship": "Funded by {name}",
+    "adviceFrom": "— {name}, admitted student",
+    "unknownsNote": "Not comparable: {rows}. These rows stay neutral until one side records a value — we never turn a missing number into a win or a loss.",
+    "table": {
+      "dimension": "Dimension",
+      "you": "You",
+      "twin": "Admitted twin",
+      "gap": "Gap"
+    },
+    "gapEven": "level",
+    "gapUnknown": "no data",
+    "gapUnit": {
+      "gpa4": "{gap} GPA",
+      "ielts": "{gap} band",
+      "toefl": "{gap} points",
+      "sat": "{gap} points",
+      "count": "{gap}",
+      "text": "differs"
+    },
+    "blueprintTitle": "Your {count, plural, one {first action} other {first # actions}}",
+    "addGoal": "Add to My Goals",
+    "goalAdded": "In your goals",
+    "addGoalHint": "Write this action into your goal planner as a goal with three steps",
+    "goalNeedsProfile": "Sign in and select a profile to save goals",
+    "goalFailed": "We could not save this goal. Your planner may already hold six active goals.",
+    "reasons": {
+      "same_field": "Same field of study",
+      "same_degree": "Same degree level",
+      "similar_gpa": "Similar GPA",
+      "similar_english": "Similar English score",
+      "similar_sat": "Similar SAT score",
+      "target_country": "One of your target countries",
+      "same_home_country": "From your home country"
+    },
+    "deltas": {
+      "gpa": {
+        "label": "GPA (4.0 scale)",
+        "compareNote": "Both GPAs are converted to the 4.0 scale through the recorded scale. A GPA with no scale recorded is never guessed.",
+        "notComparable": "One side has no GPA on record, so this row is not a comparison."
+      },
+      "english": {
+        "label": "English score",
+        "compareNote": "IELTS is compared with IELTS and TOEFL with TOEFL. The two are never converted into each other.",
+        "notComparable": "The two of you sat different English tests, or one score is missing — no honest comparison is possible."
+      },
+      "standardized": {
+        "label": "SAT / ACT",
+        "compareNote": "Compared only when both sides recorded the same test.",
+        "notComparable": "Only one of you recorded a standardized test score."
+      },
+      "major": {
+        "label": "Field of study",
+        "compareNote": "Word-based comparison of the recorded fields.",
+        "notComparable": "One side has no field of study recorded."
+      },
+      "degreeLevel": {
+        "label": "Degree level",
+        "compareNote": "Alias-aware: “MSc”, “Master's” and “Master” all compare equal.",
+        "notComparable": "One side has no degree level recorded."
+      },
+      "research": {
+        "label": "Research output",
+        "compareNote": "Published outputs recorded on each side.",
+        "notComparable": "Neither side has a recorded research output."
+      },
+      "activities": {
+        "label": "Activity evidence",
+        "compareNote": "Counts the profile fields that hold anything at all: projects, leadership, volunteering, olympiads, awards, competitions, certificates, clubs, sport, work experience.",
+        "notComparable": "One side has no activity evidence recorded."
+      }
+    },
+    "actions": {
+      "raise_gpa": {
+        "title": "Close the GPA gap to {target}",
+        "why": "Your admitted twin was selected with a GPA of {theirs}; yours is {mine}. GPA is the one row an admissions committee reads first and the hardest to change late.",
+        "open": "Open readiness",
+        "step1": "List every remaining course and the grade each one needs to move your cumulative GPA to {target}.",
+        "step2": "Book the retake or the supplementary exam with your registry office this month, not next semester.",
+        "step3": "Record the new GPA and its scale on your profile so every match recalculates."
+      },
+      "raise_english": {
+        "title": "Reach {target} on your English test",
+        "why": "Your twin held {theirs}; you have {mine}. A band short of the published minimum is the most common single reason an otherwise strong file is filtered out.",
+        "open": "Open the test planner",
+        "step1": "Book a sitting at least 60 days before your earliest deadline so a retake is still possible.",
+        "step2": "Work the weakest sub-score first — that is where one band is cheapest to gain.",
+        "step3": "Record the new score on your profile the day the result arrives."
+      },
+      "add_standardized": {
+        "title": "Add a standardized test score of {target}",
+        "why": "Your twin held {target}; you have {current}. Where a programme publishes a minimum, a missing score reads as an unfinished file.",
+        "open": "Open the test planner",
+        "step1": "Check whether your target programmes actually require this test — many waived it permanently.",
+        "step2": "Book a date that leaves room for one retake before your earliest deadline.",
+        "step3": "Add the score to your profile so the requirement checks can see it."
+      },
+      "add_research": {
+        "title": "Record {target} research outputs",
+        "why": "Your twin had {theirs}; you have {mine}. For research programmes this is the row that separates a candidate who can start work from one who must be taught first.",
+        "open": "Open activities",
+        "step1": "Ask one supervisor whether any existing project of yours can be written up or presented this term.",
+        "step2": "Enter every output you already have — a conference poster and a preprint both count.",
+        "step3": "Keep the DOI, link or acceptance email next to each entry so it can be verified."
+      },
+      "add_activity_evidence": {
+        "title": "Record evidence in {target} activity fields",
+        "why": "Your twin had activity recorded in {theirs} fields; you have {mine}. An empty activity section makes a strong academic record look untested outside the classroom.",
+        "open": "Open activities",
+        "step1": "Fill in the fields you already have evidence for: projects, volunteering, olympiads, awards, clubs, sport.",
+        "step2": "For each one write the outcome, not the description — a number, a rank or a result.",
+        "step3": "Add one new activity this term that produces a verifiable outcome."
+      },
+      "target_scholarship": {
+        "title": "Apply for {name}",
+        "why": "Your twin was funded by {name}{amount}. The same award is open to a profile like yours, and it changes the budget row entirely.",
+        "open": "Open scholarships",
+        "step1": "Open the award's official page and write down its deadline and its document list.",
+        "step2": "Check the requirement pills in the Scholarship Hub for this award and fix anything not met.",
+        "step3": "Add it to your funding plan so the amount is counted in your budget."
+      },
+      "align_major": {
+        "title": "Align your field with {theirs}",
+        "why": "Your twin was admitted in {theirs}; your recorded field is {mine}. Programmes filter on field first, and a mismatched label hides you from matches you would actually pass.",
+        "open": "Open universities",
+        "step1": "Read the entry requirements of three programmes in {theirs} and note which of your courses they accept.",
+        "step2": "Set your target major on your profile to the label those programmes use.",
+        "step3": "Re-run your matches and shortlist the programmes your record actually supports."
+      }
     }
   }
 }

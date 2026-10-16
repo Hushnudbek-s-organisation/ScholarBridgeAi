@@ -8,6 +8,7 @@ import { UniversityDetail } from "./UniversityDetail";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
+import { DecisionPillStrip } from "./DecisionPillStrip";
 import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
@@ -37,7 +38,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Zap,
+  Loader2
 } from "lucide-react";
 
 export interface University {
@@ -56,6 +59,14 @@ export interface University {
   minSat?: number | null;
   acceptanceRate: number | null;
   postStudyWorkVisaYears: number | null;
+  /**
+   * Published application fee. The USD mirror is resolved server-side by
+   * `resolvedUsdUniversityCosts`; a fee in another currency without a mirror
+   * stays NULL and is never shown as $0 (spec §14).
+   */
+  applicationFee?: number | null;
+  applicationFeeCurrency?: string | null;
+  applicationFeeUsd?: number | null;
   description: string | null;
   highlights: string | null;
   websiteUrl: string | null;
@@ -99,6 +110,14 @@ interface UniversityExplorerProps {
    * prop through the page, so the palette and the explorer stay decoupled.
    */
   autoOpenUniversityId?: number | null;
+  /**
+   * Priority 4.1 — "Start Application" posts to /api/applications and then
+   * opens the workspace. The hub owns navigation, so the explorer stays usable
+   * on its own (both props are optional and the button simply reports success
+   * inline when no navigator is wired up).
+   */
+  onNavigate?: (id: string) => void;
+  onApplicationStarted?: (applicationId: number, universityName: string) => void;
 }
 
 export function UniversityExplorer({
@@ -107,6 +126,8 @@ export function UniversityExplorer({
   onSaveUniversity,
   onUnsaveUniversity,
   autoOpenUniversityId,
+  onNavigate,
+  onApplicationStarted,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
   const tCountry = useTranslations("countryNames");
@@ -120,6 +141,14 @@ export function UniversityExplorer({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
+  /**
+   * Priority 4.1 — one-click application launcher. Which card is mid-request
+   * (so its button shows a spinner and cannot be double-clicked) and whether
+   * the last attempt failed. Both are per-card, never global: a student starts
+   * one application at a time but must see the outcome on the card they clicked.
+   */
+  const [startingUniId, setStartingUniId] = useState<number | null>(null);
+  const [startError, setStartError] = useState("");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -334,6 +363,54 @@ export function UniversityExplorer({
 
   const filteredUniversities = universities;
 
+  /**
+   * Priority 4.1 — "Start Application": create the application row, then hand
+   * the workspace to the hub. The POST is the same one the tracker uses, so the
+   * new row arrives with its checklist seeded by the requirements engine on the
+   * server rather than by a client-side guess.
+   */
+  const startApplication = async (uni: University) => {
+    if (!activeProfile) {
+      setStartError(t("startAppNeedsProfile"));
+      return;
+    }
+    if (startingUniId != null) return; // one request at a time
+    setStartingUniId(uni.id);
+    setStartError("");
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          universityId: uni.id,
+          universityName: uni.name,
+          programName: uni.programMajor || undefined,
+          status: "preparing",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // A free-plan cap or a duplicate is a real answer, not a crash: show it
+        // inline on the card the student clicked.
+        setStartError(
+          typeof data?.error === "string" && data.error.trim() ? data.error : t("startAppFailed")
+        );
+        return;
+      }
+      const applicationId = Number(data?.application?.id);
+      setNotice(t("startAppDone", { name: uni.name }));
+      if (Number.isInteger(applicationId) && applicationId > 0) {
+        onApplicationStarted?.(applicationId, uni.name);
+        onNavigate?.("applications/workspace");
+      }
+    } catch {
+      setStartError(t("startAppFailed"));
+    } finally {
+      setStartingUniId(null);
+    }
+  };
+
   const toggleCompare = (id: number) => {
     setCompareIds((prev) => {
       if (prev.includes(id)) {
@@ -428,6 +505,8 @@ export function UniversityExplorer({
         universityId={selectedUniId}
         activeProfile={activeProfile}
         onBack={() => setSelectedUniId(null)}
+        onNavigate={onNavigate}
+        onApplicationStarted={onApplicationStarted}
       />
     );
   }
@@ -657,6 +736,28 @@ export function UniversityExplorer({
             </button>
           </div>
         )}
+
+        {/* The application launcher reports its own outcome inline: a free-plan
+            cap or a network failure belongs on the page, not in an alert(). */}
+        {startError && (
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+          >
+            <span className="flex min-w-0 items-start gap-1.5">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 break-words whitespace-normal">{startError}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setStartError("")}
+              aria-label={t("exDismiss")}
+              className="rounded-lg p-1 text-rose-700 hover:bg-rose-100"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Results Count & Active Info */}
@@ -801,6 +902,15 @@ export function UniversityExplorer({
                       <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
                     </p>
 
+                    {/* Priority 4.1 — the three comparisons that decide whether
+                        this university is worth an application fee, already
+                        done: eligibility, budget, post-study work visa. */}
+                    <DecisionPillStrip
+                      university={uni}
+                      profile={activeProfile}
+                      className="mb-2.5"
+                    />
+
                     <p className="break-words text-xs leading-relaxed text-slate-600">
                       {uni.description}
                     </p>
@@ -905,6 +1015,27 @@ export function UniversityExplorer({
                     </label>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Priority 4.1 — create the application (and its
+                          checklist) from the card the student is reading. */}
+                      <button
+                        type="button"
+                        onClick={() => void startApplication(uni)}
+                        disabled={startingUniId != null}
+                        title={
+                          activeProfile
+                            ? t("startAppHint", { name: uni.name })
+                            : t("startAppNeedsProfile")
+                        }
+                        className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {startingUniId === uni.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Zap className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        {t("startApp")}
+                      </button>
+
                       <a
                         href={uni.websiteUrl ?? undefined}
                         target="_blank"

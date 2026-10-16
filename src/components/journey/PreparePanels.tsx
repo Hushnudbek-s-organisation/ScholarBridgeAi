@@ -12,6 +12,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
+import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
+import { SmartTimelineCalendar } from "@/components/SmartTimelineCalendar";
 import { Button, Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
@@ -223,6 +225,12 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
           </p>
         </JourneyCard>
       )}
+
+      {/* Priority 5.4 — the documents in this vault are only usable if the
+          diploma and transcript carry an e-Apostille and a certified
+          translation, and the bank statement is dated inside its window. This
+          turns a planned visa date into the exact dates those must be ready. */}
+      <ApostilleReadinessCard profileId={profileId} />
     </div>
   );
 }
@@ -790,6 +798,12 @@ export function StudyPlanPanel({
           The progress numbers come from your real data — they update whenever your profile, tests or applications change.
         </p>
       </JourneyCard>
+
+      {/* Priority 5.3 — a study plan says which phase you are in; the backwards
+          timeline says which date each phase has to be finished by, and flags the
+          plans that no longer fit (an exam booked too close to a deadline). */}
+      <SmartTimelineCalendar profileId={profileId} onNavigateTab={onNavigateTab} />
+
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="planning" className="mt-2" />
     </div>

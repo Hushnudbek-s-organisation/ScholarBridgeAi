@@ -21,6 +21,7 @@ import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import type { EssaySample } from "@/lib/samples/exemplars";
 import { isUnmodifiedSample } from "@/lib/samples/text";
+import { EssayHighlightField } from "./EssayHighlightField";
 
 /**
  * Advanced Essay AI (#8) — the rubric and version-history half.
@@ -406,12 +407,14 @@ export function EssayRubricStudio({
           />
         </label>
 
-        <textarea
-          aria-label={t("essayTextPlaceholder")}
-          className="mt-3 min-h-[280px] w-full rounded-xl border border-slate-200 p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none"
-          placeholder={t("essayTextPlaceholder")}
+        {/* Priority 4.3 — the same editor, with a toggleable inline highlight
+            layer: red for AI clichés and banned openings, amber for weak
+            unquantified construction, emerald for strong verbs and numbers. */}
+        <EssayHighlightField
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
+          ariaLabel={t("essayTextPlaceholder")}
+          placeholder={t("essayTextPlaceholder")}
         />
 
         <div className="mt-3 flex flex-wrap gap-2">
