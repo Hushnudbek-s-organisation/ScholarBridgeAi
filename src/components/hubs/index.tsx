@@ -60,6 +60,8 @@ import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
 import { VisaSpeakingAssistant } from "@/components/VisaSpeakingAssistant";
 import { HubPage, HubEmpty, usePaneSelection, type HubPaneDef } from "./ui";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
+import { FeeWaiverStudio } from "@/components/FeeWaiverStudio";
+import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 
@@ -154,12 +156,14 @@ export function UniversitiesHub({
   profile,
   pane,
   setPane,
+  navigate,
   hidden,
   savedUniIds,
   onSaveUniversity,
   onUnsaveUniversity,
   autoOpenUniversityId,
   onProfileSaved,
+  setWorkspaceId,
 }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
@@ -186,6 +190,10 @@ export function UniversitiesHub({
           onSaveUniversity={onSaveUniversity ?? (async () => undefined)}
           onUnsaveUniversity={onUnsaveUniversity ?? (async () => undefined)}
           autoOpenUniversityId={autoOpenUniversityId ?? null}
+          onNavigate={navigate}
+          // Priority 4.1 — "Start Application" on a card opens that university's
+          // workspace instead of the list, so the click lands somewhere useful.
+          onApplicationStarted={(applicationId) => setWorkspaceId?.(applicationId)}
         />
       )}
       {active === "careers" && (
@@ -248,7 +256,7 @@ export function ScholarshipsHub({
       {active === "recommended" && (
         <ScholarshipAutopilot activeProfile={profile} onSaveScholarship={onSaveScholarship} onNavigate={navigate} />
       )}
-      {active === "opportunities" && <OpportunitiesPanel />}
+      {active === "opportunities" && <OpportunitiesPanel activeProfile={profile} />}
     </HubPage>
   );
 }
@@ -364,6 +372,10 @@ export function FundingHub({ profile, navigate }: HubProps) {
       note={{ tone: "warn", text: td("money") }}
     >
       <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+      {/* Priority 5.1 — which of the student's universities are free to apply
+          to, whether they have a recorded reason to ask for a waiver, and the
+          two letters that actually get one granted. */}
+      <FeeWaiverStudio profile={profile} className="mt-4" />
       {/* Sponsor affidavit (Homiylik xati) and the funding cover note. */}
       <DocumentTemplatesCard kinds={["affidavit", "coverNote"]} className="mt-4" />
     </HubPage>
@@ -397,7 +409,14 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
       hiddenPanes={hidden}
       note={{ tone: "info", text: td("planning") }}
     >
-      {active === "tracker" && <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />}
+      {active === "tracker" && (
+        <>
+          <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />
+          {/* Priority 5.1 — the fees already committed to, and the waiver routes
+              still open on the universities being tracked. */}
+          <FeeWaiverStudio profile={profile} className="mt-4" />
+        </>
+      )}
       {active === "workspace" && (
         <ApplicationWorkspacePanel
           key={`ws-${profile.id}-${workspaceId ?? "list"}`}
@@ -562,6 +581,14 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
             profileId={profile.id}
             applicationId={effectiveId}
             universityName={selectedApplication?.universityName ?? null}
+          />
+          {/* Priority 5.2 — the first email to a supervisor, built from the
+              paper the student actually read and graded 0–100 on the things that
+              decide whether it gets an answer. */}
+          <ProfessorOutreachStudio
+            key={`outreach-${profile.id}-${effectiveId ?? "none"}`}
+            profile={profile}
+            defaultUniversityName={selectedApplication?.universityName ?? null}
           />
         </div>
       )}

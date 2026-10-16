@@ -18,13 +18,18 @@ import {
   Sparkles,
   BookOpen,
   Filter,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Loader2,
+  X
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { AppNote } from "@/components/AppNote";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import { fitBadgeClass } from "@/lib/fitBadge";
 import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
+import { ScholarshipRequirementPills } from "@/components/ScholarshipRequirementPills";
+import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
 import type { MatchBreakdown } from "@/lib/matching";
 
 export interface Scholarship {
@@ -110,6 +115,55 @@ export function ScholarshipHub({
   // change, where the current cards stay mounted instead of collapsing.
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  /**
+   * Priority 4.2 — "Add to My Funding Plan". Which card is mid-request, which
+   * awards are already in the plan (so the button becomes a confirmation), and
+   * any failure, shown inline rather than in a popup.
+   */
+  const [fundingBusyId, setFundingBusyId] = useState<number | null>(null);
+  const [fundingAddedIds, setFundingAddedIds] = useState<Set<number>>(new Set());
+  const [fundingError, setFundingError] = useState("");
+
+  const addToFundingPlan = async (scholarship: Scholarship) => {
+    if (!activeProfile) {
+      setFundingError(t("fundingNeedsProfile"));
+      return;
+    }
+    if (fundingBusyId != null || fundingAddedIds.has(scholarship.id)) return;
+    setFundingBusyId(scholarship.id);
+    setFundingError("");
+    try {
+      const payload = scholarshipFundingPayload({
+        profileId: activeProfile.id,
+        title: scholarship.title,
+        provider: scholarship.provider,
+        // The catalogue's resolved USD figure (period-normalised server-side).
+        // NULL means no published amount — the plan line goes in at 0 so the
+        // student can enter the real number rather than us inventing one.
+        awardAmountUsd: scholarship.amountUsdValue ?? null,
+        country: scholarship.country,
+        deadline: scholarship.deadline ? new Date(scholarship.deadline).toISOString().slice(0, 10) : null,
+        url: scholarship.websiteUrl,
+      });
+      const res = await fetch("/api/funding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setFundingError(
+          typeof data?.error === "string" && data.error.trim() ? data.error : t("fundingFailed")
+        );
+        return;
+      }
+      setFundingAddedIds((prev) => new Set(prev).add(scholarship.id));
+    } catch {
+      setFundingError(t("fundingFailed"));
+    } finally {
+      setFundingBusyId(null);
+    }
+  };
 
   // Filters
   const [search, setSearch] = useState("");
@@ -497,6 +551,9 @@ export function ScholarshipHub({
                   <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {t("requirements")}
                   </span>
+                  {/* Priority 4.2 — the published gates, answered per
+                      requirement instead of buried in the prose below. */}
+                  <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
                   <p className="text-[11px] leading-relaxed">{s.requirements}</p>
                 </div>
 
@@ -524,7 +581,7 @@ export function ScholarshipHub({
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                   <a
                     href={s.websiteUrl}
                     target="_blank"
@@ -533,6 +590,36 @@ export function ScholarshipHub({
                   >
                     {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
                   </a>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Priority 4.2 — one click puts this award into the funding
+                        plan, so the plan and the discovery feed stay in sync. */}
+                    <button
+                      type="button"
+                      onClick={() => void addToFundingPlan(s)}
+                      disabled={fundingBusyId != null || fundingAddedIds.has(s.id)}
+                      title={
+                        fundingAddedIds.has(s.id)
+                          ? t("fundingAddedHint")
+                          : activeProfile
+                            ? t("fundingAddHint", { title: s.title })
+                            : t("fundingNeedsProfile")
+                      }
+                      className={`flex min-h-11 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
+                        fundingAddedIds.has(s.id)
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200"
+                          : "bg-emerald-600 text-white shadow-xs shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
+                      }`}
+                    >
+                      {fundingBusyId === s.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      ) : fundingAddedIds.has(s.id) ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Wallet className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {fundingAddedIds.has(s.id) ? t("fundingAdded") : t("fundingAdd")}
+                    </button>
 
                   {isSaved ? (
                     <button
@@ -551,6 +638,7 @@ export function ScholarshipHub({
                       {t("track")}
                     </button>
                   )}
+                  </div>
                 </div>
               </div>
             );
@@ -567,6 +655,27 @@ export function ScholarshipHub({
           onPageChange={handlePageChange}
         />
       )}
+      {/* The funding-plan action reports its own outcome inline — no alert(). */}
+      {fundingError && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+        >
+          <span className="flex min-w-0 items-start gap-1.5">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-words whitespace-normal">{fundingError}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setFundingError("")}
+            aria-label={t("dismiss")}
+            className="min-h-11 min-w-11 rounded-lg p-1 text-rose-700 hover:bg-rose-100"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="catalogue" className="mt-2 border-t border-slate-100 pt-3" />
     </div>

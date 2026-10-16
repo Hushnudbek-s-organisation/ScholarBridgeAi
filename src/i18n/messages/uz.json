@@ -620,7 +620,57 @@
     "sopSaveToVersions": "Insho versiyalariga saqlash",
     "sopSavingVersion": "Saqlanmoqda…",
     "sopVersionSaved": "Insho versiyalariga saqlandi",
-    "sopSaveVersionError": "Qoralamani versiya sifatida saqlab bo‘lmadi. Qayta urinib ko‘ring."
+    "sopSaveVersionError": "Qoralamani versiya sifatida saqlab bo‘lmadi. Qayta urinib ko‘ring.",
+    "essayHighlightOn": "Belgilashni yashirish",
+    "essayHighlightOff": "Xatolarni belgilash",
+    "essayHighlightStrongPct": "Gaplarning {pct}% ida dalil bor",
+    "essayHighlightLegend": {
+      "cliche": "{count} ta shablon",
+      "weak": "{count} ta kuchsiz gap",
+      "strong": "{count} ta kuchli gap"
+    },
+    "essayHighlightWhy": {
+      "cliche": "Shablon yoki taqiqlangan boshlanish: {detail}",
+      "weak": "Raqamsiz, kuchsiz ifoda: {detail}",
+      "strong": "Kuchli dalil: {detail}",
+      "neutral": ""
+    },
+    "sopStructureTitle": "SOP ning besh bloki",
+    "sopStructureScore": "{total} blokdan {met} tasi bor",
+    "sopStructureNext": "Keyin qo'shiladigan bloklar: {blocks}",
+    "sopStructureComplete": "Beshala blok ham bor. Endi har birida raqam, ism yoki sana borligini tekshiring.",
+    "sopBlocks": {
+      "problem_hook": {
+        "label": "Muammo kirishi",
+        "hint": "Matnni tarjimai hol bilan emas, hal qilmoqchi bo'lgan aniq muammo bilan boshlang.",
+        "missing": "Qoralamaning boshlanishida muammo kirishi topilmadi.",
+        "found": "Isbot: {evidence}"
+      },
+      "academic_rigor": {
+        "label": "Akademik tayyorgarlik",
+        "hint": "O'zingiz bajargan eng qiyin akademik ishni ko'rsating.",
+        "missing": "Akademik tayyorgarlik dalili yo'q — kurs, bitiruv ishi yoki metod nomini ayting.",
+        "found": "Isbot: {evidence}"
+      },
+      "quantified_evidence": {
+        "label": "Raqamli tadqiqot",
+        "hint": "Kamida bitta natija raqam, tanlanma hajmi yoki ma'lumotlar bazasi bilan.",
+        "missing": "Hech narsa raqam bilan berilmagan. Aniqlik, tanlanma, byudjet yoki foydalanuvchilar sonini qo'shing.",
+        "found": "Isbot: {evidence}"
+      },
+      "specific_fit": {
+        "label": "Professor / kursga moslik",
+        "hint": "Birga ishlamoqchi bo'lgan rahbar, laboratoriya, modul yoki infratuzilma nomini ayting.",
+        "missing": "Aniq moslik yo'q — maqsadli universitetdan professor, laboratoriya yoki kurs nomini yozing.",
+        "found": "Isbot: {evidence}"
+      },
+      "return_plan": {
+        "label": "Qaytishdagi reja",
+        "hint": "Diplom bilan nima va qayerda qilishingizni ayting.",
+        "missing": "Yakuniy uchdan birida qaytish rejasi yo'q. Bitirgandan keyin nima bo'lishini yozing.",
+        "found": "Isbot: {evidence}"
+      }
+    }
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -3387,7 +3437,65 @@
     "exQuickIelts": "IELTS ≤ 6.5",
     "exResetFilters": "Filtrlarni tiklash",
     "exRefreshing": "Yangilanmoqda…",
-    "exDismiss": "Yopish"
+    "exDismiss": "Yopish",
+    "decisionTitle": "Ariza puliga arziydimi?",
+    "decisionSubtitle": "Uchta taqqoslash: e'lon qilingan talablar va sizning profilingiz asosida hisoblanadi. Tekshirib bo'lmagan joy taxmin qilmaydi, ochiq aytadi.",
+    "pillFactGpa": "E'lon qilingan minimal GPA",
+    "pillFactIelts": "E'lon qilingan minimal IELTS",
+    "pillFactTuition": "Yillik kontrakt",
+    "pillFactWorkVisa": "O'qishdan keyingi ish vizasi",
+    "startApp": "Ariza boshlash",
+    "startAppHint": "{name} uchun ariza yaratiladi va tayyor tekshiruv ro'yxati bilan ish maydoni ochiladi",
+    "startAppNeedsProfile": "Ariza boshlash uchun tizimga kiring va profilni tanlang",
+    "startAppFailed": "Arizani yaratib bo'lmadi. Kuzatuv bo'limini ochib, qayta urinib ko'ring.",
+    "startAppDone": "{name} uchun ariza yaratildi — tekshiruv ro'yxati ish maydonida kutmoqda.",
+    "startAppDoneShort": "Ariza boshlandi",
+    "pills": {
+      "eligibility": {
+        "fallback": "Moslik",
+        "notPublished": "Minimal talab e'lon qilinmagan",
+        "notPublishedHint": "Katalogda bu universitet uchun GPA, IELTS yoki SAT minimali yo'q. Mos kelaman deb hisoblashdan oldin qabul sahifasini tekshiring.",
+        "short_gpa": "GPA {shortfall} kam",
+        "short_gpaHint": "Sizning GPA {mine}; e'lon qilingan minimal {required}.",
+        "short_ielts": "IELTS {shortfall} kam",
+        "short_ieltsHint": "Sizning IELTS {mine}; e'lon qilingan minimal {required}. Farq keyingi yarim ballgacha yaxlitlangan.",
+        "short_sat": "SAT {shortfall} kam",
+        "short_satHint": "Sizning SAT {mine}; e'lon qilingan minimal {required}.",
+        "allMet": "{count} ta minimal talab bajarilgan",
+        "allMetHint": "Bu universitet e'lon qilgan barcha minimallar sizning natijalaringizga mos. Dastur darajasidagi talablar yuqoriroq bo'lishi mumkin — rasmiy sahifadan tasdiqlang.",
+        "met_gpa": "GPA minimaliga mos",
+        "met_ielts": "IELTS minimaliga mos",
+        "met_sat": "SAT minimaliga mos",
+        "differentTest": "IELTS kerak — sizda TOEFL",
+        "differentTestHint": "E'lon qilingan minimal IELTS {required}. TOEFL ni IELTS balliga aylantirmaymiz; bu universitet TOEFL ni qabul qilishini tekshiring.",
+        "unknown_gpa": "GPA kiritilmagan",
+        "unknown_gpaHint": "E'lon qilingan minimal {required}. Mos kelishini ko'rish uchun profilingizga GPA va uning shkalasini qo'shing.",
+        "unknown_ielts": "IELTS kiritilmagan",
+        "unknown_ieltsHint": "E'lon qilingan minimal {required}. Tekshirish uchun profilingizga IELTS natijasini qo'shing.",
+        "unknown_sat": "SAT kiritilmagan",
+        "unknown_satHint": "E'lon qilingan minimal {required}. Tekshirish uchun profilingizga SAT natijasini qo'shing.",
+        "partiallyKnown": "Qisman tekshirildi",
+        "partiallyKnownHint": "{met} ta minimal bajarilgan, {unknown} tasini tekshirib bo'lmaydi — natija profilingizda yo'q."
+      },
+      "budget": {
+        "fallback": "Byudjet",
+        "tuitionUnknown": "Kontrakt e'lon qilinmagan",
+        "tuitionUnknownHint": "Bu universitet uchun kontrakt summasi e'lon qilinmagan, shuning uchun byudjetingiz bilan solishtirib bo'lmaydi.",
+        "budgetUnknown": "Byudjet belgilanmagan",
+        "budgetUnknownHint": "Kontrakt yiliga taxminan {tuition}. Farqni ko'rish uchun profilingizda yillik byudjetni belgilang.",
+        "within": "Byudjetga sig'adi",
+        "withinHint": "Kontrakt {tuition}, byudjetingiz {budget} — taxminan {headroom} zaxira bor. Yashash xarajatlari hisobga olinmagan.",
+        "gap": "Byudjetdan {gap} ortiq",
+        "gapHint": "Kontrakt {tuition}, byudjetingiz {budget}. Yashash xarajatlari bu farqqa qo'shiladi."
+      },
+      "workVisa": {
+        "fallback": "Ish vizasi",
+        "unknown": "Ish vizasi e'lon qilinmagan",
+        "unknownHint": "Bu mamlakat uchun o'qishdan keyingi ish vizasi muddati bizda yo'q. Qolishga tayanishdan oldin rasmiy migratsiya sahifasini tekshiring.",
+        "years": "{years} yil ish vizasi",
+        "yearsHint": "E'lon qilingan qoidalarga ko'ra bitiruvchilar bu dasturdan keyin {years} yil qolib ishlashi mumkin."
+      }
+    }
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -3894,7 +4002,86 @@
     "awardVariable": "O'zgaruvchan mukofot; batafsil ma'lumotga qarang",
     "awardNotSpecified": "Ko'rsatilmagan",
     "perYear": " / yil",
-    "perMonth": " / oy"
+    "perMonth": " / oy",
+    "dismiss": "Yopish",
+    "fundingAdd": "Moliyalashtirish rejamga qo'shish",
+    "fundingAdded": "Rejangizda bor",
+    "fundingAddHint": "“{title}” ni rejalashtirilgan stipendiya sifatida moliyalashtirish rejasiga qo'shadi",
+    "fundingAddedHint": "Bu stipendiya allaqachon moliyalashtirish rejangizda",
+    "fundingNeedsProfile": "Moliyalashtirish rejasini tuzish uchun tizimga kiring va profilni tanlang",
+    "fundingFailed": "Bu stipendiyani rejangizga qo'shib bo'lmadi. Moliyalashtirish bo'limidan qayta urinib ko'ring.",
+    "reqPillsSummary": {
+      "clear": "E'lon qilingan barcha talablar bajarilgan",
+      "gaps": "{gaps} ta e'lon qilingan talab bajarilmagan",
+      "incomplete": "Ba'zi talablarni profilingiz bo'yicha tekshirib bo'lmadi"
+    },
+    "reqPills": {
+      "gpa": {
+        "label": "GPA",
+        "met": "GPA {mine} ≥ {required}",
+        "metHint": "4.0 shkaladagi {mine} GPA bu stipendiyaning {required} minimaliga mos.",
+        "not_met": "GPA {mine} < {required}",
+        "not_metHint": "Bu stipendiya minimal GPA {required} ni talab qiladi; sizniki {mine}, farq {shortfall}.",
+        "unknown_profile": "GPA kiritilmagan",
+        "unknown_profileHint": "Bu stipendiya kamida {required} GPA talab qiladi. Mos kelishini ko'rish uchun GPA va shkalasini qo'shing.",
+        "different_test": "GPA ni solishtirib bo'lmaydi",
+        "different_testHint": "Bu stipendiya kamida {required} GPA talab qiladi.",
+        "not_published": "GPA minimali yo'q",
+        "not_publishedHint": "Bu stipendiya GPA minimalini e'lon qilmagan."
+      },
+      "ielts": {
+        "label": "IELTS",
+        "met": "IELTS {mine} ≥ {required}",
+        "metHint": "Sizning {mine} IELTS natijangiz bu stipendiyaning {required} minimaliga mos.",
+        "not_met": "IELTS {mine} < {required}",
+        "not_metHint": "Bu stipendiya IELTS {required} talab qiladi; sizda {mine}. Minimaldan keyingi yarim ball — {nextBand}.",
+        "unknown_profile": "IELTS kiritilmagan",
+        "unknown_profileHint": "Bu stipendiya IELTS {required} talab qiladi. Tekshirish uchun natijani qo'shing.",
+        "different_test": "IELTS kerak — sizda TOEFL",
+        "different_testHint": "Bu stipendiya IELTS {required} minimalini e'lon qilgan. TOEFL ni IELTS ga aylantirmaymiz; tashkilot TOEFL ni qabul qilishini tekshiring.",
+        "not_published": "IELTS minimali yo'q",
+        "not_publishedHint": "Bu stipendiya IELTS minimalini e'lon qilmagan."
+      },
+      "degree": {
+        "label": "Ta'lim darajasi",
+        "met": "{mine} uchun ochiq",
+        "metHint": "Bu stipendiya {required} uchun ochiq; sizning darajangiz {mine}.",
+        "not_met": "{mine} uchun ochiq emas",
+        "not_metHint": "Bu stipendiya faqat {required} uchun ochiq; sizning darajangiz {mine}.",
+        "unknown_profile": "Daraja kiritilmagan",
+        "unknown_profileHint": "Bu stipendiya {required} uchun ochiq. Darajangizni belgilang.",
+        "different_test": "Darajani solishtirib bo'lmadi",
+        "different_testHint": "Bu stipendiya {required} ni ko'rsatgan, sizning darajangiz bilan moslashtirib bo'lmadi.",
+        "not_published": "Istalgan daraja",
+        "not_publishedHint": "Bu stipendiya ta'lim darajasiga cheklov e'lon qilmagan."
+      },
+      "major": {
+        "label": "Yo'nalish",
+        "met": "Yo'nalish mos: {mine}",
+        "metHint": "Bu stipendiya {required} ni ko'rsatgan; sizning yo'nalishingiz {mine}.",
+        "not_met": "Yo'nalishingiz ro'yxatda yo'q",
+        "not_metHint": "Bu stipendiya {required} ni ko'rsatgan; sizning yo'nalishingiz {mine}. Moslik so'zlar bo'yicha tekshiriladi — yaqin bo'lsa rasmiy sahifani ko'ring.",
+        "unknown_profile": "Yo'nalish kiritilmagan",
+        "unknown_profileHint": "Bu stipendiya faqat {required} uchun. Maqsadli yo'nalishingizni belgilang.",
+        "different_test": "Yo'nalishni solishtirib bo'lmadi",
+        "different_testHint": "Bu stipendiya {required} ni ko'rsatgan.",
+        "not_published": "Istalgan yo'nalish",
+        "not_publishedHint": "Bu stipendiya yo'nalish bo'yicha cheklov e'lon qilmagan."
+      },
+      "country": {
+        "label": "Davlat",
+        "met": "{required} ro'yxatingizda bor",
+        "metHint": "Bu stipendiya {required} da o'qishni moliyalashtiradi — siz belgilagan {count} ta davlatdan biri.",
+        "not_met": "Sizning davlatingiz emas",
+        "not_metHint": "Bu stipendiya {required} da o'qishni moliyalashtiradi; siznikida {mine}.",
+        "unknown_profile": "Davlat belgilanmagan",
+        "unknown_profileHint": "Bu stipendiya {required} da o'qishni moliyalashtiradi. Mos davlatni tanlaganingizni qo'shing.",
+        "different_test": "Davlatni solishtirib bo'lmadi",
+        "different_testHint": "Bu stipendiya {required} da o'qishni moliyalashtiradi.",
+        "not_published": "Davlat ko'rsatilmagan",
+        "not_publishedHint": "Bu stipendiya davlatni e'lon qilmagan."
+      }
+    }
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",
@@ -5248,6 +5435,592 @@
       "funding": "moliyalash",
       "home_ties": "vatan bilan bog‘liqlik",
       "specific_detail": "aniq tafsilot"
+    }
+  },
+  "feeWaiver": {
+    "title": "Ariza to'lovini bekor qilish va $0 ariza qidiruvi",
+    "subtitle": "Qaysi universitetlarga ariza bepul, qaysi bitta to'lov bir nechta tanlovni qamrab oladi va qayerda bekor qilishni so'rash uchun asosingiz bor.",
+    "savingTotal": "{amount} gacha tejash mumkin",
+    "loading": "Ro'yxatingiz tekshirilmoqda…",
+    "loadError": "Ro'yxatingizni yuklab bo'lmadi. Universitet qidiruvidan bir nechtasini saqlang va qaytib keling.",
+    "empty": "Tekshiradigan universitet yo'q. Qidiruvdan universitet saqlang (yoki ariza boshlang) — bu bo'lim har birining ariza to'lovini ko'rsatadi.",
+    "catalogueSourceNote": "Hali universitet saqlamagansiz, shuning uchun tanlagan davlatingizdagi yuqori o'rinli universitetlar ko'rsatilgan. O'z ro'yxatingizni saqlasangiz, hisob shaxsiy bo'ladi.",
+    "eligibilityTitle": "Sizning ko'rsatkichlaringiz",
+    "noIndicators": "Qayd etilgan ko'rsatkich yo'q",
+    "missingIndicator": "Qo'shing: {name}",
+    "eligibilityDisclaimer": "Ko'rsatkich — so'rashga asosingiz borligini bildiradi, bekor qilish berilganini emas. Har bir idora o'z mezonlari bo'yicha hal qiladi va ular har mavsumda o'zgaradi. Bu yerda ishlatiladigan chegara — yiliga {threshold} oilaviy daromad.",
+    "eligibility": {
+      "none": "Profilingizda moliyaviy qiyinchilikni ko'rsatadigan ma'lumot yo'q. Oilaviy daromad yoki moliyaviy yordam belgisini qo'shsangiz, qaysi bekor qilishlarni so'rash mumkinligi ko'rinadi.",
+      "needs_financial_aid": "Siz moliyaviy yordam kerakligini qayd etgansiz — bekor qilish anketalari birinchi navbatda shu ko'rsatkichni so'raydi.",
+      "requires_full_scholarship": "Faqat to'liq stipendiya bilan o'qiy olishingizni qayd etgansiz — ariza to'lovini bekor qilishni so'rash uchun kuchli asos.",
+      "needs_scholarship": "Stipendiya kerakligini qayd etgansiz; ko'p idoralar buni bekor qilishni so'rash uchun asos deb qabul qiladi.",
+      "income_below_threshold": "Qayd etilgan oilaviy daromadingiz chegara darajasidan past — ehtiyojga asoslangan anketalari aynan shuni tekshiradi."
+    },
+    "indicators": {
+      "needs_financial_aid": "Moliyaviy yordam kerak",
+      "needs_financial_aidHint": "Profilingizda moliyaviy yordam kerakligi qayd etilgan.",
+      "requires_full_scholarship": "To'liq stipendiya kerak",
+      "requires_full_scholarshipHint": "Profilingizda faqat to'liq stipendiya bilan o'qiy olishi qayd etilgan.",
+      "needs_scholarship": "Stipendiya kerak",
+      "needs_scholarshipHint": "Profilingizda stipendiya moliyalashtiruvi kerakligi qayd etilgan.",
+      "income_below_threshold": "Daromad chegaradan past",
+      "income_below_thresholdHint": "Oilaviy daromad tekshiruv chegarasidan past qayd etilgan."
+    },
+    "categories": {
+      "zero_fee": {
+        "title": "Ariza bepul",
+        "short": "{count} tasi $0",
+        "explain": "Bu yo'nalish xorijiy ariza beruvchilar uchun ariza to'lovini e'lon qilmagan."
+      },
+      "shared_fee": {
+        "title": "Bitta to'lov bir nechta tanlovni qamrab oladi",
+        "short": "{count} ta umumiy to'lov",
+        "explain": "Portalning bitta to'lovi bir nechta tanlovni qamrab oladi, shuning uchun har bir qo'shimcha universitet arzonroq tushadi."
+      },
+      "waiver_likely": {
+        "title": "To'lov bor — siz uchun bekor qilish yo'li ochiq",
+        "short": "{count} ta bekor qilish yo'li",
+        "explain": "Bu universitet to'lov oladi, lekin unga yetib boradigan bekor qilish yo'li bor va sizda ko'rsatkich qayd etilgan. Baribir so'rashingiz kerak, qarorni ular qiladi."
+      },
+      "published_fee": {
+        "title": "To'lov e'lon qilingan, arzonroq yo'l yo'q",
+        "short": "{count} tasi to'lov to'laydi",
+        "explain": "Katalogda bu universitetning ariza to'lovi bor va uning davlati uchun $0 yoki umumiy to'lov yo'li qayd etilmagan."
+      },
+      "fee_unknown": {
+        "title": "To'lov e'lon qilinmagan",
+        "short": "{count} tasida to'lov noma'lum",
+        "explain": "Bu universitet uchun ariza to'lovi e'lon qilinmagan. Bu $0 degani emas — byudjet tuzishdan oldin portalni tekshiring."
+      }
+    },
+    "feeZero": "$0",
+    "feeUnknown": "E'lon qilinmagan",
+    "avoidable": "{amount} gacha tejash",
+    "publishedFeeTotal": "E'lon qilingan to'lovlar jami {amount}",
+    "officialSource": "Rasmiy manba",
+    "routes": {
+      "uk-ucas": {
+        "name": "UCAS Hub",
+        "desc": "Bitta UCAS arizasi e'lon qilingan bitta to'lov evaziga beshtagacha tanlovni qamrab oladi — $0 emas, lekin beshta alohida arizadan ancha arzon."
+      },
+      "uk-direct-postgraduate": {
+        "name": "To'g'ridan-to'g'ri magistratura arizasi",
+        "desc": "Buyuk Britaniyada magistraturaga ariza asosan to'g'ridan-to'g'ri universitetga beriladi; ko'plari xorijiy nomzodlardan ariza to'lovini olmaydi, ba'zilari so'rovda bekor qiladi. Dastur sahifasidan tasdiqlang."
+      },
+      "de-uni-assist": {
+        "name": "uni-assist",
+        "desc": "uni-assist birinchi ariza uchun bitta to'lov, o'sha semestrdagi keyingi har bir ariza uchun kichikroq to'lov oladi; ko'p davlat universitetlari uni qaytaradi yoki bekor qiladi."
+      },
+      "de-direct-public": {
+        "name": "Davlat universitetiga to'g'ridan-to'g'ri ariza",
+        "desc": "Germaniya davlat universitetlarining katta qismi o'z portali orqali ariza berganlarda umuman ariza to'lovi olmaydi."
+      },
+      "hu-dreamapply": {
+        "name": "DreamApply (Vengriya)",
+        "desc": "DreamApply dan foydalanadigan venger universitetlari xorijiy nomzodlar uchun odatda ariza to'lovini e'lon qilmaydi."
+      },
+      "tr-tbbs": {
+        "name": "Türkiye Bursları (TBBS)",
+        "desc": "TBBS orqali Turkiya davlat stipendiyasiga ariza ariza to'lovisiz qabul qilinadi."
+      },
+      "kr-gks-embassy": {
+        "name": "GKS — elchixona yo'nalishi",
+        "desc": "Global Korea Scholarship elchixona yo'nalishida ariza to'lovi yo'q; viza tomonidagi balans ma'lumotnomasi alohida xarajat."
+      },
+      "kr-kaist": {
+        "name": "KAIST qabuli",
+        "desc": "KAIST xorijiy nomzodlar uchun ariza to'lovini e'lon qilmagan va qabul qilinganlarning ko'pini moliyalashtiradi."
+      },
+      "uz-elyurt-umidi": {
+        "name": "El-yurt umidi",
+        "desc": "O'zbekiston davlat dasturi o'zi yuboradigan universitetlarning ariza va qabul xarajatlarini qoplaydi."
+      }
+    },
+    "programs": {
+      "common-app": {
+        "name": "Common App to'lovni bekor qilish",
+        "desc": "Common App bekor qilishi uchun maktab maslahatchisi yoki direktor holatingizni tasdiqlashi kerak. Bu ishtirok etadigan AQSh universitetlarida Common App to'lovini qamrab oladi."
+      },
+      "css-profile": {
+        "name": "CSS Profile to'lovni bekor qilish",
+        "desc": "CSS Profile ni yuborayotganda, oilaviy daromadi mos keladigan talabalar uchun avtomatik beriladi."
+      },
+      "sat-fee-waiver": {
+        "name": "SAT to'lovini bekor qilish",
+        "desc": "College Board SAT bekor qilishi uni qabul qiladigan ko'p AQSh universitetlarida ariza to'lovini ham olib tashlaydi."
+      },
+      "duolingo-english-test": {
+        "name": "Duolingo English Test bekor qilish",
+        "desc": "Ariza to'lovini bekor qilish emas: bepul ingliz tili testi har bir ariza oldidagi xarajatlardan birini olib tashlaydi."
+      }
+    },
+    "templates": {
+      "request": "Mening so'rovim",
+      "attestation": "Maslahatchi tasdiqnomasi"
+    },
+    "letterTitle": "Xatlarni tayyorlash",
+    "letterSubtitle": "Yuborishga tayyor ikkita matn: o'z so'rovingiz va maktab maslahatchisi imzolaydigan uchinchi shaxsdagi moliyaviy qiyinchilik tasdiqnomasi. Qavs ichidagi joylar — profilingizda yo'q ma'lumotlar.",
+    "letterUniversityLabel": "Universitet",
+    "letterUniversityPlaceholder": "masalan, Munich Technical University",
+    "counselorNameLabel": "Maslahatchi ismi",
+    "counselorNamePlaceholder": "masalan, Dilnoza Karimova",
+    "counselorTitleLabel": "Maslahatchi lavozimi",
+    "counselorTitlePlaceholder": "masalan, Xalqaro bo'lim boshlig'i",
+    "schoolNameLabel": "Maktab / universitet",
+    "schoolNamePlaceholder": "masalan, Toshkent Prezident maktabi",
+    "letterSubject": "Mavzu",
+    "copySubject": "Mavzuni nusxalash",
+    "copyBody": "Xatni nusxalash",
+    "placeholders": "{count} ta joyni hali to'ldirish kerak:",
+    "letterDisclaimer": "Shablon — boshlang'ich nuqta, huquqiy yoki moliyaviy maslahat emas. Uni idoraning o'z mezonlari va joriy mavsum qoidalarini tekshirgandan keyin yuboring.",
+    "letterEmpty": "Xatni tayyorlash uchun yuqoridan universitet tanlang. Hammasi o'z profilingizdan olinadi — hech qayerga yuborilmaydi."
+  },
+  "outreach": {
+    "title": "Professorga birinchi xat studiyasi",
+    "subtitle": "O'zingiz o'qigan maqola asosida rahbarga birinchi xatni tuzing, so'ng istalgan qoralamani 0–100 ball bilan baholang — javob olishni hal qiladigan jihatlar bo'yicha.",
+    "factsTitle": "Xat shu ma'lumotlardan tuziladi",
+    "attachmentsTitle": "Nima ilova qilasiz",
+    "buildButton": "Xatni tuzish",
+    "resetButton": "Qoralamani tozalash",
+    "missingFacts": "{count} ta ma'lumot hali yetishmaydi:",
+    "profileFacts": "Profilingizdan: {name} · {level} · {major}",
+    "unknownFact": "qayd etilmagan",
+    "subjectLabel": "Mavzu qatori",
+    "subjectPlaceholder": "Kelgusi MSc talaba — sizning 2024 yilgi X maqolangiz",
+    "bodyLabel": "Xat matni ({min}–{max} so'z maqsad)",
+    "bodyPlaceholder": "Baholash uchun tayyor qoralamangizni joylang yoki chapdagi ma'lumotlardan tuzing…",
+    "copyAll": "Mavzu + matnni nusxalash",
+    "copySubject": "Mavzuni nusxalash",
+    "copyBody": "Matnni nusxalash",
+    "openInMail": "Pochta ilovamda ochish",
+    "openInMailHint": "O'z pochta ilovangizni mavzu va matn to'ldirilgan holda ochadi. Qabul qiluvchi bo'sh qoladi — professor manzilini saqlamaymiz.",
+    "rubricTitle": "Nega shu ball",
+    "wordCount": "{words} so'z",
+    "fixFirst": "Avval shuni tuzating: {item}",
+    "allChecksPassed": "Barcha tekshiruvlardan o'tdi. Yuboring va javob bo'lmasa, 10–14 kundan keyin bir marta eslatib qo'ying.",
+    "penaltiesTitle": "{count} ta ommaviy xat belgisi ballni kamaytirdi",
+    "bands": {
+      "strong": "Kuchli — yuboring",
+      "solid": "Yaxshi — bir marta ko'z yugurtiring",
+      "needs_work": "Ustida ishlash kerak",
+      "weak": "Kuchsiz — qayta yozing"
+    },
+    "fields": {
+      "professorName": "Professor ismi",
+      "professorNamePlaceholder": "masalan, Prof. Anna Weber",
+      "universityName": "Uning universiteti",
+      "universityNamePlaceholder": "masalan, TU München",
+      "labName": "Laboratoriya yoki guruh",
+      "labNamePlaceholder": "masalan, Hisoblash mexanikasi laboratoriyasi",
+      "paperTitle": "O'qigan maqolangiz",
+      "paperTitlePlaceholder": "O'zingiz haqiqatan o'qigan maqolasining aniq sarlavhasi",
+      "paperInsight": "Undan olgan xulosangiz",
+      "paperInsightPlaceholder": "Bitta aniq natija, metod yoki cheklov — maqtov emas",
+      "projectTitle": "Loyiha yoki bitiruv ishingiz",
+      "projectTitlePlaceholder": "masalan, Paxta bargi kasalliklarini aniqlash modeli",
+      "projectMetric": "Uning raqamli natijasi",
+      "projectMetricPlaceholder": "masalan, 1200 ta belgilangan namunada 94.2% aniqlik",
+      "methods": "Metod va vositalar",
+      "methodsPlaceholder": "masalan, Python, PyTorch, transfer learning",
+      "targetLevel": "Topshirayotgan darajangiz",
+      "targetLevelPlaceholder": "masalan, MSc, PhD, yozgi tadqiqot",
+      "targetIntake": "Qabul",
+      "targetIntakePlaceholder": "masalan, Kuz 2027"
+    },
+    "checks": {
+      "length": "Uzunligi band professor o'qiydigan 130–210 so'z oralig'ida",
+      "subject_specific": "Mavzuda uning ishi yoki sizning darajangiz aytilgan, “Savol” emas",
+      "paper_or_lab_cited": "Uning aniq maqolasi, laboratoriyasi yoki guruhiga havola bor",
+      "quantified_metric": "O'z ishingizda sifatlovchi emas, raqam bor",
+      "attachment_mentioned": "Nima ilova qilingani aytilgan (CV, transkript, portfolio)",
+      "clear_ask": "Bitta aniq so'rov bor — qisqa suhbat, rahbarlik yoki o'rin haqida savol",
+      "salutation_and_signoff": "To'g'ri murojaat va ismingiz bilan yakun",
+      "lengthDetail": "({words} so'z — maqsad {min}–{max})",
+      "paragraphDetail": "(eng uzun paragraf: {words} so'z, {max} dan oshmasin)"
+    },
+    "penalties": {
+      "dear_sir_madam": "“Dear Sir/Madam” — ismini toping",
+      "no_name_professor": "Familiyasiz “Dear Professor,”",
+      "passionate_filler": "“I am passionate about” hech narsa aytmaydi",
+      "cliche_delve": "AI shabloni (delve, tapestry, testament, realm of…)",
+      "do_the_needful": "“Do the needful” / “kindly revert” ommaviy xatdek o'qiladi",
+      "funding_first": "Biror ish ko'rsatmasdan moliyalashtirishni so'rash",
+      "shouting": "Bir nechta undov belgisi yoki HAMMASI KATTA HARF",
+      "mass_mail": "“Any university”, “your esteemed institution” — aniq manzil yo'q",
+      "wall_paragraph": "Bitta paragraf telefonda o'qish uchun juda uzun"
+    }
+  },
+  "timeline": {
+    "title": "Aqlli teskari taym layn",
+    "subtitle": "Har bir sanali muddatdan orqaga hisoblab: D-90, D-60, D-45, D-14 va D-3 da nima tayyor bo'lishi kerak. Imtihon muddatdan {examLead} kundan kam oldin belgilansa, natija ulgurmaydi; {tight} kundan yaqin muddatda bu reja umuman sig'maydi.",
+    "loading": "Teskari rejangiz tuzilmoqda…",
+    "loadError": "Muddatlarni yuklab bo'lmadi. Qayta urinib ko'ring yoki avval kuzatuvda muddat qo'shing.",
+    "untitledDeadline": "Nomsiz muddat",
+    "noDate": "Sana qayd etilmagan",
+    "empty": "Hali sanali muddat yo'q. Ariza yoki stipendiya muddatini qo'shing — teskari reja shu yerda paydo bo'ladi.",
+    "emptyUndated": "{count} ta muddatda sana yo'q — teskari reja orqaga sanash uchun haqiqiy sana kerak.",
+    "noConflicts": "{count} ta sanali muddatda ziddiyat yo'q: har bir imtihon natijasi uchun yetarli vaqt bor.",
+    "daysLeft": "{days} kun qoldi",
+    "daysAgo": "{days} kun oldin",
+    "overdueSteps": "{count} ta qadam allaqachon kechikkan",
+    "overdueBy": "{days} kun kechikkan",
+    "showSteps": "{count} ta qadamni ko'rsatish",
+    "hideSteps": "Qadamlarni yashirish",
+    "showAllPlans": "Yana {count} ta rejani ko'rsatish",
+    "sync": "Vazifalarimga o'tkazish",
+    "synced": "{count} ta vazifa qo'shildi",
+    "syncedNone": "Vazifalaringizda allaqachon bor",
+    "syncHint": "Bu sanali qadamlarni vazifalar ro'yxatingizga yozadi. Sizda borlari o'tkazib yuboriladi, shuning uchun ikki marta bosish takrorlamaydi.",
+    "syncPartial": "{total} tadan faqat {written} tasi saqlandi. Nima yetishmayotganini vazifalar ro'yxatidan tekshiring.",
+    "syncError": "Bu qadamlarni o'tkazib bo'lmadi. Vazifalar ro'yxatini tekshirib, qayta urinib ko'ring.",
+    "nextUpTitle": "Barcha muddatlar bo'yicha eng yaqin qadamlar",
+    "openTasks": "Vazifalar ro'yxatimni ochish",
+    "counts": {
+      "deadlines": "{count} ta muddat",
+      "steps": "{count} ta rejalashtirilgan qadam",
+      "overdue": "{count} ta kechikkan"
+    },
+    "conflicts": {
+      "exam_too_close": "{test} {examDate} da — {deadline} ({deadlineDate}) gacha atigi {gapDays} kun qoladi, natija uchun kerakli {minimumDays} kundan kam. Imtihonni oldinga surib yoki muddatni uzaytiring.",
+      "exam_after_deadline": "{test} {examDate} da, ya'ni {deadline} ({deadlineDate}) dan KEYIN. Natija ulgurmaydi; oldingi sanaga yoziling.",
+      "exam_in_past": "{test} {examDate} da allaqachon o'tgan. Natija qo'lingizda bo'lmasa, keyingi sanaga yoziling.",
+      "deadline_in_past": "{deadline} {deadlineDate} da edi — {daysOverdue} kun oldin. Keyingi bosqich hali ochiqligini tekshiring.",
+      "apostille_overdue": "{deadline} uchun apostille bosqichi {milestoneDate} da tugashi kerak edi ({daysOverdue} kun kechikkan), my.gov.uz ga taxminan {offsetDays} kun kerak. Bugun buyurtma qiling.",
+      "tight_deadline": "{deadline} ({deadlineDate}) gacha atigi {gapDays} kun qoldi — teskari reja uchun kerakli {minimumDays} kundan kam. Faqat barcha hujjat tayyor bo'lsa ariza bering."
+    },
+    "milestones": {
+      "rec_letters": {
+        "label": "Tavsiya xatlari so'ralgan",
+        "why": "90 kun oldin so'ralgan referent haqiqiy xat yozadi; bir hafta oldin so'ralgani bir xatboshi yozadi.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "shortlist_final": {
+        "label": "Yakuniy ro'yxat muzlatilgan",
+        "why": "Bundan keyingi har bir qadam universitet bo'yicha bajariladi. Ro'yxatni shu yerdan keyin o'zgartirish tayyor ishni qayta ochadi.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "english_test": {
+        "label": "Til imtihoni topshirilgan, natija qo'lda",
+        "why": "IELTS va TOEFL natijasi bir necha kun keladi, qayta topshirish uchun yana bir oturim kerak. Bu — natija qo'lingizda bo'lishi kerak bo'lgan sana, yozilgan sana emas.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "apostille": {
+        "label": "Diplom va transkript apostil qilingan",
+        "why": "my.gov.uz dagi e-apostil va tasdiqlangan tarjima taxminan ikki hafta oladi va u nusxadan emas, ASL hujjatdan qilinadi.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "vpd": {
+        "label": "uni-assist VPD olingan",
+        "why": "Germaniya universitetlari uni-assist dan Vorprüfungsdokumentation (VPD) talab qiladi; u hujjatlaringiz ko'rib chiqilgandan keyin beriladi — kunlar emas, haftalar.",
+        "skipped": {
+          "not_germany": "Faqat Germaniya — bu davlat uchun o'tkazib yuborildi.",
+          "country_unknown": "Faqat Germaniya — bu muddat uchun davlat qayd etilmagan."
+        }
+      },
+      "sop_draft": {
+        "label": "SOP va insholar qoralamasi tayyor",
+        "why": "Motivatsion xat kamida ikki marta tahrirlanishi va sohani biladigan bir kishi o'qishi kerak.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "bank_statement": {
+        "label": "Bank ma'lumotnomasi olingan",
+        "why": "Buyuk Britaniya balansni 28 kun ketma-ket saqlashni va ma'lumotnoma arizadan 31 kun ichida yopilishini talab qiladi. Erta olingan — muddati o'tgan; kech olingan — tarix yetishmaydi.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      },
+      "final_buffer": {
+        "label": "Yuborilgan, uch kun zaxira bilan",
+        "why": "Portallar ishlamay qoladi, to'lov tizimlari xorijiy kartalarni rad etadi va yuklash cheklovi oxirgi kuni chiqadi. Uch kun oldin yuborish — eng arzon sug'urta.",
+        "skipped": {
+          "not_germany": "Bu davlat uchun qo'llanilmaydi.",
+          "country_unknown": "Davlat aniqlangandan keyin qo'llaniladi."
+        }
+      }
+    },
+    "taskTitle": {
+      "rec_letters": "Tavsiya xatlarini so'rash — {deadline}",
+      "shortlist_final": "Yakuniy ro'yxatni muzlatish — {deadline}",
+      "english_test": "Til imtihoni natijasini qo'lga kiritish — {deadline}",
+      "apostille": "Diplom va transkriptni apostil qilish — {deadline}",
+      "vpd": "uni-assist VPD olish — {deadline}",
+      "sop_draft": "SOP va insho qoralamalarini tugatish — {deadline}",
+      "bank_statement": "Bank ma'lumotnomasini olish — {deadline}",
+      "final_buffer": "Arizani yuborish — {deadline}"
+    }
+  },
+  "apostille": {
+    "title": "e-Apostil va bank ma'lumotnomasi tayyorligi",
+    "subtitle": "Davlatni va viza uchun ariza bermoqchi bo'lgan sanani tanlang. Bu ularni apostil, tasdiqlangan tarjima va bank ma'lumotnomasi tayyor bo'lishi kerak bo'lgan aniq sanalarga aylantiradi — har bir raqam ortida rasmiy qoida ko'rsatilgan.",
+    "portalButton": "my.gov.uz e-apostil",
+    "countryLabel": "Davlat",
+    "yourDestination": "sizning davlatingiz",
+    "dateLabel": "Viza arizasi rejalashtirilgan sana",
+    "ukAreaLegend": "Buyuk Britaniyaning qaysi qismi?",
+    "ukAreas": {
+      "london": "London",
+      "outsideLondon": "Londondan tashqari"
+    },
+    "noDate": "Sana belgilanmagan",
+    "fundsTitle": "E'lon qilingan mablag' qoidasi",
+    "fundsNoPublishedAmount": "Milliy miqdor e'lon qilinmagan",
+    "fundsNoRule": "Bu davlat uchun bizda e'lon qilingan mablag' qoidasi yo'q. Reja tuzishdan oldin elchixona yoki konsullik sahifasini tekshiring.",
+    "basisLabel": "Miqdor qanday hisoblangan",
+    "consecutiveDays": "Hisobda {days} kun ketma-ket",
+    "statementValidity": "ma'lumotnoma yopilgan sana arizadan {days} kun ichida",
+    "estimatedFigure": "Bu yashash xarajatlari bo'yicha benchmark, e'lon qilingan viza minimali emas — reja uchun pastki chegara sifatida oling va elchixonadan tasdiqlang.",
+    "tuitionSeparate": "Ushbu summadan tashqari to'lanmagan birinchi yil kontrakti ham ko'rsatilishi kerak.",
+    "scholarshipLetterAccepted": "Rasmiy to'liq stipendiya xati bank dalilini almashtirishi mumkin.",
+    "windowTitle": "Ma'lumotnoma oynangiz",
+    "windowNeedsDate": "Viza uchun ariza bermoqchi bo'lgan sanani kiriting — bu karta aniq ma'lumotnoma oynasini va apostil sanalarini hisoblaydi.",
+    "windowExplain": "Pul hisobda eng kechasi {date} da bo'lishi kerak — bu {days} kunlik tarix — va ma'lumotnomaning yopilgan sanasi arizadan oldingi {validity} kun ichida bo'lishi shart.",
+    "window": {
+      "fundsInPlaceBy": "Pul shu sanagacha",
+      "statementNotBefore": "Ma'lumotnoma bundan erta emas",
+      "statementNotAfter": "Ma'lumotnoma bundan kech emas",
+      "earliestWindowStart": "Eng erta boshlanish"
+    },
+    "windowReasons": {
+      "no_country": "Qoidani ko'rish uchun davlatni tanlang.",
+      "no_date": "Oynani hisoblash uchun viza arizasi sanasini kiriting.",
+      "no_rule": "Bu davlat kunlar soni bo'yicha qoida e'lon qilmagan, shuning uchun hisoblaydigan oyna yo'q — yuqoridagi summa ariza paytida mavjud bo'lsa kifoya.",
+      "no_published_window": "Bu davlat uchun e'lon qilingan oyna yo'q: summa ariza berayotgan paytda mavjud bo'lishi kerak."
+    },
+    "stepsTitle": "Hujjat tayyorlash jadvali",
+    "stepsNeedDate": "Bularni haqiqiy sanalarga aylantirish uchun yuqoridan ariza sanasini belgilang.",
+    "leadDays": "Apostil va tasdiqlangan tarjima uchun birgalikda {days} kun rejalashtiring",
+    "overdueBy": "{days} kun kechikkan",
+    "steps": {
+      "collect_documents": {
+        "label": "Asl nusxalar yig'ilgan",
+        "why": "Diplom, transkript va Fuqarolik holatlari yozuvlari hujjatlari — asl nusxada. Apostil fotokopiyaga emas, asl hujjatga qo'yiladi."
+      },
+      "order_apostille": {
+        "label": "my.gov.uz da e-apostil buyurtma qilingan",
+        "why": "Davlat portali O'zbek e-apostilini beradi; kech buyurtma qilish hujjatlar to'plami muddatdan o'tib ketishining eng keng tarqalgan sababi."
+      },
+      "certified_translation": {
+        "label": "Tasdiqlangan tarjima tugatilgan",
+        "why": "Tarjima apostildan KEYIN, apostil qo'yilgan hujjatdan, qasamyodli yoki tasdiqlangan tarjimon tomonidan qilinadi."
+      },
+      "submit_file": {
+        "label": "Hujjatlar to'plami topshirilgan",
+        "why": "Rad etilgan skan yoki yo'qolgan sahifa uchun uch kun zaxira bilan yuklang yoki topshiring."
+      }
+    },
+    "issuingAuthority": {
+      "ministryJustice": "Apostil Adliya vazirligi orqali beriladi (my.gov.uz)",
+      "ministryHigherEducation": "Akademik hujjatlar apostildan oldin Oliy ta'lim vazirligida tasdiqlanadi"
+    },
+    "matrixTitle": "{country} hujjatma-hujjat nimani talab qiladi",
+    "documents": {
+      "diploma": "Diplom",
+      "transcript": "Transkript",
+      "birth_certificate": "Tug'ilganlik haqida guvohnoma",
+      "police_clearance": "Sudlanmaganlik ma'lumotnomasi",
+      "marriage_certificate": "Nikoh haqida guvohnoma",
+      "medical": "Tibbiy ma'lumotnoma",
+      "bank_statement": "Bank ma'lumotnomasi",
+      "passport": "Pasport"
+    },
+    "apostilleNeeds": {
+      "required": "Apostil talab qilinadi",
+      "accepted": "Apostil qabul qilinadi",
+      "verify": "Holat bo'yicha tekshiring",
+      "not_applicable": "Apostil qilinmaydi"
+    },
+    "translationNeeds": {
+      "sworn": "Qasamyodli tarjima",
+      "certified": "Tasdiqlangan tarjima",
+      "verify": "Tarjima: tekshiring",
+      "not_required": "Tarjima kerak emas"
+    },
+    "fundsRules": {
+      "uk_28_day": {
+        "summary": "Buyuk Britaniya Student Route: to'lanmagan birinchi yil kontrakti ustiga to'qqiz oylik yashash xarajati, 28 kun ketma-ket saqlanadi va yakuniy balans onlayn arizadan 31 kundan kech bo'lmagan sana bilan olinadi."
+      },
+      "blocked_account": {
+        "summary": "Germaniya: e'lon qilingan yillik summa bilan bloklangan hisob (Sperrkonto) yoki Expatrio, Fintiba kabi tan olingan provayderning bloklash tasdiqnomasi."
+      },
+      "balance_certificate": {
+        "summary": "Janubiy Koreya (D-2): e'lon qilingan summa uchun bank balans ma'lumotnomasi, viza arizasi uchun KVAC yoki elchixona orqali olinadi."
+      },
+      "gic_or_liquid": {
+        "summary": "Kanada: IRCC yashash xarajatlari miqdori ustiga kontrakt va yo'l xarajatlari, likvid mablag'da. Ishtirok etadigan Kanada bankidan olingan GIC qabul qilinadi."
+      },
+      "i20_amount": {
+        "summary": "AQSh (F-1): milliy miqdor yo'q. Summani maktab bergan Form I-20 o'zi belgilaydi; MRV va SEVIS to'lovlari alohida."
+      },
+      "liquid_available": {
+        "summary": "Bu davlat uchun viza minimali e'lon qilinmagan, shuning uchun ko'rsatilgan raqam — bizning yillik yashash xarajatlari benchmarkimiz. Rasmiy talab emas, reja uchun pastki chegara."
+      }
+    },
+    "matrixNotes": {
+      "united_kingdom": "Buyuk Britaniya Student Route uchun akademik hujjatlarga apostil talab qilmaydi, lekin UKVI ingliz tilidagi bo'lmagan har bir hujjat uchun tasdiqlangan tarjimani so'raydi; arizalar asosan moliyaviy dalilda yiqiladi.",
+      "united_states": "AQSh maktablari hujjat qoidalarini o'zi belgilaydi: ko'pi apostilsiz tasdiqlangan tarjimani qabul qiladi, ba'zilari diplom baholash (WES, ECE) uchun apostil talab qiladi. Magistratura bo'limidan yozma so'rang.",
+      "germany": "Germaniya universitetlari va uni-assist odatda apostil va nemis yoki ingliz tiliga qasamyodli tarjima talab qiladi. Apostilni har qanday nusxa tasdiqlanishidan oldin ASL diplomga buyurtma qiling.",
+      "south_korea": "Koreya universitetlari va viza idorasi tasdiqlangan tarjima bilan apostil qilingan hujjatlarni qabul qiladi; balans ma'lumotnomasi bank tomonidan aynan viza to'plami uchun beriladi.",
+      "canada": "Kanada 2024 yil yanvardan Apostil konvensiyasiga qo'shildi, shuning uchun ko'p hujjatlar uchun konsullik legalizatsiyasi o'rniga O'zbek e-apostili qabul qilinadi.",
+      "italy": "Italiya apostil va tasdiqlangan italyancha tarjima, diplom uchun esa Qiymat deklaratsiyasi (yoki CIMEA) talab qiladi — buni Universitaly da oldindan ro'yxatdan o'tish yopilishidan oldin boshlang.",
+      "hungary": "Vengriya tasdiqlangan tarjima bilan apostil qilingan hujjatlarni qabul qiladi; bir nechta universitet ro'yxatga olishda asl nusxani ham so'raydi, shuning uchun apostil qilingan to'plamni tikilmagan holda saqlang."
+    }
+  },
+  "twin": {
+    "title": "Siz va qabul qilingan egizagingiz",
+    "subtitle": "Ochiq ma'lumoti sizniki bilan eng ko'p ustma-ust tushadigan qabul qilingan talaba — qatorma-qator taqqoslanadi, so'ng farq ko'pi bilan uchta harakatga aylantiriladi.",
+    "loading": "Sizga eng yaqin egizak topilmoqda…",
+    "loadError": "Qabul qilingan talabalar tarixini yuklab bo'lmadi. Bir ozdan so'ng qayta urinib ko'ring.",
+    "overlapScore": "{score}% ustma-ustlik",
+    "anonymousTwin": "Qabul qilingan talaba",
+    "unknownUniversity": "Universitet e'lon qilinmagan",
+    "intakeYear": "{year} yilgi qabul",
+    "notProvided": "qayd etilmagan",
+    "insufficientNoTwin": "Hozircha hech bir qabul qilingan talabaning ma'lumoti sizniki bilan ustma-ust tushmaydi. Qancha ko'p qayd etsangiz — GPA va uning shkalasi, til natijasi, yo'nalish, loyihalar — egizak shuncha aniq topiladi.",
+    "insufficientWithTwin": "Egizak topildi, lekin ikki tomonda ham halol taqqoslaydigan ma'lumot yo'q. GPA (shkalasi bilan), til natijasi va yo'nalishingizni qayd eting — qatorma-qator farq ochiladi.",
+    "twinScholarship": "{name} hisobiga moliyalashtirilgan",
+    "adviceFrom": "— {name}, qabul qilingan talaba",
+    "unknownsNote": "Taqqoslab bo'lmaydi: {rows}. Biror tomon qiymat qayd etmaguncha bu qatorlar neytral qoladi — yo'q raqamni hech qachon yutuq yoki yo'qotish deb hisoblamaymiz.",
+    "table": {
+      "dimension": "Ko'rsatkich",
+      "you": "Siz",
+      "twin": "Qabul qilingan egizak",
+      "gap": "Farq"
+    },
+    "gapEven": "teng",
+    "gapUnknown": "ma'lumot yo'q",
+    "gapUnit": {
+      "gpa4": "{gap} GPA",
+      "ielts": "{gap} ball",
+      "toefl": "{gap} ball",
+      "sat": "{gap} ball",
+      "count": "{gap}",
+      "text": "farq qiladi"
+    },
+    "blueprintTitle": "Sizning dastlabki {count} ta harakatingiz",
+    "addGoal": "Maqsadlarimga qo'shish",
+    "goalAdded": "Maqsadlaringizda bor",
+    "addGoalHint": "Bu harakatni uch qadamli maqsad sifatida rejalashtiruvchingizga yozadi",
+    "goalNeedsProfile": "Maqsad saqlash uchun tizimga kiring va profilni tanlang",
+    "goalFailed": "Bu maqsadni saqlab bo'lmadi. Rejalashtiruvchingizda allaqachon oltita faol maqsad bo'lishi mumkin.",
+    "reasons": {
+      "same_field": "Bir xil yo'nalish",
+      "same_degree": "Bir xil ta'lim darajasi",
+      "similar_gpa": "O'xshash GPA",
+      "similar_english": "O'xshash til natijasi",
+      "similar_sat": "O'xshash SAT",
+      "target_country": "Maqsadli davlatlaringizdan biri",
+      "same_home_country": "Sizning davlatingizdan"
+    },
+    "deltas": {
+      "gpa": {
+        "label": "GPA (4.0 shkala)",
+        "compareNote": "Ikkala GPA ham qayd etilgan shkala orqali 4.0 shkalaga o'tkaziladi. Shkalasi qayd etilmagan GPA hech qachon taxmin qilinmaydi.",
+        "notComparable": "Bir tomonda GPA qayd etilmagan, shuning uchun bu qator taqqoslash emas."
+      },
+      "english": {
+        "label": "Til natijasi",
+        "compareNote": "IELTS faqat IELTS bilan, TOEFL faqat TOEFL bilan solishtiriladi. Ikkisi bir-biriga aylantirilmaydi.",
+        "notComparable": "Ikkalangiz turli til imtihoni topshirgansiz yoki bitta natija yo'q — halol taqqoslash mumkin emas."
+      },
+      "standardized": {
+        "label": "SAT / ACT",
+        "compareNote": "Faqat ikki tomon ham bir xil imtihonni qayd etganda solishtiriladi.",
+        "notComparable": "Faqat bittangiz standartlashtirilgan imtihon natijasini qayd etgan."
+      },
+      "major": {
+        "label": "Yo'nalish",
+        "compareNote": "Qayd etilgan yo'nalishlar so'zlar bo'yicha solishtiriladi.",
+        "notComparable": "Bir tomonda yo'nalish qayd etilmagan."
+      },
+      "degreeLevel": {
+        "label": "Ta'lim darajasi",
+        "compareNote": "Sinonimlar hisobga olinadi: “MSc”, “Master's” va “Master” teng deb solishtiriladi.",
+        "notComparable": "Bir tomonda ta'lim darajasi qayd etilmagan."
+      },
+      "research": {
+        "label": "Tadqiqot natijalari",
+        "compareNote": "Har bir tomonda qayd etilgan nashrlar soni.",
+        "notComparable": "Ikki tomonda ham tadqiqot natijasi qayd etilmagan."
+      },
+      "activities": {
+        "label": "Faoliyat dalillari",
+        "compareNote": "Nima bo'lsa ham to'ldirilgan profil maydonlarini sanaydi: loyihalar, yetakchilik, volontyorlik, olimpiadalar, mukofotlar, musobaqalar, sertifikatlar, klublar, sport, ish tajribasi.",
+        "notComparable": "Bir tomonda faoliyat dalili qayd etilmagan."
+      }
+    },
+    "actions": {
+      "raise_gpa": {
+        "title": "GPA ni {target} ga yetkazing",
+        "why": "Sizning egizagingiz {theirs} GPA bilan qabul qilingan; sizniki {mine}. GPA — qabul komissiyasi birinchi o'qiydigan va kech o'zgartirish qiyin bo'lgan yagona qator.",
+        "open": "Tayyorgarlikni ochish",
+        "step1": "Qolgan har bir fanni va umumiy GPA ni {target} ga ko'tarish uchun kerakli bahoni ro'yxat qiling.",
+        "step2": "Qayta topshirish yoki qo'shimcha imtihonni o'quv bo'limida shu oyda bron qiling, keyingi semestrda emas.",
+        "step3": "Yangi GPA va uning shkalasini profilingizga kiriting — barcha mosliklar qayta hisoblanadi."
+      },
+      "raise_english": {
+        "title": "Til imtihonida {target} ga erishing",
+        "why": "Egizagingizda {theirs} bor edi; sizda {mine}. E'lon qilingan minimaldan past ball — aks holda kuchli hujjat ham saralab tashlanishining eng keng tarqalgan sababi.",
+        "open": "Imtihon rejasini ochish",
+        "step1": "Eng erta muddatdan kamida 60 kun oldinga yoziling — qayta topshirish imkoni qolsin.",
+        "step2": "Avval eng zaif bo'lim ustida ishlang — bir ballni eng arzon olish joyi shu.",
+        "step3": "Natija kelgan kuni yangi ballni profilingizga kiriting."
+      },
+      "add_standardized": {
+        "title": "{target} standartlashtirilgan imtihon natijasini qo'shing",
+        "why": "Egizagingizda {target} bor edi; sizda {current}. Dastur minimal e'lon qilgan joyda yo'q ball hujjat tugallanmagandek ko'rinadi.",
+        "open": "Imtihon rejasini ochish",
+        "step1": "Maqsadli dasturlaringiz bu imtihonni haqiqatan talab qilishini tekshiring — ko'plari uni doimiy bekor qilgan.",
+        "step2": "Eng erta muddatdan oldin bitta qayta topshirishga joy qoldiradigan sanani bron qiling.",
+        "step3": "Talab tekshiruvlari ko'rishi uchun natijani profilingizga qo'shing."
+      },
+      "add_research": {
+        "title": "{target} ta tadqiqot natijasini qayd eting",
+        "why": "Egizagingizda {theirs} bor edi; sizda {mine}. Tadqiqot dasturlari uchun bu — ishni darhol boshlay oladigan nomzodni o'rgatish kerak bo'lgan nomzoddan ajratadigan qator.",
+        "open": "Faoliyatni ochish",
+        "step1": "Bir rahbardan mavjud loyihalaringizdan birini shu semestrda yozib chiqish yoki taqdim qilish mumkinligini so'rang.",
+        "step2": "Hozir borini ham kiriting — konferensiya posteri va preprint ham hisoblanadi.",
+        "step3": "Har bir yozuv yonida DOI, havola yoki qabul xatini saqlang — tekshirib bo'lishi kerak."
+      },
+      "add_activity_evidence": {
+        "title": "{target} ta faoliyat maydoniga dalil kiriting",
+        "why": "Egizagingizda {theirs} ta maydonda faoliyat bor edi; sizda {mine}. Bo'sh faoliyat bo'limi kuchli akademik natijani sinfdan tashqarida sinovdan o'tmagandek ko'rsatadi.",
+        "open": "Faoliyatni ochish",
+        "step1": "Dalilingiz bor maydonlarni to'ldiring: loyihalar, volontyorlik, olimpiadalar, mukofotlar, klublar, sport.",
+        "step2": "Har biri uchun tavsif emas, natijani yozing — raqam, o'rin yoki samara.",
+        "step3": "Shu semestrda tekshirib bo'ladigan natija beradigan bitta yangi faoliyat qo'shing."
+      },
+      "target_scholarship": {
+        "title": "{name} uchun ariza bering",
+        "why": "Egizakingiz {name}{amount} hisobiga moliyalashtirilgan. O'sha stipendiya sizga o'xshash profil uchun ham ochiq va u byudjet qatorini butunlay o'zgartiradi.",
+        "open": "Stipendiyalarni ochish",
+        "step1": "Stipendiyaning rasmiy sahifasini oching va uning muddati bilan hujjatlar ro'yxatini yozib oling.",
+        "step2": "Stipendiya hubidagi talab belgilarini tekshiring va bajarilmaganini tuzating.",
+        "step3": "Summa byudjetda hisoblanishi uchun uni moliyalashtirish rejangizga qo'shing."
+      },
+      "align_major": {
+        "title": "Yo'nalishingizni {theirs} ga moslashtiring",
+        "why": "Egizakingiz {theirs} bo'yicha qabul qilingan; sizning qayd etilgan yo'nalishingiz {mine}. Dasturlar avval yo'nalish bo'yicha saralaydi va mos kelmagan yorliq siz aslida o'tadigan mosliklarni yashiradi.",
+        "open": "Universitetlarni ochish",
+        "step1": "{theirs} bo'yicha uchta dasturning qabul talablarini o'qing va qaysi kurslaringizni tan olishini belgilang.",
+        "step2": "Profilingizdagi maqsadli yo'nalishni o'sha dasturlar ishlatadigan yorliqqa o'zgartiring.",
+        "step3": "Mosliklarni qayta hisoblang va natijangiz haqiqatan ko'taradigan dasturlarni ro'yxatga oling."
+      }
     }
   }
 }

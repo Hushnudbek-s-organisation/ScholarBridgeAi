@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { TwinStrategyCard } from "./TwinStrategyCard";
 import {
   Sparkles,
   CheckCircle2,
@@ -1097,6 +1098,12 @@ export function ChancingPanel({
           })}
         </div>
       )}
+
+      {/* Priority 5.5 — a fit score says how a university compares with you.
+          The twin says how YOU compare with a student who was actually admitted:
+          the same table, but with the gap in each row and the first three things
+          to do about it. */}
+      {profileId ? <TwinStrategyCard profileId={profileId} /> : null}
 
       <p className="text-[11px] text-slate-400 leading-relaxed">{t("footnote")}</p>
 

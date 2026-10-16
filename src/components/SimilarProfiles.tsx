@@ -19,6 +19,7 @@ import type {
   SimilarityResult,
 } from "@/lib/similarProfiles";
 import type { QsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { TwinStrategyCard } from "./TwinStrategyCard";
 
 interface SimilarProfilesProps {
   activeProfile: { id?: number | null } | null;
@@ -157,6 +158,12 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
             <option value="50">Show 50 closest matches</option>
           </select>
         </div>
+
+        {/* Priority 5.5 — the list below shows everyone similar to you. This
+            takes the single admitted student whose record overlaps yours most
+            and turns the difference into a row-by-row gap plus at most three
+            actions, the first of which can go straight into the goal planner. */}
+        <TwinStrategyCard profileId={activeProfile?.id ?? null} className="mt-6" />
 
         {loading ? (
           <div className="py-12 text-center text-sm text-slate-400">{t("loading")}</div>

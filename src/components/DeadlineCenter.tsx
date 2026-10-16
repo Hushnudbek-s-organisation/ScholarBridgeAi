@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { SmartTimelineCalendar } from "./SmartTimelineCalendar";
 import {
   CalendarClock,
   Loader2,
@@ -185,6 +186,19 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
           </button>
         </div>
       </div>
+
+      {/* Priority 5.3 — the deadlines above are the dates the office gave you.
+          This is the backwards plan behind them: what has to be finished at
+          D-90, D-60, D-45, D-14 and D-3 for each one to be reachable, and the
+          contradictions (an exam booked nine days before a deadline) that make
+          one of them impossible. */}
+      {profileId ? (
+        <SmartTimelineCalendar
+          key={`timeline-${profileId}`}
+          profileId={profileId}
+          onTasksSynced={() => void load()}
+        />
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         {!profileId ? (

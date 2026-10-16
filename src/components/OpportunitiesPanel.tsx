@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, Compass, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
+import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
+import type { StudentProfile } from "./Navbar";
 
 interface OppItem {
   id: number;
@@ -44,7 +46,16 @@ function parseFields(raw: string): string[] {
  * internships and summer schools matched to the signed-in profile.
  * The catalog is curated and admin-managed — never scraped.
  */
-export function OpportunitiesPanel() {
+export function OpportunitiesPanel({
+  activeProfile = null,
+}: {
+  /**
+   * Optional: the outreach studio below pre-fills the student's own name, level
+   * and field from it. The feed itself is scored server-side from the session,
+   * so the panel still works with no profile at all.
+   */
+  activeProfile?: StudentProfile | null;
+}) {
   const t = useTranslations("opportunities");
   const [data, setData] = useState<OppData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -177,6 +188,12 @@ export function OpportunitiesPanel() {
           ))}
         </div>
       )}
+      {/* Priority 5.2 — a research opportunity or a summer school is answered by
+          an email to a supervisor. This builds that email from the paper the
+          student actually read and grades it 0–100 on the things that decide
+          whether it gets a reply. */}
+      <ProfessorOutreachStudio profile={activeProfile} className="mt-4" />
+
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="catalogue" className="mt-2 border-t border-slate-100 pt-3" />
     </div>
