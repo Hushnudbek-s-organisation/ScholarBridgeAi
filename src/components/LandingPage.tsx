@@ -34,6 +34,66 @@ import {
 } from "@/lib/navSections";
 import { AppNote } from "./AppNote";
 
+export interface MarqueeUniversityItem {
+  rank: string;
+  name: string;
+  country: string;
+  landmark: string;
+  url: string;
+}
+
+/** Row 1: QS #1–#8, continuously scrolling right. */
+export const MARQUEE_ROW_1: MarqueeUniversityItem[] = [
+  { rank: "QS #1", name: "MIT (Massachusetts Institute of Technology)", country: "🇺🇸 USA", landmark: "Great Dome, Cambridge MA", url: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG" },
+  { rank: "QS #2", name: "Imperial College London", country: "🇬🇧 UK", landmark: "Queen's Tower, South Kensington", url: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Queen%27s_Tower%2C_Imperial_College_London.jpg" },
+  { rank: "QS #3", name: "Stanford University", country: "🇺🇸 USA", landmark: "Main Quad, Palo Alto", url: "https://upload.wikimedia.org/wikipedia/commons/c/cb/Stanford_University_-_Main_Quad_12.JPG" },
+  { rank: "QS #4", name: "University of Oxford", country: "🇬🇧 UK", landmark: "Radcliffe Camera & Bodleian", url: "https://upload.wikimedia.org/wikipedia/commons/3/3d/Radcliffe_Camera%2C_Oxford.jpg" },
+  { rank: "QS #5", name: "Harvard University", country: "🇺🇸 USA", landmark: "Harvard Yard, Cambridge MA", url: "https://upload.wikimedia.org/wikipedia/commons/0/0e/HarvardYard.jpg" },
+  { rank: "QS #6", name: "University of Cambridge", country: "🇬🇧 UK", landmark: "King's College Front Court", url: "https://upload.wikimedia.org/wikipedia/commons/5/58/Cambridge_-_King%27s_College_-_Front_court.jpg" },
+  { rank: "QS #7", name: "ETH Zurich", country: "🇨🇭 Switzerland", landmark: "ETH Hauptgebäude & Polyterrasse", url: "https://upload.wikimedia.org/wikipedia/commons/7/7c/ETH_Z%C3%BCrich_2015.jpg" },
+  { rank: "QS #8", name: "National University of Singapore (NUS)", country: "🇸🇬 Singapore", landmark: "University Hall, Kent Ridge", url: "https://upload.wikimedia.org/wikipedia/commons/1/1f/University_Hall%2C_National_University_of_Singapore_-_20070125.jpg" },
+];
+
+/** Row 2: QS #9–#21, continuously scrolling left. */
+export const MARQUEE_ROW_2: MarqueeUniversityItem[] = [
+  { rank: "QS #9", name: "UCL (University College London)", country: "🇬🇧 UK", landmark: "Wilkins Portico Building, London", url: "https://upload.wikimedia.org/wikipedia/commons/1/14/UCL_Portico_Building.jpg" },
+  { rank: "QS #12", name: "NTU Singapore", country: "🇸🇬 Singapore", landmark: "The Hive Learning Hub", url: "https://upload.wikimedia.org/wikipedia/commons/9/90/The_Hive%2C_NTU_%28I%29.jpg" },
+  { rank: "QS #13", name: "University of Chicago", country: "🇺🇸 USA", landmark: "Harper Memorial Library", url: "https://upload.wikimedia.org/wikipedia/commons/6/6b/University_of_Chicago%2C_Harper_Library.jpg" },
+  { rank: "QS #16", name: "Cornell University", country: "🇺🇸 USA", landmark: "McGraw Tower & Uris Library", url: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Cornell_University_-_McGraw_Tower_%28Uris_Library%29.jpg" },
+  { rank: "QS #17", name: "Tsinghua University", country: "🇨🇳 China", landmark: "Old Gate of Tsinghua, Beijing", url: "https://upload.wikimedia.org/wikipedia/commons/d/d5/TsinghuaUniversityGate.JPG" },
+  { rank: "QS #18", name: "UC Berkeley", country: "🇺🇸 USA", landmark: "Sather Gate & Campanile", url: "https://upload.wikimedia.org/wikipedia/commons/6/6f/Sather_Gate_at_University_of_California%2C_Berkeley%2C_California_LCCN2013633500_%28edited%29.jpg" },
+  { rank: "QS #19", name: "The University of Melbourne", country: "🇦🇺 Australia", landmark: "Old Quad Colonnade", url: "https://upload.wikimedia.org/wikipedia/commons/5/53/Old_Quad_colonnade_University_of_Melbourne_2018.jpg" },
+  { rank: "QS #21", name: "Yale University", country: "🇺🇸 USA", landmark: "Sterling Memorial Library Walk", url: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Yale_University_Library_Walk.jpg" },
+];
+
+/** Row 3: QS #22–#53, continuously scrolling right. */
+export const MARQUEE_ROW_3: MarqueeUniversityItem[] = [
+  { rank: "QS #22", name: "EPFL Lausanne", country: "🇨🇭 Switzerland", landmark: "Rolex Learning Center", url: "https://upload.wikimedia.org/wikipedia/commons/e/ec/EPFL_Rolex_Learning_Center.jpg" },
+  { rank: "QS #23", name: "Technical University of Munich (TUM)", country: "🇩🇪 Germany", landmark: "TUM Main Campus Munich", url: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg" },
+  { rank: "QS #25", name: "Princeton University", country: "🇺🇸 USA", landmark: "Historic Nassau Hall", url: "https://upload.wikimedia.org/wikipedia/commons/0/04/Nassau_Hall_Princeton.JPG" },
+  { rank: "QS #26", name: "The University of Sydney", country: "🇦🇺 Australia", landmark: "Main Sandstone Quadrangle", url: "https://upload.wikimedia.org/wikipedia/commons/e/ee/University_of_Sydney%27s_Main_Quadrangle.jpg" },
+  { rank: "QS #29", name: "University of Toronto", country: "🇨🇦 Canada", landmark: "University College Quad", url: "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg" },
+  { rank: "QS #37", name: "The University of Tokyo (UTokyo)", country: "🇯🇵 Japan", landmark: "Yasuda Auditorium, Hongo", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/Yasuda_Auditorium.jpg" },
+  { rank: "QS #38", name: "Columbia University", country: "🇺🇸 USA", landmark: "Low Memorial Library, NYC", url: "https://upload.wikimedia.org/wikipedia/commons/a/af/Low_Memorial_Library_Columbia_University_NYC.jpg" },
+  { rank: "QS #39–53", name: "KAIST & Seoul National University", country: "🇰🇷 South Korea", landmark: "KAIST Daejeon & SNU Gwanak", url: "https://upload.wikimedia.org/wikipedia/commons/0/02/KAIST_from_across_Gapcheon.jpg" },
+];
+
+export const LANDING_PHOTOS = {
+  heroStudentsMain: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=85",
+  heroCampusGraduation: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80",
+  campusUsa: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG",
+  campusUk: "https://upload.wikimedia.org/wikipedia/commons/3/3d/Radcliffe_Camera%2C_Oxford.jpg",
+  campusGermany: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg",
+  campusSwiss: "https://upload.wikimedia.org/wikipedia/commons/7/7c/ETH_Z%C3%BCrich_2015.jpg",
+  campusCanada: "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg",
+  campusAsia: "https://upload.wikimedia.org/wikipedia/commons/0/02/KAIST_from_across_Gapcheon.jpg",
+  step1Profile: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=700&q=80",
+  step2UniversityMatch: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=700&q=80",
+  step3SopWriting: "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=700&q=80",
+  step4VisaDeparture: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=700&q=80",
+  ctaAirplaneSunset: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80",
+} as const;
+
 interface LandingPageProps {
   onStart: () => void;
   onEnterApp?: () => void;
@@ -162,7 +222,8 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900 dark:bg-[#090e1a]">
+      <ScrollFlightPath />
       {/* ===== Header ===== */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-[72px] w-[min(1160px,92%)] items-center justify-between gap-2">
@@ -417,6 +478,8 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
           </div>
         </section>
 
+        <UniversityCampusMarquee onStart={onStart} />
+
         {/* ===== How it works ===== */}
         <section id="how" className="py-20 sm:py-24">
           <div className="mx-auto w-[min(1160px,92%)]">
@@ -570,5 +633,144 @@ export function LandingPage({ onStart, onEnterApp, onSignIn }: LandingPageProps)
         </div>
       </footer>
     </div>
+  );
+}
+
+const FLIGHT_PATH_D =
+  "M 600 120 C 980 240, 1040 420, 760 560 C 480 700, 180 680, 220 880 C 260 1080, 920 1040, 950 1240 C 975 1380, 720 1410, 720 1280 C 720 1150, 980 1180, 880 1420 C 760 1680, 200 1660, 240 1940 C 280 2220, 980 2180, 920 2460 C 870 2660, 340 2620, 320 2820 C 305 2950, 550 2970, 540 2840 C 530 2710, 290 2750, 380 2990 C 460 3180, 880 3200, 600 3320";
+
+/** The jet is intentionally all greyscale; site accents never bleed into the flight overlay. */
+function ExecutiveMonochromeJet({ bankDeg }: { bankDeg: number }) {
+  return (
+    <g>
+      <g transform={`translate(-6, ${8 + bankDeg * 0.18}) scale(0.95)`} opacity="0.18">
+        <path d="M 38 0 L 10 -5 L -8 -36 L -17 -36 L -10 -5 L -28 -4 L -36 -17 L -42 -17 L -36 0 L -42 17 L -36 17 L -28 4 L -10 5 L -17 36 L -8 36 L 10 5 Z" fill="#000" />
+      </g>
+      {/* Fading exhaust behind each nacelle, with a soft monochrome pulse. */}
+      <g className="sb-jet-plumes" fill="url(#jetPlumeGrad)">
+        <path d="M -8 -14 L -68 -18 L -68 -10 Z" />
+        <path d="M -8 14 L -68 10 L -68 18 Z" />
+        <path d="M -34 0 L -85 -4 L -72 0 L -85 4 Z" />
+      </g>
+      <rect x="-8" y="-19" width="14" height="6.5" rx="3" fill="#27272a" stroke="#09090b" strokeWidth="1.2" />
+      <rect x="-8" y="12.5" width="14" height="6.5" rx="3" fill="#27272a" stroke="#09090b" strokeWidth="1.2" />
+      <path d="M 6 -18 V -13.5 M 6 13.5 V 18" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+      {/* Swept wings and raised dark winglets. */}
+      <path d="M 12 -4.5 L -9 -37 L -16 -39 L -18 -34 L -8 -5.5 Z M 12 4.5 L -9 37 L -16 39 L -18 34 L -8 5.5 Z" fill="url(#jetWingGrad)" stroke="#09090b" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M -9 -37 L -16 -39 L -17 -35 L -11 -34 Z M -9 37 L -16 39 L -17 35 L -11 34 Z" fill="#18181b" />
+      <path d="M -2 -10 L -12 -31 M -2 10 L -12 31" fill="none" stroke="#52525b" strokeWidth="1" strokeDasharray="3 2" />
+      {/* Swept horizontal stabilizers and sculpted metallic fuselage. */}
+      <path d="M -24 -3.2 L -36 -18 L -42 -18 L -34 -2.5 Z M -24 3.2 L -36 18 L -42 18 L -34 2.5 Z" fill="url(#jetWingGrad)" stroke="#09090b" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -26 -4.2 L -39 -1.5 L -39 1.5 L -26 4.2 L 4 5.8 C 18 5.8, 31 4.6, 40 0 Z" fill="url(#jetFuselageGrad)" stroke="#09090b" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M 29 0 C 25 -3.1, 20 -3.6, 17 -3.2 C 19 -1.2, 19 1.2, 17 3.2 C 20 3.6, 25 3.1, 29 0 Z" fill="#09090b" />
+      <path d="M 26 -1.4 C 23 -2.2, 20 -2.2, 19 -1.6" fill="none" stroke="white" strokeWidth="0.9" strokeLinecap="round" opacity="0.85" />
+      <path d="M -26 0 H 14" stroke="#71717a" strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M -14 -3.3 L 10 -3.6 M -14 3.3 L 10 3.6" stroke="#18181b" strokeWidth="1.2" strokeDasharray="1.5 3" strokeLinecap="round" />
+      <path d="M -25 0 L -41 -2.2 L -43 0 L -41 2.2 Z" fill="#18181b" stroke="#09090b" strokeWidth="1.2" />
+    </g>
+  );
+}
+
+function ScrollFlightPath() {
+  const pathRef = React.useRef<SVGPathElement | null>(null);
+  const [flight, setFlight] = React.useState({ x: 600, y: 120, angle: 22, bankDeg: 0, progress: 0, totalLen: 4200, cameraY: 360, screenAngle: 22, scaleX: 1, scaleY: 1 });
+
+  React.useEffect(() => {
+    let raf = 0;
+    const updateFlight = () => {
+      const path = pathRef.current;
+      if (!path) return;
+      const totalLen = path.getTotalLength() || 4200;
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      const dist = progress * totalLen;
+      const delta = Math.min(12, totalLen * 0.003);
+      const pt = path.getPointAtLength(dist);
+      const prev = path.getPointAtLength(Math.max(0, dist - delta));
+      const next = path.getPointAtLength(Math.min(totalLen, dist + delta));
+      const angle = Math.atan2(next.y - prev.y, next.x - prev.x) * 180 / Math.PI;
+      const prev2 = path.getPointAtLength(Math.max(0, dist - delta * 2.5));
+      const anglePrev = Math.atan2(pt.y - prev2.y, pt.x - prev2.x) * 180 / Math.PI;
+      // Normalize angular difference at the -180/180 seam to prevent a bank spike.
+      const turn = ((angle - anglePrev + 540) % 360) - 180;
+      const bankDeg = Math.max(-24, Math.min(24, turn * 1.8));
+      const linearY = 120 + progress * 3200;
+      // SVG uses a 1000-unit viewport: the camera keeps the aircraft in its
+      // 46–50% vertical band, even when the path loops backwards in world Y.
+      const loopOffset = Math.max(-20, Math.min(20, (pt.y - linearY) * 0.35));
+      const cameraY = 480 + loopOffset - pt.y;
+      // Counter the non-uniform viewport projection so the jet keeps its
+      // proportions on narrow phones while its route spans the full width.
+      const scaleX = window.innerWidth / 1200;
+      const scaleY = window.innerHeight / 1000;
+      const screenAngle = Math.atan2((next.y - prev.y) * scaleY, (next.x - prev.x) * scaleX) * 180 / Math.PI;
+      setFlight({ x: pt.x, y: pt.y, angle, bankDeg, progress, totalLen, cameraY, screenAngle, scaleX, scaleY });
+    };
+    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(updateFlight); };
+    updateFlight();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); };
+  }, []);
+
+  return (
+    <div aria-hidden="true" className="sb-flight pointer-events-none fixed inset-0 z-20 overflow-hidden">
+      <svg viewBox="0 0 1200 1000" preserveAspectRatio="none" className="h-full w-full">
+        <defs>
+          <linearGradient id="jetFuselageGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#fff" /><stop offset="50%" stopColor="#f4f4f5" /><stop offset="100%" stopColor="#d4d4d8" /></linearGradient>
+          <linearGradient id="jetWingGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fff" /><stop offset="65%" stopColor="#e4e4e7" /><stop offset="100%" stopColor="#a1a1aa" /></linearGradient>
+          <linearGradient id="jetPlumeGrad" x1="100%" y1="0%" x2="0%" y2="0%"><stop offset="0%" stopColor="currentColor" stopOpacity="0.55" /><stop offset="50%" stopColor="currentColor" stopOpacity="0.2" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
+        </defs>
+        <g transform={`translate(0 ${flight.cameraY})`}>
+          <path d={FLIGHT_PATH_D} fill="none" stroke="currentColor" opacity="0.25" strokeWidth="2.2" strokeDasharray="8 12" strokeLinecap="round" />
+          <path ref={pathRef} d={FLIGHT_PATH_D} fill="none" stroke="currentColor" opacity="0.8" strokeWidth="3.2" strokeLinecap="round" strokeDasharray={`${flight.totalLen} ${flight.totalLen}`} strokeDashoffset={flight.totalLen * (1 - flight.progress)} />
+          <g transform={`translate(${flight.x} ${flight.y}) scale(${1 / flight.scaleX} ${1 / flight.scaleY}) rotate(${flight.screenAngle})`}><ExecutiveMonochromeJet bankDeg={flight.bankDeg} /></g>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
+  const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
+    <div className="relative overflow-hidden">
+      <div className={`sb-marquee-track ${animClass}`}>
+        {[0, 1].map((copy) => (
+          <div key={copy} className="flex shrink-0 gap-3.5 px-[7px]" aria-hidden={copy === 1 ? true : undefined}>
+            {items.map((uni) => (
+              <button key={uni.name} type="button" tabIndex={copy === 1 ? -1 : undefined} onClick={onStart} className="group relative w-64 shrink-0 rounded-2xl border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-[#111a2e] dark:hover:border-indigo-400">
+                <span className="relative block h-36 w-full overflow-hidden rounded-xl border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
+                  {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={uni.url} alt={uni.landmark} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
+                  <span className="absolute left-2 top-2 rounded-md bg-indigo-600/95 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">{uni.rank}</span>
+                  <span className="absolute right-2 top-2 rounded-md bg-white/95 px-2 py-0.5 text-[10px] font-bold text-slate-900">{uni.country}</span>
+                  <span className="absolute bottom-2 left-2.5 right-2.5 text-white">
+                    <span className="block truncate text-xs font-black leading-tight">{uni.name}</span>
+                    <span className="block truncate text-[10px] text-slate-300">{uni.landmark}</span>
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <section id="university-marquee" className="relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-10 dark:border-[#27354e]/80 dark:bg-[#0b1222]">
+      <div className="mx-auto mb-5 flex max-w-7xl flex-wrap items-end justify-between gap-3 px-4 sm:px-6">
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] font-extrabold text-indigo-700 dark:text-indigo-300">🏛️ QS Top 200 · 24 ta Top Universitet Kampusi (3 Qator)</span>
+          <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">Jahonning Yetakchi Universitetlari Kampuslari</h2>
+        </div>
+      </div>
+      <div className="space-y-3.5 overflow-hidden">
+        {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
+        {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
+        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
+      </div>
+    </section>
   );
 }

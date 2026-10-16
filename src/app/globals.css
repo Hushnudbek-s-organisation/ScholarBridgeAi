@@ -941,3 +941,27 @@ html.theme-transition *::after {
   section, article, .rounded-2xl { box-shadow: none !important; break-inside: avoid-page; }
   h1, h2, h3 { break-after: avoid-page; }
 }
+
+/* The route alone changes ink with the theme; the rest of the site stays colorful. */
+.sb-flight { color: #0f172a; }
+.dark .sb-flight { color: #f8fafc; }
+@keyframes sb-jet-exhaust { 50% { opacity: 0.55; } }
+.sb-jet-plumes { animation: sb-jet-exhaust 2.4s ease-in-out infinite; }
+
+@keyframes sbMarqueeRight {
+  0% { transform: translate3d(-50%, 0, 0); }
+  100% { transform: translate3d(0%, 0, 0); }
+}
+@keyframes sbMarqueeLeft {
+  0% { transform: translate3d(0%, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+.sb-marquee-right { display: flex; width: max-content; animation: sbMarqueeRight 46s linear infinite; }
+.sb-marquee-left { display: flex; width: max-content; animation: sbMarqueeLeft 42s linear infinite; }
+.sb-marquee-right-slow { display: flex; width: max-content; animation: sbMarqueeRight 50s linear infinite; }
+.sb-marquee-track:hover, .sb-marquee-track:focus-within { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .sb-marquee-track, .sb-jet-plumes { animation: none; }
+  .sb-marquee-track { width: max-content; }
+}
+@media print { .sb-flight { display: none; } }
