@@ -2,9 +2,11 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, CheckCircle2, Circle, BookOpen, Award, Clock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, BookOpen, Award, Clock, ArrowRight } from "lucide-react";
 import { LessonQuiz, Quiz } from "./LessonQuiz";
 import { CertificateView } from "./CertificateView";
+import { SmartVideoPlayer } from "./SmartVideoPlayer";
+import { LessonNotes } from "./LessonNotes";
 
 interface LessonDetail {
   id: number;
@@ -50,7 +52,6 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
   const [quizResult, setQuizResult] = useState<{ [lessonId: number]: { score: number; passed: boolean } }>({});
-  const videoRef = useRef<HTMLVideoElement>(null);
   const lastReport = useRef(0);
 
   const loadDetail = useCallback(async () => {
@@ -72,8 +73,12 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
     void Promise.resolve().then(loadDetail);
   }, [loadDetail]);
 
-  const selectedLesson =
-    detail?.modules.flatMap((m) => m.lessons).find((l) => l.id === selectedLessonId) ?? null;
+  // Flattened lesson order (module → lesson) so "next lesson" walks the whole
+  // course, not just the current module.
+  const flatLessons = detail?.modules.flatMap((m) => m.lessons) ?? [];
+  const selectedLesson = flatLessons.find((l) => l.id === selectedLessonId) ?? null;
+  const selectedIndex = selectedLesson ? flatLessons.findIndex((l) => l.id === selectedLesson.id) : -1;
+  const nextLesson = selectedIndex >= 0 ? flatLessons[selectedIndex + 1] ?? null : null;
 
   const reportProgress = async (seconds: number, forceComplete = false) => {
     if (!selectedLessonId) return;
@@ -83,19 +88,20 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profileId, lessonId: selectedLessonId, watchedSeconds: seconds }),
       });
-      if (forceComplete) loadDetail();
+      if (forceComplete) await loadDetail();
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleTimeUpdate = () => {
-    const video = videoRef.current;
-    if (!video || !selectedLesson) return;
-    const now = video.currentTime;
-    if (now - lastReport.current >= 5 || (selectedLesson.durationSeconds > 0 && now >= selectedLesson.durationSeconds)) {
-      lastReport.current = now;
-      reportProgress(Math.floor(now));
+  const handleTimeUpdate = (seconds: number) => {
+    if (!selectedLesson) return;
+    // Persist the playhead every 5 s (and again once the lesson length is
+    // reached) — only for native media files; embeds are completed with the
+    // explicit "mark complete" button.
+    if (seconds - lastReport.current >= 5 || (selectedLesson.durationSeconds > 0 && seconds >= selectedLesson.durationSeconds)) {
+      lastReport.current = seconds;
+      reportProgress(Math.floor(seconds));
     }
   };
 
@@ -188,27 +194,68 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
           {selectedLesson && (
             <>
               <div className="bg-slate-900 rounded-2xl overflow-hidden">
-                <video
-                  key={selectedLesson.id}
-                  ref={videoRef}
-                  src={selectedLesson.videoUrl}
-                  controls
-                  className="w-full aspect-video"
+                {/* YouTube / Vimeo / Loom links become real embeds; direct
+                    .mp4 files keep the native player. */}
+                <SmartVideoPlayer
+                  url={selectedLesson.videoUrl}
+                  title={selectedLesson.title}
                   onTimeUpdate={handleTimeUpdate}
                   onEnded={handleEnded}
-                  preload="metadata"
+                  emptyLabel={t("noVideoYet")}
                 />
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
-                <h3 className="font-bold text-slate-900 text-base">{selectedLesson.title}</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {selectedLesson.progress?.isCompleted ? `✓ ${t("markComplete")}` : `${t("watchToComplete")}`}
-                </p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="break-words text-base font-bold text-slate-900">{selectedLesson.title}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {selectedLesson.progress?.isCompleted
+                        ? `✓ ${t("lessonCompleted")}`
+                        : t("watchToComplete")}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedLesson.progress?.isCompleted ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-700">
+                        <CheckCircle2 className="h-4 w-4" />
+                        {t("lessonCompleted")}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => reportProgress(selectedLesson.durationSeconds || 300, true)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs transition-colors hover:bg-emerald-800"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        {t("markCompleteBtn")}
+                      </button>
+                    )}
+
+                    {nextLesson && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLessonId(nextLesson.id);
+                          lastReport.current = 0;
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-extrabold text-indigo-700 transition-colors hover:bg-indigo-100"
+                      >
+                        {t("nextLessonBtn")}
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {selectedLesson.content && (
-                  <p className="text-xs sm:text-sm text-slate-700 mt-3 leading-relaxed whitespace-pre-wrap">
-                    {selectedLesson.content}
-                  </p>
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                      {t("lessonContent")}
+                    </p>
+                    <LessonNotes content={selectedLesson.content} />
+                  </div>
                 )}
               </div>
 

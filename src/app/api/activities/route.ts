@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { activityEvidence, studentActivities, userDocuments } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
+import { invalidateProfileMatchCache } from "@/lib/catalogCache";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,8 @@ export async function POST(req: Request) {
       })
       .returning();
     const withEvidence = await attachEvidence(profileId, row.id, b.value.evidence);
+    // A new activity changes the match inputs — never serve a stale score.
+    invalidateProfileMatchCache(profileId);
     return NextResponse.json({ ok: true, activity: { ...row, evidence: withEvidence } });
   } catch (err) {
     return serverError("activities POST", err);
@@ -137,6 +140,7 @@ export async function PATCH(req: Request) {
       await db.delete(activityEvidence).where(eq(activityEvidence.activityId, id));
       evidence = await attachEvidence(profileId, id, b.value.evidence);
     }
+    invalidateProfileMatchCache(profileId);
     return NextResponse.json({ ok: true, id, evidence });
   } catch (err) {
     return serverError("activities PATCH", err);
@@ -155,6 +159,7 @@ export async function DELETE(req: Request) {
       .where(and(eq(studentActivities.id, id), eq(studentActivities.profileId, g.value.profileId)))
       .returning({ id: studentActivities.id });
     if (!deleted.length) return jsonError(404, "Activity not found", "not_found");
+    invalidateProfileMatchCache(g.value.profileId);
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     return serverError("activities DELETE", err);

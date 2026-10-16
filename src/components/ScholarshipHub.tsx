@@ -106,16 +106,24 @@ export function ScholarshipHub({
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  // `loading` = first load (skeletons); `refreshing` = a later filter/page
+  // change, where the current cards stay mounted instead of collapsing.
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Filters
   const [search, setSearch] = useState("");
+  // Only the text box is debounced; dropdowns and pagination fire at once.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedCoverage, setSelectedCoverage] = useState("All");
   const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
   if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
     setLastFocusRequestId(autoFocusScholarship.requestId);
     setSearch(autoFocusScholarship.title);
+    // Deep link from global search: commit the term at once — there is nothing
+    // to debounce, the student already chose the record.
+    setDebouncedSearch(autoFocusScholarship.title);
     setSelectedCountry("All");
     setSelectedCoverage("All");
   }
@@ -132,32 +140,36 @@ export function ScholarshipHub({
   // (filters, search, profile, or page size). Adjusted during render (the
   // React-endorsed alternative to a reset effect), so the debounced fetch
   // below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, search, perPage].join("|");
+  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
     setPage(1);
   }
 
-  const fetchScholarships = async () => {
-    setLoading(true);
+  const hasLoadedRef = useRef(false);
+
+  const fetchScholarships = async (signal?: AbortSignal) => {
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
     try {
       const params = new URLSearchParams();
       if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
       if (selectedCountry !== "All") params.set("country", selectedCountry);
       if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (
         autoFocusScholarship &&
-        search.trim().toLocaleLowerCase() === autoFocusScholarship.title.trim().toLocaleLowerCase()
+        debouncedSearch.trim().toLocaleLowerCase() === autoFocusScholarship.title.trim().toLocaleLowerCase()
       ) {
         params.set("focusId", String(autoFocusScholarship.id));
       }
       params.set("page", page.toString());
       params.set("perPage", perPage.toString());
 
-      const res = await fetch(`/api/scholarships?${params.toString()}`);
+      const res = await fetch(`/api/scholarships?${params.toString()}`, { signal });
       const data = await res.json();
+      hasLoadedRef.current = true;
       if (data.scholarships) {
         setScholarships(data.scholarships);
         setTotalCount(
@@ -173,17 +185,49 @@ export function ScholarshipHub({
         }
       }
     } catch (err) {
+      // A superseded request is aborted on purpose — never report it.
+      if ((err as { name?: string })?.name === "AbortError") return;
       console.error("Error fetching scholarships:", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // Debounce only what the student types; every other control fires at once.
+  // The timer lives in the change handler (not in an effect), so the state
+  // write happens in response to the user's keystroke and the request still
+  // fires once per settled term.
+  const searchDebounceRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    },
+    [],
+  );
+
+  const onSearchInput = (value: string) => {
+    setSearch(value);
+    if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      searchDebounceRef.current = null;
+      setDebouncedSearch(value);
+    }, 220);
+  };
+
+  // `debouncedSearch` (written by the change handler, or directly by the
+  // command palette's deep link) is what the request uses, so the query always
+  // matches the filter state the student can see. The previous in-flight
+  // request is aborted so a slow response can never overwrite a newer one.
   useEffect(() => {
-    const t = setTimeout(() => fetchScholarships(), 300);
-    return () => clearTimeout(t);
+    const controller = new AbortController();
+    // Started in a microtask: the effect body must not call setState
+    // synchronously (the fetch begins with the "refreshing" flag).
+    void Promise.resolve().then(() => fetchScholarships(controller.signal));
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, search, page, perPage, autoFocusScholarship?.requestId]);
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId]);
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -211,10 +255,12 @@ export function ScholarshipHub({
       {/* Top Banner / Filter */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          {/* h2, not h1 — the hub shell above already owns this screen's only
+              <h1>, and the stacked duplicate broke the page outline. */}
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Award className="h-5 w-5 text-amber-500" />
             {t("title")}
-          </h1>
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             {t("subtitle")}
           </p>
@@ -230,7 +276,7 @@ export function ScholarshipHub({
               placeholder={t("searchPlaceholder")}
               aria-label={t("searchPlaceholder")}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => onSearchInput(e.target.value)}
               className="min-h-11 w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
             />
           </div>
@@ -288,15 +334,34 @@ export function ScholarshipHub({
 
       {/* Grid List */}
       {loading ? (
-        <div className="p-12 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
-          {t("loading")}
+        // Skeleton cards sized like the real ones — no height jump on load.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[320px] animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+            >
+              <div className="space-y-3 p-5">
+                <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-5 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-24 w-full rounded-xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+              </div>
+            </div>
+          ))}
+          <span className="sr-only">{t("loading")}</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
           {t("empty")}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-150 ${
+            refreshing ? "pointer-events-none opacity-60" : ""
+          }`}
+          aria-busy={refreshing}
+        >
           {filtered.map((s) => {
             const isSaved = savedScholarshipIds.has(s.id);
             const isFocused =

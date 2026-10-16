@@ -1281,7 +1281,15 @@ check("global scholarship search opens the catalogue and passes the selected rec
   assert.match(home, /autoFocusScholarship=\{focusScholarship\}/);
   assert.match(hubs, /autoFocusScholarship=\{autoFocusScholarship \?\? null\}/);
   assert.match(scholarshipHub, /setSearch\(autoFocusScholarship\.title\)/);
-  assert.match(scholarshipHub, /params\.set\("search", search\.trim\(\)\)/);
+  // The term the student sees in the box reaches the API through the debounced
+  // mirror (`search` → 220 ms → `debouncedSearch`), so typing does not fire a
+  // request per keystroke and the palette's deep link still filters the list.
+  assert.match(scholarshipHub, /const \[debouncedSearch, setDebouncedSearch\] = useState\(""\)/);
+  // The debounce is 220 ms and lives in the change handler, so a keystroke
+  // schedules exactly one commit; the palette deep link commits immediately.
+  assert.match(scholarshipHub, /searchDebounceRef\.current = window\.setTimeout\(\(\) => \{[\s\S]{0,120}?setDebouncedSearch\(value\);\s*\}, 220\)/);
+  assert.match(scholarshipHub, /setDebouncedSearch\(autoFocusScholarship\.title\)/);
+  assert.match(scholarshipHub, /params\.set\("search", debouncedSearch\.trim\(\)\)/);
   assert.match(scholarshipHub, /params\.set\("focusId", String\(autoFocusScholarship\.id\)\)/);
   assert.match(scholarshipHub, /data-focused-record=\{isFocused \? "true" : undefined\}/);
 });

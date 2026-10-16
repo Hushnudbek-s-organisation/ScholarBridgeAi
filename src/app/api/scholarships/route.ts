@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { authenticate } from "@/lib/auth";
-import { db } from "@/db";
-import {
-  scholarships,
-  studentProfiles,
-  scholarshipSources,
-  sources,
-} from "@/db/schema";
 import { calculateScholarshipMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
-import { eq, inArray } from "drizzle-orm";
 import { seedDatabase } from "@/db/seed";
+import { getCachedScholarshipsBundle, getCachedProfileForMatching } from "@/lib/catalogCache";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
-import { pickBestSource } from "@/lib/sourcePick";
-import { toMatchProfileWithActivities } from "@/lib/profileMapping";
-import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 
 export async function GET(req: Request) {
   try {
@@ -30,12 +20,11 @@ export async function GET(req: Request) {
     const coverageType = searchParams.get("coverageType");
     const focusId = Number(searchParams.get("focusId"));
 
-    // The public catalogue and global search share one visibility boundary:
-    // inactive records stay out of student-facing lists and search results.
-    let allScholarships = await db
-      .select()
-      .from(scholarships)
-      .where(eq(scholarships.isActive, true));
+    // Cached base catalogue — the same active-only visibility boundary, the
+    // same resolved USD mirrors, without re-reading every scholarship (and its
+    // source links) on each filter change. The array handed out is a copy.
+    const bundle = await getCachedScholarshipsBundle();
+    let allScholarships = [...bundle.entries];
 
     let profileData = null;
     let matchProfile = null;
@@ -46,10 +35,10 @@ export async function GET(req: Request) {
       // silently receives the public, unpersonalised list.
       const auth = await authenticate(req);
       if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
-        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-        if (p) {
-          profileData = p;
-          matchProfile = await toMatchProfileWithActivities(p);
+        const cached = await getCachedProfileForMatching(pId);
+        if (cached) {
+          profileData = cached.profileData;
+          matchProfile = cached.matchProfile;
         }
       }
     }
@@ -72,62 +61,10 @@ export async function GET(req: Request) {
       allScholarships = allScholarships.filter(s => s.coverageType.includes(coverageType));
     }
 
-    // ---------- Fetch source signals (scholarship_sources -> sources) ----------
-    const sourceMap = new Map<number, { sourceUrl: string | null; lastVerifiedAt: string | null; sourceTitle: string | null }>();
-    try {
-      const schIds = allScholarships.map((s) => s.id);
-      if (schIds.length > 0) {
-        const links = await db
-          .select()
-          .from(scholarshipSources)
-          .where(inArray(scholarshipSources.scholarshipId, schIds));
-
-        const srcIds = [...new Set(links.map((l) => l.sourceId).filter((x): x is number => x != null))];
-        let srcById = new Map<number, { id: number; url: string; title: string; accessedAt: Date | null }>();
-        if (srcIds.length > 0) {
-          try {
-            const srcRows = await db
-              .select({ id: sources.id, url: sources.url, title: sources.title, accessedAt: sources.accessedAt })
-              .from(sources)
-              .where(inArray(sources.id, srcIds));
-            srcById = new Map(srcRows.map((r) => [r.id, r]));
-          } catch {
-            // sources shape differs
-          }
-        }
-
-        const grouped = new Map<number, typeof links>();
-        for (const link of links) {
-          const arr = grouped.get(link.scholarshipId) || [];
-          arr.push(link);
-          grouped.set(link.scholarshipId, arr);
-        }
-
-        for (const [schId, schLinks] of grouped) {
-          const best = pickBestSource(schLinks, srcById);
-          if (best?.url) {
-            sourceMap.set(schId, {
-              sourceUrl: best.url,
-              lastVerifiedAt: best.accessedAt ? best.accessedAt.toISOString() : null,
-              sourceTitle: best.title,
-            });
-          }
-        }
-
-        // If linked source exists but lacks accessedAt, fallback to scholarship's own lastVerifiedAt
-        for (const sch of allScholarships) {
-          const existing = sourceMap.get(sch.id);
-          if (existing && !existing.lastVerifiedAt) {
-            const fallback = (sch as any).lastVerifiedAt ? new Date((sch as any).lastVerifiedAt).toISOString() : null;
-            if (fallback) {
-              sourceMap.set(sch.id, { ...existing, lastVerifiedAt: fallback });
-            }
-          }
-        }
-      }
-    } catch {
-      // tables missing — UI will show pending verification
-    }
+    // ---------- Source signals (scholarship_sources -> sources) ----------
+    // Served from the cached bundle (identical "most recently accessed" pick,
+    // with the scholarship's own lastVerifiedAt only as a date fallback).
+    const sourceMap = bundle.sourceMap;
 
     const results = allScholarships.map((s) => {
       let matchInfo: {
@@ -147,9 +84,6 @@ export async function GET(req: Request) {
       const src = sourceMap.get(s.id) || null;
       return {
         ...s,
-        // Keep canonical awardAmount/awardCurrency intact, but make the
-        // compatibility field explicitly USD-safe for existing displays.
-        amountUsdValue: resolvedUsdScholarshipAmount(s),
         matchScore: matchInfo.matchScore,
         isEligible: matchInfo.isEligible,
         matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),

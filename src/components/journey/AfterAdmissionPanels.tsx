@@ -21,6 +21,7 @@ import {
   Button,
   Empty,
   ErrorNote,
+  InlineAlert,
   Field,
   JourneyCard,
   Loading,
@@ -89,14 +90,18 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
     { initial: { offers: [], summary: { total: 0, pending: 0, accepted: 0, rejected: 0 } }, errorFallback: t("opLoadError") }
   );
   const [busy, setBusy] = useState(false);
+  // Inline failure banner instead of a native alert(): the page keeps working
+  // and the student can retry the same action.
+  const [actionError, setActionError] = useState("");
 
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
+    setActionError("");
     try {
       await sendJson("/api/offers", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("opUpdateError"));
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("opUpdateError"));
+      setActionError(e instanceof Error ? e.message : t("opUpdateError"));
     } finally {
       setBusy(false);
     }
@@ -123,6 +128,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
         }
       >
         {error && <ErrorNote message={error} />}
+        <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
         <p className="text-xs text-slate-500 dark:text-slate-400">{t("opCreatedNote")}</p>
         <Button size="sm" variant="outline" className="mt-2" onClick={() => onNavigateTab("applications")}>{t("opGoApplications")}</Button>
       </JourneyCard>
@@ -411,6 +417,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [form, setForm] = useState(() => ({ applicationId: applicationId == null ? "" : String(applicationId), recommenderName: "", recommenderEmail: "", relationship: "", dueDate: "" }));
 
   const applications = new Map(
@@ -435,7 +442,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
       setAdding(false);
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("rmAddError"));
+      setActionError(e instanceof Error ? e.message : t("rmAddError"));
     } finally {
       setBusy(false);
     }
@@ -469,6 +476,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
         }
       >
         {error && <ErrorNote message={error} />}
+        <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
 
         {adding && (
           <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-700">
@@ -688,6 +696,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
     }
   );
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [form, setForm] = useState({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [] as string[], notes: "" });
 
   const add = async () => {
@@ -702,7 +711,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
       setForm({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [], notes: "" });
       await reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("tpSaveError"));
+      setActionError(e instanceof Error ? e.message : t("tpSaveError"));
     } finally {
       setBusy(false);
     }
@@ -731,6 +740,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
 
   return (
     <div className="space-y-4">
+      <InlineAlert message={actionError} onDismiss={() => setActionError("")} />
       <JourneyCard
         title={t("fpTitle")}
         subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : t("fpNoApplication")}

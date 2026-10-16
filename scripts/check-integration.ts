@@ -149,6 +149,9 @@ async function main() {
       country: "Germany",
       coverageType: "tuition",
       amountUsdValue: 9000,
+      // #29 only sums awards whose period is published — without it the value
+      // is correctly excluded from the country comparison totals.
+      awardPeriod: "total",
       deadline: "2026-12-01",
       // drizzle `date()` without a mode maps to a string, not a Date.
       deadlineDate: new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10),
@@ -300,6 +303,12 @@ async function main() {
     matchScore: number | null;
   };
   const catalogue = async (query = "", init: RequestInit = {}) => {
+    // This suite writes to `universities` and `student_profiles` with raw SQL
+    // (schema-drift simulation), bypassing the admin/profile routes that
+    // invalidate the catalogue cache in production. Clearing it here is the
+    // same contract: a write is followed by a read that must reflect it.
+    const { resetCatalogCacheForTests } = await import("../src/lib/catalogCache");
+    resetCatalogCacheForTests();
     const result = await call(universitiesGet, `/api/universities${query ? `?${query}` : ""}`, init);
     const rows: DiscoveryUniversity[] = Array.isArray(result.body?.universities) ? result.body.universities : [];
     return { ...result, rows };
@@ -440,6 +449,82 @@ async function main() {
   }
 
   // -----------------------------------------------------------------------
+  section("0c. catalogue cache — memoized reads, instant invalidation");
+  {
+    const { resetCatalogCacheForTests, catalogCacheStats, invalidateCatalogCache, invalidateProfileMatchCache } =
+      await import("../src/lib/catalogCache");
+    resetCatalogCacheForTests();
+    check("nothing is cached before the first catalogue read", catalogCacheStats().universitiesCached === false);
+
+    const first = await call(universitiesGet, "/api/universities?degreeLevel=Bachelor");
+    check("the first catalogue read answers 200 and fills the snapshot", first.status === 200 && catalogCacheStats().universitiesCached === true);
+
+    // A raw-SQL insert (i.e. a write the cache never hears about) must not
+    // reach a warm snapshot — this is the whole point of the optimization.
+    const [lateUni] = await db
+      .insert(schema.universities)
+      .values({
+        name: "Late Inserted University",
+        country: "Germany",
+        city: "Berlin",
+        degreeLevel: "Bachelor",
+        programMajor: "Computer Science",
+        description: "Inserted after the snapshot was built.",
+        websiteUrl: "https://late.example.edu",
+        annualTuitionUsd: 900,
+        annualLivingEstUsd: 10000,
+      })
+      .returning();
+    const warm = await call(universitiesGet, "/api/universities?degreeLevel=Bachelor");
+    const warmIds = (warm.body?.universities ?? []).map((row: { id: number }) => row.id);
+    check("a warm read is served without re-querying the database", !warmIds.includes(lateUni.id));
+
+    // …and the documented invalidation hook (used by every admin write) makes
+    // it visible on the very next request.
+    invalidateCatalogCache("universities");
+    const cold = await call(universitiesGet, "/api/universities?degreeLevel=Bachelor");
+    const coldIds = (cold.body?.universities ?? []).map((row: { id: number }) => row.id);
+    check("invalidation makes a new row visible immediately", coldIds.includes(lateUni.id));
+    check("a cached response equals a freshly built one for the same data", cold.status === first.status);
+
+    // Profile match inputs carry their own short-lived memo.
+    invalidateCatalogCache("universities");
+    const { getCachedProfileForMatching } = await import("../src/lib/catalogCache");
+    const warmProfile = await getCachedProfileForMatching(profile.id);
+    check("profile match inputs are cached per profile", warmProfile !== null && catalogCacheStats().profileMatchEntries === 1);
+    invalidateProfileMatchCache(profile.id);
+    check("a profile edit drops its cached match inputs", catalogCacheStats().profileMatchEntries === 0);
+
+    await db.delete(schema.universities).where(eq(schema.universities.id, lateUni.id));
+    invalidateCatalogCache("all");
+  }
+
+  // -----------------------------------------------------------------------
+  section("0d. seeded video courses — the practical walkthroughs are published");
+  {
+    const { GET: coursesGet } = await import("../src/app/api/courses/route");
+    const list = await call(coursesGet as unknown as (req: Request) => Promise<Response>, "/api/courses");
+    const courses: { title: string; moduleCount: number; lessonCount: number; totalDurationSeconds: number; hasVideo: boolean }[] =
+      Array.isArray(list.body?.courses) ? list.body.courses : [];
+    const titles = courses.map((c) => c.title);
+    check("the catalogue seeds all nine built-in courses", courses.length >= 9, `got ${courses.length}`);
+    for (const title of [
+      "How to Use Common App & CSS Profile: Step-by-Step US Application Guide",
+      "European University Portals: uni-assist VPD, TUMonline, DreamApply & Sperrkonto",
+      "Uzbekistan Flagship Grants & Documents: El-yurt umidi, GKS Korea, Türkiye Bursları & e-Apostille",
+      "How to Use ScholarBridge AI: Complete Platform Walkthrough",
+    ]) {
+      check(`practical walkthrough seeded: ${title.slice(0, 38)}…`, titles.includes(title));
+    }
+    const practical = courses.filter((c) => titles.indexOf(c.title) > -1 && c.moduleCount > 0 && c.lessonCount > 0);
+    check("every practical course reports modules and lessons", practical.length >= 4);
+    check(
+      "the practical courses carry playable video lessons",
+      courses.filter((c) => c.hasVideo && c.totalDurationSeconds > 0).length >= 3
+    );
+  }
+
+  // -----------------------------------------------------------------------
   section("1. /api/planning — costs, portfolio, CV and comparison from real rows");
 
   const { GET: planningGet } = await import("../src/app/api/planning/route");
@@ -481,21 +566,37 @@ async function main() {
   const m = await call(mentorsGet as any, `/api/mentors?profileId=${profile.id}`);
 
   check("responds 200", m.status === 200, `got ${m.status} ${JSON.stringify(m.body)?.slice(0, 200)}`);
-  check("the seeded mentor is returned", m.body?.matches?.length === 1);
+  // The platform also seeds real mentor rows, so the shared TUM/DAAD mentor
+  // legitimately appears next to this fixture. The assertion is that the
+  // fixture row IS returned (and that every returned row stays explainable),
+  // not that it is the only match.
+  const fixtureMatch = m.body?.matches?.find((x: any) => x.id === mentor.id);
+  check(
+    "the seeded mentor is returned",
+    Boolean(fixtureMatch),
+    `${m.body?.matches?.length ?? 0} match(es): ${JSON.stringify(m.body?.matches?.map((x: any) => x.id))}`
+  );
+  check(
+    "every returned match carries its reasons and its gaps",
+    Array.isArray(m.body?.matches) &&
+      m.body.matches.length > 0 &&
+      m.body.matches.every((x: any) => Array.isArray(x.reasons) && x.reasons.length > 0 && Array.isArray(x.gaps)),
+    JSON.stringify(m.body?.matches?.map((x: any) => ({ id: x.id, reasons: x.reasons?.length, gaps: x.gaps?.length })))
+  );
   check(
     "the shared university is named as a reason",
-    m.body?.matches?.[0]?.reasons?.some((r: string) => /Technical University of Munich/.test(r)),
-    JSON.stringify(m.body?.matches?.[0]?.reasons)
+    fixtureMatch?.reasons?.some((r: string) => /Technical University of Munich/.test(r)),
+    JSON.stringify(fixtureMatch?.reasons)
   );
   check(
     "the shared scholarship is named",
-    m.body?.matches?.[0]?.reasons?.some((r: string) => /DAAD/.test(r))
+    fixtureMatch?.reasons?.some((r: string) => /DAAD/.test(r))
   );
-  check("the mentor is flagged verified", m.body?.matches?.[0]?.verified === true);
-  check("the mentor id survives the round trip", m.body?.matches?.[0]?.id === mentor.id);
-  check("localized reason descriptors are returned for UI rendering", m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.sameUniversity"));
-  check("profile country is not mistaken for a preferred study country", !m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.sameCountry") && !m.body?.matches?.[0]?.gapMessages?.some((r: any) => r.key === "gaps.differentCountry"));
-  check("account interface locale is not converted into a mentor language preference", !m.body?.matches?.[0]?.reasonMessages?.some((r: any) => r.key === "reasons.languages"));
+  check("the mentor is flagged verified", fixtureMatch?.verified === true);
+  check("the mentor id survives the round trip", fixtureMatch?.id === mentor.id);
+  check("localized reason descriptors are returned for UI rendering", fixtureMatch?.reasonMessages?.some((r: any) => r.key === "reasons.sameUniversity"));
+  check("profile country is not mistaken for a preferred study country", !fixtureMatch?.reasonMessages?.some((r: any) => r.key === "reasons.sameCountry") && !fixtureMatch?.gapMessages?.some((r: any) => r.key === "gaps.differentCountry"));
+  check("account interface locale is not converted into a mentor language preference", !fixtureMatch?.reasonMessages?.some((r: any) => r.key === "reasons.languages"));
 
   const introPayload = { profileId: profile.id, mentorId: mentor.id, topic: "Application planning", message: "What should I verify?" };
   const intro = await call(mentorsPost as any, "/api/mentors", {
@@ -1145,7 +1246,9 @@ async function main() {
       ps.body.strength.overallPrecise <= 100 &&
       ps.body?.strength?.completeness === undefined &&
       ps.body?.strength?.eligibility === undefined &&
-      /does not measure eligibility.*admission likelihood/i.test(ps.body?.strength?.basis ?? "")
+      // Same wording the unit test pins (scripts/check-chancing.ts) so the
+      // honesty disclaimer cannot drift between the two suites.
+      /not an eligibility, quality, or admission-likelihood score/i.test(ps.body?.strength?.basis ?? "")
   );
   check(
     "the seeded profile reports coverage only for sections with recorded details",

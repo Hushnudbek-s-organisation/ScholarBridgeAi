@@ -32,6 +32,7 @@
     "test:visa": "tsx scripts/check-visa-similar.ts && tsx scripts/check-visa-scoring.ts",
     "test:samples": "tsx scripts/check-samples.ts",
     "test:costs": "tsx scripts/check-costs.ts",
+    "test:video": "tsx scripts/check-video-player.ts",
     "test:cv": "tsx scripts/check-cv.ts",
     "test:compare": "tsx scripts/check-compare.ts",
     "test:mentors": "tsx scripts/check-mentors.ts",

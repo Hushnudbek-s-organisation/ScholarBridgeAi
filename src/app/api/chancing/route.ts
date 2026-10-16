@@ -25,6 +25,7 @@ import {
 } from "@/lib/programChancing";
 import { countriesMatch } from "@/lib/countries";
 import { ensureOutcomesAndStoriesSeeded } from "@/db/seedOutcomesAndStories";
+import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 
 export const dynamic = "force-dynamic";
 
@@ -142,8 +143,10 @@ export async function GET(req: Request) {
       ];
     }
 
-    // Load all catalog universities for switcher & fallback sample
-    const allCatalogUnis = await db.select().from(universities);
+    // Load all catalog universities for switcher & fallback sample — from the
+    // shared catalogue cache, so this screen scores the exact same rows (and
+    // the same resolved costs) the Explorer scores.
+    const allCatalogUnis = (await getCachedUniversitiesBundle()).unis;
 
     let unis = universityIds.length
       ? allCatalogUnis.filter((u) => universityIds.includes(u.id))

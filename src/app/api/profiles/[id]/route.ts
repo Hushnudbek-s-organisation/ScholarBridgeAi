@@ -11,6 +11,7 @@ import { currentOwnerId } from "@/lib/ownership/service";
 import { writeAudit } from "@/lib/audit";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { parseStudyInterestSelections } from "@/lib/studyInterests";
+import { invalidateProfileMatchCache } from "@/lib/catalogCache";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -306,6 +307,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
+    // The student's own view of every match/score must reflect the edit
+    // immediately — drop the short-lived derived match inputs for this profile.
+    invalidateProfileMatchCache(profileId);
     const response = NextResponse.json({ profile: sanitizeProfile(updatedProfile) });
     // Changing the password rotates the session fingerprint — hand back a
     // freshly signed cookie so the owner is not logged out by their own edit.

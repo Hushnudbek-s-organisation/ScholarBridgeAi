@@ -55,36 +55,42 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   const [limit, setLimit] = useState<number>(20);
 
   useEffect(() => {
-    if (!activeProfile?.id) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
-    setLoading(true);
-    setFailed(false);
+    // Started in a microtask: the effect body itself must not call setState
+    // synchronously (React's rule for effects — `loading`/`failed` are written
+    // before the request goes out).
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (!activeProfile?.id) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setFailed(false);
 
-    const params = new URLSearchParams({
-      profileId: String(activeProfile.id),
-      limit: String(limit),
-      includeBenchmarks: "1",
-    });
-    if (decisionFilter) params.set("decision", decisionFilter);
-    if (universitySearch.trim()) params.set("university", universitySearch.trim());
-
-    fetch(`/api/similar-profiles?${params.toString()}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((json: EnrichedSimilarProfileSummary) => {
-        if (!cancelled) setData(json);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setData(null);
-          setFailed(true);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      const params = new URLSearchParams({
+        profileId: String(activeProfile.id),
+        limit: String(limit),
+        includeBenchmarks: "1",
       });
+      if (decisionFilter) params.set("decision", decisionFilter);
+      if (universitySearch.trim()) params.set("university", universitySearch.trim());
+
+      return fetch(`/api/similar-profiles?${params.toString()}`)
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+        .then((json: EnrichedSimilarProfileSummary) => {
+          if (!cancelled) setData(json);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setData(null);
+            setFailed(true);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    });
     return () => {
       cancelled = true;
     };
