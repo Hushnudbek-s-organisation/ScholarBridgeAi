@@ -32,6 +32,12 @@ async function securityHeaders() {
 }
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/wikipedia/commons/**" },
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+    ],
+  },
   allowedDevOrigins: ["*.e2b.app", "*.e2b.dev"],
   // Do not advertise the framework/fingerprint in response headers.
   poweredByHeader: false,
