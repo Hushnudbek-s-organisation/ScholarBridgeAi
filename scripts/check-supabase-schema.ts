@@ -171,14 +171,99 @@ async function main() {
     console.error("pg is not installed — run npm install first.");
     process.exit(2);
   }
-  const pool = new pg.Pool({ connectionString: url });
+
+  // --- connection diagnostics (never prints the password) --------------------
+  const redactedUrl = url.replace(/(\/?\/[^:/@\s]+)(:[^@\s/]*)?@/, "$1:***@");
+  const parsed = (() => {
+    try {
+      return new URL(url);
+    } catch {
+      return null;
+    }
+  })();
+  const host = parsed?.hostname ?? "";
+  const port = parsed?.port || "5432";
+  const looksSupabase = /(^|\.)supabase\.(co|com)$/i.test(host);
+  const directSupabaseHost = /^db\./i.test(host);
+
+  function failConnect(err: unknown): never {
+    const e = err as (Error & { code?: string }) | undefined;
+    const msg = String(e?.message ?? err ?? "unknown error");
+    const code = String(e?.code ?? "");
+    console.error(`\nCONNECTION FAILED: ${msg}${code ? ` (code: ${code})` : ""}`);
+    console.error(`  host: ${host || "(unparseable)"}  port: ${port}  url: ${redactedUrl}`);
+    const hints: string[] = [];
+    if (/password authentication failed|28000|28P01/i.test(`${msg} ${code}`)) {
+      hints.push("Wrong database user/password. Supabase: Project Settings → Database → Connection string (URI) — copy it whole, the password is the DATABASE password, not the dashboard login.");
+      const asUser = /for user "([^"]+)"/.exec(msg)?.[1] ?? "";
+      if (looksSupabase && asUser && !asUser.includes(".")) {
+        hints.push(`Supabase's pooler authenticates as "postgres.<project-ref>", not as "${asUser}". Copy the URI verbatim from Project Settings → Database → Connection string → Session pooler (it starts postgresql://postgres.<ref>:…). The string already stored in the deploy host's DATABASE_URL env var is known-good — reuse exactly that one.`);
+      }
+      hints.push("If the password contains @ # / : ? or % it must be percent-encoded in the URL (@ → %40, # → %23, % → %25), or reset it: Settings → Database → Reset database password.");
+    }
+    if (/no pg_hba\.conf entry|SSL off|ssl/i.test(msg) || /pg_hba/i.test(msg)) {
+      hints.push("The server requires TLS: append ?sslmode=require to the connection string.");
+    }
+    if (directSupabaseHost || /ETIMEDOUT|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|timeout/i.test(`${msg} ${code}`)) {
+      hints.push("Unreachable host. Supabase's DIRECT connection (db.<ref>.supabase.co:5432) is IPv6-only and cannot be reached from GitHub Actions runners — use the SESSION POOLER string instead: aws-0-<region>.pooler.supabase.com:5432 (Project Settings → Database → Connection string → Session pooler).");
+    }
+    if (port === "6543") {
+      hints.push("Port 6543 is the TRANSACTION pooler; this check works best against the SESSION pooler on port 5432.");
+    }
+    if (/ENOTFOUND|getaddrinfo/i.test(`${msg} ${code}`)) {
+      hints.push("DNS did not resolve — check the hostname for a typo or a stray space/quote copied from the dashboard.");
+    }
+    if (/database .* does not exist/i.test(msg)) {
+      hints.push("The database name in the URL does not exist on that project (Supabase uses `postgres`).");
+    }
+    if (!hints.length) hints.push("Re-copy the connection string from Supabase → Project Settings → Database and update the SUPABASE_DB_URL secret.");
+    for (const h of hints) console.error(`  → ${h}`);
+    process.exit(2);
+  }
+
+  type ColumnRow = {
+    table_name: string;
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string | null;
+  };
+
+  async function readColumns(options: Record<string, unknown>): Promise<ColumnRow[]> {
+    const pool = new pg.Pool({ connectionTimeoutMillis: 20000, ...options });
+    try {
+      const { rows } = await pool.query<ColumnRow>(
+        `SELECT table_name, column_name, data_type, is_nullable, column_default
+           FROM information_schema.columns
+          WHERE table_schema = current_schema()`,
+      );
+      return rows;
+    } finally {
+      await pool.end().catch(() => {});
+    }
+  }
+
+  let rows: ColumnRow[];
+  try {
+    rows = await readColumns({ connectionString: url });
+  } catch (err) {
+    // Supabase poolers refuse plaintext connections. pg only turns TLS on when
+    // the URL asks for it (sslmode=/ssl=), so retry once with TLS forced and
+    // tell the operator to fix the string rather than failing blindly.
+    const asksForSsl = /[?&](sslmode|ssl)=/.test(url);
+    if (looksSupabase && !asksForSsl) {
+      try {
+        rows = await readColumns({ connectionString: url, ssl: { rejectUnauthorized: false } });
+        console.log("\nNote: connected with TLS forced on — the connection string has no ?sslmode=require. Add it so every client (and the app) connects the same way.");
+      } catch (err2) {
+        failConnect(err2);
+      }
+    } else {
+      failConnect(err);
+    }
+  }
 
   const liveProvided = await (async () => {
-    const { rows } = await pool.query(
-      `SELECT table_name, column_name, data_type, is_nullable, column_default
-         FROM information_schema.columns
-        WHERE table_schema = current_schema()`,
-    );
     const map = mergeProvided();
     for (const r of rows) {
       let t = map.get(r.table_name);
@@ -199,7 +284,7 @@ async function main() {
   })();
 
   const liveCmp = compareSchemas(expected, liveProvided);
-  heading(`LIVE CHECK — real database at ${url.replace(/:[^:@/]+@/, ":***@")}`);
+  heading(`LIVE CHECK — real database at ${redactedUrl}`);
 
   let problems = 0;
   for (const t of expected) {
@@ -222,8 +307,6 @@ async function main() {
     problems++;
     console.log(issueLine(iss));
   }
-
-  await pool.end();
 
   if (problems > 0) {
     console.error(`\nFAILED: ${problems} table/column/type issue(s) in the live database. Do not apply full_schema.sql blindly: it changes RLS and anon/authenticated grants. Review its SQL, back up, test in staging, obtain operator approval, then re-run this check if an apply is authorized.`);

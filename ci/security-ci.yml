@@ -26,7 +26,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci --no-audit --no-fund
+        run: bash ci/run-step.sh "Install" npm ci --no-audit --no-fund
 
       # Two steps on purpose. Shipped dependencies have NO exceptions and must
       # stay clean; the second gate covers the dev toolchain and only ignores an
@@ -34,78 +34,81 @@ jobs:
       # first gate would otherwise fail forever on GHSA-vfj7-8cjw-p6xm, which has
       # no released fix, and hide the 22 gates that come after it).
       - name: Dependency audit — production dependencies (high+, no exceptions)
-        run: npm audit --omit=dev --audit-level=high
+        run: bash ci/run-step.sh "Dependency audit — production dependencies (high+, no exceptions)" npm audit --omit=dev --audit-level=high
 
       - name: Dependency audit — all dependencies (high+, reviewed exceptions)
-        run: npm run audit:check
+        run: bash ci/run-step.sh "Dependency audit — all dependencies (high+, reviewed exceptions)" npm run audit:check
 
       - name: Typecheck
-        run: npm run typecheck
+        run: bash ci/run-step.sh "Typecheck" npm run typecheck
 
       - name: Offline schema and documentation regression tests
-        run: npm run test:schema
+        run: bash ci/run-step.sh "Offline schema and documentation regression tests" npm run test:schema
 
       - name: Full-schema apply safety guard
-        run: npm run test:schema-apply-safety
+        run: bash ci/run-step.sh "Full-schema apply safety guard" npm run test:schema-apply-safety
 
       - name: Security regression tests
-        run: npm run test:security
+        run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
       - name: Discovery matcher tests — university/scholarship Match %
-        run: npm run test:match
+        run: bash ci/run-step.sh "Discovery matcher tests — university/scholarship Match %" npm run test:match
 
       - name: AI settings tests
-        run: npm run test:ai-settings
+        run: bash ci/run-step.sh "AI settings tests" npm run test:ai-settings
 
       - name: AI format tests
-        run: npm run test:ai-format
+        run: bash ci/run-step.sh "AI format tests" npm run test:ai-format
 
       - name: AI cost, budget and entitlement tests
-        run: npm run test:ai-cost
+        run: bash ci/run-step.sh "AI cost, budget and entitlement tests" npm run test:ai-cost
 
       - name: Ownership tests (embedded Postgres)
-        run: npm run test:ownership
+        run: bash ci/run-step.sh "Ownership tests (embedded Postgres)" npm run test:ownership
 
       - name: Portability, config and RLS tests (embedded Postgres)
-        run: npm run test:portability
+        run: bash ci/run-step.sh "Portability, config and RLS tests (embedded Postgres)" npm run test:portability
 
       - name: Telegram integration tests (embedded Postgres)
-        run: npm run test:telegram-integration
+        run: bash ci/run-step.sh "Telegram integration tests (embedded Postgres)" npm run test:telegram-integration
 
       - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
-        run: npm run test:integration
+        run: bash ci/run-step.sh "API integration tests — ownership, Premium, AI quota (embedded Postgres)" npm run test:integration
 
       - name: E2E journey tests (embedded Postgres)
-        run: npm run test:journey
+        run: bash ci/run-step.sh "E2E journey tests (embedded Postgres)" npm run test:journey
 
       - name: Chancing + probability-policy tests (embedded Postgres)
-        run: npm run test:chancing
+        run: bash ci/run-step.sh "Chancing + probability-policy tests (embedded Postgres)" npm run test:chancing
 
       - name: Recommender tests — engine + API (embedded Postgres)
-        run: npm run test:recommend
+        run: bash ci/run-step.sh "Recommender tests — engine + API (embedded Postgres)" npm run test:recommend
 
       - name: Career discovery tests — quiz engine + honesty rules
-        run: npm run test:career-discovery
+        run: bash ci/run-step.sh "Career discovery tests — quiz engine + honesty rules" npm run test:career-discovery
 
       - name: Arrival plan tests — 7/30/90 days + first year
-        run: npm run test:arrival
+        run: bash ci/run-step.sh "Arrival plan tests — 7/30/90 days + first year" npm run test:arrival
 
       - name: Opportunities feed tests (embedded Postgres)
-        run: npm run test:opportunities
+        run: bash ci/run-step.sh "Opportunities feed tests (embedded Postgres)" npm run test:opportunities
+
+      - name: Differentiator tests — pills, waivers, outreach, timeline, apostille, twin
+        run: bash ci/run-step.sh "Differentiator tests — pills, waivers, outreach, timeline, apostille, twin" npm run test:differentiators
 
       - name: i18n message parity
-        run: npm run check:i18n
+        run: bash ci/run-step.sh "i18n message parity" npm run check:i18n
 
       - name: Lint (baseline gate — fails on new or worsened problems)
-        run: npm run lint:baseline
+        run: bash ci/run-step.sh "Lint (baseline gate — fails on new or worsened problems)" npm run lint:baseline
 
       - name: Responsive source-level regression tests
-        run: npm run test:responsive
+        run: bash ci/run-step.sh "Responsive source-level regression tests" npm run test:responsive
 
       - name: Dark-mode contrast audit
-        run: npm run test:dark
+        run: bash ci/run-step.sh "Dark-mode contrast audit" npm run test:dark
 
       - name: Build
-        run: npm run build
+        run: bash ci/run-step.sh "Build" npm run build
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
