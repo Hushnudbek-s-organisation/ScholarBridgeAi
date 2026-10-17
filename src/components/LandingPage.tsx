@@ -1338,14 +1338,16 @@ export function LandingPage({
   );
 }
 /**
- * The jet's route: a wide, graceful, STRICTLY monotonic-Y S-curve from the
- * hero (y=100) to the CTA (y=3320). The previous path had backwards Y-loops
- * (…720 1410, 720 1280… and …550 2970, 540 2840…) — with a scroll-driven
- * camera each loop made the whole overlay lurch twice. Monotonic Y means the
- * camera only ever moves one way: scroll and flight can never fight.
+ * The jet's route: a wide, graceful, STRICTLY monotonic-Y double-S that
+ * spans the WHOLE viewport (viewBox 1200×1000 — no camera translate needed).
+ * The airplane flies it top-left → bottom-right exactly once per scroll
+ * journey, so its on-screen position always advances forward along the curve;
+ * nothing is translated backwards to fake motion. Monotonic Y keeps the
+ * tangent (heading) sweeping smoothly and makes any backwards slide of the
+ * trail structurally impossible.
  */
 const FLIGHT_PATH_D =
-  "M 600 100 C 960 240, 1020 460, 720 640 C 400 820, 180 1000, 260 1220 C 340 1440, 920 1560, 940 1800 C 960 2040, 300 2180, 260 2420 C 220 2660, 880 2800, 860 3040 C 840 3200, 680 3260, 600 3320";
+  "M 90 60 C 470 90, 800 150, 930 300 C 1040 425, 820 470, 560 500 C 300 530, 60 570, 150 720 C 240 870, 640 880, 900 905 C 1000 915, 1080 925, 1120 940";
 
 /** The jet is intentionally all greyscale; site accents never bleed into the flight overlay. */
 function ExecutiveMonochromeJet({
@@ -1470,7 +1472,12 @@ function ExecutiveMonochromeJet({
 
 function ScrollFlightPath() {
   /**
-   * Module 6 — zero-lag scroll flight:
+   * Zero-lag scroll flight — CONTINUOUS FORWARD (owner clarification):
+   *  • NO center-locking camera. The jet's on-screen position IS its path
+   *    position; scroll down ⇒ the jet advances along the curve, never the
+   *    other way round. The trail is a single growing stroke that starts at
+   *    the route origin and extends forward up to the jet (stroke-dashoffset
+   *    over the real path length), so it can only ever draw forward.
    *  1. NO React state on scroll: the listener writes a number, a single
    *     rAF loop lerps toward it and pokes the DOM directly (transform
    *     attributes + one stroke-dashoffset), so the main thread never
@@ -1484,7 +1491,6 @@ function ScrollFlightPath() {
    *     parks itself the instant the jet is on target — no idle rAF burn.
    */
   const pathRef = React.useRef<SVGPathElement | null>(null);
-  const cameraGroupRef = React.useRef<SVGGElement | null>(null);
   const jetGroupRef = React.useRef<SVGGElement | null>(null);
   const shadowGroupRef = React.useRef<SVGGElement | null>(null);
 
@@ -1548,9 +1554,10 @@ function ScrollFlightPath() {
       const scaleY = Math.max(0.01, window.innerHeight / 1000);
       const screenAngle = (Math.atan2(dy * scaleY, dx * scaleX) * 180) / Math.PI;
 
-      // The path is strictly monotonic in Y, so a plain "keep the jet at 48%
-      // of the viewport" camera can never fight a backwards loop again.
-      cameraGroupRef.current?.setAttribute("transform", `translate(0 ${480 - y})`);
+      // Forward-only rendering: the jet is placed AT its path point (no
+      // counter-translating camera), and the trail stroke is revealed from
+      // the route origin up to the jet — dashoffset shrinks monotonically as
+      // progress grows, so the line can never slide or extrude backwards.
       path.setAttribute("stroke-dashoffset", String(totalLen * (1 - smoothProgress)));
       jetGroupRef.current?.setAttribute(
         "transform",
@@ -1647,34 +1654,32 @@ function ScrollFlightPath() {
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <g ref={cameraGroupRef} transform="translate(0 380)" style={{ willChange: "transform" }}>
-          <path
-            d={FLIGHT_PATH_D}
-            fill="none"
-            stroke="currentColor"
-            opacity="0.25"
-            strokeWidth="2.2"
-            strokeDasharray="8 12"
-            strokeLinecap="round"
-          />
-          <path
-            ref={pathRef}
-            d={FLIGHT_PATH_D}
-            fill="none"
-            stroke="currentColor"
-            opacity="0.8"
-            strokeWidth="3.2"
-            strokeLinecap="round"
-            strokeDasharray="4200 4200"
-            strokeDashoffset={4200}
-          />
-          <g
-            ref={jetGroupRef}
-            transform="translate(600 100) scale(1 1) rotate(22)"
-            style={{ willChange: "transform" }}
-          >
-            <ExecutiveMonochromeJet bankDeg={0} shadowGroupRef={shadowGroupRef} />
-          </g>
+        <path
+          d={FLIGHT_PATH_D}
+          fill="none"
+          stroke="currentColor"
+          opacity="0.25"
+          strokeWidth="2.2"
+          strokeDasharray="8 12"
+          strokeLinecap="round"
+        />
+        <path
+          ref={pathRef}
+          d={FLIGHT_PATH_D}
+          fill="none"
+          stroke="currentColor"
+          opacity="0.8"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeDasharray="4200 4200"
+          strokeDashoffset={4200}
+        />
+        <g
+          ref={jetGroupRef}
+          transform="translate(90 60) scale(1 1) rotate(7)"
+          style={{ willChange: "transform" }}
+        >
+          <ExecutiveMonochromeJet bankDeg={0} shadowGroupRef={shadowGroupRef} />
         </g>
       </svg>
     </div>
@@ -1684,6 +1689,18 @@ function ScrollFlightPath() {
 function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
   const tIndex = useTranslations("landing");
   const sectionRef = React.useRef<HTMLElement | null>(null);
+  /**
+   * Images used to be `loading="lazy"` for everything past the first four
+   * cards. Lazy activation is measured against the VISUAL viewport, but the
+   * track slides each card in horizontally at animation speed — by the time
+   * a far card intersected, its fetch had only just started, so campus photos
+   * popped in seconds after the card was already on screen. Once the section
+   * comes near, the whole first loop copy starts downloading eagerly (24
+   * thumbnails, ~45 KB each, spread over an idle second before the section is
+   * even visible); the cloned copy shares the identical URLs and is served
+   * from the HTTP cache, so infinite looping never re-validates or refetches.
+   */
+  const [nearViewport, setNearViewport] = React.useState(false);
 
   React.useEffect(() => {
     const el = sectionRef.current;
@@ -1700,8 +1717,23 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       },
       { rootMargin: "160px 0px" },
     );
+    // A second, generous margin decides when it is worth warming the image
+    // pipeline. This fires at most twice and never per frame.
+    const prewarm = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNearViewport(true);
+          prewarm.disconnect();
+        }
+      },
+      { rootMargin: "720px 0px" },
+    );
     observer.observe(el);
-    return () => observer.disconnect();
+    prewarm.observe(el);
+    return () => {
+      observer.disconnect();
+      prewarm.disconnect();
+    };
   }, []);
 
   const renderRow = (items: MarqueeUniversityItem[], animClass: string, eagerCount = 0) => (
@@ -1728,10 +1760,15 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                     src={toWikimediaThumb(university.url, 480)}
                     onError={onWikimediaThumbError(university.url)}
                     alt={university.landmark}
-                    // The first cards of the first visible row paint immediately;
-                    // every duplicate and later row lazy-loads off-screen.
-                    loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
-                    {...(copy === 0 && index < eagerCount ? { fetchPriority: "high" as const } : { decoding: "async" as const })}
+                    // Leading cards of row 1 paint with the section; every other
+                    // FIRST-copy card is eager once the section is near (see
+                    // `nearViewport` above) — never when it has already slid into
+                    // view. The aria-hidden clone keeps `lazy` because its URLs
+                    // are identical to copy 0 and resolve from cache instantly.
+                    loading={copy === 0 && (index < eagerCount || nearViewport) ? "eager" : "lazy"}
+                    {...(copy === 0 && index < eagerCount
+                      ? { fetchPriority: "high" as const }
+                      : { fetchPriority: "low" as const, decoding: "async" as const })}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
@@ -1780,8 +1817,8 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       </div>
       <div className="space-y-3 overflow-hidden">
         {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 4)}
-        {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
-        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
+        {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 2)}
+        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 2)}
       </div>
     </section>
   );
