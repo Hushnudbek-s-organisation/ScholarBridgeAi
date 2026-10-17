@@ -10,15 +10,19 @@ export interface ResponsiveColumns {
   md?: number;
   /** Columns from `lg` (1024px) up. */
   lg?: number;
+  /** Columns from `xl` (1280px) up. */
+  xl?: number;
 }
 
 function computePerPage(
   base: number,
   md: number,
   lg: number,
+  xl: number,
   rows: number,
 ): number {
   if (typeof window === "undefined") return base * rows;
+  if (window.matchMedia("(min-width: 1280px)").matches) return xl * rows;
   if (window.matchMedia("(min-width: 1024px)").matches) return lg * rows;
   if (window.matchMedia("(min-width: 768px)").matches) return md * rows;
   return base * rows;
@@ -39,26 +43,29 @@ export function useResponsivePerPage(
   columns: ResponsiveColumns,
   rowsPerPage = ROWS_PER_PAGE,
 ): number {
-  const { base = 1, md = base, lg = md } = columns;
+  const { base = 1, md = base, lg = md, xl = lg } = columns;
 
   const [perPage, setPerPage] = useState<number>(() =>
-    computePerPage(base, md, lg, rowsPerPage),
+    computePerPage(base, md, lg, xl, rowsPerPage),
   );
 
   useEffect(() => {
     const onChange = () =>
-      setPerPage(computePerPage(base, md, lg, rowsPerPage));
+      setPerPage(computePerPage(base, md, lg, xl, rowsPerPage));
     const mdQuery = window.matchMedia("(min-width: 768px)");
     const lgQuery = window.matchMedia("(min-width: 1024px)");
+    const xlQuery = window.matchMedia("(min-width: 1280px)");
     mdQuery.addEventListener("change", onChange);
     lgQuery.addEventListener("change", onChange);
+    xlQuery.addEventListener("change", onChange);
     // Sync in case the viewport changed between first render and now.
     onChange();
     return () => {
       mdQuery.removeEventListener("change", onChange);
       lgQuery.removeEventListener("change", onChange);
+      xlQuery.removeEventListener("change", onChange);
     };
-  }, [base, md, lg, rowsPerPage]);
+  }, [base, md, lg, xl, rowsPerPage]);
 
   return perPage;
 }

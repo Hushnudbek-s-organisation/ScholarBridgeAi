@@ -381,3 +381,31 @@ export function ScrollRegion({
     </div>
   );
 }
+
+/**
+ * Lightweight placeholder for a lazily-loaded panel.
+ *
+ * The heavy panes (the visa studio, the AI studios, the admin panel) are
+ * code-split, so this is what the student sees for the few hundred
+ * milliseconds while the chunk arrives: the SHAPE of the panel, not a
+ * spinner floating in an empty page.
+ */
+export function PanelSkeleton({
+  rows = 3,
+  className = "",
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div className={`space-y-3 ${className}`} aria-hidden="true">
+      <div className="h-5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="h-20 w-full animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+        />
+      ))}
+    </div>
+  );
+}

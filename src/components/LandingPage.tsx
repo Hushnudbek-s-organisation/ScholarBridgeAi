@@ -600,7 +600,7 @@ export function LandingPage({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.16),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.18),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)]"
           />
-          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8">
             <motion.div initial="hidden" animate="visible" variants={heroGroup}>
               <motion.span
                 variants={heroItem}
@@ -668,7 +668,7 @@ export function LandingPage({
 
             {/* A compact colorful preview built from the app's real navigation source. */}
             <motion.div
-              className="relative mx-auto w-full max-w-[700px]"
+              className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
               initial={{ opacity: 0, y: 28, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
@@ -1445,7 +1445,11 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          el.classList.toggle("sb-marquee-paused", !entry.isIntersecting);
+          const paused = !entry.isIntersecting;
+          el.classList.toggle("sb-marquee-paused", paused);
+          // The state is also published as a data attribute, so the animation
+          // can be inspected (and paused) from the outside.
+          el.setAttribute("data-paused", paused ? "true" : "false");
         }
       },
       { rootMargin: "160px 0px" },
@@ -1511,6 +1515,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       ref={sectionRef}
       id="university-marquee"
       aria-labelledby="university-marquee-title"
+      data-paused="false"
       className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-[#0b1222] sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">

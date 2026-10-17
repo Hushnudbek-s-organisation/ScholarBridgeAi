@@ -46,27 +46,34 @@ import {
   TestPlannerPanel,
 } from "@/components/journey/PreparePanels";
 import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
-import { HubPage, HubEmpty, usePaneSelection, type HubPaneDef } from "./ui";
+import { HubPage, HubEmpty, PanelSkeleton, usePaneSelection, type HubPaneDef } from "./ui";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import { FeeWaiverStudio } from "@/components/FeeWaiverStudio";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 
-const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel));
-const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio));
-const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel));
-const CareerExplorerPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.CareerExplorerPanel));
-const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then((m) => m.PlanningStudio));
-const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio));
-const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio));
-const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio));
-const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant));
-const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor));
-const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor));
-const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection));
-const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace));
-const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection));
-const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection));
+/**
+ * The heavy panes are code-split: the visa studio pulls the whole speech
+ * SDK, the AI studios pull the model clients, and the mentor marketplace
+ * pulls the video player. Opening the explorer therefore downloads the
+ * explorer — not every studio in the product.
+ */
+const panelLoading = () => <PanelSkeleton rows={3} />;
+const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel), { loading: panelLoading });
+const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio), { loading: panelLoading });
+const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel), { loading: panelLoading });
+const CareerExplorerPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.CareerExplorerPanel), { loading: panelLoading });
+const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then((m) => m.PlanningStudio), { loading: panelLoading });
+const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio), { loading: panelLoading });
+const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio), { loading: panelLoading });
+const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio), { loading: panelLoading });
+const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant), { loading: panelLoading });
+const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor), { loading: panelLoading });
+const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor), { loading: panelLoading });
+const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection), { loading: panelLoading });
+const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace), { loading: panelLoading });
+const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection), { loading: panelLoading });
+const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection), { loading: panelLoading });
 
 type Profile = StudentProfile | null;
 

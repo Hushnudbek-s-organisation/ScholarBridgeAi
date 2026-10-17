@@ -36,6 +36,7 @@ import { DecisionPillStrip } from "./DecisionPillStrip";
 import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
 
 interface UniversityDetailData {
   id: number;
@@ -198,6 +199,22 @@ interface UniversityDetailProps {
 const NOT_SPECIFIED = "Not specified";
 const NOT_AVAILABLE = "Not available";
 
+/**
+ * The `/api/universities/[id]` payload. Cached client-side so "Back" renders
+ * the page again in 0ms instead of a loading spinner.
+ */
+interface UniversityDetailPayload {
+  university: UniversityDetailData;
+  programs?: ProgramData[];
+  applicationCycles?: CycleData[];
+  cycles?: CycleData[];
+  universityRequirements?: any;
+  money?: any;
+  scholarships?: ScholarshipData[];
+  sources?: SourceData[];
+  match?: UniversityDetailData["match"] | null;
+}
+
 /** Spec §19: verified vs unavailable. NULL is never shown as a value. */
 /** Format money generically for any currency — never assume USD. */
 function fmtMoney(v: number | null | undefined, currency = "USD", period = "year"): string {
@@ -290,6 +307,22 @@ export function UniversityDetail({
   const [startingApplication, setStartingApplication] = useState(false);
   const [startAppError, setStartAppError] = useState("");
   const [startAppDone, setStartAppDone] = useState(false);
+
+  /**
+   * Copy one API payload into the component state. Used by the network
+   * response and by the client-side cache, so both paths produce exactly the
+   * same screen.
+   */
+  const applyDetailPayload = React.useCallback((data: UniversityDetailPayload) => {
+    setUni(data.university);
+    setPrograms(data.programs || []);
+    setCycles(data.applicationCycles || data.cycles || []);
+    setUniversityRequirements(data.universityRequirements || null);
+    setMoney(data.money || null);
+    setScholarships(data.scholarships || []);
+    setSources(data.sources || []);
+    setMatch(data.match ?? null);
+  }, []);
 
   /**
    * Create the application row for this university and hand the workspace to the
@@ -397,22 +430,28 @@ export function UniversityDetail({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError("");
+      const qs = activeProfile?.id ? `?profileId=${activeProfile.id}` : "";
+      const cacheKey = `${universityId}${qs}`;
+      // The payload the browser already has (the student pressed "Back" a
+      // moment ago): render it instantly — no skeleton, no waiting — and
+      // only revalidate when the copy is older than 15 seconds.
+      const cached = getCatalogSwr<UniversityDetailPayload>("universityDetail", cacheKey);
+      if (cached) {
+        applyDetailPayload(cached.data);
+        setLoading(false);
+        setError("");
+        if (!cached.shouldRevalidate) return;
+      } else {
+        setLoading(true);
+        setError("");
+      }
       try {
-        const qs = activeProfile?.id ? `?profileId=${activeProfile.id}` : "";
         const res = await fetch(`/api/universities/${universityId}${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "load-failed");
         if (!cancelled) {
-          setUni(data.university);
-          setPrograms(data.programs || []);
-          setCycles(data.applicationCycles || data.cycles || []);
-          setUniversityRequirements(data.universityRequirements || null);
-          setMoney(data.money || null);
-          setScholarships(data.scholarships || []);
-          setSources(data.sources || []);
-          setMatch(data.match ?? null);
+          applyDetailPayload(data);
+          setCatalogSwr("universityDetail", cacheKey, data);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "load-failed");
@@ -423,7 +462,7 @@ export function UniversityDetail({
     return () => {
       cancelled = true;
     };
-  }, [universityId, activeProfile?.id]);
+  }, [universityId, activeProfile?.id, applyDetailPayload]);
 
   if (loading) {
     return (
@@ -462,7 +501,7 @@ export function UniversityDetail({
         {uni.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={toWikimediaThumb(uni.imageUrl, 960)}
+            src={toWikimediaThumb(uni.imageUrl, 1200)}
             onError={onWikimediaThumbError(uni.imageUrl)}
             alt=""
             decoding="async"
@@ -482,8 +521,12 @@ export function UniversityDetail({
                   src={toWikimediaThumb(uni.imageUrl, 320)}
                   onError={onWikimediaThumbError(uni.imageUrl)}
                   alt={`${uni.name} logo`}
+                  loading="eager"
                   decoding="async"
-                  className="h-full w-full object-contain p-2"
+                  // The campus photo is landscape: `object-contain` letterboxed
+                  // it into a thin strip with white bars. `object-cover` fills
+                  // the square emblem cleanly.
+                  className="h-full w-full object-cover"
                 />
               ) : (
                 <div className="sb-ink-on-bright flex flex-col items-center justify-center gap-1">
@@ -756,6 +799,11 @@ export function UniversityDetail({
         )}
       </div>
 
+      {/* ===== LAPTOP (lg+): QUICK FACTS · FINANCIAL OVERVIEW · REQUIREMENTS =====
+          On a 1440px screen three full-width cards are a column of narrow
+          text. From `lg` the quick facts and the money block sit side by side
+          and the requirement grid spans the full width under them. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* ===== ABOUT (spec §3) ===== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -773,7 +821,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== ACADEMIC REQUIREMENTS (spec §5) — compact, collapsible ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <GraduationCap className="h-4 w-4 text-indigo-600" /> {t("academicReqs")}
         </h2>
@@ -906,6 +954,7 @@ export function UniversityDetail({
             value={money?.applicationFee != null ? fmtMoney(money.applicationFee, money.applicationFeeCurrency ?? "USD", "application") : NOT_AVAILABLE}
           />
         </div>
+      </div>
       </div>
 
       {/* ===== PROGRAMS (spec §7) ===== */}

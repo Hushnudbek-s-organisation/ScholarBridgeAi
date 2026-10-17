@@ -38,6 +38,7 @@ import {
   Award,
   Filter,
   Check,
+  ChevronDown,
   Plus,
   Columns,
   ExternalLink,
@@ -320,7 +321,9 @@ export function UniversityExplorer({
       setLoading(false);
       setRefreshing(false);
       setFetchError("");
-      if (cached.isFresh) return;
+      // Fresh enough (< 15 s): render it and skip the request entirely.
+      // Older: render it instantly and refresh in the background.
+      if (!cached.shouldRevalidate) return;
     } else if (hasLoadedRef.current) {
       setRefreshing(true);
     } else {
@@ -477,6 +480,21 @@ export function UniversityExplorer({
     debouncedSearch.trim() !== "" ||
     sortBy !== "rank";
 
+  /**
+   * Phone (< 640px): the six filter controls used to stack above the first
+   * university card, pushing it ~550px down the screen. The search box and
+   * the quick chips stay visible; the secondary controls collapse behind one
+   * button that reports how many filters are active.
+   */
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const activeFilterCount =
+    (selectedCountry !== "All" ? 1 : 0) +
+    (selectedType !== "All" ? 1 : 0) +
+    (selectedLevel !== "All" ? 1 : 0) +
+    (committedMaxTuition !== 70000 ? 1 : 0) +
+    (maxRank != null ? 1 : 0) +
+    (ieltsMax != null ? 1 : 0);
+
   const resetFilters = () => {
     if (searchDebounceRef.current !== null) {
       window.clearTimeout(searchDebounceRef.current);
@@ -587,9 +605,14 @@ export function UniversityExplorer({
           )}
         </div>
 
-        {/* Filter Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
-          {/* Text Search */}
+        {/* Filter Controls Grid
+            3 tiers: on a phone the five secondary controls collapse behind one
+            button (the search box and the quick chips stay visible); from
+            `sm` up the wrapper becomes `display: contents`, so all six
+            controls are direct cells of the outer grid — 3 columns × 2 rows on
+            a tablet, a single 6-column row on a laptop. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          {/* Text Search — always visible, on every screen size. */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -602,6 +625,31 @@ export function UniversityExplorer({
             />
           </div>
 
+          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="university-filters"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 sm:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="break-words text-center">{t("exFiltersAndSort")}</span>
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
+              The elements stay MOUNTED (only the layout changes), so the
+              filters keep their values, their labels and their test ids. */}
+          <div
+            id="university-filters"
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
+          >
           {/* Country Filter */}
           <div>
             <select
@@ -693,6 +741,7 @@ export function UniversityExplorer({
               onKeyUp={(e) => commitTuition(Number((e.target as HTMLInputElement).value))}
               className="w-full accent-indigo-600 cursor-pointer h-1.5 mt-1"
             />
+          </div>
           </div>
         </div>
 
@@ -878,8 +927,9 @@ export function UniversityExplorer({
                 key={uni.id}
                 className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-lg hover:border-indigo-300 transition-all overflow-hidden flex flex-col justify-between group"
               >
-                {/* Top Image Banner */}
-                <div className="relative h-40 w-full overflow-hidden bg-slate-100">
+                {/* Top Image Banner — a taller banner on a phone, where the
+                    card is the only thing on the row. */}
+                <div className="relative h-44 w-full overflow-hidden bg-slate-100 md:h-40">
                   {uni.imageUrl ? (
                     <Image
                       src={toWikimediaThumb(uni.imageUrl, 640)}
@@ -1042,39 +1092,22 @@ export function UniversityExplorer({
                     ) : null}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                    <label className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 px-2 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={isCompared}
-                        onChange={() => toggleCompare(uni.id)}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span>{t("exCompare")}</span>
-                    </label>
-
+                  {/* Action Buttons
+                      Phone: the two primary actions share one 2-button row and
+                      the secondary controls sit on their own row, so the
+                      footer never wraps into three ragged lines. From `sm` up
+                      everything returns to a single inline row. */}
+                  <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Priority 4.1 — create the application (and its
-                          checklist) from the card the student is reading. */}
-                      <button
-                        type="button"
-                        onClick={() => void startApplication(uni)}
-                        disabled={startingUniId != null}
-                        title={
-                          activeProfile
-                            ? t("startAppHint", { name: uni.name })
-                            : t("startAppNeedsProfile")
-                        }
-                        className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {startingUniId === uni.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        ) : (
-                          <Zap className="h-3.5 w-3.5" aria-hidden />
-                        )}
-                        {t("startApp")}
-                      </button>
+                      <label className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 px-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={isCompared}
+                          onChange={() => toggleCompare(uni.id)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>{t("exCompare")}</span>
+                      </label>
 
                       <a
                         href={uni.websiteUrl ?? undefined}
@@ -1085,14 +1118,6 @@ export function UniversityExplorer({
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
-
-                      <button
-                        onClick={() => setSelectedUniId(uni.id)}
-                        className="flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        {t("exViewUniversity")}
-                      </button>
 
                       {isSaved ? (
                         <button
@@ -1111,6 +1136,37 @@ export function UniversityExplorer({
                           {t("exShortlist")}
                         </button>
                       )}
+                    </div>
+
+                    <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap sm:items-center">
+                      {/* Priority 4.1 — create the application (and its
+                          checklist) from the card the student is reading. */}
+                      <button
+                        type="button"
+                        onClick={() => void startApplication(uni)}
+                        disabled={startingUniId != null}
+                        title={
+                          activeProfile
+                            ? t("startAppHint", { name: uni.name })
+                            : t("startAppNeedsProfile")
+                        }
+                        className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {startingUniId === uni.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Zap className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        {t("startApp")}
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedUniId(uni.id)}
+                        className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        {t("exViewUniversity")}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1137,10 +1193,13 @@ export function UniversityExplorer({
         <AppNote kind="catalogue" className="border-t border-slate-200 pt-3" />
       )}
 
-      {/* Side-by-Side Comparison Modal */}
+      {/* Side-by-Side Comparison Modal
+          Phone: a bottom sheet the student swipes sideways through — the
+          metric names stay pinned on the left, so the numbers never lose
+          their label. Tablet and up: the centred dialog of before. */}
       {showCompareModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-end justify-center sm:items-center sm:p-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-t-3xl bg-white shadow-2xl overflow-hidden border border-slate-200 sm:rounded-2xl">
             <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Columns className="h-5 w-5" />
@@ -1154,7 +1213,7 @@ export function UniversityExplorer({
               </button>
             </div>
 
-            <ScrollRegion label={t("exCompare")} className="p-6 overflow-x-auto">
+            <ScrollRegion label={t("exCompare")} className="p-4 sm:p-6 overflow-x-auto">
               {compareLoading ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-500">
                   {t("exCompareLoading")}
@@ -1163,7 +1222,7 @@ export function UniversityExplorer({
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold text-slate-500 w-1/4">{t("exMetric")}</th>
+                    <th className="sticky left-0 z-10 bg-white py-3 px-4 font-bold text-slate-500 w-1/4 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMetric")}</th>
                     {comparedUniversities.map((u) => (
                       <th key={u.id} className="py-3 px-4 font-bold text-slate-900 text-sm w-1/4">
                         <div className="flex items-center gap-1">
@@ -1176,13 +1235,13 @@ export function UniversityExplorer({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMWorldRanking")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMWorldRanking")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMatchScore")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-blue-700">
                         {u.matchScore != null ? t("exMatchPct", { score: u.matchScore }) : t("exMatchUnavailable")}
@@ -1199,37 +1258,37 @@ export function UniversityExplorer({
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAnnualTuition")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMAnnualTuition")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900 font-bold">{formatMoney(u.annualTuitionUsd, "USD")}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMLivingExpenses")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMLivingExpenses")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatMoney(u.annualLivingEstUsd, "USD", { suffix: "/yr" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMPsWorkVisa")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMPsWorkVisa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-amber-700">{formatNumber(u.postStudyWorkVisaYears, { placeholder: "—", suffix: " Years" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinGpa")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinGpa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minGpa, { decimals: 2, suffix: " / 4.0" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinIelts")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinIelts")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minIelts, { decimals: 1 })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAcceptanceRate")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMAcceptanceRate")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatPercent(u.acceptanceRate, { placeholder: "—" })}</td>
                     ))}

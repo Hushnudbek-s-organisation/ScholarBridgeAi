@@ -99,43 +99,50 @@ export default async function UniversitiesPage({
         };
       });
     } else {
-      const [countRow] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(universitiesTable)
-        .where(eq(universitiesTable.isActive, true));
+      // Count and page in ONE round trip: the two statements are independent,
+      // so running them in parallel halves the time this fallback path waits
+      // for PostgreSQL. The active predicate is identical in both, so the
+      // pagination total still matches the visible rows.
+      const [countRows, data] = await Promise.all([
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(universitiesTable)
+          .where(eq(universitiesTable.isActive, true)),
+        db
+          .select({
+            id: universitiesTable.id,
+            name: universitiesTable.name,
+            country: universitiesTable.country,
+            city: universitiesTable.city,
+            flagEmoji: universitiesTable.flagEmoji,
+            worldRanking: universitiesTable.worldRanking,
+            programMajor: universitiesTable.programMajor,
+            universityType: universitiesTable.universityType,
+            annualTuition: universitiesTable.annualTuition,
+            tuitionCurrency: universitiesTable.tuitionCurrency,
+            tuitionPeriod: universitiesTable.tuitionPeriod,
+            annualTuitionUsd: universitiesTable.annualTuitionUsd,
+            annualLivingEst: universitiesTable.annualLivingEst,
+            livingCostCurrency: universitiesTable.livingCostCurrency,
+            livingCostPeriod: universitiesTable.livingCostPeriod,
+            annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
+            minIelts: universitiesTable.minIelts,
+            postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
+            officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
+            websiteUrl: universitiesTable.websiteUrl,
+          })
+          .from(universitiesTable)
+          .where(eq(universitiesTable.isActive, true))
+          .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
+          .limit(ITEMS_PER_PAGE)
+          .offset(from),
+      ]);
+      const [countRow] = countRows;
       totalItems = Number(countRow?.n ?? 0);
       const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
       if (requestedPage > lastPage) {
         redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
       }
-      const data = await db
-        .select({
-          id: universitiesTable.id,
-          name: universitiesTable.name,
-          country: universitiesTable.country,
-          city: universitiesTable.city,
-          flagEmoji: universitiesTable.flagEmoji,
-          worldRanking: universitiesTable.worldRanking,
-          programMajor: universitiesTable.programMajor,
-          universityType: universitiesTable.universityType,
-          annualTuition: universitiesTable.annualTuition,
-          tuitionCurrency: universitiesTable.tuitionCurrency,
-          tuitionPeriod: universitiesTable.tuitionPeriod,
-          annualTuitionUsd: universitiesTable.annualTuitionUsd,
-          annualLivingEst: universitiesTable.annualLivingEst,
-          livingCostCurrency: universitiesTable.livingCostCurrency,
-          livingCostPeriod: universitiesTable.livingCostPeriod,
-          annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
-          minIelts: universitiesTable.minIelts,
-          postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
-          officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
-          websiteUrl: universitiesTable.websiteUrl,
-        })
-        .from(universitiesTable)
-        .where(eq(universitiesTable.isActive, true))
-        .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
-        .limit(ITEMS_PER_PAGE)
-        .offset(from);
       // Nullable columns stay null (never "" or 0) — the card renders nothing
       // rather than pretending a ranking/focus exists.
       rows = data.map((university) => {

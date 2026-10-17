@@ -143,6 +143,14 @@ interface NavbarProps {
   onStartOnboarding?: () => void;
   onLogout?: () => void;
   onLocaleChange?: (locale: string) => void;
+  /**
+   * The navigation configuration the shell already fetched.
+   *
+   * Passing it in removes a SECOND `/api/config/nav` round trip on every page
+   * load (the shell needs the same list to hide whole sections). When the
+   * prop is absent the navbar fetches it itself, exactly as before.
+   */
+  hiddenNav?: string[];
 }
 
 interface NavItem {
@@ -314,6 +322,25 @@ const BOTTOM_BAR_GROUPS: { group: NavGroupId; section: string; icon: React.Compo
   { group: "applications", section: "applications", icon: CheckSquare, labelKey: "tabApps" },
 ];
 
+/**
+ * The tablet icon rail (768px – 1023px) shows the destinations a student
+ * moves between all day, one tap away. The full list stays in the drawer.
+ */
+const TABLET_RAIL_IDS = [
+  "dashboard",
+  "universities",
+  "scholarships",
+  "study-plan",
+  "tasks",
+  "profile",
+  "funding",
+  "applications",
+  "materials",
+  "visa",
+  "guidance",
+  "community",
+];
+
 export function Navbar({
   activeTab,
   setActiveTab,
@@ -324,6 +351,7 @@ export function Navbar({
   onStartOnboarding,
   onLogout,
   onLocaleChange,
+  hiddenNav,
 }: NavbarProps) {
   const t = useTranslations("nav");
   const tm = useTranslations("meta");
@@ -332,6 +360,8 @@ export function Navbar({
 
   // Admin → Navigation: ids hidden for EVERYONE (admin included). Hiding a
   // destination removes it from the sidebar; hiding a pane removes that tab.
+  // When the shell already fetched the configuration it hands it over, so the
+  // navbar does not ask the server for the same list a second time.
   const [hiddenItems, setHiddenItems] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -366,7 +396,9 @@ export function Navbar({
         // offline / API down — keep the defaults, the sidebar still works.
       }
     };
-    void loadHidden();
+    // The shell usually provides the configuration already (it needs the same
+    // list to hide whole sections) — do not ask the server for it twice.
+    if (!hiddenNav) void loadHidden();
     // Fired by Admin → Navigation after a save — updates the open sidebar live.
     const onUpdate = () => void loadHidden();
     window.addEventListener("scholarbridge:nav-updated", onUpdate);
@@ -374,7 +406,19 @@ export function Navbar({
       alive = false;
       window.removeEventListener("scholarbridge:nav-updated", onUpdate);
     };
-  }, []);
+  }, [hiddenNav]);
+
+  // The shell's configuration arrives asynchronously: adopt it as soon as it
+  // lands, so the sidebar never shows a destination the admin has hidden.
+  // Adjusted during render (React's documented "derive state from a prop"
+  // pattern) rather than in an effect, which would cost an extra render pass.
+  const [prevHiddenNav, setPrevHiddenNav] = useState<string[] | undefined>(undefined);
+  if (hiddenNav !== prevHiddenNav) {
+    setPrevHiddenNav(hiddenNav);
+    if (hiddenNav) {
+      setHiddenItems(parseHiddenNav(JSON.stringify(hiddenNav)));
+    }
+  }
 
   // If the admin hides the destination the user is currently on, land them back
   // on the dashboard instead of leaving a nav-less page.
@@ -751,6 +795,16 @@ export function Navbar({
   const bottomItems = BOTTOM_BAR_GROUPS.filter((b) => visibleDestinations.some((d) => d.group === b.group));
   const activeInBottomBar = bottomItems.some((b) => b.group === activeGroup);
 
+  // The tablet rail carries the destinations a student moves between all day
+  // (plus Admin for an operator). Everything else stays in the drawer.
+  const tabletItems = useMemo(() => {
+    const ids = new Set(TABLET_RAIL_IDS);
+    const list = visibleDestinations.filter((d) => ids.has(d.id));
+    const admin = utilityItems.find((u) => u.id === "admin");
+    if (admin) list.push(admin);
+    return list;
+  }, [visibleDestinations, utilityItems]);
+
   return (
     <>
       <a
@@ -776,8 +830,92 @@ export function Navbar({
         </div>
       </aside>
 
-      {/* ================= PHONE / TABLET: TOP BAR ================= */}
-      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-md lg:hidden dark:border-slate-800 dark:bg-slate-900/95">
+      {/* ================= TABLET: COMPACT ICON RAIL ================= */}
+      {/* 768px – 1023px. A stretched phone tab bar wastes the tablet's width
+          and a full desktop sidebar squeezes the content column, so tablets
+          get their own 80px rail: every destination is one tap away, the
+          labels stay short, and the drawer is still one tap for the full
+          list. */}
+      <aside className="sticky top-0 z-40 hidden h-screen w-20 shrink-0 flex-col items-center justify-between border-r border-slate-200 bg-white py-3 md:flex lg:hidden dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-1.5">
+          <button
+            onClick={() => go("dashboard")}
+            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label={tm("appName")}
+          >
+            <span className="sb-logo-well h-9 w-9 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
+            </span>
+          </button>
+          <button
+            onClick={openSearch}
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            aria-label={t("searchButton")}
+          >
+            <Search className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label={t("openMenu")}
+            aria-expanded={drawerOpen}
+            aria-haspopup="dialog"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
+
+        <nav
+          className="no-scrollbar flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto overscroll-contain px-1.5 py-2"
+          aria-label={t("mainNav")}
+        >
+          {tabletItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = isDestinationActive(item.id);
+            return (
+              <button
+                key={item.id}
+                onClick={() => go(item.id)}
+                aria-current={isActive ? "page" : undefined}
+                title={item.label}
+                className={`relative flex min-h-16 w-full min-w-11 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? "text-indigo-600 dark:text-indigo-300"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-active-tablet"
+                    className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-500/10"
+                    transition={LAYOUT_SPRING}
+                  />
+                )}
+                <Icon className="relative h-5 w-5 shrink-0" />
+                <span className="relative w-full min-w-0 break-words whitespace-normal text-center leading-tight">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex flex-col items-center gap-1.5">
+          <NotificationBell profileId={activeProfileId ?? null} placement="up" />
+          <ThemeSwitch />
+          <button
+            onClick={() => onOpenProfileModal(false)}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white transition-colors hover:bg-indigo-700"
+            aria-label={t("editProfile")}
+            title={t("editProfile")}
+          >
+            {initials}
+          </button>
+        </div>
+      </aside>
+
+      {/* ================= PHONE: TOP BAR ================= */}
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-md md:hidden dark:border-slate-800 dark:bg-slate-900/95">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
           <button
             onClick={() => setDrawerOpen(true)}
@@ -810,9 +948,9 @@ export function Navbar({
         </div>
       </header>
 
-      {/* ================= PHONE / TABLET: BOTTOM TAB BAR ================= */}
+      {/* ================= PHONE: BOTTOM TAB BAR ================= */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden dark:border-slate-800 dark:bg-slate-900/95"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden dark:border-slate-800 dark:bg-slate-900/95"
         aria-label={t("quickNav")}
       >
         <div className="mx-auto grid max-w-xl grid-cols-5">

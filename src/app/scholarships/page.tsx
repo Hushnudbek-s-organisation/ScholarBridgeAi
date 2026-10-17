@@ -103,35 +103,42 @@ export default async function ScholarshipsPage({
         website_url: scholarship.websiteUrl,
       }));
     } else {
-      const [countRow] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(scholarshipsTable)
-        .where(eq(scholarshipsTable.isActive, true));
+      const from = (requestedPage - 1) * ITEMS_PER_PAGE;
+      // Count and page in ONE round trip: the two statements are independent,
+      // so running them in parallel halves the time this fallback path waits
+      // for PostgreSQL. The active predicate is identical in both, so the
+      // pagination total still matches the visible rows.
+      const [countRows, data] = await Promise.all([
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(scholarshipsTable)
+          .where(eq(scholarshipsTable.isActive, true)),
+        db
+          .select({
+            id: scholarshipsTable.id,
+            title: scholarshipsTable.title,
+            provider: scholarshipsTable.provider,
+            country: scholarshipsTable.country,
+            coverageType: scholarshipsTable.coverageType,
+            amountUsdValue: scholarshipsTable.amountUsdValue,
+            awardAmount: scholarshipsTable.awardAmount,
+            awardCurrency: scholarshipsTable.awardCurrency,
+            awardPeriod: scholarshipsTable.awardPeriod,
+            deadline: scholarshipsTable.deadline,
+            websiteUrl: scholarshipsTable.websiteUrl,
+          })
+          .from(scholarshipsTable)
+          .where(eq(scholarshipsTable.isActive, true))
+          .orderBy(asc(scholarshipsTable.id))
+          .limit(ITEMS_PER_PAGE)
+          .offset(from),
+      ]);
+      const [countRow] = countRows;
       totalItems = Number(countRow?.n ?? 0);
       const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
       if (requestedPage > totalPagesForQuery) {
         redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
       }
-      const from = (requestedPage - 1) * ITEMS_PER_PAGE;
-      const data = await db
-        .select({
-          id: scholarshipsTable.id,
-          title: scholarshipsTable.title,
-          provider: scholarshipsTable.provider,
-          country: scholarshipsTable.country,
-          coverageType: scholarshipsTable.coverageType,
-          amountUsdValue: scholarshipsTable.amountUsdValue,
-          awardAmount: scholarshipsTable.awardAmount,
-          awardCurrency: scholarshipsTable.awardCurrency,
-          awardPeriod: scholarshipsTable.awardPeriod,
-          deadline: scholarshipsTable.deadline,
-          websiteUrl: scholarshipsTable.websiteUrl,
-        })
-        .from(scholarshipsTable)
-        .where(eq(scholarshipsTable.isActive, true))
-        .orderBy(asc(scholarshipsTable.id))
-        .limit(ITEMS_PER_PAGE)
-        .offset(from);
       rows = data.map((scholarship) => ({
         id: scholarship.id,
         title: scholarship.title,

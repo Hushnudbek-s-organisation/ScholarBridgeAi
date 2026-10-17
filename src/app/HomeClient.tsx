@@ -10,6 +10,7 @@ import { LandingPage } from "@/components/LandingPage";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
+import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { PageTransition } from "@/components/motion";
 import {
@@ -22,17 +23,25 @@ import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
+import { PanelSkeleton } from "@/components/hubs/ui";
 
-const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal));
-const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker));
-const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard));
-const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter));
-const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection));
-const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection));
-const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard));
-const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel));
-const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings));
-const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel));
+/**
+ * Every heavy screen is a separate chunk: the admin panel, the payments and
+ * rewards areas, the Telegram settings, the session list and the thirteen
+ * destination hubs. Opening the landing page therefore downloads the landing
+ * page — not the visa studio's speech SDK.
+ */
+const panelLoading = () => <PanelSkeleton rows={4} />;
+const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal), { loading: panelLoading });
+const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker), { loading: panelLoading });
+const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard), { loading: panelLoading });
+const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
+const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection), { loading: panelLoading });
+const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection), { loading: panelLoading });
+const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard), { loading: panelLoading });
+const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel), { loading: panelLoading });
+const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings), { loading: panelLoading });
+const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel), { loading: panelLoading });
 
 const UniversitiesHub = dynamic(() => import("@/components/hubs").then((m) => m.UniversitiesHub));
 const ScholarshipsHub = dynamic(() => import("@/components/hubs").then((m) => m.ScholarshipsHub));
@@ -436,11 +445,7 @@ export function Home({
             // ignore
           }
         };
-        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-          window.requestIdleCallback(runDeferredSweeps, { timeout: 2500 });
-        } else {
-          setTimeout(runDeferredSweeps, 1500);
-        }
+        scheduleWhenIdle(runDeferredSweeps, 1800);
         setRestoreError(null);
         return;
       }
@@ -903,7 +908,9 @@ export function Home({
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans">
+      {/* 3-tier shell: the column stacks on a phone, the tablet rail and the
+          laptop sidebar sit next to the content from `md` (768px) up. */}
+      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -914,10 +921,11 @@ export function Home({
         onStartOnboarding={startOnboarding}
         onLocaleChange={handleLocaleChange}
         onLogout={handleLogout}
+        hiddenNav={hiddenNav}
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
         {/* Sections swap with a short cross-fade + lift. The outer profile key
             is also an isolation boundary: unmount every profile-scoped loader,

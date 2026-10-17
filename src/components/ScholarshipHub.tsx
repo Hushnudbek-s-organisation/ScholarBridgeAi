@@ -17,6 +17,7 @@ import {
   Check, 
   Sparkles,
   BookOpen,
+  ChevronDown,
   Filter,
   AlertCircle,
   Wallet,
@@ -173,6 +174,14 @@ export function ScholarshipHub({
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedCoverage, setSelectedCoverage] = useState("All");
   const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
+  /**
+   * Phone (< 640px): the two dropdowns collapse behind one button so the
+   * first scholarship card is not pushed off the screen. The search box stays
+   * visible; the selects stay mounted either way.
+   */
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const activeFilterCount =
+    (selectedCountry !== "All" ? 1 : 0) + (selectedCoverage !== "All" ? 1 : 0);
   if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
     setLastFocusRequestId(autoFocusScholarship.requestId);
     setSearch(autoFocusScholarship.title);
@@ -184,8 +193,8 @@ export function ScholarshipHub({
   }
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
-  // `grid-cols-1 md:grid-cols-2`, so 8 / 16 cards.
-  const perPage = useResponsivePerPage({ base: 1, md: 2 });
+  // `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, so 8 / 16 / 24 cards.
+  const perPage = useResponsivePerPage({ base: 1, md: 2, xl: 3 });
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -234,7 +243,9 @@ export function ScholarshipHub({
       setTotalPages(cached.data.totalPages);
       setLoading(false);
       setRefreshing(false);
-      if (cached.isFresh) return;
+      // Fresh enough (< 15 s): render it and skip the request entirely.
+      // Older: render it instantly and refresh in the background.
+      if (!cached.shouldRevalidate) return;
     } else if (hasLoadedRef.current) {
       setRefreshing(true);
     } else {
@@ -347,8 +358,12 @@ export function ScholarshipHub({
           </p>
         </div>
 
-        {/* Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+        {/* Filter Controls
+            Phone (< 640px): the search box stays visible and the two dropdowns
+            collapse behind one button, so the first scholarship card is not
+            pushed off the screen. From `sm` up the wrapper becomes
+            `display: contents` and all three controls sit in one row. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3">
           {/* Search Box */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -362,6 +377,31 @@ export function ScholarshipHub({
             />
           </div>
 
+          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="scholarship-filters"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 sm:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="break-words text-center">{t("filtersAndSort")}</span>
+            {activeFilterCount > 0 && (
+              <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
+              The elements stay MOUNTED, so the filters keep their values and
+              their accessible names. */}
+          <div
+            id="scholarship-filters"
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
+          >
           {/* Country Filter */}
           <div>
             <select
@@ -398,6 +438,7 @@ export function ScholarshipHub({
               <option value="Partial Tuition">{t("coveragePartial")}</option>
             </select>
           </div>
+          </div>
         </div>
       </div>
 
@@ -416,7 +457,7 @@ export function ScholarshipHub({
       {/* Grid List */}
       {loading ? (
         // Skeleton cards sized like the real ones — no height jump on load.
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" aria-busy="true">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -438,7 +479,7 @@ export function ScholarshipHub({
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-150 ${
+          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
