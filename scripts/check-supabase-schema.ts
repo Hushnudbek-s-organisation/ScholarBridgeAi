@@ -195,6 +195,11 @@ async function main() {
     const hints: string[] = [];
     if (/password authentication failed|28000|28P01/i.test(`${msg} ${code}`)) {
       hints.push("Wrong database user/password. Supabase: Project Settings → Database → Connection string (URI) — copy it whole, the password is the DATABASE password, not the dashboard login.");
+      const asUser = /for user "([^"]+)"/.exec(msg)?.[1] ?? "";
+      if (looksSupabase && asUser && !asUser.includes(".")) {
+        hints.push(`Supabase's pooler authenticates as "postgres.<project-ref>", not as "${asUser}". Copy the URI verbatim from Project Settings → Database → Connection string → Session pooler (it starts postgresql://postgres.<ref>:…). The string already stored in the deploy host's DATABASE_URL env var is known-good — reuse exactly that one.`);
+      }
+      hints.push("If the password contains @ # / : ? or % it must be percent-encoded in the URL (@ → %40, # → %23, % → %25), or reset it: Settings → Database → Reset database password.");
     }
     if (/no pg_hba\.conf entry|SSL off|ssl/i.test(msg) || /pg_hba/i.test(msg)) {
       hints.push("The server requires TLS: append ?sslmode=require to the connection string.");
