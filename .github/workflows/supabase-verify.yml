@@ -1,0 +1,125 @@
+# GitHub Actions — Supabase live schema verification.
+#
+# This is the ONLY automated GitHub <-> Supabase link in the repository. On
+# every push to main (and on demand) it runs `npm run db:verify`, which is
+# strictly READ-ONLY: one `SELECT ... FROM information_schema.columns` against
+# the live Supabase database, then a diff against `src/db/schema.ts`. No DDL,
+# no writes, no migrations are ever applied from CI — the repo's rule stays
+# "Supabase is the source of truth, schema changes are a manual decision"
+# (see render.yaml and DEPLOYMENT.md §2).
+#
+# It needs ONE repository secret (Settings -> Secrets and variables -> Actions):
+#
+#   SUPABASE_DB_URL = postgresql://postgres.<ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+#
+# (Supabase dashboard -> Project Settings -> Database -> Connection string ->
+#  URI, "Session pooler".) A secret named DATABASE_URL is used as a fallback.
+# When neither is set — or the value is still a placeholder — the job SKIPS
+# with a notice instead of failing, so this workflow can never block a deploy.
+#
+# GitHub Apps need the extra `workflows` permission to create or update
+# workflow files. If the automation account cannot commit this file, copy the
+# mirror in ci/supabase-verify.yml into place once, by hand:
+#
+#   cp ci/supabase-verify.yml .github/workflows/supabase-verify.yml
+#   git add .github/workflows/supabase-verify.yml
+#   git commit -m 'ci: verify live Supabase schema on push to main'
+#
+name: Supabase schema verify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-live-schema:
+    name: Live Supabase schema (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      # Never prints the secret itself — only whether one is usable.
+      - name: Check for a Supabase connection secret
+        id: db
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATABASE_URL_SECRET: ${{ secrets.DATABASE_URL }}
+        run: |
+          url="${SUPABASE_DB_URL:-$DATABASE_URL_SECRET}"
+          case "$url" in
+            postgresql://*|postgres://*)
+              case "$url" in
+                *"REPLACE_ME"*|*"XXXX"*|*"your-project"*|*"<ref>"*)
+                  echo "configured=no" >> "$GITHUB_OUTPUT"
+                  echo "Supabase secret is still a placeholder - live verify skipped."
+                  ;;
+                *)
+                  echo "configured=yes" >> "$GITHUB_OUTPUT"
+                  echo "Supabase connection string found - running the live verify."
+                  ;;
+              esac
+              ;;
+            *)
+              echo "configured=no" >> "$GITHUB_OUTPUT"
+              echo "No SUPABASE_DB_URL (or DATABASE_URL) secret set - live verify skipped."
+              ;;
+          esac
+
+      - name: Verify live Supabase schema (information_schema SELECT only)
+        if: steps.db.outputs.configured == 'yes'
+        id: verify
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATABASE_URL_SECRET: ${{ secrets.DATABASE_URL }}
+        run: |
+          export DATABASE_URL="${SUPABASE_DB_URL:-$DATABASE_URL_SECRET}"
+          set +e
+          npm run db:verify 2>&1 | tee /tmp/verify.log
+          code="${PIPESTATUS[0]}"
+          {
+            echo "## Supabase live schema verify — exit `$code`"
+            echo
+            echo "### Gaps between src/db/schema.ts and the live database"
+            echo
+            grep -E "MISSING|TYPE MISMATCH" /tmp/verify.log || echo "(none)"
+            echo
+            echo '```'
+            tail -n 40 /tmp/verify.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "0" ]; then
+            # Runner log archives are not always downloadable, but check
+            # annotations are. Publish one annotation per gap (password-redacted)
+            # instead of a truncated tail, so every issue is readable.
+            grep -E "CONNECTION FAILED|MISSING|TYPE MISMATCH|FAILED:|PASSED" /tmp/verify.log \
+              | head -16 \
+              | while IFS= read -r line; do
+                  safe=$(printf '%s' "$line" \
+                    | sed -E -e 's#(postgres(ql)?://)[^@[:space:]]+@#\1***@#g' -e 's/%/%25/g' -e 's/\r//g')
+                  echo "::error title=Supabase live verify (exit $code)::${safe}"
+                done
+            echo "::error title=Supabase live verify failed::exit $code — see the per-gap annotations above"
+          fi
+          exit "$code"
+
+      - name: Report why it skipped
+        if: steps.db.outputs.configured != 'yes'
+        run: |
+          echo "::notice title=Supabase live verify skipped::Set the repository secret SUPABASE_DB_URL (Settings -> Secrets and variables -> Actions) to your Supabase connection string: postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require - step-by-step guide in docs/GITHUB_SUPABASE.md"

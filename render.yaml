@@ -23,6 +23,15 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      # DATABASE_URL decides which PostgreSQL the app talks to. Two options:
+      #   a) Render's managed database (the `databases:` block above) — what
+      #      this blueprint wires by default; or
+      #   b) Supabase — then delete the `fromDatabase` mapping, use
+      #      `sync: false`, and paste the Supabase connection string in the
+      #      Render dashboard (Project Settings → Database → Connection
+      #      string → URI, "Session pooler", plus `?sslmode=require`).
+      # The repo's docs (DEPLOYMENT.md §2, supabase/full_schema.sql) treat
+      # Supabase as the source of truth; pick ONE and keep the schema there.
       - key: DATABASE_URL
         fromDatabase:
           name: scholarbridge-db
@@ -64,6 +73,19 @@ services:
       # HTML-file method is also served from public/google*.html.
       - key: GOOGLE_SITE_VERIFICATION
         value: "EZ2ipQrYUQxTQEBlEGYcqAOfVHm6pc0oIm1BYkN2VTs"
+      # --- Supabase Storage (branding uploads: logo / favicon) ---------------
+      # Without these two, Admin → Branding returns 503 "Storage is not
+      # configured". Supabase dashboard → Project Settings → API.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Optional: SSR catalogue pages when no service key is present.
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      # Optional: bucket name, defaults to LOGO.
+      - key: SUPABASE_BRANDING_BUCKET
+        sync: false
       # Optional payment keys (only needed if you configure real Payme/Click).
       - key: PAYME_MERCHANT_ID
         sync: false
