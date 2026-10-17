@@ -7,8 +7,39 @@
 | Ulanish | Holat | Izoh |
 | --- | --- | --- |
 | GitHub → **Render.com** (avto-deploy) | ✅ **Ulangan** | `render[bot]` deployment'lari bor, oxirgisi 2026-10-16 15:51 → `https://scholarbridge-ai.onrender.com` (status: `success`). `main`ga push bo'lsa avtomatik deploy. |
-| Ilova → **Supabase** (runtime) | ⚠️ **Env orqali** | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — bular **Render dashboard**ida, GitHub'da emas. |
-| GitHub → **Supabase** (to'g'ridan-to'g'ri integratsiya) | ❌ **Yo'q** | Supabase GitHub App o'rnatilmagan, `supabase/config.toml` yo'q, project ref saqlanmagan, Actions'da Supabase'ga tegadigan workflow yo'q edi. |
+| Ilova → **Supabase** (runtime) | ✅ **Env orqali** | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — **Render dashboard**ida. |
+| GitHub Actions → **Supabase** (jonli tekshiruv) | ✅ **Ulangan (2026-10-17 tasdiqlandi)** | `SUPABASE_DB_URL` secret'i qo'yildi, `Supabase schema verify` workflow'i jonli bazaga ulanib, autentifikatsiyadan o'tdi va 95 jadvalni tekshirdi. Host: `aws-0-ap-northeast-2.pooler.supabase.com:5432` (Session pooler). |
+| Supabase GitHub App (branching/migration) | ❌ **Yo'q (on'iy)** | `supabase/config.toml` yo'q, CLI `link` qilinmagan. Loyiha qoidasi: schema o'zgarishi — qo'lda qaror (§4, Qadam 3). |
+
+### Tekshiruv tarixi (2026-10-17)
+
+| Run | Exit | Natija |
+| --- | --- | --- |
+| 39018546591 | 2 | Secret bor, lekin `password authentication failed for user "postgres"` (28P01) — pooler uchun username `postgres.<ref>` bo'lishi kerak edi |
+| 39019343675 | 1 | ✅ **Autentifikatsiya o'tdi**, baza o'qildi — 9 ta ustun jonli bazada yo'q (schema drift) |
+| 39019477424 | 1 | Drift ro'yxati to'liq chiqdi (quyida, §1.1) |
+
+### 1.1 Topilgan drift: 9 ustun jonli bazada yo'q
+
+Repo'dagi ikkita **additive** patch qo'llanilmagan:
+
+| Jadval | Ustun | Patch fayli |
+| --- | --- | --- |
+| `payments` | `provider_created_at`, `performed_at`, `cancelled_at`, `cancel_reason` | `supabase/add_payment_provider_lifecycle.sql` |
+| `ai_usage` | `cost_status`, `cached_prompt_tokens`, `attempts`, `fallback_used`, `error_category` | `supabase/add_ai_cost_accounting.sql` |
+
+**Oqibati (kod bu ustunlarni yozadi/o'qiydi):**
+`src/lib/payments.ts` (`.set({ cancelledAt, cancelReason })`, `.set({ performedAt })`) va
+`src/lib/ai/costReport.ts` (`fallback_used`, `cached_prompt_tokens`, `error_category`) — jonli bazada
+bu so'rovlar `column ... does not exist` bilan xato beradi: Payme lifecycle (bekor qilish/TTL) va
+AI xarajat hisoboti ishlamaydi.
+
+**Tuzatish:** ikkala faylni Supabase → **SQL Editor**da ishga tushiring (ikkalasi ham
+`IF NOT EXISTS`, qayta ishga tushirish xavfsiz). `add_payment_provider_lifecycle.sql` boshidagi
+read-only preflight SELECT'lar takroriy qator qaytarsa, avval ularni qo'lda hal qiling — aks holda
+`CREATE UNIQUE INDEX` ma'lumotni buzmasdan **xato berib** to'xtaydi.
+Butun `full_schema.sql`ni "blindly" ishga tushirmang: u RLS va `anon`/`authenticated` grant'larini
+ham o'zgartiradi.
 
 Ya'ni: **GitHub o'zi Supabase bilan bevosita bog'lanmagan.** Zanjir shunday:
 `GitHub (push) → Render (build + deploy) → Render env vars → Supabase PostgreSQL/Storage`.
