@@ -36,8 +36,9 @@ import { DecisionPillStrip } from "./DecisionPillStrip";
 import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
-import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 interface UniversityDetailData {
   id: number;
@@ -428,6 +429,17 @@ export function UniversityDetail({
     }
   };
 
+  // Profile edits must re-score the match block on this page — the cached
+  // payload was computed from the OLD profile data.
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const prevFingerprintRef = React.useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr("universityDetail");
+    }
+  }, [profileFingerprint]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -468,7 +480,7 @@ export function UniversityDetail({
     return () => {
       cancelled = true;
     };
-  }, [universityId, activeProfile?.id, applyDetailPayload, locale]);
+  }, [universityId, activeProfile?.id, applyDetailPayload, locale, profileFingerprint]);
 
   if (loading) {
     return (
@@ -574,6 +586,13 @@ export function UniversityDetail({
                 <span className="text-xs font-bold">{t("qsRanking")}</span>
                 <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
               </div>
+              {/* Pillar 5.1 — rank-verified state-scholarship eligibility. Stated
+                  as a criterion match, never as an award promise. */}
+              {uni.worldRanking != null && uni.worldRanking <= 300 && (
+                <p className="mt-2 inline-flex max-w-full items-center rounded-xl bg-amber-300/15 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-100 ring-1 ring-inset ring-amber-300/40">
+                  <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               {(() => {
@@ -1148,9 +1167,28 @@ export function UniversityDetail({
 
       {/* ===== SCHOLARSHIPS (spec §8) ===== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-        <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-          <Award className="h-4 w-4 text-amber-500" /> {t("scholarships", { count: scholarships.length })}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <Award className="h-4 w-4 text-amber-500" /> {t("scholarships", { count: scholarships.length })}
+          </h2>
+          {/* Pillar 5.1 — the grants catalogue, pre-filtered to THIS country.
+              A single click from a university page to every grant it offers. */}
+          {uni.country ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("scholarbridge:focus-record", {
+                    detail: { kind: "scholarships", country: uni.country },
+                  })
+                );
+              }}
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+            >
+              <span className="min-w-0 break-words">{t("exViewCountryScholarships")}</span>
+            </button>
+          ) : null}
+        </div>
         {scholarships.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">{t("noScholarships")}</p>
         ) : (

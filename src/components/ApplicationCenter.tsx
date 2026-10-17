@@ -69,6 +69,13 @@ interface ApplicationRow {
   outcome: Outcome | null;
 }
 
+/** One saved-university row from /api/saved-universities. */
+interface SavedUniRow {
+  id: number;
+  universityId: number;
+  university?: { name?: string; country?: string } | null;
+}
+
 interface ApplicationCenterProps {
   activeProfile: StudentProfile | null;
   /**
@@ -95,6 +102,10 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
   // Fetched, never hardcoded — null until the response arrives.
   const [deadlineCount, setDeadlineCount] = useState<number | null>(null);
   const [scholarshipMatchCount, setScholarshipMatchCount] = useState<number | null>(null);
+  // 2.5 — the shortlist feeds the tracker: saved universities that do not
+  // have an application row yet are offered as one-click starters.
+  const [savedRows, setSavedRows] = useState<SavedUniRow[]>([]);
+  const [startingAppId, setStartingAppId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!activeProfile?.id) return;
@@ -133,16 +144,54 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
     if (!activeProfileId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/applications?profileId=${activeProfileId}`);
+      const [res, savedRes] = await Promise.all([
+        fetch(`/api/applications?profileId=${activeProfileId}`),
+        fetch(`/api/saved-universities?profileId=${activeProfileId}`),
+      ]);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("loadError"));
       setRows(data.applications ?? []);
+      // The shortlist read is auxiliary — a failure here must not fail the
+      // tracker itself, it just leaves the start strip empty.
+      if (savedRes.ok) {
+        const savedData = await savedRes.json().catch(() => null);
+        setSavedRows(Array.isArray(savedData?.savedUniversities) ? savedData.savedUniversities : []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("loadError"));
     } finally {
       setLoading(false);
     }
   }, [activeProfileId, t]);
+
+  // Saved universities still missing an application row.
+  const startableSaved = savedRows.filter(
+    (s) => !rows.some((r) => r.universityId != null && r.universityId === s.universityId)
+  );
+
+  // One click: create the application (the API enriches it with the
+  // university's real fee / portal / nearest deadline), then open its
+  // workspace — the same flow the explorer card uses.
+  const startFromSaved = async (saved: SavedUniRow) => {
+    if (!activeProfileId || startingAppId !== null) return;
+    setStartingAppId(saved.universityId);
+    setError("");
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: activeProfileId, universityId: saved.universityId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("addError"));
+      await load();
+      if (data.application?.id && onOpenWorkspace) onOpenWorkspace(data.application.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("addError"));
+    } finally {
+      setStartingAppId(null);
+    }
+  };
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -235,6 +284,42 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
   return (
     <div className="space-y-4">
+      {/* 2.5 — one-click "start application" from the shortlist, so the
+          explorer's ⭐ and the tracker never live on different planets. */}
+      {!loading && startableSaved.length > 0 && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/30">
+          <p className="min-w-0 break-words text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+            {t("savedStripTitle")}
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {startableSaved.slice(0, 6).map((saved) => (
+              <li
+                key={saved.id}
+                className="flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-2.5 py-1.5 dark:border-indigo-500/40 dark:bg-slate-900"
+              >
+                <span className="min-w-0 break-words text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                  {saved.university?.name ?? ""}
+                  {saved.university?.country ? (
+                    <span className="font-medium text-slate-500"> · {saved.university.country}</span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  disabled={startingAppId !== null}
+                  onClick={() => void startFromSaved(saved)}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[11px] font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-50"
+                >
+                  {startingAppId === saved.universityId ? (
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                  ) : null}
+                  {t("startApplicationShort")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* 2 columns on phones: seven full-width metric tiles stacked ~560px
           of scrolling before the first application card. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

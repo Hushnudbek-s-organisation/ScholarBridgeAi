@@ -41,6 +41,7 @@ import {
 import { useTranslations } from "next-intl";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { StudyInterestPicker } from "@/components/StudyInterestPicker";
@@ -319,7 +320,9 @@ export function RecommendationStudio({
   const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const baseline = useRef<Record<string, unknown>>({});
-  const prefilledProfile = useRef<number | null>(null);
+  // Tracks WHICH profile snapshot was prefilled — not just which id: saving
+  // score-relevant edits in ProfileModal re-syncs this form's fields.
+  const prefilledProfile = useRef<string>("");
 
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
@@ -337,11 +340,11 @@ export function RecommendationStudio({
   }, []);
 
   // ---- Prefill from the saved profile (flagged; user confirms) -------------
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
   useEffect(() => {
     if (!activeProfile) return;
-    const pid = activeProfile.id ?? null;
-    if (prefilledProfile.current === pid) return;
-    prefilledProfile.current = pid;
+    if (prefilledProfile.current === profileFingerprint) return;
+    prefilledProfile.current = profileFingerprint;
 
     // setState only in an async callback (never synchronously in the effect
     // body) — same pattern as the rest of the app shell.
@@ -391,7 +394,7 @@ export function RecommendationStudio({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, profileFingerprint]);
 
   const interests = useMemo(() => studyInterestRecommendationTerms(studyInterests), [studyInterests]);
 
@@ -519,7 +522,7 @@ export function RecommendationStudio({
     setStudyInterestAttempted(false);
     setForm(EMPTY_FORM);
     baseline.current = {};
-    prefilledProfile.current = null;
+    prefilledProfile.current = "";
   }, []);
 
   // ---- Derived ----------------------------------------------------------------

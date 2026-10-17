@@ -2,6 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { gpaTo40Scale } from "@/lib/gpa";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { localizeMajorOrField } from "@/lib/catalogLocalizer";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { TwinStrategyCard } from "./TwinStrategyCard";
 import {
   Sparkles,
@@ -205,21 +209,39 @@ function selectivityBadgeStyles(category: string): string {
   return "bg-rose-50 text-rose-700 border-rose-200";
 }
 
-function checkStatusBadge(status: RequirementCheckItem["status"]): {
+type ChancingTranslator = (key: string) => string;
+
+/* The scoring engine speaks canonical English categories; the badge shows the
+   student's language. Unknown future values fall back to the raw string. */
+const SELECTIVITY_KEYS: Record<string, string> = {
+  "Safety / Likely": "selectSafety",
+  "Target / Match": "selectTarget",
+  "Reach": "selectReach",
+  "High Reach / Ultra-Selective": "selectHighReach",
+};
+const TIER_KEYS: Record<string, string> = {
+  "Above 75th Percentile (Top Quartile)": "tierAbove75",
+  "50th–75th Percentile (Upper-Middle Quartile)": "tier5075",
+  "25th–50th Percentile (Lower-Middle Quartile)": "tier2550",
+  "Below 25th Percentile": "tierBelow25",
+};
+
+/** Badge style + translated label for one requirement check. */
+function checkStatusBadge(status: RequirementCheckItem["status"], t: ChancingTranslator): {
   className: string;
   label: string;
 } {
   switch (status) {
     case "met":
-      return { className: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Meets Band" };
+      return { className: "bg-emerald-50 text-emerald-700 border-emerald-200", label: t("badgeMet") };
     case "borderline":
-      return { className: "bg-amber-50 text-amber-800 border-amber-200", label: "Borderline" };
+      return { className: "bg-amber-50 text-amber-800 border-amber-200", label: t("badgeBorderline") };
     case "below":
-      return { className: "bg-rose-50 text-rose-700 border-rose-200", label: "Below Min" };
+      return { className: "bg-rose-50 text-rose-700 border-rose-200", label: t("badgeBelow") };
     case "missing":
-      return { className: "bg-slate-100 text-slate-600 border-slate-200", label: "Not Entered" };
+      return { className: "bg-slate-100 text-slate-600 border-slate-200", label: t("badgeMissing") };
     default:
-      return { className: "bg-indigo-50 text-indigo-700 border-indigo-200", label: "Requirement" };
+      return { className: "bg-indigo-50 text-indigo-700 border-indigo-200", label: t("badgeRequirement") };
   }
 }
 
@@ -228,10 +250,38 @@ export function ChancingPanel({
   activeProfile,
 }: {
   profileId?: number | null;
-  activeProfile?: { id?: number | null } | null;
+  /** Full student profile — the What-If simulator starts from REAL values,
+   *  never from invented defaults like "3.85 / 1480 / 7.5". */
+  activeProfile?: {
+    id?: number | null;
+    gpa?: number | null;
+    gpaScale?: number | null;
+    ieltsScore?: number | null;
+    toeflScore?: number | null;
+    duolingoScore?: number | null;
+    satScore?: number | null;
+    budgetAnnualUsd?: number | null;
+    targetMajor?: string | null;
+    degreeLevel?: string | null;
+  } | null;
 }) {
   const profileId = propProfileId ?? activeProfile?.id ?? null;
   const t = useTranslations("chancing");
+  const { locale } = useLocaleContext();
+
+  // Scenario defaults derived from the saved profile ("" when not recorded —
+  // NULL stays NULL; the sliders simply start unset).
+  const profileScenario = useMemo(() => {
+    const gpa4 = gpaTo40Scale(activeProfile?.gpa ?? null, activeProfile?.gpaScale ?? null);
+    return {
+      gpa4: gpa4 != null ? String(gpa4) : "",
+      sat: activeProfile?.satScore != null ? String(activeProfile.satScore) : "",
+      ielts: activeProfile?.ieltsScore != null ? String(activeProfile.ieltsScore) : "",
+      budget: activeProfile?.budgetAnnualUsd != null ? String(activeProfile.budgetAnnualUsd) : "",
+      major: activeProfile?.targetMajor ?? "",
+      degreeLevel: activeProfile?.degreeLevel || "Bachelor",
+    };
+  }, [activeProfile]);
   const [results, setResults] = useState<UniversityFitAssessment[]>([]);
   const [catalogUniversities, setCatalogUniversities] = useState<CatalogUniversityOption[]>([]);
   const [isCatalogSample, setIsCatalogSample] = useState(false);
@@ -245,16 +295,34 @@ export function ChancingPanel({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedProgramByUni, setSelectedProgramByUni] = useState<Record<number, number>>({});
 
-  // What-If Simulator state
-  const [scenarioGpa4, setScenarioGpa4] = useState("3.85");
-  const [scenarioSat, setScenarioSat] = useState("1480");
-  const [scenarioIelts, setScenarioIelts] = useState("7.5");
-  const [scenarioBudgetUsd, setScenarioBudgetUsd] = useState("");
-  const [scenarioMajor, setScenarioMajor] = useState("");
-  const [scenarioDegreeLevel, setScenarioDegreeLevel] = useState("Bachelor");
+  // What-If Simulator state — initialized from the student's real profile and
+  // re-synced whenever score-relevant profile fields change.
+  const [scenarioGpa4, setScenarioGpa4] = useState(profileScenario.gpa4);
+  const [scenarioSat, setScenarioSat] = useState(profileScenario.sat);
+  const [scenarioIelts, setScenarioIelts] = useState(profileScenario.ielts);
+  const [scenarioBudgetUsd, setScenarioBudgetUsd] = useState(profileScenario.budget);
+  const [scenarioMajor, setScenarioMajor] = useState(profileScenario.major);
+  const [scenarioDegreeLevel, setScenarioDegreeLevel] = useState(profileScenario.degreeLevel);
   const [scenarioResults, setScenarioResults] = useState<Record<number, UniversityFitAssessment>>({});
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
+
+  // Saving score-relevant edits in ProfileModal re-syncs the simulator inputs
+  // (and drops scenario results computed from the OLD values).
+  const scenarioFingerprint = profileMatchFingerprint(activeProfile);
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setScenarioGpa4(profileScenario.gpa4);
+      setScenarioSat(profileScenario.sat);
+      setScenarioIelts(profileScenario.ielts);
+      setScenarioBudgetUsd(profileScenario.budget);
+      setScenarioMajor(profileScenario.major);
+      setScenarioDegreeLevel(profileScenario.degreeLevel);
+      setScenarioResults({});
+      setScenarioError(null);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioFingerprint]);
 
   const load = useCallback(
     async (opts?: { uniId?: string; country?: string; search?: string }) => {
@@ -300,7 +368,9 @@ export function ChancingPanel({
     // Started in a microtask: the effect body itself must not call setState
     // synchronously (React's rule for effects — `load` sets `loading` first).
     void Promise.resolve().then(() => load());
-  }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Re-runs on any score-relevant profile edit (fingerprint), not just a
+    // profile switch — saved GPA/IELTS changes re-score the list immediately.
+  }, [profileId, scenarioFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const availableCountries = useMemo(() => {
     const set = new Set<string>();
@@ -346,12 +416,13 @@ export function ChancingPanel({
   };
 
   const resetScenario = () => {
-    setScenarioGpa4("3.85");
-    setScenarioSat("1480");
-    setScenarioIelts("7.5");
-    setScenarioBudgetUsd("");
-    setScenarioMajor("");
-    setScenarioDegreeLevel("Bachelor");
+    // "Reset to profile values" — the student's real numbers, not defaults.
+    setScenarioGpa4(profileScenario.gpa4);
+    setScenarioSat(profileScenario.sat);
+    setScenarioIelts(profileScenario.ielts);
+    setScenarioBudgetUsd(profileScenario.budget);
+    setScenarioMajor(profileScenario.major);
+    setScenarioDegreeLevel(profileScenario.degreeLevel);
     setScenarioResults({});
     setScenarioError(null);
   };
@@ -371,7 +442,7 @@ export function ChancingPanel({
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-indigo-600" />
-            {t("title")} &amp; QS Top 200 Program Positioning
+            {t("title")} &amp; {t("titleSuffix")}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5 max-w-3xl">{t("subtitle")}</p>
         </div>
@@ -391,19 +462,19 @@ export function ChancingPanel({
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-indigo-600" />
             <h3 className="text-sm font-bold text-slate-900">
-              QS Top 200 University &amp; Program Switcher ({catalogUniversities.length || 174} Universities · 2,423 Programs)
+              {t("switcherTitle", { universityCount: catalogUniversities.length || 174, programCount: 2423 })}
             </h3>
           </div>
           {isCatalogSample && (
             <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Showing Top Matching QS Benchmark Universities
+              {t("showingTopQs")}
             </span>
           )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
           <label className="text-xs text-slate-600">
-            <span className="font-medium block mb-1">Jump to University</span>
+              <span className="font-medium block mb-1">{t("jumpToUniversity")}</span>
             <select
               value={selectedUniFilterId}
               onChange={(e) => {
@@ -413,7 +484,7 @@ export function ChancingPanel({
               }}
               className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
             >
-              <option value="">Shortlist / Top Matches</option>
+              <option value="">{t("shortlistTop")}</option>
               {catalogUniversities.map((u) => (
                 <option key={u.id} value={String(u.id)}>
                   {u.worldRanking ? `QS #${u.worldRanking} — ` : ""}
@@ -424,7 +495,7 @@ export function ChancingPanel({
           </label>
 
           <label className="text-xs text-slate-600">
-            <span className="font-medium block mb-1">Filter by Country</span>
+            <span className="font-medium block mb-1">{t("filterCountryLabel")}</span>
             <select
               value={countryFilter}
               onChange={(e) => {
@@ -435,7 +506,7 @@ export function ChancingPanel({
               }}
               className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
             >
-              <option value="">All Countries ({availableCountries.length || 20})</option>
+              <option value="">{t("allCountriesCount", { count: availableCountries.length || 20 })}</option>
               {availableCountries.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -445,7 +516,7 @@ export function ChancingPanel({
           </label>
 
           <label className="text-xs text-slate-600 sm:col-span-2">
-            <span className="font-medium block mb-1">Search University or Major</span>
+            <span className="font-medium block mb-1">{t("searchUniversity")}</span>
             <div className="flex gap-1.5">
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
@@ -459,7 +530,7 @@ export function ChancingPanel({
                       load({ uniId: "", search: searchQuery });
                     }
                   }}
-                  placeholder="e.g., MIT, TUM, Oxford, KAIST, Computer Science..."
+                  placeholder={t("searchPlaceholder")}
                   className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-2.5 py-1.5 text-xs text-slate-900"
                 />
               </div>
@@ -498,7 +569,7 @@ export function ChancingPanel({
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
-              {t("scenarioTitle")} — Interactive GPA / SAT / IELTS &amp; Program Simulator
+              {t("scenarioTitle")} — {t("scenarioSimTitle")}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">{t("scenarioDescription")}</p>
           </div>
@@ -533,7 +604,7 @@ export function ChancingPanel({
 
           <label className="text-xs text-slate-600 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="font-medium">Hypothetical SAT</span>
+              <span className="font-medium">{t("scenarioSat")}</span>
               <span className="font-bold text-indigo-600">{scenarioSat || "—"}</span>
             </div>
             <input
@@ -584,15 +655,15 @@ export function ChancingPanel({
           </label>
 
           <label className="text-xs text-slate-600 space-y-1">
-            <span className="font-medium block">Degree Level</span>
+            <span className="font-medium block">{t("scenarioDegreeLevel")}</span>
             <select
               value={scenarioDegreeLevel}
               onChange={(e) => setScenarioDegreeLevel(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 mt-1"
             >
-              <option value="Bachelor">Bachelor (BSc / BA)</option>
-              <option value="Master">Master (MSc / MA / MPP)</option>
-              <option value="PhD">PhD / Doctoral</option>
+              <option value="Bachelor">{t("degreeBachelor")}</option>
+              <option value="Master">{t("degreeMaster")}</option>
+              <option value="PhD">{t("degreePhd")}</option>
             </select>
           </label>
 
@@ -603,10 +674,10 @@ export function ChancingPanel({
               onChange={(e) => setScenarioMajor(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 mt-1"
             >
-              <option value="">Use Profile Major</option>
+              <option value="">{t("useProfileMajor")}</option>
               {MAJOR_PRESETS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {localizeMajorOrField(m, locale)}
                 </option>
               ))}
             </select>
@@ -714,12 +785,16 @@ export function ChancingPanel({
                             activeProgram.selectivityCategory
                           )}`}
                         >
-                          {activeProgram.selectivityCategory}
+                          {SELECTIVITY_KEYS[activeProgram.selectivityCategory]
+                          ? t(SELECTIVITY_KEYS[activeProgram.selectivityCategory])
+                          : activeProgram.selectivityCategory}
                         </span>
                       )}
                       {activeProgram && (
                         <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                          {activeProgram.cohortPositionTier}
+                          {TIER_KEYS[activeProgram.cohortPositionTier]
+                          ? t(TIER_KEYS[activeProgram.cohortPositionTier])
+                          : activeProgram.cohortPositionTier}
                         </span>
                       )}
                       <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
@@ -756,11 +831,11 @@ export function ChancingPanel({
                           {activeProgram.compositeProgramFitScore}%
                         </div>
                         <div className="text-[11px] font-medium text-slate-500">
-                          Program Positioning
+                          {t("programPositioning")}
                         </div>
                         {progDelta !== null && progDelta !== 0 && (
                           <div className="text-[11px] font-semibold text-emerald-700">
-                            {progDelta > 0 ? `+${progDelta}%` : `${progDelta}%`} scenario
+                            {progDelta > 0 ? `+${progDelta}%` : `${progDelta}%`} {t("scenarioBadgeWord")}
                           </div>
                         )}
                       </div>
@@ -789,7 +864,7 @@ export function ChancingPanel({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <GraduationCap className="w-4 h-4 text-indigo-600" />
-                        <span className="text-xs font-bold text-slate-800">Selected Program:</span>
+                        <span className="text-xs font-bold text-slate-800">{t("selectedProgram")}</span>
                         {programList.length > 1 ? (
                           <select
                             value={String(activeProgram.programId ?? "")}
@@ -833,7 +908,7 @@ export function ChancingPanel({
                     {/* Selectivity Comparison Metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                       <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">University Offer Rate</div>
+                        <div className="text-[11px] text-slate-500">{t("offerRate")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           {activeProgram.universityAcceptRatePct}%
                         </div>
@@ -847,16 +922,16 @@ export function ChancingPanel({
                         </div>
                       </div>
                       <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">Admitted GPA Middle 50%</div>
+                        <div className="text-[11px] text-slate-500">{t("admittedGpaBand")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           {activeProgram.programGpa25.toFixed(2)} – {activeProgram.programGpa75.toFixed(2)}{" "}
                           <span className="text-[11px] font-normal text-slate-500">
-                            (Med {activeProgram.programGpa50.toFixed(2)})
+                            {t("medianAbbr", { value: activeProgram.programGpa50.toFixed(2) })}
                           </span>
                         </div>
                       </div>
                       <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">English Requirement</div>
+                        <div className="text-[11px] text-slate-500">{t("englishRequirement")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           IELTS {activeProgram.effectiveMinIelts.toFixed(1)} / TOEFL {activeProgram.effectiveMinToefl}
                         </div>
@@ -870,12 +945,14 @@ export function ChancingPanel({
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
-                            GPA Cohort Band (4.0)
+                            {t("gpaCohortBand")}
                           </span>
                           <span className="font-bold text-indigo-600">
-                            {activeProgram.studentGpa4 !== null
-                              ? `${activeProgram.studentGpa4.toFixed(2)} (${activeProgram.studentGpaPercentile}th pct)`
-                              : "No GPA entered"}
+                            {activeProgram.studentGpa4 !== null && activeProgram.studentGpaPercentile !== null
+                              ? `${activeProgram.studentGpa4.toFixed(2)} (${t("percentileLabel", { pct: activeProgram.studentGpaPercentile })})`
+                              : activeProgram.studentGpa4 !== null
+                                ? activeProgram.studentGpa4.toFixed(2)
+                                : t("noGpaEntered")}
                           </span>
                         </div>
                         <div className="relative h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -899,9 +976,9 @@ export function ChancingPanel({
                           )}
                         </div>
                         <div className="flex justify-between text-[10px] text-slate-500">
-                          <span>25th: {activeProgram.programGpa25.toFixed(2)}</span>
-                          <span>50th: {activeProgram.programGpa50.toFixed(2)}</span>
-                          <span>75th: {activeProgram.programGpa75.toFixed(2)}</span>
+                          <span>{t("pct25")} {activeProgram.programGpa25.toFixed(2)}</span>
+                          <span>{t("pct50")} {activeProgram.programGpa50.toFixed(2)}</span>
+                          <span>{t("pct75")} {activeProgram.programGpa75.toFixed(2)}</span>
                         </div>
                       </div>
 
@@ -910,14 +987,14 @@ export function ChancingPanel({
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <Award className="w-3.5 h-3.5 text-indigo-600" />
-                            SAT Cohort Band
+                            {t("satCohortBand")}
                           </span>
                           <span className="font-bold text-indigo-600">
                             {activeProgram.studentSat !== null && activeProgram.studentSatPercentile !== null
-                              ? `${activeProgram.studentSat} (${activeProgram.studentSatPercentile}th pct)`
+                              ? `${activeProgram.studentSat} (${t("percentileLabel", { pct: activeProgram.studentSatPercentile })})`
                               : activeProgram.programSat25
-                              ? "Test-Optional / Unset"
-                              : "Grad / Not Required"}
+                              ? t("satTestOptional")
+                              : t("satNotRequired")}
                           </span>
                         </div>
                         <div className="relative h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -931,12 +1008,12 @@ export function ChancingPanel({
                         <div className="flex justify-between text-[10px] text-slate-500">
                           {activeProgram.programSat25 && activeProgram.programSat50 && activeProgram.programSat75 ? (
                             <>
-                              <span>25th: {activeProgram.programSat25}</span>
-                              <span>50th: {activeProgram.programSat50}</span>
-                              <span>75th: {activeProgram.programSat75}</span>
+                              <span>{t("pct25")} {activeProgram.programSat25}</span>
+                              <span>{t("pct50")} {activeProgram.programSat50}</span>
+                              <span>{t("pct75")} {activeProgram.programSat75}</span>
                             </>
                           ) : (
-                            <span>Curriculum / GRE / Holistic Evaluation</span>
+                            <span>{t("curriculumHolistic")}</span>
                           )}
                         </div>
                       </div>
@@ -946,12 +1023,12 @@ export function ChancingPanel({
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                            English Band
+                            {t("englishCohortBand")}
                           </span>
                           <span className="font-bold text-indigo-600">
                             {activeProgram.studentEnglishLabel
-                              ? `${activeProgram.studentEnglishLabel} (${activeProgram.studentEnglishPercentile}th pct)`
-                              : "Not entered"}
+                              ? `${activeProgram.studentEnglishLabel}${activeProgram.studentEnglishPercentile !== null ? ` (${t("percentileLabel", { pct: activeProgram.studentEnglishPercentile })})` : ""}`
+                              : t("badgeMissing")}
                           </span>
                         </div>
                         <div className="relative h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -963,9 +1040,9 @@ export function ChancingPanel({
                           )}
                         </div>
                         <div className="flex justify-between text-[10px] text-slate-500">
-                          <span>Min IELTS {activeProgram.effectiveMinIelts.toFixed(1)}</span>
-                          <span>Med IELTS {activeProgram.medianIelts.toFixed(1)}</span>
-                          <span>TOEFL {activeProgram.effectiveMinToefl}+</span>
+                          <span>{t("minIeltsWord")} {activeProgram.effectiveMinIelts.toFixed(1)}</span>
+                          <span>{t("medIeltsWord")} {activeProgram.medianIelts.toFixed(1)}</span>
+                          <span>{t("toeflMinPlus", { value: activeProgram.effectiveMinToefl })}</span>
                         </div>
                       </div>
                     </div>
@@ -982,7 +1059,7 @@ export function ChancingPanel({
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="w-3.5 h-3.5" /> {t("toggleShow")} &amp; Program Requirements
+                      <ChevronDown className="w-3.5 h-3.5" /> {t("toggleShow")} &amp; {t("programRequirementsWord")}
                     </>
                   )}
                 </button>
@@ -993,11 +1070,11 @@ export function ChancingPanel({
                     {activeProgram && activeProgram.requirementChecks.length > 0 && (
                       <div className="space-y-2">
                         <div className="font-bold text-slate-800">
-                          Program Eligibility &amp; Requirement Verification ({activeProgram.programName})
+                          {t("eligibilityVerificationTitle", { program: activeProgram.programName })}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {activeProgram.requirementChecks.map((chk, idx) => {
-                            const badge = checkStatusBadge(chk.status);
+                            const badge = checkStatusBadge(chk.status, t);
                             return (
                               <div
                                 key={`${chk.dimension}-${idx}`}
@@ -1012,8 +1089,8 @@ export function ChancingPanel({
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-[11px] text-slate-600">
-                                  <span>Your profile: {chk.studentValue}</span>
-                                  <span>Target: {chk.requiredValue}</span>
+                                  <span>{t("yourProfile")} {chk.studentValue}</span>
+                                  <span>{t("targetValue")} {chk.requiredValue}</span>
                                 </div>
                                 <p className="text-[11px] text-slate-500">{chk.detail}</p>
                               </div>
@@ -1031,18 +1108,20 @@ export function ChancingPanel({
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="font-semibold text-slate-800">
-                            Opt-in Historical Cohort Archive ({baseItem.universityName}):
+                            {t("cohortArchiveTitle", { university: baseItem.universityName })}
                           </span>{" "}
                           <span className="text-slate-600">
-                            {activeProgram.empiricalOutcomes.totalConsented} shared decisions (
-                            {activeProgram.empiricalOutcomes.acceptedCount} accepted ·{" "}
-                            {activeProgram.empiricalOutcomes.waitlistedCount} waitlisted ·{" "}
-                            {activeProgram.empiricalOutcomes.rejectedCount} rejected)
+                            {t("cohortArchiveSummary", {
+                              total: activeProgram.empiricalOutcomes.totalConsented,
+                              accepted: activeProgram.empiricalOutcomes.acceptedCount,
+                              waitlisted: activeProgram.empiricalOutcomes.waitlistedCount,
+                              rejected: activeProgram.empiricalOutcomes.rejectedCount,
+                            })}
                           </span>
                         </div>
                         {activeProgram.empiricalOutcomes.medianAdmittedGpa && (
                           <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">
-                            Archive Admitted Median GPA:{" "}
+                            {t("archiveMedianGpa")}{" "}
                             {activeProgram.empiricalOutcomes.medianAdmittedGpa.toFixed(2)}
                             {activeProgram.empiricalOutcomes.medianAdmittedSat
                               ? ` · SAT ${activeProgram.empiricalOutcomes.medianAdmittedSat}`

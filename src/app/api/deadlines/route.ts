@@ -8,9 +8,10 @@ import {
   savedScholarships,
   applicationTasks,
   applications,
+  applicationCycles,
   testBookings,
 } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
 import { daysUntil } from "@/lib/nextActions";
 
@@ -81,27 +82,58 @@ export async function GET(req: Request) {
       }
     }
 
-    // --- Saved universities (the current university record has no application
-    //     deadline field, so keep it visible without inventing a date) ---
+    // --- Saved universities (real deadlines come from the verified cycles
+    //     catalogue — one batched query, never a per-university loop) ---
     const savedUnis = await db
       .select()
       .from(savedUniversities)
       .where(eq(savedUniversities.profileId, profileId));
     if (savedUnis.length > 0) {
-      const uniRows = await db
-        .select()
-        .from(universities)
-        .where(inArray(universities.id, savedUnis.map((u) => u.universityId)));
+      const savedUniIds = savedUnis.map((u) => u.universityId);
+      const [uniRows, cycleRows] = await Promise.all([
+        db
+          .select()
+          .from(universities)
+          .where(inArray(universities.id, savedUniIds)),
+        // Nearest UPCOMING deadline per university. Ordered ascending by
+        // deadline, so the first row seen for a university is its soonest.
+        db
+          .select({
+            universityId: applicationCycles.universityId,
+            deadline: applicationCycles.deadline,
+          })
+          .from(applicationCycles)
+          .where(
+            and(
+              inArray(applicationCycles.universityId, savedUniIds),
+              gte(applicationCycles.deadline, new Date().toISOString().slice(0, 10))
+            )
+          )
+          .orderBy(asc(applicationCycles.deadline)),
+      ]);
+      const upcomingDeadlineByUni = new Map<number, string>();
+      for (const c of cycleRows) {
+        if (c.deadline && !upcomingDeadlineByUni.has(c.universityId)) {
+          const d = new Date(c.deadline);
+          upcomingDeadlineByUni.set(
+            c.universityId,
+            Number.isNaN(d.getTime()) ? String(c.deadline).slice(0, 10) : d.toISOString().slice(0, 10)
+          );
+        }
+      }
       for (const u of uniRows) {
+        const deadline = upcomingDeadlineByUni.get(u.id) ?? null;
         items.push({
           id: `uni-${u.id}`,
           type: "university",
           title: u.name,
           subtitle: `${u.country} · ${u.programMajor}`,
-          date: null,
-          // A saved university row carries no deadline field. Do not imply that its deadline is open or officially unannounced.
-          status: "NO DEADLINE ON FILE",
-          daysRemaining: null,
+          date: deadline,
+          // A cycle row with a future deadline makes the university OPEN; with
+          // none on file we still state that honestly instead of inventing a
+          // date.
+          status: deadline ? "OPEN" : "NO DEADLINE ON FILE",
+          daysRemaining: daysUntil(now, deadline),
           source: u.websiteUrl || null,
           saved: true,
         });

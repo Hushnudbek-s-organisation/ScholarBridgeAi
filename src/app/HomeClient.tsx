@@ -40,6 +40,7 @@ const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").the
 const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection), { loading: panelLoading });
 const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard), { loading: panelLoading });
 const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel), { loading: panelLoading });
+const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
 const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings), { loading: panelLoading });
 const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel), { loading: panelLoading });
 
@@ -275,6 +276,8 @@ export function Home({
     id: number;
     title: string;
     requestId: number;
+    /** Country-only deep link (e.g. "view grants in this country"). */
+    country?: string | null;
   } | null>(null);
   const scholarshipFocusSequence = useRef(0);
 
@@ -511,6 +514,19 @@ export function Home({
           id,
           title: String(detail.title ?? "").trim(),
           requestId: scholarshipFocusSequence.current,
+        });
+        handleNavigateTab("scholarships/browse");
+      } else if (detail.kind === "scholarships") {
+        // Country-filtered deep link from a university page: open the grants
+        // catalogue pre-filtered to that country (no single record to focus).
+        const country = String((detail as { country?: unknown }).country ?? "").trim();
+        if (!country) return;
+        scholarshipFocusSequence.current += 1;
+        setFocusScholarship({
+          id: 0,
+          title: "",
+          requestId: scholarshipFocusSequence.current,
+          country,
         });
         handleNavigateTab("scholarships/browse");
       } else {
@@ -927,6 +943,20 @@ export function Home({
       <div className="flex-1 min-w-0 flex flex-col">
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
+        {/* Pillar 3 — the four-stage guided path, pinned above every screen so
+            a newcomer always knows where they are and what comes next. The
+            dashboard keeps its own richer journey control center instead. */}
+        {view === "app" && activeProfile && activeProfile.onboardingCompleted !== false && activeTab !== "dashboard" && (
+          <div className="mb-3">
+            <GuidedJourneyBar
+              activeProfile={activeProfile}
+              savedUniversityCount={savedUniversities.length}
+              savedScholarshipCount={savedScholarships.length}
+              onNavigate={handleNavigateTab}
+              onOpenProfileModal={() => openProfileModal(false)}
+            />
+          </div>
+        )}
         {/* Sections swap with a short cross-fade + lift. The outer profile key
             is also an isolation boundary: unmount every profile-scoped loader,
             checklist and draft immediately when the selected student changes. */}
@@ -980,6 +1010,7 @@ export function Home({
               onUnsaveUniversity={handleUnsaveUniversity}
               autoOpenUniversityId={focusUniversityId}
               onProfileSaved={handleProfileUpdated}
+              onOpenProfileModal={openProfileModal}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />

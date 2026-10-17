@@ -98,7 +98,7 @@ export interface HubProps {
   onUnsaveScholarship?: (scholarshipId: number) => Promise<void>;
   autoOpenUniversityId?: number | null;
   /** Record selected in global search; the catalogue applies its own title filter. */
-  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
+  autoFocusScholarship?: { id: number; title: string; requestId: number; country?: string | null } | null;
   onProfileSaved?: (profile: StudentProfile) => void;
   onOpenProfileModal?: (isNew?: boolean) => void;
 }
@@ -173,6 +173,7 @@ export function UniversitiesHub({
   onUnsaveUniversity,
   autoOpenUniversityId,
   onProfileSaved,
+  onOpenProfileModal,
   setWorkspaceId,
 }: HubProps) {
   const t = useTranslations("hubs");
@@ -201,6 +202,7 @@ export function UniversitiesHub({
           onUnsaveUniversity={onUnsaveUniversity ?? (async () => undefined)}
           autoOpenUniversityId={autoOpenUniversityId ?? null}
           onNavigate={navigate}
+          onOpenProfileModal={() => onOpenProfileModal?.(false)}
           // Priority 4.1 — "Start Application" on a card opens that university's
           // workspace instead of the list, so the click lands somewhere useful.
           onApplicationStarted={(applicationId) => setWorkspaceId?.(applicationId)}

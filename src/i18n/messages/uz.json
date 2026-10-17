@@ -353,7 +353,37 @@
     "cancel": "Bekor qilish",
     "loading": "Yuklanmoqda...",
     "perMonth": "/ oy",
-    "checkoutFailed": "To‘lovni boshlab bo‘lmadi. Iltimos, qayta urinib ko‘ring."
+    "checkoutFailed": "To‘lovni boshlab bo‘lmadi. Iltimos, qayta urinib ko‘ring.",
+    "heroTagline": "Bepul — ishni boshlash uchun. Pro — vaqt tejash, sifat va cheksizlik.",
+    "freeTitle": "Bepul",
+    "freePrice": "0 so'm",
+    "freeSubtitle": "Haqiqiy foyda beradi — ishni tugatish uchun yetmaydi.",
+    "proTitle": "Pro",
+    "proBadge": "Tavsiya",
+    "proSubtitle": "Deadline yaqin, insho yozilayotganda, viza oldidan — shu paytda kerak.",
+    "choosePlanTitle": "Pro paketini tanlang",
+    "choosePlanSubtitle": "Talabaning ehtiyoji mavsumiy — shuning uchun qisqa (3 oy) va yillik variantlar ham bor.",
+    "pricesUnavailable": "Narxlar hozir yuklanmadi yoki mavjud emas. Keyinroq qayta urinib ko'ring.",
+    "free1": "Universitet va stipendiya qidiruvi + moslik bahosi",
+    "free2": "10 tagacha universitet va 10 tagacha stipendiya saqlash",
+    "free3": "Mening o'qish rejam va asosiy yo'l xaritasi",
+    "free4": "Asosiy deadline eslatmalari (Telegram)",
+    "free5": "Test rejalashtiruvchi va hujjatlar checklisti",
+    "free6": "AI yordamchi: kuniga 3–5 savol",
+    "free7": "Forumni o'qish, kurslarning kirish darslari",
+    "free8": "1 ta ariza ish maydoni",
+    "pro1": "SOP/inshoni AI bilan yozish, tahlil va versiyalar",
+    "pro2": "Profil auditi va chuqur qabul imkoniyati tahlili",
+    "pro3": "Cheksiz ariza ish maydoni va cheksiz saqlash",
+    "pro4": "Barcha muddatlar markazi + kengaytirilgan eslatmalar (3/7/14 kun)",
+    "pro5": "Cheksiz viza suhbati mashqi va viza markazi",
+    "pro6": "Cheksiz AI yordamchi",
+    "pro7": "Tavsiyanoma ombori va fayl yuklash (hujjatlar ombori)",
+    "pro8": "Ota-ona kuzatuv paneli",
+    "pro9": "Forumda yozish va kurslarning to'liq versiyasi",
+    "perDays": "{days} kun",
+    "perDayUnit": "/ {days} kun",
+    "parentPayNote": "Ota-onalar ham to'lashi mumkin — oila qaror va pulni boshqaradi."
   },
   "rewards": {
     "title": "Mukofotlar va tavsiyalar",
@@ -3567,7 +3597,16 @@
         "years": "{years} yil ish vizasi",
         "yearsHint": "E'lon qilingan qoidalarga ko'ra bitiruvchilar bu dasturdan keyin {years} yil qolib ishlashi mumkin."
       }
-    }
+    },
+    "exScoreFormula": "Asosiy {base} + akademik va moliyaviy moslik = {raw}%",
+    "exTop300Badge": "🇺🇿 Top-300 (El-Yurt Umidi granti mezoniga mos)",
+    "exViewCountryScholarships": "🔍 Shu davlat grantlarini ko'rish",
+    "exScoreBoosterHint": "💡 Aniqroq % uchun GPA/IELTS ballingizni kiriting →",
+    "exShortlistBanner": "{count} ta universitet saqlandi",
+    "exCompareOutlook": "📊 Qabul imkoniyatini solishtirish",
+    "exFindScholarships": "💰 Mos grantlarni topish",
+    "exManageApplications": "📋 Arizalarni boshqarish",
+    "exBoosterGain": "📈 IELTS/GPA farqini yopish ushbu bahoda {points} ballgacha tiklaydi"
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -3835,7 +3874,9 @@
       "waitlisted": "Kutish ro'yxatida",
       "deferred": "Kechiktirilgan",
       "withdrawn": "Bekor qilingan"
-    }
+    },
+    "savedStripTitle": "⭐ Saqlangan universitetlaringiz (1-bosishda ariza boshlash)",
+    "startApplicationShort": "⚡ Ariza boshlash"
   },
   "studyInterest": {
     "title": "Qiziqish yo‘nalishlari",
@@ -4154,7 +4195,10 @@
         "not_published": "Davlat ko'rsatilmagan",
         "not_publishedHint": "Bu stipendiya davlatni e'lon qilmagan."
       }
-    }
+    },
+    "shortlistBanner": "{count} ta stipendiya saqlandi",
+    "findUniversities": "🎓 Mos universitetlarni topish",
+    "manageApplications": "📋 Arizalarni boshqarish"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",
@@ -4192,7 +4236,65 @@
     "scenarioUnknown": "Taqqoslash uchun boshlang‘ich ball mavjud emas.",
     "scenarioNoChange": "Ko‘rsatilgan shkala bo‘yicha ball o‘zgarmadi.",
     "scenarioDelta": "Joriy moslikdan farq: {delta} ball.",
-    "scenarioBreakdownTitle": "Ssenariy dalillari taqsimoti"
+    "scenarioBreakdownTitle": "Ssenariy dalillari taqsimoti",
+    "scenarioSat": "Gipotetik SAT",
+    "scenarioSimTitle": "Interaktiv GPA / SAT / IELTS va dastur simulyatori",
+    "scenarioDegreeLevel": "Daraja bosqichi",
+    "degreeBachelor": "Bakalavr (BSc / BA)",
+    "degreeMaster": "Magistratura (MSc / MA / MPP)",
+    "degreePhd": "PhD / Doktorantura",
+    "useProfileMajor": "Profil yo'nalishidan foydalanish",
+    "jumpToUniversity": "Universitetga o'tish",
+    "shortlistTop": "Tanlanganlar / Eng moslar",
+    "filterCountryLabel": "Davlat bo'yicha saralash",
+    "searchUniversity": "Universitet yoki yo'nalish qidirish",
+    "selectedProgram": "Tanlangan dastur:",
+    "offerRate": "Universitet qabul foizi",
+    "admittedGpaBand": "Qabul qilinganlar GPA o'rtacha 50%",
+    "englishRequirement": "Ingliz tili talabi",
+    "curriculumHolistic": "O'quv dasturi / GRE / Komplex baholash",
+    "gpaCohortBand": "GPA kohortasi (4.0)",
+    "noGpaEntered": "GPA kiritilmagan",
+    "satCohortBand": "SAT kohortasi",
+    "satTestOptional": "Test-optional / Kiritilmagan",
+    "satNotRequired": "Magistratura / Talab qilinmaydi",
+    "pct25": "25-chi:",
+    "pct50": "50-chi:",
+    "pct75": "75-chi:",
+    "medianAbbr": "(Oʻrt. {value})",
+    "percentileLabel": "{pct}-chi %",
+    "selectSafety": "Xavfsiz / Ehtimolli",
+    "selectTarget": "Maqsadli / Mos",
+    "selectReach": "Yuqori daraja",
+    "selectHighReach": "Juda raqobatli",
+    "scenarioBadgeWord": "stsenariy",
+    "showingTopQs": "Eng mos QS benchmark universitetlari ko'rsatilmoqda",
+    "allCountriesCount": "Barcha davlatlar ({count})",
+    "programPositioning": "Dasturda o'rın",
+    "tierAbove75": "75-chi persentildan yuqori (yuqori chorak)",
+    "tier5075": "50–75-chi persentil (o'rta-yuqori chorak)",
+    "tier2550": "25–50-chi persentil (o'rta-past chorak)",
+    "tierBelow25": "25-chi persentildan past",
+    "searchPlaceholder": "masalan, MIT, TUM, Oxford, KAIST, Kompyuter fanlari...",
+    "titleSuffix": "QS Top 200 dastur pozitsiyasi",
+    "switcherTitle": "QS Top 200 universitet va dastur tanlagichi ({universityCount} universitet · {programCount} dastur)",
+    "badgeMet": "Me'yorga mos",
+    "badgeBorderline": "Chekkada",
+    "badgeBelow": "Minimumdan past",
+    "badgeMissing": "Kiritilmagan",
+    "badgeRequirement": "Talab",
+    "minIeltsWord": "Min IELTS",
+    "medIeltsWord": "Oʻrt. IELTS",
+    "toeflMinPlus": "TOEFL {value}+",
+    "programRequirementsWord": "Dastur talablari",
+    "eligibilityVerificationTitle": "Dastur mosligi va talablarni tekshirish ({program})",
+    "yourProfile": "Sizning profilingiz:",
+    "targetValue": "Maqsad:",
+    "cohortArchiveTitle": "Ko'ngilli tarixiy kohorta arxivi ({university}):",
+    "cohortArchiveSummary": "{total} ta ulashilgan qaror ({accepted} qabul · {waitlisted} kutishda · {rejected} rad)",
+    "archiveMedianGpa": "Arxiv qabul mediana GPA:",
+    "englishCohortBand": "Ingliz tili bandi",
+    "filterAll": "Barcha davlatlar ({count})"
   },
   "matchReasons": {
     "university": {
@@ -5110,7 +5212,9 @@
     "daysOverdue": "{days} kun kechikkan",
     "daysLeft": "{days} kun qoldi",
     "dateTba": "Sana kiritilmagan",
-    "openReference": "Manba sahifasini ochish"
+    "openReference": "Manba sahifasini ochish",
+    "filterMine": "⭐ Mening muddatlarim ({count})",
+    "filterAll": "🌐 Barcha grant muddatlari ({count})"
   },
   "consultingPanel": {
     "title": "Yakka tartibdagi maslahat",
@@ -5202,7 +5306,27 @@
     "title": "Bu funksiya yoqilmagan",
     "description": "Bu funksiyani profilingizda yoqish mumkinligini bilish uchun mavjud tariflarni ko‘rib chiqing.",
     "viewPlans": "Tariflarni ko‘rish",
-    "accessNote": "Ruxsat serverda ushbu profil va funksiya uchun tekshiriladi."
+    "accessNote": "Ruxsat serverda ushbu profil va funksiya uchun tekshiriladi.",
+    "valueTitle": "Nima olasiz",
+    "roiBadge": "💡 1 ta universitet ariza to'lovi ($75–$100) o'rniga — butun mavsum davomida barcha AI studiyalar va cheksiz arizalar",
+    "pvAiEssay1": "Maqsad universitetingizga moslashtirilgan 6 paragrafli SOP loyihasi",
+    "pvAiEssay2": "100 ballik qabul komissiyasi rubrika tahlili",
+    "pvAiEssay3": "Qatorma-qator kuchsiz jumlalar qayta yozuvchi + fee waiver va professor xatlari",
+    "pvVisa1": "Cheksiz viza suhbati mashq sessiyalari",
+    "pvVisa2": "Davlatga mos viza hujjatlari checklistlari",
+    "pvVisa3": "Har bir mashq javobiga tezkor tahlil",
+    "pvWorkspace1": "Cheksiz ariza ish maydonlari (har universitet uchun)",
+    "pvWorkspace2": "Har bir ariza bo'yicha talablar kuzatuvi",
+    "pvWorkspace3": "To'liq muddatlar markazi bilan sinxronlash",
+    "pvParent1": "Ota-onangiz uchun faqat o'quv rejim ko'rinishi",
+    "pvParent2": "Ariza jarayoni va muddatlar ko'rinishi",
+    "pvParent3": "Parol va shaxsiy loyihalar hech qachon ulashilmaydi",
+    "pvCourses1": "Barcha kurs modullariga to'liq kirish",
+    "pvCourses2": "Yuklab olinadigan shablonlar va ish varaqlari",
+    "pvCourses3": "Butun o'quv dasturi bo'yicha progress kuzatuvi",
+    "pvDocs1": "Barcha ariza hujjatlarini yuklash va saqlash",
+    "pvDocs2": "Tavsiyanoma xatlari ombori va holat kuzatuvi",
+    "pvDocs3": "Har bir yuklangan fayl uchun versiyalar tarixi"
   },
   "samples": {
     "eyebrow": "Namunalar kutubxonasi",
@@ -6095,5 +6219,22 @@
         "step3": "Mosliklarni qayta hisoblang va natijangiz haqiqatan ko'taradigan dasturlarni ro'yxatga oling."
       }
     }
+  },
+  "guidedJourney": {
+    "title": "Yo'nalish bo'yicha qo'llanma",
+    "step1": "👤 Profil va Maqsad",
+    "step2": "🎓 Universitet va Grant Tanlash",
+    "step3": "📄 Hujjatlar va AI Insho (SOP)",
+    "step4": "🚀 Ariza Topshirish va Viza",
+    "step1Hint": "Profil {pct}% to'ldirilgan",
+    "step2Hint": "{count} ta saqlangan",
+    "step3Hint": "{count} ta material tayyorlanmoqda",
+    "step4Hint": "{count} ta faol ariza",
+    "cta": "Davom etish",
+    "currentStep": "Joriy qadam",
+    "doneStep": "Bajarildi",
+    "hideLabel": "Yo'nalish panelini yashirish",
+    "showLabel": "Yo'nalish panelini ko'rsatish",
+    "stepLabel": "4 qadamdan {n}-chi"
   }
 }

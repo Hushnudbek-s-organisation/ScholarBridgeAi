@@ -39,7 +39,8 @@ import { fitBadgeClass } from "@/lib/fitBadge";
 import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
 import { ScholarshipRequirementPills } from "@/components/ScholarshipRequirementPills";
 import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
-import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import type { MatchBreakdown } from "@/lib/matching";
 
 export interface Scholarship {
@@ -110,7 +111,7 @@ interface ScholarshipHubProps {
   savedScholarshipIds: Set<number>;
   onSaveScholarship: (scholarshipId: number) => Promise<void>;
   onUnsaveScholarship: (scholarshipId: number) => Promise<void>;
-  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
+  autoFocusScholarship?: { id: number; title: string; requestId: number; country?: string | null } | null;
 }
 
 export function ScholarshipHub({
@@ -199,9 +200,18 @@ export function ScholarshipHub({
     // Deep link from global search: commit the term at once — there is nothing
     // to debounce, the student already chose the record.
     setDebouncedSearch(autoFocusScholarship.title);
-    setSelectedCountry("All");
+    // A university detail page can deep-link here with just a country: the
+    // dropdown opens pre-filtered to that country's grants.
+    setSelectedCountry(autoFocusScholarship.country && !autoFocusScholarship.title ? autoFocusScholarship.country : "All");
     setSelectedCoverage("All");
   }
+  // A focused country outside the preset option list still needs a visible
+  // <option>, otherwise the select renders empty while filtering works.
+  const focusCountry =
+    autoFocusScholarship?.country &&
+    !SCHOLARSHIP_FILTER_COUNTRIES.includes(autoFocusScholarship.country)
+      ? autoFocusScholarship.country
+      : null;
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
   // `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, so 8 / 16 / 24 cards.
@@ -215,7 +225,8 @@ export function ScholarshipHub({
   // (filters, search, profile, locale, or page size). Adjusted during render (the
   // React-endorsed alternative to a reset effect), so the debounced fetch
   // below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage, locale].join("|");
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage, locale, profileFingerprint].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -223,6 +234,16 @@ export function ScholarshipHub({
   }
 
   const hasLoadedRef = useRef(false);
+
+  // Profile edits must re-score what is on screen — cached slices were computed
+  // from the OLD profile data, so drop them before the fingerprint refetch.
+  const prevFingerprintRef = useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr();
+    }
+  }, [profileFingerprint]);
 
   const fetchScholarships = async (signal?: AbortSignal) => {
     const params = new URLSearchParams();
@@ -333,7 +354,7 @@ export function ScholarshipHub({
     void Promise.resolve().then(() => fetchScholarships(controller.signal));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale]);
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint]);
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -425,6 +446,14 @@ export function ScholarshipHub({
               className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">{t("allCountries")}</option>
+              {focusCountry && (
+                <option value={focusCountry}>
+                  {(() => {
+                    const key = countryTranslationKey(focusCountry);
+                    return key ? tCountry(key) : focusCountry;
+                  })()}
+                </option>
+              )}
               {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
                 const countryKey = countryTranslationKey(country);
                 const countryOption = qsCountryOption(country);
@@ -455,6 +484,32 @@ export function ScholarshipHub({
           </div>
         </div>
       </div>
+
+      {/* Pillar 3.2 — saved grants lead somewhere: find the universities they
+          fund and manage the applications they feed. */}
+      {savedScholarshipIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/30 dark:bg-amber-400/10">
+          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-amber-900 dark:text-amber-100">
+            {t("shortlistBanner", { count: savedScholarshipIds.size })}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "universities" } }))}
+              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+            >
+              <span className="min-w-0 break-words">{t("findUniversities")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "applications" } }))}
+              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+            >
+              <span className="min-w-0 break-words">{t("manageApplications")}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Results Count */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">

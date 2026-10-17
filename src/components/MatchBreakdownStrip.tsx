@@ -58,6 +58,53 @@ export function MatchBreakdownStrip({
           )}
         </div>
       </div>
+      {(() => {
+        // One color-coded bar per MEASURED dimension. The center line is the
+        // neutral point: emerald grows right for +points, amber/rose grows
+        // left for penalties, and 0 shows only a neutral tick. The width is a
+        // simple ±12-point linear scale, capped — it visualizes RELATIVE
+        // contribution, never a probability.
+        const bars = components.filter((c) => c.key !== "base" && c.compared);
+        if (bars.length === 0) return null;
+        const scale = 12;
+        return (
+          <div className="mt-1.5 space-y-1" aria-hidden>
+            {bars.map((c) => {
+              const clamped = Math.min(Math.abs(c.points) / scale, 1) * 50;
+              const pct = Math.max(clamped, Math.abs(c.points) > 0 ? 4 : 1.5);
+              return (
+                <div key={`bar-${c.key}`} className="flex items-center gap-1.5">
+                  <span className="w-1/3 min-w-0 break-words text-[9px] font-semibold leading-tight text-slate-500">
+                    {t(`dim.${c.key}`)}
+                  </span>
+                  <span className="relative h-1.5 min-w-0 flex-1 rounded-full bg-slate-200/70">
+                    <span className="absolute inset-y-0 left-1/2 w-px bg-slate-400/60" />
+                    {c.points > 0 && (
+                      <span className="absolute inset-y-0 left-1/2 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                    )}
+                    {c.points < 0 && (
+                      <span
+                        className={`absolute inset-y-0 rounded-full ${c.points <= -5 ? "bg-rose-500" : "bg-amber-500"}`}
+                        style={{ width: `${pct}%`, right: "50%" }}
+                      />
+                    )}
+                    {c.points === 0 && (
+                      <span className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-slate-400" />
+                    )}
+                  </span>
+                  <span
+                    className={`w-10 shrink-0 text-right text-[9px] font-bold tabular-nums ${
+                      c.points > 0 ? "text-emerald-700" : c.points < 0 ? "text-rose-700" : "text-slate-400"
+                    }`}
+                  >
+                    {`${c.points > 0 ? "+" : ""}${c.points.toFixed(1)}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       <div className="mt-1 flex flex-wrap gap-1">
         {components
           .filter((c) => c.key !== "base")
@@ -80,6 +127,21 @@ export function MatchBreakdownStrip({
             </span>
           ))}
       </div>
+      {(() => {
+        // The arithmetic spelled out: the neutral base plus every measured
+        // contribution equals the score the card shows. For the legacy bare
+        // array (no rawScore in the payload) the same sum is derived from the
+        // components themselves, so the line is never a guess.
+        const base = components.find((c) => c.key === "base");
+        if (!base || components.length <= 1) return null;
+        const sum = Math.round(components.reduce((total, c) => total + c.points, 0) * 10) / 10;
+        const raw = !Array.isArray(breakdown) && typeof breakdown.rawScore === "number" ? breakdown.rawScore : sum;
+        return (
+          <p className="mt-1.5 break-words border-t border-slate-200/70 pt-1 text-[10px] font-bold text-slate-600 tabular-nums">
+            {t("exScoreFormula", { base: base.points, raw })}
+          </p>
+        );
+      })()}
     </div>
   );
 }

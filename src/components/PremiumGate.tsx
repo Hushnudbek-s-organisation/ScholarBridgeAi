@@ -2,8 +2,25 @@
 
 import React, { useEffect, useState, ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Lock, Crown } from "lucide-react";
+import { CheckCircle2, Lock, Crown } from "lucide-react";
 import type { FeatureKey } from "@/lib/entitlements";
+
+/**
+ * Pillar 5.2 — feature-specific value preview. A locked panel that only says
+ * "upgrade" converts nobody; each entry names the three concrete deliverables
+ * the student gets the moment the feature unlocks. Keys live in the
+ * `premiumGate` message namespace (en/uz/ru), so the preview says the same
+ * honest thing in every language. Features without an entry show only the
+ * generic gate — never an invented promise.
+ */
+const FEATURE_VALUE_PREVIEW: Partial<Record<FeatureKey, readonly [string, string, string]>> = {
+  ai_essay: ["pvAiEssay1", "pvAiEssay2", "pvAiEssay3"],
+  visa_unlimited: ["pvVisa1", "pvVisa2", "pvVisa3"],
+  workspace_unlimited: ["pvWorkspace1", "pvWorkspace2", "pvWorkspace3"],
+  parent_dashboard: ["pvParent1", "pvParent2", "pvParent3"],
+  courses_full: ["pvCourses1", "pvCourses2", "pvCourses3"],
+  documents_upload: ["pvDocs1", "pvDocs2", "pvDocs3"],
+};
 
 interface PremiumGateProps {
   profileId: number | null;
@@ -85,6 +102,24 @@ function FeatureGateContent({ profileId, feature, title, description, onUpgrade,
             </h2>
             <p className="mt-2 break-words text-sm text-slate-700">{description || t("description")}</p>
           </div>
+          {FEATURE_VALUE_PREVIEW[feature] && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-left">
+              <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                {t("valueTitle")}
+              </p>
+              <ul className="mt-1.5 space-y-1.5">
+                {FEATURE_VALUE_PREVIEW[feature]!.map((key) => (
+                  <li key={key} className="flex items-start gap-1.5 text-[11px] font-semibold leading-snug text-slate-700">
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                    <span className="min-w-0 break-words">{t(key)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 break-words rounded-xl bg-amber-50 px-2.5 py-1.5 text-[10px] font-bold leading-snug text-amber-900 ring-1 ring-inset ring-amber-200">
+                {t("roiBadge")}
+              </p>
+            </div>
+          )}
           <button
             type="button"
             onClick={onUpgrade}

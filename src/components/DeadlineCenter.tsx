@@ -146,6 +146,25 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
   const soonCount = items.filter((item) => item.urgency === "soon" && item.status !== "COMPLETED").length;
   const openCount = items.filter((item) => item.status === "OPEN").length;
 
+  // 2.4 — personal-first filter. The catalogue has hundreds of recurring
+  // scholarship dates; a student with their own saved records cares about the
+  // shortlist, their applications, milestones and booked tests first. "My
+  // deadlines" becomes the default exactly when such items exist; otherwise
+  // the full list is shown (a fresh account still sees what is coming).
+  const isPersonal = (item: DeadlineItem) =>
+    item.saved === true || item.type === "application" || item.type === "milestone" || item.type === "test";
+  const personalCount = items.filter(isPersonal).length;
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  // Adjusted during render when the personal set appears/disappears (the
+  // React-endorsed pattern for state derived from new props/data): a student
+  // who saves their first scholarship lands on their own list immediately.
+  const [prevPersonalCount, setPrevPersonalCount] = useState(personalCount);
+  if (personalCount !== prevPersonalCount) {
+    setPrevPersonalCount(personalCount);
+    setScope(personalCount > 0 ? "mine" : "all");
+  }
+  const visibleItems = scope === "mine" && personalCount > 0 ? items.filter(isPersonal) : items;
+
   const statusText = (status: string) => {
     const statusKey = STATUS_TRANSLATIONS[status.trim().toUpperCase()] ?? "other";
     return text(`statuses.${statusKey}`);
@@ -214,8 +233,33 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
         ) : items.length === 0 ? (
           <p className="p-8 text-center text-xs font-semibold text-slate-500">{t("empty")}</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
-            {items.map((item) => {
+          <>
+            {personalCount > 0 && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                {(
+                  [
+                    { id: "mine", label: t("filterMine", { count: personalCount }), active: scope === "mine" },
+                    { id: "all", label: t("filterAll", { count: items.length }), active: scope === "all" },
+                  ] as const
+                ).map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    aria-pressed={pill.active}
+                    onClick={() => setScope(pill.id)}
+                    className={`min-h-11 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
+                      pill.active
+                        ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <ul className="divide-y divide-slate-100">
+            {visibleItems.map((item) => {
               const meta = TYPE_META[item.type] || TYPE_META.milestone;
               const days = item.daysRemaining;
               const completed = item.status === "COMPLETED";
@@ -284,7 +328,8 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
 

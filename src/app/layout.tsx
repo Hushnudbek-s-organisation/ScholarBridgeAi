@@ -120,6 +120,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         {/* Applies the saved theme before first paint — no light/dark flash. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+        {/* Pre-warm DNS + TLS for the two image CDNs the landing page and
+            catalogue cards load from, so the first image request is not
+            stuck behind a cold connection. */}
+        <link rel="preconnect" href="https://upload.wikimedia.org" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased">
         <ThemeProvider defaultTheme={initialTheme}>

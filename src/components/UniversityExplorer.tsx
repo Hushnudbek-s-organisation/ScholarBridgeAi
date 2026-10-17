@@ -6,9 +6,10 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { StudentProfile } from "./Navbar";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
-import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 const UniversityDetail = dynamic(
   () => import("./UniversityDetail").then((m) => m.UniversityDetail),
@@ -131,6 +132,11 @@ interface UniversityExplorerProps {
    */
   onNavigate?: (id: string) => void;
   onApplicationStarted?: (applicationId: number, universityName: string) => void;
+  /**
+   * Pillar 5.1 — the score-booster micro-pill opens the profile editor so a
+   * missing GPA/IELTS is one click from fixing (never a dead-end hint).
+   */
+  onOpenProfileModal?: () => void;
 }
 
 export function UniversityExplorer({
@@ -141,6 +147,7 @@ export function UniversityExplorer({
   autoOpenUniversityId,
   onNavigate,
   onApplicationStarted,
+  onOpenProfileModal,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
   const tCountry = useTranslations("countryNames");
@@ -273,6 +280,9 @@ export function UniversityExplorer({
     perPage,
     // Switching en↔uz↔ru refetches: the response language follows the request.
     locale,
+    // Any score-relevant profile edit (GPA, IELTS, major, budget, …) forms a
+    // new result set identity, so every card re-scores immediately.
+    profileMatchFingerprint(activeProfile),
   ].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
@@ -305,6 +315,18 @@ export function UniversityExplorer({
   // True once a response has been rendered — from then on the existing cards
   // stay mounted during a refresh instead of being replaced by a placeholder.
   const hasLoadedRef = useRef(false);
+
+  // Profile edits must re-score what is on screen. Cached slices were computed
+  // from the OLD profile data, so drop them before the fingerprint refetch —
+  // placed before the fetch effect on purpose (effects run in order).
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const prevFingerprintRef = useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr();
+    }
+  }, [profileFingerprint]);
 
   const fetchUniversities = async (signal?: AbortSignal) => {
     const params = buildFilterParams();
@@ -855,6 +877,39 @@ export function UniversityExplorer({
         )}
       </div>
 
+      {/* Pillar 3.2 — the shortlist is never a dead end: once universities
+          are saved, the next logical steps are one click away right here. */}
+      {savedUniIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-3 py-2.5 dark:border-indigo-400/30 dark:bg-indigo-500/10">
+          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+            {t("exShortlistBanner", { count: savedUniIds.size })}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onNavigate?.("universities/outlook")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exCompareOutlook")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("scholarships/browse")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exFindScholarships")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("applications/tracker")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exManageApplications")}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Results Count & Active Info */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
@@ -998,6 +1053,51 @@ export function UniversityExplorer({
                     <p className="text-[11px] text-slate-500 mb-2">
                       <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
                     </p>
+
+                    {/* Pillar 5.1 — a rank-verified state-scholarship signal.
+                        El-Yurt Umidi funds applicants admitted to top-ranked
+                        universities; ≤300 on the catalogue's QS-based ranking
+                        is a CRITERION MATCH, never a promise of an award. */}
+                    {uni.worldRanking != null && uni.worldRanking <= 300 && (
+                      <p className="mb-2 inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800">
+                        <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
+                      </p>
+                    )}
+
+                    {/* Pillar 5.1 — the % is only as sharp as the profile.
+                        A logged-in student missing score data gets a one-click
+                        route to fixing it, plus the exact recovery a
+                        below-minimum dimension currently costs. */}
+                    {activeProfile &&
+                      (() => {
+                        const bd = uni.matchBreakdown;
+                        if (!bd) return null;
+                        const missingData = bd.comparedDimensions < 4;
+                        const penalties = bd.components
+                          .filter((c) => c.compared && c.points < 0 && (c.key === "english" || c.key === "gpa"))
+                          .reduce((gain, c) => gain + Math.abs(c.points), 0);
+                        if (!missingData && penalties <= 0) return null;
+                        return (
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                            {missingData && onOpenProfileModal && (
+                              <button
+                                type="button"
+                                onClick={onOpenProfileModal}
+                                className="inline-flex min-h-11 max-w-full items-center rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-bold leading-snug text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                              >
+                                <span className="min-w-0 break-words">{t("exScoreBoosterHint")}</span>
+                              </button>
+                            )}
+                            {penalties > 0 && (
+                              <p className="inline-flex max-w-full items-center rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-800 ring-1 ring-inset ring-amber-200">
+                                <span className="min-w-0 break-words">
+                                  {t("exBoosterGain", { points: penalties.toFixed(1) })}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* Priority 4.1 — the three comparisons that decide whether
                         this university is worth an application fee, already

@@ -23,28 +23,30 @@ interface PlanPackage {
   badge?: string;
 }
 
+// Feature rows are icon + message key — every locale renders its own wording
+// (the pricing page was Uzbek-only before).
 const FREE_FEATURES = [
-  { icon: Sparkles, text: "Universitet va stipendiya qidiruvi + moslik bahosi" },
-  { icon: Check, text: "10 tagacha universitet va 10 tagacha stipendiya saqlash" },
-  { icon: Check, text: "Mening o'qish rejam va asosiy yo'l xaritasi" },
-  { icon: Check, text: "Asosiy deadline eslatmalari (Telegram)" },
-  { icon: Check, text: "Test rejalashtiruvchi va hujjatlar checklisti" },
-  { icon: MessageSquare, text: "AI yordamchi: kuniga 3–5 savol" },
-  { icon: Check, text: "Forumni o'qish, kurslarning kirish darslari" },
-  { icon: Check, text: "1 ta ariza ish maydoni" },
-];
+  { icon: Sparkles, key: "free1" },
+  { icon: Check, key: "free2" },
+  { icon: Check, key: "free3" },
+  { icon: Check, key: "free4" },
+  { icon: Check, key: "free5" },
+  { icon: MessageSquare, key: "free6" },
+  { icon: Check, key: "free7" },
+  { icon: Check, key: "free8" },
+] as const;
 
 const PRO_FEATURES = [
-  { icon: FileText, text: "SOP/inshoni AI bilan yozish, tahlil va versiyalar" },
-  { icon: Sparkles, text: "Profil auditi va chuqur qabul imkoniyati tahlili" },
-  { icon: InfinityIcon, text: "Cheksiz ariza ish maydoni va cheksiz saqlash" },
-  { icon: Check, text: "Barcha muddatlar markazi + kengaytirilgan eslatmalar (3/7/14 kun)" },
-  { icon: Plane, text: "Cheksiz viza suhbati mashqi va viza markazi" },
-  { icon: MessageSquare, text: "Cheksiz AI yordamchi" },
-  { icon: FileText, text: "Tavsiyanoma ombori va fayl yuklash (hujjatlar ombori)" },
-  { icon: Users, text: "Ota-ona kuzatuv paneli" },
-  { icon: Check, text: "Forumda yozish va kurslarning to'liq versiyasi" },
-];
+  { icon: FileText, key: "pro1" },
+  { icon: Sparkles, key: "pro2" },
+  { icon: InfinityIcon, key: "pro3" },
+  { icon: Check, key: "pro4" },
+  { icon: Plane, key: "pro5" },
+  { icon: MessageSquare, key: "pro6" },
+  { icon: FileText, key: "pro7" },
+  { icon: Users, key: "pro8" },
+  { icon: Check, key: "pro9" },
+] as const;
 
 function formatUzs(n: number) {
   return `${n.toLocaleString("uz-UZ")} so'm`;
@@ -112,8 +114,8 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">{t("title")}</h1>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-                Bepul — ishni boshlash uchun. Pro — vaqt tejash, sifat va cheksizlik.
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 break-words">
+                {t("heroTagline")}
               </p>
             </div>
           </div>
@@ -125,15 +127,15 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-extrabold text-slate-900">Bepul</h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">0 so&apos;m</span>
+            <h2 className="text-base font-extrabold text-slate-900">{t("freeTitle")}</h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">{t("freePrice")}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">Haqiqiy foyda beradi — ishni tugatish uchun yetmaydi.</p>
+          <p className="mt-1 text-xs text-slate-500 break-words">{t("freeSubtitle")}</p>
           <ul className="mt-4 space-y-2.5">
             {FREE_FEATURES.map((f) => (
-              <li key={f.text} className="flex items-start gap-2 text-sm text-slate-700">
+              <li key={f.key} className="flex items-start gap-2 text-sm text-slate-700">
                 <f.icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                <span>{f.text}</span>
+                <span className="min-w-0 break-words">{t(f.key)}</span>
               </li>
             ))}
           </ul>
@@ -142,16 +144,16 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
         <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 text-base font-extrabold text-slate-900">
-              <Crown className="h-4 w-4 text-amber-500" /> Pro
+              <Crown className="h-4 w-4 text-amber-500" /> {t("proTitle")}
             </h2>
-            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-white sb-ink-on-warm">Tavsiya</span>
+            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-white sb-ink-on-warm">{t("proBadge")}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-600">Deadline yaqin, insho yozilayotganda, viza oldidan — shu paytda kerak.</p>
+          <p className="mt-1 text-xs text-slate-600 break-words">{t("proSubtitle")}</p>
           <ul className="mt-4 space-y-2.5">
             {PRO_FEATURES.map((f) => (
-              <li key={f.text} className="flex items-start gap-2 text-sm text-slate-800">
+              <li key={f.key} className="flex items-start gap-2 text-sm text-slate-800">
                 <f.icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <span>{f.text}</span>
+                <span className="min-w-0 break-words">{t(f.key)}</span>
               </li>
             ))}
           </ul>
@@ -161,17 +163,17 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
       {!isPremium && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">Pro paketini tanlang</h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Talabaning ehtiyoji mavsumiy — shuning uchun qisqa (3 oy) va yillik variantlar ham bor.
+            <h3 className="font-bold text-slate-900 text-sm">{t("choosePlanTitle")}</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5 break-words">
+              {t("choosePlanSubtitle")}
             </p>
           </div>
 
           {/* Prices come only from /api/premium/status (app_config). No fallback
               prices are shown: if the server gives none, nothing can be bought. */}
           {packages.length === 0 && (
-            <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              Narxlar hozir yuklanmadi yoki mavjud emas. Keyinroq qayta urinib ko&apos;ring.
+            <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600 break-words">
+              {t("pricesUnavailable")}
             </p>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
@@ -197,7 +199,7 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
                     {pack.labelUz || pack.label}
                   </p>
                   <p className="mt-1 text-lg font-extrabold text-slate-900">{formatUzs(pack.priceUzs)}</p>
-                  <p className="text-[11px] text-slate-500">{pack.days} kun</p>
+                  <p className="text-[11px] text-slate-500">{t("perDays", { days: pack.days })}</p>
                 </button>
               );
             })}
@@ -208,10 +210,10 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
               <p className="text-sm font-bold text-slate-900">
                 {selected ? formatUzs(selected.priceUzs) : "—"}{" "}
                 <span className="text-xs font-medium text-slate-500">
-                  / {selected?.days ?? 30} kun
+                  {t("perDayUnit", { days: selected?.days ?? 30 })}
                 </span>
               </p>
-              <p className="text-[11px] text-slate-500">Ota-onalar ham to&apos;lashi mumkin — oila qaror va pulni boshqaradi.</p>
+              <p className="text-[11px] text-slate-500 break-words">{t("parentPayNote")}</p>
             </div>
             <button
               onClick={() => setShowCheckout(true)}
