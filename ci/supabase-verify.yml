@@ -31,6 +31,11 @@ name: Supabase schema verify
 on:
   push:
     branches: [main]
+  # TEMPORARY (connection smoke test): also run on PRs so the SUPABASE_DB_URL
+  # secret can be exercised before this workflow exists on main. Remove this
+  # trigger once the live verify has passed once.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
