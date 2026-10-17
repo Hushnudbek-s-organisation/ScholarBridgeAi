@@ -101,18 +101,26 @@ jobs:
           {
             echo "## Supabase live schema verify — exit `$code`"
             echo
+            echo "### Gaps between src/db/schema.ts and the live database"
+            echo
+            grep -E "MISSING|TYPE MISMATCH" /tmp/verify.log || echo "(none)"
+            echo
             echo '```'
             tail -n 40 /tmp/verify.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$code" != "0" ]; then
             # Runner log archives are not always downloadable, but check
-            # annotations are: publish the (password-redacted) tail so the
-            # failure reason is readable from the API/UI.
-            detail=$(tail -n 14 /tmp/verify.log \
-              | sed -E -e 's#(postgres(ql)?://)[^@[:space:]]+@#\1***@#g' -e 's/%/%25/g' \
-              | tr '\n' ' ' | cut -c1-900)
-            echo "::error title=Supabase live verify failed (exit $code)::${detail:-see the job log}"
+            # annotations are. Publish one annotation per gap (password-redacted)
+            # instead of a truncated tail, so every issue is readable.
+            grep -E "CONNECTION FAILED|MISSING|TYPE MISMATCH|FAILED:|PASSED" /tmp/verify.log \
+              | head -16 \
+              | while IFS= read -r line; do
+                  safe=$(printf '%s' "$line" \
+                    | sed -E -e 's#(postgres(ql)?://)[^@[:space:]]+@#\1***@#g' -e 's/%/%25/g' -e 's/\r//g')
+                  echo "::error title=Supabase live verify (exit $code)::${safe}"
+                done
+            echo "::error title=Supabase live verify failed::exit $code — see the per-gap annotations above"
           fi
           exit "$code"
 
