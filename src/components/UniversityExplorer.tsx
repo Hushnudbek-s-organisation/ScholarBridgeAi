@@ -7,7 +7,7 @@ import Image from "next/image";
 import { StudentProfile } from "./Navbar";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
-import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { campusPhotoSrc, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
@@ -1004,8 +1004,9 @@ export function UniversityExplorer({
                 <div className="relative h-44 w-full overflow-hidden bg-slate-100 md:h-40">
                   {uni.imageUrl ? (
                     <Image
-                      src={toWikimediaThumb(uni.imageUrl, 640)}
+                      src={campusPhotoSrc(uni.imageUrl, 640)}
                       onError={onWikimediaThumbError(uni.imageUrl)}
+                      crossOrigin="anonymous"
                       alt={`${uni.name} — ${uni.city}, ${uni.country}`}
                       width={640}
                       height={320}

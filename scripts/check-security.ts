@@ -1033,6 +1033,11 @@ async function main() {
       "courses GET",
       "gamification/leaderboard GET",
       "health GET",
+      // Same-origin campus photo proxy: strict host+prefix+extension allowlist
+      // (upload.wikimedia.org/wikipedia/commons only), image bytes in / 404s
+      // out, redirect-safe fetchGuarded upstream, no DB access at all.
+      // Reviewed in SECURITY.md ("public media proxy").
+      "image GET",
       "opportunities GET",
       "scholarships GET",
       "stories GET",

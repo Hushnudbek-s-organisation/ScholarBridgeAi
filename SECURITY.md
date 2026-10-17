@@ -261,7 +261,15 @@ Regression guards added to `npm run test:security`:
   above, scanned across `src/app` and `src/lib` (comments stripped, so the
   warning comment in the fixed file does not match itself);
 - **every API read is session-guarded or a reviewed public read** — the public
-  read allowlist is explicit in the test;
+  read allowlist is explicit in the test. `GET /api/image` is the reviewed
+  public media proxy (added with the campus-photo outage fix): it serves ONLY
+  `https://upload.wikimedia.org/wikipedia/commons/**` image URLs (exact host,
+  path prefix, image extension, no credentials), fetches upstream through the
+  redirect-safe `fetchGuarded` (private/metadata targets refused per hop),
+  never touches the database or student data, and answers 400/404 with no
+  upstream detail. It exists so browsers behind national filters (e.g.
+  Wikimedia blocks in UZ) still get university photos via our same-origin
+  egress, with a 7-day immutable cache;
 - **community and beacon writes parse a size-capped body**;
 - **the middleware caps API JSON bodies** (unit + middleware-level `413`);
 - **API responses are marked `no-store`**.

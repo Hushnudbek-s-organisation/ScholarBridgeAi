@@ -47,3 +47,44 @@ export function onWikimediaThumbError(originalUrl: string | null | undefined) {
     img.src = originalUrl;
   };
 }
+
+/** The exact upstream this proxy is allowed to serve — nothing else. */
+export const WIKIMEDIA_HOST = "upload.wikimedia.org";
+export const WIKIMEDIA_PREFIX = "/wikipedia/commons/";
+
+/** True for any Commons URL, original or thumbnail (the two shapes we store). */
+export function isWikimediaCommonsUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      u.protocol === "https:" &&
+      u.hostname === WIKIMEDIA_HOST &&
+      u.pathname.startsWith(WIKIMEDIA_PREFIX)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rewrite a Wikimedia Commons URL to the same-origin image proxy
+ * (`GET /api/image?u=…`). WHY: several of our students — Uzbekistan among
+ * them — sit behind national filters that block or cripple direct browser
+ * access to upload.wikimedia.org, so campus photos stayed blank even though
+ * the rest of the site was fast. The server-side fetch has no such problem,
+ * and the proxy responds with long immutable cache headers, so each image is
+ * fetched once per client per week and served same-origin after that.
+ * Non-Commons URLs (Unsplash, our own Supabase Storage, /public assets) pass
+ * through untouched.
+ */
+export function viaImageProxy(url: string): string {
+  if (!isWikimediaCommonsUrl(url)) return url;
+  return `/api/image?u=${encodeURIComponent(url)}`;
+}
+
+/** `toWikimediaThumb` + `viaImageProxy` in one call — the canonical src for
+ *  every campus photo the browser renders. */
+export function campusPhotoSrc(originalUrl: string | null | undefined, width: number): string {
+  return viaImageProxy(toWikimediaThumb(originalUrl, width));
+}
