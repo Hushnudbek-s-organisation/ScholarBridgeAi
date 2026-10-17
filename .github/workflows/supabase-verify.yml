@@ -89,12 +89,32 @@ jobs:
 
       - name: Verify live Supabase schema (information_schema SELECT only)
         if: steps.db.outputs.configured == 'yes'
+        id: verify
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           DATABASE_URL_SECRET: ${{ secrets.DATABASE_URL }}
         run: |
           export DATABASE_URL="${SUPABASE_DB_URL:-$DATABASE_URL_SECRET}"
-          npm run db:verify
+          set +e
+          npm run db:verify 2>&1 | tee /tmp/verify.log
+          code="${PIPESTATUS[0]}"
+          {
+            echo "## Supabase live schema verify — exit `$code`"
+            echo
+            echo '```'
+            tail -n 40 /tmp/verify.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "0" ]; then
+            # Runner log archives are not always downloadable, but check
+            # annotations are: publish the (password-redacted) tail so the
+            # failure reason is readable from the API/UI.
+            detail=$(tail -n 14 /tmp/verify.log \
+              | sed -E -e 's#(postgres(ql)?://)[^@[:space:]]+@#\1***@#g' -e 's/%/%25/g' \
+              | tr '\n' ' ' | cut -c1-900)
+            echo "::error title=Supabase live verify failed (exit $code)::${detail:-see the job log}"
+          fi
+          exit "$code"
 
       - name: Report why it skipped
         if: steps.db.outputs.configured != 'yes'
