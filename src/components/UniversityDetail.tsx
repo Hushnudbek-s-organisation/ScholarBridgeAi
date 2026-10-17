@@ -36,7 +36,7 @@ import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import { DecisionPillStrip } from "./DecisionPillStrip";
 import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
-import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { toWikimediaThumb, onWikimediaThumbError, campusPhotoSrc } from "@/lib/wikimediaThumb";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
@@ -539,9 +539,10 @@ export function UniversityDetail({
         {uni.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={toWikimediaThumb(uni.imageUrl, 1200)}
+            src={campusPhotoSrc(uni.imageUrl, 1200)}
             onError={onWikimediaThumbError(uni.imageUrl)}
             alt=""
+            crossOrigin="anonymous"
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover scale-105"
           />
@@ -556,7 +557,8 @@ export function UniversityDetail({
               {uni.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={toWikimediaThumb(uni.imageUrl, 320)}
+                  src={campusPhotoSrc(uni.imageUrl, 320)}
+                  crossOrigin="anonymous"
                   onError={onWikimediaThumbError(uni.imageUrl)}
                   alt={`${uni.name} logo`}
                   loading="eager"

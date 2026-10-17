@@ -16,7 +16,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dictionaries, type Messages } from "@/i18n/messages";
 import { formatMessage } from "@/i18n/formatMessage";
-import { toWikimediaThumb } from "@/lib/wikimediaThumb";
+import { toWikimediaThumb, viaImageProxy } from "@/lib/wikimediaThumb";
 import {
   Bell,
   BookmarkCheck,
@@ -785,7 +785,7 @@ function DeadlineBadge({ days, urgency, t }: { days: number | null | undefined; 
 function ItemThumb({ item, kind, size = "h-16 w-16" }: { item: Item; kind: Kind; size?: string }) {
   const [broken, setBroken] = useState(false);
   const raw = item.imageUrl ?? null;
-  const thumb = !broken && raw ? toWikimediaThumb(raw, 320) : !raw ? null : raw;
+  const thumb = !broken && raw ? viaImageProxy(toWikimediaThumb(raw, 320)) : !raw ? null : raw;
   return (
     <div className={`${size} shrink-0 overflow-hidden rounded-xl`} style={{ background: C.bg }}>
       {thumb ? (
@@ -1633,7 +1633,7 @@ function DetailSheet({
           {kind === "u" && item.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={toWikimediaThumb(item.imageUrl, 640)}
+              src={viaImageProxy(toWikimediaThumb(item.imageUrl, 640))}
               alt=""
               onError={(e) => {
                 const img = e.currentTarget;

@@ -54,7 +54,7 @@ import {
   NAV_UTILITY_SECTIONS,
 } from "@/lib/navSections";
 import { AppNote } from "./AppNote";
-import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { toWikimediaThumb, onWikimediaThumbError, viaImageProxy, campusPhotoSrc } from "@/lib/wikimediaThumb";
 
 export interface MarqueeUniversityItem {
   rank: string;
@@ -254,30 +254,30 @@ export const LANDING_PHOTOS = {
   // every consumer — current or future — gets the fast URL by construction.
   // The onError fallback in consumers can still reach the original via the
   // marquee pattern if a thumb ever misses.
-  campusUsa: toWikimediaThumb(
+  campusUsa: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG",
     640
-  ),
-  campusUk: toWikimediaThumb(
+  )),
+  campusUk: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/3/3d/Radcliffe_Camera%2C_Oxford.jpg",
     640
-  ),
-  campusGermany: toWikimediaThumb(
+  )),
+  campusGermany: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg",
     640
-  ),
-  campusSwiss: toWikimediaThumb(
+  )),
+  campusSwiss: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/7/7c/ETH_Z%C3%BCrich_2015.jpg",
     640
-  ),
-  campusCanada: toWikimediaThumb(
+  )),
+  campusCanada: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg",
     640
-  ),
-  campusAsia: toWikimediaThumb(
+  )),
+  campusAsia: viaImageProxy(toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/0/02/KAIST_from_across_Gapcheon.jpg",
     640
-  ),
+  )),
   step1Profile:
     "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=700&q=80",
   step2UniversityMatch:
@@ -1757,8 +1757,9 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={toWikimediaThumb(university.url, 480)}
+                    src={campusPhotoSrc(university.url, 480)}
                     onError={onWikimediaThumbError(university.url)}
+                    crossOrigin="anonymous"
                     alt={university.landmark}
                     // Leading cards of row 1 paint with the section; every other
                     // FIRST-copy card is eager once the section is near (see
