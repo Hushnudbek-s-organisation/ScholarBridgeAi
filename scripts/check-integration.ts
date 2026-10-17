@@ -90,6 +90,14 @@ async function main() {
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
   const { db, pool } = await import("../src/db");
+  // Same guard check-ownership/check-portability/check-telegram-integration
+  // already use: when Postgres is stopped at the end of the run, a lingering
+  // idle client reports 57P01 "terminating connection due to administrator
+  // command". Without a listener Node turns that into an uncaught exception and
+  // fails the step even though every assertion passed — the intermittent CI red
+  // on this suite. src/db now attaches a logging listener too; this one keeps
+  // the suite safe if that ever changes.
+  pool.on("error", () => undefined);
   const schema = await import("../src/db/schema");
   const { signSessionToken } = await import("../src/lib/auth");
 

@@ -491,6 +491,10 @@ async function apiPart() {
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
   const { pool: pool0 } = await import("../src/db");
+  // See the same guard in check-integration.ts: stopping the embedded Postgres
+  // makes a lingering idle client report 57P01, which without a listener kills
+  // the process after all assertions passed (the flaky CI red on this suite).
+  pool0.on("error", () => undefined);
   const schema = await import("../src/db/schema");
   const { drizzle } = await import("drizzle-orm/node-postgres");
   const db = drizzle(pool0, { schema });
