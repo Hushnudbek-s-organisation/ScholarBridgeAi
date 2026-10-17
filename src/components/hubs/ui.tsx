@@ -19,8 +19,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronRight, TriangleAlert } from "lucide-react";
-import { isNewBadgeActive } from "@/lib/navSections";
+import { ArrowRight, ChevronDown, ChevronRight, ChevronUp, TriangleAlert } from "lucide-react";
 import { JourneyCard } from "@/components/journey/ui";
 
 export interface HubPaneDef {
@@ -97,16 +96,6 @@ export function HubTabs({
             }`}
           >
             {pane.label}
-            {pane.isNew && isNewBadgeActive() && (
-              <span
-                aria-hidden="true"
-                className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                  isActive ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-                }`}
-              >
-                {tn("newBadge")}
-              </span>
-            )}
             {pane.premium && (
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
@@ -119,6 +108,49 @@ export function HubTabs({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The shared "long list → curated preview" footer control.
+ *
+ * Every list that used to dump dozens of rows (dashboard next steps,
+ * deadlines, study-plan phases, detail pages, feeds) now renders a short
+ * initial slice followed by this one quiet pill: `Show more (+N)` /
+ * `Show less`, localized in en/uz/ru through the shared `common` namespace.
+ * It renders nothing when everything already fits on screen — so the
+ * controls never appear unless they actually do something.
+ */
+export function ShowMoreToggle({
+  totalCount,
+  visibleCount,
+  expanded,
+  onToggle,
+  className = "",
+}: {
+  totalCount: number;
+  visibleCount: number;
+  expanded: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const tc = useTranslations("common");
+  const hiddenCount = Math.max(0, totalCount - visibleCount);
+  // Nothing to reveal AND not expanded → no control. While expanded the pill
+  // stays (it is the only way back to the compact preview).
+  if (hiddenCount <= 0 && !expanded) return null;
+  return (
+    <div className={`flex justify-center ${className}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+      >
+        {expanded ? tc("showLess") : tc("showMoreCount", { count: hiddenCount })}
+        {expanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+      </button>
     </div>
   );
 }
@@ -231,20 +263,6 @@ export function HubPage({
         )}
       </JourneyCard>
 
-      {note && (
-        <div
-          className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-[13px] ${
-            note.tone === "warn"
-              ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-              : "border-slate-200 bg-white text-slate-700 shadow-xs dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
-          }`}
-          role="note"
-        >
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <p>{note.text}</p>
-        </div>
-      )}
-
       {hasTabPanels ? (
         <div className="space-y-4">
           {visibleTabPanes.map((pane) => (
@@ -255,6 +273,21 @@ export function HubPage({
         </div>
       ) : (
         animatedContent
+      )}
+
+      {/* The standing disclaimer stays honest but gets quiet: a single-line
+          muted footnote at the END of the page, not a full banner box stacked
+          above the explorer (three of these used to stack on one screen). */}
+      {note && (
+        <p
+          className={`flex items-start gap-1.5 border-t border-slate-200/60 px-1 pt-3 text-xs text-slate-500 dark:border-slate-800/60 dark:text-slate-400 ${
+            note.tone === "warn" ? "font-semibold text-amber-700 dark:text-amber-300" : ""
+          }`}
+          role="note"
+        >
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="min-w-0 break-words">{note.text}</span>
+        </p>
       )}
     </div>
   );

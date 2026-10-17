@@ -203,7 +203,9 @@
     "points": "ball",
     "level": "Daraja",
     "search": "Qidirish",
-    "optional": "ixtiyoriy"
+    "optional": "ixtiyoriy",
+    "showMoreCount": "Yana {count} ta ko'rsatish",
+    "showLess": "Yig'ish"
   },
   "forum": {
     "title": "Jamoa forumi",
@@ -3606,7 +3608,8 @@
     "exCompareOutlook": "📊 Qabul imkoniyatini solishtirish",
     "exFindScholarships": "💰 Mos grantlarni topish",
     "exManageApplications": "📋 Arizalarni boshqarish",
-    "exBoosterGain": "📈 IELTS/GPA farqini yopish ushbu bahoda {points} ballgacha tiklaydi"
+    "exBoosterGain": "📈 IELTS/GPA farqini yopish ushbu bahoda {points} ballgacha tiklaydi",
+    "exCardDetails": "Ball tafsiloti va talablar"
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -4198,7 +4201,8 @@
     },
     "shortlistBanner": "{count} ta stipendiya saqlandi",
     "findUniversities": "🎓 Mos universitetlarni topish",
-    "manageApplications": "📋 Arizalarni boshqarish"
+    "manageApplications": "📋 Arizalarni boshqarish",
+    "cardDetails": "Talablar va ball tafsiloti"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",

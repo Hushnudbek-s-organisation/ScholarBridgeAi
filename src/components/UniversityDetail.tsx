@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ShowMoreToggle } from "./hubs/ui";
 import { useTranslations } from "next-intl";
 import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
@@ -301,6 +302,11 @@ export function UniversityDetail({
   // Presentation-only UI state (no fetch/API changes)
   const [reqsExpanded, setReqsExpanded] = useState(false);
   const [showAllPrograms, setShowAllPrograms] = useState(false);
+  // Clean-UI pass: cycles, awards and sources open as short previews; the
+  // full list is one quiet toggle away instead of a page-stretching stack.
+  const [showAllCycles, setShowAllCycles] = useState(false);
+  const [showAllScholarships, setShowAllScholarships] = useState(false);
+  const [showAllSources, setShowAllSources] = useState(false);
   const [expandedProgramReqs, setExpandedProgramReqs] = useState<Record<number, boolean>>({});
   // Saved programs (spec §24) — programId -> saved-row id, for save/unsave.
   const [savedProgramIds, setSavedProgramIds] = useState<Record<number, number>>({});
@@ -739,7 +745,7 @@ export function UniversityDetail({
           </div>
         ) : (
           <div className="mt-3 space-y-3">
-            {cycles.map((c) => (
+            {(showAllCycles ? cycles : cycles.slice(0, 2)).map((c) => (
               <div key={c.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-extrabold text-slate-800">
@@ -820,6 +826,13 @@ export function UniversityDetail({
                 </div>
               </div>
             ))}
+            <ShowMoreToggle
+              className="pt-1"
+              totalCount={cycles.length}
+              visibleCount={2}
+              expanded={showAllCycles}
+              onToggle={() => setShowAllCycles((v) => !v)}
+            />
           </div>
         )}
       </div>
@@ -1192,8 +1205,9 @@ export function UniversityDetail({
         {scholarships.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">{t("noScholarships")}</p>
         ) : (
+          <>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {scholarships.map((sch) => {
+            {(showAllScholarships ? scholarships : scholarships.slice(0, 3)).map((sch) => {
               const schName = sch.name || sch.title;
               const deadline = sch.deadlineDate || sch.deadline || null;
               const url = sch.applicationUrl || sch.websiteUrl || null;
@@ -1220,6 +1234,14 @@ export function UniversityDetail({
               );
             })}
           </div>
+          <ShowMoreToggle
+            className="mt-3"
+            totalCount={scholarships.length}
+            visibleCount={3}
+            expanded={showAllScholarships}
+            onToggle={() => setShowAllScholarships((v) => !v)}
+          />
+          </>
         )}
       </div>
 
@@ -1279,55 +1301,70 @@ export function UniversityDetail({
             );
           })()}
 
-          {/* Other admissions URLs as sources */}
-          {[
-            { url: uni.admissionsUrl, label: t("admissionsSource"), type: "official_admissions" },
-            { url: uni.internationalAdmissionsUrl, label: t("intlAdmissionsSource"), type: "official_international_admissions" },
-            { url: uni.undergraduateAdmissionsUrl, label: t("undergradAdmissionsSource"), type: "official_undergraduate_admissions" },
-            { url: uni.applicationUrl, label: t("applicationPortal"), type: "official_application_portal" },
-          ].map((link) => {
-            if (!link.url) return null;
+          {/* Secondary official links + linked sources, curated: the
+              admissions page stays visible, everything longer opens behind
+              one Show-more pill (the expanded list is the SAME JSX). */}
+          {(() => {
+            const extraLinks = [
+              { url: uni.admissionsUrl, label: t("admissionsSource"), type: "official_admissions" },
+              { url: uni.internationalAdmissionsUrl, label: t("intlAdmissionsSource"), type: "official_international_admissions" },
+              { url: uni.undergraduateAdmissionsUrl, label: t("undergradAdmissionsSource"), type: "official_undergraduate_admissions" },
+              { url: uni.applicationUrl, label: t("applicationPortal"), type: "official_application_portal" },
+            ].filter((link): link is { url: string; label: string; type: string } => Boolean(link.url));
+            const total = extraLinks.length + sources.length;
+            const visibleCount = showAllSources ? total : Math.min(1, extraLinks.length);
+            const visibleLinks = showAllSources ? extraLinks : extraLinks.slice(0, 1);
+            const visibleSources = showAllSources ? sources : [];
             return (
-              <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
-                  <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
-                </span>
-                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              </a>
-            );
-          })}
-
-          {/* Linked sources from university_sources */}
-          {sources.map((s) => {
-            const url = s.source?.url || s.url;
-            const title = s.source?.title || s.title || t("sourceFallback");
-            const type = s.sourceType || s.source?.title ? "official" : "source";
-            return (
-              <a key={s.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-extrabold text-slate-800">{title}</span>
-                  <span className="block break-all text-[10px] text-slate-400">{url}</span>
-                  {s.source?.accessedAt && (
-                    <span className="block text-[10px] text-slate-400">
-                      {t("lastChecked")} {new Date(s.source.accessedAt).toLocaleDateString(locale)}
-                      {isStaleVerified(s.source.accessedAt) && ` ${t("staleNote")}`}
+              <>
+                {visibleLinks.map((link) => (
+                  <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
+                      <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
                     </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
-                {(s.source?.isOfficial || s.sourceType !== "ranking") && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
-                  </span>
-                )}
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              </a>
+                    <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  </a>
+                ))}
+                {visibleSources.map((sc) => {
+                  const url = sc.source?.url || sc.url;
+                  const title = sc.source?.title || sc.title || t("sourceFallback");
+                  const type = sc.sourceType || sc.source?.title ? "official" : "source";
+                  return (
+                    <a key={sc.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-extrabold text-slate-800">{title}</span>
+                        <span className="block break-all text-[10px] text-slate-400">{url}</span>
+                        {sc.source?.accessedAt && (
+                          <span className="block text-[10px] text-slate-400">
+                            {t("lastChecked")} {new Date(sc.source.accessedAt).toLocaleDateString(locale)}
+                            {isStaleVerified(sc.source.accessedAt) && ` ${t("staleNote")}`}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
+                      {(sc.source?.isOfficial || sc.sourceType !== "ranking") && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
+                          <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
+                        </span>
+                      )}
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    </a>
+                  );
+                })}
+                <ShowMoreToggle
+                  className="pt-1"
+                  totalCount={total}
+                  visibleCount={visibleCount}
+                  expanded={showAllSources}
+                  onToggle={() => setShowAllSources((v) => !v)}
+                />
+              </>
             );
-          })}
+          })()}
 
           {sources.length === 0 && !uni.admissionsUrl && !uni.applicationUrl && (
             <p className="text-[11px] text-slate-400">{t("noVerifiedSources")}</p>

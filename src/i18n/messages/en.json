@@ -203,7 +203,9 @@
     "points": "points",
     "level": "Level",
     "search": "Search",
-    "optional": "optional"
+    "optional": "optional",
+    "showMoreCount": "Show more (+{count})",
+    "showLess": "Show less"
   },
   "forum": {
     "title": "Community Forum",
@@ -3606,7 +3608,8 @@
     "exCompareOutlook": "📊 Compare admission outlook",
     "exFindScholarships": "💰 Find matching scholarships",
     "exManageApplications": "📋 Manage applications",
-    "exBoosterGain": "📈 Closing the IELTS/GPA gap recovers up to {points} points on this score"
+    "exBoosterGain": "📈 Closing the IELTS/GPA gap recovers up to {points} points on this score",
+    "exCardDetails": "Score breakdown & details"
   },
   "recommend": {
     "title": "Program Recommender",
@@ -4198,7 +4201,8 @@
     },
     "shortlistBanner": "{count} scholarships shortlisted",
     "findUniversities": "🎓 Find matching universities",
-    "manageApplications": "📋 Manage applications"
+    "manageApplications": "📋 Manage applications",
+    "cardDetails": "Requirements & score breakdown"
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",

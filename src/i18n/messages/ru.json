@@ -203,7 +203,9 @@
     "points": "баллов",
     "level": "Уровень",
     "search": "Поиск",
-    "optional": "необязательно"
+    "optional": "необязательно",
+    "showMoreCount": "Показать ещё (+{count})",
+    "showLess": "Свернуть"
   },
   "forum": {
     "title": "Форум сообщества",
@@ -3606,7 +3608,8 @@
     "exCompareOutlook": "📊 Сравнить шансы поступления",
     "exFindScholarships": "💰 Найти подходящие гранты",
     "exManageApplications": "📋 Управлять заявками",
-    "exBoosterGain": "📈 Закрытие разрыва IELTS/GPA вернёт до {points} баллов к этой оценке"
+    "exBoosterGain": "📈 Закрытие разрыва IELTS/GPA вернёт до {points} баллов к этой оценке",
+    "exCardDetails": "Детали балла и требования"
   },
   "recommend": {
     "title": "Подбор программ",
@@ -4198,7 +4201,8 @@
     },
     "shortlistBanner": "{count} стипендий в шорт-листе",
     "findUniversities": "🎓 Найти подходящие университеты",
-    "manageApplications": "📋 Управлять заявками"
+    "manageApplications": "📋 Управлять заявками",
+    "cardDetails": "Требования и детали балла"
   },
   "chancing": {
     "signIn": "Войдите, чтобы увидеть оценки соответствия профиля.",

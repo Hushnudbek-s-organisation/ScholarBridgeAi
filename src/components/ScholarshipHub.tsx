@@ -379,19 +379,14 @@ export function ScholarshipHub({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Filter */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-        <div>
-          {/* h2, not h1 — the hub shell above already owns this screen's only
-              <h1>, and the stacked duplicate broke the page outline. */}
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Award className="h-5 w-5 text-amber-500" />
-            {t("title")}
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {t("subtitle")}
-          </p>
-        </div>
+      {/* Search & Filter toolbar — ONE compact card. The hub header already
+          shows the title and intro, so the catalogue repeats neither: the
+          localized <h2> stays inline (outline + SSR), the paragraph goes. */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-xs space-y-3 sm:p-4">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+          <Award className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+          <span className="min-w-0 break-words">{t("title")}</span>
+        </h2>
 
         {/* Filter Controls
             Phone (< 640px): the search box stays visible and the two dropdowns
@@ -612,26 +607,9 @@ export function ScholarshipHub({
                     )}
                   </div>
 
-                  {/* Why this match (spec §22) */}
-                  {(s.matchReasons?.length || s.matchIssues?.length) && (
-                    <div className="mt-2 space-y-1">
-                      {s.matchReasons?.map((r, i) => (
-                        <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
-                          <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>{t("strongBecause")}</b> {r}</span>
-                        </p>
-                      ))}
-                      {s.matchIssues?.map((r, i) => (
-                        <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
-                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>{t("potentialIssue")}</b> {r}</span>
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  <MatchBreakdownStrip breakdown={s.matchBreakdown} />
-
-                  {/* Computed application status (spec §6) */}
+                  {/* Computed application status (spec §6) — "is this open
+                      right now" stays glanceable on the card face; only the
+                      long diagnostics go behind the toggle below. */}
                   {s.computedStatus && (
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
@@ -654,10 +632,6 @@ export function ScholarshipHub({
                       )}
                     </div>
                   )}
-
-                  <p className="break-words text-xs leading-relaxed text-slate-600">
-                    {s.description}
-                  </p>
                 </div>
 
                 {/* Key Details Cards */}
@@ -681,56 +655,82 @@ export function ScholarshipHub({
                   </div>
                 </div>
 
-                {/* Requirements Text */}
-                {/* A neutral spec box: requirements are reference data, not a
-                    warning. Amber is kept for deadlines and match issues. */}
-                <div className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {t("requirements")}
-                  </span>
-                  {/* Priority 4.2 — the published gates, answered per
-                      requirement instead of buried in the prose below. */}
-                  <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
-                  <p className="text-[11px] leading-relaxed">{s.requirements}</p>
-                </div>
+                {/* Secondary diagnostics — the prose, the per-requirement
+                    answers, the score arithmetic, the source footnote and the
+                    funding-plan action — collapsed behind a native
+                    <details>: static SSR keeps asserting the pills and the
+                    breakdown (they are in the markup), while the browser only
+                    shows the summary line until asked. */}
+                <details className="group rounded-xl border border-slate-200/70 bg-slate-50/60 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
+                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 break-words">{t("cardDetails")}</span>
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                  </summary>
+                  <div className="mt-2 space-y-2.5">
+                    {/* Why this match (spec §22) */}
+                    {(s.matchReasons?.length || s.matchIssues?.length) && (
+                      <div className="space-y-1">
+                        {s.matchReasons?.map((r, i) => (
+                          <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                            <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span><b>{t("strongBecause")}</b> {r}</span>
+                          </p>
+                        ))}
+                        {s.matchIssues?.map((r, i) => (
+                          <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span><b>{t("potentialIssue")}</b> {r}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <MatchBreakdownStrip breakdown={s.matchBreakdown} />
 
-                {/* Source credibility footnote */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
-                  {s.sourceUrl ? (
-                    <a
-                      href={s.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" /> {t("source")}
-                    </a>
-                  ) : (
-                    <span className="text-slate-400">{t("sourcePending")}</span>
-                  )}
-                  {s.sourceLastVerifiedAt ? (
-                    <span className="text-slate-400">
-                      {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
-                    </span>
-                  ) : s.sourceUrl ? (
-                    <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
-                  ) : null}
-                </div>
+                    {s.description && (
+                      <p className="break-words text-xs leading-relaxed text-slate-600">
+                        {s.description}
+                      </p>
+                    )}
 
-                {/* Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                  <a
-                    href={s.websiteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 flex items-center gap-1"
-                  >
-                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                    {/* Requirements Text */}
+                    {/* A neutral spec box: requirements are reference data, not a
+                        warning. Amber is kept for deadlines and match issues. */}
+                    <div className="space-y-1 rounded-xl border border-slate-200/80 bg-white p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t("requirements")}
+                      </span>
+                      {/* Priority 4.2 — the published gates, answered per
+                          requirement instead of buried in the prose below. */}
+                      <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
+                      <p className="text-[11px] leading-relaxed">{s.requirements}</p>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Source credibility footnote */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                      {s.sourceUrl ? (
+                        <a
+                          href={s.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" /> {t("source")}
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">{t("sourcePending")}</span>
+                      )}
+                      {s.sourceLastVerifiedAt ? (
+                        <span className="text-slate-400">
+                          {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
+                        </span>
+                      ) : s.sourceUrl ? (
+                        <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
+                      ) : null}
+                    </div>
+
                     {/* Priority 4.2 — one click puts this award into the funding
-                        plan, so the plan and the discovery feed stay in sync. */}
+                        plan, so the plan and the discovery feed stay in sync.
+                        Lives with the details it depends on, not in the footer. */}
                     <button
                       type="button"
                       onClick={() => void addToFundingPlan(s)}
@@ -742,7 +742,7 @@ export function ScholarshipHub({
                             ? t("fundingAddHint", { title: s.title })
                             : t("fundingNeedsProfile")
                       }
-                      className={`flex min-h-11 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
+                      className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
                         fundingAddedIds.has(s.id)
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200"
                           : "bg-emerald-600 text-white shadow-xs shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
@@ -757,11 +757,25 @@ export function ScholarshipHub({
                       )}
                       {fundingAddedIds.has(s.id) ? t("fundingAdded") : t("fundingAdd")}
                     </button>
+                  </div>
+                </details>
+
+                {/* Actions — one row, two controls: the official portal link
+                    and Track/Save. Everything else moved to the drawer. */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href={s.websiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                  >
+                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
 
                   {isSaved ? (
                     <button
                       onClick={() => onUnsaveScholarship(s.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
                     >
                       <Check className="h-3.5 w-3.5" />
                       {t("tracked")}
@@ -769,13 +783,12 @@ export function ScholarshipHub({
                   ) : (
                     <button
                       onClick={() => onSaveScholarship(s.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs shadow-indigo-600/20 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs shadow-indigo-600/20 transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {t("track")}
                     </button>
                   )}
-                  </div>
                 </div>
               </div>
             );

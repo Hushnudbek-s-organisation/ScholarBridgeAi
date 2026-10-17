@@ -599,34 +599,32 @@ export function UniversityExplorer({
 
   return (
     <div className="space-y-6">
-      {/* Search & Filter Header */}
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            {/* h2, not h1: the hub shell above already renders the single <h1>
-                for this screen, and two stacked h1s broke the outline. */}
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Search className="h-5 w-5 text-indigo-600" />
-              {t("exTitle")}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t("exFilteredBy", { profile: activeProfile?.name || t("exProfileFallback") })}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {refreshing && (
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                {t("exRefreshing")}
-              </span>
-            )}
-          </div>
-
+      {/* Search & Filter toolbar — ONE compact card. The hub header above
+          already owns this screen's <h1> + intro paragraph, so the explorer
+          no longer repeats them as a giant title block: the localized
+          section name lives inline in the toolbar (still an <h2> for the
+          outline, still rendered for SSR and screen readers). */}
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <Search className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span className="min-w-0 break-words">{t("exTitle")}</span>
+          </h2>
+          {activeProfile ? (
+            <span className="hidden min-w-0 break-words text-[11px] text-slate-500 lg:inline">
+              {t("exFilteredBy", { profile: activeProfile.name || t("exProfileFallback") })}
+            </span>
+          ) : null}
+          {refreshing && (
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              {t("exRefreshing")}
+            </span>
+          )}
           {compareIds.length > 0 && (
             <button
               onClick={openCompareModal}
-              className="flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
+              className="ml-auto flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
             >
               <Columns className="h-4 w-4" />
               {t("exCompareSelected", { count: compareIds.length })}
@@ -1108,11 +1106,10 @@ export function UniversityExplorer({
                       className="mb-2.5"
                     />
 
-                    <p className="break-words text-xs leading-relaxed text-slate-600">
-                      {uni.description}
-                    </p>
-
-                    {/* Key Requirements Grid — NULL = Not specified (spec §19) */}
+                    {/* Key Requirements Grid — NULL = Not specified (spec §19).
+                        The card shows the four numbers that decide "can I
+                        afford / qualify" and nothing else; every secondary
+                        diagnostic lives in the details drawer below. */}
                     <div className="grid grid-cols-2 gap-2 my-3 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <div>
                         <span className="text-slate-400 block">{t("exAnnualTuition")}</span>
@@ -1132,10 +1129,11 @@ export function UniversityExplorer({
                       </div>
                     </div>
 
-                    {/* Highlights Badges */}
+                    {/* Up to TWO highlight pills on the card; the rest are in
+                        the drawer, so no card ever becomes a badge wall. */}
                     {highlightsList.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {highlightsList.map((hl, i) => (
+                        {highlightsList.slice(0, 2).map((hl, i) => (
                           <span key={i} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
                             ✓ {hl}
                           </span>
@@ -1143,138 +1141,174 @@ export function UniversityExplorer({
                       </div>
                     )}
 
-                    {/* Why this match (spec §23) */}
-                    {(uni.matchReasons?.length || uni.matchIssues?.length) && (
-                      <div className="mt-2 space-y-1">
-                        {uni.matchReasons?.map((r, i) => (
-                          <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
-                            <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>{t("exWhyMatch")}</b> {r}</span>
+                    {/* Secondary diagnostics, collapsed by default. A NATIVE
+                        <details> is used (not a state toggle) on purpose: the
+                        children stay in the static SSR markup that the render
+                        checks assert, while the browser shows only the summary
+                        row until the student asks for the arithmetic. */}
+                    <details className="group mt-3 rounded-xl border border-slate-200/70 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 px-3 py-2">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0 break-words">{t("exCardDetails")}</span>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                      </summary>
+                      <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
+                        {uni.description && (
+                          <p className="break-words text-xs leading-relaxed text-slate-600">
+                            {uni.description}
                           </p>
-                        ))}
-                        {uni.matchIssues?.map((r, i) => (
-                          <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
-                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>{t("exWhyLower")}</b> {r}</span>
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Exact arithmetic: every scoring dimension with the
-                        points it contributed. Nothing here is rounded into
-                        vagueness — the components add up to the score above. */}
-                    <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
-                  </div>
-
-                  {/* Post-study Work Permit Banner (NULL = not specified) */}
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-600">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
-                      {t("exPsWorkVisa")}
-                    </span>
-                    <strong className="text-slate-900 font-bold">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
-                  </div>
-
-                  {/* Source credibility footnote */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
-                    {uni.sourceUrl ? (
-                      <a
-                        href={uni.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center gap-1 text-slate-500 transition-colors hover:text-indigo-600"
-                      >
-                        <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
-                      </a>
-                    ) : (
-                      <span className="text-slate-400">{t("exSourcePending")}</span>
-                    )}
-                    {uni.sourceLastVerifiedAt ? (
-                      <span className="text-slate-400">
-                        {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
-                      </span>
-                    ) : uni.sourceUrl ? (
-                      <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
-                    ) : null}
-                  </div>
-
-                  {/* Action Buttons
-                      Phone: the two primary actions share one 2-button row and
-                      the secondary controls sit on their own row, so the
-                      footer never wraps into three ragged lines. From `sm` up
-                      everything returns to a single inline row. */}
-                  <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 px-2 text-xs text-slate-600">
-                        <input
-                          type="checkbox"
-                          checked={isCompared}
-                          onChange={() => toggleCompare(uni.id)}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span>{t("exCompare")}</span>
-                      </label>
-
-                      <a
-                        href={uni.websiteUrl ?? undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
-                        title={t("exVisitPortal")}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-
-                      {isSaved ? (
-                        <button
-                          onClick={() => onUnsaveUniversity(uni.id)}
-                          className="flex min-h-11 items-center gap-1 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {t("exSaved")}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onSaveUniversity(uni.id)}
-                          className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          {t("exShortlist")}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap sm:items-center">
-                      {/* Priority 4.1 — create the application (and its
-                          checklist) from the card the student is reading. */}
-                      <button
-                        type="button"
-                        onClick={() => void startApplication(uni)}
-                        disabled={startingUniId != null}
-                        title={
-                          activeProfile
-                            ? t("startAppHint", { name: uni.name })
-                            : t("startAppNeedsProfile")
-                        }
-                        className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {startingUniId === uni.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        ) : (
-                          <Zap className="h-3.5 w-3.5" aria-hidden />
                         )}
-                        {t("startApp")}
-                      </button>
 
+                        {highlightsList.length > 2 && (
+                          <div className="flex flex-wrap gap-1">
+                            {highlightsList.slice(2).map((hl, i) => (
+                              <span key={`more-${i}`} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
+                                ✓ {hl}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Why this match (spec §23) */}
+                        {(uni.matchReasons?.length || uni.matchIssues?.length) && (
+                          <div className="space-y-1">
+                            {uni.matchReasons?.map((r, i) => (
+                              <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                                <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                                <span><b>{t("exWhyMatch")}</b> {r}</span>
+                              </p>
+                            ))}
+                            {uni.matchIssues?.map((r, i) => (
+                              <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                                <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                                <span><b>{t("exWhyLower")}</b> {r}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Exact arithmetic: every scoring dimension with the
+                            points it contributed. Nothing here is rounded into
+                            vagueness — the components add up to the score on
+                            the card header. */}
+                        <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
+
+                        {/* Post-study Work Permit (NULL = not specified) */}
+                        <div className="flex items-center justify-between text-xs border-t border-slate-200/70 pt-2 dark:border-slate-800/60 text-slate-600">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
+                            {t("exPsWorkVisa")}
+                          </span>
+                          <strong className="text-slate-900 font-bold dark:text-slate-100">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
+                        </div>
+
+                        {/* Source credibility footnote */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                          {uni.sourceUrl ? (
+                            <a
+                              href={uni.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex min-h-11 items-center gap-1 text-slate-500 transition-colors hover:text-indigo-600"
+                            >
+                              <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">{t("exSourcePending")}</span>
+                          )}
+                          {uni.sourceLastVerifiedAt ? (
+                            <span className="text-slate-400">
+                              {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
+                            </span>
+                          ) : uni.sourceUrl ? (
+                            <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
+                          ) : null}
+                        </div>
+
+                        {/* Priority 4.1 — the application launcher lives with
+                            the decision data it follows: read the breakdown,
+                            then start. Same one-click POST, no extra row in
+                            the card footer. */}
+                        <button
+                          type="button"
+                          onClick={() => void startApplication(uni)}
+                          disabled={startingUniId != null}
+                          title={
+                            activeProfile
+                              ? t("startAppHint", { name: uni.name })
+                              : t("startAppNeedsProfile")
+                          }
+                          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {startingUniId === uni.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            <Zap className="h-3.5 w-3.5" aria-hidden />
+                          )}
+                          {t("startApp")}
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+
+                  {/* Footer — ONE row, one primary CTA. Shortlist, compare and
+                      the official site are compact icon/pill actions; nothing
+                      wraps into a second line of competing buttons. */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedUniId(uni.id)}
+                      className="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {t("exViewUniversity")}
+                    </button>
+
+                    {isSaved ? (
                       <button
-                        onClick={() => setSelectedUniId(uni.id)}
-                        className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                        onClick={() => onUnsaveUniversity(uni.id)}
+                        title={t("exSaved")}
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl bg-emerald-100 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
                       >
-                        <Eye className="h-3.5 w-3.5" />
-                        {t("exViewUniversity")}
+                        <Check className="h-3.5 w-3.5" />
+                        <span className="max-sm:hidden">{t("exSaved")}</span>
                       </button>
-                    </div>
+                    ) : (
+                      <button
+                        onClick={() => onSaveUniversity(uni.id)}
+                        title={t("exShortlist")}
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-indigo-200 bg-white px-2.5 text-xs font-bold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="max-sm:hidden">{t("exShortlist")}</span>
+                      </button>
+                    )}
+
+                    <label
+                      title={t("exCompare")}
+                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1 rounded-xl border px-2.5 text-xs transition-colors ${
+                        isCompared
+                          ? "border-indigo-300 bg-indigo-50 font-bold text-indigo-700"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isCompared}
+                        onChange={() => toggleCompare(uni.id)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="max-sm:hidden">{t("exCompare")}</span>
+                    </label>
+
+                    <a
+                      href={uni.websiteUrl ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
+                      title={t("exVisitPortal")}
+                      aria-label={t("exVisitPortal")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
                   </div>
                 </div>
               </div>

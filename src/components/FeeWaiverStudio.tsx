@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { StudentProfile } from "./Navbar";
 import { AppNote } from "@/components/AppNote";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 import { formatMoney } from "@/lib/format";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
@@ -263,6 +264,25 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
     return [...map.entries()].filter(([, list]) => list.length > 0);
   }, [evaluation.universities]);
 
+  // Clean-UI pass: the per-university section opens with six rows across the
+  // categories (the evaluation is already sorted best-option-first), and the
+  // remaining universities unfold through one Show-more pill. Same rows,
+  // same grouping — never a second source of truth.
+  const [showAllRows, setShowAllRows] = React.useState(false);
+  const totalRows = grouped.reduce((n, [, list]) => n + list.length, 0);
+  const visibleGrouped = React.useMemo(() => {
+    if (showAllRows) return grouped;
+    let budget = 6;
+    const out: typeof grouped = [];
+    for (const [category, list] of grouped) {
+      if (budget <= 0) break;
+      const take = list.slice(0, budget);
+      budget -= take.length;
+      if (take.length > 0) out.push([category, take]);
+    }
+    return out;
+  }, [grouped, showAllRows]);
+
   /* ---- letters ----------------------------------------------------------- */
   const letter: GeneratedLetter | null = React.useMemo(() => {
     const universityName = letterUniversity.trim();
@@ -387,7 +407,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
 
           {/* ---- per-university rows, best option first ---- */}
           <div className="mt-3 space-y-2">
-            {grouped.map(([category, list]) => (
+            {visibleGrouped.map(([category, list]) => (
               <div key={category} className="rounded-xl border border-slate-200">
                 <p className={`rounded-t-xl border-b px-3 py-1.5 text-[11px] font-extrabold ${CATEGORY_TONE[category]}`}>
                   {t(`categories.${category}.title`)}
@@ -470,6 +490,13 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                 </ul>
               </div>
             ))}
+            <ShowMoreToggle
+              className="pt-1"
+              totalCount={totalRows}
+              visibleCount={showAllRows ? totalRows : Math.min(6, totalRows)}
+              expanded={showAllRows}
+              onToggle={() => setShowAllRows((v) => !v)}
+            />
           </div>
         </>
       )}

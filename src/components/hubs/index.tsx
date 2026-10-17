@@ -178,7 +178,6 @@ export function UniversitiesHub({
 }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("universities");
   const active = useActivePane(pane, visible, hidden);
 
@@ -186,13 +185,14 @@ export function UniversitiesHub({
     <HubPage
       title={label}
       intro={t("introUniversities")}
-      primaryLabel={t("primaryUniversities")}
-      onPrimary={() => setPane("search")}
+      // The CTA only makes sense from another tab: on "search" itself it is a
+      // button that does nothing, so it is not rendered there.
+      primaryLabel={active !== "search" ? t("primaryUniversities") : undefined}
+      onPrimary={active !== "search" ? () => setPane("search") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "search" && (
         <UniversityExplorer
@@ -240,7 +240,6 @@ export function ScholarshipsHub({
   autoFocusScholarship,
 }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("scholarships");
   const active = useActivePane(pane, visible, hidden);
 
@@ -248,13 +247,12 @@ export function ScholarshipsHub({
     <HubPage
       title={label}
       intro={t("introScholarships")}
-      primaryLabel={t("primaryScholarships")}
-      onPrimary={() => setPane("browse")}
+      primaryLabel={active !== "browse" ? t("primaryScholarships") : undefined}
+      onPrimary={active !== "browse" ? () => setPane("browse") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "browse" && (
         <ScholarshipHub
@@ -287,8 +285,8 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
     <HubPage
       title={label}
       intro={t("introStudyPlan")}
-      primaryLabel={t("primaryStudyPlan")}
-      onPrimary={() => setPane("plan")}
+      primaryLabel={active !== "plan" ? t("primaryStudyPlan") : undefined}
+      onPrimary={active !== "plan" ? () => setPane("plan") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -309,7 +307,6 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
  * ====================================================================== */
 export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("tasks");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -322,7 +319,6 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("planning") }}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
       {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} />}
@@ -413,8 +409,8 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
     <HubPage
       title={label}
       intro={t("introApplications")}
-      primaryLabel={t("primaryApplications")}
-      onPrimary={() => setPane("tracker")}
+      primaryLabel={active !== "tracker" ? t("primaryApplications") : undefined}
+      onPrimary={active !== "tracker" ? () => setPane("tracker") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -678,8 +674,8 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
     <HubPage
       title={label}
       intro={t("introVisa")}
-      primaryLabel={t("primaryVisa")}
-      onPrimary={() => setPane("visa")}
+      primaryLabel={active !== "visa" ? t("primaryVisa") : undefined}
+      onPrimary={active !== "visa" ? () => setPane("visa") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -717,8 +713,8 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
     <HubPage
       title={label}
       intro={t("introGuidance")}
-      primaryLabel={t("primaryGuidance")}
-      onPrimary={() => setPane("mentor")}
+      primaryLabel={active !== "mentor" ? t("primaryGuidance") : undefined}
+      onPrimary={active !== "mentor" ? () => setPane("mentor") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -756,8 +752,8 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
     <HubPage
       title={label}
       intro={t("introCommunity")}
-      primaryLabel={t("primaryCommunity")}
-      onPrimary={() => setPane("forum")}
+      primaryLabel={active !== "forum" ? t("primaryCommunity") : undefined}
+      onPrimary={active !== "forum" ? () => setPane("forum") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}

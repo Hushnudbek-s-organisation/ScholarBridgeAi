@@ -596,7 +596,6 @@ export function Navbar({
 
   // ---- One nav row (sidebar + drawer) -------------------------------------
   const renderItem = (item: NavItem, layoutId: string) => {
-    const inDrawer = layoutId === "nav-active-drawer";
     const Icon = item.icon;
     const isActive = isDestinationActive(item.id);
     const isAdminTab = item.id === "admin";
@@ -624,11 +623,6 @@ export function Navbar({
         )}
         <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-500" : "text-slate-500 dark:text-slate-400"}`} />
         <span className="relative min-w-0 flex-1 break-words whitespace-normal">{item.label}</span>
-        {item.isNew && !isActive && (
-          <span className={`relative shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 ${inDrawer ? "" : "hidden xl:inline"}`}>
-            {t("newBadge")}
-          </span>
-        )}
         {item.premium && !isActive && (
           <span className="relative rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
             {t("proBadge")}

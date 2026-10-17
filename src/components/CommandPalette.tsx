@@ -269,11 +269,6 @@ export function CommandPalette({
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
                           {it.label}
-                          {it.isNew && (
-                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
-                              {t("newBadge")}
-                            </span>
-                          )}
                           {it.premium && (
                             <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">{t("proBadge")}</span>
                           )}

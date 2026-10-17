@@ -326,8 +326,18 @@ export const NAV_UTILITY_SECTIONS: NavUtilityMeta[] = [
  */
 export const NEW_BADGE_UNTIL = "2026-10-31";
 
-/** True while the release that added these sections is still recent. */
-export function isNewBadgeActive(now: Date = new Date()): boolean {
+/**
+ * True while the release that added these sections is still recent.
+ *
+ * The clean-UI pass retired visual "NEW" badges from every surface (tabs,
+ * palette, hubs, admin), so with no explicit `now` this is always false —
+ * the flag is kept only so unit tests can re-arm the badge for a date in
+ * range by passing `now` explicitly. The `isNew` metadata on the sections
+ * themselves stays (check-growth asserts the badges never disappear from the
+ * data model through a reorganisation).
+ */
+export function isNewBadgeActive(now?: Date): boolean {
+  if (!now) return false;
   return now.toISOString().slice(0, 10) <= NEW_BADGE_UNTIL;
 }
 

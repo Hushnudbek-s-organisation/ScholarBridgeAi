@@ -34,6 +34,15 @@ function urgencyFor(daysRemaining: number | null): "critical" | "soon" | "planne
   if (daysRemaining <= 45) return "soon";
   return "planned";
 }
+/**
+ * Status line for a saved university: a future cycle date on file makes the
+ * row OPEN; nothing on file stays honestly "NO DEADLINE ON FILE" — we never
+ * fabricate an OPEN for a blank, and never invent a date.
+ */
+function savedUniStatusLabel(upcoming: string | null): string {
+  return upcoming ? "OPEN" : "NO DEADLINE ON FILE";
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -123,16 +132,29 @@ export async function GET(req: Request) {
       }
       for (const u of uniRows) {
         const deadline = upcomingDeadlineByUni.get(u.id) ?? null;
+        if (!deadline) {
+          // Nothing on file → no invented countdown either: NULL stays NULL
+          // and the row reads "NO DEADLINE ON FILE" (check-journey pins this).
+          items.push({
+            id: `uni-${u.id}`,
+            type: "university",
+            title: u.name,
+            subtitle: `${u.country} · ${u.programMajor}`,
+            date: null,
+            status: "NO DEADLINE ON FILE",
+            daysRemaining: null,
+            source: u.websiteUrl || null,
+            saved: true,
+          });
+          continue;
+        }
         items.push({
           id: `uni-${u.id}`,
           type: "university",
           title: u.name,
           subtitle: `${u.country} · ${u.programMajor}`,
           date: deadline,
-          // A cycle row with a future deadline makes the university OPEN; with
-          // none on file we still state that honestly instead of inventing a
-          // date.
-          status: deadline ? "OPEN" : "NO DEADLINE ON FILE",
+          status: savedUniStatusLabel(deadline),
           daysRemaining: daysUntil(now, deadline),
           source: u.websiteUrl || null,
           saved: true,

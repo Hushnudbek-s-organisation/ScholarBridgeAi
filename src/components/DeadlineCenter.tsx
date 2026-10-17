@@ -16,6 +16,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 
 interface DeadlineItem {
   id: string;
@@ -165,6 +166,12 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
   }
   const visibleItems = scope === "mine" && personalCount > 0 ? items.filter(isPersonal) : items;
 
+  // Clean-UI pass: the list opens with six rows — enough for "what is due
+  // soon" — and the rest of a busy season arrives behind one Show-more pill.
+  const [visibleCount, setVisibleCount] = useState(6);
+  const expandedList = visibleCount >= visibleItems.length;
+  const listedItems = visibleItems.slice(0, visibleCount);
+
   const statusText = (status: string) => {
     const statusKey = STATUS_TRANSLATIONS[status.trim().toUpperCase()] ?? "other";
     return text(`statuses.${statusKey}`);
@@ -259,7 +266,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
               </div>
             )}
             <ul className="divide-y divide-slate-100">
-            {visibleItems.map((item) => {
+            {listedItems.map((item) => {
               const meta = TYPE_META[item.type] || TYPE_META.milestone;
               const days = item.daysRemaining;
               const completed = item.status === "COMPLETED";
@@ -329,6 +336,16 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
               );
             })}
             </ul>
+            {visibleItems.length > 6 && (
+              <div className="border-t border-slate-100 bg-slate-50/50 py-2.5">
+                <ShowMoreToggle
+                  totalCount={visibleItems.length}
+                  visibleCount={Math.min(visibleCount, visibleItems.length)}
+                  expanded={visibleCount > 6}
+                  onToggle={() => setVisibleCount(expandedList ? 6 : visibleItems.length)}
+                />
+              </div>
+            )}
           </>
         )}
       </div>
