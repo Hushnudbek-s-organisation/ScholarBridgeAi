@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS "saved_scholarships" ("id" serial PRIMARY KEY NOT NUL
 
 CREATE TABLE IF NOT EXISTS "ai_evaluations" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "evaluation_type" text NOT NULL DEFAULT 'Profile Analysis', "content" text NOT NULL, "created_at" timestamp NOT NULL DEFAULT now());
 
-CREATE TABLE IF NOT EXISTS "essay_versions" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "university_id" integer, "essay_type" text NOT NULL DEFAULT 'sop', "title" text NOT NULL DEFAULT '', "content" text NOT NULL DEFAULT '', "word_count" integer NOT NULL DEFAULT 0, "char_count" integer NOT NULL DEFAULT 0, "version_number" integer NOT NULL DEFAULT 1, "rubric_hook" integer, "rubric_structure" integer, "rubric_specificity" integer, "rubric_language" integer, "rubric_fit" integer, "rubric_total" integer, "ai_feedback" text, "open_for_review" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS "essay_versions" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "university_id" integer, "essay_type" text NOT NULL DEFAULT 'sop', "title" text NOT NULL DEFAULT '', "content" text NOT NULL DEFAULT '', "prompt" text, "target_name" text, "word_limit" integer, "word_count" integer NOT NULL DEFAULT 0, "char_count" integer NOT NULL DEFAULT 0, "version_number" integer NOT NULL DEFAULT 1, "rubric_hook" integer, "rubric_structure" integer, "rubric_specificity" integer, "rubric_language" integer, "rubric_fit" integer, "rubric_total" integer, "ai_feedback" text, "open_for_review" boolean NOT NULL DEFAULT FALSE, "created_at" timestamp NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile" ON "essay_versions" ("profile_id");
 CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile_type" ON "essay_versions" ("profile_id", "essay_type", "version_number");
 
@@ -68,6 +68,9 @@ CREATE TABLE IF NOT EXISTS "program_requirements" ("id" serial PRIMARY KEY NOT N
 CREATE INDEX IF NOT EXISTS "idx_program_requirements_program" ON "program_requirements" ("program_id");
 
 CREATE TABLE IF NOT EXISTS "ai_provider_credentials" ("id" serial PRIMARY KEY NOT NULL, "provider" text UNIQUE NOT NULL, "api_key_enc" text, "model" text, "updated_at" timestamp NOT NULL DEFAULT now());
+
+CREATE TABLE IF NOT EXISTS "user_sessions" ("id" serial PRIMARY KEY NOT NULL, "profile_id" integer NOT NULL, "token_hash" text UNIQUE NOT NULL, "scope" text NOT NULL DEFAULT 'web', "user_agent" text, "ip" text, "created_at" timestamp NOT NULL DEFAULT now(), "last_seen_at" timestamp NOT NULL DEFAULT now(), "revoked_at" timestamp);
+CREATE INDEX IF NOT EXISTS "idx_user_sessions_profile" ON "user_sessions" ("profile_id");
 
 
 -- ============================================================================
@@ -280,6 +283,9 @@ ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "essay_type" text DEFAULT 'sop';
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "title" text DEFAULT '';
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "content" text DEFAULT '';
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "prompt" text;
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "target_name" text;
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "word_limit" integer;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "word_count" integer DEFAULT 0;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "char_count" integer DEFAULT 0;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "version_number" integer DEFAULT 1;
@@ -408,3 +414,13 @@ ALTER TABLE "ai_provider_credentials" ADD COLUMN IF NOT EXISTS "provider" text;
 ALTER TABLE "ai_provider_credentials" ADD COLUMN IF NOT EXISTS "api_key_enc" text;
 ALTER TABLE "ai_provider_credentials" ADD COLUMN IF NOT EXISTS "model" text;
 ALTER TABLE "ai_provider_credentials" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now();
+
+-- ---------- user_sessions ----------
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "profile_id" integer;
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "token_hash" text;
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "scope" text DEFAULT 'web';
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "user_agent" text;
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "ip" text;
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "created_at" timestamp DEFAULT now();
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "last_seen_at" timestamp DEFAULT now();
+ALTER TABLE "user_sessions" ADD COLUMN IF NOT EXISTS "revoked_at" timestamp;
