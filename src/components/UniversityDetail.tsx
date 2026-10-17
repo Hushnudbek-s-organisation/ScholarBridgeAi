@@ -37,6 +37,7 @@ import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
 
 interface UniversityDetailData {
   id: number;
@@ -430,7 +431,12 @@ export function UniversityDetail({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const qs = activeProfile?.id ? `?profileId=${activeProfile.id}` : "";
+      // `locale` is part of the request AND the cache key: switching en↔uz↔ru
+      // refetches, and per-language payloads never share a cache slot.
+      const params = new URLSearchParams();
+      if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
+      params.set("locale", locale);
+      const qs = `?${params.toString()}`;
       const cacheKey = `${universityId}${qs}`;
       // The payload the browser already has (the student pressed "Back" a
       // moment ago): render it instantly — no skeleton, no waiting — and
@@ -462,7 +468,7 @@ export function UniversityDetail({
     return () => {
       cancelled = true;
     };
-  }, [universityId, activeProfile?.id, applyDetailPayload]);
+  }, [universityId, activeProfile?.id, applyDetailPayload, locale]);
 
   if (loading) {
     return (
@@ -541,7 +547,7 @@ export function UniversityDetail({
               </div>
               <p className="text-sm text-indigo-200 mt-1 flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-                {uni.city}, {uni.country} {uni.flagEmoji}
+                {localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)} {uni.flagEmoji}
               </p>
               {match && (
                 <div className="mt-3 space-y-1">
@@ -1156,7 +1162,7 @@ export function UniversityDetail({
               return (
                 <div key={sch.id} className="rounded-xl border border-slate-200 p-4 hover:border-amber-300 transition-colors">
                   <p className="text-sm font-extrabold text-slate-800">{schName}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{sch.coverageType || t("coverageNotSpecified")}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{sch.coverageType ? localizeCoverageType(sch.coverageType, locale) : t("coverageNotSpecified")}</p>
                   <div className="mt-2 space-y-1 text-[11px] text-slate-600">
                     <p><b>{t("amountLabel")}</b> {formatMoney(sch.amountUsdValue, "USD")}</p>
                     <p><b>{t("deadlineLabel")}</b> {deadline ? new Date(deadline + (deadline.length === 10 ? "T00:00:00" : "")).toLocaleDateString(locale) : t("notAnnounced")}</p>

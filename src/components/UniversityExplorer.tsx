@@ -8,6 +8,7 @@ import { StudentProfile } from "./Navbar";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
 
 const UniversityDetail = dynamic(
   () => import("./UniversityDetail").then((m) => m.UniversityDetail),
@@ -270,6 +271,8 @@ export function UniversityExplorer({
     maxRank,
     ieltsMax,
     perPage,
+    // Switching en↔uz↔ru refetches: the response language follows the request.
+    locale,
   ].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
@@ -293,6 +296,9 @@ export function UniversityExplorer({
     if (sortBy !== "rank") params.set("sort", sortBy);
     if (maxRank != null) params.set("maxRank", maxRank.toString());
     if (ieltsMax != null) params.set("ielts", ieltsMax.toString());
+    // Explicit locale: the API localizes the response AND the SWR cache key
+    // (params.toString()) splits per language, so cached rows never mix.
+    params.set("locale", locale);
     return params;
   };
 
@@ -401,6 +407,7 @@ export function UniversityExplorer({
     ieltsMax,
     page,
     perPage,
+    locale,
   ]);
 
   const filteredUniversities = universities;
@@ -974,7 +981,7 @@ export function UniversityExplorer({
                   <div className="absolute bottom-3 left-3 right-3 text-white">
                     <div className="text-xs font-medium text-slate-200 flex items-center gap-1">
                       <span>{uni.flagEmoji}</span>
-                      <span>{uni.city}, {uni.country}</span>
+                      <span>{localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)}</span>
                     </div>
                     <h3 className="break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
                   </div>
@@ -985,7 +992,7 @@ export function UniversityExplorer({
                   <div>
                     {/* Major & Program */}
                     <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                      {uni.programMajor}
+                      {localizeMajorOrField(uni.programMajor, locale)}
                     </div>
 
                     <p className="text-[11px] text-slate-500 mb-2">

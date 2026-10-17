@@ -15,6 +15,7 @@ import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -228,13 +229,13 @@ export default async function UniversitiesPage({
                 </h2>
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                  <span className="break-words">{[university.city, university.country].filter(Boolean).join(", ")}</span>
+                  <span className="break-words">{[localizeCity(university.city, locale), localizeCountry(university.country, locale)].filter(Boolean).join(", ")}</span>
                 </p>
                 {university.program_major && (
-                  <p className="mt-1 break-words text-xs text-slate-500">{university.program_major}</p>
+                  <p className="mt-1 break-words text-xs text-slate-500">{localizeMajorOrField(university.program_major, locale)}</p>
                 )}
                 <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs dark:border-slate-700">
-                  <CatalogFact label={copy.institutionType} value={university.university_type ?? copy.notPublished} />
+                  <CatalogFact label={copy.institutionType} value={university.university_type ? localizeUniversityType(university.university_type, locale) : copy.notPublished} />
                   <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
                   <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
                   <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />

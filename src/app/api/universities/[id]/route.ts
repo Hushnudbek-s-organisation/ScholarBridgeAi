@@ -14,6 +14,7 @@ import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degre
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
+import { localizeDetailPayload } from "@/lib/catalogLocalizer";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
@@ -249,10 +250,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const cachedBase = getCachedUniversityDetailBase(uniId);
     if (cachedBase) {
-      return NextResponse.json({
-        ...cachedBase,
-        match,
-      });
+      // Localize the OUTGOING copy — the cache keeps canonical English rows.
+      return NextResponse.json(
+        localizeDetailPayload(
+          {
+            ...cachedBase,
+            match,
+          },
+          locale
+        )
+      );
     }
 
     // ---------- Programs, application cycles & source links in parallel ----------
@@ -829,10 +836,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
     setCachedUniversityDetailBase(uniId, basePayload);
 
-    return NextResponse.json({
-      ...basePayload,
-      match,
-    });
+    // Localize the OUTGOING copy — the cache keeps canonical English rows.
+    return NextResponse.json(
+      localizeDetailPayload(
+        {
+          ...basePayload,
+          match,
+        },
+        locale
+      )
+    );
   } catch (error) {
     console.error("GET /api/universities/[id] error:", error);
     // Never substitute sample universities: during a database outage students

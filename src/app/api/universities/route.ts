@@ -7,6 +7,7 @@ import { getCachedUniversitiesBundle, getCachedProfileForMatching } from "@/lib/
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
+import { expandMultilingualSearchTerms, localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 
@@ -65,13 +66,19 @@ export async function GET(req: Request) {
     const programFieldsByUni = bundle.programFieldsByUni;
 
     // ---------- Filtering (NULL values excluded from numeric filters) ----------
-    if (search) {
+    // Search runs on canonical English rows: uz/ru/English queries expand to
+    // canonical keywords ("germaniya"→"germany", "kompyuter"→"computer science").
+    const searchTerms = search ? expandMultilingualSearchTerms(search) : [];
+    if (searchTerms.length > 0) {
       allUnis = allUnis.filter(u =>
-        u.name.toLowerCase().includes(search) ||
-        (u.programMajor ?? "").toLowerCase().includes(search) ||
-        (u.city ?? "").toLowerCase().includes(search) ||
-        u.country.toLowerCase().includes(search) ||
-        countriesMatch(u.country, search)
+        searchTerms.some(term =>
+          u.name.toLowerCase().includes(term) ||
+          (u.programMajor ?? "").toLowerCase().includes(term) ||
+          (u.city ?? "").toLowerCase().includes(term) ||
+          u.country.toLowerCase().includes(term) ||
+          countriesMatch(u.country, term) ||
+          (programFieldsByUni.get(u.id)?.some((f) => f.toLowerCase().includes(term)) ?? false)
+        )
       );
     }
 
@@ -233,8 +240,10 @@ export async function GET(req: Request) {
 
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
     // Without those params the full list is returned (admin tools, ...).
+    // Rows are localized LAST — every filter/match above ran on canonical
+    // English data, so canonical dropdown values never break (spec §3 STEP 3.1).
     return NextResponse.json(
-      paginatedPayload("universities", results, searchParams),
+      paginatedPayload("universities", results.map((u) => localizeUniversityRow(u, locale)), searchParams),
     );
   } catch (error) {
     console.error("GET /api/universities error:", error);

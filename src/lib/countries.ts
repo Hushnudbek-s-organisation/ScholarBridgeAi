@@ -1,3 +1,5 @@
+import { dictionaries } from "@/i18n/messages";
+
 /**
  * Shared, additive country/territory options requested for the QS top-200
  * destination set. `value` follows the app's existing stored/API convention
@@ -6,6 +8,7 @@
  * China is kept as the app's existing canonical value, while its display name
  * is explicit about the Mainland so Hong Kong SAR and Taiwan stay distinct.
  */
+
 export const QS_TOP_200_COUNTRIES = [
   { value: "Argentina", key: "argentina", code: "AR", flag: "🇦🇷" },
   { value: "Australia", key: "australia", code: "AU", flag: "🇦🇺" },
@@ -109,6 +112,26 @@ COUNTRY_KEY_BY_ALIAS.set("us", "unitedStates");
 COUNTRY_KEY_BY_ALIAS.set("eu", "europeanUnion");
 COUNTRY_KEY_BY_ALIAS.set("europeanunion", "europeanUnion");
 
+// Runtime localization (uz/ru): register the platform's own translated display
+// names as aliases of the same identity keys, so a `country` value that has
+// already been localized still resolves through `countryTranslationKey` /
+// `countriesMatch` / `qsCountryOption`. No stored data is affected — this only
+// widens what the matcher RECOGNIZES. (The keys of `countryNames` are exactly
+// the `CountryTranslationKey` union, hence the cast.)
+for (const locale of ["uz", "ru"] as const) {
+  const names = dictionaries[locale].countryNames as Record<string, string>;
+  for (const [key, name] of Object.entries(names)) {
+    if (typeof name === "string" && name) {
+      COUNTRY_KEY_BY_ALIAS.set(normalizeCountryAlias(name), key as CountryTranslationKey);
+    }
+  }
+}
+// In-dictionary names above cover the 38-key set; a few catalog extras that
+// localize outside `countryNames` map back to their nearest known identity.
+COUNTRY_KEY_BY_ALIAS.set("yevropaittifoqi", "europeanUnion");
+COUNTRY_KEY_BY_ALIAS.set("евросоюз", "europeanUnion");
+COUNTRY_KEY_BY_ALIAS.set("yevropa", "europeanUnion");
+
 /** Normalize a country label or code for matching, without changing stored data. */
 export function normalizeCountryAlias(value: string): string {
   return value
@@ -116,7 +139,9 @@ export function normalizeCountryAlias(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/&/g, "and")
-    .replace(/[^a-z0-9]/g, "");
+    // Keep Latin, digits, and Cyrillic so localized (uz/ru) display names
+    // normalize to stable non-empty keys instead of collapsing to "".
+    .replace(/[^a-z0-9а-яё]/g, "");
 }
 
 /** Return the message key for a known name, code, or common alias. */

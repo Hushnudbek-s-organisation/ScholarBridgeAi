@@ -14,6 +14,7 @@ import { db } from "@/db";
 import { scholarships as scholarshipsTable } from "@/db/schema";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
+import { localizeCountry, localizeCoverageType, localizeScholarshipProvider, localizeScholarshipTitle } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -211,20 +212,20 @@ export default async function ScholarshipsPage({
                 className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
               >
                 <span className="inline-flex min-h-7 w-fit max-w-full items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200 ring-inset">
-                  <span className="break-words">{scholarship.coverage_type || copy.coverageNotSpecified}</span>
+                  <span className="break-words">{localizeCoverageType(scholarship.coverage_type, locale) || copy.coverageNotSpecified}</span>
                 </span>
 
                 <h2 className="mt-2 break-words text-sm font-bold text-slate-900 sm:text-base">
-                  {scholarship.title}
+                  {localizeScholarshipTitle(scholarship.title, locale)}
                 </h2>
                 <p className="mt-0.5 break-words text-xs text-slate-600 sm:text-sm">
-                  {scholarship.provider}
+                  {localizeScholarshipProvider(scholarship.provider, locale)}
                 </p>
 
                 <div className="mt-3 space-y-1.5 text-xs text-slate-700">
                   <p className="flex items-start gap-1.5">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
-                    <span className="break-words">{scholarship.country}</span>
+                    <span className="break-words">{localizeCountry(scholarship.country, locale)}</span>
                   </p>
                   {scholarship.deadline && (
                     <p className="flex items-start gap-1.5">

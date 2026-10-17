@@ -6,6 +6,14 @@ import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@
 import { StudentProfile } from "./Navbar";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import type { Locale } from "@/i18n/config";
+import {
+  localizeCountry,
+  localizeCoverageType,
+  localizeScholarshipProvider,
+  localizeScholarshipTitle,
+} from "@/lib/catalogLocalizer";
 import { 
   Award, 
   Search, 
@@ -74,7 +82,7 @@ type HubTranslator = (key: string, values?: Record<string, string | number>) => 
 
 /** Award value label. Every branch is translated (uz/ru included) — the
  *  numeric amount alone is language-neutral, so it keeps `formatMoney`. */
-export function awardLabel(s: Scholarship, t: HubTranslator): string {
+export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "en"): string {
   if (s.awardBasis === "need_based") return t("awardNeedBased");
   if (s.awardBasis === "full_tuition") return t("awardFullTuition");
   if (s.awardBasis === "variable") return t("awardVariable");
@@ -83,7 +91,9 @@ export function awardLabel(s: Scholarship, t: HubTranslator): string {
     return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
   }
   if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
-  return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : t("awardNotSpecified");
+  return s.coverageType && s.coverageType !== "Unspecified"
+    ? localizeCoverageType(s.coverageType, locale)
+    : t("awardNotSpecified");
 }
 
 const SCHOLARSHIP_FILTER_COUNTRIES = withQsTop200Countries([
@@ -112,6 +122,7 @@ export function ScholarshipHub({
 }: ScholarshipHubProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
+  const { locale } = useLocaleContext();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   // `loading` = first load (skeletons); `refreshing` = a later filter/page
   // change, where the current cards stay mounted instead of collapsing.
@@ -201,10 +212,10 @@ export function ScholarshipHub({
   const resultsTopRef = useRef<HTMLDivElement>(null);
 
   // Restart numbering from page 1 whenever the result-set identity changes
-  // (filters, search, profile, or page size). Adjusted during render (the
+  // (filters, search, profile, locale, or page size). Adjusted during render (the
   // React-endorsed alternative to a reset effect), so the debounced fetch
   // below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage].join("|");
+  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage, locale].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -227,6 +238,9 @@ export function ScholarshipHub({
     }
     params.set("page", page.toString());
     params.set("perPage", perPage.toString());
+    // Explicit locale: the API localizes the response and the SWR cache key
+    // (params.toString()) splits per language, so cached rows never mix.
+    params.set("locale", locale);
     const queryKey = params.toString();
 
     const cached = getCatalogSwr<{
@@ -319,7 +333,7 @@ export function ScholarshipHub({
     void Promise.resolve().then(() => fetchScholarships(controller.signal));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId]);
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale]);
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -511,9 +525,9 @@ export function ScholarshipHub({
                           not a ragged box per line. Neutral, so amber stays
                           reserved for deadlines and match issues. */}
                       <span className="inline-block max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                        {s.country} • {s.provider}
+                        {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
                       </span>
-                      <h3 className="font-bold text-base text-slate-900 mt-1">{s.title}</h3>
+                      <h3 className="font-bold text-base text-slate-900 mt-1">{localizeScholarshipTitle(s.title, locale)}</h3>
                     </div>
 
                     {score != null ? (
@@ -595,12 +609,12 @@ export function ScholarshipHub({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
                     <span className="text-slate-400 block font-medium">{t("awardValue")}</span>
-                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t)}</strong>
+                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
                   </div>
 
                   <div>
                     <span className="text-slate-400 block font-medium">{t("coverage")}</span>
-                    <strong className="text-slate-800 font-bold">{s.coverageType}</strong>
+                    <strong className="text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
                   </div>
 
                   <div>
