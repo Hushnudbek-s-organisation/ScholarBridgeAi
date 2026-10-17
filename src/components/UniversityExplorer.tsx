@@ -1,11 +1,22 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { StudentProfile } from "./Navbar";
-import { UniversityDetail } from "./UniversityDetail";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
+import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+
+const UniversityDetail = dynamic(
+  () => import("./UniversityDetail").then((m) => m.UniversityDetail),
+  {
+    loading: () => (
+      <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-[#111a2e]" />
+    ),
+  },
+);
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
 import { DecisionPillStrip } from "./DecisionPillStrip";
@@ -289,15 +300,35 @@ export function UniversityExplorer({
   const hasLoadedRef = useRef(false);
 
   const fetchUniversities = async (signal?: AbortSignal) => {
-    if (hasLoadedRef.current) setRefreshing(true);
-    else setLoading(true);
+    const params = buildFilterParams();
+    params.set("page", page.toString());
+    params.set("perPage", perPage.toString());
+    const queryKey = params.toString();
+
+    const cached = getCatalogSwr<{
+      universities: University[];
+      total: number;
+      totalPages: number;
+      page?: number;
+    }>("universities", queryKey);
+
+    if (cached) {
+      hasLoadedRef.current = true;
+      setUniversities(cached.data.universities);
+      setTotalCount(cached.data.total);
+      setTotalPages(cached.data.totalPages);
+      setLoading(false);
+      setRefreshing(false);
+      setFetchError("");
+      if (cached.isFresh) return;
+    } else if (hasLoadedRef.current) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setFetchError("");
     try {
-      const params = buildFilterParams();
-      params.set("page", page.toString());
-      params.set("perPage", perPage.toString());
-
-      const res = await fetch(`/api/universities?${params.toString()}`, { signal });
+      const res = await fetch(`/api/universities?${queryKey}`, { signal });
       const data = await res.json();
       hasLoadedRef.current = true;
       if (!res.ok) {
@@ -311,13 +342,19 @@ export function UniversityExplorer({
         return;
       }
       if (data.universities) {
+        const nextTotal =
+          typeof data.total === "number" ? data.total : data.universities.length;
+        const nextTotalPages =
+          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1;
         setUniversities(data.universities);
-        setTotalCount(
-          typeof data.total === "number" ? data.total : data.universities.length,
-        );
-        setTotalPages(
-          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1,
-        );
+        setTotalCount(nextTotal);
+        setTotalPages(nextTotalPages);
+        setCatalogSwr("universities", queryKey, {
+          universities: data.universities,
+          total: nextTotal,
+          totalPages: nextTotalPages,
+          page: data.page,
+        });
         // The server clamps out-of-range pages - sync so the UI numbering
         // always matches the returned slice.
         if (typeof data.page === "number" && data.page !== page) {
@@ -329,7 +366,9 @@ export function UniversityExplorer({
       // one is already in flight and will render the correct slice.
       if (err?.name === "AbortError") return;
       console.error("Error fetching universities:", err);
-      setFetchError(err?.message || t("exLoadError"));
+      if (!cached) {
+        setFetchError(err?.message || t("exLoadError"));
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -843,7 +882,8 @@ export function UniversityExplorer({
                 <div className="relative h-40 w-full overflow-hidden bg-slate-100">
                   {uni.imageUrl ? (
                     <Image
-                      src={uni.imageUrl}
+                      src={toWikimediaThumb(uni.imageUrl, 640)}
+                      onError={onWikimediaThumbError(uni.imageUrl)}
                       alt={`${uni.name} — ${uni.city}, ${uni.country}`}
                       width={640}
                       height={320}

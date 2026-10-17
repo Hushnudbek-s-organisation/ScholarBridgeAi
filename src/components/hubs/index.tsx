@@ -11,36 +11,25 @@
  * error / success states.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Empty } from "@/components/journey/ui";
 import { UniversityExplorer } from "@/components/UniversityExplorer";
 import { ScholarshipHub } from "@/components/ScholarshipHub";
-import { ChancingPanel } from "@/components/ChancingPanel";
-import { RecommendationStudio } from "@/components/RecommendationStudio";
-import { CountryComparePanel } from "@/components/CountryComparePanel";
 import { OpportunitiesPanel } from "@/components/OpportunitiesPanel";
-import { PlanningStudio } from "@/components/PlanningStudio";
 import { TaskRoadmap } from "@/components/TaskRoadmap";
 import { DeadlineCenter } from "@/components/DeadlineCenter";
 import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
 import { SimilarProfiles } from "@/components/SimilarProfiles";
 import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { PremiumGate } from "@/components/PremiumGate";
-import { AiSopStudio } from "@/components/AiSopStudio";
-import { EssayRubricStudio } from "@/components/EssayRubricStudio";
-import { AiChatMentor } from "@/components/AiChatMentor";
-import { AdmissionsAdvisor } from "@/components/AdmissionsAdvisor";
-import { ConsultingSection } from "@/components/ConsultingSection";
-import { MentorMarketplace } from "@/components/MentorMarketplace";
-import { ForumSection } from "@/components/ForumSection";
-import { CoursesSection } from "@/components/CoursesSection";
 import { FaqSection } from "@/components/FaqSection";
 import { AnswerVault } from "@/components/growth/AnswerVault";
 import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
 import { GoalPlanner } from "@/components/growth/GoalPlanner";
 import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
 import { SuccessStories } from "@/components/growth/SuccessStories";
-import { CareerExplorerPanel, InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
+import { InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
 import { ArrivalPlanPanel } from "@/components/journey/ArrivalPlanPanel";
 import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
 import {
@@ -57,13 +46,27 @@ import {
   TestPlannerPanel,
 } from "@/components/journey/PreparePanels";
 import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
-import { VisaSpeakingAssistant } from "@/components/VisaSpeakingAssistant";
 import { HubPage, HubEmpty, usePaneSelection, type HubPaneDef } from "./ui";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import { FeeWaiverStudio } from "@/components/FeeWaiverStudio";
-import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
+
+const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel));
+const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio));
+const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel));
+const CareerExplorerPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.CareerExplorerPanel));
+const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then((m) => m.PlanningStudio));
+const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio));
+const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio));
+const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio));
+const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant));
+const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor));
+const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor));
+const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection));
+const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace));
+const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection));
+const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection));
 
 type Profile = StudentProfile | null;
 

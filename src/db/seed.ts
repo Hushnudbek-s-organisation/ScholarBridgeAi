@@ -79,7 +79,7 @@ export async function seedDatabase(options?: { force?: boolean }): Promise<void>
     if (seedDatabasePromise) return seedDatabasePromise;
   }
 
-  const run = runSeedDatabase()
+  const run = runSeedDatabase(options?.force)
     .then(() => {
       seedDatabaseCompleted = true;
       seedDatabasePromise = null;
@@ -95,7 +95,7 @@ export async function seedDatabase(options?: { force?: boolean }): Promise<void>
   return run;
 }
 
-async function runSeedDatabase() {
+async function runSeedDatabase(force = false) {
   try {
     // Bootstrap admin account — configured ONLY through env (no personal
     // defaults in code, so a new owner/host never inherits someone's email):
@@ -220,40 +220,51 @@ async function runSeedDatabase() {
     // Check if universities already seeded
     const existingUnis = await db.select().from(universities).limit(1);
     if (existingUnis.length > 0) {
-      // Universities exist, but older installs never received the program
-      // catalogue (programs/requirements/cycles), which the recommender reads
-      // exclusively. The call is idempotent — it only inserts what is missing.
-      try {
-        await seedProgramCatalog();
-      } catch (err) {
-        console.error("Program catalogue top-up failed:", err);
-      }
-      try {
-        await refreshSeededScholarshipCycles();
-      } catch (err) {
-        console.error("Seeded scholarship cycle refresh failed:", err);
-      }
-      try {
-        await seedOpportunities();
-      } catch (err) {
-        console.error("Opportunities catalogue top-up failed:", err);
-      }
-      try {
-        // Independent top-ups run concurrently; each one is individually
-        // idempotent and guarded by its own process cache.
-        await Promise.all([
-          ensureGrowthTables(),
-          ensureJourneyTables(),
-          ensureRichPlatformDataSeeded(),
-          ensureOutcomesAndStoriesSeeded(),
-        ]);
-      } catch (err) {
-        console.error("Rich platform data top-up failed:", err);
-      }
-      try {
-        await Promise.all([seedForum(), seedCourses(), seedGamification()]);
-      } catch (err) {
-        console.error("Catalogue top-up failed:", err);
+      const runExistingCatalogTopUps = async () => {
+        // Universities exist, but older installs never received the program
+        // catalogue (programs/requirements/cycles), which the recommender reads
+        // exclusively. The call is idempotent — it only inserts what is missing.
+        try {
+          await seedProgramCatalog();
+        } catch (err) {
+          console.error("Program catalogue top-up failed:", err);
+        }
+        try {
+          await refreshSeededScholarshipCycles();
+        } catch (err) {
+          console.error("Seeded scholarship cycle refresh failed:", err);
+        }
+        try {
+          await seedOpportunities();
+        } catch (err) {
+          console.error("Opportunities catalogue top-up failed:", err);
+        }
+        try {
+          // Independent top-ups run concurrently; each one is individually
+          // idempotent and guarded by its own process cache.
+          await Promise.all([
+            ensureGrowthTables(),
+            ensureJourneyTables(),
+            ensureRichPlatformDataSeeded(),
+            ensureOutcomesAndStoriesSeeded(),
+          ]);
+        } catch (err) {
+          console.error("Rich platform data top-up failed:", err);
+        }
+        try {
+          await Promise.all([seedForum(), seedCourses(), seedGamification()]);
+        } catch (err) {
+          console.error("Catalogue top-up failed:", err);
+        }
+      };
+
+      if (force) {
+        await runExistingCatalogTopUps();
+      } else {
+        // Do not block student-facing GET /api/universities or GET /api/scholarships
+        // when the primary catalogue already exists in PostgreSQL.
+        seedDatabaseCompleted = true;
+        void runExistingCatalogTopUps();
       }
       return;
     }
@@ -280,7 +291,7 @@ async function runSeedDatabase() {
         description: "World leader in technology, AI research, and engineering. MIT provides cutting-edge labs, startup incubators, and unmatched industry connections.",
         highlights: JSON.stringify(["OPT STEM 3-Year Extension", "World #1 CS Program", "Generous Need-Blind Aid", "CSAIL Research Lab"]),
         websiteUrl: "https://www.mit.edu",
-        imageUrl: "https://images.unsplash.com/photo-1564981797816-1043664bf78d?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG"
       },
       {
         name: "University of Oxford",
@@ -300,7 +311,7 @@ async function runSeedDatabase() {
         description: "Historic university renowned for academic excellence, tutorial system, and world-class AI and machine learning departments.",
         highlights: JSON.stringify(["UK Graduate Route 2-Yr Visa", "Rhodes & Clarendon Scholarships", "College Tutorial System", "DeepMind Chair Hub"]),
         websiteUrl: "https://www.ox.ac.uk",
-        imageUrl: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/2/2b/Radcliffe_Camera%2C_Oxford_-_Oct_2006.jpg"
       },
       {
         name: "Technical University of Munich (TUM)",
@@ -320,7 +331,7 @@ async function runSeedDatabase() {
         description: "Europe's leading technical university with virtually free/low tuition, top European industry partnerships (BMW, Siemens, Google Munich), and English-taught Master's.",
         highlights: JSON.stringify(["Ultra Low Tuition Fees", "18-Month Post-Study Job Seeker Visa", "Strong Tech Ecosystem", "DAAD Eligible"]),
         websiteUrl: "https://www.tum.de",
-        imageUrl: "https://images.unsplash.com/photo-1592285853127-6f62b210f8a8?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg"
       },
       {
         name: "University of Toronto",
@@ -340,7 +351,7 @@ async function runSeedDatabase() {
         description: "Canada's top research university offering PGWP up to 3 years, direct pathways to Canadian Permanent Residency, and premier Vector Institute AI partnerships.",
         highlights: JSON.stringify(["3-Year Post-Graduation Work Permit (PGWP)", "Express Entry PR Bonus Points", "Vector Institute AI Hub", "Co-op Internship Options"]),
         websiteUrl: "https://www.utoronto.ca",
-        imageUrl: "https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg"
       },
       {
         name: "National University of Singapore (NUS)",
@@ -360,7 +371,7 @@ async function runSeedDatabase() {
         description: "Asia's premier university located in global financial and technological center with Service Obligation tuition subsidies for international students.",
         highlights: JSON.stringify(["MOE Tuition Grant Subsidy", "Asia #1 University", "Global Fintech & Tech Hub", "SINGA Scholarship Target"]),
         websiteUrl: "https://www.nus.edu.sg",
-        imageUrl: "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a7/National_University_of_Singapore_logo_print.jpg"
       },
       {
         name: "ETH Zurich",
@@ -380,7 +391,7 @@ async function runSeedDatabase() {
         description: "World-class STEM institution with affordable tuition fees, home to Einstein, and unparalleled research in robotics, quantum computing, and AI.",
         highlights: JSON.stringify(["Low Tuition Fees (~$1.8k/yr)", "Top 10 Global Ranking", "Excellence Scholarship & Opportunity Program", "World-class Labs"]),
         websiteUrl: "https://ethz.ch",
-        imageUrl: "https://images.unsplash.com/photo-1517840901100-8179e982acb7?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/5/56/ETH_Z%C3%BCrich_-_Hauptgeb%C3%A4ude_-_Polyterrasse_2012-09-27_14-40-49_ShiftN.jpg"
       },
       {
         name: "University of Melbourne",
@@ -400,7 +411,7 @@ async function runSeedDatabase() {
         description: "Australia's top university located in one of the world's most liveable cities, offering generous post-study work rights and regional migration bonuses.",
         highlights: JSON.stringify(["3 to 4-Year Temporary Graduate Visa", "Melbourne Tech Hub", "Generous Merit Scholarships", "High Quality of Life"]),
         websiteUrl: "https://www.unimelb.edu.au",
-        imageUrl: "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Parkville_-_University_of_Melbourne_%28Ormond_College%29.jpg"
       },
       {
         name: "Stanford University",
@@ -420,7 +431,7 @@ async function runSeedDatabase() {
         description: "Silicon Valley's powerhouse university. Unrivaled ecosystem for venture capital, technology commercialization, AI breakthrough labs, and founders.",
         highlights: JSON.stringify(["Knight-Hennessy Scholars Program", "Silicon Valley Venture Access", "3-Year STEM OPT", "Pioneer AI Research"]),
         websiteUrl: "https://www.stanford.edu",
-        imageUrl: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/6/64/Stanford_University_Quad_Memorial_Church.JPG"
       },
       {
         name: "University of British Columbia (UBC)",
@@ -440,7 +451,7 @@ async function runSeedDatabase() {
         description: "Premier West Coast Canadian university surrounded by mountains and sea, renowned for sustainability, health tech, and AI co-op programs.",
         highlights: JSON.stringify(["3-Year PGWP Work Visa", "Vancouver Tech Hub", "International Leader Award", "Scenic Campus"]),
         websiteUrl: "https://www.ubc.ca",
-        imageUrl: "https://images.unsplash.com/photo-1519452635265-7b1fbfd1e4e0?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/3/30/Irving_K._Barber_Learning_Centre_-_University_of_British_Columbia_Vancouver_-_DSC09305.jpg"
       },
       {
         name: "Delft University of Technology (TU Delft)",
@@ -460,7 +471,7 @@ async function runSeedDatabase() {
         description: "Netherlands' largest technical university with outstanding English-taught Master's degrees, high graduate employability, and 1-year Orientation Year visa.",
         highlights: JSON.stringify(["Dutch Orientation Year Visa", "TU Delft Excellence Scholarship", "High English Proficiency Environment", "EU Tech Innovation Hub"]),
         websiteUrl: "https://www.tudelft.nl",
-        imageUrl: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Library_TUDelft.jpg"
       },
       {
         name: "Imperial College London",
@@ -480,7 +491,7 @@ async function runSeedDatabase() {
         description: "STEM and business focused top global university in central London, famous for algorithmic trading, bio-engineering, and deeptech ventures.",
         highlights: JSON.stringify(["Central London Tech Corridor", "President's PhD Scholarships", "2-Year UK Graduate Visa", "Strong FinTech Network"]),
         websiteUrl: "https://www.imperial.ac.uk",
-        imageUrl: "https://images.unsplash.com/photo-1526129318478-62ed807ebdf9?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Queen%27s_Tower%2C_Imperial_College_London.jpg"
       },
       {
         name: "The University of Tokyo",
@@ -500,7 +511,7 @@ async function runSeedDatabase() {
         description: "Japan's flagship university offering fully English-taught degree tracks (PEAK and USTEP) with government MEXT full scholarships available.",
         highlights: JSON.stringify(["MEXT Full Embassy Scholarship", "Low Tuition (~$5.2k)", "Robotics Capital of the World", "Fast-track Japan PR"]),
         websiteUrl: "https://www.u-tokyo.ac.jp",
-        imageUrl: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=800&auto=format&fit=crop"
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fa/2024_Yasuda_Auditorium_-_Tokyo_University.jpg"
       }
     ]).returning();
 

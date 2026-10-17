@@ -74,8 +74,13 @@ export function LocaleProvider({
     [locale]
   );
 
+  const contextValue = useMemo(
+    () => ({ locale, setLocale }),
+    [locale, setLocale]
+  );
+
   return (
-    <LocaleContext.Provider value={{ locale, setLocale }}>
+    <LocaleContext.Provider value={contextValue}>
       <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Tashkent">
         {children}
       </NextIntlClientProvider>

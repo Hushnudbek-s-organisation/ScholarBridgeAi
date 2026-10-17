@@ -35,6 +35,7 @@ import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import { DecisionPillStrip } from "./DecisionPillStrip";
 import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
+import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 
 interface UniversityDetailData {
   id: number;
@@ -461,8 +462,10 @@ export function UniversityDetail({
         {uni.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={uni.imageUrl}
+            src={toWikimediaThumb(uni.imageUrl, 960)}
+            onError={onWikimediaThumbError(uni.imageUrl)}
             alt=""
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover scale-105"
           />
         ) : (
@@ -476,8 +479,10 @@ export function UniversityDetail({
               {uni.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={uni.imageUrl}
+                  src={toWikimediaThumb(uni.imageUrl, 320)}
+                  onError={onWikimediaThumbError(uni.imageUrl)}
                   alt={`${uni.name} logo`}
+                  decoding="async"
                   className="h-full w-full object-contain p-2"
                 />
               ) : (

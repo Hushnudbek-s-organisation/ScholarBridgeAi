@@ -115,25 +115,33 @@ export function trackEvent(payload: TrackPayload = {}): void {
     // fall through to fetch
   }
 
-  try {
-    void fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      keepalive: true,
-      credentials: "same-origin",
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json && typeof json.visitorId === "string" && json.visitorId) {
-          storeVisitorId(json.visitorId);
-        }
+  const sendBeaconFetch = () => {
+    try {
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true,
+        credentials: "same-origin",
       })
-      .catch(() => {
-        /* analytics must never surface an error to the user */
-      });
-  } catch {
-    // ignore
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          if (json && typeof json.visitorId === "string" && json.visitorId) {
+            storeVisitorId(json.visitorId);
+          }
+        })
+        .catch(() => {
+          /* analytics must never surface an error to the user */
+        });
+    } catch {
+      // ignore
+    }
+  };
+
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    window.requestIdleCallback(sendBeaconFetch, { timeout: 2000 });
+  } else {
+    setTimeout(sendBeaconFetch, 600);
   }
 }
 

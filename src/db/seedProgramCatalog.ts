@@ -464,6 +464,20 @@ export async function seedProgramCatalog(): Promise<SeedProgramCatalogSummary> {
   for (const spec of UNIVERSITY_PROGRAM_CATALOG) {
     const uni = uniByName.get(spec.universityName);
     if (!uni) continue;
+
+    // Skip demo top-up when this university already has verified catalogue programs.
+    const existingVerified = await db
+      .select({ id: universityPrograms.id })
+      .from(universityPrograms)
+      .where(
+        and(
+          eq(universityPrograms.universityId, uni.id),
+          eq(universityPrograms.isVerified, true),
+        ),
+      )
+      .limit(1);
+    if (existingVerified.length > 0) continue;
+
     summary.universitiesMatched++;
 
     // ---- Source row (one per university, shared by its programmes) -------

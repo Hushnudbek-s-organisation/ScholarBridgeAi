@@ -14,6 +14,7 @@ import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -65,63 +66,97 @@ export default async function UniversitiesPage({
   let rows: UniversityRow[];
   let totalItems: number;
   try {
-    const [countRow] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(universitiesTable)
-      .where(eq(universitiesTable.isActive, true));
-    totalItems = Number(countRow?.n ?? 0);
-    const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-    if (requestedPage > lastPage) {
-      redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
+    const bundle = await getCachedUniversitiesBundle().catch(() => null);
+    if (bundle && bundle.unis.length > 0) {
+      const activeUnis = bundle.unis
+        .filter((u) => u.isActive !== false)
+        .sort((a, b) => {
+          const ar = a.worldRanking ?? Number.MAX_SAFE_INTEGER;
+          const br = b.worldRanking ?? Number.MAX_SAFE_INTEGER;
+          return ar !== br ? ar - br : a.id - b.id;
+        });
+      totalItems = activeUnis.length;
+      const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      if (requestedPage > lastPage) {
+        redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
+      }
+      rows = activeUnis.slice(from, from + ITEMS_PER_PAGE).map((university) => {
+        const costs = resolvedUsdUniversityCosts(university);
+        return {
+          id: university.id,
+          name: university.name,
+          country: university.country,
+          city: university.city,
+          flag_emoji: university.flagEmoji,
+          world_ranking: university.worldRanking,
+          program_major: university.programMajor,
+          university_type: university.universityType,
+          annual_tuition_usd: costs.annualTuitionUsd,
+          annual_living_est_usd: costs.annualLivingEstUsd,
+          min_ielts: university.minIelts,
+          post_study_work_visa_years: university.postStudyWorkVisaYears,
+          official_website_url: university.officialWebsiteUrl || university.websiteUrl,
+        };
+      });
+    } else {
+      const [countRow] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(universitiesTable)
+        .where(eq(universitiesTable.isActive, true));
+      totalItems = Number(countRow?.n ?? 0);
+      const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      if (requestedPage > lastPage) {
+        redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
+      }
+      const data = await db
+        .select({
+          id: universitiesTable.id,
+          name: universitiesTable.name,
+          country: universitiesTable.country,
+          city: universitiesTable.city,
+          flagEmoji: universitiesTable.flagEmoji,
+          worldRanking: universitiesTable.worldRanking,
+          programMajor: universitiesTable.programMajor,
+          universityType: universitiesTable.universityType,
+          annualTuition: universitiesTable.annualTuition,
+          tuitionCurrency: universitiesTable.tuitionCurrency,
+          tuitionPeriod: universitiesTable.tuitionPeriod,
+          annualTuitionUsd: universitiesTable.annualTuitionUsd,
+          annualLivingEst: universitiesTable.annualLivingEst,
+          livingCostCurrency: universitiesTable.livingCostCurrency,
+          livingCostPeriod: universitiesTable.livingCostPeriod,
+          annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
+          minIelts: universitiesTable.minIelts,
+          postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
+          officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
+          websiteUrl: universitiesTable.websiteUrl,
+        })
+        .from(universitiesTable)
+        .where(eq(universitiesTable.isActive, true))
+        .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
+        .limit(ITEMS_PER_PAGE)
+        .offset(from);
+      // Nullable columns stay null (never "" or 0) — the card renders nothing
+      // rather than pretending a ranking/focus exists.
+      rows = data.map((university) => {
+        const costs = resolvedUsdUniversityCosts(university);
+        return {
+          id: university.id,
+          name: university.name,
+          country: university.country,
+          city: university.city,
+          flag_emoji: university.flagEmoji,
+          world_ranking: university.worldRanking,
+          program_major: university.programMajor,
+          university_type: university.universityType,
+          annual_tuition_usd: costs.annualTuitionUsd,
+          annual_living_est_usd: costs.annualLivingEstUsd,
+          min_ielts: university.minIelts,
+          post_study_work_visa_years: university.postStudyWorkVisaYears,
+          official_website_url: university.officialWebsiteUrl || university.websiteUrl,
+        };
+      });
     }
-    const data = await db
-      .select({
-        id: universitiesTable.id,
-        name: universitiesTable.name,
-        country: universitiesTable.country,
-        city: universitiesTable.city,
-        flagEmoji: universitiesTable.flagEmoji,
-        worldRanking: universitiesTable.worldRanking,
-        programMajor: universitiesTable.programMajor,
-        universityType: universitiesTable.universityType,
-        annualTuition: universitiesTable.annualTuition,
-        tuitionCurrency: universitiesTable.tuitionCurrency,
-        tuitionPeriod: universitiesTable.tuitionPeriod,
-        annualTuitionUsd: universitiesTable.annualTuitionUsd,
-        annualLivingEst: universitiesTable.annualLivingEst,
-        livingCostCurrency: universitiesTable.livingCostCurrency,
-        livingCostPeriod: universitiesTable.livingCostPeriod,
-        annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
-        minIelts: universitiesTable.minIelts,
-        postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
-        officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
-        websiteUrl: universitiesTable.websiteUrl,
-      })
-      .from(universitiesTable)
-      .where(eq(universitiesTable.isActive, true))
-      .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
-      .limit(ITEMS_PER_PAGE)
-      .offset(from);
-    // Nullable columns stay null (never "" or 0) — the card renders nothing
-    // rather than pretending a ranking/focus exists.
-    rows = data.map((university) => {
-      const costs = resolvedUsdUniversityCosts(university);
-      return {
-        id: university.id,
-        name: university.name,
-        country: university.country,
-        city: university.city,
-        flag_emoji: university.flagEmoji,
-        world_ranking: university.worldRanking,
-        program_major: university.programMajor,
-        university_type: university.universityType,
-        annual_tuition_usd: costs.annualTuitionUsd,
-        annual_living_est_usd: costs.annualLivingEstUsd,
-        min_ielts: university.minIelts,
-        post_study_work_visa_years: university.postStudyWorkVisaYears,
-        official_website_url: university.officialWebsiteUrl || university.websiteUrl,
-      };
-    });
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
     console.error("University catalogue query failed", error instanceof Error ? error.name : "unknown error");

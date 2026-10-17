@@ -54,6 +54,7 @@ import {
   NAV_UTILITY_SECTIONS,
 } from "@/lib/navSections";
 import { AppNote } from "./AppNote";
+import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 
 export interface MarqueeUniversityItem {
   rank: string;
@@ -1150,10 +1151,17 @@ const FLIGHT_PATH_D =
   "M 600 120 C 980 240, 1040 420, 760 560 C 480 700, 180 680, 220 880 C 260 1080, 920 1040, 950 1240 C 975 1380, 720 1410, 720 1280 C 720 1150, 980 1180, 880 1420 C 760 1680, 200 1660, 240 1940 C 280 2220, 980 2180, 920 2460 C 870 2660, 340 2620, 320 2820 C 305 2950, 550 2970, 540 2840 C 530 2710, 290 2750, 380 2990 C 460 3180, 880 3200, 600 3320";
 
 /** The jet is intentionally all greyscale; site accents never bleed into the flight overlay. */
-function ExecutiveMonochromeJet({ bankDeg }: { bankDeg: number }) {
+function ExecutiveMonochromeJet({
+  bankDeg = 0,
+  shadowGroupRef,
+}: {
+  bankDeg?: number;
+  shadowGroupRef?: React.RefObject<SVGGElement | null>;
+}) {
   return (
     <g>
       <g
+        ref={shadowGroupRef}
         transform={`translate(-6, ${8 + bankDeg * 0.18}) scale(0.95)`}
         opacity="0.18"
       >
@@ -1265,30 +1273,38 @@ function ExecutiveMonochromeJet({ bankDeg }: { bankDeg: number }) {
 
 function ScrollFlightPath() {
   const pathRef = React.useRef<SVGPathElement | null>(null);
-  const [flight, setFlight] = React.useState({
-    x: 600,
-    y: 120,
-    angle: 22,
-    bankDeg: 0,
-    progress: 0,
-    totalLen: 4200,
-    cameraY: 360,
-    screenAngle: 22,
-    scaleX: 1,
-    scaleY: 1,
-  });
+  const cameraGroupRef = React.useRef<SVGGElement | null>(null);
+  const jetGroupRef = React.useRef<SVGGElement | null>(null);
+  const shadowGroupRef = React.useRef<SVGGElement | null>(null);
 
   React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
-    const updateFlight = () => {
+    let cachedTotalLen = 4200;
+    let cachedMaxScroll = 1;
+    let cachedScaleX = 1;
+    let cachedScaleY = 1;
+
+    const refreshMetrics = () => {
       const path = pathRef.current;
-      if (!path) return;
-      const totalLen = path.getTotalLength() || 4200;
-      const maxScroll = Math.max(
+      if (path) {
+        cachedTotalLen = path.getTotalLength() || 4200;
+        path.setAttribute("stroke-dasharray", `${cachedTotalLen} ${cachedTotalLen}`);
+      }
+      cachedMaxScroll = Math.max(
         1,
         document.documentElement.scrollHeight - window.innerHeight,
       );
-      const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      cachedScaleX = Math.max(0.01, window.innerWidth / 1200);
+      cachedScaleY = Math.max(0.01, window.innerHeight / 1000);
+    };
+
+    const updateFlight = () => {
+      const path = pathRef.current;
+      if (!path) return;
+      const totalLen = cachedTotalLen;
+      const progress = Math.max(0, Math.min(1, window.scrollY / cachedMaxScroll));
       const dist = progress * totalLen;
       const delta = Math.min(12, totalLen * 0.003);
       const pt = path.getPointAtLength(dist);
@@ -1309,36 +1325,48 @@ function ScrollFlightPath() {
       const cameraY = 480 + loopOffset - pt.y;
       // Counter the non-uniform viewport projection so the jet keeps its
       // proportions on narrow phones while its route spans the full width.
-      const scaleX = window.innerWidth / 1200;
-      const scaleY = window.innerHeight / 1000;
+      const scaleX = cachedScaleX;
+      const scaleY = cachedScaleY;
       const screenAngle =
         (Math.atan2((next.y - prev.y) * scaleY, (next.x - prev.x) * scaleX) *
           180) /
         Math.PI;
-      setFlight({
-        x: pt.x,
-        y: pt.y,
-        angle,
-        bankDeg,
-        progress,
-        totalLen,
-        cameraY,
-        screenAngle,
-        scaleX,
-        scaleY,
+
+      cameraGroupRef.current?.setAttribute("transform", `translate(0 ${cameraY})`);
+      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - progress)));
+      jetGroupRef.current?.setAttribute(
+        "transform",
+        `translate(${pt.x} ${pt.y}) scale(${1 / scaleX} ${1 / scaleY}) rotate(${screenAngle})`,
+      );
+      shadowGroupRef.current?.setAttribute(
+        "transform",
+        `translate(-6, ${8 + bankDeg * 0.18}) scale(0.95)`,
+      );
+    };
+
+    const scheduleScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateFlight();
       });
     };
-    const schedule = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(updateFlight);
+
+    const handleResize = () => {
+      refreshMetrics();
+      scheduleScroll();
     };
+
+    refreshMetrics();
     updateFlight();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
+    if (!reducedMotion) {
+      window.addEventListener("scroll", scheduleScroll, { passive: true });
+    }
+    window.addEventListener("resize", handleResize, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", scheduleScroll);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -1375,7 +1403,7 @@ function ScrollFlightPath() {
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <g transform={`translate(0 ${flight.cameraY})`}>
+        <g ref={cameraGroupRef} transform="translate(0 360)">
           <path
             d={FLIGHT_PATH_D}
             fill="none"
@@ -1393,13 +1421,14 @@ function ScrollFlightPath() {
             opacity="0.8"
             strokeWidth="3.2"
             strokeLinecap="round"
-            strokeDasharray={`${flight.totalLen} ${flight.totalLen}`}
-            strokeDashoffset={flight.totalLen * (1 - flight.progress)}
+            strokeDasharray="4200 4200"
+            strokeDashoffset={4200}
           />
           <g
-            transform={`translate(${flight.x} ${flight.y}) scale(${1 / flight.scaleX} ${1 / flight.scaleY}) rotate(${flight.screenAngle})`}
+            ref={jetGroupRef}
+            transform="translate(600 120) scale(1 1) rotate(22)"
           >
-            <ExecutiveMonochromeJet bankDeg={flight.bankDeg} />
+            <ExecutiveMonochromeJet bankDeg={0} shadowGroupRef={shadowGroupRef} />
           </g>
         </g>
       </svg>
@@ -1408,6 +1437,23 @@ function ScrollFlightPath() {
 }
 
 function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
+  const sectionRef = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          el.classList.toggle("sb-marquee-paused", !entry.isIntersecting);
+        }
+      },
+      { rootMargin: "160px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
     <div className="relative overflow-hidden">
       <div className={`sb-marquee-track ${animClass}`}>
@@ -1429,7 +1475,8 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={university.url}
+                    src={toWikimediaThumb(university.url, 640)}
+                    onError={onWikimediaThumbError(university.url)}
                     alt={university.landmark}
                     loading="lazy"
                     decoding="async"
@@ -1461,6 +1508,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
 
   return (
     <section
+      ref={sectionRef}
       id="university-marquee"
       aria-labelledby="university-marquee-title"
       className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-[#0b1222] sm:py-10"
