@@ -89,6 +89,19 @@ type MatchProfile = Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
 type ProfileMatch = { profileData: StudentProfileData; matchProfile: MatchProfile };
 
 const profileMatchCache = new Map<number, CacheEntry<ProfileMatch>>();
+const universityDetailCache = new Map<number, CacheEntry<Record<string, unknown>>>();
+
+export function getCachedUniversityDetailBase(uniId: number): Record<string, unknown> | null {
+  return fresh(universityDetailCache.get(uniId) ?? null);
+}
+
+export function setCachedUniversityDetailBase(uniId: number, payload: Record<string, unknown>): void {
+  if (universityDetailCache.size >= 250 && !universityDetailCache.has(uniId)) {
+    const oldest = universityDetailCache.keys().next().value;
+    if (oldest !== undefined) universityDetailCache.delete(oldest);
+  }
+  universityDetailCache.set(uniId, { value: payload, expiresAt: Date.now() + CATALOG_TTL_MS });
+}
 
 function fresh<T>(entry: CacheEntry<T> | null): T | null {
   if (!entry) return null;
@@ -330,10 +343,12 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
   if (kind === "universities" || kind === "all") {
     universitiesEntry = null;
     universitiesInFlight = null;
+    universityDetailCache.clear();
   }
   if (kind === "scholarships" || kind === "all") {
     scholarshipsEntry = null;
     scholarshipsInFlight = null;
+    universityDetailCache.clear();
   }
 }
 
@@ -356,6 +371,7 @@ export function resetCatalogCacheForTests() {
   universitiesInFlight = null;
   scholarshipsInFlight = null;
   profileMatchCache.clear();
+  universityDetailCache.clear();
 }
 
 /** Diagnostics for the operations dashboard / tests. */

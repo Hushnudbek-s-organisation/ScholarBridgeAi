@@ -1,21 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Navbar, StudentProfile } from "@/components/Navbar";
-import { ProfileModal } from "@/components/ProfileModal";
 import type { SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
-import { PaymentsSection } from "@/components/PaymentsSection";
-import { RewardsSection } from "@/components/RewardsSection";
-import { ParentDashboard } from "@/components/ParentDashboard";
-import { AdminPanel } from "@/components/AdminPanel";
 import { PremiumGate } from "@/components/PremiumGate";
-import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { LandingPage } from "@/components/LandingPage";
-import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
+import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { PageTransition } from "@/components/motion";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
@@ -25,26 +20,33 @@ import {
 } from "@/lib/navSections";
 import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
-import { TelegramSettings } from "@/components/telegram/TelegramSettings";
-import { SessionsPanel } from "@/components/SessionsPanel";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
-import { JourneyControlCenter } from "@/components/journey/JourneyControlCenter";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
-import {
-  CommunityHub,
-  FundingHub,
-  GuidanceHub,
-  MaterialsHub,
-  OffersHub,
-  PostAdmissionFundingHub,
-  ProfileHub,
-  ScholarshipsHub,
-  StudyPlanHub,
-  TasksHub,
-  UniversitiesHub,
-  VisaHub,
-  ApplicationsHub,
-} from "@/components/hubs";
+
+const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal));
+const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker));
+const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard));
+const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter));
+const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection));
+const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection));
+const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard));
+const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel));
+const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings));
+const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel));
+
+const UniversitiesHub = dynamic(() => import("@/components/hubs").then((m) => m.UniversitiesHub));
+const ScholarshipsHub = dynamic(() => import("@/components/hubs").then((m) => m.ScholarshipsHub));
+const StudyPlanHub = dynamic(() => import("@/components/hubs").then((m) => m.StudyPlanHub));
+const TasksHub = dynamic(() => import("@/components/hubs").then((m) => m.TasksHub));
+const ProfileHub = dynamic(() => import("@/components/hubs").then((m) => m.ProfileHub));
+const FundingHub = dynamic(() => import("@/components/hubs").then((m) => m.FundingHub));
+const ApplicationsHub = dynamic(() => import("@/components/hubs").then((m) => m.ApplicationsHub));
+const MaterialsHub = dynamic(() => import("@/components/hubs").then((m) => m.MaterialsHub));
+const OffersHub = dynamic(() => import("@/components/hubs").then((m) => m.OffersHub));
+const PostAdmissionFundingHub = dynamic(() => import("@/components/hubs").then((m) => m.PostAdmissionFundingHub));
+const VisaHub = dynamic(() => import("@/components/hubs").then((m) => m.VisaHub));
+const GuidanceHub = dynamic(() => import("@/components/hubs").then((m) => m.GuidanceHub));
+const CommunityHub = dynamic(() => import("@/components/hubs").then((m) => m.CommunityHub));
 
 /**
  * Any destination, pane, legacy section id or utility screen may appear in the
@@ -412,25 +414,32 @@ export function Home({
           setActivePane(linked.pane);
           if (linked.openProfileEditor) openProfileModal(false);
         }
-        // Fire-and-forget: check for approaching deadlines → notifications.
-        try {
-          fetch("/api/notifications/sweep", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ profileId: storedId }),
-          }).catch(() => {});
-        } catch {
-          // ignore
-        }
-        // Fire-and-forget: auto-build the personalized roadmap.
-        try {
-          fetch("/api/roadmap/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ profileId: storedId }),
-          }).catch(() => {});
-        } catch {
-          // ignore
+        // Defer non-critical background sweeps until the browser is idle so they
+        // never compete with initial route hydration or catalogue fetches.
+        const runDeferredSweeps = () => {
+          try {
+            fetch("/api/notifications/sweep", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ profileId: storedId }),
+            }).catch(() => {});
+          } catch {
+            // ignore
+          }
+          try {
+            fetch("/api/roadmap/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ profileId: storedId }),
+            }).catch(() => {});
+          } catch {
+            // ignore
+          }
+        };
+        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+          window.requestIdleCallback(runDeferredSweeps, { timeout: 2500 });
+        } else {
+          setTimeout(runDeferredSweeps, 1500);
         }
         setRestoreError(null);
         return;
@@ -655,6 +664,7 @@ export function Home({
       }
       setProfiles((prev) => prev.map((p) => (p.id === data.profile.id ? data.profile : p)));
       setActiveProfile(data.profile);
+      invalidateCatalogSwr();
     }
   };
 
@@ -666,6 +676,7 @@ export function Home({
   const handleProfileUpdated = (updated: StudentProfile) => {
     setProfiles((prev) => prev.map((profile) => (profile.id === updated.id ? updated : profile)));
     setActiveProfile(updated);
+    invalidateCatalogSwr();
   };
 
   // University Handlers

@@ -956,10 +956,10 @@ html.theme-transition *::after {
   0% { transform: translate3d(0%, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
 }
-.sb-marquee-right { display: flex; width: max-content; animation: sbMarqueeRight 46s linear infinite; }
-.sb-marquee-left { display: flex; width: max-content; animation: sbMarqueeLeft 42s linear infinite; }
-.sb-marquee-right-slow { display: flex; width: max-content; animation: sbMarqueeRight 50s linear infinite; }
-.sb-marquee-track:hover, .sb-marquee-track:focus-within { animation-play-state: paused; }
+.sb-marquee-right { display: flex; width: max-content; animation: sbMarqueeRight 46s linear infinite; will-change: transform; }
+.sb-marquee-left { display: flex; width: max-content; animation: sbMarqueeLeft 42s linear infinite; will-change: transform; }
+.sb-marquee-right-slow { display: flex; width: max-content; animation: sbMarqueeRight 50s linear infinite; will-change: transform; }
+.sb-marquee-track:hover, .sb-marquee-track:focus-within, .sb-marquee-paused .sb-marquee-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .sb-marquee-track, .sb-jet-plumes { animation: none; }
   .sb-marquee-track { width: max-content; }

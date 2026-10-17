@@ -13,6 +13,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { scholarships as scholarshipsTable } from "@/db/schema";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -81,46 +82,68 @@ export default async function ScholarshipsPage({
   let rows: ScholarshipRow[];
   let totalItems: number;
   try {
-    const [countRow] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(scholarshipsTable)
-      .where(eq(scholarshipsTable.isActive, true));
-    totalItems = Number(countRow?.n ?? 0);
-    const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-    if (requestedPage > totalPagesForQuery) {
-      redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
+    const bundle = await getCachedScholarshipsBundle().catch(() => null);
+    if (bundle && bundle.entries.length > 0) {
+      const sorted = [...bundle.entries].sort((a, b) => a.id - b.id);
+      totalItems = sorted.length;
+      const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      if (requestedPage > totalPagesForQuery) {
+        redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
+      }
+      const from = (requestedPage - 1) * ITEMS_PER_PAGE;
+      rows = sorted.slice(from, from + ITEMS_PER_PAGE).map((scholarship) => ({
+        id: scholarship.id,
+        title: scholarship.title,
+        provider: scholarship.provider,
+        country: scholarship.country,
+        coverage_type: scholarship.coverageType,
+        amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
+        award_period: scholarship.awardPeriod,
+        deadline: scholarship.deadline,
+        website_url: scholarship.websiteUrl,
+      }));
+    } else {
+      const [countRow] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(scholarshipsTable)
+        .where(eq(scholarshipsTable.isActive, true));
+      totalItems = Number(countRow?.n ?? 0);
+      const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      if (requestedPage > totalPagesForQuery) {
+        redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
+      }
+      const from = (requestedPage - 1) * ITEMS_PER_PAGE;
+      const data = await db
+        .select({
+          id: scholarshipsTable.id,
+          title: scholarshipsTable.title,
+          provider: scholarshipsTable.provider,
+          country: scholarshipsTable.country,
+          coverageType: scholarshipsTable.coverageType,
+          amountUsdValue: scholarshipsTable.amountUsdValue,
+          awardAmount: scholarshipsTable.awardAmount,
+          awardCurrency: scholarshipsTable.awardCurrency,
+          awardPeriod: scholarshipsTable.awardPeriod,
+          deadline: scholarshipsTable.deadline,
+          websiteUrl: scholarshipsTable.websiteUrl,
+        })
+        .from(scholarshipsTable)
+        .where(eq(scholarshipsTable.isActive, true))
+        .orderBy(asc(scholarshipsTable.id))
+        .limit(ITEMS_PER_PAGE)
+        .offset(from);
+      rows = data.map((scholarship) => ({
+        id: scholarship.id,
+        title: scholarship.title,
+        provider: scholarship.provider,
+        country: scholarship.country,
+        coverage_type: scholarship.coverageType,
+        amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
+        award_period: scholarship.awardPeriod,
+        deadline: scholarship.deadline,
+        website_url: scholarship.websiteUrl,
+      }));
     }
-    const from = (requestedPage - 1) * ITEMS_PER_PAGE;
-    const data = await db
-      .select({
-        id: scholarshipsTable.id,
-        title: scholarshipsTable.title,
-        provider: scholarshipsTable.provider,
-        country: scholarshipsTable.country,
-        coverageType: scholarshipsTable.coverageType,
-        amountUsdValue: scholarshipsTable.amountUsdValue,
-        awardAmount: scholarshipsTable.awardAmount,
-        awardCurrency: scholarshipsTable.awardCurrency,
-        awardPeriod: scholarshipsTable.awardPeriod,
-        deadline: scholarshipsTable.deadline,
-        websiteUrl: scholarshipsTable.websiteUrl,
-      })
-      .from(scholarshipsTable)
-      .where(eq(scholarshipsTable.isActive, true))
-      .orderBy(asc(scholarshipsTable.id))
-      .limit(ITEMS_PER_PAGE)
-      .offset(from);
-    rows = data.map((scholarship) => ({
-      id: scholarship.id,
-      title: scholarship.title,
-      provider: scholarship.provider,
-      country: scholarship.country,
-      coverage_type: scholarship.coverageType,
-      amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
-      award_period: scholarship.awardPeriod,
-      deadline: scholarship.deadline,
-      website_url: scholarship.websiteUrl,
-    }));
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
     console.error("Scholarship catalogue query failed", error instanceof Error ? error.name : "unknown error");

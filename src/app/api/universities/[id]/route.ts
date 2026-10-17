@@ -7,6 +7,7 @@ import {
   applicationCycles,
   universitySources,
   programSources,
+  scholarships,
   sources,
 } from "@/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
@@ -17,6 +18,12 @@ import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { selectUniversities } from "@/lib/universities";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import {
+  getCachedProfileForMatching,
+  getCachedUniversitiesBundle,
+  getCachedUniversityDetailBase,
+  setCachedUniversityDetailBase,
+} from "@/lib/catalogCache";
 import { studentProfiles } from "@/db/schema";
 
 /**
@@ -153,29 +160,60 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       const pId = Number.parseInt(profileIdParam, 10);
       const auth = await authenticate(req);
       if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
-        const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
-        if (p) {
-          const rows = await selectUniversities();
-          const row = rows.find((r) => r.id === uniId);
-          if (row) {
-            const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
-            match = {
-              score: result.matchScore,
-              reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
-              issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
-              breakdown: result.breakdown,
-            };
+        const cachedProfile = await getCachedProfileForMatching(pId);
+        if (cachedProfile) {
+          const bundle = await getCachedUniversitiesBundle().catch(() => null);
+          const row = bundle?.unis.find((r) => r.id === uniId) ?? {
+            ...uni,
+            ...resolvedUsdUniversityCosts(uni),
+          };
+          const result = calculateUniversityMatch(cachedProfile.matchProfile, row as never);
+          match = {
+            score: result.matchScore,
+            reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
+            issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
+            breakdown: result.breakdown,
+          };
+        } else {
+          const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
+          if (p) {
+            const rows = await selectUniversities();
+            const row = rows.find((r) => r.id === uniId);
+            if (row) {
+              const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
+              match = {
+                score: result.matchScore,
+                reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
+                issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
+                breakdown: result.breakdown,
+              };
+            }
           }
         }
       }
     }
 
-    // ---------- Programs (existing `programs` table) ----------
-    const programs = await db
-      .select()
-      .from(universityPrograms)
-      .where(eq(universityPrograms.universityId, uniId))
-      .orderBy(asc(universityPrograms.name));
+    const cachedBase = getCachedUniversityDetailBase(uniId);
+    if (cachedBase) {
+      return NextResponse.json({
+        ...cachedBase,
+        match,
+      });
+    }
+
+    // ---------- Programs & Application cycles in parallel ----------
+    const [programs, cycleRows] = await Promise.all([
+      db
+        .select()
+        .from(universityPrograms)
+        .where(eq(universityPrograms.universityId, uniId))
+        .orderBy(asc(universityPrograms.name)),
+      db
+        .select()
+        .from(applicationCycles)
+        .where(eq(applicationCycles.universityId, uniId))
+        .orderBy(asc(applicationCycles.id)),
+    ]);
 
     // ---------- Program → source links (provenance, spec §19) ----------
     // Batch-loaded for every program of this university; resilient like the
@@ -192,65 +230,81 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         isVerified: boolean;
       }[]
     >();
-    try {
-      const progIds = programs.map((p) => p.id);
-      if (progIds.length) {
-        const linkRows = await db
-          .select({
-            programId: programSources.programId,
-            sourceId: programSources.sourceId,
-            sourceType: programSources.sourceType,
-          })
-          .from(programSources)
-          .where(inArray(programSources.programId, progIds));
-        const srcIds = [...new Set(linkRows.map((r) => r.sourceId).filter((x): x is number => x != null))];
-        const srcMap = new Map<
-          number,
-          { url: string; title: string; domain: string | null; accessedAt: Date | null; isOfficial: boolean; isVerified: boolean }
-        >();
-        if (srcIds.length) {
-          const srows = await db
-            .select({
-              id: sources.id,
-              url: sources.url,
-              title: sources.title,
-              domain: sources.domain,
-              accessedAt: sources.accessedAt,
-              isOfficial: sources.isOfficial,
-              isVerified: sources.isVerified,
-            })
-            .from(sources)
-            .where(inArray(sources.id, srcIds));
-          srows.forEach((r) => srcMap.set(r.id, r));
+    const progIds = programs.map((p) => p.id);
+    const [allReqRows] = await Promise.all([
+      progIds.length
+        ? db
+            .select()
+            .from(programRequirements)
+            .where(inArray(programRequirements.programId, progIds))
+            .catch(() => [] as (typeof programRequirements.$inferSelect)[])
+        : Promise.resolve([] as (typeof programRequirements.$inferSelect)[]),
+      (async () => {
+        try {
+          if (progIds.length) {
+            const linkRows = await db
+              .select({
+                programId: programSources.programId,
+                sourceId: programSources.sourceId,
+                sourceType: programSources.sourceType,
+              })
+              .from(programSources)
+              .where(inArray(programSources.programId, progIds));
+            const srcIds = [...new Set(linkRows.map((r) => r.sourceId).filter((x): x is number => x != null))];
+            const srcMap = new Map<
+              number,
+              { url: string; title: string; domain: string | null; accessedAt: Date | null; isOfficial: boolean; isVerified: boolean }
+            >();
+            if (srcIds.length) {
+              const srows = await db
+                .select({
+                  id: sources.id,
+                  url: sources.url,
+                  title: sources.title,
+                  domain: sources.domain,
+                  accessedAt: sources.accessedAt,
+                  isOfficial: sources.isOfficial,
+                  isVerified: sources.isVerified,
+                })
+                .from(sources)
+                .where(inArray(sources.id, srcIds));
+              srows.forEach((r) => srcMap.set(r.id, r));
+            }
+            for (const link of linkRows) {
+              if (link.sourceId == null) continue;
+              const s = srcMap.get(link.sourceId);
+              if (!s) continue;
+              const arr = programSourcesMap.get(link.programId) ?? [];
+              arr.push({
+                url: s.url,
+                title: s.title,
+                sourceType: link.sourceType,
+                domain: s.domain,
+                accessedAt: s.accessedAt ? new Date(s.accessedAt).toISOString() : null,
+                isOfficial: s.isOfficial,
+                isVerified: s.isVerified,
+              });
+              programSourcesMap.set(link.programId, arr);
+            }
+          }
+        } catch {
+          // program_sources / sources unavailable — program sources simply not shown.
         }
-        for (const link of linkRows) {
-          if (link.sourceId == null) continue;
-          const s = srcMap.get(link.sourceId);
-          if (!s) continue;
-          const arr = programSourcesMap.get(link.programId) ?? [];
-          arr.push({
-            url: s.url,
-            title: s.title,
-            sourceType: link.sourceType,
-            domain: s.domain,
-            accessedAt: s.accessedAt ? new Date(s.accessedAt).toISOString() : null,
-            isOfficial: s.isOfficial,
-            isVerified: s.isVerified,
-          });
-          programSourcesMap.set(link.programId, arr);
-        }
-      }
-    } catch {
-      // program_sources / sources unavailable — program sources simply not shown.
+      })(),
+    ]);
+
+    const reqsByProgramId = new Map<number, typeof allReqRows>();
+    for (const r of allReqRows) {
+      if (r.programId == null) continue;
+      const list = reqsByProgramId.get(r.programId) ?? [];
+      list.push(r);
+      reqsByProgramId.set(r.programId, list);
     }
 
     // ---------- Program requirements (wide columns → normalized) ----------
     const programsWithReqs = [];
     for (const p of programs) {
-      const reqRows = await db
-        .select()
-        .from(programRequirements)
-        .where(eq(programRequirements.programId, p.id));
+      const reqRows = reqsByProgramId.get(p.id) ?? [];
 
       const reqs: {
         requirementType: string;
@@ -322,7 +376,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         tuitionCurrency: p.tuitionCurrency,
         tuitionPeriod: p.tuitionPeriod,
         description: p.description,
-        applicationDeadline: null,
+        applicationDeadline: null as string | null,
         minIelts: programMinIelts,
         minToefl: programMinToefl,
         minDuolingo: programMinDet,
@@ -427,11 +481,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
 
     // ---------- Application cycles (no cycle_year in DB — derive from academic_year) ----------
-    const cycleRows = await db
-      .select()
-      .from(applicationCycles)
-      .where(eq(applicationCycles.universityId, uniId))
-      .orderBy(asc(applicationCycles.id));
+    const verifiedDeadlineByProgram = new Map<number, string>();
+    for (const c of cycleRows) {
+      if (
+        c.programId != null &&
+        c.verificationStatus === "verified" &&
+        c.deadline &&
+        !verifiedDeadlineByProgram.has(c.programId)
+      ) {
+        verifiedDeadlineByProgram.set(c.programId, c.deadline);
+      }
+    }
+    for (const p of programsWithReqs) {
+      const dl = verifiedDeadlineByProgram.get(p.id);
+      if (dl && p.isVerified) {
+        p.applicationDeadline = dl;
+      }
+    }
 
     const cycles = cycleRows.map((c) => {
       let year: number | null = null;
@@ -538,10 +604,61 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     // ---------- Scholarships linked to this university ----------
-    // NOTE: the existing `scholarships` table has no university_id column, so
-    // there is no verified link to attach here. Return empty — the UI shows
-    // "No verified scholarships linked" instead of guessing.
-    const uniScholarships: unknown[] = [];
+    let uniScholarships: {
+      id: number;
+      title: string;
+      name: string;
+      description: string | null;
+      degreeLevels: string | null;
+      coverageType: string | null;
+      amountUsdValue: number | null;
+      awardAmount: number | null;
+      awardCurrency: string | null;
+      awardPeriod: string | null;
+      deadline: string | null;
+      deadlineDate: string | null;
+      applicationUrl: string | null;
+      websiteUrl: string | null;
+      isVerified: boolean;
+      eligibilityText: string | null;
+    }[] = [];
+    try {
+      const schRows = await db
+        .select()
+        .from(scholarships)
+        .where(eq(scholarships.universityId, uniId))
+        .orderBy(asc(scholarships.id));
+      uniScholarships = schRows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        name: s.title,
+        description: s.description ?? null,
+        degreeLevels: s.degreeLevels ?? null,
+        coverageType: s.coverageType ?? null,
+        amountUsdValue:
+          s.amountUsdValue != null
+            ? Number(s.amountUsdValue)
+            : s.awardAmount != null
+              ? Number(s.awardAmount)
+              : null,
+        awardAmount:
+          s.awardAmount != null
+            ? Number(s.awardAmount)
+            : s.amountUsdValue != null
+              ? Number(s.amountUsdValue)
+              : null,
+        awardCurrency: s.awardCurrency ?? "USD",
+        awardPeriod: s.awardPeriod ?? "year",
+        deadline: s.deadline ?? s.deadlineDate ?? null,
+        deadlineDate: s.deadlineDate ?? s.deadline ?? null,
+        applicationUrl: s.applicationUrl ?? s.websiteUrl ?? null,
+        websiteUrl: s.websiteUrl ?? s.applicationUrl ?? null,
+        isVerified: s.verificationStatus === "verified",
+        eligibilityText: s.requirements ?? null,
+      }));
+    } catch {
+      // scholarships table shape differs — omit safely.
+    }
 
     // ---------- Generic money fields (currency-aware, USD fallback) ----------
     const tuitionIsCanonical = uni.annualTuition != null;
@@ -562,7 +679,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
     const university = { ...uni, ...resolvedUsdUniversityCosts(uni) };
 
-    return NextResponse.json({
+    const basePayload = {
       university,
       money,
       universityRequirements,
@@ -570,9 +687,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       applicationCycles: cycles,
       sources: uniSources,
       scholarships: uniScholarships,
-      match,
       campuses: [],
       images: [],
+    };
+    setCachedUniversityDetailBase(uniId, basePayload);
+
+    return NextResponse.json({
+      ...basePayload,
+      match,
     });
   } catch (error) {
     console.error("GET /api/universities/[id] error:", error);

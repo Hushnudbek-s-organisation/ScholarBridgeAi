@@ -30,6 +30,7 @@ import { fitBadgeClass } from "@/lib/fitBadge";
 import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
 import { ScholarshipRequirementPills } from "@/components/ScholarshipRequirementPills";
 import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
+import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
 import type { MatchBreakdown } from "@/lib/matching";
 
 export interface Scholarship {
@@ -204,34 +205,60 @@ export function ScholarshipHub({
   const hasLoadedRef = useRef(false);
 
   const fetchScholarships = async (signal?: AbortSignal) => {
-    if (hasLoadedRef.current) setRefreshing(true);
-    else setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
-      if (selectedCountry !== "All") params.set("country", selectedCountry);
-      if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
-      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-      if (
-        autoFocusScholarship &&
-        debouncedSearch.trim().toLocaleLowerCase() === autoFocusScholarship.title.trim().toLocaleLowerCase()
-      ) {
-        params.set("focusId", String(autoFocusScholarship.id));
-      }
-      params.set("page", page.toString());
-      params.set("perPage", perPage.toString());
+    const params = new URLSearchParams();
+    if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
+    if (selectedCountry !== "All") params.set("country", selectedCountry);
+    if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+    if (
+      autoFocusScholarship &&
+      debouncedSearch.trim().toLocaleLowerCase() === autoFocusScholarship.title.trim().toLocaleLowerCase()
+    ) {
+      params.set("focusId", String(autoFocusScholarship.id));
+    }
+    params.set("page", page.toString());
+    params.set("perPage", perPage.toString());
+    const queryKey = params.toString();
 
-      const res = await fetch(`/api/scholarships?${params.toString()}`, { signal });
+    const cached = getCatalogSwr<{
+      scholarships: Scholarship[];
+      total: number;
+      totalPages: number;
+      page?: number;
+    }>("scholarships", queryKey);
+
+    if (cached) {
+      hasLoadedRef.current = true;
+      setScholarships(cached.data.scholarships);
+      setTotalCount(cached.data.total);
+      setTotalPages(cached.data.totalPages);
+      setLoading(false);
+      setRefreshing(false);
+      if (cached.isFresh) return;
+    } else if (hasLoadedRef.current) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const res = await fetch(`/api/scholarships?${queryKey}`, { signal });
       const data = await res.json();
       hasLoadedRef.current = true;
       if (data.scholarships) {
+        const nextTotal =
+          typeof data.total === "number" ? data.total : data.scholarships.length;
+        const nextTotalPages =
+          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1;
         setScholarships(data.scholarships);
-        setTotalCount(
-          typeof data.total === "number" ? data.total : data.scholarships.length,
-        );
-        setTotalPages(
-          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1,
-        );
+        setTotalCount(nextTotal);
+        setTotalPages(nextTotalPages);
+        setCatalogSwr("scholarships", queryKey, {
+          scholarships: data.scholarships,
+          total: nextTotal,
+          totalPages: nextTotalPages,
+          page: data.page,
+        });
         // The server clamps out-of-range pages - sync so the UI numbering
         // always matches the returned slice.
         if (typeof data.page === "number" && data.page !== page) {
