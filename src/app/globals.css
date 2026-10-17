@@ -963,6 +963,21 @@ html.theme-transition *::after {
 /* The IntersectionObserver publishes the off-screen state as a data attribute
    too, so the rows stop animating while nobody is looking at them. */
 [data-paused="true"] .sb-marquee-track { animation-play-state: paused; }
+
+/* Telegram Mini App (and other) bottom sheets: a short slide-up + fade.
+   Small and purely decorative — reduced motion turns them off. */
+@keyframes sbSheetUp {
+  from { transform: translateY(28px); opacity: 0.35; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes sbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.sb-sheet { animation: sbSheetUp 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sb-sheet, [style*="sbFadeIn"] { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .sb-marquee-track, .sb-jet-plumes { animation: none; }
   .sb-marquee-track { width: max-content; }

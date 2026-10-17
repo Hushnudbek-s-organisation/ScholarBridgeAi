@@ -213,7 +213,14 @@ async function search(ctx: BotCtx, kind: "u" | "s", rawQuery: string, page: numb
   const total = Number(body.total ?? items.length);
   const pages = Math.max(1, Number(body.totalPages ?? 1));
   const current = Math.min(Math.max(1, Number(body.page ?? page)), pages);
-  if (!items.length) return void (await editOrSend(ctx.token, ctx.chatId, messageId, T(ctx).noResults, { kind: "reply" }));
+  if (!items.length) {
+    // Nothing for these words — offer the country shortcuts and the menu so
+    // the next tap is still one tap away.
+    return void (await editOrSend(ctx.token, ctx.chatId, messageId, T(ctx).noResults, { kind: "reply" }, [
+      quickFilterRow(ctx, kind),
+      [{ text: T(ctx).btnMenu, callback_data: "mn:menu" }],
+    ]));
+  }
 
   const t = T(ctx);
   const lines = items.map((it, i) => {
@@ -237,11 +244,33 @@ async function search(ctx: BotCtx, kind: "u" | "s", rawQuery: string, page: numb
   const nav: InlineButton[] = [];
   if (current > 1) nav.push({ text: t.prev, callback_data: `pg:${kind}:${current - 1}` });
   if (current < pages) nav.push({ text: t.next, callback_data: `pg:${kind}:${current + 1}` });
-  const keyboard: InlineButton[][] = [saveRow];
+  const keyboard: InlineButton[][] = [saveRow, quickFilterRow(ctx, kind)];
   if (nav.length) keyboard.push(nav);
   const extra = appButtons(ctx, kind === "u" ? "/universities" : "/scholarships");
-  if (extra.length) keyboard.push(extra);
+  keyboard.push(extra.length ? [{ text: t.btnMenu, callback_data: "mn:menu" }, ...extra] : [{ text: t.btnMenu, callback_data: "mn:menu" }]);
   await editOrSend(ctx.token, ctx.chatId, messageId, `${header}\n\n${lines.join("\n\n")}`, { kind: "reply", profileId: ctx.link!.profileId, preview: "search results" }, keyboard);
+}
+
+/**
+ * One-tap country shortcuts shown under every result message (`qf:<kind>:<c>`).
+ * The words run as an ordinary search for that country — same service, same
+ * pagination and save buttons underneath.
+ */
+function quickFilterRow(ctx: BotCtx, kind: "u" | "s"): InlineButton[] {
+  const countries: { label: string; value: string }[] =
+    kind === "u"
+      ? [
+          { label: "🇺🇸 USA", value: "USA" },
+          { label: "🇬🇧 UK", value: "UK" },
+          { label: "🇩🇪 DE", value: "Germany" },
+          { label: "🇰🇷 KR", value: "South Korea" },
+        ]
+      : [
+          { label: "🇺🇸 USA", value: "USA" },
+          { label: "🇬🇧 UK", value: "UK" },
+          { label: "🇩🇪 DE", value: "Germany" },
+        ];
+  return countries.map((c) => ({ text: c.label, callback_data: `qf:${kind}:${c.value}` }));
 }
 
 // ---- lists -----------------------------------------------------------------
@@ -358,7 +387,24 @@ async function settings(ctx: BotCtx, messageId: number | null) {
 // Callbacks
 // ---------------------------------------------------------------------------
 
-const CALLBACK_RE = /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off)|mn:(universities|scholarships|applications|deadlines|next|saved|advisor|profile|settings|account))$/;
+/**
+ * Callback payloads are compact and validated (≤ 64 bytes, no user text):
+ *   su:<id> / ss:<id>        save university / scholarship
+ *   pg:u:<n> / pg:s:<n>      page n of the last search (query kept in DB)
+ *   sq:u:<n> / sq:s:<n>      same words, other catalogue (search-kind switch)
+ *   qf:<u|s>:<country>       quick country filter on a result message
+ *   qa:1                     ask the AI advisor the last typed question
+ *   lk:y:<id> / lk:n:<id>    link confirmation (see linking.ts)
+ *   ul:y / ul:n              unlink confirmation
+ *   st:n:1|0 / st:r:<p>      notifications on/off, reminder preset
+ *   mn:<command>             main-menu shortcuts over the commands
+ * Anything else ("mn:unlink", "evil:payload", …) is rejected safely.
+ */
+const CALLBACK_RE =
+  /^(?:(su|ss):(\d{1,9})|pg:(u|s):(\d{1,4})|sq:(u|s):(\d{1,4})|qf:(u|s):(USA|UK|Germany|South Korea|Canada)|qa:1|lk:(y|n):(\d{1,12})|ul:(y|n)|st:n:(0|1)|st:r:(standard|short|off)|mn:(universities|scholarships|applications|deadlines|next|saved|advisor|profile|settings|account|menu))$/;
+// Group map (positional — the project targets ES2017, so no named groups):
+//   1 saveKind · 2 saveId · 3 pgKind · 4 pgPage · 5 sqKind · 6 sqPage
+//   7 qfKind · 8 qfCountry · 9 lkYn · 10 lkId · 11 ulYn · 12 stN · 13 stR · 14 mnItem
 
 /** Handle a button press; returns the toast text for answerCallbackQuery. */
 export async function runCallback(ctx: BotCtx, data: string, messageId: number | null): Promise<string> {
@@ -367,7 +413,7 @@ export async function runCallback(ctx: BotCtx, data: string, messageId: number |
   const t = T(ctx);
 
   // Linking works before a link exists.
-  if (m[5]) return handleLinkCallback(m[5] as "y" | "n", Number(m[6]), ctx.from, ctx.chatId, messageId, ctx.lang);
+  if (m[9]) return handleLinkCallback(m[9] as "y" | "n", Number(m[10]), ctx.from, ctx.chatId, messageId, ctx.lang);
   if (!ctx.link) return t.sessionGone;
 
   if (m[1]) {
@@ -382,8 +428,33 @@ export async function runCallback(ctx: BotCtx, data: string, messageId: number |
     await search(ctx, m[3] as "u" | "s", last && last.k === m[3] ? last.q : "", Number(m[4]), messageId);
     return "";
   }
+  if (m[5]) {
+    // "Search the same words in the other catalogue": switch the stored kind
+    // (the query text stays) and run page 1 — pagination then follows.
+    const last = readLastQuery(ctx.link);
+    const q = last?.q ?? "";
+    await db.update(telegramLinks).set({ lastQuery: JSON.stringify({ k: m[5], q }) }).where(eq(telegramLinks.id, ctx.link.id));
+    await search(ctx, m[5] as "u" | "s", q, Number(m[6]), messageId);
+    return "";
+  }
   if (m[7]) {
-    if (m[7] === "n") {
+    // Quick country filter: the country name becomes the query, so the same
+    // result message (saves, pagination, filters) simply re-renders.
+    await db
+      .update(telegramLinks)
+      .set({ lastQuery: JSON.stringify({ k: m[7], q: m[8] }) })
+      .where(eq(telegramLinks.id, ctx.link.id));
+    await search(ctx, m[7] as "u" | "s", m[8] ?? "", 1, messageId);
+    return "";
+  }
+  if (data === "qa:1") {
+    const last = readLastQuery(ctx.link);
+    if (!last?.q) return t.advisorUsage;
+    await advisor(ctx, last.q);
+    return "";
+  }
+  if (m[11]) {
+    if (m[11] === "n") {
       await editOrSend(ctx.token, ctx.chatId, messageId, t.unlinkCancelled, { kind: "reply" });
       return "";
     }
@@ -391,17 +462,40 @@ export async function runCallback(ctx: BotCtx, data: string, messageId: number |
     await editOrSend(ctx.token, ctx.chatId, messageId, BOT_TEXTS[ctx.lang].unlinked, { kind: "reply", preview: "unlinked" });
     return "";
   }
-  if (m[10]) {
+  if (m[14]) {
     // Menu buttons are shortcuts for the commands — same code path, same
     // server-side premium and permission checks.
-    await runCommand(ctx, m[10], "");
+    await runCommand(ctx, m[14], "");
     return "";
   }
-  if (m[8] || m[9]) {
-    const patch = m[8] ? { notifyEnabled: m[8] === "1" } : { reminderDays: JSON.stringify(REMINDER_PRESETS[m[9] as ReminderPreset]) };
+  if (m[12] || m[13]) {
+    const patch = m[12] ? { notifyEnabled: m[12] === "1" } : { reminderDays: JSON.stringify(REMINDER_PRESETS[m[13] as ReminderPreset]) };
     const [row] = await db.update(telegramLinks).set(patch).where(eq(telegramLinks.id, ctx.link.id)).returning();
     if (row) await settings({ ...ctx, link: row }, messageId);
     return t.settingsSaved;
   }
   return t.error;
+}
+
+/**
+ * Plain text from a LINKED user that is a short search phrase (not a
+ * question): store it as the last query and answer with one-tap choices —
+ * search universities, search scholarships, ask the AI advisor, or open the
+ * Mini App. The same words are used by every button below.
+ */
+export async function promptPlainSearch(ctx: BotCtx, rawText: string): Promise<void> {
+  const q = rawText.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!q || !ctx.link) return void (await runCommand(ctx, "help", ""));
+  await db.update(telegramLinks).set({ lastQuery: JSON.stringify({ k: "u", q }) }).where(eq(telegramLinks.id, ctx.link.id));
+  const t = T(ctx);
+  const keyboard: InlineButton[][] = [
+    [
+      { text: t.btnSearchUnis, callback_data: "pg:u:1" },
+      { text: t.btnSearchSchs, callback_data: "sq:s:1" },
+    ],
+    [{ text: t.btnAskAi, callback_data: "qa:1" }],
+  ];
+  const extra = appButtons(ctx);
+  if (extra.length) keyboard.push(extra);
+  await send(ctx, t.plainPrompt(q), keyboard);
 }

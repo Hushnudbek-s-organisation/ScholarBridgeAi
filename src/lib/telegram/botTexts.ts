@@ -19,6 +19,12 @@ type Dict = {
   privateOnly: string;
   btnOpenApp: string;
   btnWebsite: string;
+  /** Plain-text handling: one-tap choices for a typed search term. */
+  plainPrompt: (q: string) => string;
+  btnSearchUnis: string;
+  btnSearchSchs: string;
+  btnAskAi: string;
+  btnMenu: string;
   menu: Record<MenuItem, string>;
   websiteText: string;
   account: (a: { name: string; email: string; plan: string; notify: boolean; since: string }) => string;
@@ -93,6 +99,11 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Ilovani ochish",
     menu: { universities: "🎓 Universitetlar", scholarships: "💰 Grantlar", applications: "📋 Arizalarim", deadlines: "⏰ Muddatlar", next: "✅ Keyingi qadam", saved: "⭐ Saqlanganlar", advisor: "🤖 AI maslahatchi", profile: "👤 Profil", settings: "⚙️ Sozlamalar", account: "💳 Akkaunt" },
     btnWebsite: "🌐 Sayt",
+    plainPrompt: (q) => `🔎 «${escapeHtml(q)}» so'rovi bo'yicha nima qilamiz?`,
+    btnSearchUnis: "🎓 Universitetlardan qidirish",
+    btnSearchSchs: "💰 Grantlardan qidirish",
+    btnAskAi: "🤖 AI maslahatchidan so'rash",
+    btnMenu: "🏠 Menyu",
     websiteText: "ScholarBridge saytining to'liq versiyasi:",
     account: (a) =>
       `👤 <b>${escapeHtml(a.name)}</b>\n${a.email ? `📧 ${escapeHtml(a.email)}\n` : ""}⭐ Tarif: <b>${escapeHtml(a.plan)}</b>\n🔔 Bildirishnomalar: ${a.notify ? "yoqilgan" : "o'chirilgan"}\n🔗 Ulangan: ${escapeHtml(a.since)}`,
@@ -157,6 +168,11 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Открыть приложение",
     menu: { universities: "🎓 Университеты", scholarships: "💰 Стипендии", applications: "📋 Мои заявки", deadlines: "⏰ Дедлайны", next: "✅ Следующий шаг", saved: "⭐ Сохранённое", advisor: "🤖 AI-советник", profile: "👤 Профиль", settings: "⚙️ Настройки", account: "💳 Аккаунт" },
     btnWebsite: "🌐 Сайт",
+    plainPrompt: (q) => `🔎 Что делаем с запросом «${escapeHtml(q)}»?`,
+    btnSearchUnis: "🎓 Искать среди университетов",
+    btnSearchSchs: "💰 Искать среди стипендий",
+    btnAskAi: "🤖 Спросить AI-советника",
+    btnMenu: "🏠 Меню",
     websiteText: "Полная версия ScholarBridge:",
     account: (a) =>
       `👤 <b>${escapeHtml(a.name)}</b>\n${a.email ? `📧 ${escapeHtml(a.email)}\n` : ""}⭐ Тариф: <b>${escapeHtml(a.plan)}</b>\n🔔 Уведомления: ${a.notify ? "включены" : "выключены"}\n🔗 Подключён: ${escapeHtml(a.since)}`,
@@ -221,6 +237,11 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Open app",
     menu: { universities: "🎓 Universities", scholarships: "💰 Scholarships", applications: "📋 My applications", deadlines: "⏰ Deadlines", next: "✅ Next step", saved: "⭐ Saved", advisor: "🤖 AI advisor", profile: "👤 Profile", settings: "⚙️ Settings", account: "💳 Account" },
     btnWebsite: "🌐 Website",
+    plainPrompt: (q) => `🔎 What should I do with «${escapeHtml(q)}»?`,
+    btnSearchUnis: "🎓 Search universities",
+    btnSearchSchs: "💰 Search scholarships",
+    btnAskAi: "🤖 Ask the AI advisor",
+    btnMenu: "🏠 Menu",
     websiteText: "The full ScholarBridge website:",
     account: (a) =>
       `👤 <b>${escapeHtml(a.name)}</b>\n${a.email ? `📧 ${escapeHtml(a.email)}\n` : ""}⭐ Plan: <b>${escapeHtml(a.plan)}</b>\n🔔 Notifications: ${a.notify ? "on" : "off"}\n🔗 Connected: ${escapeHtml(a.since)}`,
