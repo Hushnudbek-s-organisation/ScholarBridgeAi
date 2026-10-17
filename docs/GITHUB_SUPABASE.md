@@ -18,10 +18,12 @@
 | 39018546591 | 2 | Secret bor, lekin `password authentication failed for user "postgres"` (28P01) — pooler uchun username `postgres.<ref>` bo'lishi kerak edi |
 | 39019343675 | 1 | ✅ **Autentifikatsiya o'tdi**, baza o'qildi — 9 ta ustun jonli bazada yo'q (schema drift) |
 | 39019477424 | 1 | Drift ro'yxati to'liq chiqdi (quyida, §1.1) |
+| 39020218458 | 0 | ✅ **PASSED** — ikkala patch qo'llangach, 95 jadval va barcha ustunlar jonli bazada mavjud |
 
-### 1.1 Topilgan drift: 9 ustun jonli bazada yo'q
+### 1.1 Topilgan drift: 9 ustun jonli bazada yo'q edi — **2026-10-17 tuzatildi** ✅
 
-Repo'dagi ikkita **additive** patch qo'llanilmagan:
+Repo'dagi ikkita **additive** patch qo'llanilmagan edi (endi SQL Editor'da ishga tushirilgan,
+run 39020218458 `PASSED`):
 
 | Jadval | Ustun | Patch fayli |
 | --- | --- | --- |
@@ -34,7 +36,7 @@ Repo'dagi ikkita **additive** patch qo'llanilmagan:
 bu so'rovlar `column ... does not exist` bilan xato beradi: Payme lifecycle (bekor qilish/TTL) va
 AI xarajat hisoboti ishlamaydi.
 
-**Tuzatish:** ikkala faylni Supabase → **SQL Editor**da ishga tushiring (ikkalasi ham
+**Tuzatish (bajarildi; keyingi safar ham shu tartib):** ikkala faylni Supabase → **SQL Editor**da ishga tushiring (ikkalasi ham
 `IF NOT EXISTS`, qayta ishga tushirish xavfsiz). `add_payment_provider_lifecycle.sql` boshidagi
 read-only preflight SELECT'lar takroriy qator qaytarsa, avval ularni qo'lda hal qiling — aks holda
 `CREATE UNIQUE INDEX` ma'lumotni buzmasdan **xato berib** to'xtaydi.
