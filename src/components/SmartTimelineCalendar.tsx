@@ -58,6 +58,19 @@ interface DeadlineRow {
   daysRemaining?: number | null;
   testType?: string | null;
   source?: string | null;
+  /** Module 3 — the row belongs to the student's own saved list. */
+  saved?: boolean | null;
+  /** A small, curated suggestion (full-coverage award / high-chance uni). */
+  recommended?: boolean | null;
+  /** Dual scores carried by university rows from the shared engines. */
+  chanceScore?: number | null;
+  effectiveAcceptRatePct?: number | null;
+  matchScore?: number | null;
+  country?: string | null;
+  universityId?: number | null;
+  /** Scholarship rows: does this award pay at a saved university? */
+  coversSavedUni?: boolean | null;
+  isFullCoverage?: boolean | null;
 }
 
 interface SavedUniversityRow {
@@ -69,8 +82,20 @@ const SEVERITY_TONE: Record<TimelineConflict["severity"], string> = {
   warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100",
 };
 
-/** Which deadline kinds the backwards plan is built for. */
-const PLANNED_TYPES = new Set(["application", "scholarship", "visa"]);
+/**
+ * Which deadline kinds the backwards plan is built for. Module 3 adds
+ * "university": saved universities now resolve a REAL date on the API side,
+ * so the backwards plan can start from them too (an application deadline and
+ * a saved-university deadline produce the same lead-time steps).
+ */
+const PLANNED_TYPES = new Set(["application", "scholarship", "visa", "university"]);
+
+/** Recommended rows only earn a card when the shot is genuinely good. */
+const RECOMMENDED_CHANCE_MIN = 65;
+/** A plan older than this is history, not a to-do — counted, not shown. */
+const EXPIRED_PLAN_GRACE_DAYS = 7;
+/** "What to do this week" never lists steps further out than this. */
+const NEXT_UP_HORIZON_DAYS = 120;
 
 export interface SmartTimelineCalendarProps {
   profileId: number;
@@ -88,6 +113,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
   const [error, setError] = React.useState("");
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [showAll, setShowAll] = React.useState(false);
+  const [showAllSteps, setShowAllSteps] = React.useState(false);
   const [syncing, setSyncing] = React.useState<string | null>(null);
   const [synced, setSynced] = React.useState<Record<string, number>>({});
   const [syncError, setSyncError] = React.useState("");
@@ -156,17 +182,33 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
   /* ---- build the timeline ------------------------------------------------ */
   const timeline: SmartTimeline = React.useMemo(() => {
     // An application row's title is "<university> — <program>", so the saved
-    // university's country is attached by prefix match. Without a country the
-    // plan still runs; only the Germany-specific step is skipped, and it says
+    // university's country is attached by prefix match (or, Module 3, read
+    // straight from the row / matched by id). Without a country the plan
+    // still runs; only the Germany-specific step is skipped, and it says
     // that the destination is unknown rather than pretending it is not Germany.
     const countryFor = (row: DeadlineRow): string | null => {
+      if (row.country?.trim()) return row.country.trim();
       const title = row.title?.trim() ?? "";
-      const hit = uniCountries.find((uni) => title === uni.name || title.startsWith(`${uni.name} —`));
+      const hit =
+        (row.universityId != null ? uniCountries.find((uni) => uni.id === row.universityId) : undefined) ??
+        uniCountries.find((uni) => title === uni.name || title.startsWith(`${uni.name} —`));
       return hit?.country ?? null;
     };
 
     const deadlines: TimelineDeadline[] = rows
       .filter((row) => PLANNED_TYPES.has(String(row.type ?? "")))
+      .filter((row) => {
+        // Module 3 — a RECOMMENDED row only joins the plan when it is worth
+        // the student's attention: a high-chance university (≥ 65) or a
+        // full-coverage award that pays at one of their saved universities.
+        // Their own saved rows always pass.
+        if (!row.saved && row.recommended) {
+          const strongChance = typeof row.chanceScore === "number" && row.chanceScore >= RECOMMENDED_CHANCE_MIN;
+          const strongFunding = row.isFullCoverage === true && row.coversSavedUni === true;
+          return strongChance || strongFunding;
+        }
+        return true;
+      })
       .map((row) => ({
         id: row.id ?? null,
         label: row.title?.trim() || t("untitledDeadline"),
@@ -179,7 +221,8 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
               : ("application" as const),
         country: countryFor(row),
         universityId:
-          row.id && row.id.startsWith("uni-") ? Number(row.id.slice(4)) || null : null,
+          row.universityId ??
+          (row.id && row.id.startsWith("uni-") ? Number(row.id.slice(4)) || null : null),
       }));
 
     const tests: TimelineTest[] = rows
@@ -200,11 +243,62 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
     [rows]
   );
 
-  const datedPlans = React.useMemo(
-    () => timeline.plans.filter((plan) => plan.date != null),
-    [timeline.plans]
-  );
-  const visiblePlans = showAll ? datedPlans : datedPlans.slice(0, 3);
+  /** Row metadata by id — the chance/fit badges and saved flags ride here. */
+  const metaById = React.useMemo(() => {
+    const map = new Map<string, DeadlineRow>();
+    for (const row of rows) if (row.id) map.set(row.id, row);
+    return map;
+  }, [rows]);
+
+  const datedPlans = React.useMemo(() => timeline.plans.filter((plan) => plan.date != null), [timeline.plans]);
+
+  /**
+   * Module 3 — the plan cards are a CURATED, ordered view, not the raw feed:
+   *   1. the student's own saved deadlines, best shot first (chance score),
+   *      then nearest date;
+   *   2. curated high-chance / full-coverage suggestions;
+   *   3. everything else with a date.
+   * A plan whose deadline passed more than a week ago is history, not a
+   * to-do: it leaves the cards and only counts in the "hidden" pill.
+   */
+  const prioritizedPlans = React.useMemo(() => {
+    const metaOf = (plan: DeadlinePlan) => (plan.deadline.id ? metaById.get(plan.deadline.id) ?? null : null);
+    const tierOf = (plan: DeadlinePlan): number => {
+      const meta = metaOf(plan);
+      if (meta?.saved) return 0;
+      if (meta?.recommended) return 1;
+      return 2;
+    };
+    const active = datedPlans.filter((plan) => !(plan.daysUntilDeadline != null && plan.daysUntilDeadline < -EXPIRED_PLAN_GRACE_DAYS));
+    const expiredCount = datedPlans.length - active.length;
+    const ordered = [...active].sort((a, b) => {
+      const ta = tierOf(a);
+      const tb = tierOf(b);
+      if (ta !== tb) return ta - tb;
+      const ca = metaOf(a)?.chanceScore ?? -1;
+      const cb = metaOf(b)?.chanceScore ?? -1;
+      if (ca !== cb) return cb - ca;
+      const da = a.date ? Date.parse(a.date) : Number.MAX_SAFE_INTEGER;
+      const db = b.date ? Date.parse(b.date) : Number.MAX_SAFE_INTEGER;
+      if (da !== db) return da - db;
+      return a.deadline.label.localeCompare(b.deadline.label);
+    });
+    return { plans: ordered, expiredCount };
+  }, [datedPlans, metaById]);
+
+  const visiblePlans = showAll ? prioritizedPlans.plans : prioritizedPlans.plans.slice(0, 3);
+
+  /** "This week" list: nearest actionable steps, past-deadline plans and
+   *  anything further out than the horizon are left out until asked. */
+  const nextUpEntries = React.useMemo(() => {
+    const planById = new Map(timeline.plans.map((plan) => [plan.deadline.id, plan]));
+    return timeline.allMilestones.filter((entry) => {
+      const plan = entry.deadlineId ? planById.get(entry.deadlineId) : undefined;
+      if (plan?.daysUntilDeadline != null && plan.daysUntilDeadline < 0) return false;
+      const daysLeft = plan?.daysUntilDeadline != null ? plan.daysUntilDeadline - entry.milestone.offsetDays : null;
+      return daysLeft == null || daysLeft <= NEXT_UP_HORIZON_DAYS;
+    });
+  }, [timeline]);
 
   /* ---- sync one plan into /api/tasks ------------------------------------- */
   const syncPlan = async (plan: DeadlinePlan) => {
@@ -354,9 +448,10 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
             </p>
           )}
 
-          <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-2">
             {visiblePlans.map((plan) => {
               const key = plan.deadline.id ?? plan.deadline.label;
+              const meta = plan.deadline.id ? metaById.get(plan.deadline.id) ?? null : null;
               const open = expanded.has(key);
               const applicable = plan.milestones.filter((milestone) => milestone.applies);
               const skipped = plan.milestones.filter((milestone) => !milestone.applies);
@@ -389,6 +484,26 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                         )}
                         {plan.deadline.country && (
                           <span className="text-slate-500">{plan.deadline.country}</span>
+                        )}
+                        {/* Module 3 — the chance half of the dual score,
+                            straight from the positioning engine via the API
+                            row (never recomputed here); fit rides in the
+                            tooltip. Suggestions are labelled as such. */}
+                        {typeof meta?.chanceScore === "number" && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-extrabold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
+                            title={typeof meta.matchScore === "number" ? t("planFitBadge", { score: meta.matchScore }) : undefined}
+                          >
+                            🎯 {t("planChanceBadge", { score: meta.chanceScore })}
+                            {typeof meta.effectiveAcceptRatePct === "number" && (
+                              <span className="font-bold opacity-80">· {t("planAdmitBadge", { rate: meta.effectiveAcceptRatePct })}</span>
+                            )}
+                          </span>
+                        )}
+                        {!meta?.saved && meta?.recommended && (
+                          <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+                            {t("recommendedTag")}
+                          </span>
                         )}
                       </p>
                       {plan.overdue.length > 0 && (
@@ -491,23 +606,33 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
             })}
           </div>
 
-          {datedPlans.length > visiblePlans.length && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="mt-2 flex min-h-11 items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline"
-            >
-              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-              {t("showAllPlans", { count: datedPlans.length - visiblePlans.length })}
-            </button>
-          )}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+            {prioritizedPlans.plans.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                aria-expanded={showAll}
+                className="flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-indigo-300"
+              >
+                {showAll ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+                {showAll
+                  ? t("showLessPlans")
+                  : t("showAllPlans", { count: prioritizedPlans.plans.length - visiblePlans.length })}
+              </button>
+            )}
+            {prioritizedPlans.expiredCount > 0 && (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+                {t("expiredPlans", { count: prioritizedPlans.expiredCount })}
+              </span>
+            )}
+          </div>
 
           {/* ---- the flat, nearest-first list: what to do this week ---- */}
-          {timeline.allMilestones.length > 0 && (
+          {nextUpEntries.length > 0 && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("nextUpTitle")}</p>
               <ul className="mt-2 space-y-1">
-                {timeline.allMilestones.slice(0, 6).map((entry, index) => (
+                {(showAllSteps ? nextUpEntries : nextUpEntries.slice(0, 4)).map((entry, index) => (
                   <li key={`${entry.deadlineId ?? entry.deadlineLabel}-${entry.milestone.id}-${index}`} className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
                     <span className="font-extrabold text-slate-800">{formatDate(entry.milestone.dueDate)}</span>
                     <span className="min-w-0 break-words font-semibold text-slate-700 whitespace-normal">
@@ -523,6 +648,17 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                   </li>
                 ))}
               </ul>
+              {nextUpEntries.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllSteps((v) => !v)}
+                  aria-expanded={showAllSteps}
+                  className="mt-1.5 flex min-h-11 items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                >
+                  {showAllSteps ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+                  {showAllSteps ? t("showLessSteps") : t("showMoreSteps", { count: nextUpEntries.length - 4 })}
+                </button>
+              )}
               {onNavigateTab && (
                 <button
                   type="button"

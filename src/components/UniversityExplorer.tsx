@@ -91,6 +91,15 @@ export interface University {
   /** Unclamped total before the display clamp (one decimal). */
   matchRawScore?: number | null;
   /**
+   * Module 4 — the positioning half of the dual score from the QS Top 200 /
+   * 5-layer programme engine. `null` for signed-out visitors: there is no
+   * profile to place into an admitted cohort, and the UI never shows a fake.
+   */
+  chanceScore?: number | null;
+  effectiveAcceptRatePct?: number | null;
+  selectivityCategory?: string | null;
+  studentGpaPercentile?: number | null;
+  /**
    * The exact arithmetic behind the score: the unrounded total, one component
    * per scoring dimension (2-dp points), and how many dimensions had data.
    * Null for anonymous visitors (there is no profile to compare against).
@@ -744,6 +753,9 @@ export function UniversityExplorer({
               <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
               <option value="tuition_desc">{t("exSortTuitionDesc")}</option>
               <option value="name_asc">{t("exSortNameAsc")}</option>
+              {/* Module 4 — position first: my chances inside the admitted
+                  cohort, fit score as the tie-break (server-side sort). */}
+              <option value="chance_desc">{t("exSortChanceDesc")}</option>
             </select>
           </div>
 
@@ -1014,6 +1026,22 @@ export function UniversityExplorer({
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
+                    {/* Module 4 — the second, independent number: how my
+                        profile sits inside this department's admitted cohort
+                        (positioning engine), with the programme's effective
+                        acceptance rate as context. Rendered only when the
+                        API actually computed one. */}
+                    {typeof uni.chanceScore === "number" && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-lg bg-violet-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md"
+                        title={uni.selectivityCategory ?? undefined}
+                      >
+                        🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
+                        {typeof uni.effectiveAcceptRatePct === "number" && (
+                          <span className="opacity-85">({uni.effectiveAcceptRatePct}%)</span>
+                        )}
+                      </span>
+                    )}
                     {uni.matchBreakdown && (
                       <MatchEvidenceBadge
                         comparedDimensions={uni.matchBreakdown.comparedDimensions}

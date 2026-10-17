@@ -14,8 +14,10 @@ import {
   COUNTRY_COST_BENCHMARKS,
   CURRENCY_RATES_TO_USD,
   calculateCompleteCosts,
+  resolveCompleteCostInputs,
   resolveMultiCurrencyScholarshipAmount,
 } from "@/lib/countryCostBenchmarks";
+import { countriesMatch } from "@/lib/countries";
 import { calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
@@ -24,6 +26,29 @@ function parseOptionalNumber(raw: string | null): number | null {
   if (raw == null || !raw.trim()) return null;
   const num = Number(raw);
   return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
+/** Awards not tied to one destination apply everywhere their rules allow. */
+const GLOBAL_AWARD_COUNTRY_RE = /^(global|international|all|worldwide|multiple countries)$/i;
+
+/** Same vocabulary the cost engine itself uses for what an award pays. */
+function coversOf(s: typeof scholarships.$inferSelect): "tuition" | "living" | "both" | "other" {
+  return /full/i.test(s.coverageType || "")
+    ? "both"
+    : /tuition/i.test(s.coverageType || "")
+      ? "tuition"
+      : /stipend|living/i.test(s.coverageType || "")
+        ? "living"
+        : "other";
+}
+
+/** Annual figure for DISPLAY only (month→×12, semester→×2, rest as published). */
+function annualizeForDisplay(amountUsd: number | null, awardPeriod: string | null | undefined): number | null {
+  if (amountUsd == null) return null;
+  const p = (awardPeriod ?? "").trim().toLowerCase();
+  if (/month/.test(p)) return Math.round(amountUsd * 12);
+  if (/semester|term/.test(p)) return Math.round(amountUsd * 2);
+  return Math.round(amountUsd);
 }
 
 /**
@@ -87,27 +112,7 @@ export async function GET(req: Request) {
         ? await db.select().from(scholarships).where(inArray(scholarships.id, savedSch.map((s) => s.scholarshipId)))
         : [];
 
-    // --- Scholarships the student has actually saved ------------------------
-    const scholarshipInputs: ScholarshipInput[] = schRows.map((s) => {
-      const resolvedAward = resolveMultiCurrencyScholarshipAmount(s);
-      return {
-        name: s.title,
-        amountUsd: resolvedAward.amountUsd,
-        awardPeriod: s.awardPeriod || "year",
-        covers: /full/i.test(s.coverageType || "")
-          ? "both"
-          : /tuition/i.test(s.coverageType || "")
-            ? "tuition"
-            : /stipend|living/i.test(s.coverageType || "")
-              ? "living"
-              : "other",
-        deadlineDays: s.deadlineDate
-          ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
-          : null,
-      };
-    });
-
-    // --- Cost calculator ----------------------------------------------------
+    // --- Cost calculator: resolve the TARGET first ---------------------------
     const allKnownUnis = [...uniRows];
     for (const c of catalogRows) {
       if (!allKnownUnis.some((u) => u.id === c.id)) {
@@ -127,18 +132,163 @@ export async function GET(req: Request) {
     // unless resolved through country benchmarks or explicit query parameters.
     const baseUnset = { years: null, familyContributionUsd: null };
 
-    const { costs, resolved } = calculateCompleteCosts({
+    const costOptions = {
       university: target,
       countryOverride: countryParam ?? target?.country ?? null,
       degreeLevel: degreeLevelParam ?? target?.degreeLevel ?? profile.degreeLevel ?? null,
       yearsOverride: yearsOverride ?? baseUnset.years,
       familyContributionUsd: familyContributionOverride ?? baseUnset.familyContributionUsd,
-      scholarships: scholarshipInputs,
       overrides: customOverrides,
+    };
+
+    // Module 5 — pass 1 resolves the country benchmark and the annual
+    // tuition WITHOUT any awards: those two figures decide which scholarships
+    // are meaningful for THIS university (a Korean grant cannot pay a German
+    // bill, and a "full tuition" award is worth exactly the tuition line).
+    const preResolved = resolveCompleteCostInputs({ ...costOptions, scholarships: [] });
+    const activeTargetCountry =
+      (countryParam ?? target?.country ?? preResolved.benchmarkSource.country ?? "").trim() || null;
+    const targetAnnualTuitionUsd = preResolved.inputs.annualTuitionUsd ?? null;
+    const targetAnnualLivingUsd = preResolved.inputs.annualLivingEstUsd ?? null;
+
+    /**
+     * Effective ANNUAL USD value of one award for this university:
+     *  • "full" awards top up to the tuition line when the catalogue amount is
+     *    missing or smaller (plus the living line when the award funds both);
+     *  • everything else keeps its published (annualised) figure — an award
+     *    with no amount contributes nothing to the deduction rather than $0 fudge.
+     */
+    function awardAnnualUsd(s: typeof scholarships.$inferSelect): { annual: number | null; isFullTuition: boolean } {
+      const resolvedAward = resolveMultiCurrencyScholarshipAmount(s);
+      const isFullTuition =
+        /\bfull\b/i.test(s.coverageType ?? "") || /\bfull\b/i.test(s.tuitionCoverage ?? "");
+      const base = annualizeForDisplay(resolvedAward.amountUsd, s.awardPeriod);
+      if (isFullTuition && targetAnnualTuitionUsd != null && targetAnnualTuitionUsd > 0) {
+        let full = Math.max(base ?? 0, targetAnnualTuitionUsd);
+        const fundsLiving = /both|full[\s-]*ride|full\s+fund|living|stipend|room|board/i.test(
+          `${s.coverageType ?? ""} ${s.tuitionCoverage ?? ""}`
+        );
+        if (coversOf(s) === "both" || (fundsLiving && targetAnnualLivingUsd != null)) {
+          full += targetAnnualLivingUsd ?? 0;
+        }
+        return { annual: full, isFullTuition };
+      }
+      return { annual: base, isFullTuition };
+    }
+
+    function matchesTargetCountry(s: typeof scholarships.$inferSelect): boolean {
+      if (activeTargetCountry && countriesMatch(s.country, activeTargetCountry)) return true;
+      if (GLOBAL_AWARD_COUNTRY_RE.test((s.country ?? "").trim())) return true;
+      const name = (target?.name ?? "").trim().toLowerCase();
+      return !!name && (s.title ?? "").toLowerCase().includes(name);
+    }
+
+    // Candidate pool: everything the student saved, plus the best active
+    // awards published for this destination (or global ones) they have not
+    // saved yet — surfaced so "what if I won THIS grant?" is one click.
+    const savedIds = new Set(schRows.map((s) => s.id));
+    let suggestedRows: typeof scholarships.$inferSelect[] = [];
+    try {
+      const activeRows = await db.select().from(scholarships).where(eq(scholarships.isActive, true));
+      suggestedRows = activeRows
+        .filter((s) => !savedIds.has(s.id) && matchesTargetCountry(s))
+        .map((s) => ({ s, a: awardAnnualUsd(s) }))
+        .sort((x, y) => {
+          // Full-coverage first, then the bigger annual value, then id.
+          if (y.a.isFullTuition !== x.a.isFullTuition) return Number(y.a.isFullTuition) - Number(x.a.isFullTuition);
+          return (y.a.annual ?? -1) - (x.a.annual ?? -1) || x.s.id - y.s.id;
+        })
+        .slice(0, 12)
+        .map((x) => x.s);
+    } catch {
+      suggestedRows = [];
+    }
+
+    type Candidate = {
+      id: number;
+      title: string;
+      provider: string;
+      country: string;
+      coverageType: string;
+      covers: "tuition" | "living" | "both" | "other";
+      effectiveAnnualUsd: number | null;
+      awardPeriod: string | null;
+      deadlineDate: string | null;
+      saved: boolean;
+      matchesTargetCountry: boolean;
+    };
+    const candidates: Candidate[] = [...schRows, ...suggestedRows].map((s) => {
+      const a = awardAnnualUsd(s);
+      return {
+        id: s.id,
+        title: s.title,
+        provider: s.provider,
+        country: s.country,
+        coverageType: s.coverageType,
+        covers: coversOf(s),
+        effectiveAnnualUsd: a.annual,
+        awardPeriod: s.awardPeriod ?? null,
+        deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
+        saved: savedIds.has(s.id),
+        matchesTargetCountry: savedIds.has(s.id) ? matchesTargetCountry(s) : true,
+      };
+    });
+
+    // Which awards actually deduct from the cost:
+    //  • `?scholarshipIds=` present → exactly those ids (empty = no awards),
+    //    letting the student check/uncheck rows in the calculator;
+    //  • absent (initial load) → every SAVED award that applies to this
+    //    country, so a Korean grant no longer silently "pays" a German bill.
+    const explicitSelection = searchParams.has("scholarshipIds");
+    const selectedIds = new Set(
+      explicitSelection
+        ? (searchParams.get("scholarshipIds") ?? "")
+            .split(",")
+            .map((x) => Number.parseInt(x.trim(), 10))
+            .filter((n) => Number.isFinite(n))
+        : candidates.filter((c) => c.saved && c.matchesTargetCountry).map((c) => c.id)
+    );
+
+    const rowById = new Map([...schRows, ...suggestedRows].map((s) => [s.id, s]));
+    const scholarshipInputs: ScholarshipInput[] = candidates
+      .filter((c) => selectedIds.has(c.id))
+      .map((c) => {
+        const s = rowById.get(c.id)!;
+        const resolvedAward = resolveMultiCurrencyScholarshipAmount(s);
+        return {
+          name: c.title,
+          // `effectiveAnnualUsd` is already an ANNUAL USD figure (including the
+          // full-tuition top-up); telling the engine the period is "year"
+          // prevents a second annualisation. Without a computable figure the
+          // published amount + period pass through untouched.
+          amountUsd: c.effectiveAnnualUsd ?? resolvedAward.amountUsd,
+          awardPeriod: c.effectiveAnnualUsd != null ? "year" : s.awardPeriod || "year",
+          covers: c.covers,
+          deadlineDays: s.deadlineDate
+            ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
+            : null,
+        };
+      });
+
+    const { costs, resolved } = calculateCompleteCosts({
+      ...costOptions,
+      scholarships: scholarshipInputs,
     });
 
     const matchProfile = await toMatchProfileWithActivities(profile);
-    const portfolio = assessPortfolio({ scholarships: scholarshipInputs });
+    // The portfolio tab keeps its honest contract: it grades EVERY saved
+    // award (that is the student's portfolio, not the selected subset).
+    const portfolio = assessPortfolio({
+      scholarships: schRows.map((s) => ({
+        name: s.title,
+        amountUsd: resolveMultiCurrencyScholarshipAmount(s).amountUsd,
+        awardPeriod: s.awardPeriod || "year",
+        covers: coversOf(s),
+        deadlineDays: s.deadlineDate
+          ? Math.round((new Date(s.deadlineDate).getTime() - Date.now()) / 86400000)
+          : null,
+      })),
+    });
 
     // --- CV ------------------------------------------------------------------
     const cvDraft = buildCv({
@@ -236,6 +386,12 @@ export async function GET(req: Request) {
     return NextResponse.json({
       costs,
       portfolio,
+      // Module 5 — the interactive award selector: saved awards for this
+      // country (checked by default), suggested awards for this country
+      // (unchecked), and saved awards for OTHER countries (shown muted so
+      // the student understands why they are not deducted here).
+      activeTargetCountry,
+      availableScholarships: candidates.map((c) => ({ ...c, selected: selectedIds.has(c.id) })),
       costTarget: target
         ? { id: target.id, name: target.name, country: target.country }
         : { id: 0, name: `${resolved.benchmarkSource.country} Official Benchmark`, country: resolved.benchmarkSource.country },

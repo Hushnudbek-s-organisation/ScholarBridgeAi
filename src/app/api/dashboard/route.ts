@@ -36,6 +36,11 @@ import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
 import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal } from "@/lib/journey/funding";
 import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import {
+  coverageTier,
+  evaluateScholarshipForSavedUnis,
+  type SavedUniRef,
+} from "@/lib/savedUniCoverage";
 import { gpaTo40Scale } from "@/lib/gpa";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
@@ -590,6 +595,21 @@ async function recommendedFor(
     ).map((s) => s.universityId)
   );
 
+  // Module 1 — which saved universities a scholarship would actually pay for.
+  // The full rows (name + country + resolved annual tuition) drive the
+  // coverage rules in `savedUniCoverage`; the ranking below puts awards that
+  // fully cover THIS student's saved list in front of everything else.
+  const savedUniRows =
+    savedIds.size > 0
+      ? await db.select().from(universities).where(inArray(universities.id, [...savedIds]))
+      : [];
+  const savedUniRefs: SavedUniRef[] = savedUniRows.map((u) => ({
+    id: u.id,
+    name: u.name,
+    country: u.country,
+    annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
+  }));
+
   /**
    * One row per candidate university: the fit (catalogue match) AND the
    * positioning score from the QS Top 200 / program engine. Both are kept:
@@ -722,10 +742,27 @@ async function recommendedFor(
       seenScholarships.add(key);
       return true;
     })
-    .map((s) => ({ row: s, match: calculateScholarshipMatch(matchProfile, s) }))
-    .sort((a, b) => b.match.matchScore - a.match.matchScore)
+    .map((s) => ({
+      row: s,
+      match: calculateScholarshipMatch(matchProfile, s),
+      // Coverage of the student's SAVED universities (shared rules with the
+      // Scholarship Hub and the deadlines feed — one source of truth).
+      cov: evaluateScholarshipForSavedUnis(
+        { ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) },
+        savedUniRefs
+      ),
+    }))
+    // Four tiers, then fit score: full coverage AT a saved university always
+    // leads; then other awards that apply at a saved university; then general
+    // full-coverage awards; only inside a tier does the engine's fit score decide.
+    .sort(
+      (a, b) =>
+        coverageTier(b.cov) - coverageTier(a.cov) ||
+        b.match.matchScore - a.match.matchScore ||
+        a.row.id - b.row.id
+    )
     .slice(0, 6)
-    .map(({ row: s, match }) => ({
+    .map(({ row: s, match, cov }) => ({
       id: s.id,
       title: s.title,
       provider: s.provider,
@@ -751,6 +788,10 @@ async function recommendedFor(
       gpaProvided: gpa != null,
       /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */
       countryEligibility: scholarshipCountryVerdict(s.eligibleCountries, applicantCountry),
+      /** Saved-university coverage (Module 1): which rows this award pays for. */
+      coveredUniversities: cov.coveredUniNames,
+      coversSavedUni: cov.coversSavedUni,
+      isFullForSavedUni: cov.isFullForSavedUni,
     }));
 
   // Opportunities: level + field are profile facts, so use them. A row whose

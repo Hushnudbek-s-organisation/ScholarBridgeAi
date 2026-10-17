@@ -81,6 +81,17 @@ interface UniversityDetailData {
     issues: string[];
     breakdown: MatchBreakdown;
   } | null;
+  /**
+   * Module 4 — the positioning half of the dual score (admission chance
+   * inside the department's admitted cohort). Null when signed out; the
+   * UI never paints a score that the API did not compute.
+   */
+  chance?: {
+    score: number;
+    effectiveAcceptRatePct: number;
+    selectivityCategory: string;
+    studentGpaPercentile: number | null;
+  } | null;
 }
 
 interface ProgramData {
@@ -216,6 +227,7 @@ interface UniversityDetailPayload {
   scholarships?: ScholarshipData[];
   sources?: SourceData[];
   match?: UniversityDetailData["match"] | null;
+  chance?: UniversityDetailData["chance"] | null;
 }
 
 /** Spec §19: verified vs unavailable. NULL is never shown as a value. */
@@ -297,6 +309,7 @@ export function UniversityDetail({
   const [scholarships, setScholarships] = useState<ScholarshipData[]>([]);
   const [sources, setSources] = useState<SourceData[]>([]);
   const [match, setMatch] = useState<UniversityDetailData["match"]>(null);
+  const [chance, setChance] = useState<UniversityDetailData["chance"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Presentation-only UI state (no fetch/API changes)
@@ -330,6 +343,7 @@ export function UniversityDetail({
     setScholarships(data.scholarships || []);
     setSources(data.sources || []);
     setMatch(data.match ?? null);
+    setChance(data.chance ?? null);
   }, []);
 
   /**
@@ -585,6 +599,25 @@ export function UniversityDetail({
                     evidenceCoveragePct={match.breakdown.evidenceCoveragePct}
                     evidenceLevel={match.breakdown.evidenceLevel}
                   />
+                </div>
+              )}
+              {/* Module 4 — the second, INDEPENDENT number beside fit: how this
+                  profile sits inside the department's admitted cohort (5-layer
+                  positioning engine), with the programme's effective acceptance
+                  rate as context. Shown only when the API computed one. */}
+              {typeof chance?.score === "number" && (
+                <div className="mt-3">
+                  <span
+                    className="inline-flex flex-wrap items-center gap-1.5 rounded-xl bg-violet-500/20 backdrop-blur-md border border-violet-300/30 px-3 py-1.5 text-xs font-bold"
+                    title={chance.selectivityCategory || undefined}
+                  >
+                    🎯 {t("chanceBadgeLabel", { score: chance.score })}
+                    {typeof chance.effectiveAcceptRatePct === "number" && (
+                      <span className="font-semibold opacity-90">
+                        · {t("chanceAdmitRate", { rate: chance.effectiveAcceptRatePct })}
+                      </span>
+                    )}
+                  </span>
                 </div>
               )}
               <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">

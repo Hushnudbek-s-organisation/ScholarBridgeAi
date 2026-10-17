@@ -302,6 +302,171 @@ function scrollToId(id: string) {
 }
 
 /**
+ * PhotoCraft-style editorial index marker (`02 / CAMPUSES`): a monospace
+ * station number between two architectural hairlines, above each section's
+ * localized eyebrow. Decoration with a real reading order — it says where the
+ * student is on the page, nothing more.
+ */
+function SectionIndex({
+  n,
+  label,
+  onDark = false,
+}: {
+  n: string;
+  label: string;
+  onDark?: boolean;
+}) {
+  return (
+    <div
+      className={`mb-3 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] ${
+        onDark ? "text-indigo-300" : "text-indigo-600 dark:text-indigo-400"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`h-px w-6 ${onDark ? "bg-white/20" : "bg-slate-200 dark:bg-slate-800"}`}
+      />
+      <span>
+        {n} / {label}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`h-px w-6 ${onDark ? "bg-white/20" : "bg-slate-200 dark:bg-slate-800"}`}
+      />
+    </div>
+  );
+}
+
+/**
+ * The right-edge precision ruler ("lineyka"). Fixed to the viewport, it draws
+ * the six landing stations as major ticks on a graduated millimetre scale —
+ * 4 minor ticks + a half tick between every station. Clicking a station
+ * smooth-scrolls to the section; the sliding vernier cursor (line + live
+ * `00%`–`100%` readout) tracks scroll progress the same zero-React way the
+ * jet does: passive listener → damped number → direct DOM writes in one rAF.
+ */
+function LandingPrecisionRuler() {
+  const t = useTranslations("landing");
+  const trackRef = React.useRef<HTMLDivElement | null>(null);
+  const cursorRef = React.useRef<HTMLDivElement | null>(null);
+  const readoutRef = React.useRef<HTMLSpanElement | null>(null);
+
+  const stations = [
+    { id: "top", n: "01", labelKey: "secOverview" },
+    { id: "campuses", n: "02", labelKey: "secCampuses" },
+    { id: "how", n: "03", labelKey: "secHow" },
+    { id: "features", n: "04", labelKey: "secCapabilities" },
+    { id: "chancing", n: "05", labelKey: "secChancing" },
+    { id: "roadmap", n: "06", labelKey: "secRoadmap" },
+  ] as const;
+
+  React.useEffect(() => {
+    let raf = 0;
+    let target = 0;
+    let smooth = 0;
+    const readout = () => {
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      return Math.max(0, Math.min(1, window.scrollY / max));
+    };
+    const paint = () => {
+      const track = trackRef.current;
+      if (track) {
+        cursorRef.current?.style.setProperty(
+          "transform",
+          `translate3d(0, ${(smooth * (track.clientHeight - 2)).toFixed(2)}px, 0)`,
+        );
+      }
+      if (readoutRef.current) {
+        readoutRef.current.textContent = `${String(Math.round(smooth * 100)).padStart(2, "0")}%`;
+      }
+    };
+    const tick = () => {
+      raf = 0;
+      const delta = target - smooth;
+      if (Math.abs(delta) > 0.0005) {
+        smooth += delta * 0.18;
+        paint();
+        raf = requestAnimationFrame(tick);
+      } else if (smooth !== target) {
+        smooth = target;
+        paint();
+      }
+    };
+    const onScroll = () => {
+      target = readout();
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    target = readout();
+    smooth = target;
+    paint();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  return (
+    <nav
+      aria-label={t("rulerLabel")}
+      className="print:hidden fixed right-0 top-16 bottom-0 z-30 hidden w-11 select-none flex-col justify-center border-l border-slate-200/80 bg-[#f8fafc]/85 py-6 backdrop-blur-md md:flex dark:border-slate-800/60 dark:bg-[#090e1a]/85"
+    >
+      <div ref={trackRef} className="relative flex h-full flex-col items-end justify-between pr-1.5">
+        {stations.map((station, index) => (
+          <div key={station.id} className="flex flex-col items-end">
+            {index > 0 && (
+              // Graduated millimetres between two stations: four minor ticks,
+              // a longer half tick, four more minors.
+              <span aria-hidden="true" className="flex flex-col items-end gap-[7px] pb-[7px]">
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-3 bg-slate-400 dark:bg-slate-600" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => scrollToId(station.id)}
+              title={t(station.labelKey)}
+              aria-label={`${station.n} · ${t(station.labelKey)}`}
+              className="group flex min-h-11 items-center gap-1 rounded-md px-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500"
+            >
+              <span className="font-mono text-[10px] font-black text-slate-500 dark:text-slate-400">
+                {station.n}
+              </span>
+              <span
+                aria-hidden="true"
+                className="h-[1.5px] w-4 rounded-full bg-slate-400 transition-colors group-hover:bg-indigo-500 group-focus-visible:bg-indigo-500 dark:bg-slate-600 dark:group-hover:bg-indigo-400 dark:group-focus-visible:bg-indigo-400"
+              />
+            </button>
+          </div>
+        ))}
+        {/* The vernier cursor: one hairline + a live percentage, translated
+            along the track by the rAF loop above — never re-rendered. */}
+        <div
+          ref={cursorRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 top-0 flex items-center gap-1 will-change-transform"
+          style={{ transform: "translate3d(0, 0, 0)" }}
+        >
+          <span className="font-mono text-[9px] font-black tabular-nums text-indigo-600 dark:text-indigo-400">
+            <span ref={readoutRef}>00%</span>
+          </span>
+          <span className="h-[2px] w-7 rounded-full bg-indigo-500/90" />
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+/**
  * Localized marketing landing page (en / uz / ru).
  *
  * Design adapted from the reference layout: header with anchor nav, hero with
@@ -480,6 +645,7 @@ export function LandingPage({
   return (
     <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-[#090e1a] dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
       <ScrollFlightPath />
+      <LandingPrecisionRuler />
 
       {/* ===== Header ===== */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-[#f8fafc]/90 backdrop-blur-xl dark:border-slate-800 dark:bg-[#090e1a]/90">
@@ -619,6 +785,9 @@ export function LandingPage({
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8">
             <motion.div initial="hidden" animate="visible" variants={heroGroup}>
+              <div>
+                <SectionIndex n="01" label={t("secOverview")} />
+              </div>
               <motion.span
                 variants={heroItem}
                 className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
@@ -885,6 +1054,7 @@ export function LandingPage({
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
+              <SectionIndex n="03" label={t("secHow")} />
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("howEyebrow")}
               </div>
@@ -935,6 +1105,7 @@ export function LandingPage({
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
+              <SectionIndex n="04" label={t("secCapabilities")} onDark />
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">
                 {t("featEyebrow")}
               </div>
@@ -973,6 +1144,7 @@ export function LandingPage({
         >
           <div className="mx-auto grid w-[min(1180px,94%)] items-center gap-7 lg:grid-cols-2">
             <Reveal>
+              <SectionIndex n="05" label={t("secChancing")} />
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("chanceEyebrow")}
               </div>
@@ -1053,6 +1225,7 @@ export function LandingPage({
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
+              <SectionIndex n="06" label={t("secRoadmap")} />
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("roadEyebrow")}
               </div>
@@ -1107,7 +1280,7 @@ export function LandingPage({
         </section>
 
         {/* ===== CTA ===== */}
-        <section className="py-8 sm:py-10">
+        <section id="cta" className="scroll-mt-20 py-8 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)]">
             <Reveal>
               <div className="relative overflow-hidden rounded-[26px] border border-indigo-900/20 bg-gradient-to-br from-[#161b38] via-[#20205a] to-[#29235b] px-6 py-10 text-center text-white dark:border-indigo-500/20 dark:from-[#0c1324] dark:via-[#171b47] dark:to-[#241d50] sm:px-14 sm:py-12">
@@ -1164,8 +1337,15 @@ export function LandingPage({
     </div>
   );
 }
+/**
+ * The jet's route: a wide, graceful, STRICTLY monotonic-Y S-curve from the
+ * hero (y=100) to the CTA (y=3320). The previous path had backwards Y-loops
+ * (…720 1410, 720 1280… and …550 2970, 540 2840…) — with a scroll-driven
+ * camera each loop made the whole overlay lurch twice. Monotonic Y means the
+ * camera only ever moves one way: scroll and flight can never fight.
+ */
 const FLIGHT_PATH_D =
-  "M 600 120 C 980 240, 1040 420, 760 560 C 480 700, 180 680, 220 880 C 260 1080, 920 1040, 950 1240 C 975 1380, 720 1410, 720 1280 C 720 1150, 980 1180, 880 1420 C 760 1680, 200 1660, 240 1940 C 280 2220, 980 2180, 920 2460 C 870 2660, 340 2620, 320 2820 C 305 2950, 550 2970, 540 2840 C 530 2710, 290 2750, 380 2990 C 460 3180, 880 3200, 600 3320";
+  "M 600 100 C 960 240, 1020 460, 720 640 C 400 820, 180 1000, 260 1220 C 340 1440, 920 1560, 940 1800 C 960 2040, 300 2180, 260 2420 C 220 2660, 880 2800, 860 3040 C 840 3200, 680 3260, 600 3320";
 
 /** The jet is intentionally all greyscale; site accents never bleed into the flight overlay. */
 function ExecutiveMonochromeJet({
@@ -1289,6 +1469,20 @@ function ExecutiveMonochromeJet({
 }
 
 function ScrollFlightPath() {
+  /**
+   * Module 6 — zero-lag scroll flight:
+   *  1. NO React state on scroll: the listener writes a number, a single
+   *     rAF loop lerps toward it and pokes the DOM directly (transform
+   *     attributes + one stroke-dashoffset), so the main thread never
+   *     re-renders the landing tree while scrolling;
+   *  2. GEOMETRY PRE-SAMPLED ONCE: 600 path points (position + tangent) go
+   *     into a Float64 lookup table at mount. `getPointAtLength()` — the old
+   *     four-calls-per-frame cost — is never touched again; every frame is
+   *     O(1) linear interpolation between two adjacent samples;
+   *  3. DAMPED SPRING (`smooth += (target - smooth) * 0.15`): notched
+   *     mouse-wheel jumps glide, trackpad flicks decelerate, and the loop
+   *     parks itself the instant the jet is on target — no idle rAF burn.
+   */
   const pathRef = React.useRef<SVGPathElement | null>(null);
   const cameraGroupRef = React.useRef<SVGGElement | null>(null);
   const jetGroupRef = React.useRef<SVGGElement | null>(null);
@@ -1296,64 +1490,71 @@ function ScrollFlightPath() {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
+    const path = pathRef.current;
+    if (!path) return;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    let raf = 0;
-    let cachedTotalLen = 4200;
-    let cachedMaxScroll = 1;
-    let cachedScaleX = 1;
-    let cachedScaleY = 1;
 
-    const refreshMetrics = () => {
-      const path = pathRef.current;
-      if (path) {
-        cachedTotalLen = path.getTotalLength() || 4200;
-        path.setAttribute("stroke-dasharray", `${cachedTotalLen} ${cachedTotalLen}`);
+    const LUT_STEPS = 600;
+    // [x, y, dx, dy] per sample — typed array, allocation-free per frame.
+    let lut = new Float64Array((LUT_STEPS + 1) * 4);
+    let totalLen = 4200;
+
+    const sampleLut = () => {
+      totalLen = path.getTotalLength() || 4200;
+      path.setAttribute("stroke-dasharray", `${totalLen} ${totalLen}`);
+      const step = totalLen / LUT_STEPS;
+      let prev = path.getPointAtLength(0);
+      for (let i = 0; i <= LUT_STEPS; i++) {
+        const p = i === 0 ? prev : path.getPointAtLength(i * step);
+        const q = i === 0 ? path.getPointAtLength(step) : p;
+        const dx = i === 0 ? q.x - prev.x : p.x - prev.x;
+        const dy = i === 0 ? q.y - prev.y : p.y - prev.y;
+        lut[i * 4] = p.x;
+        lut[i * 4 + 1] = p.y;
+        lut[i * 4 + 2] = dx || 0.0001;
+        lut[i * 4 + 3] = dy;
+        prev = p;
       }
-      cachedMaxScroll = Math.max(
-        1,
-        document.documentElement.scrollHeight - window.innerHeight,
-      );
-      cachedScaleX = Math.max(0.01, window.innerWidth / 1200);
-      cachedScaleY = Math.max(0.01, window.innerHeight / 1000);
     };
 
-    const updateFlight = () => {
-      const path = pathRef.current;
-      if (!path) return;
-      const totalLen = cachedTotalLen;
-      const progress = Math.max(0, Math.min(1, window.scrollY / cachedMaxScroll));
-      const dist = progress * totalLen;
-      const delta = Math.min(12, totalLen * 0.003);
-      const pt = path.getPointAtLength(dist);
-      const prev = path.getPointAtLength(Math.max(0, dist - delta));
-      const next = path.getPointAtLength(Math.min(totalLen, dist + delta));
-      const angle =
-        (Math.atan2(next.y - prev.y, next.x - prev.x) * 180) / Math.PI;
-      const prev2 = path.getPointAtLength(Math.max(0, dist - delta * 2.5));
-      const anglePrev =
-        (Math.atan2(pt.y - prev2.y, pt.x - prev2.x) * 180) / Math.PI;
-      // Normalize angular difference at the -180/180 seam to prevent a bank spike.
-      const turn = ((angle - anglePrev + 540) % 360) - 180;
-      const bankDeg = Math.max(-24, Math.min(24, turn * 1.8));
-      const linearY = 120 + progress * 3200;
-      // SVG uses a 1000-unit viewport: the camera keeps the aircraft in its
-      // 46–50% vertical band, even when the path loops backwards in world Y.
-      const loopOffset = Math.max(-20, Math.min(20, (pt.y - linearY) * 0.35));
-      const cameraY = 480 + loopOffset - pt.y;
-      // Counter the non-uniform viewport projection so the jet keeps its
-      // proportions on narrow phones while its route spans the full width.
-      const scaleX = cachedScaleX;
-      const scaleY = cachedScaleY;
-      const screenAngle =
-        (Math.atan2((next.y - prev.y) * scaleY, (next.x - prev.x) * scaleX) *
-          180) /
-        Math.PI;
+    const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
 
-      cameraGroupRef.current?.setAttribute("transform", `translate(0 ${cameraY})`);
-      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - progress)));
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+    const apply = () => {
+      const f = smoothProgress * LUT_STEPS;
+      const i0 = Math.min(LUT_STEPS, Math.floor(f));
+      const i1 = Math.min(LUT_STEPS, i0 + 1);
+      const w = f - i0;
+      const x = lerp(lut[i0 * 4], lut[i1 * 4], w);
+      const y = lerp(lut[i0 * 4 + 1], lut[i1 * 4 + 1], w);
+      const dx = lerp(lut[i0 * 4 + 2], lut[i1 * 4 + 2], w);
+      const dy = lerp(lut[i0 * 4 + 3], lut[i1 * 4 + 3], w);
+      // Bank from how sharply the TANGENT turned over the last ~8 samples —
+      // LUT arithmetic, no extra geometry queries.
+      const iBack = Math.max(0, i0 - 8);
+      const bdx = lut[i0 * 4 + 2] - lut[iBack * 4 + 2];
+      const bdy = lut[i0 * 4 + 3] - lut[iBack * 4 + 3];
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const turn =
+        bdx !== 0 || bdy !== 0
+          ? (((angle - (Math.atan2(bdy, bdx) * 180) / Math.PI) + 540) % 360) - 180
+          : 0;
+      const bankDeg = clamp(turn * 1.8, -24, 24);
+
+      // Counter the non-uniform viewport projection so the jet keeps its
+      // proportions on narrow phones while the route spans the full width.
+      const scaleX = Math.max(0.01, window.innerWidth / 1200);
+      const scaleY = Math.max(0.01, window.innerHeight / 1000);
+      const screenAngle = (Math.atan2(dy * scaleY, dx * scaleX) * 180) / Math.PI;
+
+      // The path is strictly monotonic in Y, so a plain "keep the jet at 48%
+      // of the viewport" camera can never fight a backwards loop again.
+      cameraGroupRef.current?.setAttribute("transform", `translate(0 ${480 - y})`);
+      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - smoothProgress)));
       jetGroupRef.current?.setAttribute(
         "transform",
-        `translate(${pt.x} ${pt.y}) scale(${1 / scaleX} ${1 / scaleY}) rotate(${screenAngle})`,
+        `translate(${x} ${y}) scale(${1 / scaleX} ${1 / scaleY}) rotate(${screenAngle})`,
       );
       shadowGroupRef.current?.setAttribute(
         "transform",
@@ -1361,28 +1562,54 @@ function ScrollFlightPath() {
       );
     };
 
-    const scheduleScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        updateFlight();
-      });
+    let targetProgress = 0;
+    let smoothProgress = 0;
+    let raf = 0;
+
+    const readTarget = () => {
+      const max = Math.max(
+        1,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      return clamp(window.scrollY / max, 0, 1);
+    };
+
+    const tick = () => {
+      raf = 0;
+      const delta = targetProgress - smoothProgress;
+      if (Math.abs(delta) > 0.00015) {
+        smoothProgress += delta * 0.15;
+        apply();
+        raf = requestAnimationFrame(tick);
+      } else if (smoothProgress !== targetProgress) {
+        smoothProgress = targetProgress;
+        apply();
+      }
+    };
+
+    const schedule = () => {
+      targetProgress = readTarget();
+      if (!raf) raf = requestAnimationFrame(tick);
     };
 
     const handleResize = () => {
-      refreshMetrics();
-      scheduleScroll();
+      sampleLut();
+      targetProgress = readTarget();
+      smoothProgress = targetProgress;
+      apply();
     };
 
-    refreshMetrics();
-    updateFlight();
+    sampleLut();
+    targetProgress = readTarget();
+    smoothProgress = targetProgress;
+    apply();
     if (!reducedMotion) {
-      window.addEventListener("scroll", scheduleScroll, { passive: true });
+      window.addEventListener("scroll", schedule, { passive: true });
     }
     window.addEventListener("resize", handleResize, { passive: true });
     return () => {
       if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", scheduleScroll);
+      window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", handleResize);
     };
   }, []);
@@ -1409,7 +1636,7 @@ function ScrollFlightPath() {
             <stop offset="50%" stopColor="#f4f4f5" />
             <stop offset="100%" stopColor="#d4d4d8" />
           </linearGradient>
-          <linearGradient id="jetWingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id="jetWingGrad" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#fff" />
             <stop offset="65%" stopColor="#e4e4e7" />
             <stop offset="100%" stopColor="#a1a1aa" />
@@ -1420,7 +1647,7 @@ function ScrollFlightPath() {
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <g ref={cameraGroupRef} transform="translate(0 360)">
+        <g ref={cameraGroupRef} transform="translate(0 380)" style={{ willChange: "transform" }}>
           <path
             d={FLIGHT_PATH_D}
             fill="none"
@@ -1443,7 +1670,8 @@ function ScrollFlightPath() {
           />
           <g
             ref={jetGroupRef}
-            transform="translate(600 120) scale(1 1) rotate(22)"
+            transform="translate(600 100) scale(1 1) rotate(22)"
+            style={{ willChange: "transform" }}
           >
             <ExecutiveMonochromeJet bankDeg={0} shadowGroupRef={shadowGroupRef} />
           </g>
@@ -1454,6 +1682,7 @@ function ScrollFlightPath() {
 }
 
 function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
+  const tIndex = useTranslations("landing");
   const sectionRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
@@ -1532,12 +1761,13 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
   return (
     <section
       ref={sectionRef}
-      id="university-marquee"
+      id="campuses"
       aria-labelledby="university-marquee-title"
       data-paused="false"
       className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-[#0b1222] sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">
+        <SectionIndex n="02" label={tIndex("secCampuses")} />
         <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
           QS Top 200 · 24 ta Top Universitet Kampusi · 3 Qator
         </span>

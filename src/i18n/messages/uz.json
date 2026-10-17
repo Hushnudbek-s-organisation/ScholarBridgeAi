@@ -789,7 +789,14 @@
     "mockChipPubs": "0 maqola",
     "chanceBadge": "Moslik — ehtimol emas",
     "chanceDataBasis": "Namuna ma’lumotlari asosi",
-    "chanceDataPublished": "Katalog maydonlari namunasi"
+    "chanceDataPublished": "Katalog maydonlari namunasi",
+    "secOverview": "UMUMIY KO'RINISH",
+    "secCampuses": "KAMPUSLAR",
+    "secHow": "QANDAY ISHLAYDI",
+    "secCapabilities": "IMKONIYATLAR",
+    "secChancing": "HALOL BAHOLASH",
+    "secRoadmap": "YO'L XARITASI",
+    "rulerLabel": "Bo'limlar chizg'ichi"
   },
   "profileReport": {
     "title": "Profil va dastur solishtiruvi · ichki loyiha",
@@ -2172,7 +2179,9 @@
     "ccEstimatedCostNote": "Ayrim xarajatlar taxminiy. Bu summaga tayanishdan oldin taxminlarni va universitetning amaldagi rasmiy xarajatlarini tekshiring.",
     "dvNewDocLinksToApplication": "Bu yerda yaratilgan yangi hujjatlar tanlangan arizaga bog‘lanadi.",
     "dvLinkToApplication": "Arizaga bog‘lash",
-    "dvUnlinkFromApplication": "Arizadan uzish"
+    "dvUnlinkFromApplication": "Arizadan uzish",
+    "ccCoversUniFull": "🎯 100% to'liq grant: {unis}",
+    "ccCoversUni": "✓ Amaliy: {unis}"
   },
   "autopilot": {
     "title": "Stipendiya avtopiloti",
@@ -3609,7 +3618,10 @@
     "exFindScholarships": "💰 Mos grantlarni topish",
     "exManageApplications": "📋 Arizalarni boshqarish",
     "exBoosterGain": "📈 IELTS/GPA farqini yopish ushbu bahoda {points} ballgacha tiklaydi",
-    "exCardDetails": "Ball tafsiloti va talablar"
+    "exCardDetails": "Ball tafsiloti va talablar",
+    "exSortChanceDesc": "🎯 Saralash: Eng yuqori kirish imkoniyati",
+    "chanceBadgeLabel": "Kirish imkoniyati: {score}%",
+    "chanceAdmitRate": "Qabul: {rate}%"
   },
   "recommend": {
     "title": "Dasturlar tanlovi",
@@ -4202,7 +4214,9 @@
     "shortlistBanner": "{count} ta stipendiya saqlandi",
     "findUniversities": "🎓 Mos universitetlarni topish",
     "manageApplications": "📋 Arizalarni boshqarish",
-    "cardDetails": "Talablar va ball tafsiloti"
+    "cardDetails": "Talablar va ball tafsiloti",
+    "coversSavedFull": "🎯 {unis} — 100% to'liq qoplaydi",
+    "coversSaved": "✓ {unis} uchun amal qiladi"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",
@@ -5964,7 +5978,15 @@
       "sop_draft": "SOP va insho qoralamalarini tugatish — {deadline}",
       "bank_statement": "Bank ma'lumotnomasini olish — {deadline}",
       "final_buffer": "Arizani yuborish — {deadline}"
-    }
+    },
+    "showLessPlans": "Kamroq ko'rsatish",
+    "showMoreSteps": "Yana {count} ta qadam",
+    "showLessSteps": "Kamroq qadam",
+    "expiredPlans": "Muddati o'tgan {count} ta reja yashirilgan",
+    "planChanceBadge": "Kirish imkoniyati: {score}%",
+    "planAdmitBadge": "qabul {rate}%",
+    "planFitBadge": "Moslik: {score}%",
+    "recommendedTag": "Tavsiya"
   },
   "apostille": {
     "title": "e-Apostil va bank ma'lumotnomasi tayyorligi",

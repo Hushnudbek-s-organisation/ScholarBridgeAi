@@ -74,6 +74,10 @@ export interface Scholarship {
   computedStatus?: string;
   statusLabel?: string;
   expectedLabel?: string | null;
+  // Saved-university coverage (Module 1) — present on personalised payloads.
+  coveredUniversities?: string[];
+  coversSavedUni?: boolean;
+  isFullForSavedUni?: boolean;
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   sourceLastVerifiedAt?: string | null;
@@ -633,6 +637,21 @@ export function ScholarshipHub({
                     </div>
                   )}
                 </div>
+
+                {/* Module 1 — this award applies to a university in the
+                    student's saved list; 100%-full coverage is called out
+                    with the exact names from the catalogue, never invented. */}
+                {(s.coveredUniversities?.length ?? 0) > 0 && (
+                  <p>
+                    <span className="inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      <span className="min-w-0 break-words">
+                        {s.isFullForSavedUni
+                          ? t("coversSavedFull", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })
+                          : t("coversSaved", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })}
+                      </span>
+                    </span>
+                  </p>
+                )}
 
                 {/* Key Details Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">

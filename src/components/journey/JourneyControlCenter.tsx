@@ -157,6 +157,11 @@ export interface JourneyDashboard {
       matchBreakdown?: MatchBreakdown;
       /** What we can honestly say about the citizenship rule. */
       countryEligibility: "open-to-all" | "citizenship-match" | "unknown";
+      /** Module 1 — which SAVED universities this award pays for. Absent on
+       *  legacy/cold payloads, so every reader must tolerate `undefined`. */
+      coveredUniversities?: string[];
+      coversSavedUni?: boolean;
+      isFullForSavedUni?: boolean;
     }[];
     opportunities: {
       id: number;
@@ -364,6 +369,20 @@ export function RecommendedPanel({
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecSchols ? recommended.scholarships : recommended.scholarships.slice(0, 3)).map((s) => (
                 <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  {/* Module 1 — this award applies to a university the student
+                      SAVED, and 100%-full ones lead the list. The names come
+                      straight from the coverage rules; nothing is claimed. */}
+                  {(s.coveredUniversities?.length ?? 0) > 0 && (
+                    <p className="mb-1.5">
+                      <span className="inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        <span className="min-w-0 break-words">
+                          {s.isFullForSavedUni
+                            ? t("ccCoversUniFull", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })
+                            : t("ccCoversUni", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })}
+                        </span>
+                      </span>
+                    </p>
+                  )}
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
                   <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
                   <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">

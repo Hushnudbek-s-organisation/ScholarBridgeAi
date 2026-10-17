@@ -789,7 +789,14 @@
     "mockChipPubs": "0 Pubs",
     "chanceBadge": "Fit — not a probability",
     "chanceDataBasis": "Example data basis",
-    "chanceDataPublished": "Sample catalogue fields"
+    "chanceDataPublished": "Sample catalogue fields",
+    "secOverview": "OVERVIEW",
+    "secCampuses": "CAMPUSES",
+    "secHow": "HOW IT WORKS",
+    "secCapabilities": "CAPABILITIES",
+    "secChancing": "HONEST CHANCING",
+    "secRoadmap": "ROADMAP",
+    "rulerLabel": "Landing sections ruler"
   },
   "profileReport": {
     "title": "Profile and programme review · built-in draft",
@@ -2172,7 +2179,9 @@
     "ccEstimatedCostNote": "Some cost lines are estimates. Review the assumptions and the university’s current official costs before relying on this figure.",
     "dvNewDocLinksToApplication": "New documents created here will be linked to the selected application.",
     "dvLinkToApplication": "Link to application",
-    "dvUnlinkFromApplication": "Unlink from application"
+    "dvUnlinkFromApplication": "Unlink from application",
+    "ccCoversUniFull": "🎯 100% Full Grant for: {unis}",
+    "ccCoversUni": "✓ Applies to: {unis}"
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -3609,7 +3618,10 @@
     "exFindScholarships": "💰 Find matching scholarships",
     "exManageApplications": "📋 Manage applications",
     "exBoosterGain": "📈 Closing the IELTS/GPA gap recovers up to {points} points on this score",
-    "exCardDetails": "Score breakdown & details"
+    "exCardDetails": "Score breakdown & details",
+    "exSortChanceDesc": "🎯 Sort: Highest Admission Chance",
+    "chanceBadgeLabel": "Chance: {score}%",
+    "chanceAdmitRate": "Admission rate {rate}%"
   },
   "recommend": {
     "title": "Program Recommender",
@@ -4202,7 +4214,9 @@
     "shortlistBanner": "{count} scholarships shortlisted",
     "findUniversities": "🎓 Find matching universities",
     "manageApplications": "📋 Manage applications",
-    "cardDetails": "Requirements & score breakdown"
+    "cardDetails": "Requirements & score breakdown",
+    "coversSavedFull": "🎯 Covers {unis} — 100% full",
+    "coversSaved": "✓ Applies to {unis}"
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",
@@ -5964,7 +5978,15 @@
       "sop_draft": "Finish the SOP and essay drafts — {deadline}",
       "bank_statement": "Issue the bank statement — {deadline}",
       "final_buffer": "Submit the application — {deadline}"
-    }
+    },
+    "showLessPlans": "Show less",
+    "showMoreSteps": "Show {count} more steps",
+    "showLessSteps": "Show fewer steps",
+    "expiredPlans": "{count} past-deadline plan(s) hidden",
+    "planChanceBadge": "Chance: {score}%",
+    "planAdmitBadge": "admit {rate}%",
+    "planFitBadge": "Fit score: {score}%",
+    "recommendedTag": "Suggested"
   },
   "apostille": {
     "title": "e-Apostille & Bank-Statement Readiness",

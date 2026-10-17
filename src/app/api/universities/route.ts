@@ -10,6 +10,8 @@ import { countriesMatch } from "@/lib/countries";
 import { expandMultilingualSearchTerms, localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
+import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 
 /**
  * University discovery API (spec §16).
@@ -43,6 +45,8 @@ export async function GET(req: Request) {
     // activity portfolio and every financial flag.
     let profileData = null;
     let matchProfile = null;
+    /** Same student read through the 5-layer positioning engine (chance). */
+    let chancingProfile = null;
     if (profileIdStr) {
       const pId = parseInt(profileIdStr, 10);
       // Personalised matching reads private profile data (GPA, scores,
@@ -56,6 +60,7 @@ export async function GET(req: Request) {
         if (cached) {
           profileData = cached.profileData;
           matchProfile = cached.matchProfile;
+          chancingProfile = cached.chancingProfile;
         }
       }
     }
@@ -187,10 +192,37 @@ export async function GET(req: Request) {
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
+      // Module 4 — dual scoring. `matchScore` answers "does this fit my
+      // profile?" (shared match engine, unchanged); `chanceScore` answers
+      // "how well does my profile sit inside this department's admitted
+      // cohort?" (QS Top 200 + 5-layer program engine). Same synthetic
+      // programme row the dashboard uses, so the two screens can never
+      // disagree — and both stay NULL for signed-out visitors.
+      let chance: ReturnType<typeof evaluateUniversityAndProgramChance> | null = null;
+      if (chancingProfile) {
+        chance = evaluateUniversityAndProgramChance(
+          chancingProfile,
+          uni,
+          {
+            id: uni.id,
+            universityId: uni.id,
+            name: profileData?.targetMajor || uni.programMajor || "General Studies",
+            degreeLevel: profileData?.degreeLevel || uni.degreeLevel || "Bachelor",
+            field: profileData?.targetMajor || uni.programMajor || null,
+          },
+          { minGpa: uni.minGpa, minIelts: uni.minIelts, minSat: uni.minSat },
+          [],
+          matchQsUniversityBenchmark(uni)
+        );
+      }
       return {
         ...uni,
         programFields: progFields,
         matchScore: matchInfo.matchScore,
+        chanceScore: chance ? chance.compositeProgramFitScore : null,
+        effectiveAcceptRatePct: chance ? chance.effectiveProgramAcceptRatePct : null,
+        selectivityCategory: chance ? chance.selectivityCategory : null,
+        studentGpaPercentile: chance ? chance.studentGpaPercentile : null,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         // The exact arithmetic behind the score (two-decimal points per
@@ -221,6 +253,15 @@ export async function GET(req: Request) {
       });
     } else if (sort === "name_asc") {
       results.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "chance_desc" && profileData) {
+      // Admission chance first (QS/programme positioning engine), fit score
+      // as tie-break. Signed-out callers have no chance scores at all, so
+      // they fall through to the default ranking instead of an empty sort.
+      results.sort(
+        (a, b) =>
+          (b.chanceScore ?? -1) - (a.chanceScore ?? -1) ||
+          (b.matchScore ?? -1) - (a.matchScore ?? -1)
+      );
     } else if (profileData) {
       // NULL match scores sort last (no profile data -> never ranked by score).
       results.sort((a, b) => {

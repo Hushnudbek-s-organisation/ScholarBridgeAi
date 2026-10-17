@@ -275,19 +275,21 @@ export function HubPage({
         animatedContent
       )}
 
-      {/* The standing disclaimer stays honest but gets quiet: a single-line
-          muted footnote at the END of the page, not a full banner box stacked
-          above the explorer (three of these used to stack on one screen). */}
+      {/* The standing disclaimer stays honest but gets quiet: a compact
+          11px footnote BELOW the section content (it used to be a banner
+          stacked above the explorer — three of these on one screen). */}
       {note && (
-        <p
-          className={`flex items-start gap-1.5 border-t border-slate-200/60 px-1 pt-3 text-xs text-slate-500 dark:border-slate-800/60 dark:text-slate-400 ${
-            note.tone === "warn" ? "font-semibold text-amber-700 dark:text-amber-300" : ""
+        <div
+          className={`mt-6 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${
+            note.tone === "warn"
+              ? "border-amber-200/70 bg-amber-50/60 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-300"
+              : "border-slate-200/70 bg-slate-50/70 text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
           }`}
           role="note"
         >
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span className="min-w-0 break-words">{note.text}</span>
-        </p>
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+          <p className="min-w-0 break-words">{note.text}</p>
+        </div>
       )}
     </div>
   );

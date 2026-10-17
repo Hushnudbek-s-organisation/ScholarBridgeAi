@@ -125,10 +125,28 @@ interface ResolvedInputs {
   familyContributionUsd: number | null;
 }
 
+/** Module 5 — one row of the interactive award selector. */
+interface AvailableScholarship {
+  id: number;
+  title: string;
+  provider: string;
+  country: string;
+  coverageType: string;
+  covers: "tuition" | "living" | "both" | "other";
+  effectiveAnnualUsd: number | null;
+  awardPeriod: string | null;
+  deadlineDate: string | null;
+  saved: boolean;
+  matchesTargetCountry: boolean;
+  selected: boolean;
+}
+
 interface PlanningData {
   costs: CostBreakdown;
   portfolio: Portfolio;
   costTarget: { id: number; name: string; country: string } | null;
+  activeTargetCountry?: string | null;
+  availableScholarships?: AvailableScholarship[];
   universities: { id: number; name: string; country: string }[];
   catalogUniversities?: { id: number; name: string; country: string }[];
   countries?: string[];
@@ -193,12 +211,35 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
   const [familyContributionUsd, setFamilyContributionUsd] = useState<string>("");
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customAmounts, setCustomAmounts] = useState<CustomOverridesState>(EMPTY_OVERRIDES);
+  /**
+   * Module 5 — which awards deduct from the cost. `null` means "let the
+   * server auto-select the saved awards that apply to the chosen country";
+   * any explicit tick/uncheck switches to an exact id list. Changing the
+   * university or country resets back to `null` so the new destination gets
+   * its own honest default instead of last term's checklist.
+   */
+  const [selectedScholarshipIds, setSelectedScholarshipIds] = useState<number[] | null>(null);
+  const [savingScholarshipId, setSavingScholarshipId] = useState<number | null>(null);
+  // Bumped when an award is saved from the selector — refetches the plan so
+  // the newly saved row lands in "Your saved awards" (server is the truth).
+  const [savedAwardNonce, setSavedAwardNonce] = useState(0);
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("cost");
   const [copied, setCopied] = useState(false);
 
   const overridesQueryKey = JSON.stringify(customAmounts);
-  const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}:${countryOverride}:${degreeLevel}:${yearsOverride}:${familyContributionUsd}:${overridesQueryKey}`;
+  // Target identity changes → drop the manual award checklist (back to the
+  // server's country-appropriate auto-selection). Render-phase state
+  // adjustment, the pattern this file already uses for `page`.
+  const targetKey = `${universityId ?? "auto"}|${countryOverride}`;
+  const [prevTargetKey, setPrevTargetKey] = useState(targetKey);
+  if (targetKey !== prevTargetKey) {
+    setPrevTargetKey(targetKey);
+    setSelectedScholarshipIds(null);
+  }
+  const selectionKey =
+    selectedScholarshipIds === null ? "auto" : selectedScholarshipIds.join(",") || "none";
+  const requestKey = `${profileId ?? "none"}:${universityId ?? "default"}:${countryOverride}:${degreeLevel}:${yearsOverride}:${familyContributionUsd}:${overridesQueryKey}:${selectionKey}:${savedAwardNonce}`;
   const data = result?.requestKey === requestKey ? result.data : result?.data ?? null;
   const error = errorResult?.requestKey === requestKey ? errorResult.message : "";
   const loading = profileId !== null && result === null && error === "";
@@ -219,6 +260,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
     if (customAmounts.flightsUsd.trim() !== "") params.set("flightsUsd", customAmounts.flightsUsd.trim());
     if (customAmounts.visaUsd.trim() !== "") params.set("visaUsd", customAmounts.visaUsd.trim());
     if (customAmounts.appFeeUsd.trim() !== "") params.set("appFeeUsd", customAmounts.appFeeUsd.trim());
+    // Module 5 — an explicit checklist ("" = apply NOTHING) overrides the
+    // server default of "every saved award that fits this country".
+    if (selectedScholarshipIds !== null) params.set("scholarshipIds", selectedScholarshipIds.join(","));
 
     void (async () => {
       try {
@@ -248,6 +292,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
     yearsOverride,
     familyContributionUsd,
     customAmounts,
+    selectedScholarshipIds,
+    savedAwardNonce,
   ]);
 
   if (!activeProfile) {
@@ -280,6 +326,38 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
     setCustomAmounts(EMPTY_OVERRIDES);
     setYearsOverride("");
     setFamilyContributionUsd("");
+  };
+
+  /**
+   * Tick/uncheck an award in the cost calculator. The FIRST click leaves the
+   * auto-selected server state and pins an exact list (the same list with one
+   * row flipped), so the toggle is reversible and reproducible in the URL.
+   */
+  const toggleAppliedScholarship = (id: number) => {
+    const rows = data?.availableScholarships ?? [];
+    const current = selectedScholarshipIds ?? rows.filter((r) => r.selected).map((r) => r.id);
+    setSelectedScholarshipIds(
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    );
+  };
+
+  /** "What if I win this grant?" → also keep it: save it to the plan. */
+  const saveAwardForPlan = async (id: number) => {
+    if (!activeProfile || savingScholarshipId != null) return;
+    setSavingScholarshipId(id);
+    try {
+      await fetch("/api/saved-scholarships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: activeProfile.id, scholarshipId: id }),
+      });
+      // The saved-universities/scholarships lists live in HomeClient; the
+      // planning refetch (nonce) is enough to move the row into "Your saved
+      // awards" here without a cross-component event bus.
+      setSavedAwardNonce((n) => n + 1);
+    } finally {
+      setSavingScholarshipId(null);
+    }
   };
 
   const compareIds = data?.universities.slice(0, 6) ?? [];
@@ -625,6 +703,99 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   <span className="text-xs font-bold text-slate-600">{money(data.costs.totalUsd)}</span>
                 </div>
               </div>
+
+              {/* Module 5 — which awards pay THIS bill. Saved awards for the
+                  selected university's country (and global ones) are checked
+                  by default and can be toggled live; full-tuition rows show
+                  the effective annual value against this university's own
+                  tuition line. Saved awards for other destinations stay
+                  listed but muted — a Korean grant cannot deduct from a
+                  German invoice, and now the student can see exactly that. */}
+              {(data.availableScholarships?.length ?? 0) > 0 &&
+                (() => {
+                  const rows = data.availableScholarships ?? [];
+                  const applicable = rows.filter((r) => r.saved && r.matchesTargetCountry);
+                  const suggested = rows.filter((r) => !r.saved);
+                  const elsewhere = rows.filter((r) => r.saved && !r.matchesTargetCountry);
+                  const targetName = data.costTarget?.name || data.activeTargetCountry || "this university";
+                  const awardRow = (r: AvailableScholarship) => (
+                    <li key={r.id} className="flex flex-wrap items-start gap-2 border-t border-slate-100 py-2 first:border-t-0">
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={r.selected}
+                          onChange={() => toggleAppliedScholarship(r.id)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                          aria-label={`Apply ${r.title} to this plan`}
+                        />
+                        <span className="min-w-0 break-words">
+                          <span className="block text-xs font-bold text-slate-800">
+                            {r.title}
+                            {/full/i.test(r.coverageType) && (
+                              <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                                full coverage
+                              </span>
+                            )}
+                          </span>
+                          <span className="block text-[11px] text-slate-500">
+                            {r.provider} · {r.country}
+                            {r.deadlineDate ? ` · deadline ${r.deadlineDate}` : ""}
+                          </span>
+                        </span>
+                      </label>
+                      <span className="shrink-0 text-xs font-extrabold text-emerald-700">
+                        {r.effectiveAnnualUsd != null
+                          ? `$${r.effectiveAnnualUsd.toLocaleString("en-US")}/yr`
+                          : "amount not published"}
+                      </span>
+                      {!r.saved && (
+                        <button
+                          type="button"
+                          onClick={() => void saveAwardForPlan(r.id)}
+                          disabled={savingScholarshipId === r.id}
+                          className="shrink-0 rounded-md border border-indigo-200 bg-white px-2 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                        >
+                          {savingScholarshipId === r.id ? "saving…" : "Save"}
+                        </button>
+                      )}
+                    </li>
+                  );
+                  return (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Scholarships applied to {targetName}
+                        <span className="ml-2 text-[11px] font-semibold text-slate-400">
+                          {data.activeTargetCountry ? `for ${data.activeTargetCountry} awards` : ""}
+                        </span>
+                      </h3>
+                      {applicable.length > 0 && (
+                        <ul className="mt-2">{applicable.map(awardRow)}</ul>
+                      )}
+                      {applicable.length === 0 && (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          No saved award applies to {data.activeTargetCountry ?? "this destination"} yet — pick one below,
+                          or save it from the Scholarship hub first.
+                        </p>
+                      )}
+                      {suggested.length > 0 && (
+                        <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
+                          <summary className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[11px] font-bold text-indigo-700">
+                            Recommended for {data.activeTargetCountry ?? "this country"} ({suggested.length}) — tick to simulate
+                          </summary>
+                          <ul className="pb-2">{suggested.map(awardRow)}</ul>
+                        </details>
+                      )}
+                      {elsewhere.length > 0 && (
+                        <details className="mt-2 rounded-xl bg-slate-50 px-3 py-1.5">
+                          <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-[11px] font-medium text-slate-500 hover:underline">
+                            Other saved scholarships not applicable to {data.activeTargetCountry ?? "this country"} ({elsewhere.length})
+                          </summary>
+                          <ul className="pb-2 opacity-70">{elsewhere.map(awardRow)}</ul>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })()}
 
               {data.benchmarkSource && (
                 <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">

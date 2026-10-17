@@ -789,7 +789,14 @@
     "mockChipPubs": "0 публикаций",
     "chanceBadge": "Соответствие — не вероятность",
     "chanceDataBasis": "Основа примера",
-    "chanceDataPublished": "Пример полей каталога"
+    "chanceDataPublished": "Пример полей каталога",
+    "secOverview": "ОБЗОР",
+    "secCampuses": "КАМПУСЫ",
+    "secHow": "КАК ЭТО РАБОТАЕТ",
+    "secCapabilities": "ВОЗМОЖНОСТИ",
+    "secChancing": "ЧЕСТНАЯ ОЦЕНКА",
+    "secRoadmap": "ДОРОЖНАЯ КАРТА",
+    "rulerLabel": "Линейка разделов"
   },
   "profileReport": {
     "title": "Сравнение профиля и программ · встроенный черновик",
@@ -2172,7 +2179,9 @@
     "ccEstimatedCostNote": "Часть расходов указана приблизительно. Перед использованием суммы проверьте предположения и актуальные официальные расходы университета.",
     "dvNewDocLinksToApplication": "Новые документы будут связаны с выбранной заявкой.",
     "dvLinkToApplication": "Связать с заявкой",
-    "dvUnlinkFromApplication": "Отвязать от заявки"
+    "dvUnlinkFromApplication": "Отвязать от заявки",
+    "ccCoversUniFull": "🎯 100% полное финансирование: {unis}",
+    "ccCoversUni": "✓ Применимо к: {unis}"
   },
   "autopilot": {
     "title": "Автопилот стипендий",
@@ -3609,7 +3618,10 @@
     "exFindScholarships": "💰 Найти подходящие гранты",
     "exManageApplications": "📋 Управлять заявками",
     "exBoosterGain": "📈 Закрытие разрыва IELTS/GPA вернёт до {points} баллов к этой оценке",
-    "exCardDetails": "Детали балла и требования"
+    "exCardDetails": "Детали балла и требования",
+    "exSortChanceDesc": "🎯 Сортировка: Наивысший шанс поступления",
+    "chanceBadgeLabel": "Шанс: {score}%",
+    "chanceAdmitRate": "Приём: {rate}%"
   },
   "recommend": {
     "title": "Подбор программ",
@@ -4202,7 +4214,9 @@
     "shortlistBanner": "{count} стипендий в шорт-листе",
     "findUniversities": "🎓 Найти подходящие университеты",
     "manageApplications": "📋 Управлять заявками",
-    "cardDetails": "Требования и детали балла"
+    "cardDetails": "Требования и детали балла",
+    "coversSavedFull": "🎯 Покрывает {unis} на 100%",
+    "coversSaved": "✓ Применимо к {unis}"
   },
   "chancing": {
     "signIn": "Войдите, чтобы увидеть оценки соответствия профиля.",
@@ -5964,7 +5978,15 @@
       "sop_draft": "Закончить черновики письма и эссе — {deadline}",
       "bank_statement": "Получить банковскую выписку — {deadline}",
       "final_buffer": "Отправить заявку — {deadline}"
-    }
+    },
+    "showLessPlans": "Свернуть",
+    "showMoreSteps": "Показать ещё {count} шагов",
+    "showLessSteps": "Свернуть шаги",
+    "expiredPlans": "Скрыто просроченных планов: {count}",
+    "planChanceBadge": "Шанс: {score}%",
+    "planAdmitBadge": "приём {rate}%",
+    "planFitBadge": "Оценка соответствия: {score}%",
+    "recommendedTag": "Рекомендация"
   },
   "apostille": {
     "title": "Готовность: e-апостиль и банковская выписка",

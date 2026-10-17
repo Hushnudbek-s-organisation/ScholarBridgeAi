@@ -15,7 +15,9 @@ import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { localizeDetailPayload } from "@/lib/catalogLocalizer";
-import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { toMatchProfileWithActivities, chancingProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
+import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
@@ -38,6 +40,51 @@ import { studentProfiles } from "@/db/schema";
  * It is fully generic — no university names, no hardcoded rules.
  * Values are only used as FALLBACK when the dedicated column is empty.
  */
+/**
+ * Module 4 — the positioning half of the dual score, computed exactly the way
+ * GET /api/universities and the dashboard compute it: a synthetic programme
+ * row from the student's stated major (or the university's own field) plus
+ * the university's published minimums, against the QS Top 200 benchmark.
+ */
+function chanceForUniRow(
+  chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>,
+  // Bundle/DB university row — the engine only reads benchmark-shaped fields.
+  uni: {
+    id: number;
+    name?: string;
+    country?: string;
+    programMajor?: string | null;
+    degreeLevel?: string | null;
+    minGpa?: number | null;
+    minIelts?: number | null;
+    minSat?: number | null;
+  },
+  profileRow: { targetMajor?: string | null; degreeLevel?: string | null }
+) {
+  // The engine reads benchmark-shaped fields only; the cast is the same
+  // convention the match call above uses for bundle/DB rows.
+  const chanceEval = evaluateUniversityAndProgramChance(
+    chancingProfile,
+    uni as never,
+    {
+      id: uni.id,
+      universityId: uni.id,
+      name: profileRow.targetMajor || uni.programMajor || "General Studies",
+      degreeLevel: profileRow.degreeLevel || uni.degreeLevel || "Bachelor",
+      field: profileRow.targetMajor || uni.programMajor || null,
+    },
+    { minGpa: uni.minGpa ?? null, minIelts: uni.minIelts ?? null, minSat: uni.minSat ?? null },
+    [],
+    matchQsUniversityBenchmark(uni as never)
+  );
+  return {
+    score: chanceEval.compositeProgramFitScore,
+    effectiveAcceptRatePct: chanceEval.effectiveProgramAcceptRatePct,
+    selectivityCategory: chanceEval.selectivityCategory,
+    studentGpaPercentile: chanceEval.studentGpaPercentile,
+  };
+}
+
 function parseOtherRequirements(texts: string[]) {
   const joined = texts.join("\n");
   const out: {
@@ -209,6 +256,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       issues: string[];
       breakdown: MatchBreakdown;
     } | null = null;
+    /**
+     * Module 4 — the positioning half of the dual score. Fit (`match`) says
+     * "does this university want someone like me overall"; `chance` says how
+     * my numbers sit inside the admitted cohort of the department, from the
+     * same engine the Explorer and the dashboard use. Owner/admin reads only.
+     */
+    let chance: {
+      score: number;
+      effectiveAcceptRatePct: number;
+      selectivityCategory: string;
+      studentGpaPercentile: number | null;
+    } | null = null;
     const locale = localeFromRequest(req);
     const profileIdParam = new URL(req.url).searchParams.get("profileId");
     if (profileIdParam) {
@@ -229,6 +288,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
             breakdown: result.breakdown,
           };
+          chance = chanceForUniRow(cachedProfile.chancingProfile, row, cachedProfile.profileData);
         } else {
           const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
           if (p) {
@@ -243,6 +303,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
               breakdown: result.breakdown,
             };
+            chance = chanceForUniRow(await chancingProfileWithActivities(p), uni, p);
           }
         }
       }
@@ -256,6 +317,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           {
             ...cachedBase,
             match,
+            chance,
           },
           locale
         )
@@ -842,6 +904,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         {
           ...basePayload,
           match,
+          chance,
         },
         locale
       )

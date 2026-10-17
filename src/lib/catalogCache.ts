@@ -40,7 +40,7 @@ import {
 import { inArray, eq } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
 import { pickBestSource } from "@/lib/sourcePick";
-import { toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   resolvedUsdUniversityCosts,
   resolvedUsdScholarshipAmount,
@@ -86,7 +86,18 @@ let scholarshipsEntry: CacheEntry<ScholarshipsBundle> | null = null;
 let scholarshipsInFlight: Promise<ScholarshipsBundle> | null = null;
 
 type MatchProfile = Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
-type ProfileMatch = { profileData: StudentProfileData; matchProfile: MatchProfile };
+type ChancingProfile = Awaited<ReturnType<typeof chancingProfileWithActivities>>;
+/**
+ * The DB row plus its derived match inputs. `chancingProfile` is the same
+ * person read through the 5-layer positioning engine (chance scores) — the
+ * two are computed together so a request can never mix a fresh fit score with
+ * a stale cohort profile.
+ */
+type ProfileMatch = {
+  profileData: StudentProfileData;
+  matchProfile: MatchProfile;
+  chancingProfile: ChancingProfile;
+};
 
 const profileMatchCache = new Map<number, CacheEntry<ProfileMatch>>();
 const universityDetailCache = new Map<number, CacheEntry<Record<string, unknown>>>();
@@ -330,8 +341,15 @@ export async function getCachedProfileForMatching(profileId: number): Promise<Pr
 
   const [row] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
   if (!row) return null;
-  const matchProfile = await toMatchProfileWithActivities(row);
-  const value: ProfileMatch = { profileData: row as unknown as StudentProfileData, matchProfile };
+  const [matchProfile, chancingProfile] = await Promise.all([
+    toMatchProfileWithActivities(row),
+    chancingProfileWithActivities(row),
+  ]);
+  const value: ProfileMatch = {
+    profileData: row as unknown as StudentProfileData,
+    matchProfile,
+    chancingProfile,
+  };
   profileMatchCache.set(profileId, { value, expiresAt: Date.now() + PROFILE_MATCH_TTL_MS });
   return value;
 }
