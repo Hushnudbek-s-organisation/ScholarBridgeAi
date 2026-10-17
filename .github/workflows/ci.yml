@@ -25,6 +25,50 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
 
+      # Flaky-failure diagnostics. The runner's log archive is not always
+      # downloadable (blob host unreachable), which turned intermittent
+      # failures into a bare "Process completed with exit code 1". This wraps
+      # `npm` for every later step through BASH_ENV — the individual
+      # `run: npm run test:*` steps stay unchanged — so a failing step
+      # republishes its own interesting lines as check annotations and its tail
+      # into the job summary. Credentials are never part of these logs.
+      - name: Report failing-step details as annotations
+        run: |
+          cat > /tmp/ci-report.sh <<'EOS'
+          npm() {
+            local args="$*" title log code n line safe
+            log="/tmp/ci-step-$$.log"
+            # Annotation titles are truncated by GitHub anyway; keep them short
+            # and readable ("run test:integration") instead of dumping argv.
+            title=$(printf '%s' "$args" | cut -c1-70)
+            command npm "$@" 2>&1 | tee "$log"
+            code=${PIPESTATUS[0]}
+            if [ "$code" != "0" ]; then
+              {
+                echo "## FAILED: npm ${args} (exit ${code})"
+                echo
+                echo '```'
+                tail -n 80 "$log"
+                echo '```'
+              } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              n=0
+              while IFS= read -r line; do
+                [ "$n" -ge 25 ] && break
+                safe=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g' | cut -c1-400)
+                [ -n "$safe" ] || continue
+                echo "::error title=npm ${title} (exit ${code})::${safe}"
+                n=$((n + 1))
+              done < <(grep -aE "✗|FAIL|Error|error:|npm error|npm ERR|failed|Timed out|timeout|EADDRINUSE|ECONNREFUSED|ENOSPC|Cannot find|not ok|initdb|pg_ctl|drizzle" "$log" | head -25)
+            fi
+            rm -f "$log"
+            return "$code"
+          }
+          EOS
+          # BASH_ENV is *sourced* by every later bash step, so the function
+          # definition itself has to go into that file — appending the path
+          # would make bash try to execute it ("Permission denied").
+          cat /tmp/ci-report.sh >> "$BASH_ENV"
+
       # Two steps on purpose. Shipped dependencies have NO exceptions and must
       # stay clean; the second gate covers the dev toolchain and only ignores an
       # advisory that a reviewed entry in audit-exceptions.json documents (the
