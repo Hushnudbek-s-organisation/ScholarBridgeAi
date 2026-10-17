@@ -44,6 +44,7 @@ import {
   scholarships,
   sources,
   studentProfiles,
+  userSessions,
   universities,
   universityPrograms,
   universitySources,
@@ -78,6 +79,13 @@ export const CORE_TABLES: PgTable[] = [
   programRequirements,
   // admin AI keys (the admin panel persists them; env vars remain the fallback)
   aiProviderCredentials,
+  // Session revocation (audit A23): authenticate() checks this table on
+  // EVERY authenticated request; when it is missing, checkSessionRecord's
+  // SELECT throws and the whole site answers 503 "Authentication is
+  // temporarily unavailable." — sign-in itself still succeeds, which makes
+  // the outage look like a password problem. It has no other lazy-DDL owner
+  // (telegram_links gets ensureTelegramTables; user_sessions had nothing).
+  userSessions,
 ];
 
 function quote(name: string): string {

@@ -162,6 +162,32 @@ export function countriesMatch(a: string | null | undefined, b: string | null | 
   return !!leftAlias && leftAlias === rightAlias;
 }
 
+/**
+ * EU member states, compared by normalized English/romanised alias or by the
+ * dictionary key when the label localizes. Used by the scholarship coverage
+ * rules: a "European Union" award applies at any EU destination.
+ */
+const EU_COUNTRY_ALIASES = new Set([
+  "austria", "belgium", "bulgaria", "croatia", "cyprus", "czechia", "czechrepublic", "czechrepublic",
+  "denmark", "estonia", "finland", "france", "germany", "greece", "hungary", "ireland", "italy",
+  "latvia", "lithuania", "luxembourg", "malta", "netherlands", "poland", "portugal", "romania",
+  "slovakia", "slovakiarepublic", "slovenia", "espana", "spain", "sweden",
+]);
+const EU_COUNTRY_KEYS = new Set([
+  "austria", "belgium", "bulgaria", "croatia", "cyprus", "czechia", "denmark", "estonia", "finland",
+  "france", "germany", "greece", "hungary", "ireland", "italy", "latvia", "lithuania", "luxembourg",
+  "malta", "netherlands", "poland", "portugal", "romania", "slovakia", "slovenia", "spain", "sweden",
+]);
+
+/** True when the label names an EU member state (aliases/diacritics tolerated). */
+export function isEuropeanCountry(value: string | null | undefined): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  if (EU_COUNTRY_ALIASES.has(normalizeCountryAlias(v))) return true;
+  const key = countryTranslationKey(v);
+  return !!key && EU_COUNTRY_KEYS.has(key);
+}
+
 /** Return shared flag/code metadata for any recognized name or alias. */
 export function qsCountryOption(value: string): QsCountryOption | undefined {
   const key = countryTranslationKey(value);

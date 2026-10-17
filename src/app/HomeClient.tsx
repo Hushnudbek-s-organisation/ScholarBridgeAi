@@ -969,8 +969,7 @@ export function Home({
           }
           distance={14}
         >
-          {/* One-line "what is this page?" banner for newcomers (admin-editable) */}
-          {!(activeProfile && !activeProfile.onboardingCompleted) && <SectionIntro section={activeTab} />}
+
           {/* Onboarding wizard — shown for profiles that haven't completed
               the step-by-step setup yet. Resumes from the saved step. */}
           {activeProfile && !activeProfile.onboardingCompleted ? (
@@ -1190,6 +1189,11 @@ export function Home({
 
           {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
 
+          {/* One-line "what is this page?" help for newcomers (admin-editable).
+              Module 2: it sits at the BOTTOM of every section now — the main
+              content leads, the explanation is one quiet chip away (opened
+              sections expand it in place; it never pushes the page down). */}
+          {!(activeProfile && !activeProfile.onboardingCompleted) && <SectionIntro section={activeTab} />}
         </PageTransition>
         </div>
       </main>
