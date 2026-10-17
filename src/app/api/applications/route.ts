@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { applications, applicationOutcomes, universities } from "@/db/schema";
+import {
+  applications,
+  applicationCycles,
+  applicationOutcomes,
+  savedUniversities,
+  universities,
+} from "@/db/schema";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { enforceFreeCap } from "@/lib/planLimits";
@@ -96,13 +102,67 @@ export async function POST(req: Request) {
     }
     if (universityId) {
       const [uni] = await db
-        .select({ name: universities.name })
+        .select({
+          name: universities.name,
+          programMajor: universities.programMajor,
+          applicationFee: universities.applicationFee,
+          admissionsUrl: universities.admissionsUrl,
+          applicationUrl: universities.applicationUrl,
+          officialWebsiteUrl: universities.officialWebsiteUrl,
+          websiteUrl: universities.websiteUrl,
+        })
         .from(universities)
         .where(eq(universities.id, universityId));
       if (!uni) {
         return NextResponse.json({ error: "University not found" }, { status: 404 });
       }
       universityName = uni.name;
+
+      // The catalogue already knows this university's real cycle: the nearest
+      // UPCOMING application deadline and its intake populate the new row
+      // instead of a blank tracker line. Only verified data is used — when no
+      // cycle row exists the fields simply stay empty (NULL stays NULL).
+      const today = new Date().toISOString().slice(0, 10);
+      const [cycle] = await db
+        .select({
+          deadline: applicationCycles.deadline,
+          intake: applicationCycles.intake,
+          academicYear: applicationCycles.academicYear,
+          applicationUrl: applicationCycles.applicationUrl,
+        })
+        .from(applicationCycles)
+        .where(and(eq(applicationCycles.universityId, universityId), gte(applicationCycles.deadline, today)))
+        .orderBy(asc(applicationCycles.deadline))
+        .limit(1);
+      if (cycle) {
+        if (body.deadline == null && cycle.deadline) {
+          const d = new Date(cycle.deadline);
+          body.deadline = Number.isNaN(d.getTime())
+            ? String(cycle.deadline).slice(0, 10)
+            : d.toISOString().slice(0, 10);
+        }
+        if (!body.intakeTerm && cycle.intake) {
+          // "Fall" + "2027-2028" -> "Fall 2027" — the tracker's display form.
+          const startYear = /^\d{4}/.exec(String(cycle.academicYear ?? ""))?.[0];
+          body.intakeTerm = `${cycle.intake}${startYear ? ` ${startYear}` : ""}`;
+        }
+        if (!body.portalUrl && cycle.applicationUrl) body.portalUrl = cycle.applicationUrl;
+      }
+      if (!body.portalUrl) {
+        body.portalUrl = uni.applicationUrl || uni.admissionsUrl || uni.officialWebsiteUrl || uni.websiteUrl || null;
+      }
+      if (body.programName == null && uni.programMajor) body.programName = uni.programMajor;
+      if (body.feeAmount == null && uni.applicationFee != null) {
+        body.feeAmount = Math.round(Number(uni.applicationFee));
+      }
+
+      // Keep the shortlist and the tracker in sync: starting an application
+      // for a catalogue university also marks it saved (idempotent — the
+      // unique (profile, university) index makes a duplicate a no-op).
+      await db
+        .insert(savedUniversities)
+        .values({ profileId, universityId })
+        .onConflictDoNothing();
     }
 
     const round = ROUNDS.includes(String(body.applicationRound)) ? String(body.applicationRound) : null;
@@ -116,7 +176,9 @@ export async function POST(req: Request) {
         universityName,
         programName: clampString(body.programName, 200) || null,
         applicationRound: round,
-        intakeTerm: clampString(body.intakeTerm, 60) || null,
+        // Next general intake season when the catalogue has no cycle row —
+        // the tracker's "intake" column would otherwise always start blank.
+        intakeTerm: clampString(body.intakeTerm, 60) || "Fall 2027",
         deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(body.deadline ?? "")) ? String(body.deadline) : null,
         status,
         applicationFeePaid: Boolean(body.applicationFeePaid),

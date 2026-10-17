@@ -1,4 +1,52 @@
 import type { scholarships } from "@/db/schema";
+import type { Locale } from "@/i18n/config";
+
+/** Runtime display labels — the database keeps the canonical English values;
+ *  these strings only localize the outgoing UI text. */
+const STATUS_LABEL_TABLES: Record<
+  Locale,
+  { open: string; closed: string; upcoming: string; rolling: string; notAnnounced: string; unknown: string }
+> = {
+  en: {
+    open: "OPEN",
+    closed: "CLOSED",
+    upcoming: "UPCOMING",
+    rolling: "ROLLING",
+    notAnnounced: "DATE NOT ANNOUNCED",
+    unknown: "UNKNOWN",
+  },
+  uz: {
+    open: "OCHIQ",
+    closed: "YOPILGAN",
+    upcoming: "TEZ ORADA",
+    rolling: "DOIMIY QABUL",
+    notAnnounced: "SANA E'LON QILINMAGAN",
+    unknown: "NOMA'LUM",
+  },
+  ru: {
+    open: "ОТКРЫТА",
+    closed: "ЗАКРЫТА",
+    upcoming: "СКОРО",
+    rolling: "ПРИЁМ КРУГЛЫЙ ГОД",
+    notAnnounced: "ДАТА НЕ ОБЪЯВЛЕНА",
+    unknown: "НЕИЗВЕСТНО",
+  },
+};
+
+const EXPECTED_PREFIX: Record<Locale, { withDeadline: string; opensAround: string }> = {
+  en: {
+    withDeadline: "Expected based on previous cycles: ",
+    opensAround: "Expected based on previous cycles: opens around ",
+  },
+  uz: {
+    withDeadline: "Oldingi yillar asosida kutilayotgan muddat: ",
+    opensAround: "Oldingi yillar asosida kutilayotgan muddat: taxminan ",
+  },
+  ru: {
+    withDeadline: "Ожидается на основе прошлых циклов: ",
+    opensAround: "Ожидается на основе прошлых циклов: открытие около ",
+  },
+};
 
 export type ScholarshipApplicationStatus =
   | "open"
@@ -91,31 +139,34 @@ export function computeScholarshipStatus(s: ScholarshipLike): ScholarshipApplica
   return "unknown";
 }
 
-/** Human-friendly label + a note that the status was computed, not stored. */
-export function statusLabel(status: ScholarshipApplicationStatus): string {
+/** Human-friendly label + a note that the status was computed, not stored.
+ *  Localized at runtime via `locale` (default "en" — unpassed callers such as
+ *  the deadlines feed and the autopilot engine keep the exact English words). */
+export function statusLabel(status: ScholarshipApplicationStatus, locale: Locale = "en"): string {
+  const table = STATUS_LABEL_TABLES[locale];
   switch (status) {
     case "open":
-      return "OPEN";
+      return table.open;
     case "closed":
-      return "CLOSED";
+      return table.closed;
     case "upcoming":
-      return "UPCOMING";
+      return table.upcoming;
     case "rolling":
-      return "ROLLING";
+      return table.rolling;
     case "not_announced":
-      return "DATE NOT ANNOUNCED";
+      return table.notAnnounced;
     default:
-      return "UNKNOWN";
+      return table.unknown;
   }
 }
 
 /** Spec §7: clearly label estimated dates from historical cycles. */
-export function expectedPeriodLabel(s: ScholarshipLike): string | null {
+export function expectedPeriodLabel(s: ScholarshipLike, locale: Locale = "en"): string | null {
   if (s.recurrence === "annual" && s.expectedDeadlinePeriod) {
-    return `Expected based on previous cycles: ${s.expectedDeadlinePeriod}`;
+    return `${EXPECTED_PREFIX[locale].withDeadline}${s.expectedDeadlinePeriod}`;
   }
   if (s.recurrence === "annual" && s.expectedOpeningPeriod) {
-    return `Expected based on previous cycles: opens around ${s.expectedOpeningPeriod}`;
+    return `${EXPECTED_PREFIX[locale].opensAround}${s.expectedOpeningPeriod}`;
   }
   return null;
 }
@@ -127,12 +178,15 @@ export type ScholarshipWithStatus = typeof scholarships.$inferSelect & {
 };
 
 /** Attach computed status fields to a scholarship row. */
-export function withStatus(s: ScholarshipLike & Record<string, unknown>): ScholarshipWithStatus {
+export function withStatus(
+  s: ScholarshipLike & Record<string, unknown>,
+  locale: Locale = "en"
+): ScholarshipWithStatus {
   const computedStatus = computeScholarshipStatus(s);
   return {
     ...s,
     computedStatus,
-    statusLabel: statusLabel(computedStatus),
-    expectedLabel: expectedPeriodLabel(s),
+    statusLabel: statusLabel(computedStatus, locale),
+    expectedLabel: expectedPeriodLabel(s, locale),
   } as ScholarshipWithStatus;
 }

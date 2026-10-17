@@ -5,6 +5,8 @@ import { opportunities, studentProfiles } from "@/db/schema";
 import { seedOpportunities } from "@/db/seedOpportunities";
 import { authenticate } from "@/lib/auth";
 import { countByType, rankOpportunities } from "@/lib/opportunities";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeOpportunityRow } from "@/lib/catalogLocalizer";
 
 export const dynamic = "force-dynamic";
 
@@ -77,10 +79,13 @@ export async function GET(req: Request) {
       items.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || a.title.localeCompare(b.title));
     }
 
+    // Localize seeded display content AFTER scoring/sorting — matching and
+    // ranking above ran on canonical English rows.
+    const locale = localeFromRequest(req);
     return NextResponse.json({
       count: items.length,
       counts: countByType(rows),
-      items,
+      items: items.map((item) => localizeOpportunityRow(item, locale)),
       scoredFor: profile ? profile.major ?? "your profile" : null,
     });
   } catch {

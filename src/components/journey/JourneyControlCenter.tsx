@@ -11,7 +11,7 @@
  *   5. Where am I weak?    → profile readiness, weakest first
  *   6. What should I look at? → recommendations based on the real profile
  */
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
 import { ArrowRight, CalendarClock, ChevronDown, Compass, Printer, RefreshCw, Sparkles } from "lucide-react";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 import { AnimatedNumber as CountUp, RevealGroup, RevealItem, SectionTransition } from "@/components/motion";
 import {
   Button,
@@ -241,6 +242,9 @@ export function RecommendedPanel({
 }) {
   const t = useTranslations("journey");
   const awardLabel = useScholarshipAwardLabel();
+  const [showAllRecUnis, setShowAllRecUnis] = useState(false);
+  const [showAllRecSchols, setShowAllRecSchols] = useState(false);
+  const [showAllRecOpps, setShowAllRecOpps] = useState(false);
   // Every row here is justified by THIS profile: the list stays empty (and
   // names the fields to add) until the profile supplies a basis, the order is
   // the shared fit engine's score, and each card shows the engine's own
@@ -284,7 +288,7 @@ export function RecommendedPanel({
             </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {recommended.universities.slice(0, 6).map((u) => (
+              {(showAllRecUnis ? recommended.universities : recommended.universities.slice(0, 3)).map((u) => (
                 <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     {u.flagEmoji} {u.name}
@@ -345,13 +349,20 @@ export function RecommendedPanel({
               ))}
             </div>
           )}
+          <ShowMoreToggle
+            className="mt-2"
+            totalCount={recommended.universities.length}
+            visibleCount={3}
+            expanded={showAllRecUnis}
+            onToggle={() => setShowAllRecUnis((v) => !v)}
+          />
         </div>
 
         {recommended.scholarships.length > 0 ? (
           <div>
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("ccScholarshipsHeading")}</h3>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {recommended.scholarships.slice(0, 6).map((s) => (
+              {(showAllRecSchols ? recommended.scholarships : recommended.scholarships.slice(0, 3)).map((s) => (
                 <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
                   <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
@@ -399,6 +410,13 @@ export function RecommendedPanel({
                 </div>
               ))}
             </div>
+            <ShowMoreToggle
+              className="mt-2"
+              totalCount={recommended.scholarships.length}
+              visibleCount={3}
+              expanded={showAllRecSchols}
+              onToggle={() => setShowAllRecSchols((v) => !v)}
+            />
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
@@ -410,7 +428,7 @@ export function RecommendedPanel({
           <div>
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("ccOpportunitiesHeading")}</h3>
             <ul className="space-y-1.5">
-              {recommended.opportunities.map((o) => (
+              {(showAllRecOpps ? recommended.opportunities : recommended.opportunities.slice(0, 3)).map((o) => (
                 <li key={o.id} className="flex items-center gap-2 text-sm">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
                   <span className="min-w-0 flex-1 break-words whitespace-normal text-slate-700 dark:text-slate-200">
@@ -433,6 +451,13 @@ export function RecommendedPanel({
                 </li>
               ))}
             </ul>
+            <ShowMoreToggle
+              className="mt-2"
+              totalCount={recommended.opportunities.length}
+              visibleCount={3}
+              expanded={showAllRecOpps}
+              onToggle={() => setShowAllRecOpps((v) => !v)}
+            />
           </div>
         )}
         <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
@@ -455,6 +480,13 @@ export function JourneyControlCenter({
   const reduceMotion = useReducedMotion();
   const t = useTranslations("journey");
   const awardLabel = useScholarshipAwardLabel();
+  // Clean-UI pass: every long dashboard list opens as a curated preview and
+  // grows through one shared Show-more pill. The hooks sit above the early
+  // returns so the hook order never depends on data state.
+  const [showAllSteps, setShowAllSteps] = useState(false);
+  const [showAllDeadlines, setShowAllDeadlines] = useState(false);
+  const [showAllReadiness, setShowAllReadiness] = useState(false);
+  const [showAllPhases, setShowAllPhases] = useState(false);
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
@@ -598,7 +630,7 @@ export function JourneyControlCenter({
               </p>
             )}
           </div>
-          <div className="min-w-0 border-t border-slate-200/70 pt-3 dark:border-slate-700/70 sm:border-0 sm:pt-1">
+          <div className="flex min-w-0 items-start justify-between gap-3 border-t border-slate-200/70 pt-3 dark:border-slate-700/70 sm:justify-end sm:border-0 sm:pt-1">
             <ProgressRing
               pct={journey.progressPct}
               size={88}
@@ -607,6 +639,18 @@ export function JourneyControlCenter({
               ariaValueText={t("ccProgressAria", { pct: Math.round(journey.progressPct), done: doneStageCount, total: totalStages })}
               tone={journey.progressPct >= 100 ? "good" : "brand"}
             />
+            {/* Print is a utility, not a journey step: it sits as a quiet
+                icon next to the ring so the CTA row below is only ever
+                "Continue" + "See study plan". */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              aria-label={t("printSummaryHint")}
+              title={t("printSummary")}
+              className="print:hidden mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/70 bg-white/60 text-slate-500 transition-colors hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700/70 dark:bg-white/10 dark:text-slate-300 dark:hover:text-indigo-200"
+            >
+              <Printer className="h-4 w-4" aria-hidden />
+            </button>
           </div>
         </div>
 
@@ -624,16 +668,6 @@ export function JourneyControlCenter({
             onClick={() => onNavigateTab("study-plan")}
           >
             {t("ccSeeStudyPlan")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="print:hidden min-h-11 w-full px-4 py-2.5 sm:w-auto"
-            onClick={() => window.print()}
-            aria-label={t("printSummaryHint")}
-          >
-            <Printer className="h-4 w-4" aria-hidden />
-            {t("printSummary")}
           </Button>
         </div>
 
@@ -800,8 +834,9 @@ export function JourneyControlCenter({
         {nextSteps.length === 0 ? (
           <Empty title={t("ccNothingOutstanding")} hint={t("ccNothingOutstandingHint")} />
         ) : (
+          <>
           <ul className="space-y-2">
-            {nextSteps.map((s, i) => (
+            {(showAllSteps ? nextSteps : nextSteps.slice(0, 3)).map((s, i) => (
               <motion.li
                 key={s.id}
                 initial={reduceMotion ? false : { opacity: 0, x: -8 }}
@@ -829,6 +864,14 @@ export function JourneyControlCenter({
               </motion.li>
             ))}
           </ul>
+          <ShowMoreToggle
+            className="mt-3"
+            totalCount={nextSteps.length}
+            visibleCount={3}
+            expanded={showAllSteps}
+            onToggle={() => setShowAllSteps((v) => !v)}
+          />
+          </>
         )}
       </JourneyCard>
 
@@ -846,8 +889,9 @@ export function JourneyControlCenter({
               action={<Button size="sm" variant="outline" className="min-h-11" onClick={() => onNavigateTab("universities")}>{t("ccExploreUniversities")}</Button>}
             />
           ) : (
+            <>
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-              {deadlines.map((d, i) => (
+              {(showAllDeadlines ? deadlines : deadlines.slice(0, 4)).map((d, i) => (
                 <motion.li
                   key={d.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 6 }}
@@ -869,6 +913,14 @@ export function JourneyControlCenter({
                 </motion.li>
               ))}
             </ul>
+            <ShowMoreToggle
+              className="mt-3"
+              totalCount={deadlines.length}
+              visibleCount={4}
+              expanded={showAllDeadlines}
+              onToggle={() => setShowAllDeadlines((v) => !v)}
+            />
+            </>
           )}
         </JourneyCard>
 
@@ -923,7 +975,7 @@ export function JourneyControlCenter({
         subtitle={t("ccChecklistSubtitle")}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {readiness.categories.map((c) => (
+          {(showAllReadiness ? readiness.categories : readiness.categories.slice(0, 3)).map((c) => (
             <motion.button
               key={c.key}
               type="button"
@@ -951,6 +1003,13 @@ export function JourneyControlCenter({
             </motion.button>
           ))}
         </div>
+        <ShowMoreToggle
+          className="mt-3"
+          totalCount={readiness.categories.length}
+          visibleCount={3}
+          expanded={showAllReadiness}
+          onToggle={() => setShowAllReadiness((v) => !v)}
+        />
       </JourneyCard>
 
       {/* ---- University-level test catalogue comparisons ------------------ */}
@@ -1035,7 +1094,15 @@ export function JourneyControlCenter({
       {/* ---- The ten study-plan phases (spec §12) ------------------------- */}
       <JourneyCard title={t("ccStudyPlanTitle")} subtitle={t("ccStudyPlanSubtitle")}>
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {data.phases.map((p) => (
+          {(showAllPhases
+            ? data.phases
+            // Collapsed: the three phases that need attention first — in
+            // progress before planned before done — while the FULL ordered
+            // plan is exactly what the toggle reveals.
+            : [...data.phases]
+              .sort((a, b) => (a.status === "done" ? 2 : a.status === "in_progress" ? 0 : 1) - (b.status === "done" ? 2 : b.status === "in_progress" ? 0 : 1))
+              .slice(0, 3)
+          ).map((p) => (
             <li key={p.key}>
               <button
                 type="button"
@@ -1068,6 +1135,13 @@ export function JourneyControlCenter({
             </li>
           ))}
         </ol>
+        <ShowMoreToggle
+          className="mt-3"
+          totalCount={data.phases.length}
+          visibleCount={3}
+          expanded={showAllPhases}
+          onToggle={() => setShowAllPhases((v) => !v)}
+        />
       </JourneyCard>
     </div>
   );

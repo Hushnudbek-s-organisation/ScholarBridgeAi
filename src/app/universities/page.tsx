@@ -15,6 +15,7 @@ import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -99,43 +100,50 @@ export default async function UniversitiesPage({
         };
       });
     } else {
-      const [countRow] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(universitiesTable)
-        .where(eq(universitiesTable.isActive, true));
+      // Count and page in ONE round trip: the two statements are independent,
+      // so running them in parallel halves the time this fallback path waits
+      // for PostgreSQL. The active predicate is identical in both, so the
+      // pagination total still matches the visible rows.
+      const [countRows, data] = await Promise.all([
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(universitiesTable)
+          .where(eq(universitiesTable.isActive, true)),
+        db
+          .select({
+            id: universitiesTable.id,
+            name: universitiesTable.name,
+            country: universitiesTable.country,
+            city: universitiesTable.city,
+            flagEmoji: universitiesTable.flagEmoji,
+            worldRanking: universitiesTable.worldRanking,
+            programMajor: universitiesTable.programMajor,
+            universityType: universitiesTable.universityType,
+            annualTuition: universitiesTable.annualTuition,
+            tuitionCurrency: universitiesTable.tuitionCurrency,
+            tuitionPeriod: universitiesTable.tuitionPeriod,
+            annualTuitionUsd: universitiesTable.annualTuitionUsd,
+            annualLivingEst: universitiesTable.annualLivingEst,
+            livingCostCurrency: universitiesTable.livingCostCurrency,
+            livingCostPeriod: universitiesTable.livingCostPeriod,
+            annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
+            minIelts: universitiesTable.minIelts,
+            postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
+            officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
+            websiteUrl: universitiesTable.websiteUrl,
+          })
+          .from(universitiesTable)
+          .where(eq(universitiesTable.isActive, true))
+          .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
+          .limit(ITEMS_PER_PAGE)
+          .offset(from),
+      ]);
+      const [countRow] = countRows;
       totalItems = Number(countRow?.n ?? 0);
       const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
       if (requestedPage > lastPage) {
         redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
       }
-      const data = await db
-        .select({
-          id: universitiesTable.id,
-          name: universitiesTable.name,
-          country: universitiesTable.country,
-          city: universitiesTable.city,
-          flagEmoji: universitiesTable.flagEmoji,
-          worldRanking: universitiesTable.worldRanking,
-          programMajor: universitiesTable.programMajor,
-          universityType: universitiesTable.universityType,
-          annualTuition: universitiesTable.annualTuition,
-          tuitionCurrency: universitiesTable.tuitionCurrency,
-          tuitionPeriod: universitiesTable.tuitionPeriod,
-          annualTuitionUsd: universitiesTable.annualTuitionUsd,
-          annualLivingEst: universitiesTable.annualLivingEst,
-          livingCostCurrency: universitiesTable.livingCostCurrency,
-          livingCostPeriod: universitiesTable.livingCostPeriod,
-          annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
-          minIelts: universitiesTable.minIelts,
-          postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
-          officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
-          websiteUrl: universitiesTable.websiteUrl,
-        })
-        .from(universitiesTable)
-        .where(eq(universitiesTable.isActive, true))
-        .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
-        .limit(ITEMS_PER_PAGE)
-        .offset(from);
       // Nullable columns stay null (never "" or 0) — the card renders nothing
       // rather than pretending a ranking/focus exists.
       rows = data.map((university) => {
@@ -221,13 +229,13 @@ export default async function UniversitiesPage({
                 </h2>
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                  <span className="break-words">{[university.city, university.country].filter(Boolean).join(", ")}</span>
+                  <span className="break-words">{[localizeCity(university.city, locale), localizeCountry(university.country, locale)].filter(Boolean).join(", ")}</span>
                 </p>
                 {university.program_major && (
-                  <p className="mt-1 break-words text-xs text-slate-500">{university.program_major}</p>
+                  <p className="mt-1 break-words text-xs text-slate-500">{localizeMajorOrField(university.program_major, locale)}</p>
                 )}
                 <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs dark:border-slate-700">
-                  <CatalogFact label={copy.institutionType} value={university.university_type ?? copy.notPublished} />
+                  <CatalogFact label={copy.institutionType} value={university.university_type ? localizeUniversityType(university.university_type, locale) : copy.notPublished} />
                   <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
                   <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
                   <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />

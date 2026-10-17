@@ -6,6 +6,14 @@ import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@
 import { StudentProfile } from "./Navbar";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import type { Locale } from "@/i18n/config";
+import {
+  localizeCountry,
+  localizeCoverageType,
+  localizeScholarshipProvider,
+  localizeScholarshipTitle,
+} from "@/lib/catalogLocalizer";
 import { 
   Award, 
   Search, 
@@ -17,6 +25,7 @@ import {
   Check, 
   Sparkles,
   BookOpen,
+  ChevronDown,
   Filter,
   AlertCircle,
   Wallet,
@@ -30,7 +39,8 @@ import { fitBadgeClass } from "@/lib/fitBadge";
 import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
 import { ScholarshipRequirementPills } from "@/components/ScholarshipRequirementPills";
 import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
-import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import type { MatchBreakdown } from "@/lib/matching";
 
 export interface Scholarship {
@@ -73,7 +83,7 @@ type HubTranslator = (key: string, values?: Record<string, string | number>) => 
 
 /** Award value label. Every branch is translated (uz/ru included) — the
  *  numeric amount alone is language-neutral, so it keeps `formatMoney`. */
-export function awardLabel(s: Scholarship, t: HubTranslator): string {
+export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "en"): string {
   if (s.awardBasis === "need_based") return t("awardNeedBased");
   if (s.awardBasis === "full_tuition") return t("awardFullTuition");
   if (s.awardBasis === "variable") return t("awardVariable");
@@ -82,7 +92,9 @@ export function awardLabel(s: Scholarship, t: HubTranslator): string {
     return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
   }
   if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
-  return s.coverageType && s.coverageType !== "Unspecified" ? s.coverageType : t("awardNotSpecified");
+  return s.coverageType && s.coverageType !== "Unspecified"
+    ? localizeCoverageType(s.coverageType, locale)
+    : t("awardNotSpecified");
 }
 
 const SCHOLARSHIP_FILTER_COUNTRIES = withQsTop200Countries([
@@ -99,7 +111,7 @@ interface ScholarshipHubProps {
   savedScholarshipIds: Set<number>;
   onSaveScholarship: (scholarshipId: number) => Promise<void>;
   onUnsaveScholarship: (scholarshipId: number) => Promise<void>;
-  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
+  autoFocusScholarship?: { id: number; title: string; requestId: number; country?: string | null } | null;
 }
 
 export function ScholarshipHub({
@@ -111,6 +123,7 @@ export function ScholarshipHub({
 }: ScholarshipHubProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
+  const { locale } = useLocaleContext();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   // `loading` = first load (skeletons); `refreshing` = a later filter/page
   // change, where the current cards stay mounted instead of collapsing.
@@ -173,29 +186,47 @@ export function ScholarshipHub({
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedCoverage, setSelectedCoverage] = useState("All");
   const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
+  /**
+   * Phone (< 640px): the two dropdowns collapse behind one button so the
+   * first scholarship card is not pushed off the screen. The search box stays
+   * visible; the selects stay mounted either way.
+   */
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const activeFilterCount =
+    (selectedCountry !== "All" ? 1 : 0) + (selectedCoverage !== "All" ? 1 : 0);
   if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
     setLastFocusRequestId(autoFocusScholarship.requestId);
     setSearch(autoFocusScholarship.title);
     // Deep link from global search: commit the term at once — there is nothing
     // to debounce, the student already chose the record.
     setDebouncedSearch(autoFocusScholarship.title);
-    setSelectedCountry("All");
+    // A university detail page can deep-link here with just a country: the
+    // dropdown opens pre-filtered to that country's grants.
+    setSelectedCountry(autoFocusScholarship.country && !autoFocusScholarship.title ? autoFocusScholarship.country : "All");
     setSelectedCoverage("All");
   }
+  // A focused country outside the preset option list still needs a visible
+  // <option>, otherwise the select renders empty while filtering works.
+  const focusCountry =
+    autoFocusScholarship?.country &&
+    !SCHOLARSHIP_FILTER_COUNTRIES.includes(autoFocusScholarship.country)
+      ? autoFocusScholarship.country
+      : null;
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
-  // `grid-cols-1 md:grid-cols-2`, so 8 / 16 cards.
-  const perPage = useResponsivePerPage({ base: 1, md: 2 });
+  // `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, so 8 / 16 / 24 cards.
+  const perPage = useResponsivePerPage({ base: 1, md: 2, xl: 3 });
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const resultsTopRef = useRef<HTMLDivElement>(null);
 
   // Restart numbering from page 1 whenever the result-set identity changes
-  // (filters, search, profile, or page size). Adjusted during render (the
+  // (filters, search, profile, locale, or page size). Adjusted during render (the
   // React-endorsed alternative to a reset effect), so the debounced fetch
   // below always fires once - already with the correct page.
-  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage].join("|");
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage, locale, profileFingerprint].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -203,6 +234,16 @@ export function ScholarshipHub({
   }
 
   const hasLoadedRef = useRef(false);
+
+  // Profile edits must re-score what is on screen — cached slices were computed
+  // from the OLD profile data, so drop them before the fingerprint refetch.
+  const prevFingerprintRef = useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr();
+    }
+  }, [profileFingerprint]);
 
   const fetchScholarships = async (signal?: AbortSignal) => {
     const params = new URLSearchParams();
@@ -218,6 +259,9 @@ export function ScholarshipHub({
     }
     params.set("page", page.toString());
     params.set("perPage", perPage.toString());
+    // Explicit locale: the API localizes the response and the SWR cache key
+    // (params.toString()) splits per language, so cached rows never mix.
+    params.set("locale", locale);
     const queryKey = params.toString();
 
     const cached = getCatalogSwr<{
@@ -234,7 +278,9 @@ export function ScholarshipHub({
       setTotalPages(cached.data.totalPages);
       setLoading(false);
       setRefreshing(false);
-      if (cached.isFresh) return;
+      // Fresh enough (< 15 s): render it and skip the request entirely.
+      // Older: render it instantly and refresh in the background.
+      if (!cached.shouldRevalidate) return;
     } else if (hasLoadedRef.current) {
       setRefreshing(true);
     } else {
@@ -308,7 +354,7 @@ export function ScholarshipHub({
     void Promise.resolve().then(() => fetchScholarships(controller.signal));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId]);
+  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint]);
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -333,22 +379,21 @@ export function ScholarshipHub({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Filter */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-        <div>
-          {/* h2, not h1 — the hub shell above already owns this screen's only
-              <h1>, and the stacked duplicate broke the page outline. */}
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Award className="h-5 w-5 text-amber-500" />
-            {t("title")}
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {t("subtitle")}
-          </p>
-        </div>
+      {/* Search & Filter toolbar — ONE compact card. The hub header already
+          shows the title and intro, so the catalogue repeats neither: the
+          localized <h2> stays inline (outline + SSR), the paragraph goes. */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-xs space-y-3 sm:p-4">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+          <Award className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+          <span className="min-w-0 break-words">{t("title")}</span>
+        </h2>
 
-        {/* Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+        {/* Filter Controls
+            Phone (< 640px): the search box stays visible and the two dropdowns
+            collapse behind one button, so the first scholarship card is not
+            pushed off the screen. From `sm` up the wrapper becomes
+            `display: contents` and all three controls sit in one row. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3">
           {/* Search Box */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -362,6 +407,31 @@ export function ScholarshipHub({
             />
           </div>
 
+          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="scholarship-filters"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 sm:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="break-words text-center">{t("filtersAndSort")}</span>
+            {activeFilterCount > 0 && (
+              <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
+              The elements stay MOUNTED, so the filters keep their values and
+              their accessible names. */}
+          <div
+            id="scholarship-filters"
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
+          >
           {/* Country Filter */}
           <div>
             <select
@@ -371,6 +441,14 @@ export function ScholarshipHub({
               className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">{t("allCountries")}</option>
+              {focusCountry && (
+                <option value={focusCountry}>
+                  {(() => {
+                    const key = countryTranslationKey(focusCountry);
+                    return key ? tCountry(key) : focusCountry;
+                  })()}
+                </option>
+              )}
               {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
                 const countryKey = countryTranslationKey(country);
                 const countryOption = qsCountryOption(country);
@@ -398,8 +476,35 @@ export function ScholarshipHub({
               <option value="Partial Tuition">{t("coveragePartial")}</option>
             </select>
           </div>
+          </div>
         </div>
       </div>
+
+      {/* Pillar 3.2 — saved grants lead somewhere: find the universities they
+          fund and manage the applications they feed. */}
+      {savedScholarshipIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/30 dark:bg-amber-400/10">
+          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-amber-900 dark:text-amber-100">
+            {t("shortlistBanner", { count: savedScholarshipIds.size })}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "universities" } }))}
+              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+            >
+              <span className="min-w-0 break-words">{t("findUniversities")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "applications" } }))}
+              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+            >
+              <span className="min-w-0 break-words">{t("manageApplications")}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Results Count */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
@@ -416,7 +521,7 @@ export function ScholarshipHub({
       {/* Grid List */}
       {loading ? (
         // Skeleton cards sized like the real ones — no height jump on load.
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" aria-busy="true">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -438,7 +543,7 @@ export function ScholarshipHub({
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-150 ${
+          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
@@ -470,9 +575,9 @@ export function ScholarshipHub({
                           not a ragged box per line. Neutral, so amber stays
                           reserved for deadlines and match issues. */}
                       <span className="inline-block max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                        {s.country} • {s.provider}
+                        {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
                       </span>
-                      <h3 className="font-bold text-base text-slate-900 mt-1">{s.title}</h3>
+                      <h3 className="font-bold text-base text-slate-900 mt-1">{localizeScholarshipTitle(s.title, locale)}</h3>
                     </div>
 
                     {score != null ? (
@@ -502,26 +607,9 @@ export function ScholarshipHub({
                     )}
                   </div>
 
-                  {/* Why this match (spec §22) */}
-                  {(s.matchReasons?.length || s.matchIssues?.length) && (
-                    <div className="mt-2 space-y-1">
-                      {s.matchReasons?.map((r, i) => (
-                        <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
-                          <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>{t("strongBecause")}</b> {r}</span>
-                        </p>
-                      ))}
-                      {s.matchIssues?.map((r, i) => (
-                        <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
-                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span><b>{t("potentialIssue")}</b> {r}</span>
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  <MatchBreakdownStrip breakdown={s.matchBreakdown} />
-
-                  {/* Computed application status (spec §6) */}
+                  {/* Computed application status (spec §6) — "is this open
+                      right now" stays glanceable on the card face; only the
+                      long diagnostics go behind the toggle below. */}
                   {s.computedStatus && (
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
@@ -544,22 +632,18 @@ export function ScholarshipHub({
                       )}
                     </div>
                   )}
-
-                  <p className="break-words text-xs leading-relaxed text-slate-600">
-                    {s.description}
-                  </p>
                 </div>
 
                 {/* Key Details Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
                     <span className="text-slate-400 block font-medium">{t("awardValue")}</span>
-                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t)}</strong>
+                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
                   </div>
 
                   <div>
                     <span className="text-slate-400 block font-medium">{t("coverage")}</span>
-                    <strong className="text-slate-800 font-bold">{s.coverageType}</strong>
+                    <strong className="text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
                   </div>
 
                   <div>
@@ -571,56 +655,82 @@ export function ScholarshipHub({
                   </div>
                 </div>
 
-                {/* Requirements Text */}
-                {/* A neutral spec box: requirements are reference data, not a
-                    warning. Amber is kept for deadlines and match issues. */}
-                <div className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {t("requirements")}
-                  </span>
-                  {/* Priority 4.2 — the published gates, answered per
-                      requirement instead of buried in the prose below. */}
-                  <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
-                  <p className="text-[11px] leading-relaxed">{s.requirements}</p>
-                </div>
+                {/* Secondary diagnostics — the prose, the per-requirement
+                    answers, the score arithmetic, the source footnote and the
+                    funding-plan action — collapsed behind a native
+                    <details>: static SSR keeps asserting the pills and the
+                    breakdown (they are in the markup), while the browser only
+                    shows the summary line until asked. */}
+                <details className="group rounded-xl border border-slate-200/70 bg-slate-50/60 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
+                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 break-words">{t("cardDetails")}</span>
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                  </summary>
+                  <div className="mt-2 space-y-2.5">
+                    {/* Why this match (spec §22) */}
+                    {(s.matchReasons?.length || s.matchIssues?.length) && (
+                      <div className="space-y-1">
+                        {s.matchReasons?.map((r, i) => (
+                          <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                            <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span><b>{t("strongBecause")}</b> {r}</span>
+                          </p>
+                        ))}
+                        {s.matchIssues?.map((r, i) => (
+                          <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span><b>{t("potentialIssue")}</b> {r}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <MatchBreakdownStrip breakdown={s.matchBreakdown} />
 
-                {/* Source credibility footnote */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
-                  {s.sourceUrl ? (
-                    <a
-                      href={s.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" /> {t("source")}
-                    </a>
-                  ) : (
-                    <span className="text-slate-400">{t("sourcePending")}</span>
-                  )}
-                  {s.sourceLastVerifiedAt ? (
-                    <span className="text-slate-400">
-                      {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
-                    </span>
-                  ) : s.sourceUrl ? (
-                    <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
-                  ) : null}
-                </div>
+                    {s.description && (
+                      <p className="break-words text-xs leading-relaxed text-slate-600">
+                        {s.description}
+                      </p>
+                    )}
 
-                {/* Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                  <a
-                    href={s.websiteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 flex items-center gap-1"
-                  >
-                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                    {/* Requirements Text */}
+                    {/* A neutral spec box: requirements are reference data, not a
+                        warning. Amber is kept for deadlines and match issues. */}
+                    <div className="space-y-1 rounded-xl border border-slate-200/80 bg-white p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t("requirements")}
+                      </span>
+                      {/* Priority 4.2 — the published gates, answered per
+                          requirement instead of buried in the prose below. */}
+                      <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
+                      <p className="text-[11px] leading-relaxed">{s.requirements}</p>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Source credibility footnote */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                      {s.sourceUrl ? (
+                        <a
+                          href={s.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" /> {t("source")}
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">{t("sourcePending")}</span>
+                      )}
+                      {s.sourceLastVerifiedAt ? (
+                        <span className="text-slate-400">
+                          {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
+                        </span>
+                      ) : s.sourceUrl ? (
+                        <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
+                      ) : null}
+                    </div>
+
                     {/* Priority 4.2 — one click puts this award into the funding
-                        plan, so the plan and the discovery feed stay in sync. */}
+                        plan, so the plan and the discovery feed stay in sync.
+                        Lives with the details it depends on, not in the footer. */}
                     <button
                       type="button"
                       onClick={() => void addToFundingPlan(s)}
@@ -632,7 +742,7 @@ export function ScholarshipHub({
                             ? t("fundingAddHint", { title: s.title })
                             : t("fundingNeedsProfile")
                       }
-                      className={`flex min-h-11 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
+                      className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
                         fundingAddedIds.has(s.id)
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200"
                           : "bg-emerald-600 text-white shadow-xs shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
@@ -647,11 +757,25 @@ export function ScholarshipHub({
                       )}
                       {fundingAddedIds.has(s.id) ? t("fundingAdded") : t("fundingAdd")}
                     </button>
+                  </div>
+                </details>
+
+                {/* Actions — one row, two controls: the official portal link
+                    and Track/Save. Everything else moved to the drawer. */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <a
+                    href={s.websiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                  >
+                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
 
                   {isSaved ? (
                     <button
                       onClick={() => onUnsaveScholarship(s.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
                     >
                       <Check className="h-3.5 w-3.5" />
                       {t("tracked")}
@@ -659,13 +783,12 @@ export function ScholarshipHub({
                   ) : (
                     <button
                       onClick={() => onSaveScholarship(s.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs shadow-indigo-600/20 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs shadow-indigo-600/20 transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {t("track")}
                     </button>
                   )}
-                  </div>
                 </div>
               </div>
             );

@@ -42,7 +42,7 @@ import {
   type BotLang,
 } from "./core";
 import { CMD_TEXTS } from "./botTexts";
-import { runCallback, runCommand, type BotCtx } from "./bot";
+import { promptPlainSearch, runCallback, runCommand, type BotCtx } from "./bot";
 import { handleLinkStart, loadOwnedRequest, type TgUser } from "./linking";
 import {
   getLinkByProfile,
@@ -160,6 +160,17 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
 
   const cmd = parseCommand(msg.text);
   if (!cmd) {
+    const typed = (msg.text ?? "").trim();
+    if (ctx.link && typed) {
+      // A question (or a full sentence) is conversation: the AI admissions
+      // mentor answers it right here, no command needed.
+      if (typed.length > 35 || typed.endsWith("?")) {
+        return void (await runCommand(ctx, "advisor", typed.slice(0, 2000)));
+      }
+      // A short phrase is a search term: remember it and offer one-tap
+      // choices for it (universities / scholarships / AI / open the app).
+      return void (await promptPlainSearch(ctx, typed));
+    }
     // Plain text: point to the commands (or the website when not linked).
     return void (await runCommand(ctx, "help", ""));
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ShowMoreToggle } from "./hubs/ui";
 import { useTranslations } from "next-intl";
 import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
@@ -36,6 +37,9 @@ import { DecisionPillStrip } from "./DecisionPillStrip";
 import type { DecisionProfileInput } from "@/lib/decisionPills";
 import type { MatchBreakdown } from "@/lib/matching";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
+import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 interface UniversityDetailData {
   id: number;
@@ -198,6 +202,22 @@ interface UniversityDetailProps {
 const NOT_SPECIFIED = "Not specified";
 const NOT_AVAILABLE = "Not available";
 
+/**
+ * The `/api/universities/[id]` payload. Cached client-side so "Back" renders
+ * the page again in 0ms instead of a loading spinner.
+ */
+interface UniversityDetailPayload {
+  university: UniversityDetailData;
+  programs?: ProgramData[];
+  applicationCycles?: CycleData[];
+  cycles?: CycleData[];
+  universityRequirements?: any;
+  money?: any;
+  scholarships?: ScholarshipData[];
+  sources?: SourceData[];
+  match?: UniversityDetailData["match"] | null;
+}
+
 /** Spec §19: verified vs unavailable. NULL is never shown as a value. */
 /** Format money generically for any currency — never assume USD. */
 function fmtMoney(v: number | null | undefined, currency = "USD", period = "year"): string {
@@ -282,6 +302,11 @@ export function UniversityDetail({
   // Presentation-only UI state (no fetch/API changes)
   const [reqsExpanded, setReqsExpanded] = useState(false);
   const [showAllPrograms, setShowAllPrograms] = useState(false);
+  // Clean-UI pass: cycles, awards and sources open as short previews; the
+  // full list is one quiet toggle away instead of a page-stretching stack.
+  const [showAllCycles, setShowAllCycles] = useState(false);
+  const [showAllScholarships, setShowAllScholarships] = useState(false);
+  const [showAllSources, setShowAllSources] = useState(false);
   const [expandedProgramReqs, setExpandedProgramReqs] = useState<Record<number, boolean>>({});
   // Saved programs (spec §24) — programId -> saved-row id, for save/unsave.
   const [savedProgramIds, setSavedProgramIds] = useState<Record<number, number>>({});
@@ -290,6 +315,22 @@ export function UniversityDetail({
   const [startingApplication, setStartingApplication] = useState(false);
   const [startAppError, setStartAppError] = useState("");
   const [startAppDone, setStartAppDone] = useState(false);
+
+  /**
+   * Copy one API payload into the component state. Used by the network
+   * response and by the client-side cache, so both paths produce exactly the
+   * same screen.
+   */
+  const applyDetailPayload = React.useCallback((data: UniversityDetailPayload) => {
+    setUni(data.university);
+    setPrograms(data.programs || []);
+    setCycles(data.applicationCycles || data.cycles || []);
+    setUniversityRequirements(data.universityRequirements || null);
+    setMoney(data.money || null);
+    setScholarships(data.scholarships || []);
+    setSources(data.sources || []);
+    setMatch(data.match ?? null);
+  }, []);
 
   /**
    * Create the application row for this university and hand the workspace to the
@@ -394,25 +435,47 @@ export function UniversityDetail({
     }
   };
 
+  // Profile edits must re-score the match block on this page — the cached
+  // payload was computed from the OLD profile data.
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const prevFingerprintRef = React.useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr("universityDetail");
+    }
+  }, [profileFingerprint]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError("");
+      // `locale` is part of the request AND the cache key: switching en↔uz↔ru
+      // refetches, and per-language payloads never share a cache slot.
+      const params = new URLSearchParams();
+      if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
+      params.set("locale", locale);
+      const qs = `?${params.toString()}`;
+      const cacheKey = `${universityId}${qs}`;
+      // The payload the browser already has (the student pressed "Back" a
+      // moment ago): render it instantly — no skeleton, no waiting — and
+      // only revalidate when the copy is older than 15 seconds.
+      const cached = getCatalogSwr<UniversityDetailPayload>("universityDetail", cacheKey);
+      if (cached) {
+        applyDetailPayload(cached.data);
+        setLoading(false);
+        setError("");
+        if (!cached.shouldRevalidate) return;
+      } else {
+        setLoading(true);
+        setError("");
+      }
       try {
-        const qs = activeProfile?.id ? `?profileId=${activeProfile.id}` : "";
         const res = await fetch(`/api/universities/${universityId}${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "load-failed");
         if (!cancelled) {
-          setUni(data.university);
-          setPrograms(data.programs || []);
-          setCycles(data.applicationCycles || data.cycles || []);
-          setUniversityRequirements(data.universityRequirements || null);
-          setMoney(data.money || null);
-          setScholarships(data.scholarships || []);
-          setSources(data.sources || []);
-          setMatch(data.match ?? null);
+          applyDetailPayload(data);
+          setCatalogSwr("universityDetail", cacheKey, data);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "load-failed");
@@ -423,7 +486,7 @@ export function UniversityDetail({
     return () => {
       cancelled = true;
     };
-  }, [universityId, activeProfile?.id]);
+  }, [universityId, activeProfile?.id, applyDetailPayload, locale, profileFingerprint]);
 
   if (loading) {
     return (
@@ -462,7 +525,7 @@ export function UniversityDetail({
         {uni.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={toWikimediaThumb(uni.imageUrl, 960)}
+            src={toWikimediaThumb(uni.imageUrl, 1200)}
             onError={onWikimediaThumbError(uni.imageUrl)}
             alt=""
             decoding="async"
@@ -482,8 +545,12 @@ export function UniversityDetail({
                   src={toWikimediaThumb(uni.imageUrl, 320)}
                   onError={onWikimediaThumbError(uni.imageUrl)}
                   alt={`${uni.name} logo`}
+                  loading="eager"
                   decoding="async"
-                  className="h-full w-full object-contain p-2"
+                  // The campus photo is landscape: `object-contain` letterboxed
+                  // it into a thin strip with white bars. `object-cover` fills
+                  // the square emblem cleanly.
+                  className="h-full w-full object-cover"
                 />
               ) : (
                 <div className="sb-ink-on-bright flex flex-col items-center justify-center gap-1">
@@ -498,7 +565,7 @@ export function UniversityDetail({
               </div>
               <p className="text-sm text-indigo-200 mt-1 flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-                {uni.city}, {uni.country} {uni.flagEmoji}
+                {localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)} {uni.flagEmoji}
               </p>
               {match && (
                 <div className="mt-3 space-y-1">
@@ -525,6 +592,13 @@ export function UniversityDetail({
                 <span className="text-xs font-bold">{t("qsRanking")}</span>
                 <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
               </div>
+              {/* Pillar 5.1 — rank-verified state-scholarship eligibility. Stated
+                  as a criterion match, never as an award promise. */}
+              {uni.worldRanking != null && uni.worldRanking <= 300 && (
+                <p className="mt-2 inline-flex max-w-full items-center rounded-xl bg-amber-300/15 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-100 ring-1 ring-inset ring-amber-300/40">
+                  <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               {(() => {
@@ -671,7 +745,7 @@ export function UniversityDetail({
           </div>
         ) : (
           <div className="mt-3 space-y-3">
-            {cycles.map((c) => (
+            {(showAllCycles ? cycles : cycles.slice(0, 2)).map((c) => (
               <div key={c.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-extrabold text-slate-800">
@@ -752,10 +826,22 @@ export function UniversityDetail({
                 </div>
               </div>
             ))}
+            <ShowMoreToggle
+              className="pt-1"
+              totalCount={cycles.length}
+              visibleCount={2}
+              expanded={showAllCycles}
+              onToggle={() => setShowAllCycles((v) => !v)}
+            />
           </div>
         )}
       </div>
 
+      {/* ===== LAPTOP (lg+): QUICK FACTS · FINANCIAL OVERVIEW · REQUIREMENTS =====
+          On a 1440px screen three full-width cards are a column of narrow
+          text. From `lg` the quick facts and the money block sit side by side
+          and the requirement grid spans the full width under them. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* ===== ABOUT (spec §3) ===== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -773,7 +859,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== ACADEMIC REQUIREMENTS (spec §5) — compact, collapsible ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <GraduationCap className="h-4 w-4 text-indigo-600" /> {t("academicReqs")}
         </h2>
@@ -906,6 +992,7 @@ export function UniversityDetail({
             value={money?.applicationFee != null ? fmtMoney(money.applicationFee, money.applicationFeeCurrency ?? "USD", "application") : NOT_AVAILABLE}
           />
         </div>
+      </div>
       </div>
 
       {/* ===== PROGRAMS (spec §7) ===== */}
@@ -1093,21 +1180,41 @@ export function UniversityDetail({
 
       {/* ===== SCHOLARSHIPS (spec §8) ===== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-        <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-          <Award className="h-4 w-4 text-amber-500" /> {t("scholarships", { count: scholarships.length })}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <Award className="h-4 w-4 text-amber-500" /> {t("scholarships", { count: scholarships.length })}
+          </h2>
+          {/* Pillar 5.1 — the grants catalogue, pre-filtered to THIS country.
+              A single click from a university page to every grant it offers. */}
+          {uni.country ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("scholarbridge:focus-record", {
+                    detail: { kind: "scholarships", country: uni.country },
+                  })
+                );
+              }}
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+            >
+              <span className="min-w-0 break-words">{t("exViewCountryScholarships")}</span>
+            </button>
+          ) : null}
+        </div>
         {scholarships.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">{t("noScholarships")}</p>
         ) : (
+          <>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {scholarships.map((sch) => {
+            {(showAllScholarships ? scholarships : scholarships.slice(0, 3)).map((sch) => {
               const schName = sch.name || sch.title;
               const deadline = sch.deadlineDate || sch.deadline || null;
               const url = sch.applicationUrl || sch.websiteUrl || null;
               return (
                 <div key={sch.id} className="rounded-xl border border-slate-200 p-4 hover:border-amber-300 transition-colors">
                   <p className="text-sm font-extrabold text-slate-800">{schName}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{sch.coverageType || t("coverageNotSpecified")}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{sch.coverageType ? localizeCoverageType(sch.coverageType, locale) : t("coverageNotSpecified")}</p>
                   <div className="mt-2 space-y-1 text-[11px] text-slate-600">
                     <p><b>{t("amountLabel")}</b> {formatMoney(sch.amountUsdValue, "USD")}</p>
                     <p><b>{t("deadlineLabel")}</b> {deadline ? new Date(deadline + (deadline.length === 10 ? "T00:00:00" : "")).toLocaleDateString(locale) : t("notAnnounced")}</p>
@@ -1127,6 +1234,14 @@ export function UniversityDetail({
               );
             })}
           </div>
+          <ShowMoreToggle
+            className="mt-3"
+            totalCount={scholarships.length}
+            visibleCount={3}
+            expanded={showAllScholarships}
+            onToggle={() => setShowAllScholarships((v) => !v)}
+          />
+          </>
         )}
       </div>
 
@@ -1186,55 +1301,70 @@ export function UniversityDetail({
             );
           })()}
 
-          {/* Other admissions URLs as sources */}
-          {[
-            { url: uni.admissionsUrl, label: t("admissionsSource"), type: "official_admissions" },
-            { url: uni.internationalAdmissionsUrl, label: t("intlAdmissionsSource"), type: "official_international_admissions" },
-            { url: uni.undergraduateAdmissionsUrl, label: t("undergradAdmissionsSource"), type: "official_undergraduate_admissions" },
-            { url: uni.applicationUrl, label: t("applicationPortal"), type: "official_application_portal" },
-          ].map((link) => {
-            if (!link.url) return null;
+          {/* Secondary official links + linked sources, curated: the
+              admissions page stays visible, everything longer opens behind
+              one Show-more pill (the expanded list is the SAME JSX). */}
+          {(() => {
+            const extraLinks = [
+              { url: uni.admissionsUrl, label: t("admissionsSource"), type: "official_admissions" },
+              { url: uni.internationalAdmissionsUrl, label: t("intlAdmissionsSource"), type: "official_international_admissions" },
+              { url: uni.undergraduateAdmissionsUrl, label: t("undergradAdmissionsSource"), type: "official_undergraduate_admissions" },
+              { url: uni.applicationUrl, label: t("applicationPortal"), type: "official_application_portal" },
+            ].filter((link): link is { url: string; label: string; type: string } => Boolean(link.url));
+            const total = extraLinks.length + sources.length;
+            const visibleCount = showAllSources ? total : Math.min(1, extraLinks.length);
+            const visibleLinks = showAllSources ? extraLinks : extraLinks.slice(0, 1);
+            const visibleSources = showAllSources ? sources : [];
             return (
-              <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
-                  <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
-                </span>
-                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              </a>
-            );
-          })}
-
-          {/* Linked sources from university_sources */}
-          {sources.map((s) => {
-            const url = s.source?.url || s.url;
-            const title = s.source?.title || s.title || t("sourceFallback");
-            const type = s.sourceType || s.source?.title ? "official" : "source";
-            return (
-              <a key={s.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-extrabold text-slate-800">{title}</span>
-                  <span className="block break-all text-[10px] text-slate-400">{url}</span>
-                  {s.source?.accessedAt && (
-                    <span className="block text-[10px] text-slate-400">
-                      {t("lastChecked")} {new Date(s.source.accessedAt).toLocaleDateString(locale)}
-                      {isStaleVerified(s.source.accessedAt) && ` ${t("staleNote")}`}
+              <>
+                {visibleLinks.map((link) => (
+                  <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
+                      <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
                     </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
-                {(s.source?.isOfficial || s.sourceType !== "ranking") && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
-                  </span>
-                )}
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              </a>
+                    <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  </a>
+                ))}
+                {visibleSources.map((sc) => {
+                  const url = sc.source?.url || sc.url;
+                  const title = sc.source?.title || sc.title || t("sourceFallback");
+                  const type = sc.sourceType || sc.source?.title ? "official" : "source";
+                  return (
+                    <a key={sc.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-extrabold text-slate-800">{title}</span>
+                        <span className="block break-all text-[10px] text-slate-400">{url}</span>
+                        {sc.source?.accessedAt && (
+                          <span className="block text-[10px] text-slate-400">
+                            {t("lastChecked")} {new Date(sc.source.accessedAt).toLocaleDateString(locale)}
+                            {isStaleVerified(sc.source.accessedAt) && ` ${t("staleNote")}`}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
+                      {(sc.source?.isOfficial || sc.sourceType !== "ranking") && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
+                          <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
+                        </span>
+                      )}
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    </a>
+                  );
+                })}
+                <ShowMoreToggle
+                  className="pt-1"
+                  totalCount={total}
+                  visibleCount={visibleCount}
+                  expanded={showAllSources}
+                  onToggle={() => setShowAllSources((v) => !v)}
+                />
+              </>
             );
-          })}
+          })()}
 
           {sources.length === 0 && !uni.admissionsUrl && !uni.applicationUrl && (
             <p className="text-[11px] text-slate-400">{t("noVerifiedSources")}</p>

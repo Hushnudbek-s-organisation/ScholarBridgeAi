@@ -169,11 +169,6 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                       <span className="text-xs font-extrabold text-slate-800">
                         {tn(navLabelKey(section.id))}
                       </span>
-                      {section.isNew && (
-                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
-                          {tn("new")}
-                        </span>
-                      )}
                       <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
                         {section.id}
                       </code>

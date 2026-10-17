@@ -7,6 +7,7 @@ import { seedDatabase } from "@/db/seed";
 import { getCachedScholarshipsBundle, getCachedProfileForMatching } from "@/lib/catalogCache";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
+import { expandMultilingualSearchTerms, localizeScholarshipRow } from "@/lib/catalogLocalizer";
 
 export async function GET(req: Request) {
   try {
@@ -43,13 +44,21 @@ export async function GET(req: Request) {
       }
     }
 
-    if (search) {
+    // Search runs on canonical English rows: uz/ru/English queries expand to
+    // canonical keywords ("to'liq"→"full", "stipendiya"→"scholarship", …).
+    const searchTerms = search ? expandMultilingualSearchTerms(search) : [];
+    if (searchTerms.length > 0) {
       allScholarships = allScholarships.filter(s =>
-        s.title.toLowerCase().includes(search) ||
-        s.provider.toLowerCase().includes(search) ||
-        s.country.toLowerCase().includes(search) ||
-        s.description.toLowerCase().includes(search) ||
-        countriesMatch(s.country, search)
+        searchTerms.some(term =>
+          s.title.toLowerCase().includes(term) ||
+          s.provider.toLowerCase().includes(term) ||
+          s.country.toLowerCase().includes(term) ||
+          s.description.toLowerCase().includes(term) ||
+          s.coverageType.toLowerCase().includes(term) ||
+          (s.degreeLevels ?? "").toLowerCase().includes(term) ||
+          (s.eligibleMajors ?? "").toLowerCase().includes(term) ||
+          countriesMatch(s.country, term)
+        )
       );
     }
 
@@ -80,7 +89,9 @@ export async function GET(req: Request) {
         matchInfo = calculateScholarshipMatch(matchProfile, s);
       }
       // Computed application status from dates (spec §6) — never stale.
-      const statusInfo = withStatus(s);
+      // Labels are localized for the caller's locale (default "en" callers,
+      // like the deadlines feed, keep the canonical English words).
+      const statusInfo = withStatus(s, locale);
       const src = sourceMap.get(s.id) || null;
       return {
         ...s,
@@ -146,8 +157,10 @@ export async function GET(req: Request) {
 
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
     // Without those params the full list is returned (admin tools, ...).
+    // Rows are localized LAST — every filter above ran on canonical English
+    // data, so canonical dropdown values like "Full Tuition" never break.
     return NextResponse.json(
-      paginatedPayload("scholarships", results, searchParams),
+      paginatedPayload("scholarships", results.map((s) => localizeScholarshipRow(s, locale)), searchParams),
     );
   } catch (error) {
     console.error("GET /api/scholarships error:", error);

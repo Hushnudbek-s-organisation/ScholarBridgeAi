@@ -32,24 +32,28 @@ export function invalidateSectionHelp() {
 }
 
 // ---------------------------------------------------------------------------
-// "I've read it" — dismissed banners, persisted per browser.
+// "I want to read this" — the clean-UI pass made help banners opt-IN: the
+// full explanation is only ever shown for sections the student explicitly
+// opened via the "?" chip (persisted per browser), never by default. First
+// paint on every page is the compact chip, so no giant indigo box pushes
+// the real content down the screen.
 // ---------------------------------------------------------------------------
-const DISMISS_KEY = "scholarbridge_help_dismissed";
+const OPEN_KEY = "scholarbridge_help_opened";
 const listeners = new Set<() => void>();
 
-function readDismissed(): string {
+function readOpened(): string {
   try {
-    return localStorage.getItem(DISMISS_KEY) ?? "[]";
+    return localStorage.getItem(OPEN_KEY) ?? "[]";
   } catch {
     return "[]";
   }
 }
 
-function writeDismissed(list: string[]) {
+function writeOpened(list: string[]) {
   try {
-    localStorage.setItem(DISMISS_KEY, JSON.stringify(list));
+    localStorage.setItem(OPEN_KEY, JSON.stringify(list));
   } catch {
-    // storage unavailable — the banner simply comes back next visit
+    // storage unavailable — the open state simply does not persist
   }
   listeners.forEach((l) => l());
 }
@@ -73,18 +77,20 @@ export function isHelpSection(id: string): id is HelpSection {
 }
 
 /**
- * Short "What is this page and how do I use it?" banner shown at the top of
- * a section, so a first-time visitor never lands on an unexplained screen.
- * Dismissible (remembered per browser) and re-openable with the "?" chip.
- * Text: translated default, or the admin's custom text; the admin can also
- * switch a banner off (Admin → Growth tools → Guide & help).
+ * Short "What is this page and how do I use it?" explanation, opt-IN by
+ * design: every section starts with one quiet "?" chip so no full-width
+ * banner pushes content down on first load. Clicking the chip opens the
+ * explanation; the student can collapse it back to the chip again, per
+ * browser (remembered). Text: translated default, or the admin's custom
+ * text; the admin can also switch a section off entirely (Admin → Growth
+ * tools → Guide & help).
  */
 export function SectionIntro({ section }: { section: string }) {
   const t = useTranslations("help");
   const reduceMotion = useReducedMotion();
   const [overrides, setOverrides] = useState<Record<string, SectionHelpOverride> | null>(helpCache);
-  const dismissedRaw = useSyncExternalStore(subscribe, readDismissed, () => "[]");
-  const dismissed = parse(dismissedRaw);
+  const openedRaw = useSyncExternalStore(subscribe, readOpened, () => "[]");
+  const opened = parse(openedRaw);
 
   useEffect(() => {
     let live = true;
@@ -105,32 +111,17 @@ export function SectionIntro({ section }: { section: string }) {
   const o = overrides?.[section];
   if (o && o.enabled === false) return null;
   const text = o?.text || t(section);
-  const isDismissed = dismissed.includes(section);
+  // Opt-in banner: only shown when this exact section was opened before.
+  const isOpen = opened.includes(section);
 
   const toggle = () => {
-    const next = isDismissed ? dismissed.filter((s) => s !== section) : [...dismissed, section];
-    writeDismissed(next);
+    const next = isOpen ? opened.filter((s) => s !== section) : [...opened, section];
+    writeOpened(next);
   };
 
   return (
     <AnimatePresence initial={false} mode="wait">
-      {isDismissed ? (
-        <motion.div
-          key="chip"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.2 }}
-          className="mb-3 flex justify-end"
-        >
-          <button
-            onClick={toggle}
-            className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-indigo-200"
-          >
-            <HelpCircle className="h-3.5 w-3.5" aria-hidden /> {t("show")}
-          </button>
-        </motion.div>
-      ) : (
+      {isOpen ? (
         <motion.div
           key="banner"
           initial={reduceMotion ? false : { opacity: 0, y: -6 }}
@@ -177,6 +168,23 @@ export function SectionIntro({ section }: { section: string }) {
               <X className="h-4 w-4" aria-hidden />
             </button>
           </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="chip"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
+          className="mb-3 flex justify-end"
+        >
+          <button
+            onClick={toggle}
+            aria-expanded={false}
+            className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-indigo-200"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden /> {t("show")}
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

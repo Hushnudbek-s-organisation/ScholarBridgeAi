@@ -8,9 +8,10 @@ import {
   savedScholarships,
   applicationTasks,
   applications,
+  applicationCycles,
   testBookings,
 } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
 import { daysUntil } from "@/lib/nextActions";
 
@@ -33,6 +34,15 @@ function urgencyFor(daysRemaining: number | null): "critical" | "soon" | "planne
   if (daysRemaining <= 45) return "soon";
   return "planned";
 }
+/**
+ * Status line for a saved university: a future cycle date on file makes the
+ * row OPEN; nothing on file stays honestly "NO DEADLINE ON FILE" — we never
+ * fabricate an OPEN for a blank, and never invent a date.
+ */
+function savedUniStatusLabel(upcoming: string | null): string {
+  return upcoming ? "OPEN" : "NO DEADLINE ON FILE";
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -81,27 +91,71 @@ export async function GET(req: Request) {
       }
     }
 
-    // --- Saved universities (the current university record has no application
-    //     deadline field, so keep it visible without inventing a date) ---
+    // --- Saved universities (real deadlines come from the verified cycles
+    //     catalogue — one batched query, never a per-university loop) ---
     const savedUnis = await db
       .select()
       .from(savedUniversities)
       .where(eq(savedUniversities.profileId, profileId));
     if (savedUnis.length > 0) {
-      const uniRows = await db
-        .select()
-        .from(universities)
-        .where(inArray(universities.id, savedUnis.map((u) => u.universityId)));
+      const savedUniIds = savedUnis.map((u) => u.universityId);
+      const [uniRows, cycleRows] = await Promise.all([
+        db
+          .select()
+          .from(universities)
+          .where(inArray(universities.id, savedUniIds)),
+        // Nearest UPCOMING deadline per university. Ordered ascending by
+        // deadline, so the first row seen for a university is its soonest.
+        db
+          .select({
+            universityId: applicationCycles.universityId,
+            deadline: applicationCycles.deadline,
+          })
+          .from(applicationCycles)
+          .where(
+            and(
+              inArray(applicationCycles.universityId, savedUniIds),
+              gte(applicationCycles.deadline, new Date().toISOString().slice(0, 10))
+            )
+          )
+          .orderBy(asc(applicationCycles.deadline)),
+      ]);
+      const upcomingDeadlineByUni = new Map<number, string>();
+      for (const c of cycleRows) {
+        if (c.deadline && !upcomingDeadlineByUni.has(c.universityId)) {
+          const d = new Date(c.deadline);
+          upcomingDeadlineByUni.set(
+            c.universityId,
+            Number.isNaN(d.getTime()) ? String(c.deadline).slice(0, 10) : d.toISOString().slice(0, 10)
+          );
+        }
+      }
       for (const u of uniRows) {
+        const deadline = upcomingDeadlineByUni.get(u.id) ?? null;
+        if (!deadline) {
+          // Nothing on file → no invented countdown either: NULL stays NULL
+          // and the row reads "NO DEADLINE ON FILE" (check-journey pins this).
+          items.push({
+            id: `uni-${u.id}`,
+            type: "university",
+            title: u.name,
+            subtitle: `${u.country} · ${u.programMajor}`,
+            date: null,
+            status: "NO DEADLINE ON FILE",
+            daysRemaining: null,
+            source: u.websiteUrl || null,
+            saved: true,
+          });
+          continue;
+        }
         items.push({
           id: `uni-${u.id}`,
           type: "university",
           title: u.name,
           subtitle: `${u.country} · ${u.programMajor}`,
-          date: null,
-          // A saved university row carries no deadline field. Do not imply that its deadline is open or officially unannounced.
-          status: "NO DEADLINE ON FILE",
-          daysRemaining: null,
+          date: deadline,
+          status: savedUniStatusLabel(deadline),
+          daysRemaining: daysUntil(now, deadline),
           source: u.websiteUrl || null,
           saved: true,
         });

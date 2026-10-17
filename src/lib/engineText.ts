@@ -30,6 +30,15 @@ export type ReasonKind = "university" | "scholarship";
 
 /** Read the caller's language from a Request (cookie set by LanguageSwitcher). */
 export function localeFromRequest(req: Request): Locale {
+  // An explicit `?locale=` query parameter wins: clients pass it so every
+  // response (and its client-side SWR cache key) deterministically matches the
+  // language it was requested in, independent of cookie timing.
+  try {
+    const q = new URL(req.url).searchParams.get("locale");
+    if (q && isLocale(q)) return q;
+  } catch {
+    // Unparseable URL — fall through to the cookie below.
+  }
   return localeFromCookieHeader(req.headers.get("cookie"));
 }
 

@@ -446,6 +446,71 @@ async function main() {
   }
 
   // ===========================================================================
+  section("Plain text + smart callbacks (interactive search & AI)");
+  // ===========================================================================
+  {
+    // A short typed phrase → one-tap choices for exactly those words.
+    let m = mark();
+    await service.handleUpdate(msg(1001, "germany"));
+    const prompt = since(m).find((c) => c.method === "sendMessage");
+    const promptBtns = buttonsOf(prompt);
+    check("plain search phrase → interactive one-tap prompt", /germany/i.test(prompt?.body.text ?? "") && promptBtns.length > 0);
+    check(
+      "prompt offers universities / scholarships / AI / app buttons",
+      promptBtns.some((b) => b.callback_data === "pg:u:1") &&
+        promptBtns.some((b) => b.callback_data === "sq:s:1") &&
+        promptBtns.some((b) => b.callback_data === "qa:1") &&
+        promptBtns.some((b) => typeof b.url === "string"),
+      promptBtns.map((b) => b.callback_data ?? b.url).join(",")
+    );
+    const storedQuery = JSON.parse(String((await linkOf(aziza.id))?.lastQuery ?? "null"));
+    check("the typed words are stored as the last query", storedQuery?.k === "u" && storedQuery?.q === "germany");
+
+    // "Universities" button runs the search for those words.
+    m = mark();
+    await service.handleUpdate(cb(1001, "pg:u:1"));
+    const uniRes = lastTo(1001)?.body.text ?? "";
+    check("pg:u:1 searches universities with the typed words", /Technical University of Munich/.test(uniRes));
+    check("the result keeps the quick country filters + menu", (() => {
+      const btns = buttonsOf(lastTo(1001));
+      return btns.some((b) => b.callback_data === "qf:u:USA") && btns.some((b) => b.callback_data === "mn:menu");
+    })());
+
+    // "Scholarships" button switches the catalogue, same words.
+    m = mark();
+    await service.handleUpdate(cb(1001, "sq:s:1"));
+    check("sq:s:1 switches to the scholarship catalogue with the same words", /DAAD/.test(lastTo(1001)?.body.text ?? ""));
+    check("…and remembers the new search kind", JSON.parse(String((await linkOf(aziza.id))?.lastQuery ?? "null"))?.k === "s");
+
+    // Quick country filter re-runs the search for that country.
+    m = mark();
+    await service.handleUpdate(cb(1001, "qf:u:Germany"));
+    check("qf:u:Germany filters universities by country", /Technical University of Munich/.test(lastTo(1001)?.body.text ?? ""));
+
+    // One tap on the AI button answers the stored question.
+    m = mark();
+    await service.handleUpdate(cb(1001, "qa:1"));
+    const aiAnswer = lastTo(1001)?.body.text ?? "";
+    check("qa:1 asks the AI advisor the stored question", /offline|guidance/i.test(aiAnswer) && aiAnswer.length > 80, aiAnswer.slice(0, 80));
+
+    // The menu button re-opens the main menu.
+    m = mark();
+    await service.handleUpdate(cb(1001, "mn:menu"));
+    check("mn:menu re-opens the main menu", buttonsOf(since(m).find((c) => c.method === "sendMessage")).some((b) => b.callback_data === "mn:next"));
+
+    // A question (or a full sentence) goes to the AI mentor directly.
+    m = mark();
+    await service.handleUpdate(msg(1001, "Magistratura uchun Germaniyada qanday grantlar bor?"));
+    const mentorAnswer = lastTo(1001)?.body.text ?? "";
+    check("a natural-language question is answered by the AI advisor", /offline|guidance/i.test(mentorAnswer) && mentorAnswer.length > 80, mentorAnswer.slice(0, 80));
+
+    // Unlinked Telegram: plain text still points to commands/website (no data).
+    m = mark();
+    await service.handleUpdate(msg(5555, "munich"));
+    check("plain text from an unlinked Telegram shows no account data", buttonsOf(lastTo(5555)).length > 0 || /help|website|sayt|connect/i.test(lastTo(5555)?.body.text ?? ""));
+  }
+
+  // ===========================================================================
   section("Sign-in code (linked Telegram only)");
   // ===========================================================================
   {

@@ -249,18 +249,35 @@ export const LANDING_PHOTOS = {
     "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=85",
   heroCampusGraduation:
     "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80",
-  campusUsa:
+  // Campus photos are raw Wikimedia originals (multi-MB camera scans) at the
+  // source; convert each to a CDN-cached 640px thumbnail (~40 KB) HERE so
+  // every consumer — current or future — gets the fast URL by construction.
+  // The onError fallback in consumers can still reach the original via the
+  // marquee pattern if a thumb ever misses.
+  campusUsa: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG",
-  campusUk:
+    640
+  ),
+  campusUk: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/3/3d/Radcliffe_Camera%2C_Oxford.jpg",
-  campusGermany:
+    640
+  ),
+  campusGermany: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg",
-  campusSwiss:
+    640
+  ),
+  campusSwiss: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/7/7c/ETH_Z%C3%BCrich_2015.jpg",
-  campusCanada:
+    640
+  ),
+  campusCanada: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg",
-  campusAsia:
+    640
+  ),
+  campusAsia: toWikimediaThumb(
     "https://upload.wikimedia.org/wikipedia/commons/0/02/KAIST_from_across_Gapcheon.jpg",
+    640
+  ),
   step1Profile:
     "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=700&q=80",
   step2UniversityMatch:
@@ -600,7 +617,7 @@ export function LandingPage({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.16),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.18),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)]"
           />
-          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8">
             <motion.div initial="hidden" animate="visible" variants={heroGroup}>
               <motion.span
                 variants={heroItem}
@@ -668,7 +685,7 @@ export function LandingPage({
 
             {/* A compact colorful preview built from the app's real navigation source. */}
             <motion.div
-              className="relative mx-auto w-full max-w-[700px]"
+              className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
               initial={{ opacity: 0, y: 28, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
@@ -1445,7 +1462,11 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          el.classList.toggle("sb-marquee-paused", !entry.isIntersecting);
+          const paused = !entry.isIntersecting;
+          el.classList.toggle("sb-marquee-paused", paused);
+          // The state is also published as a data attribute, so the animation
+          // can be inspected (and paused) from the outside.
+          el.setAttribute("data-paused", paused ? "true" : "false");
         }
       },
       { rootMargin: "160px 0px" },
@@ -1454,7 +1475,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
     return () => observer.disconnect();
   }, []);
 
-  const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
+  const renderRow = (items: MarqueeUniversityItem[], animClass: string, eagerCount = 0) => (
     <div className="relative overflow-hidden">
       <div className={`sb-marquee-track ${animClass}`}>
         {[0, 1].map((copy) => (
@@ -1463,7 +1484,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
             className="flex shrink-0 gap-3 px-1.5"
             aria-hidden={copy === 1 ? true : undefined}
           >
-            {items.map((university) => (
+            {items.map((university, index) => (
               <button
                 key={university.name}
                 type="button"
@@ -1475,11 +1496,13 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={toWikimediaThumb(university.url, 640)}
+                    src={toWikimediaThumb(university.url, 480)}
                     onError={onWikimediaThumbError(university.url)}
                     alt={university.landmark}
-                    loading="lazy"
-                    decoding="async"
+                    // The first cards of the first visible row paint immediately;
+                    // every duplicate and later row lazy-loads off-screen.
+                    loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
+                    {...(copy === 0 && index < eagerCount ? { fetchPriority: "high" as const } : { decoding: "async" as const })}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
@@ -1511,6 +1534,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       ref={sectionRef}
       id="university-marquee"
       aria-labelledby="university-marquee-title"
+      data-paused="false"
       className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-[#0b1222] sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">
@@ -1525,7 +1549,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
         </h2>
       </div>
       <div className="space-y-3 overflow-hidden">
-        {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
+        {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 4)}
         {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
         {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
       </div>

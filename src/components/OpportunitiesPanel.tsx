@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, Compass, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
 import type { StudentProfile } from "./Navbar";
 
@@ -61,6 +62,9 @@ export function OpportunitiesPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
+  // Six feed cards at a time — a curated first screen instead of dozens of
+  // stacked boxes. The pill below unfolds the rest of the ranked list.
+  const [visibleCount, setVisibleCount] = useState(6);
 
   // setState only inside promise callbacks — never synchronously in the
   // effect body (loading starts as `true` in state).
@@ -130,7 +134,7 @@ export function OpportunitiesPanel({
               {t("noResults")}
             </p>
           )}
-          {data.items.map((o) => (
+          {data.items.slice(0, visibleCount).map((o) => (
             <div key={o.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -186,6 +190,12 @@ export function OpportunitiesPanel({
               )}
             </div>
           ))}
+          <ShowMoreToggle
+            totalCount={data.items.length}
+            visibleCount={Math.min(visibleCount, data.items.length)}
+            expanded={visibleCount > 6}
+            onToggle={() => setVisibleCount(visibleCount >= data.items.length ? 6 : data.items.length)}
+          />
         </div>
       )}
       {/* Priority 5.2 — a research opportunity or a summer school is answered by

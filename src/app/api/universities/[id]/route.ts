@@ -7,19 +7,20 @@ import {
   applicationCycles,
   universitySources,
   programSources,
-  scholarships,
   sources,
 } from "@/db/schema";
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, asc, inArray, sql } from "drizzle-orm";
 import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { toMatchProfileWithActivities } from "@/lib/profileMapping";
-import { selectUniversities } from "@/lib/universities";
+import { localizeDetailPayload } from "@/lib/catalogLocalizer";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
   getCachedProfileForMatching,
+  getCachedScholarshipsBundle,
   getCachedUniversitiesBundle,
   getCachedUniversityDetailBase,
   setCachedUniversityDetailBase,
@@ -89,6 +90,60 @@ function parseOtherRequirements(texts: string[]) {
  * Missing data stays null — the UI shows "Not available" / "Not specified".
  * No verification flags are invented: they come from the DB columns only.
  */
+
+/** Words that never identify an institution on their own. */
+const INSTITUTION_STOPWORDS = new Set([
+  "university",
+  "universities",
+  "universite",
+  "universitat",
+  "universidad",
+  "univ",
+  "college",
+  "school",
+  "institute",
+  "institut",
+  "academy",
+  "polytechnic",
+  "polytechnique",
+  "fachhochschule",
+]);
+
+/** "Harvard University" → "harvard university" (letters and digits only). */
+function normalizeInstitutionName(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** The significant words of an institution name ("toronto", "stanford", …). */
+function institutionTokens(value: string | null | undefined): string[] {
+  return normalizeInstitutionName(value)
+    .split(" ")
+    .filter((word) => word.length >= 5 && !INSTITUTION_STOPWORDS.has(word));
+}
+
+/**
+ * Does this scholarship provider name the university itself?
+ *
+ * "Harvard University" matches "Harvard University" and "Harvard University —
+ * [scholarship]", and so does a provider carrying the university's distinctive
+ * name ("Stanford" for "Stanford University"). Generic words such as
+ * "University" or "College" never match on their own.
+ */
+function providerMatchesInstitution(
+  provider: string | null | undefined,
+  universityName: string | null | undefined,
+): boolean {
+  const p = normalizeInstitutionName(provider);
+  const u = normalizeInstitutionName(universityName);
+  if (!p || !u) return false;
+  if (p === u) return true;
+  if (p.includes(u) || u.includes(p)) return true;
+  return institutionTokens(universityName).some((token) => p.includes(token));
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -177,17 +232,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         } else {
           const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
           if (p) {
-            const rows = await selectUniversities();
-            const row = rows.find((r) => r.id === uniId);
-            if (row) {
-              const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
-              match = {
-                score: result.matchScore,
-                reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
-                issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
-                breakdown: result.breakdown,
-              };
-            }
+            // The row was already read above — scoring it needs no second
+            // full-table scan. `toUniversityData` maps exactly the same shape
+            // the catalogue list scores, so both screens show one number.
+            const row = toUniversityData({ ...uni, ...resolvedUsdUniversityCosts(uni) });
+            const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
+            match = {
+              score: result.matchScore,
+              reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
+              issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
+              breakdown: result.breakdown,
+            };
           }
         }
       }
@@ -195,14 +250,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const cachedBase = getCachedUniversityDetailBase(uniId);
     if (cachedBase) {
-      return NextResponse.json({
-        ...cachedBase,
-        match,
-      });
+      // Localize the OUTGOING copy — the cache keeps canonical English rows.
+      return NextResponse.json(
+        localizeDetailPayload(
+          {
+            ...cachedBase,
+            match,
+          },
+          locale
+        )
+      );
     }
 
-    // ---------- Programs & Application cycles in parallel ----------
-    const [programs, cycleRows] = await Promise.all([
+    // ---------- Programs, application cycles & source links in parallel ----------
+    // Three independent reads: running them together turns a 3-round-trip
+    // page into a single round trip instead of three sequential waits.
+    const [programs, cycleRows, universitySourceLinks] = await Promise.all([
       db
         .select()
         .from(universityPrograms)
@@ -213,6 +276,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .from(applicationCycles)
         .where(eq(applicationCycles.universityId, uniId))
         .orderBy(asc(applicationCycles.id)),
+      db
+        .select({
+          id: universitySources.id,
+          universityId: universitySources.universityId,
+          sourceId: universitySources.sourceId,
+          sourceType: universitySources.sourceType,
+        })
+        .from(universitySources)
+        .where(eq(universitySources.universityId, uniId))
+        // A missing table must not 500 the page — the sources block below
+        // simply renders nothing.
+        .catch(() => [] as { id: number; universityId: number; sourceId: number | null; sourceType: string }[]),
     ]);
 
     // ---------- Program → source links (provenance, spec §19) ----------
@@ -231,7 +306,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }[]
     >();
     const progIds = programs.map((p) => p.id);
-    const [allReqRows] = await Promise.all([
+    const [allReqRows, , programDeadlineRows] = await Promise.all([
       progIds.length
         ? db
             .select()
@@ -291,7 +366,36 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           // program_sources / sources unavailable — program sources simply not shown.
         }
       })(),
+      // ---------- Program deadlines ----------
+      // The canonical schema has no `programs.application_deadline` column, but
+      // enriched deployments add one (see data/supabase_enrichment.sql). The
+      // read is defensive: when the column is missing the query fails, the
+      // deadlines stay null and the page still renders. A published date is
+      // never invented here — it is either in the column or nowhere.
+      (async () => {
+        try {
+          const res = await db.execute(sql`
+            SELECT id, application_deadline
+            FROM programs
+            WHERE university_id = ${uniId}
+              AND application_deadline IS NOT NULL
+          `);
+          return (res.rows as { id: number; application_deadline: string | null }[]);
+        } catch {
+          return [] as { id: number; application_deadline: string | null }[];
+        }
+      })(),
     ]);
+
+    // programId → published deadline (YYYY-MM-DD), read once for the page.
+    const programDeadlineByProgramId = new Map<number, string>();
+    for (const row of programDeadlineRows) {
+      if (row?.application_deadline == null) continue;
+      programDeadlineByProgramId.set(
+        row.id,
+        String(row.application_deadline).slice(0, 10),
+      );
+    }
 
     const reqsByProgramId = new Map<number, typeof allReqRows>();
     for (const r of allReqRows) {
@@ -376,7 +480,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         tuitionCurrency: p.tuitionCurrency,
         tuitionPeriod: p.tuitionPeriod,
         description: p.description,
-        applicationDeadline: null as string | null,
+        // The published programme deadline (from `programs.application_deadline`).
+        // NULL means the catalogue has no date for this programme — the UI
+        // says "not announced" instead of showing a made-up one.
+        applicationDeadline: programDeadlineByProgramId.get(p.id) ?? null,
         minIelts: programMinIelts,
         minToefl: programMinToefl,
         minDuolingo: programMinDet,
@@ -541,15 +648,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       } | null;
     }[] = [];
     try {
-      const linkRows = await db
-        .select({
-          id: universitySources.id,
-          universityId: universitySources.universityId,
-          sourceId: universitySources.sourceId,
-          sourceType: universitySources.sourceType,
-        })
-        .from(universitySources)
-        .where(eq(universitySources.universityId, uniId));
+      // The link rows were already read in parallel with the programs and
+      // cycles above — only the source details still need a second read.
+      const linkRows = universitySourceLinks;
 
       const srcIds = [...new Set(linkRows.map((r) => r.sourceId).filter((x): x is number => x != null))];
       const srcMap = new Map<
@@ -603,7 +704,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       // university_sources table shape differs — sources are simply not shown.
     }
 
-    // ---------- Scholarships linked to this university ----------
+    // ---------- Scholarships relevant to this university ----------
+    // The catalogue bundle already holds every ACTIVE scholarship, so this
+    // section costs no extra query. Three signals decide relevance:
+    //   1. the scholarship is linked to this university (`university_id`);
+    //   2. its provider IS this university ("Harvard University" awards);
+    //   3. it is offered in the same country.
+    // Exact provider links come first, then verified awards by amount, and the
+    // list is capped so the page stays scannable. Nothing is invented: an
+    // award without a published amount stays "amount unknown".
     let uniScholarships: {
       id: number;
       title: string;
@@ -621,43 +730,78 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       websiteUrl: string | null;
       isVerified: boolean;
       eligibilityText: string | null;
+      sourceUrl: string | null;
+      lastVerifiedAt: string | null;
+      verificationStatus: string;
     }[] = [];
     try {
-      const schRows = await db
-        .select()
-        .from(scholarships)
-        .where(eq(scholarships.universityId, uniId))
-        .orderBy(asc(scholarships.id));
-      uniScholarships = schRows.map((s) => ({
-        id: s.id,
-        title: s.title,
-        name: s.title,
-        description: s.description ?? null,
-        degreeLevels: s.degreeLevels ?? null,
-        coverageType: s.coverageType ?? null,
-        amountUsdValue:
-          s.amountUsdValue != null
-            ? Number(s.amountUsdValue)
-            : s.awardAmount != null
-              ? Number(s.awardAmount)
-              : null,
-        awardAmount:
-          s.awardAmount != null
-            ? Number(s.awardAmount)
-            : s.amountUsdValue != null
+      const schBundle = await getCachedScholarshipsBundle();
+      const uniName = uni.name ?? "";
+      const uniCountry = uni.country ?? "";
+      const scored = schBundle.entries
+        .map((s) => {
+          const linked = s.universityId === uniId;
+          const providerMatch = providerMatchesInstitution(s.provider, uniName);
+          const sameCountry = countriesMatch(s.country, uniCountry);
+          if (!linked && !providerMatch && !sameCountry) return null;
+          const source = schBundle.sourceMap.get(s.id);
+          const amountUsdValue =
+            s.amountUsdValue != null
               ? Number(s.amountUsdValue)
-              : null,
-        awardCurrency: s.awardCurrency ?? "USD",
-        awardPeriod: s.awardPeriod ?? "year",
-        deadline: s.deadline ?? s.deadlineDate ?? null,
-        deadlineDate: s.deadlineDate ?? s.deadline ?? null,
-        applicationUrl: s.applicationUrl ?? s.websiteUrl ?? null,
-        websiteUrl: s.websiteUrl ?? s.applicationUrl ?? null,
-        isVerified: s.verificationStatus === "verified",
-        eligibilityText: s.requirements ?? null,
-      }));
+              : s.awardAmount != null
+                ? Number(s.awardAmount)
+                : null;
+          return {
+            linked,
+            providerMatch,
+            verified: s.verificationStatus === "verified",
+            amountUsdValue,
+            row: {
+              id: s.id,
+              title: s.title,
+              name: s.title,
+              description: s.description ?? null,
+              degreeLevels: s.degreeLevels ?? null,
+              coverageType: s.coverageType ?? null,
+              amountUsdValue,
+              awardAmount:
+                s.awardAmount != null
+                  ? Number(s.awardAmount)
+                  : s.amountUsdValue != null
+                    ? Number(s.amountUsdValue)
+                    : null,
+              awardCurrency: s.awardCurrency ?? "USD",
+              awardPeriod: s.awardPeriod ?? "year",
+              deadline: s.deadline ?? s.deadlineDate ?? null,
+              deadlineDate: s.deadlineDate ?? s.deadline ?? null,
+              applicationUrl: s.applicationUrl ?? s.websiteUrl ?? null,
+              websiteUrl: s.websiteUrl ?? s.applicationUrl ?? null,
+              isVerified: s.verificationStatus === "verified",
+              eligibilityText: s.requirements ?? null,
+              sourceUrl: source?.sourceUrl ?? s.sourceUrl ?? null,
+              lastVerifiedAt: source?.lastVerifiedAt ?? null,
+              verificationStatus: s.verificationStatus,
+            },
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+      scored.sort((a, b) => {
+        // A scholarship linked to THIS university outranks a country-wide one.
+        if (a.linked !== b.linked) return a.linked ? -1 : 1;
+        // Then the ones this institution actually awards.
+        if (a.providerMatch !== b.providerMatch) return a.providerMatch ? -1 : 1;
+        // Then verified rows, then the biggest published award.
+        if (a.verified !== b.verified) return a.verified ? -1 : 1;
+        const am = a.amountUsdValue ?? -1;
+        const bm = b.amountUsdValue ?? -1;
+        if (am !== bm) return bm - am;
+        return a.row.id - b.row.id;
+      });
+
+      uniScholarships = scored.slice(0, 6).map((x) => x.row);
     } catch {
-      // scholarships table shape differs — omit safely.
+      // The scholarship catalogue is unavailable — omit safely.
     }
 
     // ---------- Generic money fields (currency-aware, USD fallback) ----------
@@ -692,10 +836,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
     setCachedUniversityDetailBase(uniId, basePayload);
 
-    return NextResponse.json({
-      ...basePayload,
-      match,
-    });
+    // Localize the OUTGOING copy — the cache keeps canonical English rows.
+    return NextResponse.json(
+      localizeDetailPayload(
+        {
+          ...basePayload,
+          match,
+        },
+        locale
+      )
+    );
   } catch (error) {
     console.error("GET /api/universities/[id] error:", error);
     // Never substitute sample universities: during a database outage students

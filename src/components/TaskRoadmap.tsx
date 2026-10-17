@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { CheckSquare, Plus, Trash2, Check, Clock } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 
 export interface TaskItem {
   id: number;
@@ -29,6 +30,11 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"All" | "Pending" | "Completed">("All");
+
+  // Clean-UI pass: the flat list opens with the six most relevant tasks —
+  // the rest unfold through one quiet Show-more pill (labels keep wrapping;
+  // nothing here truncates).
+  const [visibleTaskCount, setVisibleTaskCount] = useState(6);
 
   const categoryLabel = (category: string) => {
     switch (category) {
@@ -339,7 +345,7 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredTasks.map((t) => (
+          {filteredTasks.slice(0, visibleTaskCount).map((t) => (
             <div
               key={t.id}
               className={`flex min-w-0 items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-xs transition-all sm:gap-4 ${
@@ -398,6 +404,13 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
               </button>
             </div>
           ))}
+          <ShowMoreToggle
+            className="pt-1"
+            totalCount={filteredTasks.length}
+            visibleCount={Math.min(visibleTaskCount, filteredTasks.length)}
+            expanded={visibleTaskCount > 6}
+            onToggle={() => setVisibleTaskCount(visibleTaskCount >= filteredTasks.length ? 6 : filteredTasks.length)}
+          />
         </div>
       )}
       {/* Standing small print: this panel can be wrong — say so where it is read. */}

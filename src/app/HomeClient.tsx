@@ -10,6 +10,7 @@ import { LandingPage } from "@/components/LandingPage";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
 import { trackScreen } from "@/lib/tracker";
+import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { PageTransition } from "@/components/motion";
 import {
@@ -22,17 +23,26 @@ import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
+import { PanelSkeleton } from "@/components/hubs/ui";
 
-const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal));
-const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker));
-const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard));
-const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter));
-const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection));
-const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection));
-const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard));
-const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel));
-const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings));
-const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel));
+/**
+ * Every heavy screen is a separate chunk: the admin panel, the payments and
+ * rewards areas, the Telegram settings, the session list and the thirteen
+ * destination hubs. Opening the landing page therefore downloads the landing
+ * page — not the visa studio's speech SDK.
+ */
+const panelLoading = () => <PanelSkeleton rows={4} />;
+const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal), { loading: panelLoading });
+const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker), { loading: panelLoading });
+const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard), { loading: panelLoading });
+const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
+const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection), { loading: panelLoading });
+const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection), { loading: panelLoading });
+const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard), { loading: panelLoading });
+const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel), { loading: panelLoading });
+const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
+const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings), { loading: panelLoading });
+const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel), { loading: panelLoading });
 
 const UniversitiesHub = dynamic(() => import("@/components/hubs").then((m) => m.UniversitiesHub));
 const ScholarshipsHub = dynamic(() => import("@/components/hubs").then((m) => m.ScholarshipsHub));
@@ -266,6 +276,8 @@ export function Home({
     id: number;
     title: string;
     requestId: number;
+    /** Country-only deep link (e.g. "view grants in this country"). */
+    country?: string | null;
   } | null>(null);
   const scholarshipFocusSequence = useRef(0);
 
@@ -436,11 +448,7 @@ export function Home({
             // ignore
           }
         };
-        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-          window.requestIdleCallback(runDeferredSweeps, { timeout: 2500 });
-        } else {
-          setTimeout(runDeferredSweeps, 1500);
-        }
+        scheduleWhenIdle(runDeferredSweeps, 1800);
         setRestoreError(null);
         return;
       }
@@ -506,6 +514,19 @@ export function Home({
           id,
           title: String(detail.title ?? "").trim(),
           requestId: scholarshipFocusSequence.current,
+        });
+        handleNavigateTab("scholarships/browse");
+      } else if (detail.kind === "scholarships") {
+        // Country-filtered deep link from a university page: open the grants
+        // catalogue pre-filtered to that country (no single record to focus).
+        const country = String((detail as { country?: unknown }).country ?? "").trim();
+        if (!country) return;
+        scholarshipFocusSequence.current += 1;
+        setFocusScholarship({
+          id: 0,
+          title: "",
+          requestId: scholarshipFocusSequence.current,
+          country,
         });
         handleNavigateTab("scholarships/browse");
       } else {
@@ -903,7 +924,9 @@ export function Home({
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans">
+      {/* 3-tier shell: the column stacks on a phone, the tablet rail and the
+          laptop sidebar sit next to the content from `md` (768px) up. */}
+      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -914,11 +937,26 @@ export function Home({
         onStartOnboarding={startOnboarding}
         onLocaleChange={handleLocaleChange}
         onLogout={handleLogout}
+        hiddenNav={hiddenNav}
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
+        {/* Pillar 3 — the four-stage guided path, pinned above every screen so
+            a newcomer always knows where they are and what comes next. The
+            dashboard keeps its own richer journey control center instead. */}
+        {view === "app" && activeProfile && activeProfile.onboardingCompleted !== false && activeTab !== "dashboard" && (
+          <div className="mb-3">
+            <GuidedJourneyBar
+              activeProfile={activeProfile}
+              savedUniversityCount={savedUniversities.length}
+              savedScholarshipCount={savedScholarships.length}
+              onNavigate={handleNavigateTab}
+              onOpenProfileModal={() => openProfileModal(false)}
+            />
+          </div>
+        )}
         {/* Sections swap with a short cross-fade + lift. The outer profile key
             is also an isolation boundary: unmount every profile-scoped loader,
             checklist and draft immediately when the selected student changes. */}
@@ -972,6 +1010,7 @@ export function Home({
               onUnsaveUniversity={handleUnsaveUniversity}
               autoOpenUniversityId={focusUniversityId}
               onProfileSaved={handleProfileUpdated}
+              onOpenProfileModal={openProfileModal}
               workspaceId={workspaceId}
               setWorkspaceId={setWorkspaceId}
             />

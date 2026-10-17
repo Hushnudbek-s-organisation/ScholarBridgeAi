@@ -46,27 +46,34 @@ import {
   TestPlannerPanel,
 } from "@/components/journey/PreparePanels";
 import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
-import { HubPage, HubEmpty, usePaneSelection, type HubPaneDef } from "./ui";
+import { HubPage, HubEmpty, PanelSkeleton, usePaneSelection, type HubPaneDef } from "./ui";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import { FeeWaiverStudio } from "@/components/FeeWaiverStudio";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 
-const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel));
-const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio));
-const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel));
-const CareerExplorerPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.CareerExplorerPanel));
-const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then((m) => m.PlanningStudio));
-const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio));
-const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio));
-const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio));
-const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant));
-const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor));
-const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor));
-const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection));
-const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace));
-const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection));
-const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection));
+/**
+ * The heavy panes are code-split: the visa studio pulls the whole speech
+ * SDK, the AI studios pull the model clients, and the mentor marketplace
+ * pulls the video player. Opening the explorer therefore downloads the
+ * explorer — not every studio in the product.
+ */
+const panelLoading = () => <PanelSkeleton rows={3} />;
+const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel), { loading: panelLoading });
+const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio), { loading: panelLoading });
+const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel), { loading: panelLoading });
+const CareerExplorerPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.CareerExplorerPanel), { loading: panelLoading });
+const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then((m) => m.PlanningStudio), { loading: panelLoading });
+const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio), { loading: panelLoading });
+const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio), { loading: panelLoading });
+const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio), { loading: panelLoading });
+const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant), { loading: panelLoading });
+const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor), { loading: panelLoading });
+const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor), { loading: panelLoading });
+const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection), { loading: panelLoading });
+const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace), { loading: panelLoading });
+const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection), { loading: panelLoading });
+const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection), { loading: panelLoading });
 
 type Profile = StudentProfile | null;
 
@@ -91,7 +98,7 @@ export interface HubProps {
   onUnsaveScholarship?: (scholarshipId: number) => Promise<void>;
   autoOpenUniversityId?: number | null;
   /** Record selected in global search; the catalogue applies its own title filter. */
-  autoFocusScholarship?: { id: number; title: string; requestId: number } | null;
+  autoFocusScholarship?: { id: number; title: string; requestId: number; country?: string | null } | null;
   onProfileSaved?: (profile: StudentProfile) => void;
   onOpenProfileModal?: (isNew?: boolean) => void;
 }
@@ -166,11 +173,11 @@ export function UniversitiesHub({
   onUnsaveUniversity,
   autoOpenUniversityId,
   onProfileSaved,
+  onOpenProfileModal,
   setWorkspaceId,
 }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("universities");
   const active = useActivePane(pane, visible, hidden);
 
@@ -178,13 +185,14 @@ export function UniversitiesHub({
     <HubPage
       title={label}
       intro={t("introUniversities")}
-      primaryLabel={t("primaryUniversities")}
-      onPrimary={() => setPane("search")}
+      // The CTA only makes sense from another tab: on "search" itself it is a
+      // button that does nothing, so it is not rendered there.
+      primaryLabel={active !== "search" ? t("primaryUniversities") : undefined}
+      onPrimary={active !== "search" ? () => setPane("search") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "search" && (
         <UniversityExplorer
@@ -194,6 +202,7 @@ export function UniversitiesHub({
           onUnsaveUniversity={onUnsaveUniversity ?? (async () => undefined)}
           autoOpenUniversityId={autoOpenUniversityId ?? null}
           onNavigate={navigate}
+          onOpenProfileModal={() => onOpenProfileModal?.(false)}
           // Priority 4.1 — "Start Application" on a card opens that university's
           // workspace instead of the list, so the click lands somewhere useful.
           onApplicationStarted={(applicationId) => setWorkspaceId?.(applicationId)}
@@ -231,7 +240,6 @@ export function ScholarshipsHub({
   autoFocusScholarship,
 }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("scholarships");
   const active = useActivePane(pane, visible, hidden);
 
@@ -239,13 +247,12 @@ export function ScholarshipsHub({
     <HubPage
       title={label}
       intro={t("introScholarships")}
-      primaryLabel={t("primaryScholarships")}
-      onPrimary={() => setPane("browse")}
+      primaryLabel={active !== "browse" ? t("primaryScholarships") : undefined}
+      onPrimary={active !== "browse" ? () => setPane("browse") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("catalogue") }}
     >
       {active === "browse" && (
         <ScholarshipHub
@@ -278,8 +285,8 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
     <HubPage
       title={label}
       intro={t("introStudyPlan")}
-      primaryLabel={t("primaryStudyPlan")}
-      onPrimary={() => setPane("plan")}
+      primaryLabel={active !== "plan" ? t("primaryStudyPlan") : undefined}
+      onPrimary={active !== "plan" ? () => setPane("plan") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -300,7 +307,6 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
  * ====================================================================== */
 export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("tasks");
   const active = useActivePane(pane, visible, hidden);
   if (!profile) return <MissingProfile />;
@@ -313,7 +319,6 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "info", text: td("planning") }}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
       {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} />}
@@ -404,8 +409,8 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
     <HubPage
       title={label}
       intro={t("introApplications")}
-      primaryLabel={t("primaryApplications")}
-      onPrimary={() => setPane("tracker")}
+      primaryLabel={active !== "tracker" ? t("primaryApplications") : undefined}
+      onPrimary={active !== "tracker" ? () => setPane("tracker") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -669,8 +674,8 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
     <HubPage
       title={label}
       intro={t("introVisa")}
-      primaryLabel={t("primaryVisa")}
-      onPrimary={() => setPane("visa")}
+      primaryLabel={active !== "visa" ? t("primaryVisa") : undefined}
+      onPrimary={active !== "visa" ? () => setPane("visa") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -708,8 +713,8 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
     <HubPage
       title={label}
       intro={t("introGuidance")}
-      primaryLabel={t("primaryGuidance")}
-      onPrimary={() => setPane("mentor")}
+      primaryLabel={active !== "mentor" ? t("primaryGuidance") : undefined}
+      onPrimary={active !== "mentor" ? () => setPane("mentor") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -747,8 +752,8 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
     <HubPage
       title={label}
       intro={t("introCommunity")}
-      primaryLabel={t("primaryCommunity")}
-      onPrimary={() => setPane("forum")}
+      primaryLabel={active !== "forum" ? t("primaryCommunity") : undefined}
+      onPrimary={active !== "forum" ? () => setPane("forum") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}

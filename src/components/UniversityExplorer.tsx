@@ -6,8 +6,10 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { StudentProfile } from "./Navbar";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
-import { getCatalogSwr, setCatalogSwr } from "@/lib/clientCatalogSwr";
+import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { toWikimediaThumb, onWikimediaThumbError } from "@/lib/wikimediaThumb";
+import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 const UniversityDetail = dynamic(
   () => import("./UniversityDetail").then((m) => m.UniversityDetail),
@@ -38,6 +40,7 @@ import {
   Award,
   Filter,
   Check,
+  ChevronDown,
   Plus,
   Columns,
   ExternalLink,
@@ -129,6 +132,11 @@ interface UniversityExplorerProps {
    */
   onNavigate?: (id: string) => void;
   onApplicationStarted?: (applicationId: number, universityName: string) => void;
+  /**
+   * Pillar 5.1 — the score-booster micro-pill opens the profile editor so a
+   * missing GPA/IELTS is one click from fixing (never a dead-end hint).
+   */
+  onOpenProfileModal?: () => void;
 }
 
 export function UniversityExplorer({
@@ -139,6 +147,7 @@ export function UniversityExplorer({
   autoOpenUniversityId,
   onNavigate,
   onApplicationStarted,
+  onOpenProfileModal,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
   const tCountry = useTranslations("countryNames");
@@ -269,6 +278,11 @@ export function UniversityExplorer({
     maxRank,
     ieltsMax,
     perPage,
+    // Switching en↔uz↔ru refetches: the response language follows the request.
+    locale,
+    // Any score-relevant profile edit (GPA, IELTS, major, budget, …) forms a
+    // new result set identity, so every card re-scores immediately.
+    profileMatchFingerprint(activeProfile),
   ].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
@@ -292,12 +306,27 @@ export function UniversityExplorer({
     if (sortBy !== "rank") params.set("sort", sortBy);
     if (maxRank != null) params.set("maxRank", maxRank.toString());
     if (ieltsMax != null) params.set("ielts", ieltsMax.toString());
+    // Explicit locale: the API localizes the response AND the SWR cache key
+    // (params.toString()) splits per language, so cached rows never mix.
+    params.set("locale", locale);
     return params;
   };
 
   // True once a response has been rendered — from then on the existing cards
   // stay mounted during a refresh instead of being replaced by a placeholder.
   const hasLoadedRef = useRef(false);
+
+  // Profile edits must re-score what is on screen. Cached slices were computed
+  // from the OLD profile data, so drop them before the fingerprint refetch —
+  // placed before the fetch effect on purpose (effects run in order).
+  const profileFingerprint = profileMatchFingerprint(activeProfile);
+  const prevFingerprintRef = useRef(profileFingerprint);
+  useEffect(() => {
+    if (prevFingerprintRef.current !== profileFingerprint) {
+      prevFingerprintRef.current = profileFingerprint;
+      invalidateCatalogSwr();
+    }
+  }, [profileFingerprint]);
 
   const fetchUniversities = async (signal?: AbortSignal) => {
     const params = buildFilterParams();
@@ -320,7 +349,9 @@ export function UniversityExplorer({
       setLoading(false);
       setRefreshing(false);
       setFetchError("");
-      if (cached.isFresh) return;
+      // Fresh enough (< 15 s): render it and skip the request entirely.
+      // Older: render it instantly and refresh in the background.
+      if (!cached.shouldRevalidate) return;
     } else if (hasLoadedRef.current) {
       setRefreshing(true);
     } else {
@@ -398,6 +429,7 @@ export function UniversityExplorer({
     ieltsMax,
     page,
     perPage,
+    locale,
   ]);
 
   const filteredUniversities = universities;
@@ -477,6 +509,21 @@ export function UniversityExplorer({
     debouncedSearch.trim() !== "" ||
     sortBy !== "rank";
 
+  /**
+   * Phone (< 640px): the six filter controls used to stack above the first
+   * university card, pushing it ~550px down the screen. The search box and
+   * the quick chips stay visible; the secondary controls collapse behind one
+   * button that reports how many filters are active.
+   */
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const activeFilterCount =
+    (selectedCountry !== "All" ? 1 : 0) +
+    (selectedType !== "All" ? 1 : 0) +
+    (selectedLevel !== "All" ? 1 : 0) +
+    (committedMaxTuition !== 70000 ? 1 : 0) +
+    (maxRank != null ? 1 : 0) +
+    (ieltsMax != null ? 1 : 0);
+
   const resetFilters = () => {
     if (searchDebounceRef.current !== null) {
       window.clearTimeout(searchDebounceRef.current);
@@ -552,34 +599,32 @@ export function UniversityExplorer({
 
   return (
     <div className="space-y-6">
-      {/* Search & Filter Header */}
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            {/* h2, not h1: the hub shell above already renders the single <h1>
-                for this screen, and two stacked h1s broke the outline. */}
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Search className="h-5 w-5 text-indigo-600" />
-              {t("exTitle")}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t("exFilteredBy", { profile: activeProfile?.name || t("exProfileFallback") })}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {refreshing && (
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                {t("exRefreshing")}
-              </span>
-            )}
-          </div>
-
+      {/* Search & Filter toolbar — ONE compact card. The hub header above
+          already owns this screen's <h1> + intro paragraph, so the explorer
+          no longer repeats them as a giant title block: the localized
+          section name lives inline in the toolbar (still an <h2> for the
+          outline, still rendered for SSR and screen readers). */}
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <Search className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span className="min-w-0 break-words">{t("exTitle")}</span>
+          </h2>
+          {activeProfile ? (
+            <span className="hidden min-w-0 break-words text-[11px] text-slate-500 lg:inline">
+              {t("exFilteredBy", { profile: activeProfile.name || t("exProfileFallback") })}
+            </span>
+          ) : null}
+          {refreshing && (
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              {t("exRefreshing")}
+            </span>
+          )}
           {compareIds.length > 0 && (
             <button
               onClick={openCompareModal}
-              className="flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
+              className="ml-auto flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
             >
               <Columns className="h-4 w-4" />
               {t("exCompareSelected", { count: compareIds.length })}
@@ -587,9 +632,14 @@ export function UniversityExplorer({
           )}
         </div>
 
-        {/* Filter Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
-          {/* Text Search */}
+        {/* Filter Controls Grid
+            3 tiers: on a phone the five secondary controls collapse behind one
+            button (the search box and the quick chips stay visible); from
+            `sm` up the wrapper becomes `display: contents`, so all six
+            controls are direct cells of the outer grid — 3 columns × 2 rows on
+            a tablet, a single 6-column row on a laptop. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          {/* Text Search — always visible, on every screen size. */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -602,6 +652,31 @@ export function UniversityExplorer({
             />
           </div>
 
+          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="university-filters"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 sm:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="break-words text-center">{t("exFiltersAndSort")}</span>
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
+              The elements stay MOUNTED (only the layout changes), so the
+              filters keep their values, their labels and their test ids. */}
+          <div
+            id="university-filters"
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
+          >
           {/* Country Filter */}
           <div>
             <select
@@ -693,6 +768,7 @@ export function UniversityExplorer({
               onKeyUp={(e) => commitTuition(Number((e.target as HTMLInputElement).value))}
               className="w-full accent-indigo-600 cursor-pointer h-1.5 mt-1"
             />
+          </div>
           </div>
         </div>
 
@@ -799,6 +875,39 @@ export function UniversityExplorer({
         )}
       </div>
 
+      {/* Pillar 3.2 — the shortlist is never a dead end: once universities
+          are saved, the next logical steps are one click away right here. */}
+      {savedUniIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-3 py-2.5 dark:border-indigo-400/30 dark:bg-indigo-500/10">
+          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+            {t("exShortlistBanner", { count: savedUniIds.size })}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onNavigate?.("universities/outlook")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exCompareOutlook")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("scholarships/browse")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exFindScholarships")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("applications/tracker")}
+              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+            >
+              <span className="min-w-0 break-words">{t("exManageApplications")}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Results Count & Active Info */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
@@ -878,8 +987,9 @@ export function UniversityExplorer({
                 key={uni.id}
                 className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-lg hover:border-indigo-300 transition-all overflow-hidden flex flex-col justify-between group"
               >
-                {/* Top Image Banner */}
-                <div className="relative h-40 w-full overflow-hidden bg-slate-100">
+                {/* Top Image Banner — a taller banner on a phone, where the
+                    card is the only thing on the row. */}
+                <div className="relative h-44 w-full overflow-hidden bg-slate-100 md:h-40">
                   {uni.imageUrl ? (
                     <Image
                       src={toWikimediaThumb(uni.imageUrl, 640)}
@@ -924,7 +1034,7 @@ export function UniversityExplorer({
                   <div className="absolute bottom-3 left-3 right-3 text-white">
                     <div className="text-xs font-medium text-slate-200 flex items-center gap-1">
                       <span>{uni.flagEmoji}</span>
-                      <span>{uni.city}, {uni.country}</span>
+                      <span>{localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)}</span>
                     </div>
                     <h3 className="break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
                   </div>
@@ -935,12 +1045,57 @@ export function UniversityExplorer({
                   <div>
                     {/* Major & Program */}
                     <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                      {uni.programMajor}
+                      {localizeMajorOrField(uni.programMajor, locale)}
                     </div>
 
                     <p className="text-[11px] text-slate-500 mb-2">
                       <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
                     </p>
+
+                    {/* Pillar 5.1 — a rank-verified state-scholarship signal.
+                        El-Yurt Umidi funds applicants admitted to top-ranked
+                        universities; ≤300 on the catalogue's QS-based ranking
+                        is a CRITERION MATCH, never a promise of an award. */}
+                    {uni.worldRanking != null && uni.worldRanking <= 300 && (
+                      <p className="mb-2 inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800">
+                        <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
+                      </p>
+                    )}
+
+                    {/* Pillar 5.1 — the % is only as sharp as the profile.
+                        A logged-in student missing score data gets a one-click
+                        route to fixing it, plus the exact recovery a
+                        below-minimum dimension currently costs. */}
+                    {activeProfile &&
+                      (() => {
+                        const bd = uni.matchBreakdown;
+                        if (!bd) return null;
+                        const missingData = bd.comparedDimensions < 4;
+                        const penalties = bd.components
+                          .filter((c) => c.compared && c.points < 0 && (c.key === "english" || c.key === "gpa"))
+                          .reduce((gain, c) => gain + Math.abs(c.points), 0);
+                        if (!missingData && penalties <= 0) return null;
+                        return (
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                            {missingData && onOpenProfileModal && (
+                              <button
+                                type="button"
+                                onClick={onOpenProfileModal}
+                                className="inline-flex min-h-11 max-w-full items-center rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-bold leading-snug text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                              >
+                                <span className="min-w-0 break-words">{t("exScoreBoosterHint")}</span>
+                              </button>
+                            )}
+                            {penalties > 0 && (
+                              <p className="inline-flex max-w-full items-center rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-800 ring-1 ring-inset ring-amber-200">
+                                <span className="min-w-0 break-words">
+                                  {t("exBoosterGain", { points: penalties.toFixed(1) })}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* Priority 4.1 — the three comparisons that decide whether
                         this university is worth an application fee, already
@@ -951,11 +1106,10 @@ export function UniversityExplorer({
                       className="mb-2.5"
                     />
 
-                    <p className="break-words text-xs leading-relaxed text-slate-600">
-                      {uni.description}
-                    </p>
-
-                    {/* Key Requirements Grid — NULL = Not specified (spec §19) */}
+                    {/* Key Requirements Grid — NULL = Not specified (spec §19).
+                        The card shows the four numbers that decide "can I
+                        afford / qualify" and nothing else; every secondary
+                        diagnostic lives in the details drawer below. */}
                     <div className="grid grid-cols-2 gap-2 my-3 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <div>
                         <span className="text-slate-400 block">{t("exAnnualTuition")}</span>
@@ -975,10 +1129,11 @@ export function UniversityExplorer({
                       </div>
                     </div>
 
-                    {/* Highlights Badges */}
+                    {/* Up to TWO highlight pills on the card; the rest are in
+                        the drawer, so no card ever becomes a badge wall. */}
                     {highlightsList.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {highlightsList.map((hl, i) => (
+                        {highlightsList.slice(0, 2).map((hl, i) => (
                           <span key={i} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
                             ✓ {hl}
                           </span>
@@ -986,132 +1141,174 @@ export function UniversityExplorer({
                       </div>
                     )}
 
-                    {/* Why this match (spec §23) */}
-                    {(uni.matchReasons?.length || uni.matchIssues?.length) && (
-                      <div className="mt-2 space-y-1">
-                        {uni.matchReasons?.map((r, i) => (
-                          <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
-                            <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>{t("exWhyMatch")}</b> {r}</span>
+                    {/* Secondary diagnostics, collapsed by default. A NATIVE
+                        <details> is used (not a state toggle) on purpose: the
+                        children stay in the static SSR markup that the render
+                        checks assert, while the browser shows only the summary
+                        row until the student asks for the arithmetic. */}
+                    <details className="group mt-3 rounded-xl border border-slate-200/70 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 px-3 py-2">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0 break-words">{t("exCardDetails")}</span>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                      </summary>
+                      <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
+                        {uni.description && (
+                          <p className="break-words text-xs leading-relaxed text-slate-600">
+                            {uni.description}
                           </p>
-                        ))}
-                        {uni.matchIssues?.map((r, i) => (
-                          <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
-                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                            <span><b>{t("exWhyLower")}</b> {r}</span>
-                          </p>
-                        ))}
+                        )}
+
+                        {highlightsList.length > 2 && (
+                          <div className="flex flex-wrap gap-1">
+                            {highlightsList.slice(2).map((hl, i) => (
+                              <span key={`more-${i}`} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
+                                ✓ {hl}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Why this match (spec §23) */}
+                        {(uni.matchReasons?.length || uni.matchIssues?.length) && (
+                          <div className="space-y-1">
+                            {uni.matchReasons?.map((r, i) => (
+                              <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                                <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                                <span><b>{t("exWhyMatch")}</b> {r}</span>
+                              </p>
+                            ))}
+                            {uni.matchIssues?.map((r, i) => (
+                              <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                                <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                                <span><b>{t("exWhyLower")}</b> {r}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Exact arithmetic: every scoring dimension with the
+                            points it contributed. Nothing here is rounded into
+                            vagueness — the components add up to the score on
+                            the card header. */}
+                        <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
+
+                        {/* Post-study Work Permit (NULL = not specified) */}
+                        <div className="flex items-center justify-between text-xs border-t border-slate-200/70 pt-2 dark:border-slate-800/60 text-slate-600">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
+                            {t("exPsWorkVisa")}
+                          </span>
+                          <strong className="text-slate-900 font-bold dark:text-slate-100">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
+                        </div>
+
+                        {/* Source credibility footnote */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                          {uni.sourceUrl ? (
+                            <a
+                              href={uni.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex min-h-11 items-center gap-1 text-slate-500 transition-colors hover:text-indigo-600"
+                            >
+                              <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">{t("exSourcePending")}</span>
+                          )}
+                          {uni.sourceLastVerifiedAt ? (
+                            <span className="text-slate-400">
+                              {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
+                            </span>
+                          ) : uni.sourceUrl ? (
+                            <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
+                          ) : null}
+                        </div>
+
+                        {/* Priority 4.1 — the application launcher lives with
+                            the decision data it follows: read the breakdown,
+                            then start. Same one-click POST, no extra row in
+                            the card footer. */}
+                        <button
+                          type="button"
+                          onClick={() => void startApplication(uni)}
+                          disabled={startingUniId != null}
+                          title={
+                            activeProfile
+                              ? t("startAppHint", { name: uni.name })
+                              : t("startAppNeedsProfile")
+                          }
+                          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {startingUniId === uni.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            <Zap className="h-3.5 w-3.5" aria-hidden />
+                          )}
+                          {t("startApp")}
+                        </button>
                       </div>
-                    )}
-
-                    {/* Exact arithmetic: every scoring dimension with the
-                        points it contributed. Nothing here is rounded into
-                        vagueness — the components add up to the score above. */}
-                    <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
+                    </details>
                   </div>
 
-                  {/* Post-study Work Permit Banner (NULL = not specified) */}
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-600">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Briefcase className="h-3.5 w-3.5 text-indigo-600" />
-                      {t("exPsWorkVisa")}
-                    </span>
-                    <strong className="text-slate-900 font-bold">{formatNumber(uni.postStudyWorkVisaYears, { suffix: " Years" })}</strong>
-                  </div>
+                  {/* Footer — ONE row, one primary CTA. Shortlist, compare and
+                      the official site are compact icon/pill actions; nothing
+                      wraps into a second line of competing buttons. */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedUniId(uni.id)}
+                      className="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {t("exViewUniversity")}
+                    </button>
 
-                  {/* Source credibility footnote */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
-                    {uni.sourceUrl ? (
-                      <a
-                        href={uni.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center gap-1 text-slate-500 transition-colors hover:text-indigo-600"
+                    {isSaved ? (
+                      <button
+                        onClick={() => onUnsaveUniversity(uni.id)}
+                        title={t("exSaved")}
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl bg-emerald-100 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
                       >
-                        <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
-                      </a>
+                        <Check className="h-3.5 w-3.5" />
+                        <span className="max-sm:hidden">{t("exSaved")}</span>
+                      </button>
                     ) : (
-                      <span className="text-slate-400">{t("exSourcePending")}</span>
+                      <button
+                        onClick={() => onSaveUniversity(uni.id)}
+                        title={t("exShortlist")}
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-indigo-200 bg-white px-2.5 text-xs font-bold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="max-sm:hidden">{t("exShortlist")}</span>
+                      </button>
                     )}
-                    {uni.sourceLastVerifiedAt ? (
-                      <span className="text-slate-400">
-                        {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
-                      </span>
-                    ) : uni.sourceUrl ? (
-                      <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
-                    ) : null}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                    <label className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 px-2 text-xs text-slate-600">
+                    <label
+                      title={t("exCompare")}
+                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1 rounded-xl border px-2.5 text-xs transition-colors ${
+                        isCompared
+                          ? "border-indigo-300 bg-indigo-50 font-bold text-indigo-700"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={isCompared}
                         onChange={() => toggleCompare(uni.id)}
                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>{t("exCompare")}</span>
+                      <span className="max-sm:hidden">{t("exCompare")}</span>
                     </label>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Priority 4.1 — create the application (and its
-                          checklist) from the card the student is reading. */}
-                      <button
-                        type="button"
-                        onClick={() => void startApplication(uni)}
-                        disabled={startingUniId != null}
-                        title={
-                          activeProfile
-                            ? t("startAppHint", { name: uni.name })
-                            : t("startAppNeedsProfile")
-                        }
-                        className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {startingUniId === uni.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        ) : (
-                          <Zap className="h-3.5 w-3.5" aria-hidden />
-                        )}
-                        {t("startApp")}
-                      </button>
-
-                      <a
-                        href={uni.websiteUrl ?? undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
-                        title={t("exVisitPortal")}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-
-                      <button
-                        onClick={() => setSelectedUniId(uni.id)}
-                        className="flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        {t("exViewUniversity")}
-                      </button>
-
-                      {isSaved ? (
-                        <button
-                          onClick={() => onUnsaveUniversity(uni.id)}
-                          className="flex min-h-11 items-center gap-1 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {t("exSaved")}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onSaveUniversity(uni.id)}
-                          className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          {t("exShortlist")}
-                        </button>
-                      )}
-                    </div>
+                    <a
+                      href={uni.websiteUrl ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
+                      title={t("exVisitPortal")}
+                      aria-label={t("exVisitPortal")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
                   </div>
                 </div>
               </div>
@@ -1137,10 +1334,13 @@ export function UniversityExplorer({
         <AppNote kind="catalogue" className="border-t border-slate-200 pt-3" />
       )}
 
-      {/* Side-by-Side Comparison Modal */}
+      {/* Side-by-Side Comparison Modal
+          Phone: a bottom sheet the student swipes sideways through — the
+          metric names stay pinned on the left, so the numbers never lose
+          their label. Tablet and up: the centred dialog of before. */}
       {showCompareModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-end justify-center sm:items-center sm:p-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-t-3xl bg-white shadow-2xl overflow-hidden border border-slate-200 sm:rounded-2xl">
             <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Columns className="h-5 w-5" />
@@ -1154,7 +1354,7 @@ export function UniversityExplorer({
               </button>
             </div>
 
-            <ScrollRegion label={t("exCompare")} className="p-6 overflow-x-auto">
+            <ScrollRegion label={t("exCompare")} className="p-4 sm:p-6 overflow-x-auto">
               {compareLoading ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-500">
                   {t("exCompareLoading")}
@@ -1163,7 +1363,7 @@ export function UniversityExplorer({
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold text-slate-500 w-1/4">{t("exMetric")}</th>
+                    <th className="sticky left-0 z-10 bg-white py-3 px-4 font-bold text-slate-500 w-1/4 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMetric")}</th>
                     {comparedUniversities.map((u) => (
                       <th key={u.id} className="py-3 px-4 font-bold text-slate-900 text-sm w-1/4">
                         <div className="flex items-center gap-1">
@@ -1176,13 +1376,13 @@ export function UniversityExplorer({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMWorldRanking")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMWorldRanking")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMatchScore")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-blue-700">
                         {u.matchScore != null ? t("exMatchPct", { score: u.matchScore }) : t("exMatchUnavailable")}
@@ -1199,37 +1399,37 @@ export function UniversityExplorer({
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAnnualTuition")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMAnnualTuition")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900 font-bold">{formatMoney(u.annualTuitionUsd, "USD")}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMLivingExpenses")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMLivingExpenses")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatMoney(u.annualLivingEstUsd, "USD", { suffix: "/yr" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMPsWorkVisa")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMPsWorkVisa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 font-bold text-amber-700">{formatNumber(u.postStudyWorkVisaYears, { placeholder: "—", suffix: " Years" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinGpa")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinGpa")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minGpa, { decimals: 2, suffix: " / 4.0" })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMMinIelts")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinIelts")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minIelts, { decimals: 1 })}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-500">{t("exMAcceptanceRate")}</td>
+                    <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMAcceptanceRate")}</td>
                     {comparedUniversities.map((u) => (
                       <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatPercent(u.acceptanceRate, { placeholder: "—" })}</td>
                     ))}

@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { applicationTasks, universities } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeTaskRow } from "@/lib/catalogLocalizer";
 
 /**
  * Application tasks — basic roadmap is FREE (the "start from zero" promise).
@@ -53,7 +55,10 @@ export async function GET(req: Request) {
       .leftJoin(universities, eq(applicationTasks.universityId, universities.id))
       .where(eq(applicationTasks.profileId, profileId));
 
-    return NextResponse.json({ tasks });
+    // Localize seeded demo-task titles/categories for the caller's language;
+    // user-created tasks are personal notes and pass through verbatim.
+    const locale = localeFromRequest(req);
+    return NextResponse.json({ tasks: tasks.map((task) => localizeTaskRow(task, locale)) });
   } catch (error) {
     console.error("GET /api/tasks error:", error);
     return NextResponse.json({ error: "Failed to fetch application tasks" }, { status: 500 });

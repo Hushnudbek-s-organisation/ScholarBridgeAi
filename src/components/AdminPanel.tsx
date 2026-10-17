@@ -329,13 +329,6 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
                             >
                               <Icon className="h-3.5 w-3.5 shrink-0" />
                               <span className="min-w-0 flex-1 truncate">{t(`tab.${s.id}`)}</span>
-                              {s.isNew && (
-                                <span
-                                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-emerald-300" : "bg-emerald-500"}`}
-                                  title={tn("new")}
-                                  aria-label={tn("new")}
-                                />
-                              )}
                             </button>
                           </li>
                         );
@@ -363,7 +356,6 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
                   {SECTIONS.filter((s) => s.group === g).map((s) => (
                     <option key={s.id} value={s.id}>
                       {t(`tab.${s.id}`)}
-                      {s.isNew ? ` · ${tn("new")}` : ""}
                     </option>
                   ))}
                 </optgroup>
