@@ -8,6 +8,7 @@ import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import type { Locale } from "@/i18n/config";
+import { CountryFlag } from "@/components/CountryFlag";
 import {
   localizeCountry,
   localizeCoverageType,
@@ -442,7 +443,7 @@ export function ScholarshipHub({
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
               aria-label={t("allCountries")}
-              className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+              className="sb-flag-emoji min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
             >
               <option value="All">{t("allCountries")}</option>
               {focusCountry && (
@@ -579,6 +580,7 @@ export function ScholarshipHub({
                           not a ragged box per line. Neutral, so amber stays
                           reserved for deadlines and match issues. */}
                       <span className="inline-block max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                        <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
                         {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
                       </span>
                       <h3 className="font-bold text-base text-slate-900 mt-1">{localizeScholarshipTitle(s.title, locale)}</h3>

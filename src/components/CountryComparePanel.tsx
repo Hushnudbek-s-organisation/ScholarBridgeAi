@@ -3,7 +3,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Globe2, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { countriesMatch, countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
+import { countriesMatch, countryTranslationKey, resolveCountryCode, withQsTop200Countries } from "@/lib/countries";
+import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
+import { CountryFlag } from "@/components/CountryFlag";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { AppNote } from "@/components/AppNote";
 
@@ -40,8 +42,14 @@ function money(v: number | null): string {
 export function CountryComparePanel() {
   const t = useTranslations("countryCompare");
   const tCountry = useTranslations("countryNames");
+  const tc = useTranslations("common");
   const [data, setData] = useState<CompareData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  // The pill row used to sprawl across every catalog country; it now shows a
+  // ranked 10-pill window (selected pills NEVER fall out of the window) with
+  // a search field and a Show-more footer.
+  const [countrySearch, setCountrySearch] = useState("");
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,9 +101,26 @@ export function CountryComparePanel() {
   const countryOptions = withQsTop200Countries(
     availableRows.slice(0, 14).map((country) => country.country)
   );
+  const compareSearching = countrySearch.trim() !== "";
+  const isSelectedCountry = (c: string) => selected.some((value) => countriesMatch(value, c));
+  const visibleOptions = (() => {
+    const labelOf = (c: string) => {
+      const k = countryTranslationKey(c);
+      return k ? tCountry(k) : c;
+    };
+    const filtered = countryOptions.filter((c) =>
+      countrySearchMatch(countrySearch, [c, labelOf(c), resolveCountryCode(c)])
+    );
+    const ranked = rankCountryPicks(filtered, {
+      isSelected: isSelectedCountry,
+      priorityCodes: ["us", "gb", "de", "ca", "kr", "au", "sg", "jp"],
+      codeOf: (c) => resolveCountryCode(c),
+    });
+    return collapsePicks(ranked, 10, showAllCountries || compareSearching, isSelectedCountry);
+  })();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700">
       <div>
         <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
           <Globe2 className="h-3.5 w-3.5" /> {t("title")}
@@ -103,29 +128,48 @@ export function CountryComparePanel() {
         <p className="mt-1 max-w-2xl text-[11px] text-slate-500">{t("subtitle")}</p>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {countryOptions.map((country) => {
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={countrySearch}
+          onChange={(e) => setCountrySearch(e.target.value)}
+          placeholder={tc("searchCountry")}
+          aria-label={tc("searchCountry")}
+          className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+        />
+        {visibleOptions.map((country) => {
           const countryKey = countryTranslationKey(country);
           const count = availableRows
             .filter((row) => countriesMatch(row.country, country))
             .reduce((total, row) => total + row.universities, 0);
-          const isSelected = selected.some((value) => countriesMatch(value, country));
+          const isSelected = isSelectedCountry(country);
           return (
             <button
               key={country}
               type="button"
               onClick={() => toggle(country)}
               aria-pressed={isSelected}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 isSelected
                   ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                   : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
               }`}
             >
+              <CountryFlag country={country} size="xs" />
               {countryKey ? tCountry(countryKey) : country} <span className="text-[9px] opacity-60">({count})</span>
             </button>
           );
         })}
+        {!compareSearching && visibleOptions.length < countryOptions.length && (
+          <button
+            type="button"
+            onClick={() => setShowAllCountries((v) => !v)}
+            aria-expanded={showAllCountries}
+            className="rounded-full px-2 py-1 text-[11px] font-bold text-indigo-700 hover:underline dark:text-indigo-300"
+          >
+            {showAllCountries ? tc("showLess") : tc("showMoreCount", { count: countryOptions.length - visibleOptions.length })}
+          </button>
+        )}
         <button
           onClick={() => void load(selected)}
           disabled={loading || selected.length < 1}
@@ -157,7 +201,12 @@ export function CountryComparePanel() {
                 const countryKey = countryTranslationKey(c.country);
                 return (
                   <tr key={c.country} className="border-b border-slate-100">
-                    <td className="py-2 pr-3 font-bold text-slate-800">{countryKey ? tCountry(countryKey) : c.country}</td>
+                    <td className="py-2 pr-3 font-bold text-slate-800">
+                      <span className="inline-flex items-center gap-1.5">
+                        <CountryFlag country={c.country} size="xs" />
+                        {countryKey ? tCountry(countryKey) : c.country}
+                      </span>
+                    </td>
                       <td className="py-2 pr-3">{c.universities}</td>
                     <td className="py-2 pr-3">
                       {money(c.tuition.avgUsd)} <span className="text-[9px] text-slate-400">({c.tuition.published}/{c.universities})</span>

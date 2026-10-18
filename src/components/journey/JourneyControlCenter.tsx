@@ -12,6 +12,7 @@
  *   6. What should I look at? → recommendations based on the real profile
  */
 import React, { useCallback, useState } from "react";
+import { CountryFlag } from "@/components/CountryFlag";
 import { useTranslations } from "next-intl";
 import { useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -295,8 +296,9 @@ export function RecommendedPanel({
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecUnis ? recommended.universities : recommended.universities.slice(0, 3)).map((u) => (
                 <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {u.flagEmoji} {u.name}
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
+                    <span className="min-w-0 break-words">{u.name}</span>
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-300">
                     {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : t("ccRankingUnavailable")}

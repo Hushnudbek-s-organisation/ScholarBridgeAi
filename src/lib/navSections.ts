@@ -257,8 +257,13 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
       "The visa case, the interview, and everything after it: documents, flights, housing, insurance and arrival.",
     stage: "visa",
     panes: [
-      { id: "visa", label: "Visa", description: "Visa requirements for your destination, your case status, appointments and interview practice." },
-      { id: "departure", label: "Departure checklist", isNew: true, description: "After the visa: flight, housing, insurance, packing and arrival steps." },
+      // The simulator leads: it is the tool students come to this hub FOR, so
+      // it opens at the top of the viewport instead of sitting 1,500 px under
+      // the requirements panel it used to share the tab with.
+      { id: "speaking", label: "AI speaking simulator", description: "Live voice and text consular visa interview simulator with instant feedback." },
+      { id: "visa", label: "Visa requirements", description: "Visa requirements for your destination, model answers and past session history." },
+      { id: "apostille", label: "e-Apostille & funds", description: "Uzbekistan e-Apostille matrix, translation rules and bank-statement window calculator." },
+      { id: "departure", label: "Departure & arrival", isNew: true, description: "After the visa: flight, housing, insurance, packing and 7/30/90-day arrival steps." },
     ],
   },
 
@@ -437,6 +442,8 @@ export const LEGACY_SECTION_ALIASES: Record<string, { section: string; pane?: st
   interviews: { section: "materials", pane: "interviews" },
   // After admission
   departure: { section: "visa", pane: "departure" },
+  speaking: { section: "visa", pane: "speaking" },
+  apostille: { section: "visa", pane: "apostille" },
   // Help & learning
   chat: { section: "guidance", pane: "mentor" },
   advisor: { section: "guidance", pane: "mentor" },

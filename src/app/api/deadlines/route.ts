@@ -27,6 +27,14 @@ import {
 import { calculateUniversityMatch } from "@/lib/matching";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { localeFromRequest } from "@/lib/engineText";
+import {
+  localizeCountry,
+  localizeMajorOrField,
+  localizeScholarshipProvider,
+  localizeScholarshipTitle,
+  localizeStatusValue,
+} from "@/lib/catalogLocalizer";
 import {
   coverageTier,
   evaluateScholarshipForSavedUnis,
@@ -142,6 +150,10 @@ export async function GET(req: Request) {
 
     const items: any[] = [];
     const now = new Date();
+    // Feed rows are translated for the student's locale (en = source values);
+    // machine-readable statuses (COMPLETED/PENDING/REGISTERED) stay raw so
+    // client chips can re-style them.
+    const locale = localeFromRequest(req);
 
     // --- Private context in one parallel read: what the student saved, and
     //     the profile the scoring engines need. ---
@@ -171,7 +183,7 @@ export async function GET(req: Request) {
     const savedUniRefs: SavedUniRef[] = uniRows.map((u) => ({
       id: u.id,
       name: u.name,
-      country: u.country,
+      country: localizeCountry(u.country, locale),
       annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
     }));
 
@@ -318,10 +330,10 @@ export async function GET(req: Request) {
       items.push({
         id: `sch-${s.id}`,
         type: "scholarship",
-        title: s.title,
-        subtitle: s.provider,
+        title: localizeScholarshipTitle(s.title, locale),
+        subtitle: localizeScholarshipProvider(s.provider, locale),
         date: date!.toISOString().slice(0, 10),
-        status: statusLabel(status),
+        status: localizeStatusValue(statusLabel(status), locale),
         daysRemaining: daysUntil(now, date!.toISOString()),
         source: s.sourceUrl || s.websiteUrl || null,
         saved: true,
@@ -352,10 +364,10 @@ export async function GET(req: Request) {
         items.push({
           id: `sch-${s.id}`,
           type: "scholarship",
-          title: s.title,
-          subtitle: s.provider,
+          title: localizeScholarshipTitle(s.title, locale),
+          subtitle: localizeScholarshipProvider(s.provider, locale),
           date: date!.toISOString().slice(0, 10),
-          status: statusLabel(status),
+          status: localizeStatusValue(statusLabel(status), locale),
           daysRemaining: daysUntil(now, date!.toISOString()),
           source: s.sourceUrl || s.websiteUrl || null,
           saved: false,
@@ -378,13 +390,13 @@ export async function GET(req: Request) {
             id: `uni-${u.id}`,
             type: "university",
             title: u.name,
-            subtitle: `${u.country} · ${u.programMajor}`,
+            subtitle: `${localizeCountry(u.country, locale)} · ${localizeMajorOrField(u.programMajor, locale)}`,
             date: null,
             status: "NO DEADLINE ON FILE",
             daysRemaining: null,
             source: u.websiteUrl || null,
             saved: true,
-            country: u.country,
+            country: localizeCountry(u.country, locale),
             universityId: u.id,
           });
           continue;
@@ -394,14 +406,14 @@ export async function GET(req: Request) {
           id: `uni-${u.id}`,
           type: "university",
           title: u.name,
-          subtitle: `${u.country} · ${u.programMajor}`,
+          subtitle: `${localizeCountry(u.country, locale)} · ${localizeMajorOrField(u.programMajor, locale)}`,
           date: deadline,
-          status: savedUniStatusLabel(deadline),
+          status: localizeStatusValue(savedUniStatusLabel(deadline), locale),
           daysRemaining: daysUntil(now, deadline),
           source: u.websiteUrl || null,
           saved: true,
           recommended: false,
-          country: u.country,
+          country: localizeCountry(u.country, locale),
           universityId: u.id,
           chanceScore: scores?.chanceScore ?? null,
           effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,
@@ -482,14 +494,14 @@ export async function GET(req: Request) {
         id: `uni-${u.id}`,
         type: "university",
         title: u.name,
-        subtitle: `${u.country} · ${u.programMajor}`,
+        subtitle: `${localizeCountry(u.country, locale)} · ${localizeMajorOrField(u.programMajor, locale)}`,
         date: deadline,
-        status: savedUniStatusLabel(deadline),
+        status: localizeStatusValue(savedUniStatusLabel(deadline), locale),
         daysRemaining: deadline ? daysUntil(now, deadline) : null,
         source: u.websiteUrl || null,
         saved: false,
         recommended: true,
-        country: u.country,
+        country: localizeCountry(u.country, locale),
         universityId: u.id,
         chanceScore: scores?.chanceScore ?? chanceScore,
         effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,

@@ -9,6 +9,12 @@ import { withStatus } from "@/lib/scholarshipStatus";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { guardStudent, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
 import {
+  localizeCountry,
+  localizeScholarshipProvider,
+  localizeScholarshipTitle,
+  localizeStatusValue,
+} from "@/lib/catalogLocalizer";
+import {
   autopilotPriority,
   autopilotTags,
   commonScholarshipAwardPeriod,
@@ -52,9 +58,10 @@ export async function GET(req: Request) {
       const st = withStatus(s);
       const item: AutopilotScholarship = {
         id: s.id,
-        title: s.title,
-        provider: s.provider,
-        country: s.country,
+        // Catalogue text arrives in the student's language (en = source).
+        title: localizeScholarshipTitle(s.title, locale),
+        provider: localizeScholarshipProvider(s.provider, locale),
+        country: localizeCountry(s.country, locale),
         coverageType: s.coverageType,
         amountUsdValue: resolvedUsdScholarshipAmount(s),
         awardPeriod: s.awardPeriod,
@@ -70,7 +77,7 @@ export async function GET(req: Request) {
       return {
         ...item,
         websiteUrl: s.applicationUrl || s.websiteUrl,
-        statusLabel: st.statusLabel,
+        statusLabel: localizeStatusValue(st.statusLabel, locale),
         isEligible: m.isEligible,
         reasons: translateReasons(locale, "scholarship", m.reasonDetails, m.reasons).slice(0, 3),
         issues: translateReasons(locale, "scholarship", m.issueDetails, m.potentialIssues).slice(0, 2),

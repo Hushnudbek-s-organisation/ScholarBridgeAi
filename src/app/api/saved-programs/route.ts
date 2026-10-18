@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { savedPrograms, universityPrograms, universities } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { positiveInt, readJsonBody } from "@/lib/request";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeProgramRow, localizeUniversityRow } from "@/lib/catalogLocalizer";
 
 /**
  * Saved programs (spec §24 — program shortlist).
@@ -47,8 +49,15 @@ export async function GET(req: Request) {
       .innerJoin(universities, eq(universityPrograms.universityId, universities.id))
       .where(eq(savedPrograms.profileId, profileId));
 
+    const locale = localeFromRequest(req);
+    // Program + parent-university rows are translated for the student's locale.
+    const localized = saved.map((row) => ({
+      ...row,
+      program: localizeProgramRow(row.program as never, locale),
+      university: localizeUniversityRow(row.university as never, locale),
+    }));
     return NextResponse.json({
-      savedPrograms: saved,
+      savedPrograms: localized,
       count: saved.length,
     });
   } catch (error) {

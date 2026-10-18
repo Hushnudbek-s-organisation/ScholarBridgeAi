@@ -30,6 +30,7 @@ import { GoalPlanner } from "@/components/growth/GoalPlanner";
 import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
 import { SuccessStories } from "@/components/growth/SuccessStories";
 import { InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
+import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { ArrivalPlanPanel } from "@/components/journey/ArrivalPlanPanel";
 import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
 import {
@@ -134,6 +135,52 @@ function useActivePane(pane: string | null, visible: { id: string }[], hidden: s
 
 function MissingProfile() {
   return <Empty title="Choose a profile" hint="Sign in and pick a student profile to open this section." />;
+}
+
+/**
+ * A quiet pill switcher for panels that used to STACK vertically inside one
+ * tab (visa simulator under the requirements wall, four essay studios in a
+ * row, vault under answers …). Only the selected tool is mounted, so the
+ * first thing the student came for opens at the TOP of the viewport instead
+ * of a thousand pixels below a neighbor.
+ *
+ * Deliberately NOT a nested tablist — the pane tabs above already own the
+ * tab semantics; these are toggle buttons (aria-pressed) so assistive tech
+ * reads a simple two-choice control.
+ */
+export function SubPills({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  options: { id: string; label: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label={ariaLabel}>
+      {options.map((o) => {
+        const isActive = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            aria-pressed={isActive}
+            className={`min-h-11 shrink-0 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
+              isActive
+                ? "border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
+                : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /** Premium gate wrapper that keeps the existing feature flags and copy. */
@@ -370,6 +417,9 @@ export function FundingHub({ profile, navigate }: HubProps) {
   const t = useTranslations("hubs");
   const td = useTranslations("disclaimers");
   const { label } = usePanes("funding");
+  // The three funding tools used to stack into one ~2,500 px wall; one is
+  // mounted at a time now, and the plan (the reason the tab exists) leads.
+  const [fundTool, setFundTool] = useState<"plan" | "waivers" | "templates">("plan");
   if (!profile) return <MissingProfile />;
   return (
     <HubPage
@@ -379,13 +429,23 @@ export function FundingHub({ profile, navigate }: HubProps) {
       onPrimary={() => navigate("scholarships")}
       note={{ tone: "warn", text: td("money") }}
     >
-      <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+      <SubPills
+        ariaLabel={label}
+        value={fundTool}
+        onChange={(id) => setFundTool(id as "plan" | "waivers" | "templates")}
+        options={[
+          { id: "plan", label: t("pillFundingPlan") },
+          { id: "waivers", label: t("pillWaivers") },
+          { id: "templates", label: t("pillTemplates") },
+        ]}
+      />
+      {fundTool === "plan" && <FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />}
       {/* Priority 5.1 — which of the student's universities are free to apply
           to, whether they have a recorded reason to ask for a waiver, and the
           two letters that actually get one granted. */}
-      <FeeWaiverStudio profile={profile} className="mt-4" />
+      {fundTool === "waivers" && <FeeWaiverStudio profile={profile} />}
       {/* Sponsor affidavit (Homiylik xati) and the funding cover note. */}
-      <DocumentTemplatesCard kinds={["affidavit", "coverNote"]} className="mt-4" />
+      {fundTool === "templates" && <DocumentTemplatesCard kinds={["affidavit", "coverNote"]} />}
     </HubPage>
   );
 }
@@ -418,12 +478,19 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "tracker" && (
-        <>
+        <div className="space-y-4">
           <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />
-          {/* Priority 5.1 — the fees already committed to, and the waiver routes
-              still open on the universities being tracked. */}
-          <FeeWaiverStudio profile={profile} className="mt-4" />
-        </>
+          {/* Priority 5.1 — the waiver studio now lives in the Financial Plan
+              destination (tab "Fee waivers"); the tracker stays about
+              applications, and this one-line pointer keeps the tool reachable. */}
+          <button
+            type="button"
+            onClick={() => navigate("funding")}
+            className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left text-xs font-bold text-slate-600 transition-colors hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:text-indigo-200"
+          >
+            {t("feeWaiverHint")}
+          </button>
+        </div>
       )}
       {active === "workspace" && (
         <ApplicationWorkspacePanel
@@ -443,6 +510,7 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
  * ====================================================================== */
 export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspaceId, setWorkspaceId }: HubProps) {
   const t = useTranslations("hubs");
+  const tp = useTranslations("navPanes");
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("materials");
   const active = useActivePane(pane, visible, hidden);
@@ -451,6 +519,11 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
   // The list of applications the student can attach materials to. Local state
   // only — it is a view filter, never a second source of truth.
   const [applications, setApplications] = useState<{ id: number; universityId: number | null; universityName: string; programName: string | null }[]>([]);
+  // De-stacked toolbars: the documents pane (vault + saved answers) and the
+  // essays pane (four studios that used to form a ~4,000 px wall) each mount
+  // ONE tool at a time. View state only — never a second source of truth.
+  const [docsView, setDocsView] = useState<"vault" | "answers">("vault");
+  const [essayTool, setEssayTool] = useState<"sop" | "rubric" | "recommendations" | "outreach">("sop");
   useEffect(() => {
     if (!profileId) return;
     let live = true;
@@ -547,57 +620,87 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
       )}
       {active === "documents" && (
         <div className="space-y-4">
-          <DocumentVaultPanel
-            key={`vault-${profile.id}-${effectiveId ?? "none"}`}
-            profileId={profile.id}
-            applicationId={effectiveId}
-            onNavigateTab={navigate}
+          <SubPills
+            ariaLabel={tp("documents")}
+            value={docsView}
+            onChange={(id) => setDocsView(id as "vault" | "answers")}
+            options={[
+              { id: "vault", label: t("pillVault") },
+              { id: "answers", label: t("pillAnswers") },
+            ]}
           />
-          <AnswerVault activeProfile={profile} />
+          {docsView === "vault" ? (
+            <DocumentVaultPanel
+              key={`vault-${profile.id}-${effectiveId ?? "none"}`}
+              profileId={profile.id}
+              applicationId={effectiveId}
+              onNavigateTab={navigate}
+            />
+          ) : (
+            <AnswerVault activeProfile={profile} />
+          )}
         </div>
       )}
       {active === "essays" && (
         <div className="space-y-4">
-          <Gated
-            profileId={profile.id}
-            feature="ai_essay"
-            title={t("essayPremiumTitle")}
-            description={t("essayPremiumDescription")}
-            onUpgrade={() => navigate("payments")}
-          >
-            <div className="space-y-4">
-              <AiSopStudio
-                key={`sop-${profile.id}-${effectiveId ?? "none"}`}
-                activeProfile={profile}
-                applicationId={effectiveId}
-                universityId={selectedApplication?.universityId ?? null}
-                universityName={selectedApplication?.universityName ?? null}
-                programName={selectedApplication?.programName ?? null}
-              />
-              <EssayRubricStudio
-                key={`essay-${profile.id}-${effectiveId ?? "none"}`}
-                activeProfile={profile}
-                applicationId={effectiveId}
-                universityId={selectedApplication?.universityId ?? null}
-                universityName={selectedApplication?.universityName ?? null}
-                programName={selectedApplication?.programName ?? null}
-              />
-            </div>
-          </Gated>
-          <RecommendationManagerPanel
-            key={`recommendations-${profile.id}-${effectiveId ?? "none"}`}
-            profileId={profile.id}
-            applicationId={effectiveId}
-            universityName={selectedApplication?.universityName ?? null}
+          <SubPills
+            ariaLabel={tp("essays")}
+            value={essayTool}
+            onChange={(id) => setEssayTool(id as "sop" | "rubric" | "recommendations" | "outreach")}
+            options={[
+              { id: "sop", label: t("pillSop") },
+              { id: "rubric", label: t("pillRubric") },
+              { id: "recommendations", label: t("pillRecommendations") },
+              { id: "outreach", label: t("pillOutreach") },
+            ]}
           />
+          {(essayTool === "sop" || essayTool === "rubric") && (
+            <Gated
+              profileId={profile.id}
+              feature="ai_essay"
+              title={t("essayPremiumTitle")}
+              description={t("essayPremiumDescription")}
+              onUpgrade={() => navigate("payments")}
+            >
+              {essayTool === "sop" ? (
+                <AiSopStudio
+                  key={`sop-${profile.id}-${effectiveId ?? "none"}`}
+                  activeProfile={profile}
+                  applicationId={effectiveId}
+                  universityId={selectedApplication?.universityId ?? null}
+                  universityName={selectedApplication?.universityName ?? null}
+                  programName={selectedApplication?.programName ?? null}
+                />
+              ) : (
+                <EssayRubricStudio
+                  key={`essay-${profile.id}-${effectiveId ?? "none"}`}
+                  activeProfile={profile}
+                  applicationId={effectiveId}
+                  universityId={selectedApplication?.universityId ?? null}
+                  universityName={selectedApplication?.universityName ?? null}
+                  programName={selectedApplication?.programName ?? null}
+                />
+              )}
+            </Gated>
+          )}
+          {essayTool === "recommendations" && (
+            <RecommendationManagerPanel
+              key={`recommendations-${profile.id}-${effectiveId ?? "none"}`}
+              profileId={profile.id}
+              applicationId={effectiveId}
+              universityName={selectedApplication?.universityName ?? null}
+            />
+          )}
           {/* Priority 5.2 — the first email to a supervisor, built from the
               paper the student actually read and graded 0–100 on the things that
               decide whether it gets an answer. */}
-          <ProfessorOutreachStudio
-            key={`outreach-${profile.id}-${effectiveId ?? "none"}`}
-            profile={profile}
-            defaultUniversityName={selectedApplication?.universityName ?? null}
-          />
+          {essayTool === "outreach" && (
+            <ProfessorOutreachStudio
+              key={`outreach-${profile.id}-${effectiveId ?? "none"}`}
+              profile={profile}
+              defaultUniversityName={selectedApplication?.universityName ?? null}
+            />
+          )}
         </div>
       )}
       {active === "interviews" && <InterviewCenterPanel onNavigateTab={navigate} />}
@@ -668,6 +771,8 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("visa");
   const active = useActivePane(pane, visible, hidden);
+  // The departure pane's two planners switch instead of stacking.
+  const [departureView, setDepartureView] = useState<"pre" | "arrival">("pre");
   if (!profile) return <MissingProfile />;
 
   return (
@@ -682,18 +787,33 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
       hiddenPanes={hidden}
       note={{ tone: "warn", text: td("visa") }}
     >
+      {/* The simulator used to render 1,500 px BELOW the requirements wall in
+          one shared "visa" tab. Now every tool owns its pane and the
+          simulator IS the default landing pane of this hub. */}
+      {active === "speaking" && <VisaSpeakingAssistant activeProfile={profile} />}
       {active === "visa" && (
-        <div className="space-y-4">
-          <VisaCenterPanel profileId={profile.id} onNavigateTab={navigate} />
-          <VisaSpeakingAssistant activeProfile={profile} />
-        </div>
+        <VisaCenterPanel profileId={profile.id} onNavigateTab={navigate} hideApostille />
       )}
+      {active === "apostille" && <ApostilleReadinessCard profileId={profile.id} />}
       {active === "departure" && (
         <div className="space-y-4">
-          <DepartureChecklist activeProfile={profile} onNavigate={navigate} />
-          {/* After arrival: the 7/30/90-day and first-year plan (product journey §14.3-14.4).
-              Lives here so "after the visa" is one place — never a second nav section. */}
-          <ArrivalPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+          <SubPills
+            ariaLabel={label}
+            value={departureView}
+            onChange={(id) => setDepartureView(id as "pre" | "arrival")}
+            options={[
+              { id: "pre", label: t("pillPreDeparture") },
+              { id: "arrival", label: t("pillArrivalPlan") },
+            ]}
+          />
+          {departureView === "pre" ? (
+            <DepartureChecklist activeProfile={profile} onNavigate={navigate} />
+          ) : (
+            /* After arrival: the 7/30/90-day and first-year plan (product
+               journey §14.3-14.4). Lives here so "after the visa" is one
+               place — never a second nav section. */
+            <ArrivalPlanPanel profileId={profile.id} onNavigateTab={navigate} />
+          )}
         </div>
       )}
     </HubPage>
@@ -707,6 +827,9 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
   const t = useTranslations("hubs");
   const { panes, visible, label } = usePanes("guidance");
   const active = useActivePane(pane, visible, hidden);
+  // AI chat vs the advisor, and booking vs browsing, switch instead of stacking.
+  const [mentorTool, setMentorTool] = useState<"chat" | "advisor">("chat");
+  const [consultTool, setConsultTool] = useState<"consulting" | "mentors">("consulting");
   if (!profile) return <MissingProfile />;
 
   return (
@@ -721,18 +844,44 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
       hiddenPanes={hidden}
       note={{ tone: "warn", text: t("aiDisclaimer") }}
     >
-      {active === "mentor" && (
-        <div className="space-y-4">
+      {active === "mentor" &&
+        (hidden.includes("advisor") ? (
           <AiChatMentor activeProfile={profile} />
-          {!hidden.includes("advisor") && <AdmissionsAdvisor activeProfile={profile} />}
-        </div>
-      )}
-      {active === "consulting" && (
-        <div className="space-y-4">
+        ) : (
+          <div className="space-y-4">
+            <SubPills
+              ariaLabel={label}
+              value={mentorTool}
+              onChange={(id) => setMentorTool(id as "chat" | "advisor")}
+              options={[
+                { id: "chat", label: t("pillChat") },
+                { id: "advisor", label: t("pillAdvisor") },
+              ]}
+            />
+            {mentorTool === "chat" ? <AiChatMentor activeProfile={profile} /> : <AdmissionsAdvisor activeProfile={profile} />}
+          </div>
+        ))}
+      {active === "consulting" &&
+        (hidden.includes("mentors") ? (
           <ConsultingSection key={profile.id} activeProfile={profile} />
-          {!hidden.includes("mentors") && <MentorMarketplace key={profile.id} activeProfile={profile} />}
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            <SubPills
+              ariaLabel={label}
+              value={consultTool}
+              onChange={(id) => setConsultTool(id as "consulting" | "mentors")}
+              options={[
+                { id: "consulting", label: t("pillConsulting") },
+                { id: "mentors", label: t("pillMentors") },
+              ]}
+            />
+            {consultTool === "consulting" ? (
+              <ConsultingSection key={profile.id} activeProfile={profile} />
+            ) : (
+              <MentorMarketplace key={profile.id} activeProfile={profile} />
+            )}
+          </div>
+        ))}
       {active === "faq" && <FaqSection />}
     </HubPage>
   );
@@ -746,6 +895,7 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("community");
   const active = useActivePane(pane, visible, hidden);
+  const [courseTool, setCourseTool] = useState<"courses" | "providers">("courses");
   if (!profile) return <MissingProfile />;
 
   return (
@@ -763,8 +913,20 @@ export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
       {active === "forum" && <ForumSection activeProfile={profile} isModerator={profile.isAdmin ?? false} />}
       {active === "courses" && (
         <div className="space-y-4">
-          <CoursesSection activeProfile={profile} />
-          <LearningProvidersPanel key={`lp-${profile.id}`} profileId={profile.id} />
+          <SubPills
+            ariaLabel={label}
+            value={courseTool}
+            onChange={(id) => setCourseTool(id as "courses" | "providers")}
+            options={[
+              { id: "courses", label: t("pillCourses") },
+              { id: "providers", label: t("pillProviders") },
+            ]}
+          />
+          {courseTool === "courses" ? (
+            <CoursesSection activeProfile={profile} />
+          ) : (
+            <LearningProvidersPanel key={`lp-${profile.id}`} profileId={profile.id} />
+          )}
         </div>
       )}
     </HubPage>

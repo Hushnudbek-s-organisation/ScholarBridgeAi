@@ -217,3 +217,120 @@ export function withQsTop200Countries(existing: readonly string[]): string[] {
 
   return options;
 }
+
+/* ==========================================================================
+ * Flag/code resolution for EVERY country label the platform stores
+ * ==========================================================================
+ * `QS_TOP_200_COUNTRIES` is the picker catalogue, but catalogs, saved rows,
+ * deadlines and search results carry more identities than it lists
+ * (Uzbekistan, Türkiye, the EU as a "country", "Global" award pools …). The
+ * map below closes that gap for flag + ISO code rendering only — matching and
+ * selection semantics keep using the alias registry above.
+ */
+
+export interface ExtraCountryMeta {
+  /** Canonical ISO-3166-1 alpha-2 code (upper case), or "GL" for pools. */
+  code: string;
+  flag: string;
+  aliases: readonly string[];
+}
+
+/**
+ * Extra display identities. Keys double as stable ids; every alias normalizes
+ * into the same lookup. "GL" is deliberately not a real ISO code — it is the
+ * platform's "open to the whole world" pool marker.
+ */
+export const EXTRA_COUNTRY_META: Record<string, ExtraCountryMeta> = {
+  uzbekistan: {
+    code: "UZ",
+    flag: "\u{1F1FA}\u{1F1FF}",
+    aliases: ["Uzbekistan", "O'zbekiston", "Ozbekiston", "Republic of Uzbekistan", "O‘zbekiston", "Узбекистан", "Республика Узбекистан"],
+  },
+  europeanUnion: {
+    code: "EU",
+    flag: "\u{1F1EA}\u{1F1FA}",
+    aliases: ["European Union", "Europe", "EU", "Yevropa Ittifoqi", "Yevropa", "Евросоюз", "Европейский союз"],
+  },
+  turkey: {
+    code: "TR",
+    flag: "\u{1F1F9}\u{1F1F7}",
+    aliases: ["Turkey", "Türkiye", "Turkiye", "Турция"],
+  },
+  hungary: { code: "HU", flag: "\u{1F1ED}\u{1F1FA}", aliases: ["Hungary", "Vengriya", "Мадиар", "Венгрия"] },
+  poland: { code: "PL", flag: "\u{1F1F5}\u{1F1F1}", aliases: ["Poland", "Polyaka", "Польша"] },
+  czechRepublic: { code: "CZ", flag: "\u{1F1E8}\u{1F1FF}", aliases: ["Czech Republic", "Czechia", "Chexiya", "Чехия", "Czech"] },
+  ukraine: { code: "UA", flag: "\u{1F1FA}\u{1F1E6}", aliases: ["Ukraine", "Ukraina", "Украина"] },
+  vietnam: { code: "VN", flag: "\u{1F1FB}\u{1F1F3}", aliases: ["Vietnam", "Viet Nam", "Vyetnam", "Вьетнам"] },
+  pakistan: { code: "PK", flag: "\u{1F1F5}\u{1F1F0}", aliases: ["Pakistan", "Пакис­тон", "Пакистан"] },
+  bangladesh: { code: "BD", flag: "\u{1F1E7}\u{1F1E9}", aliases: ["Bangladesh", "Banglades", "Бангладеш"] },
+  india: { code: "IN", flag: "\u{1F1EE}\u{1F1F3}", aliases: ["India", "Indiya", "Индия"] },
+  global: {
+    code: "GL",
+    flag: "\u{1F30D}",
+    aliases: ["Global", "International", "Multiple Countries", "All", "Worldwide", "World", "Dunyo", "Butun dunyo", "Весь мир", "Международные"],
+  },
+};
+
+const EXTRA_META_BY_ALIAS = new Map<string, ExtraCountryMeta>();
+for (const meta of Object.values(EXTRA_COUNTRY_META)) {
+  for (const alias of [meta.code, ...meta.aliases]) {
+    EXTRA_META_BY_ALIAS.set(normalizeCountryAlias(alias), meta);
+  }
+}
+
+/** Regional-indicator pair (a flag emoji) → 2-letter code, else null. */
+function codeFromFlagEmoji(emoji: string | null | undefined): string | null {
+  if (!emoji) return null;
+  const codePoints = Array.from(emoji.trim()).map((ch) => ch.codePointAt(0) ?? 0);
+  if (codePoints.length !== 2) return null;
+  const A = 0x1f1e6;
+  if (codePoints[0] < A || codePoints[0] > A + 25 || codePoints[1] < A || codePoints[1] > A + 25) return null;
+  return String.fromCharCode(65 + codePoints[0] - A, 65 + codePoints[1] - A).toLowerCase();
+}
+
+/**
+ * Canonical lowercase ISO-2 for any stored country label: a known name/alias
+ * first, a bare 2-letter code as stored, then a flag emoji (fallback or the
+ * label itself). Null only when nothing identifies a country.
+ */
+export function resolveCountryCode(
+  countryOrName: string | null | undefined,
+  fallbackEmoji?: string | null
+): string | null {
+  const raw = (countryOrName ?? "").trim();
+  if (raw) {
+    const opt = qsCountryOption(raw);
+    if (opt) return opt.code.toLowerCase();
+    const extra = EXTRA_META_BY_ALIAS.get(normalizeCountryAlias(raw));
+    if (extra) return extra.code.toLowerCase();
+    if (/^[A-Za-z]{2}$/.test(raw)) return raw.toLowerCase();
+    const fromLabel = codeFromFlagEmoji(raw);
+    if (fromLabel) return fromLabel;
+  }
+  return codeFromFlagEmoji(fallbackEmoji);
+}
+
+/**
+ * A trustworthy flag emoji for any country label — never the generic 🌐 when
+ * the name identifies a real country (that is exactly how "🌐" sneaks into
+ * catalog rows). Falls back to the given emoji, then to 🌐 for the truly
+ * unknown.
+ */
+export function resolveCountryFlagEmoji(
+  countryOrName: string | null | undefined,
+  fallbackEmoji?: string | null
+): string {
+  const raw = (countryOrName ?? "").trim();
+  if (raw) {
+    const opt = qsCountryOption(raw);
+    if (opt) return opt.flag;
+    const extra = EXTRA_META_BY_ALIAS.get(normalizeCountryAlias(raw));
+    if (extra) return extra.flag;
+  }
+  const code = resolveCountryCode(countryOrName, fallbackEmoji);
+  if (code === "gl") return "\u{1F30D}";
+  if (code) return codeFromFlagEmoji(fallbackEmoji) === code && fallbackEmoji
+    ? fallbackEmoji.trim()
+    : String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1e6 + (c.charCodeAt(0) - 65)));
+  return (fallbackEmoji ?? "").trim() || "\u{1F310}";
+}

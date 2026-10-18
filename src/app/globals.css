@@ -943,6 +943,16 @@ html.theme-transition *::after {
 }
 
 /* The route alone changes ink with the theme; the rest of the site stays colorful. */
+/* Flag fallback badge: force a COLOR emoji font for regional-indicator
+   pairs so Windows Chrome/Edge paints the flag instead of two ASCII letters
+   ("US"). SVG flags in <CountryFlag> do not need this; native <select>
+   options carry the class so the emoji path works there too. */
+.sb-flag-emoji {
+  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Twemoji Mozilla", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+}
+
 .sb-flight { color: #0f172a; }
 .dark .sb-flight { color: #f8fafc; }
 @keyframes sb-jet-exhaust { 50% { opacity: 0.55; } }

@@ -39,6 +39,7 @@ import type { MatchBreakdown } from "@/lib/matching";
 import { toWikimediaThumb, onWikimediaThumbError, campusPhotoSrc } from "@/lib/wikimediaThumb";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
+import { CountryFlag } from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 interface UniversityDetailData {
@@ -570,7 +571,7 @@ export function UniversityDetail({
                 />
               ) : (
                 <div className="sb-ink-on-bright flex flex-col items-center justify-center gap-1">
-                  <span className="text-2xl leading-none">{uni.flagEmoji}</span>
+                  <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="lg" />
                   <Building2 className="h-7 w-7 text-amber-500 dark:text-amber-600" />
                 </div>
               )}
@@ -581,7 +582,7 @@ export function UniversityDetail({
               </div>
               <p className="text-sm text-indigo-200 mt-1 flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-                {localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)} {uni.flagEmoji}
+                {localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)} <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="xs" />
               </p>
               {match && (
                 <div className="mt-3 space-y-1">

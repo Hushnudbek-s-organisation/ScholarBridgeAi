@@ -2,12 +2,11 @@
 
 import React, { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  countriesMatch,
-  countryTranslationKey,
-  withQsTop200Countries,
-} from "@/lib/countries";
-import {
+import {countriesMatch, countryTranslationKey, withQsTop200Countries, resolveCountryCode} from "@/lib/countries";
+
+import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
+import { CountryFlag } from "@/components/CountryFlag";
+import { ShowMoreToggle } from "@/components/hubs/ui";import {
   User,
   GraduationCap,
   Compass,
@@ -141,6 +140,7 @@ const labelCls = "block text-[11px] font-bold text-slate-600 uppercase tracking-
 
 export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
   const tCountry = useTranslations("countryNames");
+  const tCommon = useTranslations("common");
   const tOnboarding = useTranslations("onboarding");
   const tStudy = useTranslations("studyInterest");
   const tDisc = useTranslations("careerDiscovery");
@@ -168,6 +168,10 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const [step, setStep] = useState<number>(startStep);
   const [createdId, setCreatedId] = useState<number | null>(profile?.id ?? null);
   const [saving, setSaving] = useState(false);
+  // STEP 7 country wall → search + ranked 12-card preview (the same pattern
+  // as the profile modal), so the wizard fits one screen on a phone.
+  const [countrySearch, setCountrySearch] = useState("");
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
   const pathButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -426,6 +430,25 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
     setError("");
     setStep((s) => Math.max(0, s - 1));
   };
+
+  const countrySearching = countrySearch.trim() !== "";
+  const isChosenCountry = (c: string) =>
+    form.preferredCountries.some((value) => countriesMatch(value, c));
+  const visibleWizardCountries = (() => {
+    const labelOf = (c: string) => {
+      const k = countryTranslationKey(c);
+      return k ? tCountry(k) : c;
+    };
+    const filtered = COUNTRIES.filter((c) =>
+      countrySearchMatch(countrySearch, [c, labelOf(c), resolveCountryCode(c)])
+    );
+    const ranked = rankCountryPicks(filtered, {
+      isSelected: isChosenCountry,
+      priorityCodes: ["us", "gb", "de", "ca", "kr", "au", "sg", "jp"],
+      codeOf: (c) => resolveCountryCode(c),
+    });
+    return collapsePicks(ranked, 12, showAllCountries || countrySearching, isChosenCountry);
+  })();
 
   const toggleCountry = (c: string) => {
     const selected = form.preferredCountries.some((value) => countriesMatch(value, c));
@@ -898,8 +921,17 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
 
         {/* STEP 7 — Preferred countries */}
         {step === 6 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {COUNTRIES.map((c) => {
+          <div className="space-y-3">
+            <input
+              type="search"
+              value={countrySearch}
+              onChange={(e) => setCountrySearch(e.target.value)}
+              placeholder={`🔍 ${tCommon("searchCountry")}`}
+              aria-label={tCommon("searchCountry")}
+              className="min-h-11 w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {visibleWizardCountries.map((c) => {
               const active = form.preferredCountries.some((value) => countriesMatch(value, c));
               const countryKey = countryTranslationKey(c);
               return (
@@ -914,10 +946,22 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                       : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
                   }`}
                 >
-                  {countryKey ? tCountry(countryKey) : c}
+                  <span className="inline-flex items-center gap-1.5">
+                    <CountryFlag country={c} size="sm" />
+                    {countryKey ? tCountry(countryKey) : c}
+                  </span>
                 </button>
               );
             })}
+            </div>
+            {!countrySearching && (
+              <ShowMoreToggle
+                totalCount={COUNTRIES.length}
+                visibleCount={visibleWizardCountries.length}
+                expanded={showAllCountries}
+                onToggle={() => setShowAllCountries((v) => !v)}
+              />
+            )}
           </div>
         )}
 

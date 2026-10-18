@@ -24,7 +24,9 @@
  * publishes no figure the card says so instead of guessing (spec §14).
  */
 import React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { localizeCountry } from "@/lib/catalogLocalizer";
+import { resolveCountryFlagEmoji } from "@/lib/countries";
 import {
   AlertTriangle,
   Building2,
@@ -76,6 +78,9 @@ export function ApostilleReadinessCard({
   className = "",
 }: ApostilleReadinessCardProps) {
   const t = useTranslations("apostille");
+  const locale = useLocale() as "en" | "uz" | "ru";
+  /** Destination labels read in the student's language; `en` is verbatim. */
+  const countryLabel = (value: string) => localizeCountry(value, locale);
 
   const destinations = React.useMemo(() => APOSTILLE_MATRIX.map((entry) => entry.country), []);
   const [country, setCountry] = React.useState<string>(defaultCountry?.trim() || destinations[0] || "");
@@ -127,7 +132,7 @@ export function ApostilleReadinessCard({
   const requirement = funds.requirement;
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="apostille-title">
+    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-700 ${className}`} aria-labelledby="apostille-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="apostille-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
@@ -155,11 +160,11 @@ export function ApostilleReadinessCard({
           <select
             value={country}
             onChange={(event) => setCountry(event.target.value)}
-            className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+            className="sb-field sb-flag-emoji mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
           >
             {destinations.map((destination) => (
               <option key={destination} value={destination}>
-                {destination}
+                {resolveCountryFlagEmoji(destination)} {countryLabel(destination)}
                 {preferred.includes(destination) ? ` · ${t("yourDestination")}` : ""}
               </option>
             ))}
@@ -215,7 +220,7 @@ export function ApostilleReadinessCard({
                 : t("fundsNoPublishedAmount")}
             </p>
             <p className="mt-1 break-words text-[11px] leading-relaxed text-slate-600">
-              {t(`fundsRules.${requirement.ruleId}.summary`, { country: requirement.country })}
+              {t(`fundsRules.${requirement.ruleId}.summary`, { country: countryLabel(requirement.country) })}
             </p>
             {/* How the published figure is built, in the source's own numbers. */}
             {requirement.basis && (

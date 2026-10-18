@@ -6,6 +6,8 @@ import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeScholarshipRow } from "@/lib/catalogLocalizer";
 
 const SAVED_SCHOLARSHIP_STATUSES = new Set([
   "Saved",
@@ -54,14 +56,18 @@ export async function GET(req: Request) {
       .innerJoin(scholarships, eq(savedScholarships.scholarshipId, scholarships.id))
       .where(eq(savedScholarships.profileId, profileId));
 
+    const locale = localeFromRequest(req);
     return NextResponse.json({
       savedScholarships: saved.map((row) => ({
         ...row,
-        scholarship: {
-          ...row.scholarship,
-          // Existing tracker UI consumes this USD compatibility field.
-          amountUsdValue: resolvedUsdScholarshipAmount(row.scholarship),
-        },
+        scholarship: localizeScholarshipRow(
+          {
+            ...row.scholarship,
+            // Existing tracker UI consumes this USD compatibility field.
+            amountUsdValue: resolvedUsdScholarshipAmount(row.scholarship),
+          } as never,
+          locale
+        ),
       })),
     });
   } catch (error) {

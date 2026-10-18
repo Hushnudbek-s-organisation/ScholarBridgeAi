@@ -14,6 +14,8 @@ import {
 } from "@/db/schema";
 import { guardStudent, serverError } from "@/lib/journey/api";
 import { NAV_SECTIONS } from "@/lib/navSections";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeCity, localizeCountry, localizeScholarshipProvider } from "@/lib/catalogLocalizer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
+  const locale = localeFromRequest(req);
   const g = await guardStudent(req, searchParams.get("profileId"));
   if (!g.ok) return g.response;
   const { profileId } = g.value;
@@ -145,9 +148,9 @@ export async function GET(req: Request) {
     for (const u of unis)
       // The row id travels on the `scholarbridge:focus-record` event, so the
       // tab stays a real section id the sidebar already understands.
-      found.push({ kind: "university", id: u.id, title: u.name, subtitle: `${u.city}, ${u.country}`, group: "explore", tab: "universities/search" });
+      found.push({ kind: "university", id: u.id, title: u.name, subtitle: `${localizeCity(u.city, locale)}, ${localizeCountry(u.country, locale)}`, group: "explore", tab: "universities/search" });
     for (const s of schs)
-      found.push({ kind: "scholarship", id: s.id, title: s.title, subtitle: `${s.provider} · ${s.country}`, group: "explore", tab: "scholarships/browse" });
+      found.push({ kind: "scholarship", id: s.id, title: s.title, subtitle: `${localizeScholarshipProvider(s.provider, locale)} · ${localizeCountry(s.country, locale)}`, group: "explore", tab: "scholarships/browse" });
     for (const a of apps)
       found.push({ kind: "application", id: a.id, title: a.universityName || "Application", subtitle: a.programName ?? "Your application", group: "applications", tab: "applications/workspace" });
     for (const d of docs)

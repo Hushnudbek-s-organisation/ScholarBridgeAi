@@ -5,10 +5,11 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { StudentProfile } from "./Navbar";
-import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
+import {countryTranslationKey, qsCountryOption, withQsTop200Countries, resolveCountryCode} from "@/lib/countries";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { campusPhotoSrc, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
+import { CountryFlag } from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 
 const UniversityDetail = dynamic(
@@ -1017,7 +1018,11 @@ export function UniversityExplorer({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-5xl select-none">
-                      {uni.flagEmoji || "🎓"}
+                      {resolveCountryCode(uni.country, uni.flagEmoji) ? (
+                        <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="xl" />
+                      ) : (
+                        "🎓"
+                      )}
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
@@ -1062,7 +1067,7 @@ export function UniversityExplorer({
                   {/* Title & Country Overlay */}
                   <div className="absolute bottom-3 left-3 right-3 text-white">
                     <div className="text-xs font-medium text-slate-200 flex items-center gap-1">
-                      <span>{uni.flagEmoji}</span>
+                      <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="xs" />
                       <span>{localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)}</span>
                     </div>
                     <h3 className="break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
@@ -1396,7 +1401,7 @@ export function UniversityExplorer({
                     {comparedUniversities.map((u) => (
                       <th key={u.id} className="py-3 px-4 font-bold text-slate-900 text-sm w-1/4">
                         <div className="flex items-center gap-1">
-                          <span>{u.flagEmoji}</span>
+                          <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
                           <span>{u.name}</span>
                         </div>
                       </th>

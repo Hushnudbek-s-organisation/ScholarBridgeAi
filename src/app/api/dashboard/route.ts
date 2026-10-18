@@ -30,6 +30,11 @@ import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/match
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
+import {
+  localizeOpportunityRow,
+  localizeScholarshipRow,
+  localizeUniversityRow,
+} from "@/lib/catalogLocalizer";
 import { hasUndergraduateAdmission, supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import type { Locale } from "@/i18n/config";
@@ -828,9 +833,10 @@ async function recommendedFor(
     personalised: hasBasis,
     basis,
     missing,
-    universities: universitiesOut,
-    scholarships: relevantScholarships,
-    opportunities: opportunitiesOut,
+    // Rows leave the API in the student's language (en = source values).
+    universities: universitiesOut.map((u) => localizeUniversityRow(u, locale)),
+    scholarships: relevantScholarships.map((s) => localizeScholarshipRow(s, locale)),
+    opportunities: opportunitiesOut.map((o) => localizeOpportunityRow(o, locale)),
   };
 }
 

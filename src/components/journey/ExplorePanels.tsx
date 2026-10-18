@@ -360,7 +360,16 @@ export function CareerExplorerPanel({
 // VISA CENTER (spec §25)
 // ===========================================================================
 
-export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: number; onNavigateTab: (t: string) => void }) {
+export function VisaCenterPanel({
+  profileId,
+  onNavigateTab,
+  hideApostille = false,
+}: {
+  profileId: number;
+  onNavigateTab: (t: string) => void;
+  /** The hub's own "e-Apostille & funds" pane renders the card instead. */
+  hideApostille?: boolean;
+}) {
   const t = useTranslations("journey");
   const { locale } = useLocaleContext();
   const reduceMotion = useReducedMotion();
@@ -400,7 +409,7 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
               onChange={(e) => setCountry(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={() => onNavigateTab("visa")}>
+          <Button variant="outline" onClick={() => onNavigateTab("visa/speaking")}>
             <GraduationCap className="h-3.5 w-3.5" /> {t("vcOpenSpeaking")}
           </Button>
         </div>
@@ -478,7 +487,9 @@ export function VisaCenterPanel({ profileId, onNavigateTab }: { profileId: numbe
           translation lead time, and the exact bank-statement window (UK 28
           consecutive days, closed within 31 days of the application).
           Re-keyed on the country picker so both panels always agree. */}
-      <ApostilleReadinessCard key={`apostille-${country || "none"}`} profileId={profileId} defaultCountry={country || null} />
+      {!hideApostille && (
+        <ApostilleReadinessCard key={`apostille-${country || "none"}`} profileId={profileId} defaultCountry={country || null} />
+      )}
 
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="visa" className="mt-2" />
@@ -543,7 +554,7 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
         action={
           // The simulator is the one place that scores a spoken answer, so it
           // stays one click away from every track.
-          <Button onClick={() => onNavigateTab("visa")}>
+          <Button onClick={() => onNavigateTab("visa/speaking")}>
             <Mic className="h-3.5 w-3.5" /> {t("icLaunchSim")}
           </Button>
         }
@@ -713,7 +724,7 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
               <p className="text-base" aria-hidden>🎓</p>
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icUniTitle")}</p>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icUniText")}</p>
-              <Button className="mt-3" onClick={() => onNavigateTab("visa")}>
+              <Button className="mt-3" onClick={() => onNavigateTab("visa/speaking")}>
                 {t("icUniBtn")}
               </Button>
             </div>
@@ -721,7 +732,7 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
               <p className="text-base" aria-hidden>🛂</p>
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icVisaTitle")}</p>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icVisaText")}</p>
-              <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa")}>
+              <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa/speaking")}>
                 {t("icVisaBtn")}
               </Button>
             </div>
