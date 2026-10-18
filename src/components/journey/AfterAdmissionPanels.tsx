@@ -643,7 +643,7 @@ interface FundingData {
     openActions: { name: string; kind: string; amountUsd: number; status: string }[];
   };
   items: { id: number; kind: string; kindLabel: string; name: string; amountUsd: number; status: string; covers: string | null; notes: string | null }[];
-  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null }[]; tab: string; cta: string };
+  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null; country: string | null; coversGap: boolean }[]; tab: string; cta: string };
   benchmarkSource?: { country: string; name: string; url: string; notes: string; defaultCurrency: string };
   countries?: string[];
   displayCurrency?: string;
@@ -698,6 +698,9 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [form, setForm] = useState({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [] as string[], notes: "" });
+  // Scratchpad for the gap card: ticking saved awards previews how much of
+  // the shortfall they would close, without touching the plan itself.
+  const [gapPicks, setGapPicks] = useState<Record<number, boolean>>({});
 
   const add = async () => {
     if (!form.name.trim() || !form.amountUsd) return;
@@ -965,30 +968,56 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         </JourneyCard>
       )}
 
-      {data.gapActions.gap != null && data.gapActions.gap > 0 && (
-        <JourneyCard title={t("fpGapTitle")}>
-          <p className="text-sm text-slate-700 dark:text-slate-200">
-            You are short <strong className="tabular-nums">${data.gapActions.gap.toLocaleString()}</strong> for a year.
-          </p>
-          {data.gapActions.scholarships.length > 0 ? (
-            <ul className="mt-2 space-y-1">
-              {data.gapActions.scholarships.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{s.title}</span>
-                  <Pill tone="brand">${s.amountUsdValue.toLocaleString()}</Pill>
-                  <Pill tone="slate">tuition coverage: {s.tuitionCoverage}</Pill>
-                  {s.deadlineDate && <span className="text-slate-400">closes {s.deadlineDate}</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 text-xs text-slate-500">{t("fpNoScholarshipCloses")}</p>
-          )}
-          <Button size="sm" className="mt-3" onClick={() => onNavigateTab(data.gapActions.tab)}>
-            {data.gapActions.cta}
-          </Button>
-        </JourneyCard>
-      )}
+      {data.gapActions.gap != null && data.gapActions.gap > 0 &&
+        (() => {
+          const gapValue = data.gapActions.gap ?? 0;
+          const chosen = data.gapActions.scholarships.filter((s) => gapPicks[s.id]);
+          const remaining = Math.max(0, gapValue - chosen.reduce((sum, s) => sum + s.amountUsdValue, 0));
+          return (
+            <JourneyCard title={t("fpGapTitle")}>
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                {t("fpGapShort", { amount: `$${gapValue.toLocaleString()}` })}
+              </p>
+              {data.gapActions.scholarships.length > 0 ? (
+                <>
+                  <ul className="mt-2 space-y-1">
+                    {data.gapActions.scholarships.map((s) => (
+                      <li key={s.id} className="flex flex-wrap items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 accent-indigo-600"
+                          checked={Boolean(gapPicks[s.id])}
+                          onChange={(e) => setGapPicks((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                          aria-label={t("fpGapCheckAria", { title: s.title })}
+                        />
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{s.title}</span>
+                        <Pill tone={s.coversGap ? "good" : "brand"}>${s.amountUsdValue.toLocaleString()}</Pill>
+                        {s.coversGap && <Pill tone="good">{t("fpGapCloses")}</Pill>}
+                        <Pill tone="slate">{t("fpTuitionCoverage", { coverage: s.tuitionCoverage })}</Pill>
+                        {s.deadlineDate && (
+                          <span className="text-slate-400">{t("fpCloses", { date: s.deadlineDate })}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-slate-500">{t("fpGapCheckHint")}</p>
+                  {chosen.length > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {remaining === 0
+                        ? t("fpGapClosed")
+                        : t("fpGapRemaining", { amount: `$${remaining.toLocaleString()}` })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">{t("fpNoScholarshipCloses")}</p>
+              )}
+              <Button size="sm" className="mt-3" onClick={() => onNavigateTab(data.gapActions.tab)}>
+                {data.gapActions.cta}
+              </Button>
+            </JourneyCard>
+          );
+        })()}
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="money" className="mt-2" />
     </div>

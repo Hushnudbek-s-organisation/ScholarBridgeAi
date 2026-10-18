@@ -122,6 +122,7 @@ export async function GET(req: Request) {
         id: s.id,
         title: s.title,
         provider: s.provider,
+        country: s.country ?? null,
         amountUsdValue: resolveMultiCurrencyScholarshipAmount(s).amountUsd,
         tuitionCoverage: s.tuitionCoverage || "Not specified",
         deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
@@ -129,6 +130,26 @@ export async function GET(req: Request) {
       .filter((s): s is typeof s & { amountUsdValue: number } => s.amountUsdValue != null && s.amountUsdValue > 0)
       .sort((a, b) => b.amountUsdValue - a.amountUsdValue)
       .slice(0, 8);
+
+    // A scholarship BIGGER than the gap is the best possible answer — the old
+    // `<= gap` filter hid it (a $25k award vanishes when $15k is short).
+    // Gap-closers first (cheapest sufficient), then the biggest partials,
+    // the selected university's own country first inside each group.
+    const gapCandidates = (
+      list: typeof matched,
+      gap: number | null,
+      homeCountry: string | null,
+    ): (typeof matched)[number][] => {
+      if (gap == null || list.length === 0) return [];
+      const home = (x: (typeof list)[number]) => Number(Boolean(homeCountry && x.country === homeCountry));
+      const closers = list
+        .filter((x) => x.amountUsdValue >= gap)
+        .sort((a, b) => home(b) - home(a) || a.amountUsdValue - b.amountUsdValue);
+      const partials = list
+        .filter((x) => x.amountUsdValue < gap)
+        .sort((a, b) => home(b) - home(a) || b.amountUsdValue - a.amountUsdValue);
+      return [...closers, ...partials].slice(0, 5);
+    };
 
     return NextResponse.json({
       costLines: lines.map(({ key, label }) => ({ key, label })),
@@ -151,9 +172,13 @@ export async function GET(req: Request) {
       items: rows.map((r) => ({ ...r, kindLabel: FUNDING_KIND_LABELS[(r.kind as FundingKind) in FUNDING_KIND_LABELS ? (r.kind as FundingKind) : "other"] })),
       gapActions: {
         gap: plan.fundingGap,
-        scholarships: plan.fundingGap == null
-          ? []
-          : matched.filter((s) => s.amountUsdValue <= plan.fundingGap! || plan.fundingGap === 0).slice(0, 5),
+        scholarships: (() => {
+          const gap = plan.fundingGap;
+          return gapCandidates(matched, gap, uni && !countryParam ? (uni.country as string | null) : null).map((s) => ({
+            ...s,
+            coversGap: gap != null && s.amountUsdValue >= gap,
+          }));
+        })(),
         tab: "scholarships",
         cta: plan.fundingGap == null
           ? "Verify the missing cost lines before estimating a funding gap"

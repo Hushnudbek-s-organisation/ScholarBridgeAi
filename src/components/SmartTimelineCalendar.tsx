@@ -105,11 +105,19 @@ export interface SmartTimelineCalendarProps {
   className?: string;
 }
 
+/**
+ * The four steps that decide an application for every destination — the other
+ * four refine them. The calendar opens on these (students skimming a packed
+ * hub were drowning in 8 rows per deadline); "All steps" is one tap away.
+ */
+const ESSENTIAL_MILESTONE_IDS = new Set(["shortlist_final", "english_test", "bank_statement", "final_buffer"]);
+
 export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab, className = "" }: SmartTimelineCalendarProps) {
   const t = useTranslations("timeline");
   const [rows, setRows] = React.useState<DeadlineRow[]>([]);
   const [uniCountries, setUniCountries] = React.useState<{ name: string; country: string; id: number | null }[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [detailedSteps, setDetailedSteps] = React.useState(false);
   const [error, setError] = React.useState("");
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [showAll, setShowAll] = React.useState(false);
@@ -380,6 +388,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
             {t("counts.steps", { count: timeline.counts.milestones })}
           </span>
+          <button
+            type="button"
+            onClick={() => setDetailedSteps((v) => !v)}
+            aria-pressed={detailedSteps}
+            className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200"
+          >
+            {t(detailedSteps ? "modeEssential" : "modeDetailed")}
+          </button>
           {timeline.counts.overdue > 0 && (
             <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
               {t("counts.overdue", { count: timeline.counts.overdue })}
@@ -455,6 +471,8 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
               const open = expanded.has(key);
               const applicable = plan.milestones.filter((milestone) => milestone.applies);
               const skipped = plan.milestones.filter((milestone) => !milestone.applies);
+              const essential = applicable.filter((milestone) => ESSENTIAL_MILESTONE_IDS.has(milestone.id));
+              const listed = detailedSteps || essential.length === 0 ? applicable : essential;
               const syncCount = synced[key];
 
               return (
@@ -549,7 +567,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                   {open && (
                     <div className="border-t border-slate-100 p-3">
                       <ol className="space-y-1.5">
-                        {applicable.map((milestone) => {
+                        {listed.map((milestone) => {
                           const overdue = milestone.daysOverdue > 0;
                           return (
                             <li

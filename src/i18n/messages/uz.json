@@ -1942,6 +1942,14 @@
     "fpTuitionCoveragePill": "ta'lim puli qoplamasi: {cov}",
     "fpCloses": "muddati {date}",
     "fpNoScholarshipCloses": "Saqlangan stipendiya shu farqni hali yopmayapti.",
+    "fpGapShort": "Bir yil uchun {amount} yetishmayapti.",
+    "fpTuitionCoverage": "ta'limni qoplash: {coverage}",
+    "fpGapCloses": "farqni to'liq yopadi",
+    "fpGapCheckHint": "Qaysi grantlar farqni qancha yopishini ko'rish uchun belgilang.",
+    "fpGapRemaining": "Belgilangan grantlar bilan ham {amount} yetishmaydi.",
+    "fpGapClosed": "Belgilangan grantlar bu farqni to'liq yopadi.",
+    "fpGapCheckAria": "{title} — farq hisobiga qo'shish",
+    "rbStartFromFailed": "Bu arizani ochib bo'lmadi. Iltimos, trekerdan qayta urinib ko'ring.",
     "lpLoadError": "O'quv provayderlarini yuklab bo'lmadi",
     "lpTitle": "O'quv va imtihon provayderlari",
     "lpSubtitle": "ScholarBridge kelgusi kunda tashqi o'quv platformasidan mashq ballari va kurs progressini o'qiy oladi. Hozircha hech narsa ulanmagan va yo'lingizning hech qismini buningga bog'liq emas.",
@@ -6034,7 +6042,9 @@
     "planChanceBadge": "Kirish imkoniyati: {score}%",
     "planAdmitBadge": "qabul {rate}%",
     "planFitBadge": "Moslik: {score}%",
-    "recommendedTag": "Tavsiya"
+    "recommendedTag": "Tavsiya",
+    "modeEssential": "Asosiy qadamlar",
+    "modeDetailed": "Barcha qadamlar"
   },
   "apostille": {
     "title": "e-Apostil va bank ma'lumotnomasi tayyorligi",
