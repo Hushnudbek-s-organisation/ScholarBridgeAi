@@ -26,7 +26,7 @@
 import React from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { localizeCountry } from "@/lib/catalogLocalizer";
-import { resolveCountryFlagEmoji } from "@/lib/countries";
+import { countriesMatch, resolveCountryFlagEmoji } from "@/lib/countries";
 import {
   AlertTriangle,
   Building2,
@@ -100,10 +100,31 @@ export function ApostilleReadinessCard({
         const data = await res.json().catch(() => null);
         if (!res.ok || !live) return;
         const raw = data?.profile?.preferredCountries ?? data?.preferredCountries ?? null;
-        const parsed = typeof raw === "string" ? JSON.parse(raw || "[]") : Array.isArray(raw) ? raw : [];
-        const list = (Array.isArray(parsed) ? parsed : []).map((item: unknown) => String(item)).filter(Boolean);
-        if (list.length > 0) setPreferred(list);
-        if (!defaultCountry && list[0]) setCountry(list[0]);
+        // Stored forms vary: a JSON array, a comma-separated string, or a real
+        // array. Parse all three without ever trusting JSON.parse to succeed,
+        // and keep only names this matrix actually knows — a picker option that
+        // does not exist would render an empty selection.
+        const asList = (() => {
+          if (Array.isArray(raw)) return raw.map((item) => String(item));
+          if (typeof raw === "string") {
+            const text = raw.trim();
+            if (text.startsWith("[")) {
+              try {
+                const parsedJson: unknown = JSON.parse(text);
+                if (Array.isArray(parsedJson)) return parsedJson.map((item) => String(item));
+              } catch {
+                /* fall through to the comma split — old rows stored plain text */
+              }
+            }
+            return text.split(",").map((part) => part.trim());
+          }
+          return [];
+        })()
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .filter((name) => destinations.some((destination) => countriesMatch(name, destination)));
+        if (asList.length > 0) setPreferred(asList);
+        if (!defaultCountry && asList[0]) setCountry(asList[0]);
       } catch {
         /* the picker still works with the built-in destination list */
       }
@@ -112,7 +133,7 @@ export function ApostilleReadinessCard({
       live = false;
       controller.abort();
     };
-  }, [profileId, defaultCountry]);
+  }, [profileId, defaultCountry, destinations]);
 
   const readiness = React.useMemo(
     () => checkApostilleReadiness(country, applicationDate || null, { ukArea }),
@@ -127,7 +148,7 @@ export function ApostilleReadinessCard({
       : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
   };
 
-  const isUk = country.trim().toLowerCase() === "united kingdom";
+  const isUk = countriesMatch((country ?? "").trim(), "United Kingdom");
   const funds = readiness.funds;
   const requirement = funds.requirement;
 
@@ -352,7 +373,10 @@ export function ApostilleReadinessCard({
             <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">{t("stepsNeedDate")}</p>
           )}
           <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">
-            {t("leadDays", { days: readiness.profile.leadDays })} · {t(`issuingAuthority.${readiness.profile.issuingAuthorityKey}`)}
+            {t("leadDays", { days: readiness.profile.leadDays })}
+            {t.has(`issuingAuthority.${readiness.profile.issuingAuthorityKey}` as never) && (
+              <> · {t(`issuingAuthority.${readiness.profile.issuingAuthorityKey}` as never)}</>
+            )}
           </p>
         </div>
       )}
@@ -381,9 +405,17 @@ export function ApostilleReadinessCard({
               </li>
             ))}
           </ul>
-          <p className="break-words border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
-            {t(`matrixNotes.${readiness.profile.country.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`)}
-          </p>
+          {(() => {
+            const noteKey = readiness.profile.country
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_");
+            if (!t.has(`matrixNotes.${noteKey}` as never)) return null;
+            return (
+              <p className="break-words border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
+                {t(`matrixNotes.${noteKey}` as never)}
+              </p>
+            );
+          })()}
         </div>
       )}
 

@@ -44,6 +44,8 @@ import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { ScrollRegion } from "@/components/hubs/ui";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { localizeCountry } from "@/lib/catalogLocalizer";
+import CountryFlag from "@/components/CountryFlag";
 import { StudyInterestPicker } from "@/components/StudyInterestPicker";
 import {
   compatibilityTargetMajor,
@@ -875,7 +877,12 @@ export function RecommendationStudio({
                             <td className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-100">{r.program.name}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                               {r.university.name}
-                              {r.university.country ? <span className="text-slate-400 dark:text-slate-500"> · {r.university.country}</span> : null}
+                              {r.university.country ? (
+                                <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                                  · <CountryFlag country={r.university.country} size="xs" />
+                                  {localizeCountry(r.university.country, locale)}
+                                </span>
+                              ) : null}
                             </td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{fitLabel(r.subjectFit.level)}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
@@ -923,7 +930,12 @@ export function RecommendationStudio({
                               >
                                 <MapPin className="h-3 w-3" /> {r.university.name}
                               </button>
-                              {r.university.country ? <span>· {r.university.country}</span> : null}
+                              {r.university.country ? (
+                                <span className="inline-flex items-center gap-1">
+                                  · <CountryFlag country={r.university.country} size="xs" />
+                                  {localizeCountry(r.university.country, locale)}
+                                </span>
+                              ) : null}
                               {r.university.city ? <span>· {r.university.city}</span> : null}
                             </p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

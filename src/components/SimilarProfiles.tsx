@@ -20,6 +20,9 @@ import type {
 } from "@/lib/similarProfiles";
 import type { QsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { TwinStrategyCard } from "./TwinStrategyCard";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { localizeCountry } from "@/lib/catalogLocalizer";
+import CountryFlag from "@/components/CountryFlag";
 
 interface SimilarProfilesProps {
   activeProfile: { id?: number | null } | null;
@@ -47,6 +50,7 @@ const RESULT_BADGE: Record<OutcomeResult, string> = {
 
 export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   const t = useTranslations("similarOutcomes");
+  const { locale } = useLocaleContext();
   const [data, setData] = useState<EnrichedSimilarProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -200,8 +204,9 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
                             </span>
                           )}
                           {bench?.country && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                              {bench.country}
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              <CountryFlag country={bench.country} size="xs" />
+                              {localizeCountry(bench.country, locale)}
                             </span>
                           )}
                         </div>

@@ -622,7 +622,12 @@ const fundingBlock = hubs.slice(hubs.indexOf("export function FundingHub"), hubs
 check("FeeWaiverStudio is mounted in the funding hub", fundingBlock.includes("<FeeWaiverStudio profile={profile}"));
 check("the funding hub still passes only profileId to the financial plan", fundingBlock.includes("<FinancialPlanPanel profileId={profile.id} onNavigateTab={navigate} />"));
 check("the funding hub block still carries no applicationId token", !fundingBlock.includes("applicationId="));
-check("FeeWaiverStudio is mounted in the applications tracker pane", hubs.includes('{active === "tracker" && (') && hubs.includes("<FeeWaiverStudio profile={profile} className=\"mt-4\" />"));
+// Spec update (2026-10 "single Applications & Visa flow" pass): the waiver
+// studio was de-duplicated OUT of the tracker pane — one mount in the funding
+// hub, a one-line pointer here. The pin below enforces the NEW shape: the
+// duplicate stacked mount must never come back.
+const trackerBlock = hubs.slice(hubs.indexOf('{active === "tracker" && ('), hubs.indexOf('{active === "workspace"'));
+check("the applications tracker pane links to the funding hub instead of re-mounting the waiver studio", trackerBlock.includes('t("feeWaiverHint")') && !trackerBlock.includes("<FeeWaiverStudio"));
 check("ProfessorOutreachStudio is mounted in the materials hub", hubs.includes("<ProfessorOutreachStudio") && hubs.includes('key={`outreach-${profile.id}-${effectiveId ?? "none"}`}'));
 check("the universities hub wires the one-click application launcher", hubs.includes("onApplicationStarted={(applicationId) => setWorkspaceId?.(applicationId)}"));
 

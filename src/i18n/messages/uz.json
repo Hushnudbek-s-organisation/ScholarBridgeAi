@@ -3868,7 +3868,9 @@
     "outlookExplain": "Qabul istiqboli u kelib chiqqan talablar yonida ko‘rsatiladi. Bu profilingiz e’lon qilingan talablarga qanchalik mos kelishini tasvirlaydi — ehtimollik ham, kafolat ham emas.",
     "openWorkspace": "Ish maydonini ochish",
     "essayPremiumTitle": "AI yozish vositalari Premium tarkibida",
-    "essayPremiumDescription": "Davom etishdan oldin mavjud tariflar va funksiya ruxsatini ko‘rib chiqing."
+    "essayPremiumDescription": "Davom etishdan oldin mavjud tariflar va funksiya ruxsatini ko‘rib chiqing.",
+    "sectionFailed": "Bu bo‘lim brauzeringizda xatoga uchradi — hub’ning qolgan qismi ishlaydi.",
+    "sectionRetry": "Qayta urinish"
   },
   "disclaimers": {
     "general": "ScholarBridgeAI — mustaqil yo‘l-yo‘riq xizmati; hech bir universitet, stipendiya tashkiloti yoki davlat idorasiga aloqador emas. AI natijalari va katalog ma’lumotlari xato yoki eskirgan bo‘lishi mumkin — tafsilotlarni doim rasmiy manbadan tekshiring.",

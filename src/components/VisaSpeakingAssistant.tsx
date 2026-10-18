@@ -307,7 +307,39 @@ function browserSupportsGeminiLive(): boolean {
 }
 
 function createWorkletUrl(source: string): string {
+  // A CSP that forbids blob:, or an engine without object URLs, must fall
+  // back to text+voice mode — not surface as an uncaught crash.
+  if (typeof window === "undefined" || typeof URL?.createObjectURL !== "function") {
+    throw new Error("Browser audio pipeline is unavailable");
+  }
   return URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+}
+
+/**
+ * Several in-app browsers (Telegram, some Android/Linux WebViews, older
+ * Safari) expose `window.speechSynthesis` as an object whose methods are
+ * missing or throw synchronously. An `"speechSynthesis" in window` check
+ * alone passes on those engines — and the first `.getVoices()` /
+ * `.addEventListener()` call then took the WHOLE hub down with a TypeError.
+ * Every speech access goes through these guards instead; a broken voice
+ * engine must only disable voice, never the page.
+ */
+function getSafeSpeechSynthesis(): SpeechSynthesis | null {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  try {
+    const synth = window.speechSynthesis;
+    return synth && typeof synth.getVoices === "function" ? synth : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeCancelSpeech(): void {
+  try {
+    getSafeSpeechSynthesis()?.cancel();
+  } catch {
+    // Engines that throw on cancel during teardown are harmless; ignore.
+  }
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -332,8 +364,14 @@ function pickVoice(
   locale: string,
   gender: VisaOfficerGender,
 ): SpeechSynthesisVoice | null {
-  if (!("speechSynthesis" in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
+  const synth = getSafeSpeechSynthesis();
+  if (!synth) return null;
+  let voices: SpeechSynthesisVoice[] = [];
+  try {
+    voices = synth.getVoices();
+  } catch {
+    return null;
+  }
   if (voices.length === 0) return null;
 
   const prefix = locale.split("-")[0].toLowerCase();
@@ -606,9 +644,7 @@ export function VisaSpeakingAssistant({
       typeof window !== "undefined" &&
       !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   );
-  const [ttsSupported] = useState(
-    () => typeof window !== "undefined" && "speechSynthesis" in window,
-  );
+  const [ttsSupported] = useState(() => getSafeSpeechSynthesis() !== null);
   const [micBlocked, setMicBlocked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadedModelAnswer, setLoadedModelAnswer] = useState(false);
@@ -848,13 +884,29 @@ export function VisaSpeakingAssistant({
 
   useEffect(() => {
     mountedRef.current = true;
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.getVoices();
-      const warm = () => window.speechSynthesis.getVoices();
-      window.speechSynthesis.addEventListener("voiceschanged", warm);
-      return () => {
-        window.speechSynthesis.removeEventListener("voiceschanged", warm);
+    const synth = getSafeSpeechSynthesis();
+    if (!synth) return;
+    try {
+      void synth.getVoices();
+      const warm = () => {
+        try {
+          void synth.getVoices();
+        } catch {
+          // Voice list probing is best-effort on flaky engines.
+        }
       };
+      if (typeof synth.addEventListener === "function") {
+        synth.addEventListener("voiceschanged", warm);
+        return () => {
+          try {
+            synth.removeEventListener?.("voiceschanged", warm);
+          } catch {
+            // Detaching on a half-implemented engine cannot be fatal.
+          }
+        };
+      }
+    } catch {
+      // No voice warm-up — the interview still runs on text and typing.
     }
   }, []);
 
@@ -868,7 +920,7 @@ export function VisaSpeakingAssistant({
         // ignore
       }
       recognitionRef.current = null;
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      safeCancelSpeech();
       cancelAnimationFrame(meterRafRef.current);
       meterStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       meterStreamRef.current = null;
@@ -1216,7 +1268,7 @@ export function VisaSpeakingAssistant({
 
     function fallbackSpeak(text: string): void {
       const token = sessionRef.current;
-      if (mutedRef.current || !("speechSynthesis" in window)) {
+      if (mutedRef.current || getSafeSpeechSynthesis() === null) {
         setOfficer("idle");
         autoListen(token);
         return;
@@ -1239,7 +1291,7 @@ export function VisaSpeakingAssistant({
       const browserSpeak = () => {
         if (sessionRef.current !== token || finished) return;
         try {
-          window.speechSynthesis.cancel();
+          safeCancelSpeech();
           const c = getVisaCountry(configRef.current?.countryCode);
           const utter = new SpeechSynthesisUtterance(text);
           utter.lang = c?.locale ?? "en-US";
@@ -1253,7 +1305,7 @@ export function VisaSpeakingAssistant({
           setOfficer("speaking");
           utter.onend = finishSpeaking;
           utter.onerror = finishSpeaking;
-          window.speechSynthesis.speak(utter);
+          getSafeSpeechSynthesis()?.speak(utter);
           // Some browsers fire neither onend nor onerror (no user activation,
           // throttled tab, cancelled utterance). Without this the officer stayed
           // "speaking" forever and the microphone button stayed disabled.
@@ -1595,6 +1647,12 @@ export function VisaSpeakingAssistant({
 
       if (!liveOutputCtxRef.current || !livePlayerNodeRef.current) {
         const outCtx = new Ctor({ sampleRate: GEMINI_OUTPUT_RATE });
+        // CSP-blocked blob: URLs or engines without AudioWorklet must fall
+        // back to text + standard-voice mode with a notice, not crash.
+        if (typeof outCtx.audioWorklet?.addModule !== "function") {
+          void outCtx.close().catch(() => {});
+          throw new Error(t("liveUnsupported"));
+        }
         livePlayerWorkletUrlRef.current = createWorkletUrl(PLAYER_WORKLET_SOURCE);
         await outCtx.audioWorklet.addModule(livePlayerWorkletUrlRef.current);
         const player = new AudioWorkletNode(outCtx, "visa-pcm-player", {
@@ -1929,7 +1987,7 @@ export function VisaSpeakingAssistant({
         // ignore
       }
       recognitionRef.current = null;
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      safeCancelSpeech();
       stopNeuralSpeech();
       stopFallbackMeter();
       resetConversation();
@@ -2013,7 +2071,7 @@ export function VisaSpeakingAssistant({
         setNotice(t("interrupted"));
         return;
       }
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      safeCancelSpeech();
       stopNeuralSpeech();
       clearSpeakWatchdog();
       stopListening();
@@ -2027,7 +2085,7 @@ export function VisaSpeakingAssistant({
       commitLiveOutput();
       stopListening();
       stopLiveAll();
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      safeCancelSpeech();
       stopNeuralSpeech();
       setOfficer("idle");
       setAnalysis(null);
@@ -2053,7 +2111,7 @@ export function VisaSpeakingAssistant({
       clearSpeakWatchdog();
       stopListening();
       stopLiveAll();
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      safeCancelSpeech();
       stopNeuralSpeech();
       setOfficer("idle");
       resetConversation();
@@ -2068,7 +2126,7 @@ export function VisaSpeakingAssistant({
       mutedRef.current = next;
       setMuted(next);
       if (next) {
-        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        safeCancelSpeech();
         stopNeuralSpeech();
         clearLivePlayback();
       } else {

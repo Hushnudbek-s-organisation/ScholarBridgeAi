@@ -137,7 +137,12 @@ ABSOLUTE RULES:
 FORMAT RULES (follow exactly):
 - Use plain text with short headings and simple bullets.
 - NO HTML, NO markdown tables, and no fenced code blocks.
-- Keep the report concise and suitable for editing in the student's dashboard. Suggested sections: recorded profile details, current catalogue comparisons, funding catalogue entries, and verification steps. Do not add generic essays, document, recommendation, or test recommendations unless the verified data says they apply.`;
+- Keep the report concise and suitable for editing in the student's dashboard. Structure it as exactly four crisp executive sections in ${localeToLanguageName(locale)}:
+  1. "Recorded Academic & Evidence Baseline" — the exact recorded GPA/scale, test scores, research, leadership and activity records, and what remains unrecorded (state it as unrecorded, never as a weakness).
+  2. "University Catalogue Fit Analysis" — compare only the supplied universities using the supplied fit percentages and verification signals; say which fields each comparison rests on.
+  3. "Scholarship & Funding Alignment" — review the matched catalogue awards against the recorded budget and funding need; unrecorded figures stay flagged as unknown.
+  4. "High-Impact Verification & Action Plan" — 3-5 concrete next steps to verify official programme requirements and strengthen the unrecorded areas, each naming the exact page or tool to check.
+Do not add generic essay, document, recommendation, or test recommendations unless the verified data says they apply.`;
 
     const systemInstruction =
       "You are ScholarBridge's factual study-planning assistant. Use only the verified facts supplied, distinguish unknown information, and never estimate admission outcomes.";
