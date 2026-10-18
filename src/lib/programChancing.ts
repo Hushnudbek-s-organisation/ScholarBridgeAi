@@ -973,7 +973,7 @@ export function evaluateUniversityAndProgramChance(
     ? majorOverlap(profile.targetMajor, `${programName} ${field}`) ?? 0.5
     : 0.7;
   const majorComp = Math.round(clamp(45 + majorFitRatio * 50, 40, 96));
-  const holisticComp = clamp(
+  const activityHolisticComp = clamp(
     Math.round(
       35 +
         Math.min(25, actCounts.activities * 6) +
@@ -984,6 +984,11 @@ export function evaluateUniversityAndProgramChance(
     25,
     98
   );
+  // A writing signal is only one small part of the holistic component; absent
+  // private essay memory, the original extracurricular score is unchanged.
+  const holisticComp = typeof profile.privateEssayScore === "number" && Number.isFinite(profile.privateEssayScore)
+    ? clamp(Math.round(activityHolisticComp * 0.85 + profile.privateEssayScore * 0.15), 25, 98)
+    : activityHolisticComp;
 
   let rawAcademicScore: number;
   let degreeCalibrationNote: string;

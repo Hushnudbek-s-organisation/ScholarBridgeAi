@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   applicationOutcomes,
   applications,
+  essayVersions,
   programRequirements,
   savedUniversities,
   studentProfiles,
@@ -56,6 +57,10 @@ export async function GET(req: Request) {
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId));
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    const [latestEssaySignal] = await db.select({ rubricTotal: essayVersions.rubricTotal })
+      .from(essayVersions)
+      .where(and(eq(essayVersions.profileId, profileId), inArray(essayVersions.essayType, ["private_memory", "sop", "personal_statement", "why_us", "supplemental", "scholarship"])))
+      .orderBy(desc(essayVersions.createdAt), desc(essayVersions.id)).limit(1);
 
     const locale = localeFromRequest(req);
     let matchProfile = await toMatchProfileWithActivities(profile);
@@ -325,6 +330,7 @@ export async function GET(req: Request) {
       workExperienceYears: profile.workExperienceYears,
       researchPublications: profile.researchPublications,
       completedCourses: profile.courseworkNotes || profile.apCourses || profile.ibCourses || profile.aLevelSubjects,
+      privateEssayScore: latestEssaySignal?.rubricTotal ?? null,
     };
 
     const results = unis.map((uni) => {

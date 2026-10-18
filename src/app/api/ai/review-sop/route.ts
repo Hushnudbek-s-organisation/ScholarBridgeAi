@@ -5,6 +5,7 @@ import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { localeToLanguageName } from "@/i18n/config";
 import { buildSopReviewFallback } from "@/lib/sopGuidance";
+import { rememberEssayPrivately } from "@/lib/privateEssayMemory";
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +29,13 @@ export async function POST(req: Request) {
       type: "sop",
       targetName: targetUni || targetProgram || undefined,
     });
+    if (guarded.profileId) {
+      try {
+        await rememberEssayPrivately({ profileId: guarded.profileId, content: sopText, targetName: targetUni || targetProgram, source: "review" });
+      } catch (memoryError) {
+        console.warn("Private essay memory save failed:", memoryError);
+      }
+    }
     const scoreLines = [
       `Opening: ${rubric.scores.hook}/100`,
       `Structure: ${rubric.scores.structure}/100`,

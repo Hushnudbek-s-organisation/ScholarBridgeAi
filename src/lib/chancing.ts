@@ -51,6 +51,8 @@ export interface ChancingProfile {
    * activity changes nothing and the portfolio looks disconnected.
    */
   savedActivities?: { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
+  /** Private deterministic writing signal; never emitted by chancing APIs. */
+  privateEssayScore?: number | null;
   budgetAnnualUsd?: number | null;
   familyIncomeUsd?: number | null;
   careerGoal?: string | null;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { applications, essayVersions } from "@/db/schema";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
@@ -63,6 +63,8 @@ export async function GET(req: Request) {
       .from(essayVersions)
       .where(and(
         eq(essayVersions.profileId, profileId),
+        // Private background memories are never returned to the student-facing history API.
+        inArray(essayVersions.essayType, ESSAY_TYPES),
         type ? eq(essayVersions.essayType, parseType(type)) : undefined,
         contextFilter,
       ))
