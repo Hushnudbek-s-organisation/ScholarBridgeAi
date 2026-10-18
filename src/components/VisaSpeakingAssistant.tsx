@@ -904,6 +904,11 @@ export function VisaSpeakingAssistant({
             // Detaching on a half-implemented engine cannot be fatal.
           }
         };
+      } else if ("onvoiceschanged" in synth) {
+        synth.onvoiceschanged = warm;
+        return () => {
+          try { synth.onvoiceschanged = null; } catch { /* optional legacy property */ }
+        };
       }
     } catch {
       // No voice warm-up — the interview still runs on text and typing.

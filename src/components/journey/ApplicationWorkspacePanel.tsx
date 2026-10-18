@@ -71,7 +71,7 @@ interface WorkspaceData {
   tests: { id: number; testType: string; currentScore: number | null; targetScore: number | null; targetDate: string | null }[];
   finance: { id: number; kind: string; name: string; amountUsd: number; status: string }[];
   deadlines: { id: number; title: string; dueDate: string; kind: string }[];
-  offer: { status: string; decidedAt: string | null } | null;
+  offer: { status: string; decidedAt: string | null; responseDeadline?: string | null; depositAmount?: number | null; depositDueDate?: string | null; tuitionCommitment?: number | null } | null;
   submissionChecklist: { key: string; label: string; ok: boolean }[];
   readyToSubmit: boolean;
   reversePlan: { key: string; title: string; date: null; daysBefore: null; tab: string }[];
@@ -159,6 +159,28 @@ export function ApplicationWorkspacePanel({
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("dvUpdateError"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveOffer = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!data?.application) return;
+    const values = new FormData(event.currentTarget);
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/offers", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, applicationId: data.application.id, status: values.get("status"), decidedAt: values.get("decidedAt") || null, responseDeadline: values.get("responseDeadline") || null, depositAmount: values.get("depositAmount") || null, depositDueDate: values.get("depositDueDate") || null, tuitionCommitment: values.get("tuitionCommitment") || null }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || t("opCreateError"));
+      setMessage(t("awOfferSaved"));
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("opCreateError"));
     } finally {
       setBusy(false);
     }
@@ -262,6 +284,12 @@ export function ApplicationWorkspacePanel({
     label: key.charAt(0).toUpperCase() + key.slice(1),
     items: data.requirements.filter((r) => r.section === key),
   })).filter((s) => s.items.length > 0);
+  const sectionKeys: Record<string, string[]> = {
+    requirements: SECTION_ORDER,
+    documents: ["documents"], essays: ["essays"], recommendations: ["recommendations"],
+    tests: ["english", "testing"], finance: ["finance"],
+  };
+  const visibleSections = sections.filter((s) => sectionKeys[tab]?.includes(s.key));
 
   return (
     <div className="space-y-4">
@@ -405,7 +433,7 @@ export function ApplicationWorkspacePanel({
           }
         >
           <div className="space-y-4">
-            {sections.map((s) => (
+            {visibleSections.map((s) => (
               <div key={s.key}>
                 <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {s.label}
@@ -467,7 +495,12 @@ export function ApplicationWorkspacePanel({
                 </ul>
               </div>
             ))}
-            {sections.length === 0 && <Empty title={t("awNoReqs")} hint={t("awNoReqsHint")} />}
+            {visibleSections.length === 0 && <Empty title={t("awNoReqs")} hint={t("awNoReqsHint")} />}
+            {tab === "documents" && <WorkspaceList title={t("awDocumentsSaved")} empty={t("awNoDocuments")} rows={data.documents.map((d) => `${d.title} · ${d.docType} · ${d.status}${d.expiresAt ? ` · ${t("awExpires", { date: d.expiresAt })}` : ""}`)} onOpen={() => onNavigateTab("materials/documents")} action={t("awManageDocuments")} />}
+            {tab === "essays" && <WorkspaceList title={t("awEssaysSaved")} empty={t("awNoEssays")} rows={data.essays.map((e) => `${e.title} · ${e.essayType} · ${e.wordCount} words · v${e.versionNumber}`)} onOpen={() => onNavigateTab("materials/essays")} action={t("awOpenEssayStudio")} />}
+            {tab === "recommendations" && <WorkspaceList title={t("awRecommendationsSaved")} empty={t("awNoRecommendations")} rows={data.recommendations.map((r) => `${r.recommenderName} · ${r.relationship ?? "—"} · ${r.status}${r.dueDate ? ` · ${r.dueDate}` : ""}`)} onOpen={() => onNavigateTab("materials/essays")} action={t("awManageRecommendations")} />}
+            {tab === "tests" && <WorkspaceList title={t("awTestsSaved")} empty={t("awNoTests")} rows={data.tests.map((test) => `${test.testType.toUpperCase()} · ${test.currentScore ?? "—"} → ${test.targetScore ?? "—"}${test.targetDate ? ` · ${test.targetDate}` : ""}`)} onOpen={() => onNavigateTab("study-plan/tests")} action={t("awOpenTestPlanner")} />}
+            {tab === "finance" && <WorkspaceList title={t("awFinanceSaved")} empty={t("awNoFinance")} rows={data.finance.map((f) => `${f.name} · ${f.kind} · $${f.amountUsd.toLocaleString()} · ${f.status}`)} onOpen={() => onNavigateTab("funding")} action={t("awOpenFinancialPlan")} />}
           </div>
         </JourneyCard>
       )}
@@ -579,25 +612,32 @@ export function ApplicationWorkspacePanel({
       {/* ---- Decision (spec §23) ----------------------------------------- */}
       {tab === "decision" && (
         <JourneyCard title={t("tabDecision")} subtitle={t("awDecisionSubtitle")}>
-          {data.offer ? (
-            <div className="space-y-2">
-              <Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>
-                {data.offer.status}
-              </Pill>
-              {data.offer.status === "accepted" && (
-                <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>
-              )}
-              <Button className="mt-2" variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button>
-            </div>
-          ) : (
-            <Empty
-              title={t("awNoDecision")}
-              hint={t("awNoDecisionHint")}
-            />
-          )}
+          {data.offer ? <div className="mb-3 space-y-2"><Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>{t(`opStatus_${data.offer.status}` as never)}</Pill>{data.offer.status === "accepted" && <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>}<Button variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button></div> : <Empty title={t("awNoDecision")} hint={t("awNoDecisionHint")} />}
+          <details open={!data.offer} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+            <summary className="cursor-pointer text-sm font-bold text-indigo-700 dark:text-indigo-300">{data.offer ? t("awEditDecision") : t("awRecordDecision")}</summary>
+            <form onSubmit={saveOffer} className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="text-xs font-semibold">{t("opStatus")}<select name="status" defaultValue={data.offer?.status ?? "pending"} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">{["pending", "accepted", "waitlisted", "deferred", "rejected"].map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
+              <label className="text-xs font-semibold">{t("opRespondBy")}<input name="responseDeadline" type="date" defaultValue={data.offer?.responseDeadline ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-xs font-semibold">{t("opDecidedOn")}<input name="decidedAt" type="date" defaultValue={data.offer?.decidedAt ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-xs font-semibold">{t("opDepositAmount")}<input name="depositAmount" type="number" min="0" step="1" defaultValue={data.offer?.depositAmount ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-xs font-semibold">{t("opDepositDue")}<input name="depositDueDate" type="date" defaultValue={data.offer?.depositDueDate ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-xs font-semibold">{t("opTuitionCommitment")}<input name="tuitionCommitment" type="number" min="0" step="1" defaultValue={data.offer?.tuitionCommitment ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <Button type="submit" disabled={busy} className="sm:col-span-2">{t("opSaveOffer")}</Button>
+            </form>
+          </details>
         </JourneyCard>
       )}
       </SectionTransition>
+    </div>
+  );
+}
+
+function WorkspaceList({ title, empty, rows, onOpen, action }: { title: string; empty: string; rows: string[]; onOpen: () => void; action: string }) {
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-900">
+      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{title}</h3>
+      {rows.length ? <ul className="mt-2 space-y-1">{rows.map((row, i) => <li key={`${row}-${i}`} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">{row}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{empty}</p>}
+      <Button size="sm" variant="outline" className="mt-3" onClick={onOpen}>{action}</Button>
     </div>
   );
 }

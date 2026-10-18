@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { applicationOutcomes, applications, studentProfiles } from "@/db/schema";
+import { admissionOffers, applicationOutcomes, applications, fundingItems, studentProfiles } from "@/db/schema";
 import { requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { hasExplicitOutcomeShareConsent } from "@/lib/similarProfiles";
@@ -80,6 +80,42 @@ export async function POST(req: Request) {
         shareConsent,
       })
       .returning();
+
+    if (["accepted", "rejected", "waitlisted", "deferred"].includes(result)) {
+      const decidedAt = /^\d{4}-\d{2}-\d{2}$/.test(String(body.decidedAt ?? "")) ? String(body.decidedAt) : null;
+      const notes = clampString(body.notes, 2000) || null;
+      await db.insert(admissionOffers).values({
+        applicationId: application.id,
+        profileId: application.profileId,
+        status: result,
+        decidedAt,
+        notes,
+      }).onConflictDoUpdate({
+        target: admissionOffers.applicationId,
+        set: { status: result, decidedAt, notes, updatedAt: new Date() },
+      });
+      const scholarshipAmount = positiveInt(body.scholarshipAmountUsd);
+      const scholarshipName = clampString(body.scholarshipName, 200) || "Admission scholarship";
+      if (result === "accepted" && scholarshipAmount != null && scholarshipAmount > 0) {
+        const [existingFunding] = await db.select({ id: fundingItems.id }).from(fundingItems).where(and(
+          eq(fundingItems.profileId, application.profileId),
+          eq(fundingItems.applicationId, application.id),
+          eq(fundingItems.kind, "scholarship"),
+          eq(fundingItems.name, scholarshipName),
+          eq(fundingItems.amountUsd, scholarshipAmount),
+        )).limit(1);
+        if (!existingFunding) await db.insert(fundingItems).values({
+          profileId: application.profileId,
+          applicationId: application.id,
+          kind: "scholarship",
+          name: scholarshipName,
+          amountUsd: scholarshipAmount,
+          covers: JSON.stringify(["tuition"]),
+          status: "awarded",
+          notes: notes ?? "Recorded from application outcome",
+        });
+      }
+    }
 
     // Keep the tracker in sync: a decision means the application is decided.
     await db

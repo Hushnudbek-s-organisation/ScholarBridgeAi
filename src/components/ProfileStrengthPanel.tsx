@@ -149,7 +149,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
 
   if (loading && !data) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-6 text-sm text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
       </div>
     );
@@ -176,7 +176,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
@@ -220,7 +220,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
           <Activity className="h-3.5 w-3.5" aria-hidden /> {t("extraTitle")}
         </h3>
@@ -233,7 +233,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
           ].map(([label, value]) => (
             <div key={String(label)} className="min-h-16 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
               <p className="break-words text-[11px] font-semibold leading-snug text-slate-600 dark:text-slate-300">{label}</p>
-              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900 dark:text-slate-100">{value}</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900 dark:text-slate-100 dark:text-slate-100">{value}</p>
             </div>
           ))}
         </div>

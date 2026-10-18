@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { savedScholarships, scholarshipDecisions, scholarships, studentProfiles } from "@/db/schema";
+import { savedScholarships, savedUniversities, scholarshipDecisions, scholarships, studentProfiles, universities } from "@/db/schema";
 import { calculateScholarshipMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
-import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
+import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { coverageTier, evaluateScholarshipForSavedUnis } from "@/lib/savedUniCoverage";
 import { guardStudent, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
 import {
   localizeCountry,
@@ -43,11 +44,22 @@ export async function GET(req: Request) {
   try {
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
     if (!profile) return jsonError(404, "Profile not found", "not_found");
-    const [rows, decisions, saved] = await Promise.all([
+    const [rows, decisions, saved, savedUniversityRows] = await Promise.all([
       db.select().from(scholarships).where(eq(scholarships.isActive, true)),
       db.select().from(scholarshipDecisions).where(eq(scholarshipDecisions.profileId, profileId)),
       db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships).where(eq(savedScholarships.profileId, profileId)),
+      db.select({ universityId: savedUniversities.universityId }).from(savedUniversities).where(eq(savedUniversities.profileId, profileId)),
     ]);
+    const savedUniIds = [...new Set(savedUniversityRows.map((u) => u.universityId))];
+    const savedUniRows = savedUniIds.length
+      ? await db.select().from(universities).where(inArray(universities.id, savedUniIds))
+      : [];
+    const savedUniRefs = savedUniRows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      country: u.country,
+      annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
+    }));
     const matchProfile = await toMatchProfileWithActivities(profile);
     const now = new Date();
     const decisionById = new Map(decisions.map((d) => [d.scholarshipId, d.status]));
@@ -56,6 +68,7 @@ export async function GET(req: Request) {
     const all = rows.map((s) => {
       const m = calculateScholarshipMatch(matchProfile, s);
       const st = withStatus(s);
+      const cov = evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) }, savedUniRefs);
       const item: AutopilotScholarship = {
         id: s.id,
         // Catalogue text arrives in the student's language (en = source).
@@ -85,12 +98,16 @@ export async function GET(req: Request) {
         priority: autopilotPriority(item, now),
         decision: decisionById.get(s.id) ?? null,
         saved: savedIds.has(s.id),
+        coveredUniversities: cov.coveredUniNames,
+        coversSavedUni: cov.coversSavedUni,
+        isFullForSavedUni: cov.isFullForSavedUni,
+        coverageTier: coverageTier(cov),
       };
     });
 
     const queue = all
       .filter((s) => !s.decision && (!s.tags.closed || s.tags.reopens) && s.isEligible !== false)
-      .sort((a, b) => b.priority - a.priority);
+      .sort((a, b) => (b.coverageTier ?? 0) - (a.coverageTier ?? 0) || b.priority - a.priority);
     const applied = all.filter((s) => s.decision === "applied");
     const hidden = all.filter((s) => s.decision === "hidden");
     const decided = new Set(all.filter((s) => s.decision).map((s) => s.id));
@@ -139,6 +156,9 @@ export async function POST(req: Request) {
   try {
     const [exists] = await db.select({ id: scholarships.id }).from(scholarships).where(eq(scholarships.id, scholarshipId)).limit(1);
     if (!exists) return jsonError(404, "Scholarship not found", "not_found");
+    if (action === "applied") {
+      await db.insert(savedScholarships).values({ profileId, scholarshipId }).onConflictDoNothing();
+    }
     if (action === "reset") {
       await db
         .delete(scholarshipDecisions)

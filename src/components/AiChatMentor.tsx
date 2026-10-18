@@ -119,7 +119,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-[700px]">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col h-[700px]">
       {/* Chat Header */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -129,20 +129,20 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           <div>
             {/* h2 — the hosting hub already renders the screen's <h1>. */}
             <h2 className="font-bold text-base flex items-center gap-2">
-              ScholarBridgeAI Counselor
+              {t("chatCounselorTitle")}
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold">
-                Online
+                {t("chatOnline")}
               </span>
             </h2>
             <p className="text-xs text-slate-300">
-              Personalized for {activeProfile?.name} • {activeProfile?.targetMajor}
+              {t("chatPersonalized", { name: activeProfile?.name ?? "", major: activeProfile?.targetMajor ?? "" })}
             </p>
           </div>
         </div>
       </div>
 
       {/* Messages Scroll View */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
+      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-slate-800/50">
         <AnimatePresence initial={false}>
         {messages.map((m) => (
           <motion.div
@@ -169,7 +169,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
                   ? "whitespace-pre-wrap bg-indigo-600 text-white rounded-tr-none shadow-xs"
                   : m.error
                   ? "bg-red-50 text-red-700 rounded-tl-none border border-red-200"
-                  : "bg-white text-slate-800 rounded-tl-none border border-slate-200 shadow-xs"
+                  : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-xs"
               }`}
             >
               {m.offline && (
@@ -207,12 +207,12 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       </div>
 
       {/* Prompt Suggestions */}
-      <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-white p-3">
+      <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-white dark:bg-slate-900 p-3">
         {samplePrompts.map((prompt, i) => (
           <button
             key={i}
             onClick={() => handleSend(prompt)}
-            className="min-h-11 max-w-full rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+            className="min-h-11 max-w-full rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 px-3 py-2 text-left text-xs text-slate-600 dark:text-slate-300 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
           >
             💡 {prompt}
           </button>
@@ -225,14 +225,14 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           e.preventDefault();
           handleSend();
         }}
-        className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+        className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2"
       >
         <input
           type="text"
           placeholder={t("inputPlaceholder")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="flex-1 px-4 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="flex-1 px-4 py-2.5 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
         />
         <button
           type="submit"

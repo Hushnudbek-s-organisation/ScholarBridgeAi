@@ -11,6 +11,7 @@ import {
   applicationCycles,
   studentProfiles,
   testBookings,
+  testPlans,
 } from "@/db/schema";
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
@@ -33,7 +34,6 @@ import {
   localizeMajorOrField,
   localizeScholarshipProvider,
   localizeScholarshipTitle,
-  localizeStatusValue,
 } from "@/lib/catalogLocalizer";
 import {
   coverageTier,
@@ -183,7 +183,7 @@ export async function GET(req: Request) {
     const savedUniRefs: SavedUniRef[] = uniRows.map((u) => ({
       id: u.id,
       name: u.name,
-      country: localizeCountry(u.country, locale),
+      country: u.country,
       annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
     }));
 
@@ -333,7 +333,7 @@ export async function GET(req: Request) {
         title: localizeScholarshipTitle(s.title, locale),
         subtitle: localizeScholarshipProvider(s.provider, locale),
         date: date!.toISOString().slice(0, 10),
-        status: localizeStatusValue(statusLabel(status), locale),
+        status: statusLabel(status).toUpperCase(),
         daysRemaining: daysUntil(now, date!.toISOString()),
         source: s.sourceUrl || s.websiteUrl || null,
         saved: true,
@@ -367,7 +367,7 @@ export async function GET(req: Request) {
           title: localizeScholarshipTitle(s.title, locale),
           subtitle: localizeScholarshipProvider(s.provider, locale),
           date: date!.toISOString().slice(0, 10),
-          status: localizeStatusValue(statusLabel(status), locale),
+          status: statusLabel(status).toUpperCase(),
           daysRemaining: daysUntil(now, date!.toISOString()),
           source: s.sourceUrl || s.websiteUrl || null,
           saved: false,
@@ -397,6 +397,7 @@ export async function GET(req: Request) {
             source: u.websiteUrl || null,
             saved: true,
             country: localizeCountry(u.country, locale),
+            rawCountry: u.country,
             universityId: u.id,
           });
           continue;
@@ -408,12 +409,13 @@ export async function GET(req: Request) {
           title: u.name,
           subtitle: `${localizeCountry(u.country, locale)} · ${localizeMajorOrField(u.programMajor, locale)}`,
           date: deadline,
-          status: localizeStatusValue(savedUniStatusLabel(deadline), locale),
+          status: savedUniStatusLabel(deadline),
           daysRemaining: daysUntil(now, deadline),
           source: u.websiteUrl || null,
           saved: true,
           recommended: false,
           country: localizeCountry(u.country, locale),
+          rawCountry: u.country,
           universityId: u.id,
           chanceScore: scores?.chanceScore ?? null,
           effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,
@@ -453,7 +455,7 @@ export async function GET(req: Request) {
         title: `${a.universityName}${a.programName ? ` — ${a.programName}` : ""}`,
         subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · "),
         date: due ? due.toISOString().slice(0, 10) : null,
-        status: a.status,
+        status: String(a.status || "PENDING").toUpperCase(),
         daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
         source: a.portalUrl || null,
         saved: true,
@@ -461,10 +463,10 @@ export async function GET(req: Request) {
     }
 
     // --- Test dates (IELTS / SAT / TOEFL / Duolingo / GRE) ---
-    const bookings = await db
-      .select()
-      .from(testBookings)
-      .where(eq(testBookings.profileId, profileId));
+    const [bookings, plans] = await Promise.all([
+      db.select().from(testBookings).where(eq(testBookings.profileId, profileId)),
+      db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
+    ]);
     for (const b of bookings) {
       const testDay = new Date(b.testDate);
       items.push({
@@ -483,6 +485,27 @@ export async function GET(req: Request) {
       });
     }
 
+    const bookedTestDates = new Set(bookings.map((b) => `${String(b.testType).toLowerCase()}|${isoDateOr(b.testDate)}`));
+    for (const plan of plans) {
+      if (!plan.isActive) continue;
+      for (const candidateDate of [...new Set([isoDateOr(plan.nextTestDate), isoDateOr(plan.targetDate)].filter((d): d is string => !!d))]) {
+        if (bookedTestDates.has(`${plan.testType.toLowerCase()}|${candidateDate}`)) continue;
+        items.push({
+          id: `test-plan-${plan.id}-${candidateDate}`,
+          type: "test",
+          title: `${plan.testType.toUpperCase()} test (planned)`,
+          subtitle: plan.currentScore == null ? "Study plan" : `Current ${plan.currentScore}; target ${plan.targetScore ?? "—"}`,
+          testType: plan.testType,
+          testRegistered: false,
+          date: candidateDate,
+          status: "PENDING",
+          daysRemaining: daysUntil(now, candidateDate),
+          source: null,
+          saved: true,
+        });
+      }
+    }
+
     // --- High-chance suggestions (outside the student's saved list) ---
     // Placed after the saved sections: the backwards planner shows them with
     // `recommended: true` and a chance badge, ordered by CHANCE, nearest
@@ -496,12 +519,13 @@ export async function GET(req: Request) {
         title: u.name,
         subtitle: `${localizeCountry(u.country, locale)} · ${localizeMajorOrField(u.programMajor, locale)}`,
         date: deadline,
-        status: localizeStatusValue(savedUniStatusLabel(deadline), locale),
+        status: savedUniStatusLabel(deadline),
         daysRemaining: deadline ? daysUntil(now, deadline) : null,
         source: u.websiteUrl || null,
         saved: false,
         recommended: true,
         country: localizeCountry(u.country, locale),
+        rawCountry: u.country,
         universityId: u.id,
         chanceScore: scores?.chanceScore ?? chanceScore,
         effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,

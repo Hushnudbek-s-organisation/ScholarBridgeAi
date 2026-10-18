@@ -21,6 +21,7 @@ import {
   Undo2,
 } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
+import { CountryFlag } from "@/components/CountryFlag";
 import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "./ui";
 
 interface Tags {
@@ -50,6 +51,10 @@ interface Item {
   tags: Tags;
   decision: "applied" | "hidden" | null;
   saved: boolean;
+  coveredUniversities?: string[];
+  coversSavedUni?: boolean;
+  isFullForSavedUni?: boolean;
+  coverageTier?: number;
 }
 
 interface Data {
@@ -178,7 +183,7 @@ export function ScholarshipAutopilot({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.22, delay: Math.min(i, 6) * 0.03 }}
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+      className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
     >
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
@@ -188,7 +193,7 @@ export function ScholarshipAutopilot({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold leading-snug text-slate-900">{s.title}</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {s.provider} · {s.country}
+            {s.provider} · <CountryFlag country={s.country} size="xs" /> {s.country}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
@@ -206,6 +211,7 @@ export function ScholarshipAutopilot({
               <CalendarClock className="h-3 w-3" /> {deadlineText(s)}
             </span>
             {s.tags.fullFunding && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{t("tagFull")}</span>}
+            {(s.coveredUniversities?.length ?? 0) > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">{s.isFullForSavedUni ? t("coverageFull", { universities: s.coveredUniversities!.join(", ") }) : t("coveragePartial", { universities: s.coveredUniversities!.join(", ") })}</span>}
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${s.tags.essay ? "bg-amber-100 text-amber-700" : "bg-teal-100 text-teal-700"}`}>
               <FileText className="h-3 w-3" /> {s.tags.essay ? t("tagEssay") : t("tagNoEssay")}
             </span>

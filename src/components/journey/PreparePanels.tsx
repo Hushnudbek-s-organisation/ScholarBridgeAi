@@ -795,7 +795,7 @@ export function StudyPlanPanel({
           ))}
         </ol>
         <p className="mt-3 text-[11px] text-slate-400">
-          The progress numbers come from your real data — they update whenever your profile, tests or applications change.
+          {t("spProgressFromData")}
         </p>
       </JourneyCard>
 
@@ -845,11 +845,12 @@ interface ActivityData {
 }
 
 export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
+  const t = useTranslations("journey");
   const ts = useTranslations("samples");
   const { data, loading, error, reload } = useResource<ActivityData>(
-    useCallback(() => getJson<ActivityData>(`/api/activities?profileId=${profileId}`, "Could not load your activities"), [profileId]),
+    useCallback(() => getJson<ActivityData>(`/api/activities?profileId=${profileId}`, t("actLoadError")), [profileId, t]),
     [profileId],
-    { initial: { categories: [], activities: [], summary: { total: 0, totalHours: 0, withEvidence: 0 } }, errorFallback: "Could not load your activities" }
+    { initial: { categories: [], activities: [], summary: { total: 0, totalHours: 0, withEvidence: 0 } }, errorFallback: t("actLoadError") }
   );
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
@@ -883,7 +884,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
       await sendJson(
         "/api/activities",
         { method: "POST", body: JSON.stringify({ profileId, ...form, hours: form.hours ? Number(form.hours) : null }) },
-        "Could not save"
+        t("actSaveError")
       );
       setForm({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
       setLoadedActivity(null);
@@ -898,52 +899,52 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
     await reload();
   };
 
-  if (loading && data.activities.length === 0) return <Loading label="Loading your activities…" />;
+  if (loading && data.activities.length === 0) return <Loading label={t("actLoading")} />;
 
   return (
     <div className="space-y-4">
       <JourneyCard
-        title="My activities"
-        subtitle="Everything you have done that an application can use. You are the source of truth — we never invent an activity or an achievement for you."
+        title={t("actTitle")}
+        subtitle={t("actSubtitle")}
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone="slate">{data.summary.total}</Pill>
             <Pill tone="brand">{data.summary.totalHours}h</Pill>
-            <Pill tone="good">{data.summary.withEvidence} with evidence</Pill>
+            <Pill tone="good">{t("actWithEvidence", { count: data.summary.withEvidence })}</Pill>
           </div>
         }
       >
         {error && <ErrorNote message={error} />}
         <SampleExemplarBar group="activity" className="mb-3" loadLabel={ts("activityLoad")} onLoad={loadActivitySample} />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Category">
+          <Field label={t("actCategory")}>
             <select className={inputClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {(data.categories.length ? data.categories : ["volunteering", "leadership", "project"]).map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(`actCat_${c}` as never)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Title">
-            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Peer tutoring programme" />
+          <Field label={t("actFieldTitle")}>
+            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("actTitlePlaceholder")} />
           </Field>
-          <Field label="Role">
-            <input className={inputClass} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="Lead tutor" />
+          <Field label={t("actRole")}>
+            <input className={inputClass} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder={t("actRolePlaceholder")} />
           </Field>
-          <Field label="Organisation">
+          <Field label={t("actOrganization")}>
             <input className={inputClass} value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} />
           </Field>
-          <Field label="Hours">
+          <Field label={t("actHours")}>
             <input className={inputClass} type="number" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
           </Field>
           <div className="sm:col-span-1 lg:col-span-3">
-            <Field label="What you did">
+            <Field label={t("actDescription")}>
               <input className={inputClass} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </Field>
           </div>
           <div className="sm:col-span-2 lg:col-span-4">
-            <Field label="Achievements" hint="Only what really happened — this is what applications will read.">
+            <Field label={t("actAchievements")} hint={t("actAchievementsHint")}>
               <input className={inputClass} value={form.achievements} onChange={(e) => setForm({ ...form, achievements: e.target.value })} />
             </Field>
           </div>
@@ -954,14 +955,14 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
           </p>
         )}
         <Button className="mt-3" onClick={add} disabled={busy || !form.title.trim() || formHoldsSample}>
-          <Plus className="h-3.5 w-3.5" /> Add activity
+          <Plus className="h-3.5 w-3.5" />{t("actAdd")}
         </Button>
       </JourneyCard>
 
       {data.activities.length === 0 ? (
         <Empty
-          title="No activities yet"
-          hint="Competitive applications usually show four or more. Start with something you already do — small things count."
+          title={t("actEmptyTitle")}
+          hint={t("actEmptyHint")}
         />
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -977,7 +978,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
                     {a.hours ? ` · ${a.hours}h` : ""}
                   </p>
                 </div>
-                <Button size="sm" variant="danger" onClick={() => void remove(a.id)} aria-label={`Delete ${a.title}`}>
+                <Button size="sm" variant="danger" onClick={() => void remove(a.id)} aria-label={t("actDelete", { title: a.title })}>
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>

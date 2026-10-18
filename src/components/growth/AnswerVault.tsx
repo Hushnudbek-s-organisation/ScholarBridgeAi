@@ -126,7 +126,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
 
       {items && items.length > 0 && (
         <>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
               <span>{t("progress", { done: answered, total })}</span>
               <span className="font-black text-sky-600">{total ? Math.round((answered / total) * 100) : 0}%</span>
@@ -155,19 +155,19 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
               const example = sampleLib?.ANSWER_VAULT_SAMPLES.find((sample) => sample.category === i.category) ?? null;
               const holdsExample = isUnmodifiedSample(draft, loadedExample[i.promptId]);
               return (
-                <li key={i.promptId} className={`overflow-hidden rounded-2xl border bg-white ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200"}`}>
+                <li key={i.promptId} className={`overflow-hidden rounded-2xl border bg-white dark:bg-slate-900 ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>
                   <button
                     onClick={() => setOpen(isOpen ? null : i.promptId)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left"
                     aria-expanded={isOpen}
                   >
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-200"}`}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-200 dark:border-slate-700"}`}
                     >
                       {done && <Check className="h-3.5 w-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-slate-900">{tr(i.question)}</span>
+                      <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{tr(i.question)}</span>
                       <span className="text-[11px] text-slate-400">
                         {catLabel(i.category)}
                         {i.wordLimit ? ` · ${t("limit", { n: i.wordLimit })}` : ""}
@@ -189,7 +189,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                             type="button"
                             aria-expanded={Boolean(exampleOpen[i.promptId])}
                             onClick={() => setExampleOpen((o) => ({ ...o, [i.promptId]: !o[i.promptId] }))}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
                           >
                             <Lightbulb className="h-3.5 w-3.5" aria-hidden />
                             {exampleOpen[i.promptId] ? ts("answerHide") : ts("answerShow")}
@@ -216,7 +216,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                         rows={7}
                         maxLength={6000}
                         placeholder={t("placeholder")}
-                        className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        className="w-full resize-y rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                       />
                       {holdsExample && (
                         <p className="mt-2 text-[11px] leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
@@ -238,7 +238,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                             onClick={() => void persist(i.promptId, draft)}
                             disabled={holdsExample}
                             title={holdsExample ? ts("unmodified") : undefined}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                           >
                             <Save className="h-3.5 w-3.5" /> {t("save")}
                           </button>

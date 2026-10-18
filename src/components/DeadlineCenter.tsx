@@ -31,12 +31,21 @@ interface DeadlineItem {
   testType?: string;
   testLocation?: string | null;
   testRegistered?: boolean;
+  country?: string | null;
+  rawCountry?: string | null;
+  universityId?: number | null;
+  recommended?: boolean | null;
+  chanceScore?: number | null;
+  matchScore?: number | null;
+  coversSavedUni?: boolean | null;
+  isFullCoverage?: boolean | null;
   /** critical (≤14d) · soon (≤45d) · planned · past · undated */
   urgency?: "critical" | "soon" | "planned" | "past" | "undated";
 }
 
 interface DeadlineCenterProps {
   profileId: number | null;
+  onNavigateTab?: (id: string) => void;
 }
 
 const TYPE_META: Record<DeadlineItem["type"], { labelKey: string; icon: React.ReactNode }> = {
@@ -51,18 +60,18 @@ const URGENCY_META: Record<NonNullable<DeadlineItem["urgency"]>, { dot: string; 
   critical: { dot: "🔴", labelKey: "urgency.critical", chip: "bg-red-50 text-red-700 border-red-200" },
   soon: { dot: "🟠", labelKey: "urgency.soon", chip: "bg-orange-50 text-orange-700 border-orange-200" },
   planned: { dot: "🟡", labelKey: "urgency.planned", chip: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  past: { dot: "⚪", labelKey: "urgency.passed", chip: "bg-slate-100 text-slate-500 border-slate-200" },
-  undated: { dot: "⚪", labelKey: "urgency.noDate", chip: "bg-slate-100 text-slate-500 border-slate-200" },
+  past: { dot: "⚪", labelKey: "urgency.passed", chip: "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700" },
+  undated: { dot: "⚪", labelKey: "urgency.noDate", chip: "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700" },
 };
 
 const STATUS_STYLES: Record<string, string> = {
   OPEN: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  CLOSED: "bg-slate-200 text-slate-600 border-slate-200",
+  CLOSED: "bg-slate-200 text-slate-600 border-slate-200 dark:border-slate-700",
   UPCOMING: "bg-amber-100 text-amber-700 border-amber-200",
   ROLLING: "bg-sky-100 text-sky-700 border-sky-200",
-  "DATE NOT ANNOUNCED": "bg-slate-100 text-slate-500 border-slate-200",
-  "NO DEADLINE ON FILE": "bg-slate-100 text-slate-500 border-slate-200",
-  UNKNOWN: "bg-slate-100 text-slate-500 border-slate-200",
+  "DATE NOT ANNOUNCED": "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700",
+  "NO DEADLINE ON FILE": "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700",
+  UNKNOWN: "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700",
   PENDING: "bg-amber-100 text-amber-700 border-amber-200",
   COMPLETED: "bg-emerald-100 text-emerald-700 border-emerald-200",
   REGISTERED: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -101,7 +110,7 @@ const STATUS_TRANSLATIONS: Record<string, string> = {
   WITHDRAWN: "withdrawn",
 };
 
-export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
+export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps) {
   const t = useTranslations("deadlineCenter");
   const locale = useLocale();
   const [items, setItems] = useState<DeadlineItem[]>([]);
@@ -179,7 +188,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xs">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
           <CalendarClock className="h-5 w-5 text-indigo-600" />
         </div>
@@ -206,7 +215,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
           <button
             type="button"
             onClick={() => void load()}
-            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:ml-auto sm:w-auto"
+            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:ml-auto sm:w-auto"
           >
             <RefreshCw className="h-3.5 w-3.5" /> {t("refresh")}
           </button>
@@ -223,6 +232,8 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
           key={`timeline-${profileId}`}
           profileId={profileId}
           onTasksSynced={() => void load()}
+          onNavigateTab={onNavigateTab}
+          deadlineItems={items}
         />
       ) : null}
 
@@ -257,7 +268,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
                     className={`min-h-11 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
                       pill.active
                         ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     {pill.label}
@@ -292,7 +303,7 @@ export function DeadlineCenter({ profileId }: DeadlineCenterProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words text-xs font-bold text-slate-800">{title}</span>
-                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700"}`}>
                         {statusText(item.status)}
                       </span>
                       {urgency && (

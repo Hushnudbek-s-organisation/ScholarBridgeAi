@@ -120,7 +120,7 @@ export function CountryComparePanel() {
   })();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 dark:border-slate-700">
       <div>
         <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
           <Globe2 className="h-3.5 w-3.5" /> {t("title")}
@@ -135,7 +135,7 @@ export function CountryComparePanel() {
           onChange={(e) => setCountrySearch(e.target.value)}
           placeholder={tc("searchCountry")}
           aria-label={tc("searchCountry")}
-          className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          className="min-h-11 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
         {visibleOptions.map((country) => {
           const countryKey = countryTranslationKey(country);
@@ -152,7 +152,7 @@ export function CountryComparePanel() {
               className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 isSelected
                   ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50"
               }`}
             >
               <CountryFlag country={country} size="xs" />
@@ -185,7 +185,7 @@ export function CountryComparePanel() {
         <ScrollRegion label={t("compare")} className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+              <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-wide text-slate-400">
                 <th className="py-2 pr-3">{t("country")}</th>
                 <th className="py-2 pr-3">{t("universities")}</th>
                 <th className="py-2 pr-3">{t("avgTuition")}</th>

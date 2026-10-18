@@ -48,7 +48,7 @@ import {
 } from "@/lib/smartTimeline";
 
 /** One row of `GET /api/deadlines` — applications, scholarships, tasks, tests. */
-interface DeadlineRow {
+export interface DeadlineRow {
   id?: string | null;
   type?: string | null;
   title?: string | null;
@@ -67,6 +67,7 @@ interface DeadlineRow {
   effectiveAcceptRatePct?: number | null;
   matchScore?: number | null;
   country?: string | null;
+  rawCountry?: string | null;
   universityId?: number | null;
   /** Scholarship rows: does this award pay at a saved university? */
   coversSavedUni?: boolean | null;
@@ -102,6 +103,7 @@ export interface SmartTimelineCalendarProps {
   /** Called after tasks are written, so the host panel can refresh its list. */
   onTasksSynced?: (count: number) => void;
   onNavigateTab?: (id: string) => void;
+  deadlineItems?: DeadlineRow[];
   className?: string;
 }
 
@@ -112,7 +114,7 @@ export interface SmartTimelineCalendarProps {
  */
 const ESSENTIAL_MILESTONE_IDS = new Set(["shortlist_final", "english_test", "bank_statement", "final_buffer"]);
 
-export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab, className = "" }: SmartTimelineCalendarProps) {
+export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab, deadlineItems, className = "" }: SmartTimelineCalendarProps) {
   const t = useTranslations("timeline");
   const [rows, setRows] = React.useState<DeadlineRow[]>([]);
   const [uniCountries, setUniCountries] = React.useState<{ name: string; country: string; id: number | null }[]>([]);
@@ -144,14 +146,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
       setError("");
       try {
         const [deadlineRes, savedRes] = await Promise.all([
-          fetch(`/api/deadlines?profileId=${profileId}`, { signal: controller.signal }),
+          deadlineItems ? Promise.resolve(null) : fetch(`/api/deadlines?profileId=${profileId}`, { signal: controller.signal }),
           // Best effort: this only adds the destination country, which decides
           // whether a country-specific step (the German VPD) belongs in a plan.
           fetch(`/api/saved-universities?profileId=${profileId}`, { signal: controller.signal }).catch(() => null),
         ]);
 
-        const deadlineData = await deadlineRes.json().catch(() => null);
-        if (!deadlineRes.ok || !Array.isArray(deadlineData?.items)) {
+        const deadlineData = deadlineItems ? { items: deadlineItems } : await deadlineRes?.json().catch(() => null);
+        if ((!deadlineItems && !deadlineRes?.ok) || !Array.isArray(deadlineData?.items)) {
           if (live) setError(t("loadError"));
           return;
         }
@@ -185,7 +187,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [profileId, t]);
+  }, [profileId, deadlineItems, t]);
 
   /* ---- build the timeline ------------------------------------------------ */
   const timeline: SmartTimeline = React.useMemo(() => {
@@ -195,6 +197,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
     // still runs; only the Germany-specific step is skipped, and it says
     // that the destination is unknown rather than pretending it is not Germany.
     const countryFor = (row: DeadlineRow): string | null => {
+      if (row.rawCountry?.trim()) return row.rawCountry.trim();
       if (row.country?.trim()) return row.country.trim();
       const title = row.title?.trim() ?? "";
       const hit =
@@ -367,10 +370,10 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
   };
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="smart-timeline-title">
+    <section className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 ${className}`} aria-labelledby="smart-timeline-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id="smart-timeline-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+          <h3 id="smart-timeline-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
             <CalendarClock className="h-4 w-4 text-indigo-600" aria-hidden />
             {t("title")}
           </h3>
@@ -382,10 +385,10 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
             {t("counts.deadlines", { count: timeline.counts.deadlines })}
           </span>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
             {t("counts.steps", { count: timeline.counts.milestones })}
           </span>
           <button
@@ -459,7 +462,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
 
           {/* ---- one backwards plan per dated deadline ---- */}
           {visiblePlans.length === 0 && !loading && (
-            <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
               {timeline.counts.undatedDeadlines > 0 ? t("emptyUndated", { count: timeline.counts.undatedDeadlines }) : t("empty")}
             </p>
           )}
@@ -476,10 +479,10 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
               const syncCount = synced[key];
 
               return (
-                <article key={key} className="rounded-xl border border-slate-200">
+                <article key={key} className="rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex flex-wrap items-start justify-between gap-2 p-3">
                     <div className="min-w-0">
-                      <p className="break-words text-xs font-extrabold text-slate-900">{plan.deadline.label}</p>
+                      <p className="break-words text-xs font-extrabold text-slate-900 dark:text-slate-100">{plan.deadline.label}</p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
                         <span className="inline-flex items-center gap-1 font-semibold">
                           <Clock className="h-3 w-3" aria-hidden />
@@ -556,7 +559,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                         type="button"
                         onClick={() => togglePlan(key)}
                         aria-expanded={open}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-slate-200 px-2 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-slate-200 dark:border-slate-700 px-2 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
                       >
                         {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
                         {t(open ? "hideSteps" : "showSteps", { count: applicable.length })}
@@ -575,7 +578,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                               className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 ${
                                 overdue
                                   ? "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10"
-                                  : "border-slate-200 bg-white"
+                                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                               }`}
                             >
                               <span
@@ -639,7 +642,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
               </button>
             )}
             {prioritizedPlans.expiredCount > 0 && (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+              <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
                 {t("expiredPlans", { count: prioritizedPlans.expiredCount })}
               </span>
             )}
@@ -647,7 +650,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
 
           {/* ---- the flat, nearest-first list: what to do this week ---- */}
           {nextUpEntries.length > 0 && (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 p-3">
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("nextUpTitle")}</p>
               <ul className="mt-2 space-y-1">
                 {(showAllSteps ? nextUpEntries : nextUpEntries.slice(0, 4)).map((entry, index) => (
