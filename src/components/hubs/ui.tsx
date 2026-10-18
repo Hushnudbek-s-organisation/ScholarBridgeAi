@@ -19,6 +19,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowRight, ChevronDown, ChevronRight, ChevronUp, TriangleAlert } from "lucide-react";
 import { JourneyCard } from "@/components/journey/ui";
 
@@ -212,18 +213,41 @@ export function HubPage({
   const t = useTranslations("hubs");
   const nav = useTranslations("nav");
   const reduceMotion = useReducedMotion();
+  // Bumping this key remounts the pane ErrorBoundary — the retry button after
+  // a crash without reloading the whole hub.
+  const [paneAttempt, setPaneAttempt] = useState(0);
   const visibleTabPanes = panes?.filter((pane) => !hiddenPanes.includes(pane.id)) ?? [];
   const hasTabPanels = visibleTabPanes.length > 1 && Boolean(activePane);
+  // A pane that throws on render (bad data, a missing library in some browser)
+  // must take down only itself: the boundary stays mounted around one pane at
+  // a time, the sidebar, hero and every sibling tab keep working, and the
+  // retry pill remounts exactly the failed pane.
   const animatedContent = (
-    <motion.div
-      key={activePane ?? "single"}
-      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-4"
+    <ErrorBoundary
+      key={`pane-${activePane ?? "single"}-${paneAttempt}`}
+      fallback={
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/40 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">{t("sectionFailed")}</p>
+          <button
+            type="button"
+            onClick={() => setPaneAttempt((n) => n + 1)}
+            className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+          >
+            {t("sectionRetry")}
+          </button>
+        </div>
+      }
     >
-      {children}
-    </motion.div>
+      <motion.div
+        key={activePane ?? "single"}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className="space-y-4"
+      >
+        {children}
+      </motion.div>
+    </ErrorBoundary>
   );
   return (
     <div className="space-y-4">

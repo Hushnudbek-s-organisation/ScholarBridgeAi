@@ -575,6 +575,25 @@ export interface VisaApplicantProfile {
   targetMajor?: string | null;
 }
 
+const VISA_OFFICER_FRAMEWORKS: Record<string, string> = {
+  US:
+    "FRAMEWORK (F-1): the interview turns on INA §214(b) non-immigrant intent — probe why THIS specific university over the alternatives the applicant could have chosen, whether the I-20 and stated finances are coherent to the cent, and what the concrete post-graduation plan is (including why the applicant will return home).",
+  GB:
+    "FRAMEWORK (Student route): apply the UKVI Genuine Student test in question form — course progression logic (why this level after the previous one), the applicant's own academic rationale without a script, and awareness of maintenance funds including the 28-day rule.",
+  DE:
+    "FRAMEWORK (§16b national visa): probe why Germany for this field, real familiarity with the module handbook and admission restrictions (NC), the financing model — blocked account (currently €11,904 per year; the applicant should know their own actual figure and that it changes) or scholarship such as DAAD — and the language of instruction.",
+  KR:
+    "FRAMEWORK (D-2): why Korea and why this university, language preparation (TOPIK level or the English-track evidence), proof of the sponsor's income supporting tuition and living costs, and a clear plan after graduation.",
+  CA:
+    "FRAMEWORK (Study Permit): acceptance and level coherence, tuition prepayment and GIC or equivalent proof, a GTE-style explanation of purpose in the applicant's own words, and family, employment and economic ties to the home country.",
+  AU:
+    "FRAMEWORK (Subclass 500, Genuine Student criterion): previous study record versus the chosen course, financial capacity stated exactly, the career value of the degree back home, and any ties the applicant can name.",
+  SG:
+    "FRAMEWORK (Student's Pass): the institution's standing, tuition already settled or arranged, the applicant's study plan in their own words, and what they return home to.",
+  JP:
+    "FRAMEWORK (Student visa): the designated institution and admission letter, the sponsor's livelihood and tax documents, Japanese or English study preparation, and post-study intent stated plainly.",
+};
+
 /**
  * System instruction: the model roleplays a REAL consular officer and
  * speaks strictly in the country's official visa-interview language.
@@ -585,6 +604,10 @@ export function buildOfficerSystemPrompt(
   profile?: VisaApplicantProfile | null,
 ): string {
   const officerWord = gender === "female" ? "female" : "male";
+  // Each post probes the legal ground on which THIS visa is actually refused.
+  // These are interview angles for the roleplay — the officer never lectures
+  // about law, it asks the questions the real desk asks.
+  const framework = VISA_OFFICER_FRAMEWORKS[country.code.toUpperCase()] ?? "";
   const profileLine =
     profile && (profile.name || profile.degreeLevel || profile.targetMajor)
       ? `APPLICANT FILE (use naturally, do not read aloud): name ${profile.name || "unknown"}, applying for ${profile.degreeLevel || "unknown"} in ${profile.targetMajor || "unknown"}.`
@@ -597,9 +620,9 @@ ABSOLUTE LANGUAGE RULE: conduct the ENTIRE interview ONLY in ${country.language}
 You are a ${officerWord} officer — use grammatically correct ${officerWord} forms when referring to yourself if ${country.language} has grammatical gender.
 
 INTERVIEW STYLE:
-- Ask ONE short question at a time (1-2 sentences, under 60 words) so it can be read aloud by text-to-speech.
+- Ask ONE short question at a time (1-2 sentences, under 55 words) so it can be read aloud by text-to-speech.
 - Begin with a brief formal greeting, then your first question.
-- Ask realistic follow-up questions based on the applicant's answers. Probe the classic refusal grounds: unclear study purpose, weak funding proof, weak ties to the home country, immigration intent after studies, inconsistent answers.
+- ${framework}Ask realistic follow-up questions based on the applicant's answers. Probe the classic refusal grounds: unclear study purpose, weak funding proof, weak ties to the home country, immigration intent after studies, inconsistent answers.
 - Typical questions asked at this post (use as inspiration, never read as a list):
 ${country.questions.map((q) => `  - ${q}`).join("\n")}
 - Be realistic, not cruel: a neutral tone with short reactions ("I see.", "Understood.") before the next question is fine.
@@ -663,6 +686,7 @@ Score the APPLICANT only, based on their own turns:
 - language_level: grammar, vocabulary and fluency in ${country.language} (0-100)
 - estimated_visa_chance: realistic overall approval likelihood combining all signals (0-100)
 
+Evaluate every substantive applicant turn for SPECIFICITY — named programme modules, exact sponsor and funding figures, concrete home-country ties (real employers, property, family commitments), a coherent post-study plan — versus red-flag phrasing (rehearsed-sounding recitals, contradictions with the applicant's own earlier turns, "I don't know yet" on purpose or funding).
 Fairness rules: the applicant's turns may contain speech-recognition errors — ignore minor transcription artifacts. DO penalize vague, evasive, contradictory or off-topic answers. If there are almost no applicant answers, score near 0 and say the interview was too short.
 
 Respond with JSON ONLY (no markdown, no commentary) in exactly this shape:
@@ -671,7 +695,7 @@ Respond with JSON ONLY (no markdown, no commentary) in exactly this shape:
   "persuasiveness": 0,
   "language_level": 0,
   "estimated_visa_chance": 0,
-  "recommendations": "4-6 short actionable bullet lines written in ${uiLanguage}, each line starting with \\u2022 "
+  "recommendations": "4-6 short actionable bullet lines written in ${uiLanguage} — each one anchored in something the applicant actually said (quote three to eight words of it), never generic advice that could fit anyone — each line starting with \\u2022 "
 }
 
 TRANSCRIPT:

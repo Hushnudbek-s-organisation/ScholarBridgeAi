@@ -3868,7 +3868,9 @@
     "outlookExplain": "Admission outlook is shown next to the requirements it comes from. It describes how your profile compares with published requirements — it is never a probability and never a guarantee.",
     "openWorkspace": "Open workspace",
     "essayPremiumTitle": "AI writing tools are part of Premium",
-    "essayPremiumDescription": "Check the available plans and feature access before continuing."
+    "essayPremiumDescription": "Check the available plans and feature access before continuing.",
+    "sectionFailed": "This section hit a problem in your browser — the rest of the hub still works.",
+    "sectionRetry": "Try again"
   },
   "disclaimers": {
     "general": "ScholarBridgeAI is an independent guide — it is not affiliated with any university, scholarship provider or government. AI output and catalogue data can be wrong or out of date; always confirm the details at the official source.",

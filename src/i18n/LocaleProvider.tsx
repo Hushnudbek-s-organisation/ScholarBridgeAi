@@ -81,7 +81,28 @@ export function LocaleProvider({
 
   return (
     <LocaleContext.Provider value={contextValue}>
-      <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Tashkent">
+      <NextIntlClientProvider
+        locale={locale}
+        messages={messages}
+        timeZone="Asia/Tashkent"
+        // A missing key must degrade to readable text, never to the red
+        // "something went wrong" screen: next-intl throws IntlError on absent
+        // messages, and one forgotten key in one locale would otherwise crash
+        // the whole hub. Dev keeps a console warning; production gets the
+        // English value of the same key, or the bare key as the last resort.
+        onError={(error) => {
+          if (process.env.NODE_ENV !== "production") console.warn("[i18n]", error.message);
+        }}
+        getMessageFallback={({ namespace, key }) => {
+          const path = namespace ? [namespace, ...key.split(".")] : key.split(".");
+          let node: unknown = dictionaries.en;
+          for (const part of path) {
+            if (node && typeof node === "object") node = (node as Record<string, unknown>)[part];
+            else return path[path.length - 1] ?? key;
+          }
+          return typeof node === "string" ? node : (path[path.length - 1] ?? key);
+        }}
+      >
         {children}
       </NextIntlClientProvider>
     </LocaleContext.Provider>

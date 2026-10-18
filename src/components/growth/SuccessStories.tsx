@@ -3,6 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
+import CountryFlag from "@/components/CountryFlag";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
@@ -93,6 +96,7 @@ const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 export function SuccessStories({ activeProfile }: { activeProfile: StudentProfile | null }) {
   const t = useTranslations("stories");
   const tCountry = useTranslations("countryNames");
+  const { locale } = useLocaleContext();
   const [view, setView] = useState<"browse" | "share" | "mine">("browse");
   const [items, setItems] = useState<Story[] | null>(null);
   const [countries, setCountries] = useState<string[]>([]);
@@ -223,8 +227,16 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
             {s.admittedUniversity}
             {s.isVerified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-500" aria-label={t("verified")} />}
           </p>
-          <p className="text-[11px] text-slate-500">
-            {[s.admittedCountry, s.degreeLevel, s.major, s.intakeYear].filter(Boolean).join(" · ")}
+          <p className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+            {s.admittedCountry && (
+              <span className="inline-flex items-center gap-1">
+                <CountryFlag country={s.admittedCountry} size="xs" />
+                {localizeCountry(s.admittedCountry, locale)}
+              </span>
+            )}
+            {[s.degreeLevel, s.major ? localizeMajorOrField(s.major, locale) : null, s.intakeYear].filter(Boolean).map((part, i) => (
+              <span key={`${String(part)}-${i}`}>· {String(part)}</span>
+            ))}
           </p>
         </div>
         {s.twin != null && s.twin > 0 ? (

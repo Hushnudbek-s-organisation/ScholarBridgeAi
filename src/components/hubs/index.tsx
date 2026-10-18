@@ -111,9 +111,12 @@ function usePanes(sectionId: string): { panes: HubPaneDef[]; visible: { id: stri
   const section = NAV_SECTIONS.find((s) => s.id === sectionId);
   const panes = useMemo(
     () =>
+      // `has` first: a pane whose message key is missing falls back to the
+      // English label in navSections.ts instead of taking the hub down
+      // (belt and braces next to the provider-level getMessageFallback).
       (section?.panes ?? []).map((p) => ({
         id: p.id,
-        label: tp(p.id as never),
+        label: tp.has(p.id as never) ? tp(p.id as never) : p.label,
         premium: p.premium,
         // NEW is a badge on a feature, never an extra destination: it travels
         // with the tab into whichever destination the feature now lives in.
@@ -121,7 +124,11 @@ function usePanes(sectionId: string): { panes: HubPaneDef[]; visible: { id: stri
       })),
     [section, tp]
   );
-  const label = section ? tn(NAV_SECTION_LABEL_KEYS[section.id] as never) : sectionId;
+  const label = section
+    ? tn.has(NAV_SECTION_LABEL_KEYS[section.id] as never)
+      ? tn(NAV_SECTION_LABEL_KEYS[section.id] as never)
+      : section.label
+    : sectionId;
   const visible = useMemo(() => section?.panes ?? [], [section]);
   return { panes, visible, label };
 }

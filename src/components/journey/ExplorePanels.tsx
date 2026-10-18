@@ -25,6 +25,9 @@ import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { INTERVIEW_TRACKS, interviewText } from "@/lib/journey/interviewTracks";
 import { Mic } from "lucide-react";
+import { cachedFetchJson } from "@/lib/clientCache";
+import { localizeCity, localizeCountry } from "@/lib/catalogLocalizer";
+import CountryFlag from "@/components/CountryFlag";
 
 // ===========================================================================
 // CAREER & MAJOR EXPLORER (spec §15)
@@ -76,6 +79,7 @@ export function CareerExplorerPanel({
 }) {
   const t = useTranslations("journey");
   const tDisc = useTranslations("careerDiscovery");
+  const { locale } = useLocaleContext();
   // ONE panel, TWO modes: the guided "find my direction" quiz and the catalog
   // explorer. A discovery pick hands over to the catalog below — never a
   // second, parallel explorer.
@@ -303,11 +307,12 @@ export function CareerExplorerPanel({
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {unis.map((u) => (
               <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                  {u.flagEmoji} {u.name}
+                <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
+                  <span className="min-w-0 break-words">{u.name}</span>
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  {u.city}, {u.country} · #{u.worldRanking}
+                  {localizeCity(u.city, locale)}, {localizeCountry(u.country, locale)} · #{u.worldRanking}
                 </p>
                 {/* Show matched field(s) so the student sees WHY this university appears for the chosen major */}
                 {(u.programMajor || (Array.isArray(u.programFields) && u.programFields.length > 0)) && (
@@ -379,18 +384,30 @@ export function VisaCenterPanel({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let live = true;
     (async () => {
       try {
+        // cachedFetchJson throws on a failed request — the catch below (not a
+        // bare `finally`) is what keeps a dropped network from surfacing as an
+        // unhandled rejection in this panel.
         const [reqs, hist] = await Promise.all([
-          fetch("/api/visa/requirements?country=" + encodeURIComponent(country), { cache: "no-store" }),
-          fetch(`/api/visa/history?profileId=${profileId}`, { cache: "no-store" }),
+          cachedFetchJson<any>("/api/visa/requirements?country=" + encodeURIComponent(country), "Could not load visa requirements"),
+          cachedFetchJson<any>(`/api/visa/history?profileId=${profileId}`, "Could not load your practice history"),
         ]);
-        setData(reqs.ok ? await reqs.json() : { requirements: [] });
-        if (hist.ok) setHistory(await hist.json());
+        if (!live) return;
+        setData(reqs && Array.isArray(reqs.requirements) ? reqs : { requirements: [] });
+        if (hist) setHistory(hist);
+      } catch {
+        if (!live) return;
+        setData({ requirements: [] });
+        setHistory(null);
       } finally {
-        setLoading(false);
+        if (live) setLoading(false);
       }
     })();
+    return () => {
+      live = false;
+    };
   }, [country, profileId]);
 
   return (
@@ -474,9 +491,9 @@ export function VisaCenterPanel({
                 <Pill tone="slate">#{i + 1}</Pill>
                 <span className="text-slate-600 dark:text-slate-300">{s.country ?? "—"}</span>
                 <span className="flex-1">
-                  <ProgressBar pct={Math.round((s.total / 5) * 100)} size="sm" />
+                  <ProgressBar pct={Math.max(0, Math.min(100, Math.round(s.total)))} size="sm" />
                 </span>
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{s.total}/5</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{Math.round(s.total)}/100</span>
               </li>
             ))}
           </ul>

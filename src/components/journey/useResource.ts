@@ -16,6 +16,7 @@
  * unmounted panel) and exposes an explicit `reload` for event handlers.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cachedFetchJson, invalidateClientCache } from "@/lib/clientCache";
 
 export interface Resource<T> {
   data: T;
@@ -70,6 +71,11 @@ export function useResource<T>(
 
   const reload = useCallback(async () => {
     setLoading(true);
+    // reload() runs right after a mutation the caller just performed — it must
+    // read the server truth, so the shared GET cache is cleared first. (This
+    // also covers panels that POST/PATCH through raw fetch instead of
+    // sendJson, which clears the cache itself.)
+    invalidateClientCache();
     try {
       const res = await fetcherRef.current();
       setData(res);
@@ -85,12 +91,18 @@ export function useResource<T>(
   return { data, loading, error, reload, setData };
 }
 
-/** `fetch` + JSON + throw-on-error, in the shape `useResource` expects. */
-export async function getJson<T>(url: string, fallback: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error || fallback);
-  return json as T;
+/**
+ * `fetch` + JSON + throw-on-error, in the shape `useResource` expects.
+ * Reads go through the 15-second client cache (tab switches are instant);
+ * every `sendJson` mutation invalidates it, and `opts.noCache` forces a
+ * fresh request for callers that mutate through raw `fetch` themselves.
+ */
+export async function getJson<T>(
+  url: string,
+  fallback: string,
+  opts?: { noCache?: boolean }
+): Promise<T> {
+  return cachedFetchJson<T>(url, fallback, opts?.noCache ? 0 : undefined);
 }
 
 export async function sendJson<T>(
@@ -98,6 +110,9 @@ export async function sendJson<T>(
   init: RequestInit,
   fallback: string
 ): Promise<T> {
+  // Any mutation attempt (even a failing one) may have changed server state,
+  // so the shared GET cache is cleared before the request goes out.
+  invalidateClientCache();
   const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },

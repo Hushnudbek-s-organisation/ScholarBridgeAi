@@ -14,7 +14,7 @@
 import React, { useCallback, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
 import { useTranslations } from "next-intl";
-import { useResource } from "./useResource";
+import { getJson, useResource } from "./useResource";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
@@ -508,12 +508,7 @@ export function JourneyControlCenter({
   const [showAllDeadlines, setShowAllDeadlines] = useState(false);
   const [showAllReadiness, setShowAllReadiness] = useState(false);
   const [showAllPhases, setShowAllPhases] = useState(false);
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/dashboard?profileId=${profileId}`, { cache: "no-store" });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || "Could not load your dashboard");
-    return json as JourneyDashboard;
-  }, [profileId]);
+  const load = useCallback(async () => getJson<JourneyDashboard>(`/api/dashboard?profileId=${profileId}`, "Could not load your dashboard"), [profileId]);
   const resource = useResource<JourneyDashboard | null>(
     () => profileId ? load() : Promise.resolve(null),
     [profileId],

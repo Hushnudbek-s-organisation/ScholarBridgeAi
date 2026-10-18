@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { gpaTo40Scale } from "@/lib/gpa";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
-import { localizeMajorOrField } from "@/lib/catalogLocalizer";
+import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
+import CountryFlag from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { TwinStrategyCard } from "./TwinStrategyCard";
 import {
@@ -488,7 +489,7 @@ export function ChancingPanel({
               {catalogUniversities.map((u) => (
                 <option key={u.id} value={String(u.id)}>
                   {u.worldRanking ? `QS #${u.worldRanking} — ` : ""}
-                  {u.name} ({u.country})
+                  {u.name} ({localizeCountry(u.country, locale)})
                 </option>
               ))}
             </select>
@@ -803,14 +804,14 @@ export function ChancingPanel({
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                        {baseItem.flagEmoji ? `${baseItem.flagEmoji} ` : ""}
-                        {baseItem.universityName}
+                      <h3 className="flex min-w-0 flex-wrap items-center gap-1.5 font-bold text-slate-900 text-base sm:text-lg">
+                        <CountryFlag country={baseItem.country} flagEmoji={baseItem.flagEmoji} size="sm" />
+                        <span className="min-w-0 break-words">{baseItem.universityName}</span>
                       </h3>
                       {baseItem.country && (
                         <span className="text-xs text-slate-500">
-                          · {baseItem.city ? `${baseItem.city}, ` : ""}
-                          {baseItem.country}
+                          · {baseItem.city ? `${localizeCity(baseItem.city, locale)}, ` : ""}
+                          {localizeCountry(baseItem.country, locale)}
                         </span>
                       )}
                     </div>
