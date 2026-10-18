@@ -981,6 +981,18 @@ html.theme-transition *::after {
   border-color: var(--color-slate-700);
 }
 
+/* Landing-only below-the-fold islands: retain an estimated footprint while
+   allowing the browser to skip rendering until the section approaches view. */
+.sb-cv-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
+/* A single pre-composited glow replaces frame-by-frame blur-radius changes. */
+.sb-kinetic-word[data-state="active"] {
+  text-shadow: 0 0 22px rgba(255, 255, 255, 0.75), 0 0 44px rgba(56, 189, 248, 0.45);
+}
+
 /* Telegram Mini App (and other) bottom sheets: a short slide-up + fade.
    Small and purely decorative — reduced motion turns them off. */
 @keyframes sbSheetUp {

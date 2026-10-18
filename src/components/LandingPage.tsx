@@ -317,16 +317,31 @@ const scrollEngine = (() => {
   let velocity = 0;
   let raf = 0;
   let bound = false;
+  let vw = 0;
+  let vh = 0;
+  let maxScroll = 1;
+  let resizeObserver: ResizeObserver | null = null;
   const subs = new Set<ScrollSubscriber>();
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  const readTarget = () => {
-    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    return clamp01(window.scrollY / max);
+  const refreshDimensions = () => {
+    vw = window.innerWidth || 1;
+    vh = window.innerHeight || 1;
+    maxScroll = Math.max(1, document.documentElement.scrollHeight - vh);
+  };
+  const onScroll = () => {
+    target = clamp01(window.scrollY / maxScroll);
+    if (!raf) raf = requestAnimationFrame(step);
+  };
+  const onResize = () => {
+    refreshDimensions();
+    target = clamp01(window.scrollY / maxScroll);
+    subs.forEach((fn) => fn());
+    if (!raf) raf = requestAnimationFrame(step);
   };
   const step = () => {
     raf = 0;
     const delta = target - smooth;
-    if (Math.abs(delta) > 0.00015) {
+    if (Math.abs(delta) > 0.0004) {
       const moved = delta * 0.15;
       smooth += moved;
       velocity = Math.abs(moved) * 0.8 + velocity * 0.2;
@@ -341,37 +356,41 @@ const scrollEngine = (() => {
       subs.forEach((fn) => fn());
     }
   };
-  const kick = () => {
-    if (!raf) raf = requestAnimationFrame(step);
-  };
-  const onScroll = () => {
-    target = readTarget();
-    kick();
+  const initialize = () => {
+    if (bound) return;
+    bound = true;
+    // Initial dimensions are captured once when animation subscribers mount;
+    // subsequent updates come only from ResizeObserver / window resize.
+    refreshDimensions();
+    target = clamp01(window.scrollY / maxScroll);
+    smooth = target;
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(document.documentElement);
+    }
   };
   const subscribe = (fn: ScrollSubscriber) => {
-    if (!bound) {
-      bound = true;
-      target = readTarget();
-      smooth = target;
-      window.addEventListener("scroll", onScroll, { passive: true });
-      window.addEventListener("resize", onScroll, { passive: true });
-    }
+    initialize();
     subs.add(fn);
-    fn(); // paint the current state once synchronously (SSR → hydration)
-    kick();
+    fn();
+    if (!raf) raf = requestAnimationFrame(step);
     return () => {
       subs.delete(fn);
     };
   };
   return {
+    initialize,
     subscribe,
     progress: () => smooth,
     velocity: () => velocity,
-    /** Re-align after geometry was re-sampled (resize): snap, no travel. */
+    viewport: () => ({ vw, vh }),
+    /** Re-align after cached geometry changes without doing a layout read. */
     settle() {
-      target = readTarget();
+      target = clamp01(window.scrollY / maxScroll);
       smooth = target;
-      kick();
+      if (!raf) raf = requestAnimationFrame(step);
     },
   };
 })();
@@ -462,17 +481,25 @@ function PhotoCraftKineticHud() {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
+    scrollEngine.initialize();
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
     const N = HUD_SECTIONS.length;
     const ROW_GAP = 22;
     const TOP_STACK_START_Y = 82;
     const WINDOW = 0.58;
+    const prevStates: Array<string | undefined> = Array(N);
+    const prevTransforms: Array<string | undefined> = Array(N);
+    const prevOpacities: Array<string | undefined> = Array(N);
+    let prevVh = -1;
+    let prevReadout = -1;
 
     const paint = () => {
       const smooth = scrollEngine.progress();
-      const vh = window.innerHeight || 900;
-      const BOTTOM_STACK_END_Y = vh - 36;
+      const { vh } = scrollEngine.viewport();
+      const height = vh || 900;
+      const viewportChanged = height !== prevVh;
+      const BOTTOM_STACK_END_Y = height - 36;
       const s = smooth * (N - 1);
 
       for (let i = 0; i < N; i++) {
@@ -481,19 +508,20 @@ function PhotoCraftKineticHud() {
         const topSlotY = TOP_STACK_START_Y + i * ROW_GAP;
         const bottomSlotY = BOTTOM_STACK_END_Y - (N - 1 - i) * ROW_GAP;
         const delta = i - s;
+        const state = delta <= -WINDOW ? "passed" : delta >= WINDOW ? "upcoming" : (() => {
+          const t = Math.max(0, Math.min(1, (WINDOW - delta) / (2 * WINDOW)));
+          return Math.pow(Math.sin(t * Math.PI), 0.72) > 0.35 ? "active" : "transition";
+        })();
+        if (!viewportChanged && prevStates[i] === state && (state === "passed" || state === "upcoming")) continue;
 
-        if (delta <= -WINDOW) {
-          el.style.transform = `translate3d(0px, ${topSlotY.toFixed(1)}px, 0px) scale(1)`;
-          el.style.opacity = "0.48";
-          el.style.filter = "none";
-          el.style.textShadow = "none";
-          el.dataset.state = "passed";
-        } else if (delta >= WINDOW) {
-          el.style.transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
-          el.style.opacity = "0.48";
-          el.style.filter = "none";
-          el.style.textShadow = "none";
-          el.dataset.state = "upcoming";
+        let transform: string;
+        let opacity: string;
+        if (state === "passed") {
+          transform = `translate3d(0px, ${topSlotY.toFixed(1)}px, 0px) scale(1)`;
+          opacity = "0.48";
+        } else if (state === "upcoming") {
+          transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
+          opacity = "0.48";
         } else {
           const rawT = (WINDOW - delta) / (2 * WINDOW);
           const t = Math.max(0, Math.min(1, rawT));
@@ -502,27 +530,38 @@ function PhotoCraftKineticHud() {
           const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
           const scale = 1 + bell * 2.15;
           const shiftX = -bell * 10;
-          const opacity = 0.48 + bell * 0.52;
-          el.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
-          el.style.opacity = opacity.toFixed(3);
-          el.style.textShadow =
-            bell > 0.15
-              ? `0 0 ${(22 * bell).toFixed(0)}px rgba(255,255,255,${(0.75 * bell).toFixed(2)}), 0 0 ${(44 * bell).toFixed(0)}px rgba(56,189,248,${(0.45 * bell).toFixed(2)})`
-              : "none";
-          el.dataset.state = bell > 0.35 ? "active" : "transition";
+          transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
+          opacity = (0.48 + bell * 0.52).toFixed(3);
+        }
+        if (prevTransforms[i] !== transform) {
+          el.style.transform = transform;
+          prevTransforms[i] = transform;
+        }
+        if (prevOpacities[i] !== opacity) {
+          el.style.opacity = opacity;
+          prevOpacities[i] = opacity;
+        }
+        if (prevStates[i] !== state) {
+          el.dataset.state = state;
+          prevStates[i] = state;
         }
       }
+      prevVh = height;
 
       const exactVal = smooth * 100;
-      const laserY = vh * (0.22 + 0.52 * smooth);
+      const laserY = height * (0.22 + 0.52 * smooth);
       if (tapeRef.current) {
-        tapeRef.current.style.transform = `translate3d(0px, ${(laserY - exactVal * 24).toFixed(1)}px, 0px)`;
+        const transform = `translate3d(0px, ${(laserY - exactVal * 24).toFixed(1)}px, 0px)`;
+        if (tapeRef.current.style.transform !== transform) tapeRef.current.style.transform = transform;
       }
       if (laserRef.current) {
-        laserRef.current.style.transform = `translate3d(0px, ${laserY.toFixed(1)}px, 0px)`;
+        const transform = `translate3d(0px, ${laserY.toFixed(1)}px, 0px)`;
+        if (laserRef.current.style.transform !== transform) laserRef.current.style.transform = transform;
       }
-      if (readoutRef.current) {
-        readoutRef.current.textContent = `${String(Math.round(exactVal)).padStart(3, "0")} %`;
+      const rounded = Math.round(exactVal);
+      if (readoutRef.current && rounded !== prevReadout) {
+        readoutRef.current.textContent = `${String(rounded).padStart(3, "0")} %`;
+        prevReadout = rounded;
       }
     };
 
@@ -592,7 +631,7 @@ function PhotoCraftKineticHud() {
           tabIndex={-1}
           onClick={() => scrollToId(sec.id)}
           style={{ transformOrigin: "right center", willChange: "transform, opacity", opacity: 0 }}
-          className="pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-[12px] font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+          className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-[12px] font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
         >
           {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
         </button>
@@ -783,7 +822,7 @@ export function LandingPage({
       <PhotoCraftKineticHud />
 
       {/* ===== Header ===== */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-[#f8fafc]/90 backdrop-blur-xl dark:border-slate-800 dark:bg-[#090e1a]/90">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-[#f8fafc]/90 backdrop-blur-md dark:border-slate-800 dark:bg-[#090e1a]/90">
         <div className="mx-auto flex h-16 w-[min(1180px,94%)] items-center justify-between gap-2">
           <a
             href="#top"
@@ -1186,7 +1225,7 @@ export function LandingPage({
         {/* ===== How it works ===== */}
         <section
           id="how"
-          className="scroll-mt-20 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-20 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
@@ -1237,7 +1276,7 @@ export function LandingPage({
         {/* ===== Features ===== */}
         <section
           id="features"
-          className="scroll-mt-16 border-b border-slate-800 bg-slate-900 py-8 text-white sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-800 bg-slate-900 py-8 text-white sm:py-10"
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
@@ -1276,7 +1315,7 @@ export function LandingPage({
         {/* ===== Chancing (honest) ===== */}
         <section
           id="chancing"
-          className="scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
         >
           <div className="mx-auto grid w-[min(1180px,94%)] items-center gap-7 lg:grid-cols-2">
             <Reveal>
@@ -1357,7 +1396,7 @@ export function LandingPage({
         {/* ===== Roadmap ===== */}
         <section
           id="roadmap"
-          className="scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
         >
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
@@ -1416,7 +1455,7 @@ export function LandingPage({
         </section>
 
         {/* ===== CTA ===== */}
-        <section id="cta" className="scroll-mt-20 py-8 sm:py-10">
+        <section id="cta" className="sb-cv-section scroll-mt-20 py-8 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)]">
             <Reveal>
               <div className="relative overflow-hidden rounded-[26px] border border-indigo-900/20 bg-gradient-to-br from-[#161b38] via-[#20205a] to-[#29235b] px-6 py-10 text-center text-white dark:border-indigo-500/20 dark:from-[#0c1324] dark:via-[#171b47] dark:to-[#241d50] sm:px-14 sm:py-12">
@@ -1689,7 +1728,7 @@ function ScrollFlightPath() {
    *    climbs, the loop and the dive *feel* like altitude changes.
    *  • TRAIL: revealed forward-only via `stroke-dashoffset = totalLen·(1−p)`
    *    over the measured path length — structurally cannot extrude backwards.
-   *  • GEOMETRY: 1000-point Float64 LUT [x, y, unwrapped screen heading,
+   *  • GEOMETRY: 360-point Float64 LUT [x, y, unwrapped screen heading,
    *    turn over 8 samples], resampled on resize because the screen heading
    *    bakes in the current viewport aspect; headings are UNWRAPPED at
    *    sample time so the ±180° seam never snaps the nose mid-loop.
@@ -1720,25 +1759,37 @@ function ScrollFlightPath() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    const STEPS = 1000;
+    const STEPS = 360;
     // [x, y, unwrapped screen-heading°, bank-turn°] per sample.
     let lut = new Float64Array((STEPS + 1) * 4);
     let totalLen = 4200;
+    let lastDashOffset = "";
+    let lastDorsalOp = "";
+    let lastBellyOp = "";
+    let lastBurnerOp = "";
+    let lastVortOp = -1;
+    let lastCameraTransform = "";
+    let lastJetTransform = "";
+    let lastShadowTransform = "";
+    let lastVortexTransform = "";
+    let lastPlumeTransform = "";
+    let lastBurnerTransform = "";
+    let sampledWidth = 0;
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 
     const sampleLut = () => {
       totalLen = path.getTotalLength() || 4200;
       path.setAttribute("stroke-dasharray", `${totalLen} ${totalLen}`);
-      // Screen heading must bake in the CURRENT viewport aspect ratio — the
-      // SVG stretches its viewBox non-uniformly, so a 45° view-space tangent
-      // is not 45° on a phone.
-      const sx = Math.max(0.01, window.innerWidth / 1200);
-      const sy = Math.max(0.01, window.innerHeight / 1000);
+      // Screen heading bakes in the cached viewport aspect ratio.
+      const { vw, vh } = scrollEngine.viewport();
+      const sx = Math.max(0.01, (vw || 1200) / 1200);
+      const sy = Math.max(0.01, (vh || 1000) / 1000);
       const step = totalLen / STEPS;
-      let prev = path.getPointAtLength(0);
+      let here = path.getPointAtLength(0);
+      let ahead = path.getPointAtLength(step);
+      let prev = here;
       let prevAngle = NaN;
       for (let i = 0; i <= STEPS; i++) {
-        const here = i === 0 ? prev : path.getPointAtLength(i * step);
-        const ahead = i === STEPS ? here : path.getPointAtLength((i + 1) * step);
         const dx = (i === STEPS ? here.x - prev.x : ahead.x - here.x) || 0.0001;
         const dy = i === STEPS ? here.y - prev.y : ahead.y - here.y;
         let a = (Math.atan2(dy * sy, dx * sx) * 180) / Math.PI;
@@ -1750,7 +1801,11 @@ function ScrollFlightPath() {
         lut[i * 4 + 1] = here.y;
         lut[i * 4 + 2] = a;
         prevAngle = a;
-        prev = here;
+        if (i < STEPS) {
+          prev = here;
+          here = ahead;
+          if (i < STEPS - 1) ahead = path.getPointAtLength((i + 2) * step);
+        }
       }
       for (let i = 0; i <= STEPS; i++) {
         const back = Math.max(0, i - 8);
@@ -1791,24 +1846,40 @@ function ScrollFlightPath() {
 
       const cameraY = 470 - (0.78 * (90 + p * 3230) + 0.22 * y);
 
-      // Forward-only rendering: the trail dash shrinks monotonically with p.
-      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - p)));
-      cameraRef.current?.setAttribute(
-        "transform",
-        `translate(0 ${cameraY.toFixed(2)})`,
-      );
-      const scaleX = Math.max(0.01, window.innerWidth / 1200);
-      const scaleY = Math.max(0.01, window.innerHeight / 1000);
-      jetGroupRef.current?.setAttribute(
-        "transform",
-        `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(approach / scaleX).toFixed(4)} ${(approach / scaleY).toFixed(4)}) rotate(${angle.toFixed(2)}) scale(1 ${wingScaleY.toFixed(3)})`,
-      );
-      shadowGroupRef.current?.setAttribute(
-        "transform",
-        `translate(-6, ${(8 + bankDeg * 0.18).toFixed(2)}) scale(0.95)`,
-      );
-      dorsalRef.current?.setAttribute("opacity", dorsalOp.toFixed(3));
-      bellyRef.current?.setAttribute("opacity", bellyOp.toFixed(3));
+      // Forward-only rendering: rounded attributes are only touched on change.
+      const dashOffset = (totalLen * (1 - p)).toFixed(2);
+      if (dashOffset !== lastDashOffset) {
+        path.setAttribute("stroke-dashoffset", dashOffset);
+        lastDashOffset = dashOffset;
+      }
+      const cameraTransform = `translate(0 ${cameraY.toFixed(2)})`;
+      if (cameraTransform !== lastCameraTransform) {
+        cameraRef.current?.setAttribute("transform", cameraTransform);
+        lastCameraTransform = cameraTransform;
+      }
+      const { vw, vh } = scrollEngine.viewport();
+      const scaleX = Math.max(0.01, (vw || 1200) / 1200);
+      const scaleY = Math.max(0.01, (vh || 1000) / 1000);
+      const jetTransform = `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(approach / scaleX).toFixed(4)} ${(approach / scaleY).toFixed(4)}) rotate(${angle.toFixed(2)}) scale(1 ${wingScaleY.toFixed(3)})`;
+      if (jetTransform !== lastJetTransform) {
+        jetGroupRef.current?.setAttribute("transform", jetTransform);
+        lastJetTransform = jetTransform;
+      }
+      const shadowTransform = `translate(-6, ${(8 + bankDeg * 0.18).toFixed(2)}) scale(0.95)`;
+      if (shadowTransform !== lastShadowTransform) {
+        shadowGroupRef.current?.setAttribute("transform", shadowTransform);
+        lastShadowTransform = shadowTransform;
+      }
+      const dorsalValue = dorsalOp.toFixed(3);
+      if (dorsalValue !== lastDorsalOp) {
+        dorsalRef.current?.setAttribute("opacity", dorsalValue);
+        lastDorsalOp = dorsalValue;
+      }
+      const bellyValue = bellyOp.toFixed(3);
+      if (bellyValue !== lastBellyOp) {
+        bellyRef.current?.setAttribute("opacity", bellyValue);
+        lastBellyOp = bellyValue;
+      }
 
       const vortOp = Math.min(
         0.85,
@@ -1818,42 +1889,57 @@ function ScrollFlightPath() {
       );
       const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
       const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
-      vortexGroupRef.current?.setAttribute("opacity", vortOp.toFixed(3));
-      vortexTopRef.current?.setAttribute(
-        "d",
-        `M -16 -38 Q ${(-65 * vL).toFixed(1)} ${(-46 - curl).toFixed(1)} ${(-150 * vL).toFixed(1)} ${(-30 + curl * 0.6).toFixed(1)}`,
-      );
-      vortexBottomRef.current?.setAttribute(
-        "d",
-        `M -16 38 Q ${(-65 * vL).toFixed(1)} ${(46 - curl).toFixed(1)} ${(-150 * vL).toFixed(1)} ${(30 + curl * 0.6).toFixed(1)}`,
-      );
+      const vortValue = vortOp.toFixed(3);
+      if (Math.abs(vortOp - lastVortOp) > 0.01) {
+        vortexGroupRef.current?.setAttribute("opacity", vortValue);
+        lastVortOp = Number(vortValue);
+      }
+      const vortexTransform = `scale(${vL.toFixed(3)} ${(1 + curl * 0.015).toFixed(3)})`;
+      if (vortexTransform !== lastVortexTransform) {
+        vortexGroupRef.current?.setAttribute("transform", vortexTransform);
+        lastVortexTransform = vortexTransform;
+      }
 
-      plumeRef.current?.setAttribute(
-        "transform",
-        `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`,
-      );
-      burnerRef.current?.setAttribute(
-        "transform",
-        `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`,
-      );
-      burnerRef.current?.setAttribute(
-        "opacity",
-        Math.min(0.9, vel * 40).toFixed(3),
-      );
+      const plumeTransform = `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`;
+      if (plumeTransform !== lastPlumeTransform) {
+        plumeRef.current?.setAttribute("transform", plumeTransform);
+        lastPlumeTransform = plumeTransform;
+      }
+      const burnerTransform = `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`;
+      if (burnerTransform !== lastBurnerTransform) {
+        burnerRef.current?.setAttribute("transform", burnerTransform);
+        lastBurnerTransform = burnerTransform;
+      }
+      const burnerValue = Math.min(0.9, vel * 40).toFixed(3);
+      if (burnerValue !== lastBurnerOp) {
+        burnerRef.current?.setAttribute("opacity", burnerValue);
+        lastBurnerOp = burnerValue;
+      }
     };
 
+    scrollEngine.initialize();
+    sampledWidth = window.innerWidth;
     sampleLut();
     const unsub = paintOnceUnderReducedMotion(paint, reducedMotion);
     const handleResize = () => {
-      // Aspect ratio changed → screen headings in the LUT are stale.
-      sampleLut();
-      if (!reducedMotion) scrollEngine.settle();
-      paint();
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        resizeTimer = undefined;
+        const width = window.innerWidth;
+        // Mobile browser chrome changes height while scrolling; it does not
+        // change the SVG's horizontal scale, so do not resample the LUT.
+        if (Math.abs(width - sampledWidth) < 2) return;
+        sampledWidth = width;
+        sampleLut();
+        if (!reducedMotion) scrollEngine.settle();
+        paint();
+      }, 120);
     };
     window.addEventListener("resize", handleResize, { passive: true });
     return () => {
       unsub();
       window.removeEventListener("resize", handleResize);
+      if (resizeTimer) clearTimeout(resizeTimer);
     };
   }, []);
 
@@ -1861,6 +1947,7 @@ function ScrollFlightPath() {
     <div
       aria-hidden="true"
       className="sb-flight pointer-events-none fixed inset-0 z-20 overflow-hidden text-zinc-900/75 dark:text-white/80"
+      style={{ contain: "strict", pointerEvents: "none" }}
     >
       <svg
         viewBox="0 0 1200 1000"
@@ -1942,18 +2029,6 @@ function ScrollFlightPath() {
 function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
   const tIndex = useTranslations("landing");
   const sectionRef = React.useRef<HTMLElement | null>(null);
-  /**
-   * Images used to be `loading="lazy"` for everything past the first four
-   * cards. Lazy activation is measured against the VISUAL viewport, but the
-   * track slides each card in horizontally at animation speed — by the time
-   * a far card intersected, its fetch had only just started, so campus photos
-   * popped in seconds after the card was already on screen. Once the section
-   * comes near, the whole first loop copy starts downloading eagerly (24
-   * thumbnails, ~45 KB each, spread over an idle second before the section is
-   * even visible); the cloned copy shares the identical URLs and is served
-   * from the HTTP cache, so infinite looping never re-validates or refetches.
-   */
-  const [nearViewport, setNearViewport] = React.useState(false);
 
   React.useEffect(() => {
     const el = sectionRef.current;
@@ -1970,23 +2045,8 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       },
       { rootMargin: "160px 0px" },
     );
-    // A second, generous margin decides when it is worth warming the image
-    // pipeline. This fires at most twice and never per frame.
-    const prewarm = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setNearViewport(true);
-          prewarm.disconnect();
-        }
-      },
-      { rootMargin: "720px 0px" },
-    );
     observer.observe(el);
-    prewarm.observe(el);
-    return () => {
-      observer.disconnect();
-      prewarm.disconnect();
-    };
+    return () => observer.disconnect();
   }, []);
 
   const renderRow = (items: MarqueeUniversityItem[], animClass: string, eagerCount = 0) => (
@@ -2010,16 +2070,13 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={campusPhotoSrc(university.url, 480)}
+                    src={campusPhotoSrc(university.url, 320)}
                     onError={onWikimediaThumbError(university.url)}
                     crossOrigin="anonymous"
                     alt={university.landmark}
-                    // Leading cards of row 1 paint with the section; every other
-                    // FIRST-copy card is eager once the section is near (see
-                    // `nearViewport` above) — never when it has already slid into
-                    // view. The aria-hidden clone keeps `lazy` because its URLs
-                    // are identical to copy 0 and resolve from cache instantly.
-                    loading={copy === 0 && (index < eagerCount || nearViewport) ? "eager" : "lazy"}
+                    width={288}
+                    height={128}
+                    loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
                     {...(copy === 0 && index < eagerCount
                       ? { fetchPriority: "high" as const }
                       : { fetchPriority: "low" as const, decoding: "async" as const })}
@@ -2070,9 +2127,9 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
         </h2>
       </div>
       <div className="space-y-3 overflow-hidden">
-        {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 4)}
-        {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 2)}
-        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 2)}
+        {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 2)}
+        {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 0)}
+        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 0)}
       </div>
     </section>
   );
