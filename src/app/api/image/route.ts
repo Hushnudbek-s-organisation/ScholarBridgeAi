@@ -11,9 +11,10 @@
  *     this can never become an open SSRF relay — and the upstream fetch runs
  *     through `fetchGuarded`, so a Wikimedia 302 aimed at a private address
  *     (or the metadata endpoint) is refused per hop, never followed blindly;
- *   • responses are `public, max-age=604800, immutable` — one fetch per URL
- *     per client per week (the <img> tags also carry crossOrigin="anonymous"
- *     so no cookies ride along and no auth-only `no-store` header applies);
+ *   • a bounded 64-entry / 512 KiB-per-image LRU shares validated bytes in
+ *     process RAM for 24 hours; client responses remain `public, max-age=604800,
+ *     immutable` (the <img> tags also carry crossOrigin="anonymous" so no
+ *     cookies ride along and no auth-only `no-store` header applies);
  *   • upstream failures answer a plain 404/502 — no upstream error bodies,
  *     no secrets, never a 500 stack.
  *
@@ -29,6 +30,48 @@ export const dynamic = "force-dynamic";
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 /** Upstream fetch budget — Wikimedia thumbnails are usually < 100 ms TTFB. */
 const UPSTREAM_TIMEOUT_MS = 8_000;
+const MAX_IMAGE_BYTES = 512 * 1024;
+const IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const IMAGE_CACHE_MAX_ENTRIES = 64;
+type CachedImage = { bytes: Uint8Array; contentType: string; expiresAt: number };
+// Per-process bounded LRU; only already-validated Wikimedia images enter it.
+const imageCache = new Map<string, CachedImage>();
+
+function cachedImage(key: string): CachedImage | undefined {
+  const entry = imageCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    imageCache.delete(key);
+    return undefined;
+  }
+  imageCache.delete(key);
+  imageCache.set(key, entry);
+  return entry;
+}
+
+function storeImage(key: string, entry: CachedImage) {
+  imageCache.delete(key);
+  imageCache.set(key, entry);
+  while (imageCache.size > IMAGE_CACHE_MAX_ENTRIES) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest === undefined) break;
+    imageCache.delete(oldest);
+  }
+}
+
+function imageResponse(bytes: Uint8Array, contentType: string): NextResponse {
+  return new NextResponse(Buffer.from(bytes), {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=604800, immutable",
+      "Access-Control-Allow-Origin": "*",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      Vary: "Accept",
+    },
+  });
+}
 
 function rejected(error: string, status = 400): NextResponse {
   return NextResponse.json({ error }, { status });
@@ -55,6 +98,10 @@ export async function GET(req: Request): Promise<Response> {
     return rejected("url_not_allowed");
   }
 
+  const cacheKey = target.toString();
+  const hit = cachedImage(cacheKey);
+  if (hit) return imageResponse(hit.bytes, hit.contentType);
+
   let upstream: Response;
   try {
     upstream = await fetchGuarded(target.toString(), {
@@ -77,17 +124,40 @@ export async function GET(req: Request): Promise<Response> {
   if (!/^image\//i.test(contentType)) {
     return rejected("not_an_image", 404);
   }
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_IMAGE_BYTES) {
+    await upstream.body.cancel().catch(() => undefined);
+    return rejected("image_too_large", 404);
+  }
 
-  const resHeaders = new Headers({
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=604800, immutable",
-      "Access-Control-Allow-Origin": "*",
-      "Cross-Origin-Resource-Policy": "cross-origin",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-      Vary: "Accept",
-    });
-  const len = upstream.headers.get("content-length");
-  if (len && /^\d+$/.test(len)) resHeaders.set("Content-Length", len);
-  return new NextResponse(upstream.body, { headers: resHeaders });
+  const reader = upstream.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_IMAGE_BYTES) {
+        await reader.cancel();
+        return rejected("image_too_large", 404);
+      }
+      chunks.push(value);
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    return rejected("image_unavailable", 404);
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  storeImage(cacheKey, {
+    bytes,
+    contentType,
+    expiresAt: Date.now() + IMAGE_CACHE_TTL_MS,
+  });
+  return imageResponse(bytes, contentType);
 }
