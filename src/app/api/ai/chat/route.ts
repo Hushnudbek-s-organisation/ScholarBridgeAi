@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { studentProfiles } from "@/db/schema";
+import { savedScholarships, savedUniversities, scholarships, studentActivities, studentProfiles, universities } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
@@ -35,6 +35,11 @@ export async function POST(req: Request) {
     let languageInstruction = "";
     if (profileId) {
       const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+      const [savedUniversityRows, activityRows, savedScholarshipRows] = await Promise.all([
+        db.select({ name: universities.name, country: universities.country }).from(savedUniversities).innerJoin(universities, eq(savedUniversities.universityId, universities.id)).where(eq(savedUniversities.profileId, profileId)),
+        db.select({ category: studentActivities.category, title: studentActivities.title, role: studentActivities.role, achievements: studentActivities.achievements }).from(studentActivities).where(eq(studentActivities.profileId, profileId)).orderBy(studentActivities.sortOrder).limit(30),
+        db.select({ title: scholarships.title }).from(savedScholarships).innerJoin(scholarships, eq(savedScholarships.scholarshipId, scholarships.id)).where(eq(savedScholarships.profileId, profileId)).limit(20),
+      ]);
       if (profile) {
         languageInstruction = `IMPORTANT: Respond to the student entirely in ${localeToLanguageName(profile.preferredLocale || "en")}. Keep the technical terms where they are clearer, but write your explanation in the student's language.\n`;
         profileContext = `STUDENT CONTEXT:
@@ -47,7 +52,9 @@ export async function POST(req: Request) {
 - Financial aid needed: ${profile.needsFinancialAid === true || profile.needScholarship === true ? "Yes" : profile.needsFinancialAid === false ? "No (explicitly stated)" : "Not recorded"}
 - Full scholarship required: ${profile.requiresFullScholarship === true ? "Yes" : profile.requiresFullScholarship === false ? "No (explicitly stated)" : "Not recorded"}
 - Countries: ${profile.preferredCountries}
-- Activities: ${[profile.extracurriculars, profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates].filter(Boolean).join("; ") || "Not provided"}`;
+- Activities: ${[profile.extracurriculars, profile.leadership, profile.volunteering, profile.sports, profile.clubs, profile.researchExperience, profile.projects, profile.olympiads, profile.awards, profile.competitions, profile.certificates, ...activityRows.map((a) => `${a.category}: ${a.title}${a.role ? ` (${a.role})` : ""}${a.achievements ? ` — ${a.achievements}` : ""}`)].filter(Boolean).join("; ") || "Not provided"}
+- Saved university shortlist: ${savedUniversityRows.map((u) => `${u.name} (${u.country})`).join("; ") || "None saved"}
+- Saved scholarships: ${savedScholarshipRows.map((s) => s.title).join("; ") || "None saved"}`;
       }
     }
 

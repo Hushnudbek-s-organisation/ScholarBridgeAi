@@ -13,6 +13,7 @@ import {
   learningProviders,
   opportunities,
   recommendationRequests,
+  savedScholarships,
   savedUniversities,
   scholarships,
   studentChecklist,
@@ -608,6 +609,7 @@ async function recommendedFor(
     savedIds.size > 0
       ? await db.select().from(universities).where(inArray(universities.id, [...savedIds]))
       : [];
+  const savedScholarshipIds = new Set((await db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships).where(eq(savedScholarships.profileId, profileId))).map((row) => row.scholarshipId));
   const savedUniRefs: SavedUniRef[] = savedUniRows.map((u) => ({
     id: u.id,
     name: u.name,
@@ -770,6 +772,7 @@ async function recommendedFor(
     .map(({ row: s, match, cov }) => ({
       id: s.id,
       title: s.title,
+      saved: savedScholarshipIds.has(s.id),
       provider: s.provider,
       country: s.country,
       amountUsdValue: resolvedUsdScholarshipAmount(s),

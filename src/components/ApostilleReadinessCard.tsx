@@ -52,14 +52,14 @@ const NEED_TONE: Record<ApostilleNeed, string> = {
   required: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100",
   accepted: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100",
   verify: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100",
-  not_applicable: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
+  not_applicable: "border-slate-200 dark:border-slate-700 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
 };
 
 const TRANSLATION_TONE: Record<TranslationNeed, string> = {
   sworn: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100",
   certified: "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100",
   verify: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100",
-  not_required: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
+  not_required: "border-slate-200 dark:border-slate-700 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
 };
 
 export interface ApostilleReadinessCardProps {
@@ -153,10 +153,10 @@ export function ApostilleReadinessCard({
   const requirement = funds.requirement;
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-700 ${className}`} aria-labelledby="apostille-title">
+    <section className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 dark:border-slate-700 ${className}`} aria-labelledby="apostille-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id="apostille-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+          <h3 id="apostille-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
             <Stamp className="h-4 w-4 text-violet-600" aria-hidden />
             {t("title")}
           </h3>
@@ -203,7 +203,7 @@ export function ApostilleReadinessCard({
         </label>
 
         {isUk && (
-          <fieldset className="rounded-xl border border-slate-200 p-2">
+          <fieldset className="rounded-xl border border-slate-200 dark:border-slate-700 p-2">
             <legend className="px-1 text-[11px] font-bold text-slate-600">{t("ukAreaLegend")}</legend>
             <div className="flex flex-wrap gap-1.5">
               {(["outsideLondon", "london"] as const).map((area) => (
@@ -215,7 +215,7 @@ export function ApostilleReadinessCard({
                   className={`min-h-11 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                     ukArea === area
                       ? "border-sky-500 bg-sky-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
                   {t(`ukAreas.${area}`)}
@@ -227,7 +227,7 @@ export function ApostilleReadinessCard({
       </div>
 
       {/* ---- the published funds rule ---- */}
-      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 p-3">
         <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
           <Building2 className="h-3.5 w-3.5" aria-hidden />
           {t("fundsTitle")}
@@ -235,7 +235,7 @@ export function ApostilleReadinessCard({
 
         {requirement ? (
           <>
-            <p className="mt-1.5 break-words text-xs font-extrabold text-slate-900">
+            <p className="mt-1.5 break-words text-xs font-extrabold text-slate-900 dark:text-slate-100">
               {requirement.amount != null
                 ? `${formatMoney(requirement.amount, requirement.currency)}${requirement.amountUsd != null ? ` · ${formatMoney(requirement.amountUsd, "USD")}` : ""}`
                 : t("fundsNoPublishedAmount")}
@@ -312,9 +312,9 @@ export function ApostilleReadinessCard({
               ["statementNotAfter", funds.statementNotAfter],
               ["earliestWindowStart", funds.earliestWindowStart],
             ] as const).map(([key, value]) => (
-              <div key={key} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 dark:border-emerald-500/30">
+              <div key={key} className="rounded-lg border border-emerald-200 bg-white dark:bg-slate-900 px-2.5 py-1.5 dark:border-emerald-500/30">
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t(`window.${key}`)}</dt>
-                <dd className="mt-0.5 break-words text-xs font-extrabold text-slate-900">{formatDate(value)}</dd>
+                <dd className="mt-0.5 break-words text-xs font-extrabold text-slate-900 dark:text-slate-100">{formatDate(value)}</dd>
               </div>
             ))}
           </dl>
@@ -331,14 +331,14 @@ export function ApostilleReadinessCard({
           {t(`windowReasons.${funds.reason}`)}
         </p>
       ) : (
-        <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">
           {t("windowNeedsDate")}
         </p>
       )}
 
       {/* ---- the dated preparation schedule ---- */}
       {readiness.profile && (
-        <div className="mt-3 rounded-xl border border-slate-200 p-3">
+        <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("stepsTitle")}</p>
           <ol className="mt-2 space-y-1.5">
             {readiness.steps.map((step) => {
@@ -347,7 +347,7 @@ export function ApostilleReadinessCard({
                 <li
                   key={step.id}
                   className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 ${
-                    overdue ? "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10" : "border-slate-200 bg-white"
+                    overdue ? "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                   }`}
                 >
                   <span
@@ -383,8 +383,8 @@ export function ApostilleReadinessCard({
 
       {/* ---- the document matrix ---- */}
       {readiness.profile && (
-        <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-          <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+          <p className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
             {t("matrixTitle", { country: readiness.profile.country })}
           </p>
           <ul className="divide-y divide-slate-100">

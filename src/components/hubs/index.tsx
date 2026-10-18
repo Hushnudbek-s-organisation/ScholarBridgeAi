@@ -359,7 +359,7 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
 /* =========================================================================
  * MY PLAN → Tasks & Timeline
  * ====================================================================== */
-export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
+export function TasksHub({ profile, pane, setPane, navigate, hidden }: HubProps) {
   const t = useTranslations("hubs");
   const { panes, visible, label } = usePanes("tasks");
   const active = useActivePane(pane, visible, hidden);
@@ -375,7 +375,7 @@ export function TasksHub({ profile, pane, setPane, hidden }: HubProps) {
       hiddenPanes={hidden}
     >
       {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
-      {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} />}
+      {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} onNavigateTab={navigate} />}
     </HubPage>
   );
 }
@@ -671,7 +671,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
             >
               {essayTool === "sop" ? (
                 <AiSopStudio
-                  key={`sop-${profile.id}-${effectiveId ?? "none"}`}
+                  key={`sop-${profile.id}-${effectiveId ?? "none"}-${selectedApplication?.universityName ?? ""}-${selectedApplication?.programName ?? ""}`}
                   activeProfile={profile}
                   applicationId={effectiveId}
                   universityId={selectedApplication?.universityId ?? null}

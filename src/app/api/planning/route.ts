@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { savedScholarships, savedUniversities, scholarships, studentProfiles, universities } from "@/db/schema";
+import { savedScholarships, savedUniversities, scholarships, studentActivities, studentProfiles, universities } from "@/db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
 import { assessPortfolio, type ScholarshipInput } from "@/lib/costs";
@@ -291,6 +291,12 @@ export async function GET(req: Request) {
     });
 
     // --- CV ------------------------------------------------------------------
+    const activities = await db.select().from(studentActivities).where(eq(studentActivities.profileId, profileId)).orderBy(asc(studentActivities.sortOrder), asc(studentActivities.id));
+    const activityText = (...categories: string[]) => activities
+      .filter((a) => categories.includes(a.category.toLowerCase()))
+      .map((a) => [a.title, a.role, a.organization, a.description, a.achievements].filter(Boolean).join(" — "))
+      .join(" | ");
+    const appendActivityText = (legacy: string | null, extra: string) => [legacy, extra].filter(Boolean).join(", ");
     const cvDraft = buildCv({
       name: profile.name,
       email: profile.email,
@@ -307,17 +313,17 @@ export async function GET(req: Request) {
       apCourses: profile.apCourses,
       ibCourses: profile.ibCourses,
       aLevelSubjects: profile.aLevelSubjects,
-      leadership: profile.leadership,
-      volunteering: profile.volunteering,
-      sports: profile.sports,
-      clubs: profile.clubs,
-      researchExperience: profile.researchExperience,
-      projects: profile.projects,
+      leadership: appendActivityText(profile.leadership, activityText("leadership")),
+      volunteering: appendActivityText(profile.volunteering, activityText("volunteering", "community")),
+      sports: appendActivityText(profile.sports, activityText("sport", "sports")),
+      clubs: appendActivityText(profile.clubs, activityText("club")),
+      researchExperience: appendActivityText(profile.researchExperience, activityText("research")),
+      projects: appendActivityText(profile.projects, activityText("project")),
+      awards: appendActivityText(profile.awards, activityText("award")),
+      competitions: appendActivityText(profile.competitions, activityText("competition")),
+      certificates: appendActivityText(profile.certificates, activityText("certificate")),
       workExperienceYears: profile.workExperienceYears,
       olympiads: profile.olympiads,
-      awards: profile.awards,
-      competitions: profile.competitions,
-      certificates: profile.certificates,
       careerGoal: profile.careerGoal,
     });
     const cv = localizeCv(localeFromRequest(req), cvDraft);

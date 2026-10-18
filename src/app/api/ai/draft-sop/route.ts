@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { studentProfiles } from "@/db/schema";
+import { savedScholarships, savedUniversities, scholarships, studentActivities, studentProfiles, universities } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
@@ -28,6 +28,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
+    const [savedUniversityRows, activityRows, savedScholarshipRows] = await Promise.all([
+      db.select({ name: universities.name, country: universities.country }).from(savedUniversities).innerJoin(universities, eq(savedUniversities.universityId, universities.id)).where(eq(savedUniversities.profileId, profileId)),
+      db.select({ category: studentActivities.category, title: studentActivities.title, role: studentActivities.role, organization: studentActivities.organization, description: studentActivities.description, achievements: studentActivities.achievements }).from(studentActivities).where(eq(studentActivities.profileId, profileId)).orderBy(studentActivities.sortOrder).limit(30),
+      db.select({ title: scholarships.title }).from(savedScholarships).innerJoin(scholarships, eq(savedScholarships.scholarshipId, scholarships.id)).where(eq(savedScholarships.profileId, profileId)).limit(20),
+    ]);
+
     const targetUni = universityName.trim();
     const targetProg = programName.trim() || profile.targetMajor?.trim() || "";
     if (!targetUni || !targetProg) {
@@ -46,7 +52,12 @@ export async function POST(req: Request) {
       careerGoals,
       programEvidence,
       experienceExample,
-      profileFacts: getSopProfileFacts(profile),
+      profileFacts: [
+        ...getSopProfileFacts(profile),
+        ...activityRows.map((a) => `Recorded ${a.category} activity: ${[a.title, a.role, a.organization, a.description, a.achievements].filter(Boolean).join(" — ")}`),
+        ...(savedUniversityRows.length ? [`Saved university shortlist: ${savedUniversityRows.map((u) => `${u.name} (${u.country})`).join("; ")}`] : []),
+        ...(savedScholarshipRows.length ? [`Saved scholarships: ${savedScholarshipRows.map((s) => s.title).join("; ")}`] : []),
+      ],
     };
 
     const prompt = `You are a careful academic-writing coach helping a student prepare a working Statement of Purpose draft for ${JSON.stringify(targetProg)} at ${JSON.stringify(targetUni)}.

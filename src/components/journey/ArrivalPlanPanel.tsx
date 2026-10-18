@@ -130,7 +130,7 @@ export function ArrivalPlanPanel({
         >
           <ul className="space-y-3">
             {resource.data.countryGuidance.tips.map((tip) => (
-              <li key={tip.key} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <li key={tip.key} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
                   <Pill tone="slate">{t(`windows.${tip.window}`)}</Pill>
                   <Pill tone="info">{t("countrySourceBadge")}</Pill>
@@ -208,7 +208,7 @@ export function ArrivalPlanPanel({
                         className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
                           doneFlag
                             ? "border-emerald-200 bg-emerald-50/60"
-                            : "border-slate-200 bg-white"
+                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                         }`}
                       >
                         <button

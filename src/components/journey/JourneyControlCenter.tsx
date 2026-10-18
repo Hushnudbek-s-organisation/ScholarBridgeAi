@@ -135,6 +135,7 @@ export interface JourneyDashboard {
     scholarships: {
       id: number;
       title: string;
+      saved?: boolean;
       provider: string;
       country: string;
       amountUsdValue: number | null;
@@ -241,16 +242,39 @@ function actionLabelForStep(t: RecTranslator, id: string, tab: string): string {
  */
 export function RecommendedPanel({
   recommended,
+  profileId,
   onNavigateTab,
+  onRefresh,
 }: {
   recommended: JourneyDashboard["recommended"];
+  profileId?: number;
   onNavigateTab: (tab: string) => void;
+  onRefresh?: () => Promise<void>;
 }) {
   const t = useTranslations("journey");
   const awardLabel = useScholarshipAwardLabel();
   const [showAllRecUnis, setShowAllRecUnis] = useState(false);
   const [showAllRecSchols, setShowAllRecSchols] = useState(false);
   const [showAllRecOpps, setShowAllRecOpps] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const saveRecommendation = async (kind: "university" | "scholarship", id: number) => {
+    if (!profileId) return;
+    const key = `${kind}-${id}`;
+    setSaving(key);
+    setSaveError("");
+    try {
+      const res = await fetch(kind === "university" ? "/api/saved-universities" : "/api/saved-scholarships", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, [kind === "university" ? "universityId" : "scholarshipId"]: id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || t("ccSaveError"));
+      await onRefresh?.();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : t("ccSaveError"));
+    } finally { setSaving(null); }
+  };
   // Every row here is justified by THIS profile: the list stays empty (and
   // names the fields to add) until the profile supplies a basis, the order is
   // the shared fit engine's score, and each card shows the engine's own
@@ -270,6 +294,7 @@ export function RecommendedPanel({
       }
     >
       <div className="space-y-4">
+        {saveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">{saveError}</p>}
         {!recommended.personalised && (
           <div className="rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-3 text-xs text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
             <p className="font-semibold">{t("ccRecNoBasis")}</p>
@@ -348,9 +373,11 @@ export function RecommendedPanel({
                       verificationStatus={u.verificationStatus}
                       lastVerified={u.lastVerifiedAt}
                     />
-                    <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>
-                      {t("ccView")}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {!u.saved && <Button size="sm" variant="outline" disabled={saving === `university-${u.id}`} onClick={() => void saveRecommendation("university", u.id)}>{saving === `university-${u.id}` ? t("ccSaving") : t("ccSave")}</Button>}
+                      {u.saved && <Pill tone="good">{t("ccSaved")}</Pill>}
+                      <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>{t("ccView")}</Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -427,7 +454,10 @@ export function RecommendedPanel({
                         ? t("ccRecCitMatch")
                         : t("ccRecCitUnknown")}
                   </p>
-                  <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
+                    {s.saved ? <Pill tone="good">{t("ccSaved")}</Pill> : <Button size="sm" variant="outline" disabled={saving === `scholarship-${s.id}`} onClick={() => void saveRecommendation("scholarship", s.id)}>{saving === `scholarship-${s.id}` ? t("ccSaving") : t("ccSave")}</Button>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -508,11 +538,11 @@ export function JourneyControlCenter({
   const [showAllDeadlines, setShowAllDeadlines] = useState(false);
   const [showAllReadiness, setShowAllReadiness] = useState(false);
   const [showAllPhases, setShowAllPhases] = useState(false);
-  const load = useCallback(async () => getJson<JourneyDashboard>(`/api/dashboard?profileId=${profileId}`, "Could not load your dashboard"), [profileId]);
+  const load = useCallback(async () => getJson<JourneyDashboard>(`/api/dashboard?profileId=${profileId}`, t("ccLoadError")), [profileId, t]);
   const resource = useResource<JourneyDashboard | null>(
     () => profileId ? load() : Promise.resolve(null),
     [profileId],
-    { initial: null, errorFallback: "Could not load your dashboard" }
+    { initial: null, errorFallback: t("ccLoadError") }
   );
   const { error, reload: refresh } = resource;
   const data = resource.data;
@@ -521,20 +551,20 @@ export function JourneyControlCenter({
   if (!profileId) {
     return (
       <Empty
-        title="Select a profile"
-        hint="Sign in and pick a student profile to build your study-abroad journey."
+        title={t("ccSelectProfile")}
+        hint={t("ccSelectProfileHint")}
       />
     );
   }
-  if (loading) return <Loading label="Building your journey…" cards={2} />;
+  if (loading) return <Loading label={t("ccBuildingJourney")} cards={2} />;
   if (error) {
     return (
       <Empty
-        title="We could not load your dashboard"
+        title={t("ccDashboardLoadFailed")}
         hint={error}
         action={
           <Button variant="outline" onClick={() => void refresh()}>
-            <RefreshCw className="h-3.5 w-3.5" /> Try again
+            <RefreshCw className="h-3.5 w-3.5" />{t("ccTryAgain")}
           </Button>
         }
       />
@@ -976,7 +1006,7 @@ export function JourneyControlCenter({
                 ))}
               </div>
               <Button className="mt-3 w-full" variant="outline" onClick={() => onNavigateTab("workspace")}>
-                Open application workspaces
+                {t("ccOpenWorkspaces")}
               </Button>
             </>
           )}
@@ -1056,7 +1086,7 @@ export function JourneyControlCenter({
       )}
 
       {/* ---- 6. Recommended for you — profile-driven; see RecommendedPanel -- */}
-      <RecommendedPanel recommended={recommended} onNavigateTab={onNavigateTab} />
+      <RecommendedPanel recommended={recommended} profileId={profileId} onNavigateTab={onNavigateTab} onRefresh={refresh} />
 
       {/* ---- Documents about to expire (spec §7) -------------------------- */}
       {data.expiringDocuments.length > 0 && (

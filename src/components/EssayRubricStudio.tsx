@@ -223,7 +223,11 @@ export function EssayRubricStudio({
       else if (universityId != null) params.set("universityId", String(universityId));
       const res = await fetch(`/api/essays?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
-      if (res.ok) setVersions(data.versions ?? []);
+      if (res.ok) {
+        const loaded: Version[] = data.versions ?? [];
+        setVersions(loaded);
+        if (loaded[0]?.content) setText((current) => current.trim() ? current : loaded[0].content);
+      }
     } catch {
       // Version history is a convenience — never block the editor.
     }
@@ -406,6 +410,8 @@ export function EssayRubricStudio({
             onChange={(e) => setPrompt(e.target.value)}
           />
         </label>
+
+        {!text.trim() && versions.length > 0 && <button type="button" onClick={() => setText(versions[0].content)} className="mb-2 inline-flex min-h-11 items-center gap-2 rounded-full border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">{t("essayLoadLatestSaved")}</button>}
 
         {/* Priority 4.3 — the same editor, with a toggleable inline highlight
             layer: red for AI clichés and banned openings, amber for weak

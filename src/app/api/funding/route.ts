@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { applications, fundingItems, savedScholarships, savedUniversities, scholarships, universities } from "@/db/schema";
 import { guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal, ONE_OFF_COST_LINES, FUNDING_KIND_LABELS, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
+import { countriesMatch } from "@/lib/countries";
 import {
   COUNTRY_COST_BENCHMARKS,
   CURRENCY_RATES_TO_USD,
@@ -113,12 +114,13 @@ export async function GET(req: Request) {
       .from(savedScholarships)
       .where(eq(savedScholarships.profileId, profileId));
     const savedIds = saved.map((s) => s.scholarshipId);
-    const candidates = savedIds.length
-      ? await db.select().from(scholarships).where(eq(scholarships.isActive, true)).limit(200)
-      : [];
+    const candidates = await db.select().from(scholarships).where(eq(scholarships.isActive, true));
+    const activeCountry = countryParam ?? uni?.country ?? null;
+    const globalCountry = /^(global|international|all|worldwide|multiple countries)$/i;
     const matched = candidates
-      .filter((s) => savedIds.includes(s.id))
+      .filter((s) => savedIds.includes(s.id) || Boolean(activeCountry && countriesMatch(s.country, activeCountry)) || globalCountry.test((s.country ?? "").trim()))
       .map((s) => ({
+        saved: savedIds.includes(s.id),
         id: s.id,
         title: s.title,
         provider: s.provider,

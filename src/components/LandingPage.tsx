@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Reveal, RevealGroup, RevealItem } from "./motion";
 import { staggerParent } from "./motion/variants";
 import { ThemeSwitch } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 /** Hero children: each one rises a beat after the previous. */
 const heroGroup = staggerParent(0.1, 0.08);
@@ -824,6 +825,7 @@ export function LandingPage({
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <LanguageSwitcher compact />
             <ThemeSwitch />
             {onSignIn && (
               <button
@@ -2058,13 +2060,13 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">
         <SectionIndex n="02" label={tIndex("secCampuses")} />
         <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
-          QS Top 200 · 24 ta Top Universitet Kampusi · 3 Qator
+          {tIndex("marqueeBadge")}
         </span>
         <h2
           id="university-marquee-title"
           className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950 dark:text-white sm:text-3xl"
         >
-          Jahonning Yetakchi Universitetlari Kampuslari
+          {tIndex("marqueeTitle")}
         </h2>
       </div>
       <div className="space-y-3 overflow-hidden">

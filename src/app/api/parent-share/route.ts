@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes, timingSafeEqual } from "crypto";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { applicationOutcomes, applications, studentProfiles } from "@/db/schema";
+import { admissionOffers, applicationOutcomes, applications, studentProfiles } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
 import { readJsonBody, clampString } from "@/lib/request";
 import { configuredAppUrl } from "@/lib/appUrl";
@@ -255,6 +255,10 @@ export async function GET(req: Request) {
         latestOutcomeByApplication.set(row.applicationId, String(row.result ?? "").toLowerCase());
       }
     }
+    const offerRows = await db.select({ applicationId: admissionOffers.applicationId, status: admissionOffers.status })
+      .from(admissionOffers).where(eq(admissionOffers.profileId, matchedId));
+    // Offers are the current decision record and supersede an older outcome for the same application.
+    for (const offer of offerRows) latestOutcomeByApplication.set(offer.applicationId, String(offer.status ?? "").toLowerCase());
     const acceptedCount = [...latestOutcomeByApplication.values()].filter((result) => result === "accepted").length;
 
     const source: ParentSource = {

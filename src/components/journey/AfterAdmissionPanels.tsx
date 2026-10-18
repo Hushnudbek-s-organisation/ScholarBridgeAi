@@ -13,7 +13,7 @@
  * is the student's own record; the panels only ever state what the student (or
  * an admin-published source) entered.
  */
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, Mail, Plus, Printer, ShieldCheck, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
@@ -93,6 +93,30 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
   // Inline failure banner instead of a native alert(): the page keeps working
   // and the student can retry the same action.
   const [actionError, setActionError] = useState("");
+  const [applications, setApplications] = useState<{ id: number; universityName: string; programName?: string | null }[]>([]);
+  const [offerForm, setOfferForm] = useState({ applicationId: "", status: "pending", decidedAt: "", responseDeadline: "", depositAmount: "", depositDueDate: "", tuitionCommitment: "" });
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/applications?profileId=${profileId}`, { credentials: "include" })
+      .then((r) => r.json()).then((d) => { if (live) setApplications(Array.isArray(d.applications) ? d.applications : []); })
+      .catch(() => { if (live) setApplications([]); });
+    return () => { live = false; };
+  }, [profileId]);
+
+  const createOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerForm.applicationId) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await sendJson("/api/offers", { method: "POST", body: JSON.stringify({ profileId, applicationId: Number(offerForm.applicationId), status: offerForm.status, decidedAt: offerForm.decidedAt || null, responseDeadline: offerForm.responseDeadline || null, depositAmount: offerForm.depositAmount || null, depositDueDate: offerForm.depositDueDate || null, tuitionCommitment: offerForm.tuitionCommitment || null }) }, t("opCreateError"));
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : t("opCreateError"));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const patch = async (payload: Record<string, unknown>) => {
     setBusy(true);
@@ -122,15 +146,27 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
         action={
           <div className="flex flex-wrap gap-2">
             <Pill tone="slate">{data.summary.total}</Pill>
-            {data.summary.pending > 0 && <Pill tone="warn">{data.summary.pending} awaiting</Pill>}
-            {data.summary.accepted > 0 && <Pill tone="good">{data.summary.accepted} accepted</Pill>}
+            {data.summary.pending > 0 && <Pill tone="warn">{t("opPendingSummary", { count: data.summary.pending })}</Pill>}
+            {data.summary.accepted > 0 && <Pill tone="good">{t("opAcceptedSummary", { count: data.summary.accepted })}</Pill>}
           </div>
         }
       >
         {error && <ErrorNote message={error} />}
         <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
         <p className="text-xs text-slate-500 dark:text-slate-400">{t("opCreatedNote")}</p>
-        <Button size="sm" variant="outline" className="mt-2" onClick={() => onNavigateTab("applications")}>{t("opGoApplications")}</Button>
+        <details className="mt-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+          <summary className="cursor-pointer text-sm font-bold text-indigo-700 dark:text-indigo-300">{t("opRecordOffer")}</summary>
+          <form onSubmit={createOffer} className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="text-xs font-semibold">{t("opApplication")}<select required className={`${inputClass} mt-1`} value={offerForm.applicationId} onChange={(e) => setOfferForm({ ...offerForm, applicationId: e.target.value })}><option value="">{t("opChooseApplication")}</option>{applications.map((a) => <option key={a.id} value={a.id}>{a.universityName}{a.programName ? ` · ${a.programName}` : ""}</option>)}</select></label>
+            <label className="text-xs font-semibold">{t("opStatus")}<select className={`${inputClass} mt-1`} value={offerForm.status} onChange={(e) => setOfferForm({ ...offerForm, status: e.target.value })}>{OFFER_STATUSES.map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
+            <label className="text-xs font-semibold">{t("opDecidedOn")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.decidedAt} onChange={(e) => setOfferForm({ ...offerForm, decidedAt: e.target.value })} /></label>
+            <label className="text-xs font-semibold">{t("opRespondBy")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.responseDeadline} onChange={(e) => setOfferForm({ ...offerForm, responseDeadline: e.target.value })} /></label>
+            <label className="text-xs font-semibold">{t("opDepositAmount")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.depositAmount} onChange={(e) => setOfferForm({ ...offerForm, depositAmount: e.target.value })} /></label>
+            <label className="text-xs font-semibold">{t("opDepositDue")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.depositDueDate} onChange={(e) => setOfferForm({ ...offerForm, depositDueDate: e.target.value })} /></label>
+            <label className="text-xs font-semibold sm:col-span-2">{t("opTuitionCommitment")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.tuitionCommitment} onChange={(e) => setOfferForm({ ...offerForm, tuitionCommitment: e.target.value })} /></label>
+            <button type="submit" disabled={busy || !applications.length} className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">{t("opSaveOffer")}</button>
+          </form>
+        </details>
       </JourneyCard>
 
       {data.offers.length === 0 ? (
@@ -151,7 +187,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                 >
                   {OFFER_STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {t(`opStatus_${s}` as never)}
                     </option>
                   ))}
                 </select>
@@ -226,7 +262,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                   <Line label={t("opOtherConfirmed")} value={o.funding.otherConfirmed} tone="good" />
                   <Line label={t("lineDepositNow")} value={o.funding.payableNow.amount} tone="warn" />
                 </dl>
-                {o.funding.payableNow.dueDate && <p className="mt-1 text-xs text-slate-500">Due {o.funding.payableNow.dueDate} to {o.funding.payableNow.payee}.</p>}
+                {o.funding.payableNow.dueDate && <p className="mt-1 text-xs text-slate-500">{t("opDuePayee", { date: o.funding.payableNow.dueDate, payee: o.funding.payableNow.payee })}</p>}
                 <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-slate-500 dark:text-slate-400">
                   {o.funding.explanation.map((line) => (
                     <li key={line}>{line}</li>
@@ -643,7 +679,7 @@ interface FundingData {
     openActions: { name: string; kind: string; amountUsd: number; status: string }[];
   };
   items: { id: number; kind: string; kindLabel: string; name: string; amountUsd: number; status: string; covers: string | null; notes: string | null }[];
-  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null; country: string | null; coversGap: boolean }[]; tab: string; cta: string };
+  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null; country: string | null; coversGap: boolean; saved: boolean }[]; tab: string; cta: string };
   benchmarkSource?: { country: string; name: string; url: string; notes: string; defaultCurrency: string };
   countries?: string[];
   displayCurrency?: string;
@@ -720,6 +756,20 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
     }
   };
 
+  const addGapScholarship = async (scholarship: FundingData["gapActions"]["scholarships"][number]) => {
+    if (data.items.some((item) => item.kind === "scholarship" && item.name === scholarship.title)) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await sendJson("/api/funding", { method: "POST", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, kind: "scholarship", name: scholarship.title, amountUsd: scholarship.amountUsdValue, status: "planned", covers: ["tuition"] }) }, t("tpSaveError"));
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("tpSaveError"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const patch = async (payload: Record<string, unknown>) => {
     await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, ...payload }) }, t("dvUpdateError"));
     await reload();
@@ -777,10 +827,10 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         <div className="mb-3 grid gap-2 sm:grid-cols-2">
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Benchmark Country
+              {t("fpBenchmarkCountry")}
             </label>
             <select
-              aria-label="Benchmark country"
+              aria-label={t("fpBenchmarkCountry")}
               className={inputClass}
               value={activeCountry}
               onChange={(e) => setCountryOverride(e.target.value)}
@@ -794,10 +844,10 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           </div>
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Display Currency
+              {t("fpDisplayCurrency")}
             </label>
             <select
-              aria-label="Display currency"
+              aria-label={t("fpDisplayCurrency")}
               className={inputClass}
               value={displayCurrency}
               onChange={(e) => setDisplayCurrency(e.target.value)}
@@ -813,20 +863,20 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
 
         {data.university && (
           <p className="mb-3 text-[11px] text-slate-500">
-            Published costs for {data.university.name}, {data.university.city}, {data.university.country} ·{" "}
+            {t("fpPublishedCosts", { university: data.university.name, city: data.university.city, country: data.university.country })} ·{" "}
             <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
           </p>
         )}
         {data.benchmarkSource && (
           <p className="mb-3 text-[11px] text-slate-500">
-            Official {data.benchmarkSource.country} student cost benchmark:{" "}
+            {t("fpOfficialBenchmark", { country: data.benchmarkSource.country })}{" "}
             <SourceTag url={data.benchmarkSource.url} name={data.benchmarkSource.name} lastVerified="2026-10-01" />{" "}
             — {data.benchmarkSource.notes}
           </p>
         )}
         {data.estimatedLines.length > 0 && (
           <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-            These lines use official country benchmarks or estimates, not university-specific published figures: {data.estimatedLines.join(", ")}. Verify them with the university before using them in a budget.
+            {t("fpBenchmarkDisclaimer", { lines: data.estimatedLines.join(", ") })}
           </p>
         )}
         {data.unknownLines.length > 0 && (
@@ -917,7 +967,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
             <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               {FUNDING_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {t(`fpStatus_${s}` as never)}
                 </option>
               ))}
             </select>
@@ -931,7 +981,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               <option value="">{t("fpEverything")}</option>
               {(data.costLines.length ? data.costLines : [{ key: "tuition", label: t("lineTuition") }]).map((l) => (
                 <option key={l.key} value={l.key}>
-                  {l.label} only
+                  {l.label} {t("fpOnly")}
                 </option>
               ))}
             </select>
@@ -949,13 +999,13 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{i.name}</p>
                   <p className="text-[11px] text-slate-500">
-                    {i.kindLabel} · ${i.amountUsd.toLocaleString()} · {i.status}
+                    {i.kindLabel} · ${i.amountUsd.toLocaleString()} · {t(`fpStatus_${i.status}` as never)}
                   </p>
                 </div>
                 <select className={`${inputClass} w-auto`} value={i.status} onChange={(e) => void patch({ id: i.id, status: e.target.value })}>
                   {FUNDING_STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {t(`fpStatus_${s}` as never)}
                     </option>
                   ))}
                 </select>
@@ -997,6 +1047,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                         {s.deadlineDate && (
                           <span className="text-slate-400">{t("fpCloses", { date: s.deadlineDate })}</span>
                         )}
+                        {data.items.some((item) => item.kind === "scholarship" && item.name === s.title) ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(s)}>{t("fpAddToPlan")}</Button>}
                       </li>
                     ))}
                   </ul>

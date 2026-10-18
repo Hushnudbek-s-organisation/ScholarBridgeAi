@@ -974,6 +974,13 @@ html.theme-transition *::after {
    too, so the rows stop animating while nobody is looking at them. */
 [data-paused="true"] .sb-marquee-track { animation-play-state: paused; }
 
+/* DeadlineCenter's externally pinned list wrapper keeps its literal utility
+   class string for the component contract; scope its dark surface precisely. */
+.dark .overflow-hidden.rounded-2xl.border.border-slate-200.bg-white.shadow-xs {
+  background-color: var(--color-slate-900);
+  border-color: var(--color-slate-700);
+}
+
 /* Telegram Mini App (and other) bottom sheets: a short slide-up + fade.
    Small and purely decorative — reduced motion turns them off. */
 @keyframes sbSheetUp {
