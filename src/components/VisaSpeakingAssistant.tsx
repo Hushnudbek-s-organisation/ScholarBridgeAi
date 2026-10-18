@@ -27,6 +27,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { localeToLanguageName } from "@/i18n/config";
 import { countryTranslationKey } from "@/lib/countries";
+import { collapsePicks, countrySearchMatch, matchesAnyCountry, rankCountryPicks } from "@/lib/countryPicker";
+import { CountryFlag } from "@/components/CountryFlag";
 import {
   VISA_COUNTRIES,
   VISA_LIVE_VOICES,
@@ -582,6 +584,13 @@ export function VisaSpeakingAssistant({
 
   const [screen, setScreen] = useState<Screen>("setup");
   const [countryCode, setCountryCode] = useState<string | null>(null);
+  /**
+   * The 37-country wall is now a compact picker: selected + priority
+   * destinations first, everything else behind one search box and a
+   * "Show all (+N)" footer.
+   */
+  const [countrySearch, setCountrySearch] = useState("");
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const [gender, setGender] = useState<VisaOfficerGender | null>(null);
   const [voice, setVoice] = useState<VisaLiveVoice>("Kore");
   const [messages, setMessages] = useState<VisaMessage[]>([]);
@@ -745,6 +754,51 @@ export function VisaSpeakingAssistant({
     const key = countryTranslationKey(name);
     return key ? tCountry(key) : name;
   };
+  /** Interview-language names localized for the card chips (uz/ru). */
+  const VISA_LANGUAGE_NAMES: Record<string, { uz: string; ru: string }> = {
+    English: { uz: "Ingliz tili", ru: "Английский" },
+    Deutsch: { uz: "Nemis tili", ru: "Немецкий" },
+    Français: { uz: "Fransuz tili", ru: "Французский" },
+    Español: { uz: "Ispan tili", ru: "Испанский" },
+    Italiano: { uz: "Italyan tili", ru: "Итальянский" },
+    Nederlands: { uz: "Golland tili", ru: "Нидерландский" },
+    Dansk: { uz: "Dat tili", ru: "Датский" },
+    Norsk: { uz: "Norveg tili", ru: "Норвежский" },
+    Svenska: { uz: "Shved tili", ru: "Шведский" },
+    Suomi: { uz: "Fin tili", ru: "Финский" },
+    Português: { uz: "Portugal tili", ru: "Португальский" },
+    "Bahasa Indonesia": { uz: "Indonez tili", ru: "Индонезийский" },
+    Русский: { uz: "Rus tili", ru: "Русский" },
+    العربية: { uz: "Arab tili", ru: "Арабский" },
+    日本語: { uz: "Yapon tili", ru: "Японский" },
+    한국어: { uz: "Koreys tili", ru: "Корейский" },
+    普通话: { uz: "Xitoy tili", ru: "Китайский" },
+    國語: { uz: "Xitoy tili (mandarin)", ru: "Китайский (мандарин)" },
+  };
+  const languageLabel = (lang: string) => {
+    if (locale === "en") return lang;
+    const hit = VISA_LANGUAGE_NAMES[lang];
+    return hit ? hit[locale as "uz" | "ru"] : lang;
+  };
+
+  const countryPickerSearching = countrySearch.trim() !== "";
+  const visibleVisaCountries = (() => {
+    const preferred = (activeProfile?.preferredCountries ?? []) as string[];
+    const ranked = rankCountryPicks(VISA_COUNTRIES, {
+      isSelected: (c) => c.code === (countryCode ?? "") || matchesAnyCountry(c.name, preferred),
+      priorityCodes: ["us", "gb", "de", "ca", "kr", "au", "sg", "jp"],
+      codeOf: (c) => c.code.toLowerCase(),
+    });
+    const filtered = ranked.filter((c) =>
+      countrySearchMatch(countrySearch, [c.name, localizedCountryName(c.name), c.code, c.language])
+    );
+    return collapsePicks(
+      filtered,
+      8,
+      showAllCountries || countryPickerSearching,
+      (c) => c.code === (countryCode ?? "")
+    );
+  })();
   const lastOfficer = [...messages]
     .reverse()
     .find((m) => m.role === "officer");
@@ -2096,13 +2150,25 @@ export function VisaSpeakingAssistant({
 
       {screen === "setup" && (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-            <h2 className="text-base font-bold text-slate-900">
-              {t("countryTitle")}
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-500">{t("countryHint")}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {t("countryTitle")}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t("countryHint")}</p>
+              </div>
+              <input
+                type="search"
+                value={countrySearch}
+                onChange={(e) => setCountrySearch(e.target.value)}
+                placeholder={t("searchCountryPlaceholder")}
+                aria-label={t("searchCountryPlaceholder")}
+                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {VISA_COUNTRIES.map((c) => {
+              {visibleVisaCountries.map((c) => {
                 const selected = countryCode === c.code;
                 return (
                   <button
@@ -2119,7 +2185,7 @@ export function VisaSpeakingAssistant({
                     {selected && (
                       <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-blue-600" />
                     )}
-                    <div className="text-3xl leading-none">{c.flag}</div>
+                    <CountryFlag country={c.name} flagEmoji={c.flag} size="lg" />
                     <div
                       className={`mt-2 break-words text-xs font-bold ${
                         selected ? "text-blue-900" : "text-slate-800"
@@ -2135,12 +2201,34 @@ export function VisaSpeakingAssistant({
                       }`}
                     >
                       <Globe className="h-2.5 w-2.5" />
-                      {c.language}
+                      {languageLabel(c.language)}
                     </div>
                   </button>
                 );
               })}
             </div>
+            {visibleVisaCountries.length === 0 && (
+              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+                {t("countryNoMatches")}
+              </p>
+            )}
+            {!countryPickerSearching && VISA_COUNTRIES.length > visibleVisaCountries.length && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllCountries((v) => !v)}
+                  aria-expanded={showAllCountries}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  {showAllCountries
+                    ? t("showFewer")
+                    : t("showAllCountries", {
+                        total: VISA_COUNTRIES.length,
+                        hidden: VISA_COUNTRIES.length - visibleVisaCountries.length,
+                      })}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
@@ -2249,14 +2337,14 @@ export function VisaSpeakingAssistant({
       {screen === "interview" && country && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
-            <span className="text-3xl leading-none">{country.flag}</span>
+            <CountryFlag country={country.name} flagEmoji={country.flag} size="lg" />
             <div className="min-w-0">
-              <div className="break-words text-sm font-bold text-slate-900">
+              <div className="break-words text-sm font-bold text-slate-900 dark:text-slate-100">
                 {localizedCountryName(country.name)}
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-slate-500">
+              <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <Globe className="h-3 w-3" />
-                {country.language}
+                {languageLabel(country.language)}
               </div>
             </div>
             <span
@@ -2830,8 +2918,8 @@ export function VisaSpeakingAssistant({
           )}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xs">
-            <p className="text-3xl leading-none">{country.flag}</p>
-            <h2 className="mt-2 text-lg font-extrabold text-slate-900">
+            <CountryFlag country={country.name} flagEmoji={country.flag} size="lg" className="mx-auto" />
+            <h2 className="mt-2 text-lg font-extrabold text-slate-900 dark:text-slate-100">
               {localizedCountryName(country.name)} · {t("visaChance")}
             </h2>
             <div className="mt-4 flex justify-center">

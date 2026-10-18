@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { CountryFlag } from "@/components/CountryFlag";
 import { AlertTriangle, Compass, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
@@ -142,7 +143,8 @@ export function OpportunitiesPanel({
                   {o.isVerified && (
                     <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">✓ {t("verified")}</span>
                   )}
-                  <p className="text-[10px] text-slate-500">
+                  <p className="flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
+                    <CountryFlag country={o.country} size="xs" />
                     {[o.provider, o.country || "International", o.level].filter(Boolean).join(" · ")}
                   </p>
                 </div>

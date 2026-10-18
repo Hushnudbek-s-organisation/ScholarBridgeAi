@@ -6,6 +6,8 @@ import { calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
+import { localeFromRequest } from "@/lib/engineText";
+import { localizeUniversityRow } from "@/lib/catalogLocalizer";
 
 const SAVED_UNIVERSITY_STATUSES = new Set([
   "Shortlisted",
@@ -64,11 +66,17 @@ export async function GET(req: Request) {
     // Fit is computed from the current profile and available catalogue data;
     // do not persist or return a stale score or an admissions-style tier.
     const matchProfile = profile ? await toMatchProfileWithActivities(profile) : null;
+    const locale = localeFromRequest(req);
     const withLiveMatch = saved.map((row) => {
       const live = matchProfile
         ? calculateUniversityMatch(matchProfile, toUniversityData(row.university))
         : null;
-      return { ...row, matchScore: live?.matchScore ?? null };
+      // The nested university row arrives translated (en keeps source values).
+      return {
+        ...row,
+        matchScore: live?.matchScore ?? null,
+        university: localizeUniversityRow(row.university as never, locale),
+      };
     });
 
     return NextResponse.json({ savedUniversities: withLiveMatch });

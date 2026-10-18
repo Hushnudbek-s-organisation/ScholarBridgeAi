@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { countriesMatch, countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
+import { countriesMatch, countryTranslationKey, resolveCountryCode, withQsTop200Countries } from "@/lib/countries";
+import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
+import { CountryFlag } from "@/components/CountryFlag";
+import { ShowMoreToggle } from "@/components/hubs/ui";
 import { StudentProfile } from "./Navbar";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
@@ -76,6 +79,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const t = useTranslations("profile");
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
+  const tc = useTranslations("common");
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const studyInterestsTouched = useRef(false);
   useDialogFocusTrap({ open: isOpen, dialogRef, onEscape: onClose });
@@ -172,6 +176,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Preferred-destinations picker: 12 ranked pills + search + Show more —
+  // the same pattern as the visa simulator and the compare panel, so no
+  // modal is ever a 38-button wall again.
+  const [countrySearch, setCountrySearch] = useState("");
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
 
   useEffect(() => {
@@ -325,6 +334,25 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     "France",
     "Sweden",
   ]);
+
+  const preferredSearching = countrySearch.trim() !== "";
+  const isPreferredCountry = (c: string) =>
+    formData.preferredCountries.some((value) => countriesMatch(value, c));
+  const visibleCountryOptions = (() => {
+    const labelOf = (c: string) => {
+      const k = countryTranslationKey(c);
+      return k ? tCountry(k) : c;
+    };
+    const filtered = countryOptions.filter((c) =>
+      countrySearchMatch(countrySearch, [c, labelOf(c), resolveCountryCode(c)])
+    );
+    const ranked = rankCountryPicks(filtered, {
+      isSelected: isPreferredCountry,
+      priorityCodes: ["us", "gb", "de", "ca", "kr", "au", "sg", "jp"],
+      codeOf: (c) => resolveCountryCode(c),
+    });
+    return collapsePicks(ranked, 12, showAllCountries || preferredSearching, isPreferredCountry);
+  })();
 
   const handleCountryToggle = (country: string) => {
     setFormData((prev) => {
@@ -867,8 +895,16 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <Globe className="h-3.5 w-3.5 text-blue-600" />
               Preferred Study Destinations
             </h3>
+            <input
+              type="search"
+              value={countrySearch}
+              onChange={(e) => setCountrySearch(e.target.value)}
+              placeholder={tc("searchCountry")}
+              aria-label={tc("searchCountry")}
+              className="mb-2 min-h-11 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            />
             <div className="flex flex-wrap gap-2">
-              {countryOptions.map((country) => {
+              {visibleCountryOptions.map((country) => {
                 const selected = formData.preferredCountries.some((value) => countriesMatch(value, country));
                 const countryKey = countryTranslationKey(country);
                 return (
@@ -877,18 +913,28 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     key={country}
                     aria-pressed={selected}
                     onClick={() => handleCountryToggle(country)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                       selected
                         ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
-                    {selected ? "✓ " : "+ "}
+                    <CountryFlag country={country} size="xs" />
+                    {selected ? "✓" : "+"}{" "}
                     {countryKey ? tCountry(countryKey) : country}
                   </button>
                 );
               })}
             </div>
+            {!preferredSearching && (
+              <ShowMoreToggle
+                totalCount={countryOptions.length}
+                visibleCount={visibleCountryOptions.length}
+                expanded={showAllCountries}
+                onToggle={() => setShowAllCountries((v) => !v)}
+                className="mt-2 justify-start"
+              />
+            )}
           </div>
 
           {/* Research & Experience */}
