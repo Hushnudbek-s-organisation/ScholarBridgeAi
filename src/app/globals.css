@@ -977,11 +977,11 @@ html.theme-transition *::after {
    too, so the rows stop animating while nobody is looking at them. */
 [data-paused="true"] .sb-marquee-track { animation-play-state: paused; }
 
-/* DeadlineCenter's externally pinned list wrapper keeps its literal utility
-   class string for the component contract; scope its dark surface precisely. */
-.dark .overflow-hidden.rounded-2xl.border.border-slate-200.bg-white.shadow-xs {
-  background-color: var(--color-slate-900);
-  border-color: var(--color-slate-700);
+/* DeadlineCenter's list wrapper has a dedicated hook so this dark surface
+   cannot accidentally override other cards with the same utility classes. */
+.dark [data-deadline-list] {
+  background-color: var(--sb-surface);
+  border-color: var(--sb-border-subtle);
 }
 
 /* Landing-only below-the-fold islands: retain an estimated footprint while

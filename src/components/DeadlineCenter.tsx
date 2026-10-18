@@ -237,7 +237,7 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
         />
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div data-deadline-list className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         {!profileId ? (
           <p className="p-8 text-center text-xs font-semibold text-slate-500">{t("noProfile")}</p>
         ) : loading ? (
