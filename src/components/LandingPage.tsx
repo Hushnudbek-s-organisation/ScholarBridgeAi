@@ -18,7 +18,7 @@ const heroItem = {
     transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   ArrowRight,
   Award,
@@ -302,6 +302,90 @@ function scrollToId(id: string) {
 }
 
 /**
+ * THE single shared scroll engine for every animated overlay (kinetic HUD,
+ * ruler tape, flight). One passive scroll listener, ONE damped rAF loop
+ * (`smooth += (target - smooth) * 0.15`), zero React state: subscribers are
+ * plain callbacks that write DOM styles directly. The loop parks itself the
+ * instant every subscriber is settled, so idle scrolling costs nothing.
+ * `velocity()` feeds the afterburner/contrail reactions to fast scrolls.
+ */
+type ScrollSubscriber = () => void;
+const scrollEngine = (() => {
+  let smooth = 0;
+  let target = 0;
+  let velocity = 0;
+  let raf = 0;
+  let bound = false;
+  const subs = new Set<ScrollSubscriber>();
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  const readTarget = () => {
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    return clamp01(window.scrollY / max);
+  };
+  const step = () => {
+    raf = 0;
+    const delta = target - smooth;
+    if (Math.abs(delta) > 0.00015) {
+      const moved = delta * 0.15;
+      smooth += moved;
+      velocity = Math.abs(moved) * 0.8 + velocity * 0.2;
+      subs.forEach((fn) => fn());
+      raf = requestAnimationFrame(step);
+    } else if (smooth !== target) {
+      smooth = target;
+      velocity = 0;
+      subs.forEach((fn) => fn());
+    } else if (velocity !== 0) {
+      velocity = 0;
+      subs.forEach((fn) => fn());
+    }
+  };
+  const kick = () => {
+    if (!raf) raf = requestAnimationFrame(step);
+  };
+  const onScroll = () => {
+    target = readTarget();
+    kick();
+  };
+  const subscribe = (fn: ScrollSubscriber) => {
+    if (!bound) {
+      bound = true;
+      target = readTarget();
+      smooth = target;
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+    }
+    subs.add(fn);
+    fn(); // paint the current state once synchronously (SSR → hydration)
+    kick();
+    return () => {
+      subs.delete(fn);
+    };
+  };
+  return {
+    subscribe,
+    progress: () => smooth,
+    velocity: () => velocity,
+    /** Re-align after geometry was re-sampled (resize): snap, no travel. */
+    settle() {
+      target = readTarget();
+      smooth = target;
+      kick();
+    },
+  };
+})();
+
+/** Reduced-motion overlay: paint once, never subscribe to scrolling. */
+function paintOnceUnderReducedMotion(paint: () => void, reduce: boolean) {
+  if (typeof window === "undefined") return () => {};
+  if (reduce) {
+    paint();
+    return () => {};
+  }
+  return scrollEngine.subscribe(paint);
+}
+
+/**
  * PhotoCraft-style editorial index marker (`02 / CAMPUSES`): a monospace
  * station number between two architectural hairlines, above each section's
  * localized eyebrow. Decoration with a real reading order — it says where the
@@ -338,131 +422,181 @@ function SectionIndex({
 }
 
 /**
- * The right-edge precision ruler ("lineyka"). Fixed to the viewport, it draws
- * the six landing stations as major ticks on a graduated millimetre scale —
- * 4 minor ticks + a half tick between every station. Clicking a station
- * smooth-scrolls to the section; the sliding vernier cursor (line + live
- * `00%`–`100%` readout) tracks scroll progress the same zero-React way the
- * jet does: passive listener → damped number → direct DOM writes in one rAF.
+ * The six kinetic section words. Labels are resolved per-locale HERE (never
+ * raw i18n keys — the landing must not leak `landing.*` into the DOM) and the
+ * whole HUD is aria-hidden: it mirrors navigation that already exists as real
+ * accessible controls (header nav, section index markers), so the animation
+ * duplicates nothing for assistive tech or the SSR text checks.
  */
-function LandingPrecisionRuler() {
-  const t = useTranslations("landing");
-  const trackRef = React.useRef<HTMLDivElement | null>(null);
-  const cursorRef = React.useRef<HTMLDivElement | null>(null);
+const HUD_SECTIONS = [
+  { id: "top", word: { en: "SCHOLARBRIDGE", uz: "BOSH SAHIFA", ru: "ГЛАВНАЯ" } },
+  { id: "campuses", word: { en: "TOP CAMPUSES", uz: "TOP KAMPUSLAR", ru: "ТОП КАМПУСЫ" } },
+  { id: "how", word: { en: "HOW IT WORKS", uz: "QANDAY ISHLAYDI", ru: "КАК РАБОТАЕТ" } },
+  { id: "features", word: { en: "HIGHLIGHTS", uz: "IMKONIYATLAR", ru: "ВОЗМОЖНОСТИ" } },
+  { id: "chancing", word: { en: "CHANCING", uz: "QABUL TAHLILI", ru: "ОЦЕНКА ШАНСОВ" } },
+  { id: "roadmap", word: { en: "GET STARTED", uz: "YO'L XARITASI", ru: "ДОРОЖНАЯ КАРТА" } },
+] as const;
+
+/**
+ * PhotoCraft-style kinetic HUD, driven entirely by direct DOM writes from
+ * the shared scroll engine (zero useState per frame):
+ *
+ *  • KINETIC WORDS — every upcoming section title sits stacked in the
+ *    bottom-right; as its section reaches the viewport the word PEELS off the
+ *    stack, glides up the right margin while swelling to ~3.15x with a white/
+ *    sky glow, then shrinks back into the top-right "already read" stack.
+ *    Position is continuous (cubic-eased travel + sine-bell scale), never a
+ *    toggled class, so the animation is scrubbable in both directions.
+ *  • ZOOMED ALTIMETER TAPE — a 0–100 ruler (major labels every 5, four minor
+ *    ticks between) translates against a fixed glowing laser cursor; the
+ *    cursor rides `0.22 + 0.52 · progress` of the viewport with a
+ *    zero-padded `033 %` readout, exactly like a HUD altitude tape.
+ */
+function PhotoCraftKineticHud() {
+  const locale = useLocale();
+  const wordRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const tapeRef = React.useRef<HTMLDivElement | null>(null);
+  const laserRef = React.useRef<HTMLDivElement | null>(null);
   const readoutRef = React.useRef<HTMLSpanElement | null>(null);
 
-  const stations = [
-    { id: "top", n: "01", labelKey: "secOverview" },
-    { id: "campuses", n: "02", labelKey: "secCampuses" },
-    { id: "how", n: "03", labelKey: "secHow" },
-    { id: "features", n: "04", labelKey: "secCapabilities" },
-    { id: "chancing", n: "05", labelKey: "secChancing" },
-    { id: "roadmap", n: "06", labelKey: "secRoadmap" },
-  ] as const;
-
   React.useEffect(() => {
-    let raf = 0;
-    let target = 0;
-    let smooth = 0;
-    const readout = () => {
-      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      return Math.max(0, Math.min(1, window.scrollY / max));
-    };
+    if (typeof window === "undefined") return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    const N = HUD_SECTIONS.length;
+    const ROW_GAP = 22;
+    const TOP_STACK_START_Y = 82;
+    const WINDOW = 0.58;
+
     const paint = () => {
-      const track = trackRef.current;
-      if (track) {
-        cursorRef.current?.style.setProperty(
-          "transform",
-          `translate3d(0, ${(smooth * (track.clientHeight - 2)).toFixed(2)}px, 0)`,
-        );
+      const smooth = scrollEngine.progress();
+      const vh = window.innerHeight || 900;
+      const BOTTOM_STACK_END_Y = vh - 36;
+      const s = smooth * (N - 1);
+
+      for (let i = 0; i < N; i++) {
+        const el = wordRefs.current[i];
+        if (!el) continue;
+        const topSlotY = TOP_STACK_START_Y + i * ROW_GAP;
+        const bottomSlotY = BOTTOM_STACK_END_Y - (N - 1 - i) * ROW_GAP;
+        const delta = i - s;
+
+        if (delta <= -WINDOW) {
+          el.style.transform = `translate3d(0px, ${topSlotY.toFixed(1)}px, 0px) scale(1)`;
+          el.style.opacity = "0.48";
+          el.style.filter = "none";
+          el.style.textShadow = "none";
+          el.dataset.state = "passed";
+        } else if (delta >= WINDOW) {
+          el.style.transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
+          el.style.opacity = "0.48";
+          el.style.filter = "none";
+          el.style.textShadow = "none";
+          el.dataset.state = "upcoming";
+        } else {
+          const rawT = (WINDOW - delta) / (2 * WINDOW);
+          const t = Math.max(0, Math.min(1, rawT));
+          const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
+          const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
+          const scale = 1 + bell * 2.15;
+          const shiftX = -bell * 10;
+          const opacity = 0.48 + bell * 0.52;
+          el.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
+          el.style.opacity = opacity.toFixed(3);
+          el.style.textShadow =
+            bell > 0.15
+              ? `0 0 ${(22 * bell).toFixed(0)}px rgba(255,255,255,${(0.75 * bell).toFixed(2)}), 0 0 ${(44 * bell).toFixed(0)}px rgba(56,189,248,${(0.45 * bell).toFixed(2)})`
+              : "none";
+          el.dataset.state = bell > 0.35 ? "active" : "transition";
+        }
+      }
+
+      const exactVal = smooth * 100;
+      const laserY = vh * (0.22 + 0.52 * smooth);
+      if (tapeRef.current) {
+        tapeRef.current.style.transform = `translate3d(0px, ${(laserY - exactVal * 24).toFixed(1)}px, 0px)`;
+      }
+      if (laserRef.current) {
+        laserRef.current.style.transform = `translate3d(0px, ${laserY.toFixed(1)}px, 0px)`;
       }
       if (readoutRef.current) {
-        readoutRef.current.textContent = `${String(Math.round(smooth * 100)).padStart(2, "0")}%`;
+        readoutRef.current.textContent = `${String(Math.round(exactVal)).padStart(3, "0")} %`;
       }
     };
-    const tick = () => {
-      raf = 0;
-      const delta = target - smooth;
-      if (Math.abs(delta) > 0.0005) {
-        smooth += delta * 0.18;
-        paint();
-        raf = requestAnimationFrame(tick);
-      } else if (smooth !== target) {
-        smooth = target;
-        paint();
-      }
-    };
-    const onScroll = () => {
-      target = readout();
-      if (!raf) raf = requestAnimationFrame(tick);
-    };
-    target = readout();
-    smooth = target;
-    paint();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, []);
+
+    const unsub = paintOnceUnderReducedMotion(paint, reducedMotion);
+    return unsub;
+  }, [locale]);
+
+  const ticks = [];
+  for (let val = 0; val <= 100; val++) {
+    const major = val % 5 === 0;
+    ticks.push(
+      <div
+        key={val}
+        className="absolute left-0 flex w-full items-center gap-1.5 pl-1"
+        style={{ top: `${val * 24}px` }}
+      >
+        {major ? (
+          <span className="font-mono text-[10px] font-semibold leading-none text-slate-500 dark:text-zinc-400">
+            {val}
+          </span>
+        ) : null}
+        <span
+          aria-hidden="true"
+          className={
+            major
+              ? "h-px w-3.5 bg-slate-400 dark:bg-zinc-300"
+              : "h-px w-2 bg-slate-400 dark:bg-zinc-500"
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <nav
-      aria-label={t("rulerLabel")}
-      className="print:hidden fixed right-0 top-16 bottom-0 z-30 hidden w-11 select-none flex-col justify-center border-l border-slate-200/80 bg-[#f8fafc]/85 py-6 backdrop-blur-md md:flex dark:border-slate-800/60 dark:bg-[#090e1a]/85"
-    >
-      <div ref={trackRef} className="relative flex h-full flex-col items-end justify-between pr-1.5">
-        {stations.map((station, index) => (
-          <div key={station.id} className="flex flex-col items-end">
-            {index > 0 && (
-              // Graduated millimetres between two stations: four minor ticks,
-              // a longer half tick, four more minors.
-              <span aria-hidden="true" className="flex flex-col items-end gap-[7px] pb-[7px]">
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-3 bg-slate-400 dark:bg-slate-600" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-                <span className="h-px w-1.5 bg-slate-300 dark:bg-slate-700" />
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => scrollToId(station.id)}
-              title={t(station.labelKey)}
-              aria-label={`${station.n} · ${t(station.labelKey)}`}
-              className="group flex min-h-11 items-center gap-1 rounded-md px-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500"
-            >
-              <span className="font-mono text-[10px] font-black text-slate-500 dark:text-slate-400">
-                {station.n}
-              </span>
-              <span
-                aria-hidden="true"
-                className="h-[1.5px] w-4 rounded-full bg-slate-400 transition-colors group-hover:bg-indigo-500 group-focus-visible:bg-indigo-500 dark:bg-slate-600 dark:group-hover:bg-indigo-400 dark:group-focus-visible:bg-indigo-400"
-              />
-            </button>
-          </div>
-        ))}
-        {/* The vernier cursor: one hairline + a live percentage, translated
-            along the track by the rAF loop above — never re-rendered. */}
+    <div aria-hidden="true" className="print:hidden fixed inset-0 z-30 hidden select-none md:block">
+      {/* Zoomed altimeter tape + glowing laser cursor (far right edge). */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-14 overflow-hidden">
         <div
-          ref={cursorRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute right-0 top-0 flex items-center gap-1 will-change-transform"
-          style={{ transform: "translate3d(0, 0, 0)" }}
+          ref={tapeRef}
+          className="absolute left-0 top-0 w-full"
+          style={{ height: 101 * 24, transform: "translate3d(0, 0, 0)", willChange: "transform" }}
         >
-          <span className="font-mono text-[9px] font-black tabular-nums text-indigo-600 dark:text-indigo-400">
-            <span ref={readoutRef}>00%</span>
+          {ticks}
+        </div>
+        <div
+          ref={laserRef}
+          className="absolute right-0 top-0 w-full"
+          style={{ transform: "translate3d(0, 0, 0)", willChange: "transform" }}
+        >
+          <span className="block h-[2px] w-full bg-sky-400 shadow-[0_0_12px_2px_rgba(56,189,248,0.95)]" />
+          <span
+            ref={readoutRef}
+            className="mt-1 block pr-1.5 text-right font-mono text-[10px] font-bold tracking-wider text-sky-600 drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] dark:text-sky-400"
+          >
+            000 %
           </span>
-          <span className="h-[2px] w-7 rounded-full bg-indigo-500/90" />
         </div>
       </div>
-    </nav>
+      {/* Kinetic section words — peel, swell, dock (see useEffect for math). */}
+      {HUD_SECTIONS.map((sec, idx) => (
+        <button
+          key={sec.id}
+          ref={(el) => {
+            wordRefs.current[idx] = el;
+          }}
+          type="button"
+          tabIndex={-1}
+          onClick={() => scrollToId(sec.id)}
+          style={{ transformOrigin: "right center", willChange: "transform, opacity", opacity: 0 }}
+          className="pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-[12px] font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+        >
+          {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -645,7 +779,7 @@ export function LandingPage({
   return (
     <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-[#090e1a] dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
       <ScrollFlightPath />
-      <LandingPrecisionRuler />
+      <PhotoCraftKineticHud />
 
       {/* ===== Header ===== */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-[#f8fafc]/90 backdrop-blur-xl dark:border-slate-800 dark:bg-[#090e1a]/90">
@@ -1338,27 +1472,73 @@ export function LandingPage({
   );
 }
 /**
- * The jet's route: a wide, graceful, STRICTLY monotonic-Y double-S that
- * spans the WHOLE viewport (viewBox 1200×1000 — no camera translate needed).
- * The airplane flies it top-left → bottom-right exactly once per scroll
- * journey, so its on-screen position always advances forward along the curve;
- * nothing is translated backwards to fake motion. Monotonic Y keeps the
- * tangent (heading) sweeping smoothly and makes any backwards slide of the
- * trail structurally impossible.
+ * The jet's route for the whole scroll story. Unlike a flat "slide along a
+ * polyline" mascot, this 3320-unit path is an aerobatic sequence: a long
+ * descending S-cruise, a VICTORY LOOP (34–48 % of scroll — the tangent turns
+ * through a full ~360°), a BARREL ROLL segment (63–75 %) and a final low pass
+ * / approach (82–100 %). It is only ever consumed through a pre-sampled
+ * lookup table, so the geometry cost is paid once per resize, not per frame.
  */
 const FLIGHT_PATH_D =
-  "M 90 60 C 470 90, 800 150, 930 300 C 1040 425, 820 470, 560 500 C 300 530, 60 570, 150 720 C 240 870, 640 880, 900 905 C 1000 915, 1080 925, 1120 940";
+  "M 580 90 " +
+  "C 980 220, 1060 440, 740 620 " +
+  "C 420 800, 140 860, 220 1100 " +
+  "C 300 1340, 920 1420, 940 1220 " +
+  "C 960 1040, 660 1040, 680 1240 " +
+  "C 700 1440, 980 1560, 860 1820 " +
+  "C 740 2080, 160 2040, 220 2340 " +
+  "C 280 2640, 1020 2580, 920 2880 " +
+  "C 820 3140, 420 3160, 600 3320";
 
-/** The jet is intentionally all greyscale; site accents never bleed into the flight overlay. */
+/**
+ * The airframe stays greyscale like the rest of the overlay; only the
+ * afterburner gets a blue-white core, per the reference HUD treatment.
+ * Every extra node (vortex sheets, plume/burner groups, dorsal/ventral
+ * shade overlays) starts invisible and is driven by ScrollFlightPath's
+ * per-frame DOM writes — the component itself never re-renders on scroll.
+ */
 function ExecutiveMonochromeJet({
   bankDeg = 0,
   shadowGroupRef,
+  plumeGroupRef,
+  burnerGroupRef,
+  vortexGroupRef,
+  vortexTopRef,
+  vortexBottomRef,
+  dorsalShadeRef,
+  bellyShadeRef,
 }: {
   bankDeg?: number;
   shadowGroupRef?: React.RefObject<SVGGElement | null>;
+  plumeGroupRef?: React.RefObject<SVGGElement | null>;
+  burnerGroupRef?: React.RefObject<SVGGElement | null>;
+  vortexGroupRef?: React.RefObject<SVGGElement | null>;
+  vortexTopRef?: React.RefObject<SVGPathElement | null>;
+  vortexBottomRef?: React.RefObject<SVGPathElement | null>;
+  dorsalShadeRef?: React.RefObject<SVGPathElement | null>;
+  bellyShadeRef?: React.RefObject<SVGPathElement | null>;
 }) {
   return (
     <g>
+      {/* Wingtip vortex sheets — invisible until a hard bank / roll / fast
+          scroll (see ScrollFlightPath paint). Drawn from the wingtips
+          backwards in the jet's own rotated frame, so they always curl off
+          the correct tip and squash realistically during the barrel roll. */}
+      <g
+        ref={vortexGroupRef}
+        opacity="0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      >
+        <path ref={vortexTopRef} d="M -16 -38 Q -65 -46 -150 -30" opacity="0.8" />
+        <path
+          ref={vortexBottomRef}
+          d="M -16 38 Q -65 46 -150 30"
+          opacity="0.55"
+        />
+      </g>
       <g
         ref={shadowGroupRef}
         transform={`translate(-6, ${8 + bankDeg * 0.18}) scale(0.95)`}
@@ -1369,11 +1549,18 @@ function ExecutiveMonochromeJet({
           fill="#000"
         />
       </g>
-      {/* Fading exhaust behind each nacelle, with a soft monochrome pulse. */}
-      <g className="sb-jet-plumes" fill="url(#jetPlumeGrad)">
+      {/* Fading exhaust behind each nacelle, with a soft monochrome pulse.
+          The per-frame velocity boost multiplies this group's scaleX. */}
+      <g ref={plumeGroupRef} className="sb-jet-plumes" fill="url(#jetPlumeGrad)">
         <path d="M -8 -14 L -68 -18 L -68 -10 Z" />
         <path d="M -8 14 L -68 10 L -68 18 Z" />
         <path d="M -34 0 L -85 -4 L -72 0 L -85 4 Z" />
+      </g>
+      {/* Afterburner ring — opacity + stretch are scroll-velocity driven. */}
+      <g ref={burnerGroupRef} opacity="0" fill="url(#jetAfterburnGrad)">
+        <path d="M -8 -14 L -120 -15 L -96 -9 Z" />
+        <path d="M -8 14 L -120 15 L -96 9 Z" />
+        <path d="M -34 0 L -170 -5 L -140 0 L -170 5 Z" />
       </g>
       <rect
         x="-8"
@@ -1466,157 +1653,204 @@ function ExecutiveMonochromeJet({
         stroke="#09090b"
         strokeWidth="1.2"
       />
+      {/* Dorsal / ventral shade overlays — during the barrel roll the side
+          facing away from the sky darkens, selling the inversion. The belly
+          copy is the same silhouette mirrored with scale(1 -1). */}
+      <path
+        ref={dorsalShadeRef}
+        d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -9 -37 L -16 -39 L -18 -34 L -10 -6 L -24 -3.2 L -36 -18 L -42 -18 L -39 -1.5 L -39 0 Z"
+        fill="#09090b"
+        opacity="0"
+      />
+      <path
+        ref={bellyShadeRef}
+        transform="scale(1 -1)"
+        d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -9 -37 L -16 -39 L -18 -34 L -10 -6 L -24 -3.2 L -36 -18 L -42 -18 L -39 -1.5 L -39 0 Z"
+        fill="#09090b"
+        opacity="0"
+      />
     </g>
   );
 }
 
 function ScrollFlightPath() {
   /**
-   * Zero-lag scroll flight — CONTINUOUS FORWARD (owner clarification):
-   *  • NO center-locking camera. The jet's on-screen position IS its path
-   *    position; scroll down ⇒ the jet advances along the curve, never the
-   *    other way round. The trail is a single growing stroke that starts at
-   *    the route origin and extends forward up to the jet (stroke-dashoffset
-   *    over the real path length), so it can only ever draw forward.
-   *  1. NO React state on scroll: the listener writes a number, a single
-   *     rAF loop lerps toward it and pokes the DOM directly (transform
-   *     attributes + one stroke-dashoffset), so the main thread never
-   *     re-renders the landing tree while scrolling;
-   *  2. GEOMETRY PRE-SAMPLED ONCE: 600 path points (position + tangent) go
-   *     into a Float64 lookup table at mount. `getPointAtLength()` — the old
-   *     four-calls-per-frame cost — is never touched again; every frame is
-   *     O(1) linear interpolation between two adjacent samples;
-   *  3. DAMPED SPRING (`smooth += (target - smooth) * 0.15`): notched
-   *     mouse-wheel jumps glide, trackpad flicks decelerate, and the loop
-   *     parks itself the instant the jet is on target — no idle rAF burn.
+   * Scroll-locked aerobatic flight on the SHARED damped scroll engine
+   * (`paintOnceUnderReducedMotion` → `scrollEngine.subscribe`): zero React
+   * state per frame, one passive listener for the whole page.
+   *  • CAMERA: the 3320-unit route cannot fit in a viewport, so a decoupled
+   *    camera translates the world instead: `cameraY = 470 − (0.78·(90 +
+   *    p·3230) + 0.22·y)`. The 0.78 monotonic blend guarantees the NET screen
+   *    motion stays forward even while the loop's geometry flies "backwards"
+   *    through the sky (retreat during loops is bounded, forward travel is
+   *    0.78·3230 per full scroll); the 0.22 real-position term is what makes
+   *    climbs, the loop and the dive *feel* like altitude changes.
+   *  • TRAIL: revealed forward-only via `stroke-dashoffset = totalLen·(1−p)`
+   *    over the measured path length — structurally cannot extrude backwards.
+   *  • GEOMETRY: 1000-point Float64 LUT [x, y, unwrapped screen heading,
+   *    turn over 8 samples], resampled on resize because the screen heading
+   *    bakes in the current viewport aspect; headings are UNWRAPPED at
+   *    sample time so the ±180° seam never snaps the nose mid-loop.
+   *  • MANEUVERS (fraction of scroll p): 0.10–0.28 S-banks (|bank| ≤ 38°),
+   *    0.34–0.48 victory loop, 0.63–0.75 barrel roll (wingScaleY = cos φ
+   *    with a 0.18 silhouette floor, dorsal/ventral shading swap), 0.82–1.00
+   *    approach (28 % scale-in). Wingtip vortices fade in with |bank|,
+   *    roll-phase and damped scroll velocity; the afterburner stretches the
+   *    exhaust plumes by `1 + min(1.8, vel·28)` with a blue-white flash.
    */
   const pathRef = React.useRef<SVGPathElement | null>(null);
+  const cameraRef = React.useRef<SVGGElement | null>(null);
   const jetGroupRef = React.useRef<SVGGElement | null>(null);
   const shadowGroupRef = React.useRef<SVGGElement | null>(null);
+  const plumeRef = React.useRef<SVGGElement | null>(null);
+  const burnerRef = React.useRef<SVGGElement | null>(null);
+  const vortexGroupRef = React.useRef<SVGGElement | null>(null);
+  const vortexTopRef = React.useRef<SVGPathElement | null>(null);
+  const vortexBottomRef = React.useRef<SVGPathElement | null>(null);
+  const dorsalRef = React.useRef<SVGPathElement | null>(null);
+  const bellyRef = React.useRef<SVGPathElement | null>(null);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const path = pathRef.current;
     if (!path) return;
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
-    const LUT_STEPS = 600;
-    // [x, y, dx, dy] per sample — typed array, allocation-free per frame.
-    let lut = new Float64Array((LUT_STEPS + 1) * 4);
+    const STEPS = 1000;
+    // [x, y, unwrapped screen-heading°, bank-turn°] per sample.
+    let lut = new Float64Array((STEPS + 1) * 4);
     let totalLen = 4200;
 
     const sampleLut = () => {
       totalLen = path.getTotalLength() || 4200;
       path.setAttribute("stroke-dasharray", `${totalLen} ${totalLen}`);
-      const step = totalLen / LUT_STEPS;
+      // Screen heading must bake in the CURRENT viewport aspect ratio — the
+      // SVG stretches its viewBox non-uniformly, so a 45° view-space tangent
+      // is not 45° on a phone.
+      const sx = Math.max(0.01, window.innerWidth / 1200);
+      const sy = Math.max(0.01, window.innerHeight / 1000);
+      const step = totalLen / STEPS;
       let prev = path.getPointAtLength(0);
-      for (let i = 0; i <= LUT_STEPS; i++) {
-        const p = i === 0 ? prev : path.getPointAtLength(i * step);
-        const q = i === 0 ? path.getPointAtLength(step) : p;
-        const dx = i === 0 ? q.x - prev.x : p.x - prev.x;
-        const dy = i === 0 ? q.y - prev.y : p.y - prev.y;
-        lut[i * 4] = p.x;
-        lut[i * 4 + 1] = p.y;
-        lut[i * 4 + 2] = dx || 0.0001;
-        lut[i * 4 + 3] = dy;
-        prev = p;
+      let prevAngle = NaN;
+      for (let i = 0; i <= STEPS; i++) {
+        const here = i === 0 ? prev : path.getPointAtLength(i * step);
+        const ahead = i === STEPS ? here : path.getPointAtLength((i + 1) * step);
+        const dx = (i === STEPS ? here.x - prev.x : ahead.x - here.x) || 0.0001;
+        const dy = i === STEPS ? here.y - prev.y : ahead.y - here.y;
+        let a = (Math.atan2(dy * sy, dx * sx) * 180) / Math.PI;
+        if (i > 0) {
+          while (a - prevAngle > 180) a -= 360;
+          while (a - prevAngle < -180) a += 360;
+        }
+        lut[i * 4] = here.x;
+        lut[i * 4 + 1] = here.y;
+        lut[i * 4 + 2] = a;
+        prevAngle = a;
+        prev = here;
+      }
+      for (let i = 0; i <= STEPS; i++) {
+        const back = Math.max(0, i - 8);
+        const span = i - back || 1;
+        lut[i * 4 + 3] = ((lut[i * 4 + 2] - lut[back * 4 + 2]) * 8) / span;
       }
     };
 
-    const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
+    const clamp = (v: number, lo: number, hi: number) =>
+      Math.max(lo, Math.min(hi, v));
 
-    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-    const apply = () => {
-      const f = smoothProgress * LUT_STEPS;
-      const i0 = Math.min(LUT_STEPS, Math.floor(f));
-      const i1 = Math.min(LUT_STEPS, i0 + 1);
+    const paint = () => {
+      const p = scrollEngine.progress();
+      const vel = scrollEngine.velocity();
+      const f = p * STEPS;
+      const i0 = Math.min(STEPS, Math.floor(f));
+      const i1 = Math.min(STEPS, i0 + 1);
       const w = f - i0;
-      const x = lerp(lut[i0 * 4], lut[i1 * 4], w);
-      const y = lerp(lut[i0 * 4 + 1], lut[i1 * 4 + 1], w);
-      const dx = lerp(lut[i0 * 4 + 2], lut[i1 * 4 + 2], w);
-      const dy = lerp(lut[i0 * 4 + 3], lut[i1 * 4 + 3], w);
-      // Bank from how sharply the TANGENT turned over the last ~8 samples —
-      // LUT arithmetic, no extra geometry queries.
-      const iBack = Math.max(0, i0 - 8);
-      const bdx = lut[i0 * 4 + 2] - lut[iBack * 4 + 2];
-      const bdy = lut[i0 * 4 + 3] - lut[iBack * 4 + 3];
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-      const turn =
-        bdx !== 0 || bdy !== 0
-          ? (((angle - (Math.atan2(bdy, bdx) * 180) / Math.PI) + 540) % 360) - 180
-          : 0;
-      const bankDeg = clamp(turn * 1.8, -24, 24);
+      const lerp = (a: number, b: number) => a + (b - a) * w;
+      const x = lerp(lut[i0 * 4], lut[i1 * 4]);
+      const y = lerp(lut[i0 * 4 + 1], lut[i1 * 4 + 1]);
+      const angle = lerp(lut[i0 * 4 + 2], lut[i1 * 4 + 2]);
+      const turn = lerp(lut[i0 * 4 + 3], lut[i1 * 4 + 3]);
+      const bankDeg = clamp(turn * 1.8, -38, 38);
 
-      // Counter the non-uniform viewport projection so the jet keeps its
-      // proportions on narrow phones while the route spans the full width.
+      const inRoll = p > 0.63 && p < 0.75;
+      const rollPhase = inRoll ? (p - 0.63) / 0.12 : 0;
+      const cosR = inRoll ? Math.cos(rollPhase * Math.PI * 2) : 1;
+      let wingScaleY = cosR * (1 - Math.abs(bankDeg) * 0.008);
+      if (Math.abs(wingScaleY) < 0.18) {
+        wingScaleY = (wingScaleY < 0 ? -1 : 1) * 0.18;
+      }
+      const dorsalOp = inRoll ? Math.max(0, -cosR) * 0.5 : 0;
+      const bellyOp = inRoll ? Math.max(0, cosR) * 0.5 : 0;
+
+      const ap = clamp((p - 0.82) / 0.18, 0, 1);
+      const approach = 1 + ap * ap * (3 - 2 * ap) * 0.28;
+
+      const cameraY = 470 - (0.78 * (90 + p * 3230) + 0.22 * y);
+
+      // Forward-only rendering: the trail dash shrinks monotonically with p.
+      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - p)));
+      cameraRef.current?.setAttribute(
+        "transform",
+        `translate(0 ${cameraY.toFixed(2)})`,
+      );
       const scaleX = Math.max(0.01, window.innerWidth / 1200);
       const scaleY = Math.max(0.01, window.innerHeight / 1000);
-      const screenAngle = (Math.atan2(dy * scaleY, dx * scaleX) * 180) / Math.PI;
-
-      // Forward-only rendering: the jet is placed AT its path point (no
-      // counter-translating camera), and the trail stroke is revealed from
-      // the route origin up to the jet — dashoffset shrinks monotonically as
-      // progress grows, so the line can never slide or extrude backwards.
-      path.setAttribute("stroke-dashoffset", String(totalLen * (1 - smoothProgress)));
       jetGroupRef.current?.setAttribute(
         "transform",
-        `translate(${x} ${y}) scale(${1 / scaleX} ${1 / scaleY}) rotate(${screenAngle})`,
+        `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(approach / scaleX).toFixed(4)} ${(approach / scaleY).toFixed(4)}) rotate(${angle.toFixed(2)}) scale(1 ${wingScaleY.toFixed(3)})`,
       );
       shadowGroupRef.current?.setAttribute(
         "transform",
-        `translate(-6, ${8 + bankDeg * 0.18}) scale(0.95)`,
+        `translate(-6, ${(8 + bankDeg * 0.18).toFixed(2)}) scale(0.95)`,
       );
-    };
+      dorsalRef.current?.setAttribute("opacity", dorsalOp.toFixed(3));
+      bellyRef.current?.setAttribute("opacity", bellyOp.toFixed(3));
 
-    let targetProgress = 0;
-    let smoothProgress = 0;
-    let raf = 0;
-
-    const readTarget = () => {
-      const max = Math.max(
-        1,
-        document.documentElement.scrollHeight - window.innerHeight,
+      const vortOp = Math.min(
+        0.85,
+        Math.abs(bankDeg) / 22 +
+          (inRoll ? Math.sin(rollPhase * Math.PI) * 0.8 : 0) +
+          vel * 12,
       );
-      return clamp(window.scrollY / max, 0, 1);
-    };
+      const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
+      const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
+      vortexGroupRef.current?.setAttribute("opacity", vortOp.toFixed(3));
+      vortexTopRef.current?.setAttribute(
+        "d",
+        `M -16 -38 Q ${(-65 * vL).toFixed(1)} ${(-46 - curl).toFixed(1)} ${(-150 * vL).toFixed(1)} ${(-30 + curl * 0.6).toFixed(1)}`,
+      );
+      vortexBottomRef.current?.setAttribute(
+        "d",
+        `M -16 38 Q ${(-65 * vL).toFixed(1)} ${(46 - curl).toFixed(1)} ${(-150 * vL).toFixed(1)} ${(30 + curl * 0.6).toFixed(1)}`,
+      );
 
-    const tick = () => {
-      raf = 0;
-      const delta = targetProgress - smoothProgress;
-      if (Math.abs(delta) > 0.00015) {
-        smoothProgress += delta * 0.15;
-        apply();
-        raf = requestAnimationFrame(tick);
-      } else if (smoothProgress !== targetProgress) {
-        smoothProgress = targetProgress;
-        apply();
-      }
-    };
-
-    const schedule = () => {
-      targetProgress = readTarget();
-      if (!raf) raf = requestAnimationFrame(tick);
-    };
-
-    const handleResize = () => {
-      sampleLut();
-      targetProgress = readTarget();
-      smoothProgress = targetProgress;
-      apply();
+      plumeRef.current?.setAttribute(
+        "transform",
+        `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`,
+      );
+      burnerRef.current?.setAttribute(
+        "transform",
+        `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`,
+      );
+      burnerRef.current?.setAttribute(
+        "opacity",
+        Math.min(0.9, vel * 40).toFixed(3),
+      );
     };
 
     sampleLut();
-    targetProgress = readTarget();
-    smoothProgress = targetProgress;
-    apply();
-    if (!reducedMotion) {
-      window.addEventListener("scroll", schedule, { passive: true });
-    }
+    const unsub = paintOnceUnderReducedMotion(paint, reducedMotion);
+    const handleResize = () => {
+      // Aspect ratio changed → screen headings in the LUT are stale.
+      sampleLut();
+      if (!reducedMotion) scrollEngine.settle();
+      paint();
+    };
     window.addEventListener("resize", handleResize, { passive: true });
     return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", schedule);
+      unsub();
       window.removeEventListener("resize", handleResize);
     };
   }, []);
@@ -1653,33 +1887,50 @@ function ScrollFlightPath() {
             <stop offset="50%" stopColor="currentColor" stopOpacity="0.2" />
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
+          <linearGradient id="jetAfterburnGrad" x1="100%" y1="0%" x2="0%" y2="0%">
+            <stop offset="0%" stopColor="#eff6ff" stopOpacity="0.95" />
+            <stop offset="40%" stopColor="#38bdf8" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+          </linearGradient>
         </defs>
-        <path
-          d={FLIGHT_PATH_D}
-          fill="none"
-          stroke="currentColor"
-          opacity="0.25"
-          strokeWidth="2.2"
-          strokeDasharray="8 12"
-          strokeLinecap="round"
-        />
-        <path
-          ref={pathRef}
-          d={FLIGHT_PATH_D}
-          fill="none"
-          stroke="currentColor"
-          opacity="0.8"
-          strokeWidth="3.2"
-          strokeLinecap="round"
-          strokeDasharray="4200 4200"
-          strokeDashoffset={4200}
-        />
-        <g
-          ref={jetGroupRef}
-          transform="translate(90 60) scale(1 1) rotate(7)"
-          style={{ willChange: "transform" }}
-        >
-          <ExecutiveMonochromeJet bankDeg={0} shadowGroupRef={shadowGroupRef} />
+        <g ref={cameraRef} transform="translate(0 380)" style={{ willChange: "transform" }}>
+          <path
+            d={FLIGHT_PATH_D}
+            fill="none"
+            stroke="currentColor"
+            opacity="0.25"
+            strokeWidth="2.2"
+            strokeDasharray="8 12"
+            strokeLinecap="round"
+          />
+          <path
+            ref={pathRef}
+            d={FLIGHT_PATH_D}
+            fill="none"
+            stroke="currentColor"
+            opacity="0.8"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            strokeDasharray="4200 4200"
+            strokeDashoffset={4200}
+          />
+          <g
+            ref={jetGroupRef}
+            transform="translate(580 90) scale(1 1) rotate(7)"
+            style={{ willChange: "transform" }}
+          >
+            <ExecutiveMonochromeJet
+              bankDeg={0}
+              shadowGroupRef={shadowGroupRef}
+              plumeGroupRef={plumeRef}
+              burnerGroupRef={burnerRef}
+              vortexGroupRef={vortexGroupRef}
+              vortexTopRef={vortexTopRef}
+              vortexBottomRef={vortexBottomRef}
+              dorsalShadeRef={dorsalRef}
+              bellyShadeRef={bellyRef}
+            />
+          </g>
         </g>
       </svg>
     </div>
