@@ -9,6 +9,7 @@ import { sendLoginAlert } from "@/lib/telegram/service";
 import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampString, readJsonBody } from "@/lib/request";
+import { isDatabaseUnreachable } from "@/lib/dbError";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,17 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     console.error("POST /api/auth/sign-in error:", error);
+    // A database outage must never look like a credential problem: the user
+    // gets "temporarily unavailable" (retry guidance, /api/health has the
+    // driver-level diagnosis) instead of an error that invites password
+    // resetting while the real fault is the connection string.
+    const unreachable = isDatabaseUnreachable(error);
+    if (unreachable) {
+      return NextResponse.json(
+        { error: "Authentication is temporarily unavailable. The database could not be reached — check /api/health.", code: "unavailable" },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Sign-in failed" }, { status: 500 });
   }
 }

@@ -23,19 +23,23 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
-      # DATABASE_URL decides which PostgreSQL the app talks to. Two options:
-      #   a) Render's managed database (the `databases:` block above) — what
-      #      this blueprint wires by default; or
-      #   b) Supabase — then delete the `fromDatabase` mapping, use
-      #      `sync: false`, and paste the Supabase connection string in the
-      #      Render dashboard (Project Settings → Database → Connection
-      #      string → URI, "Session pooler", plus `?sslmode=require`).
-      # The repo's docs (DEPLOYMENT.md §2, supabase/full_schema.sql) treat
-      # Supabase as the source of truth; pick ONE and keep the schema there.
+      # DATABASE_URL — paste the connection string in the Render dashboard.
+      # The repo's source of truth is SUPABASE (DEPLOYMENT.md §2,
+      # supabase/full_schema.sql), so use:
+      #   Project Settings → Database → Connection string → URI
+      #   → "Session pooler" host (aws-0-<region>.pooler.supabase.com:5432)
+      #   → append ?sslmode=require
+      # NEVER the DIRECT `db.<ref>.supabase.co` host from Render: it is
+      # IPv6-only and Render's egress is IPv4 — every query would time out and
+      # the site would answer "Authentication is temporarily unavailable."
+      # The free Render DB below is NOT wired anymore on purpose: Render frees
+      # idle free-tier databases after 30 days, the mapped connectionString
+      # then points at a deleted host, and the same outage returns. Keep it
+      # only if you deliberately want Render-managed data (re-add the
+      # fromDatabase mapping and update DEPLOYMENT.md §2).
       - key: DATABASE_URL
-        fromDatabase:
-          name: scholarbridge-db
-          property: connectionString
+        sync: false
+        required: true
       - key: NODE_VERSION
         value: "22"
       # Signs the HttpOnly session cookie (sb_session). REQUIRED in
