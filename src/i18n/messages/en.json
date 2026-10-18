@@ -1942,6 +1942,14 @@
     "fpTuitionCoveragePill": "tuition coverage: {cov}",
     "fpCloses": "closes {date}",
     "fpNoScholarshipCloses": "No saved scholarship closes this gap yet.",
+    "fpGapShort": "You are short {amount} for a year.",
+    "fpTuitionCoverage": "tuition coverage: {coverage}",
+    "fpGapCloses": "covers the gap",
+    "fpGapCheckHint": "Tick the awards to preview how much of the gap they would close.",
+    "fpGapRemaining": "Still {amount} short with the ticked awards.",
+    "fpGapClosed": "The ticked awards close this gap.",
+    "fpGapCheckAria": "Count {title} toward the gap",
+    "rbStartFromFailed": "Could not open that application. Please try again from the tracker.",
     "lpLoadError": "Could not load learning providers",
     "lpTitle": "Study & test providers",
     "lpSubtitle": "ScholarBridge can read practice scores and course progress from an external study platform one day. Nothing is connected yet, and nothing about your journey depends on it.",
@@ -6034,7 +6042,9 @@
     "planChanceBadge": "Chance: {score}%",
     "planAdmitBadge": "admit {rate}%",
     "planFitBadge": "Fit score: {score}%",
-    "recommendedTag": "Suggested"
+    "recommendedTag": "Suggested",
+    "modeEssential": "Essential steps",
+    "modeDetailed": "All steps"
   },
   "apostille": {
     "title": "e-Apostille & Bank-Statement Readiness",

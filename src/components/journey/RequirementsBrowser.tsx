@@ -24,6 +24,7 @@ import {
 
 interface AppRow {
   id: number;
+  universityId: number | null;
   universityName: string;
   programName: string | null;
   deadline: string | null;
@@ -135,18 +136,20 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
    * into a blank search. Null while loading or when nothing scored.
    */
   const [topMatch, setTopMatch] = useState<{ id: number; name: string } | null>(null);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    // Ranked by the hybrid fit + positioning score — see /api/dashboard.
+    // Ranked by the same hybrid fit + positioning score the explorer uses —
+    // ONE row from /api/universities instead of the dashboard's 25+ queries.
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/dashboard?profileId=${profileId}`, { credentials: "same-origin" });
+        const res = await fetch(`/api/universities?profileId=${profileId}&perPage=1`, { credentials: "same-origin" });
         if (!res.ok) return;
         const json = (await res.json()) as {
-          recommended?: { universities?: { id: number; name: string }[] };
+          universities?: { id: number; name: string }[];
         };
-        const first = json.recommended?.universities?.[0];
+        const first = json.universities?.[0];
         if (!cancelled && first) setTopMatch({ id: first.id, name: first.name });
       } catch {
         // The blueprint still works without a top match; the button says why.
@@ -160,7 +163,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/applications", { cache: "no-store" });
+        const res = await fetch(`/api/applications?profileId=${profileId}`, { credentials: "same-origin", cache: "no-store" });
         const json = await res.json().catch(() => ({}));
         if (res.ok) {
           setApps(json.applications ?? []);
@@ -170,7 +173,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
         setLoading(false);
       }
     })();
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -203,13 +206,38 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 onClick={() => {
-                  // Open the workspace of the highest-fit university the
-                  // dashboard already ranked, rather than starting from a blank
-                  // search.
+                  // The workspace is keyed by APPLICATION id — passing the
+                  // university id straight through 404s the panel. Reuse the
+                  // student's application for this university, or create one,
+                  // and open its real id.
                   const best = topMatch;
-                  if (best) onOpenWorkspace(best.id);
+                  if (!best || starting) return;
+                  setStarting(true);
+                  void (async () => {
+                    try {
+                      const existing = apps.find((a) => a.universityId === best.id);
+                      if (existing) {
+                        onOpenWorkspace(existing.id);
+                        return;
+                      }
+                      const res = await fetch("/api/applications", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ profileId, universityId: best.id, universityName: best.name }),
+                      });
+                      const json = (await res.json().catch(() => ({}))) as { application?: { id?: number }; error?: string };
+                      const appId = json.application?.id;
+                      if (res.ok && typeof appId === "number") onOpenWorkspace(appId);
+                      else setError(typeof json.error === "string" ? json.error : t("rbStartFromFailed"));
+                    } catch {
+                      setError(t("rbStartFromFailed"));
+                    } finally {
+                      setStarting(false);
+                    }
+                  })();
                 }}
-                disabled={!topMatch}
+                disabled={!topMatch || starting}
               >
                 {topMatch
                   ? t("rbStartFromMatch", { university: topMatch.name })
