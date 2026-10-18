@@ -986,6 +986,12 @@ export function UniversityExplorer({
             // Semantic tier (emerald / indigo / amber / neutral) — not one
             // hardcoded blue for a 99% and a 41% alike.
             const matchBadgeColor = fitBadgeClass(uni.matchScore);
+            const majorFields = localizeMajorOrField(uni.programMajor, locale)
+              .split(",")
+              .map((field) => field.trim())
+              .filter(Boolean);
+            const visibleMajorFields = majorFields.slice(0, 3).join(", ");
+            const remainingMajorFields = Math.max(0, majorFields.length - 3);
 
             let highlightsList: string[] = [];
             try {
@@ -998,7 +1004,7 @@ export function UniversityExplorer({
             return (
               <div
                 key={uni.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-lg hover:border-indigo-300 transition-all overflow-hidden flex flex-col justify-between group"
+                className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-700 dark:bg-[#111a2e] dark:hover:border-indigo-500/50"
               >
                 {/* Top Image Banner — a taller banner on a phone, where the
                     card is the only thing on the row. */}
@@ -1028,7 +1034,7 @@ export function UniversityExplorer({
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
 
                   {/* Match Score Badge */}
-                  <div className="absolute left-3 right-16 top-3 flex flex-wrap items-center gap-1.5">
+                  <div className="absolute left-3 right-24 top-3 flex flex-wrap items-center gap-1.5">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
@@ -1043,18 +1049,7 @@ export function UniversityExplorer({
                         title={uni.selectivityCategory ?? undefined}
                       >
                         🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
-                        {typeof uni.effectiveAcceptRatePct === "number" && (
-                          <span className="opacity-85">({uni.effectiveAcceptRatePct}%)</span>
-                        )}
                       </span>
-                    )}
-                    {uni.matchBreakdown && (
-                      <MatchEvidenceBadge
-                        comparedDimensions={uni.matchBreakdown.comparedDimensions}
-                        totalDimensions={uni.matchBreakdown.totalDimensions}
-                        evidenceCoveragePct={uni.matchBreakdown.evidenceCoveragePct}
-                        evidenceLevel={uni.matchBreakdown.evidenceLevel}
-                      />
                     )}
                   </div>
 
@@ -1078,8 +1073,9 @@ export function UniversityExplorer({
                 <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                   <div>
                     {/* Major & Program */}
-                    <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                      {localizeMajorOrField(uni.programMajor, locale)}
+                    <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+                      {visibleMajorFields}
+                      {remainingMajorFields > 0 && <span> +{remainingMajorFields}</span>}
                     </div>
 
                     <p className="text-[11px] text-slate-500 mb-2">
@@ -1091,8 +1087,9 @@ export function UniversityExplorer({
                         universities; ≤300 on the catalogue's QS-based ranking
                         is a CRITERION MATCH, never a promise of an award. */}
                     {uni.worldRanking != null && uni.worldRanking <= 300 && (
-                      <p className="mb-2 inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800">
-                        <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
+                      <p className="mb-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200">
+                        <CountryFlag country="Uzbekistan" size="xs" />
+                        <span className="min-w-0 break-words">{t("exTop300Badge").replace(/^🇺🇿\s*/, "")}</span>
                       </p>
                     )}
 
@@ -1144,44 +1141,32 @@ export function UniversityExplorer({
                         The card shows the four numbers that decide "can I
                         afford / qualify" and nothing else; every secondary
                         diagnostic lives in the details drawer below. */}
-                    <div className="grid grid-cols-2 gap-2 my-3 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <div className="my-3 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 bg-slate-50 p-3 text-[11px] dark:border-slate-700/80 dark:bg-slate-800/60">
                       <div>
-                        <span className="text-slate-400 block">{t("exAnnualTuition")}</span>
-                        <strong className="text-slate-900">{formatMoney(uni.annualTuitionUsd, "USD")}</strong>
+                        <span className="block text-slate-500 dark:text-slate-400">{t("exAnnualTuition")}</span>
+                        <strong className="font-bold text-slate-900 dark:text-white">{formatMoney(uni.annualTuitionUsd, "USD")}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">{t("exLivingEst")}</span>
-                        <strong className="text-slate-900">{formatMoney(uni.annualLivingEstUsd, "USD", { suffix: "/yr" })}</strong>
+                        <span className="block text-slate-500 dark:text-slate-400">{t("exLivingEst")}</span>
+                        <strong className="font-bold text-slate-900 dark:text-white">{formatMoney(uni.annualLivingEstUsd, "USD")}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">{t("exMinGpa")}</span>
-                        <strong className="text-slate-900">{formatNumber(uni.minGpa, { decimals: 2, suffix: " / 4.0" })}</strong>
+                        <span className="block text-slate-500 dark:text-slate-400">{t("exMinGpa")}</span>
+                        <strong className="font-bold text-slate-900 dark:text-white">{formatNumber(uni.minGpa, { decimals: 2, suffix: " / 4.0" })}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">{t("exMinIelts")}</span>
-                        <strong className="text-slate-900">{formatNumber(uni.minIelts, { decimals: 1 })}</strong>
+                        <span className="block text-slate-500 dark:text-slate-400">{t("exMinIelts")}</span>
+                        <strong className="font-bold text-slate-900 dark:text-white">{formatNumber(uni.minIelts, { decimals: 1 })}</strong>
                       </div>
                     </div>
-
-                    {/* Up to TWO highlight pills on the card; the rest are in
-                        the drawer, so no card ever becomes a badge wall. */}
-                    {highlightsList.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {highlightsList.slice(0, 2).map((hl, i) => (
-                          <span key={i} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
-                            ✓ {hl}
-                          </span>
-                        ))}
-                      </div>
-                    )}
 
                     {/* Secondary diagnostics, collapsed by default. A NATIVE
                         <details> is used (not a state toggle) on purpose: the
                         children stay in the static SSR markup that the render
                         checks assert, while the browser shows only the summary
                         row until the student asks for the arithmetic. */}
-                    <details className="group mt-3 rounded-xl border border-slate-200/70 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 px-3 py-2">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                    <details className="group mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
                         <span className="min-w-0 break-words">{t("exCardDetails")}</span>
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
                       </summary>
@@ -1192,10 +1177,10 @@ export function UniversityExplorer({
                           </p>
                         )}
 
-                        {highlightsList.length > 2 && (
+                        {highlightsList.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {highlightsList.slice(2).map((hl, i) => (
-                              <span key={`more-${i}`} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
+                            {highlightsList.map((hl, i) => (
+                              <span key={`highlight-${i}`} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
                                 ✓ {hl}
                               </span>
                             ))}
@@ -1224,6 +1209,19 @@ export function UniversityExplorer({
                             points it contributed. Nothing here is rounded into
                             vagueness — the components add up to the score on
                             the card header. */}
+                        {typeof uni.effectiveAcceptRatePct === "number" && (
+                          <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {t("chanceAdmitRate", { rate: uni.effectiveAcceptRatePct })}
+                          </p>
+                        )}
+                        {uni.matchBreakdown && (
+                          <MatchEvidenceBadge
+                            comparedDimensions={uni.matchBreakdown.comparedDimensions}
+                            totalDimensions={uni.matchBreakdown.totalDimensions}
+                            evidenceCoveragePct={uni.matchBreakdown.evidenceCoveragePct}
+                            evidenceLevel={uni.matchBreakdown.evidenceLevel}
+                          />
+                        )}
                         <MatchBreakdownStrip breakdown={uni.matchBreakdown} />
 
                         {/* Post-study Work Permit (NULL = not specified) */}
@@ -1287,10 +1285,10 @@ export function UniversityExplorer({
                   {/* Footer — ONE row, one primary CTA. Shortlist, compare and
                       the official site are compact icon/pill actions; nothing
                       wraps into a second line of competing buttons. */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5 pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
                     <button
                       onClick={() => setSelectedUniId(uni.id)}
-                      className="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-500"
                     >
                       <Eye className="h-3.5 w-3.5" />
                       {t("exViewUniversity")}
@@ -1300,7 +1298,7 @@ export function UniversityExplorer({
                       <button
                         onClick={() => onUnsaveUniversity(uni.id)}
                         title={t("exSaved")}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl bg-emerald-100 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-red-100 hover:text-red-700"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
                       >
                         <Check className="h-3.5 w-3.5" />
                         <span className="max-sm:hidden">{t("exSaved")}</span>
@@ -1309,7 +1307,7 @@ export function UniversityExplorer({
                       <button
                         onClick={() => onSaveUniversity(uni.id)}
                         title={t("exShortlist")}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-indigo-200 bg-white px-2.5 text-xs font-bold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-50"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         <span className="max-sm:hidden">{t("exShortlist")}</span>
@@ -1318,10 +1316,10 @@ export function UniversityExplorer({
 
                     <label
                       title={t("exCompare")}
-                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1 rounded-xl border px-2.5 text-xs transition-colors ${
+                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs transition-colors ${
                         isCompared
-                          ? "border-indigo-300 bg-indigo-50 font-bold text-indigo-700"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "border-indigo-300 bg-indigo-50 font-bold text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/20 dark:text-indigo-200"
+                          : "border-slate-200 bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       }`}
                     >
                       <input
@@ -1337,7 +1335,7 @@ export function UniversityExplorer({
                       href={uni.websiteUrl ?? undefined}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:text-slate-700"
+                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300"
                       title={t("exVisitPortal")}
                       aria-label={t("exVisitPortal")}
                     >
