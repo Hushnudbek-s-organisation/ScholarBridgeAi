@@ -343,7 +343,7 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
   "Petroleum / Mining Engineering": { uz: "Neft-gaz / Konchilik muhandisligi", ru: "Нефтегазовая / Горная инженерия" },
   "Software Engineering": { uz: "Dasturiy injiniring", ru: "Программная инженерия" },
   "Computer Engineering": { uz: "Kompyuter muhandisligi", ru: "Компьютерная инженерия" },
-  "Computer Science": { uz: "Kompyuter savodxonligi", ru: "Информатика" },
+  "Computer Science": { uz: "Kompyuter fanlari", ru: "Информатика" },
   "Information Technology / Information Systems": { uz: "Axborot texnologiyalari / Axborot tizimlari", ru: "Информационные технологии / Информационные системы" },
   "Artificial Intelligence / Machine Learning": { uz: "Sun'iy intellekt / Mashinali o'qitish", ru: "Искусственный интеллект / Машинное обучение" },
   "Artificial Intelligence": { uz: "Sun'iy intellekt", ru: "Искусственный интеллект" },
@@ -358,7 +358,7 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
 
 /** Word/alias layer — small tokens that appear inside compound field names. */
 const FIELD_WORD_ALIASES: Array<[RegExp, Record<TargetLocale, string>]> = [
-  [/\bcomputer science\b/i, { uz: "kompyuter savodxonligi", ru: "информатика" }],
+  [/\bcomputer science\b/i, { uz: "kompyuter fanlari", ru: "информатика" }],
   [/\binformatics\b/i, { uz: "informatika", ru: "информатика" }],
   [/\bsoftware\b/i, { uz: "dasturiy ta'minot", ru: "программное обеспечение" }],
   [/\bdata science\b/i, { uz: "ma'lumotlar fani", ru: "наука о данных" }],
@@ -895,6 +895,34 @@ const HIGHLIGHT_PHRASES: Array<[RegExp, Record<TargetLocale, string>]> = [
   [/\btarget\b/gi, { uz: "maqsad", ru: "цель" }],
 ];
 
+function localizeDynamicHighlight(text: string, locale: Locale, tl: TargetLocale): string | null {
+  const ranking = text.match(/^QS World University Ranking #(\d+) globally$/i);
+  if (ranking) {
+    return tl === "uz"
+      ? `QS jahon reytingida #${ranking[1]}-o'rin`
+      : `№${ranking[1]} в мировом рейтинге QS`;
+  }
+
+  const location = text.match(/^Located in ([^,]+),\s*([^(]+?)(?:\s*\(Founded (\d+)\))?$/i);
+  if (location) {
+    const city = localizeCity(location[1].trim(), locale);
+    const country = localizeCountry(location[2].trim(), locale);
+    const year = location[3];
+    if (tl === "uz") {
+      return `${city}, ${country}da joylashgan${year ? ` (${year}-yilda tashkil etilgan)` : ""}`;
+    }
+    return `Расположен в г. ${city}, ${country}${year ? ` (основан в ${year} г.)` : ""}`;
+  }
+
+  const international = text.match(/^(\d+(?:\.\d+)?)%\s+international student body$/i);
+  if (international) {
+    return tl === "uz"
+      ? `${international[1]}% xalqaro talabalar ulushi`
+      : `${international[1]}% иностранных студентов`;
+  }
+  return null;
+}
+
 const HIGHLIGHT_TITLE_MAP: Record<string, Record<TargetLocale, string>> = {
   Ranking: { uz: "Reyting", ru: "Рейтинг" },
   "Ranking Badge": { uz: "Reyting", ru: "Рейтинг" },
@@ -924,6 +952,8 @@ export function localizeHighlightItem<T>(item: T, locale: Locale): T {
   if (typeof item === "string") {
     const exact = HIGHLIGHT_BADGES[item.trim()];
     if (exact) return exact[tl] as unknown as T;
+    const dynamic = localizeDynamicHighlight(item, locale, tl);
+    if (dynamic) return dynamic as unknown as T;
     // Pattern layer for unknown badges — phrase substitutions.
     let out: string = item;
     for (const [pattern, translations] of HIGHLIGHT_PHRASES) {
@@ -946,11 +976,16 @@ export function localizeHighlightItem<T>(item: T, locale: Locale): T {
       if (badge) {
         newText = badge[tl];
       } else {
-        let out = text;
-        for (const [pattern, translations] of HIGHLIGHT_PHRASES) {
-          if (pattern.test(out)) out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+        const dynamic = localizeDynamicHighlight(text, locale, tl);
+        if (dynamic) {
+          newText = dynamic;
+        } else {
+          let out = text;
+          for (const [pattern, translations] of HIGHLIGHT_PHRASES) {
+            if (pattern.test(out)) out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+          }
+          newText = out;
         }
-        newText = out;
       }
     }
     if (newTitle !== title || newText !== text) {

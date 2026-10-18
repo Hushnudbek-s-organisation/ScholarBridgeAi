@@ -33,13 +33,12 @@
       against Tailwind's real palette, NOT the inverted one. Unpinned, those
       resolve to near-white fills and glowing borders. Each is pinned to its tier.
 
-      The pins live INSIDE `@layer utilities`, after Tailwind's generated rules,
-      with deliberately low specificity:
-        • base pins are `:where(.dark) .x` → (0,1,0): they beat the plain
-          utility by source order, but LOSE to `hover:`, `focus:`, `disabled:`
-          and `dark:hover:` variants (0,2,0) — interaction states keep working;
-        • base pins step aside (`:where(:not([class*="dark:bg-"]))`) when the
-          element declares its own `dark:` value, so explicit dark intent wins.
+      The pins live inside `@layer utilities`. Their root selector uses
+      `html:where(.dark)` so the type selector lifts them above same-specificity
+      generated Tailwind utility rules even when those rules are emitted later.
+      Pins that set only fallback fills step aside (`:where(:not([class*="dark:bg-"]))`)
+      when the element declares its own `dark:` value. State-specific utilities
+      should remain available for interaction styling.
       Never hand-write a `dark:` slate utility without a matching pin below —
       `npm run test:dark` fails on unpinned ones.
 
@@ -160,46 +159,49 @@
 
 @layer utilities {
   /* ---- Tier 1 · cards and shells --------------------------------------- */
-  :where(.dark) .bg-white:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface); }
-  :where(.dark) .bg-white\/95:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
-  :where(.dark) .bg-white\/90:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
-  :where(.dark) .bg-white\/85:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.85); }
-  :where(.dark) .bg-white\/80:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
-  :where(.dark) .bg-white\/70:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.7); }
+  html:where(.dark) .bg-white:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface); }
+  html:where(.dark) .bg-white\/95:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
+  html:where(.dark) .bg-white\/90:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
+  html:where(.dark) .bg-white\/85:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.85); }
+  html:where(.dark) .bg-white\/80:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
+  html:where(.dark) .bg-white\/70:where(:not([class*="dark:bg-"])) { background-color: rgb(var(--sb-surface-rgb) / 0.7); }
   /* Low-opacity whites (`bg-white/10`, `/20`) are glass chips on coloured
      heroes and read correctly in both themes — they are left alone. */
 
   /* ---- Tier 2 · inner wells -------------------------------------------- */
   /* `bg-slate-50` is the canvas on the page, but a recessed well inside a card:
      there it lifts to Tier 2 instead of punching a black hole into the card. */
-  :where(.dark :is(.bg-white, .dark\:bg-slate-900)) .bg-slate-50:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
+  html:where(.dark) :where(:is(.bg-white, .dark\:bg-slate-900)) .bg-slate-50:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
   /* Translucent neutral wells (`bg-slate-50/60`, `bg-slate-100/50`). */
-  :where(.dark) :is([class^="bg-slate-50/"], [class*=" bg-slate-50/"], [class^="bg-slate-100/"], [class*=" bg-slate-100/"]):where(:not([class*="dark:bg-"])) {
+  html:where(.dark) :is([class^="bg-slate-50/"], [class*=" bg-slate-50/"], [class^="bg-slate-100/"], [class*=" bg-slate-100/"]):where(:not([class*="dark:bg-"])) {
+    background-color: rgb(var(--sb-well-rgb) / 0.75);
+  }
+  html:where(.dark) .bg-slate-50\/50:where(:not([class*="dark:bg-"])) {
     background-color: rgb(var(--sb-well-rgb) / 0.75);
   }
 
   /* ---- Deliberately dark panels and scrims ------------------------------ */
-  :where(.dark) .bg-slate-950:where(:not([class*="dark:bg-"])) { background-color: var(--sb-canvas); }
-  :where(.dark) .bg-slate-900:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface-hero); }
-  :where(.dark) .bg-slate-800:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
-  :where(.dark) .bg-slate-700:where(:not([class*="dark:bg-"])) { background-color: var(--sb-control); }
-  :where(.dark) .bg-slate-600:where(:not([class*="dark:bg-"])) { background-color: var(--sb-border-strong); }
+  html:where(.dark) .bg-slate-950:where(:not([class*="dark:bg-"])) { background-color: var(--sb-canvas); }
+  html:where(.dark) .bg-slate-900:where(:not([class*="dark:bg-"])) { background-color: var(--sb-surface-hero); }
+  html:where(.dark) .bg-slate-800:where(:not([class*="dark:bg-"])) { background-color: var(--sb-well); }
+  html:where(.dark) .bg-slate-700:where(:not([class*="dark:bg-"])) { background-color: var(--sb-control); }
+  html:where(.dark) .bg-slate-600:where(:not([class*="dark:bg-"])) { background-color: var(--sb-border-strong); }
   /* Alpha variants are separate classes: unpinned, `bg-slate-950/50` resolves
      to the inverted (white) token — a modal backdrop of white fog. */
-  :where(.dark) :is(.bg-slate-950\/40, .bg-slate-900\/40) { background-color: rgb(var(--sb-scrim-rgb) / 0.4); }
-  :where(.dark) :is(.bg-slate-950\/50, .bg-slate-900\/50) { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
-  :where(.dark) :is(.bg-slate-950\/60, .bg-slate-900\/60) { background-color: rgb(var(--sb-scrim-rgb) / 0.6); }
-  :where(.dark) :is(.bg-slate-950\/70, .bg-slate-900\/70) { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
-  :where(.dark) :is(.bg-slate-950\/80, .bg-slate-900\/80) { background-color: rgb(var(--sb-scrim-rgb) / 0.8); }
-  :where(.dark) :is(.bg-slate-950\/90, .bg-slate-900\/90) { background-color: rgb(var(--sb-scrim-rgb) / 0.9); }
-  :where(.dark) .bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
-  :where(.dark) .bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
-  :where(.dark) .bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
-  :where(.dark) .bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
+  html:where(.dark) :is(.bg-slate-950\/40, .bg-slate-900\/40) { background-color: rgb(var(--sb-scrim-rgb) / 0.4); }
+  html:where(.dark) :is(.bg-slate-950\/50, .bg-slate-900\/50) { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
+  html:where(.dark) :is(.bg-slate-950\/60, .bg-slate-900\/60) { background-color: rgb(var(--sb-scrim-rgb) / 0.6); }
+  html:where(.dark) :is(.bg-slate-950\/70, .bg-slate-900\/70) { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
+  html:where(.dark) :is(.bg-slate-950\/80, .bg-slate-900\/80) { background-color: rgb(var(--sb-scrim-rgb) / 0.8); }
+  html:where(.dark) :is(.bg-slate-950\/90, .bg-slate-900\/90) { background-color: rgb(var(--sb-scrim-rgb) / 0.9); }
+  html:where(.dark) .bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
+  html:where(.dark) .bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
+  html:where(.dark) .bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
+  html:where(.dark) .bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
 
   /* A dark CONTROL (primary button, badge) written as `bg-slate-900` would melt
      into a dark card; in dark mode it becomes an authoritative royal indigo. */
-  :where(.dark) :is(button, a, span).bg-slate-900:where(:not([class*="dark:bg-"])) {
+  html:where(.dark) :is(button, a, span).bg-slate-900:where(:not([class*="dark:bg-"])) {
     background-color: var(--sb-control-indigo);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000);
   }
@@ -207,296 +209,297 @@
   /* ---- `dark:` slate utilities ------------------------------------------
      Written against Tailwind's REAL palette ("slate-900 = dark card"), so they
      are pinned to the matching tier instead of the inverted token.          */
-  :where(.dark) .dark\:bg-slate-950 { background-color: var(--sb-canvas); }
-  :where(.dark) .dark\:bg-slate-900 { background-color: var(--sb-surface); }
-  :where(.dark) .dark\:bg-slate-800 { background-color: var(--sb-well); }
-  :where(.dark) .dark\:bg-slate-700 { background-color: var(--sb-control); }
-  :where(.dark) .dark\:bg-slate-600 { background-color: var(--sb-border-strong); }
-  :where(.dark) .dark\:bg-slate-500 { background-color: #64748b; }
-  :where(.dark) .dark\:bg-slate-400 { background-color: #94a3b8; }
-  :where(.dark) .dark\:bg-slate-300 { background-color: #cbd5e1; }
-  :where(.dark) .dark\:bg-slate-200 { background-color: #e2e8f0; }
-  :where(.dark) .dark\:bg-slate-100 { background-color: #f1f5f9; }
-  :where(.dark) .dark\:bg-slate-50 { background-color: #f8fafc; }
-  :where(.dark) .dark\:bg-slate-950\/50 { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
-  :where(.dark) .dark\:bg-slate-950\/70 { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
-  :where(.dark) .dark\:bg-slate-900\/95 { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
-  :where(.dark) .dark\:bg-slate-900\/90 { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
-  :where(.dark) .dark\:bg-slate-900\/80 { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
-  :where(.dark) .dark\:bg-slate-900\/60 { background-color: rgb(var(--sb-surface-rgb) / 0.6); }
-  :where(.dark) .dark\:bg-slate-900\/50 { background-color: rgb(var(--sb-surface-rgb) / 0.5); }
-  :where(.dark) .dark\:bg-slate-900\/40 { background-color: rgb(var(--sb-surface-rgb) / 0.4); }
-  :where(.dark) .dark\:bg-slate-900\/20 { background-color: rgb(var(--sb-surface-rgb) / 0.2); }
-  :where(.dark) .dark\:bg-slate-900\/10 { background-color: rgb(var(--sb-surface-rgb) / 0.1); }
-  :where(.dark) .dark\:bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
-  :where(.dark) .dark\:bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
-  :where(.dark) .dark\:bg-slate-800\/70 { background-color: rgb(var(--sb-well-rgb) / 0.7); }
+  html:where(.dark) .dark\:bg-slate-950 { background-color: var(--sb-canvas); }
+  html:where(.dark) .dark\:bg-slate-900 { background-color: var(--sb-surface); }
+  html:where(.dark) .dark\:bg-slate-800 { background-color: var(--sb-well); }
+  html:where(.dark) .dark\:bg-slate-700 { background-color: var(--sb-control); }
+  html:where(.dark) .dark\:bg-slate-600 { background-color: var(--sb-border-strong); }
+  html:where(.dark) .dark\:bg-slate-500 { background-color: #64748b; }
+  html:where(.dark) .dark\:bg-slate-400 { background-color: #94a3b8; }
+  html:where(.dark) .dark\:bg-slate-300 { background-color: #cbd5e1; }
+  html:where(.dark) .dark\:bg-slate-200 { background-color: #e2e8f0; }
+  html:where(.dark) .dark\:bg-slate-100 { background-color: #f1f5f9; }
+  html:where(.dark) .dark\:bg-slate-50 { background-color: #f8fafc; }
+  html:where(.dark) .dark\:bg-slate-950\/50 { background-color: rgb(var(--sb-scrim-rgb) / 0.5); }
+  html:where(.dark) .dark\:bg-slate-950\/70 { background-color: rgb(var(--sb-scrim-rgb) / 0.7); }
+  html:where(.dark) .dark\:bg-slate-900\/95 { background-color: rgb(var(--sb-surface-rgb) / 0.95); }
+  html:where(.dark) .dark\:bg-slate-900\/90 { background-color: rgb(var(--sb-surface-rgb) / 0.9); }
+  html:where(.dark) .dark\:bg-slate-900\/80 { background-color: rgb(var(--sb-surface-rgb) / 0.8); }
+  html:where(.dark) .dark\:bg-slate-900\/60 { background-color: rgb(var(--sb-surface-rgb) / 0.6); }
+  html:where(.dark) .dark\:bg-slate-900\/50 { background-color: rgb(var(--sb-surface-rgb) / 0.5); }
+  html:where(.dark) .dark\:bg-slate-900\/40 { background-color: rgb(var(--sb-surface-rgb) / 0.4); }
+  html:where(.dark) .dark\:bg-slate-900\/20 { background-color: rgb(var(--sb-surface-rgb) / 0.2); }
+  html:where(.dark) .dark\:bg-slate-900\/10 { background-color: rgb(var(--sb-surface-rgb) / 0.1); }
+  html:where(.dark) .dark\:bg-slate-800\/90 { background-color: rgb(var(--sb-well-rgb) / 0.9); }
+  html:where(.dark) .dark\:bg-slate-800\/80 { background-color: rgb(var(--sb-well-rgb) / 0.8); }
+  html:where(.dark) .dark\:bg-slate-800\/70 { background-color: rgb(var(--sb-well-rgb) / 0.7); }
   :where(.dark) .dark\:bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
-  :where(.dark) .dark\:bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
-  :where(.dark) .dark\:bg-slate-800\/40 { background-color: rgb(var(--sb-well-rgb) / 0.4); }
-  :where(.dark) .dark\:bg-slate-700\/60 { background-color: rgb(var(--sb-control-rgb) / 0.6); }
-  :where(.dark) .dark\:bg-slate-700\/50 { background-color: rgb(var(--sb-control-rgb) / 0.5); }
+  html:where(.dark) .dark\:bg-slate-800\/60 { background-color: rgb(var(--sb-well-rgb) / 0.6); }
+  html:where(.dark) .dark\:bg-slate-800\/50 { background-color: rgb(var(--sb-well-rgb) / 0.5); }
+  html:where(.dark) .dark\:bg-slate-800\/40 { background-color: rgb(var(--sb-well-rgb) / 0.4); }
+  html:where(.dark) .dark\:bg-slate-700\/60 { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+  html:where(.dark) .dark\:bg-slate-700\/50 { background-color: rgb(var(--sb-control-rgb) / 0.5); }
 
-  :where(.dark) .dark\:text-slate-50 { color: var(--sb-ink-display); }
-  :where(.dark) .dark\:text-slate-100 { color: var(--sb-ink-heading); }
-  :where(.dark) .dark\:text-slate-200 { color: var(--sb-ink-body); }
-  :where(.dark) .dark\:text-slate-300 { color: var(--sb-ink-secondary); }
-  :where(.dark) .dark\:text-slate-400 { color: var(--sb-ink-muted); }
-  :where(.dark) .dark\:text-slate-500 { color: var(--sb-ink-dim); }
-  :where(.dark) .dark\:text-slate-600 { color: var(--sb-ink-faint); }
+  html:where(.dark) .dark\:text-slate-50 { color: var(--sb-ink-display); }
+  html:where(.dark) .dark\:text-slate-100 { color: var(--sb-ink-heading); }
+  html:where(.dark) .dark\:text-slate-200 { color: var(--sb-ink-body); }
+  html:where(.dark) .dark\:text-slate-300 { color: var(--sb-ink-secondary); }
+  html:where(.dark) .dark\:text-slate-400 { color: var(--sb-ink-muted); }
+  html:where(.dark) .dark\:text-slate-500 { color: var(--sb-ink-dim); }
+  html:where(.dark) .dark\:text-slate-600 { color: var(--sb-ink-faint); }
   /* 700–950 are dark inks, only ever meaningful on a light `dark:` fill. */
-  :where(.dark) .dark\:text-slate-700 { color: #334155; }
-  :where(.dark) .dark\:text-slate-800 { color: #1e293b; }
-  :where(.dark) .dark\:text-slate-900 { color: #0f172a; }
-  :where(.dark) .dark\:text-slate-950 { color: #020617; }
+  html:where(.dark) .dark\:text-slate-700 { color: #334155; }
+  html:where(.dark) .dark\:text-slate-800 { color: #1e293b; }
+  html:where(.dark) .dark\:text-slate-900 { color: #0f172a; }
+  html:where(.dark) .dark\:text-slate-950 { color: #020617; }
 
-  :where(.dark) .dark\:border-slate-950 { border-color: #0b1222; }
-  :where(.dark) .dark\:border-slate-900 { border-color: #131d33; }
-  :where(.dark) .dark\:border-slate-800 { border-color: var(--sb-border-subtle); }
-  :where(.dark) .dark\:border-slate-700 { border-color: var(--sb-border); }
-  :where(.dark) .dark\:border-slate-600 { border-color: var(--sb-border-strong); }
-  :where(.dark) .dark\:border-slate-500 { border-color: var(--sb-border-stronger); }
-  :where(.dark) .dark\:border-slate-400 { border-color: #94a3b8; }
-  :where(.dark) .dark\:border-slate-300 { border-color: #cbd5e1; }
-  :where(.dark) .dark\:border-slate-200 { border-color: #e2e8f0; }
-  :where(.dark) .dark\:border-slate-100 { border-color: #f1f5f9; }
-  :where(.dark) .dark\:border-slate-50 { border-color: #f8fafc; }
-  :where(.dark) .dark\:border-slate-800\/60 { border-color: rgb(27 40 66 / 0.6); }
-  :where(.dark) .dark\:border-slate-700\/80 { border-color: rgb(var(--sb-border-rgb) / 0.8); }
-  :where(.dark) .dark\:border-slate-700\/70 { border-color: rgb(var(--sb-border-rgb) / 0.7); }
-  :where(.dark) .dark\:border-slate-700\/60 { border-color: rgb(var(--sb-border-rgb) / 0.6); }
-  :where(.dark) .dark\:border-slate-700\/50 { border-color: rgb(var(--sb-border-rgb) / 0.5); }
+  html:where(.dark) .dark\:border-slate-950 { border-color: #0b1222; }
+  html:where(.dark) .dark\:border-slate-900 { border-color: #131d33; }
+  html:where(.dark) .dark\:border-slate-800 { border-color: var(--sb-border-subtle); }
+  html:where(.dark) .dark\:border-slate-700 { border-color: var(--sb-border); }
+  html:where(.dark) .dark\:border-slate-600 { border-color: var(--sb-border-strong); }
+  html:where(.dark) .dark\:border-slate-500 { border-color: var(--sb-border-stronger); }
+  html:where(.dark) .dark\:border-slate-400 { border-color: #94a3b8; }
+  html:where(.dark) .dark\:border-slate-300 { border-color: #cbd5e1; }
+  html:where(.dark) .dark\:border-slate-200 { border-color: #e2e8f0; }
+  html:where(.dark) .dark\:border-slate-100 { border-color: #f1f5f9; }
+  html:where(.dark) .dark\:border-slate-50 { border-color: #f8fafc; }
+  html:where(.dark) .dark\:border-slate-800\/60 { border-color: rgb(27 40 66 / 0.6); }
+  html:where(.dark) .dark\:border-slate-700\/80 { border-color: rgb(var(--sb-border-rgb) / 0.8); }
+  html:where(.dark) .dark\:border-slate-700\/70 { border-color: rgb(var(--sb-border-rgb) / 0.7); }
+  html:where(.dark) .dark\:border-slate-700\/60 { border-color: rgb(var(--sb-border-rgb) / 0.6); }
+  html:where(.dark) .dark\:border-slate-700\/50 { border-color: rgb(var(--sb-border-rgb) / 0.5); }
 
   /* Divide utilities are zero-specificity in Tailwind 4 (`:where(& > …)`), so
      the pin is too — a child's own border colour still wins. */
-  :where(.dark .dark\:divide-slate-800 > :not(:last-child)) { border-color: var(--sb-border-subtle); }
-  :where(.dark .dark\:divide-slate-700 > :not(:last-child)) { border-color: var(--sb-border); }
-  :where(.dark .dark\:divide-slate-600 > :not(:last-child)) { border-color: var(--sb-border-strong); }
-  :where(.dark) .dark\:ring-slate-800 { --tw-ring-color: var(--sb-border-subtle); }
-  :where(.dark) .dark\:ring-slate-700 { --tw-ring-color: var(--sb-border); }
-  :where(.dark) .dark\:ring-slate-600 { --tw-ring-color: var(--sb-border-strong); }
-  :where(.dark) .dark\:stroke-slate-800 { stroke: var(--sb-border-subtle); }
-  :where(.dark) .dark\:stroke-slate-700 { stroke: var(--sb-border); }
-  :where(.dark) .dark\:stroke-slate-600 { stroke: var(--sb-border-strong); }
-  :where(.dark) .dark\:from-slate-950 { --tw-gradient-from: var(--sb-canvas); }
-  :where(.dark) .dark\:from-slate-900 { --tw-gradient-from: var(--sb-surface); }
-  :where(.dark) .dark\:from-slate-800 { --tw-gradient-from: var(--sb-well); }
-  :where(.dark) .dark\:via-slate-900 { --tw-gradient-via: var(--sb-surface); }
-  :where(.dark) .dark\:via-slate-800 { --tw-gradient-via: var(--sb-well); }
-  :where(.dark) .dark\:to-slate-950 { --tw-gradient-to: var(--sb-canvas); }
-  :where(.dark) .dark\:to-slate-900 { --tw-gradient-to: var(--sb-surface); }
-  :where(.dark) .dark\:to-slate-800 { --tw-gradient-to: var(--sb-well); }
+  html:where(.dark) :where(.dark\:divide-slate-800 > :not(:last-child)) { border-color: var(--sb-border-subtle); }
+  html:where(.dark) :where(.dark\:divide-slate-700 > :not(:last-child)) { border-color: var(--sb-border); }
+  html:where(.dark) :where(.dark\:divide-slate-600 > :not(:last-child)) { border-color: var(--sb-border-strong); }
+  html:where(.dark) .dark\:ring-slate-800 { --tw-ring-color: var(--sb-border-subtle); }
+  html:where(.dark) .dark\:ring-slate-700 { --tw-ring-color: var(--sb-border); }
+  html:where(.dark) .dark\:ring-slate-600 { --tw-ring-color: var(--sb-border-strong); }
+  html:where(.dark) .dark\:stroke-slate-800 { stroke: var(--sb-border-subtle); }
+  html:where(.dark) .dark\:stroke-slate-700 { stroke: var(--sb-border); }
+  html:where(.dark) .dark\:stroke-slate-600 { stroke: var(--sb-border-strong); }
+  html:where(.dark) .dark\:from-slate-950 { --tw-gradient-from: var(--sb-canvas); }
+  html:where(.dark) .dark\:from-slate-900 { --tw-gradient-from: var(--sb-surface); }
+  html:where(.dark) .dark\:from-slate-800 { --tw-gradient-from: var(--sb-well); }
+  html:where(.dark) .dark\:via-slate-900 { --tw-gradient-via: var(--sb-surface); }
+  html:where(.dark) .dark\:via-slate-800 { --tw-gradient-via: var(--sb-well); }
+  html:where(.dark) .dark\:to-slate-950 { --tw-gradient-to: var(--sb-canvas); }
+  html:where(.dark) .dark\:to-slate-900 { --tw-gradient-to: var(--sb-surface); }
+  html:where(.dark) .dark\:to-slate-800 { --tw-gradient-to: var(--sb-well); }
   /* A focus ring's offset gap must match the surface it sits on. */
-  :where(.dark) :is(.dark\:ring-offset-slate-900, .dark\:ring-offset-slate-100) { --tw-ring-offset-color: var(--sb-surface); }
-  :where(.dark) .dark\:ring-offset-slate-950 { --tw-ring-offset-color: var(--sb-canvas); }
-  :where(.dark) :is(.dark\:focus-visible\:ring-offset-slate-900, .dark\:focus-visible\:ring-offset-slate-100):focus-visible { --tw-ring-offset-color: var(--sb-surface); }
-  :where(.dark) .dark\:focus-visible\:ring-offset-slate-950:focus-visible { --tw-ring-offset-color: var(--sb-canvas); }
-  :where(.dark) .focus-visible\:ring-offset-white:focus-visible:where(:not([class*="dark:focus-visible:ring-offset-"])) { --tw-ring-offset-color: var(--sb-surface); }
-  :where(.dark) :is(.dark\:placeholder\:text-slate-400, .dark\:placeholder\:text-slate-500)::placeholder { color: var(--sb-field-placeholder); }
+  html:where(.dark) :is(.dark\:ring-offset-slate-900, .dark\:ring-offset-slate-100) { --tw-ring-offset-color: var(--sb-surface); }
+  html:where(.dark) .dark\:ring-offset-slate-950 { --tw-ring-offset-color: var(--sb-canvas); }
+  html:where(.dark) :is(.dark\:focus-visible\:ring-offset-slate-900, .dark\:focus-visible\:ring-offset-slate-100):focus-visible { --tw-ring-offset-color: var(--sb-surface); }
+  html:where(.dark) .dark\:focus-visible\:ring-offset-slate-950:focus-visible { --tw-ring-offset-color: var(--sb-canvas); }
+  html:where(.dark) .focus-visible\:ring-offset-white:focus-visible:where(:not([class*="dark:focus-visible:ring-offset-"])) { --tw-ring-offset-color: var(--sb-surface); }
+  html:where(.dark) :is(.dark\:placeholder\:text-slate-400, .dark\:placeholder\:text-slate-500)::placeholder { color: var(--sb-field-placeholder); }
   /* `dark:` state variants of slate. */
-  :where(.dark) .dark\:open\:bg-slate-900:is([open], :popover-open) { background-color: var(--sb-surface); }
-  :where(.dark) .dark\:open\:bg-slate-800:is([open], :popover-open) { background-color: var(--sb-well); }
-  :where(.dark) .dark\:disabled\:bg-slate-900:disabled { background-color: var(--sb-surface); }
-  :where(.dark) .dark\:disabled\:bg-slate-800:disabled { background-color: var(--sb-well); }
+  html:where(.dark) .dark\:open\:bg-slate-900:is([open], :popover-open) { background-color: var(--sb-surface); }
+  html:where(.dark) .dark\:open\:bg-slate-800:is([open], :popover-open) { background-color: var(--sb-well); }
+  html:where(.dark) .dark\:disabled\:bg-slate-900:disabled { background-color: var(--sb-surface); }
+  html:where(.dark) .dark\:disabled\:bg-slate-800:disabled { background-color: var(--sb-well); }
   @media (hover: hover) {
-    :where(.dark) .dark\:hover\:bg-slate-900:hover { background-color: var(--sb-surface); }
-    :where(.dark) .dark\:hover\:bg-slate-800:hover { background-color: var(--sb-control); }
-    :where(.dark) .dark\:hover\:bg-slate-800\/80:hover { background-color: rgb(var(--sb-control-rgb) / 0.8); }
-    :where(.dark) .dark\:hover\:bg-slate-800\/60:hover { background-color: rgb(var(--sb-control-rgb) / 0.6); }
-    :where(.dark) .dark\:hover\:bg-slate-700:hover { background-color: var(--sb-control-strong); }
-    :where(.dark) .dark\:hover\:text-slate-100:hover { color: var(--sb-ink-heading); }
-    :where(.dark) .dark\:hover\:text-slate-200:hover { color: var(--sb-ink-body); }
-    :where(.dark) .dark\:hover\:text-slate-300:hover { color: var(--sb-ink-secondary); }
-    :where(.dark) .dark\:hover\:border-slate-600:hover { border-color: var(--sb-border-strong); }
-    :where(.dark) .dark\:hover\:border-slate-500:hover { border-color: var(--sb-border-stronger); }
+    html:where(.dark) .dark\:hover\:bg-slate-900:hover { background-color: var(--sb-surface); }
+    html:where(.dark) .dark\:hover\:bg-slate-800:hover { background-color: var(--sb-control); }
+    html:where(.dark) .dark\:hover\:bg-slate-800\/80:hover { background-color: rgb(var(--sb-control-rgb) / 0.8); }
+    html:where(.dark) .dark\:hover\:bg-slate-800\/60:hover { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+    html:where(.dark) .dark\:hover\:bg-slate-700:hover { background-color: var(--sb-control-strong); }
+    html:where(.dark) .dark\:hover\:text-slate-100:hover { color: var(--sb-ink-heading); }
+    html:where(.dark) .dark\:hover\:text-slate-200:hover { color: var(--sb-ink-body); }
+    html:where(.dark) .dark\:hover\:text-slate-300:hover { color: var(--sb-ink-secondary); }
+    html:where(.dark) .dark\:hover\:border-slate-600:hover { border-color: var(--sb-border-strong); }
+    html:where(.dark) .dark\:hover\:border-slate-500:hover { border-color: var(--sb-border-stronger); }
   }
 
   /* ---- Light-surface state variants -------------------------------------
      Inverted, `hover:bg-slate-50` would be the canvas colour: a row would
      DARKEN on hover. Pale hovers lift to Tier 3 instead.                    */
   @media (hover: hover) {
-    :where(.dark) :is(.hover\:bg-slate-50, .hover\:bg-slate-100, .hover\:bg-white):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
-    :where(.dark) .hover\:bg-slate-50\/60:hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(var(--sb-control-rgb) / 0.6); }
-    :where(.dark) :is(.hover\:bg-white\/70, .hover\:bg-white\/80):hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(255 255 255 / 0.06); }
-    :where(.dark) :is(.hover\:bg-slate-700, .hover\:bg-slate-800, .hover\:bg-slate-900):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
-    :where(.dark) :is(button, a).bg-slate-900:is(.hover\:bg-slate-700, .hover\:bg-slate-800):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control-indigo-hover); }
+    html:where(.dark) :is(.hover\:bg-slate-50, .hover\:bg-slate-100, .hover\:bg-white):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
+    html:where(.dark) .hover\:bg-slate-50\/60:hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(var(--sb-control-rgb) / 0.6); }
+    html:where(.dark) :is(.hover\:bg-white\/70, .hover\:bg-white\/80):hover:where(:not([class*="dark:hover:bg-"])) { background-color: rgb(255 255 255 / 0.06); }
+    html:where(.dark) :is(.hover\:bg-slate-700, .hover\:bg-slate-800, .hover\:bg-slate-900):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control); }
+    html:where(.dark) :is(button, a).bg-slate-900:is(.hover\:bg-slate-700, .hover\:bg-slate-800):hover:where(:not([class*="dark:hover:bg-"])) { background-color: var(--sb-control-indigo-hover); }
   }
-  :where(.dark) .disabled\:bg-slate-600:disabled { background-color: var(--sb-border-strong); }
-  :where(.dark) .disabled\:bg-slate-800:disabled { background-color: var(--sb-control-strong); }
-  :where(.dark) .open\:bg-white:is([open], :popover-open):where(:not([class*="dark:open:bg-"])) { background-color: var(--sb-surface); }
+  html:where(.dark) .disabled\:bg-slate-600:disabled { background-color: var(--sb-border-strong); }
+  html:where(.dark) .disabled\:bg-slate-800:disabled { background-color: var(--sb-control-strong); }
+  html:where(.dark) .open\:bg-white:is([open], :popover-open):where(:not([class*="dark:open:bg-"])) { background-color: var(--sb-surface); }
 
   /* ---- Gradient stops ----------------------------------------------------
      Tailwind reads `var(--tw-gradient-from)` on the same element, so pinning
      the stop variable is enough. Pale stops are SURFACES (the card itself),
      so they get opaque tints of Tier 1 rather than translucent washes.      */
-  :where(.dark) .from-slate-900:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface-hero); }
-  :where(.dark) .via-slate-900:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface-hero); }
-  :where(.dark) .to-slate-900:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface-hero); }
-  :where(.dark) .from-slate-900\/85 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.85); }
-  :where(.dark) .from-slate-900\/80 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.8); }
-  :where(.dark) .to-slate-900\/85 { --tw-gradient-to: rgb(var(--sb-surface-hero-rgb) / 0.85); }
-  :where(.dark) .via-slate-900\/20 { --tw-gradient-via: rgb(var(--sb-surface-hero-rgb) / 0.2); }
-  :where(.dark) .from-slate-800 { --tw-gradient-from: var(--sb-well); }
-  :where(.dark) .to-slate-800 { --tw-gradient-to: var(--sb-well); }
-  :where(.dark) .from-white:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface); }
-  :where(.dark) .via-white:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface); }
-  :where(.dark) .to-white:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface); }
-  :where(.dark) :is(.from-slate-50, .from-slate-100):where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-well); }
-  :where(.dark) :is(.via-slate-50, .via-slate-100):where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-well); }
-  :where(.dark) :is(.to-slate-50, .to-slate-100):where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-well); }
-  :where(.dark) .from-indigo-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #1b2547; }
-  :where(.dark) .via-indigo-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #1b2547; }
-  :where(.dark) .to-indigo-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #1b2547; }
-  :where(.dark) .from-violet-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #23244c; }
-  :where(.dark) .via-violet-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #23244c; }
-  :where(.dark) .to-violet-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #23244c; }
-  :where(.dark) .from-blue-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #172a4c; }
-  :where(.dark) .via-blue-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #172a4c; }
-  :where(.dark) .to-blue-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #172a4c; }
-  :where(.dark) .from-sky-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #14203a; }
-  :where(.dark) .via-sky-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #14203a; }
-  :where(.dark) .to-sky-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #14203a; }
-  :where(.dark) .from-teal-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #113240; }
-  :where(.dark) .via-teal-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #113240; }
-  :where(.dark) .to-teal-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #113240; }
-  :where(.dark) .from-emerald-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #11323a; }
-  :where(.dark) .via-emerald-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #11323a; }
-  :where(.dark) .to-emerald-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #11323a; }
-  :where(.dark) .from-amber-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a2114; }
-  :where(.dark) .via-amber-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a2114; }
-  :where(.dark) .to-amber-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a2114; }
-  :where(.dark) .from-orange-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a1b14; }
-  :where(.dark) .via-orange-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a1b14; }
-  :where(.dark) .to-orange-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a1b14; }
-  :where(.dark) .from-rose-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #332035; }
-  :where(.dark) .via-rose-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #332035; }
-  :where(.dark) .to-rose-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #332035; }
+  html:where(.dark) .from-slate-900:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface-hero); }
+  html:where(.dark) .via-slate-900:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface-hero); }
+  html:where(.dark) .to-slate-900:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface-hero); }
+  html:where(.dark) .from-slate-900\/85 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.85); }
+  html:where(.dark) .from-slate-900\/80 { --tw-gradient-from: rgb(var(--sb-surface-hero-rgb) / 0.8); }
+  html:where(.dark) .to-slate-900\/85 { --tw-gradient-to: rgb(var(--sb-surface-hero-rgb) / 0.85); }
+  html:where(.dark) .via-slate-900\/20 { --tw-gradient-via: rgb(var(--sb-surface-hero-rgb) / 0.2); }
+  html:where(.dark) .from-slate-800 { --tw-gradient-from: var(--sb-well); }
+  html:where(.dark) .to-slate-800 { --tw-gradient-to: var(--sb-well); }
+  html:where(.dark) .from-white:where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-surface); }
+  html:where(.dark) .via-white:where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-surface); }
+  html:where(.dark) .to-white:where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-surface); }
+  html:where(.dark) :is(.from-slate-50, .from-slate-100):where(:not([class*="dark:from-"])) { --tw-gradient-from: var(--sb-well); }
+  html:where(.dark) :is(.via-slate-50, .via-slate-100):where(:not([class*="dark:via-"])) { --tw-gradient-via: var(--sb-well); }
+  html:where(.dark) :is(.to-slate-50, .to-slate-100):where(:not([class*="dark:to-"])) { --tw-gradient-to: var(--sb-well); }
+  html:where(.dark) .from-indigo-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #1b2547; }
+  html:where(.dark) .via-indigo-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #1b2547; }
+  html:where(.dark) .to-indigo-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #1b2547; }
+  html:where(.dark) .from-violet-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #23244c; }
+  html:where(.dark) .via-violet-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #23244c; }
+  html:where(.dark) .to-violet-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #23244c; }
+  html:where(.dark) .from-blue-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #172a4c; }
+  html:where(.dark) .via-blue-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #172a4c; }
+  html:where(.dark) .to-blue-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #172a4c; }
+  html:where(.dark) .from-sky-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #14203a; }
+  html:where(.dark) .via-sky-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #14203a; }
+  html:where(.dark) .to-sky-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #14203a; }
+  html:where(.dark) .from-teal-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #113240; }
+  html:where(.dark) .via-teal-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #113240; }
+  html:where(.dark) .to-teal-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #113240; }
+  html:where(.dark) .from-emerald-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #11323a; }
+  html:where(.dark) .via-emerald-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #11323a; }
+  html:where(.dark) .to-emerald-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #11323a; }
+  html:where(.dark) .from-amber-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a2114; }
+  html:where(.dark) .via-amber-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a2114; }
+  html:where(.dark) .to-amber-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a2114; }
+  html:where(.dark) .from-orange-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #2a1b14; }
+  html:where(.dark) .via-orange-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #2a1b14; }
+  html:where(.dark) .to-orange-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #2a1b14; }
+  html:where(.dark) .from-rose-50:where(:not([class*="dark:from-"])) { --tw-gradient-from: #332035; }
+  html:where(.dark) .via-rose-50:where(:not([class*="dark:via-"])) { --tw-gradient-via: #332035; }
+  html:where(.dark) .to-rose-50:where(:not([class*="dark:to-"])) { --tw-gradient-to: #332035; }
   /* The rank-2 leaderboard badge is silver; keep it metallic, not paper-white. */
-  :where(.dark) .from-slate-300 { --tw-gradient-from: #3d4d6d; }
+  html:where(.dark) .from-slate-300 { --tw-gradient-from: #3d4d6d; }
 
   /* ---- Light copy on dark panels ---------------------------------------- */
-  :where(.dark) .text-slate-50:where(:not([class*="dark:text-"])) { color: var(--sb-ink-display); }
-  :where(.dark) .text-slate-100:where(:not([class*="dark:text-"])) { color: var(--sb-ink-heading); }
-  :where(.dark) .text-slate-200:where(:not([class*="dark:text-"])) { color: var(--sb-ink-body); }
-  :where(.dark) .text-slate-300:where(:not([class*="dark:text-"])) { color: var(--sb-ink-secondary); }
+  html:where(.dark) .text-slate-50:where(:not([class*="dark:text-"])) { color: var(--sb-ink-display); }
+  html:where(.dark) .text-slate-100:where(:not([class*="dark:text-"])) { color: var(--sb-ink-heading); }
+  html:where(.dark) .text-slate-200:where(:not([class*="dark:text-"])) { color: var(--sb-ink-body); }
+  html:where(.dark) .text-slate-300:where(:not([class*="dark:text-"])) { color: var(--sb-ink-secondary); }
   /* The accent 50/100 tokens are washes now; as TEXT they are light copy on a
      dark hero (`text-indigo-100`, `text-cyan-50`) and keep their real value. */
-  :where(.dark) :is(.text-indigo-50, .text-indigo-100, [class^="text-indigo-100/"], [class*=" text-indigo-100/"], .dark\:text-indigo-50, .dark\:text-indigo-100) { color: #e0e7ff; }
-  :where(.dark) :is(.text-violet-50, .text-violet-100, [class^="text-violet-100/"], [class*=" text-violet-100/"], .dark\:text-violet-50, .dark\:text-violet-100) { color: #ede9fe; }
-  :where(.dark) :is(.text-purple-50, .text-purple-100, [class^="text-purple-100/"], [class*=" text-purple-100/"], .dark\:text-purple-50, .dark\:text-purple-100) { color: #f3e8ff; }
-  :where(.dark) :is(.text-blue-50, .text-blue-100, [class^="text-blue-100/"], [class*=" text-blue-100/"], .dark\:text-blue-50, .dark\:text-blue-100) { color: #dbeafe; }
-  :where(.dark) :is(.text-sky-50, .text-sky-100, [class^="text-sky-100/"], [class*=" text-sky-100/"], .dark\:text-sky-50, .dark\:text-sky-100) { color: #e0f2fe; }
-  :where(.dark) :is(.text-cyan-50, .text-cyan-100, [class^="text-cyan-100/"], [class*=" text-cyan-100/"], .dark\:text-cyan-50, .dark\:text-cyan-100) { color: #cffafe; }
-  :where(.dark) :is(.text-teal-50, .text-teal-100, [class^="text-teal-100/"], [class*=" text-teal-100/"], .dark\:text-teal-50, .dark\:text-teal-100) { color: #ccfbf1; }
-  :where(.dark) :is(.text-emerald-50, .text-emerald-100, [class^="text-emerald-100/"], [class*=" text-emerald-100/"], .dark\:text-emerald-50, .dark\:text-emerald-100) { color: #d1fae5; }
-  :where(.dark) :is(.text-green-50, .text-green-100, [class^="text-green-100/"], [class*=" text-green-100/"], .dark\:text-green-50, .dark\:text-green-100) { color: #dcfce7; }
-  :where(.dark) :is(.text-amber-50, .text-amber-100, [class^="text-amber-100/"], [class*=" text-amber-100/"], .dark\:text-amber-50, .dark\:text-amber-100) { color: #fef3c7; }
-  :where(.dark) :is(.text-yellow-50, .text-yellow-100, [class^="text-yellow-100/"], [class*=" text-yellow-100/"], .dark\:text-yellow-50, .dark\:text-yellow-100) { color: #fef9c3; }
-  :where(.dark) :is(.text-orange-50, .text-orange-100, [class^="text-orange-100/"], [class*=" text-orange-100/"], .dark\:text-orange-50, .dark\:text-orange-100) { color: #ffedd5; }
-  :where(.dark) :is(.text-red-50, .text-red-100, [class^="text-red-100/"], [class*=" text-red-100/"], .dark\:text-red-50, .dark\:text-red-100) { color: #fee2e2; }
-  :where(.dark) :is(.text-rose-50, .text-rose-100, [class^="text-rose-100/"], [class*=" text-rose-100/"], .dark\:text-rose-50, .dark\:text-rose-100) { color: #ffe4e6; }
+  html:where(.dark) :is(.text-indigo-50, .text-indigo-100, [class^="text-indigo-100/"], [class*=" text-indigo-100/"], .dark\:text-indigo-50, .dark\:text-indigo-100) { color: #e0e7ff; }
+  html:where(.dark) :is(.text-violet-50, .text-violet-100, [class^="text-violet-100/"], [class*=" text-violet-100/"], .dark\:text-violet-50, .dark\:text-violet-100) { color: #ede9fe; }
+  html:where(.dark) :is(.text-purple-50, .text-purple-100, [class^="text-purple-100/"], [class*=" text-purple-100/"], .dark\:text-purple-50, .dark\:text-purple-100) { color: #f3e8ff; }
+  html:where(.dark) :is(.text-blue-50, .text-blue-100, [class^="text-blue-100/"], [class*=" text-blue-100/"], .dark\:text-blue-50, .dark\:text-blue-100) { color: #dbeafe; }
+  html:where(.dark) :is(.text-sky-50, .text-sky-100, [class^="text-sky-100/"], [class*=" text-sky-100/"], .dark\:text-sky-50, .dark\:text-sky-100) { color: #e0f2fe; }
+  html:where(.dark) :is(.text-cyan-50, .text-cyan-100, [class^="text-cyan-100/"], [class*=" text-cyan-100/"], .dark\:text-cyan-50, .dark\:text-cyan-100) { color: #cffafe; }
+  html:where(.dark) :is(.text-teal-50, .text-teal-100, [class^="text-teal-100/"], [class*=" text-teal-100/"], .dark\:text-teal-50, .dark\:text-teal-100) { color: #ccfbf1; }
+  html:where(.dark) :is(.text-emerald-50, .text-emerald-100, [class^="text-emerald-100/"], [class*=" text-emerald-100/"], .dark\:text-emerald-50, .dark\:text-emerald-100) { color: #d1fae5; }
+  html:where(.dark) :is(.text-green-50, .text-green-100, [class^="text-green-100/"], [class*=" text-green-100/"], .dark\:text-green-50, .dark\:text-green-100) { color: #dcfce7; }
+  html:where(.dark) :is(.text-amber-50, .text-amber-100, [class^="text-amber-100/"], [class*=" text-amber-100/"], .dark\:text-amber-50, .dark\:text-amber-100) { color: #fef3c7; }
+  html:where(.dark) :is(.text-yellow-50, .text-yellow-100, [class^="text-yellow-100/"], [class*=" text-yellow-100/"], .dark\:text-yellow-50, .dark\:text-yellow-100) { color: #fef9c3; }
+  html:where(.dark) :is(.text-orange-50, .text-orange-100, [class^="text-orange-100/"], [class*=" text-orange-100/"], .dark\:text-orange-50, .dark\:text-orange-100) { color: #ffedd5; }
+  html:where(.dark) :is(.text-red-50, .text-red-100, [class^="text-red-100/"], [class*=" text-red-100/"], .dark\:text-red-50, .dark\:text-red-100) { color: #fee2e2; }
+  html:where(.dark) :is(.text-rose-50, .text-rose-100, [class^="text-rose-100/"], [class*=" text-rose-100/"], .dark\:text-rose-50, .dark\:text-rose-100) { color: #ffe4e6; }
 
   @media (hover: hover) {
-    :where(.dark) :is(.dark\:hover\:text-indigo-50, .dark\:hover\:text-indigo-100):hover { color: #e0e7ff; }
-    :where(.dark) :is(.dark\:hover\:text-sky-50, .dark\:hover\:text-sky-100):hover { color: #e0f2fe; }
-    :where(.dark) :is(.dark\:hover\:text-emerald-50, .dark\:hover\:text-emerald-100):hover { color: #d1fae5; }
-    :where(.dark) :is(.dark\:hover\:text-amber-50, .dark\:hover\:text-amber-100):hover { color: #fef3c7; }
+    html:where(.dark) :is(.dark\:hover\:text-indigo-50, .dark\:hover\:text-indigo-100):hover { color: #e0e7ff; }
+    html:where(.dark) :is(.dark\:hover\:text-sky-50, .dark\:hover\:text-sky-100):hover { color: #e0f2fe; }
+    html:where(.dark) :is(.dark\:hover\:text-emerald-50, .dark\:hover\:text-emerald-100):hover { color: #d1fae5; }
+    html:where(.dark) :is(.dark\:hover\:text-amber-50, .dark\:hover\:text-amber-100):hover { color: #fef3c7; }
   }
 
   /* ---- Accent inks and hairlines -----------------------------------------
      On a dark surface the light-mode inks (600–900) collapse into the fill;
      they become the matching pastel. Solid accent FILLS (`bg-indigo-600`) are
      deliberately untouched, so buttons and gradients keep their brand colour. */
-  :where(.dark) :is(.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900):where(:not([class*="dark:text-"])) { color: #a5b4fc; }
-  :where(.dark) :is(.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900):where(:not([class*="dark:text-"])) { color: #c4b5fd; }
-  :where(.dark) :is(.text-purple-500, .text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900):where(:not([class*="dark:text-"])) { color: #d8b4fe; }
-  :where(.dark) :is(.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900):where(:not([class*="dark:text-"])) { color: #93c5fd; }
-  :where(.dark) :is(.text-sky-500, .text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900):where(:not([class*="dark:text-"])) { color: #7dd3fc; }
-  :where(.dark) :is(.text-cyan-500, .text-cyan-600, .text-cyan-700, .text-cyan-800, .text-cyan-900):where(:not([class*="dark:text-"])) { color: #67e8f9; }
-  :where(.dark) :is(.text-teal-500, .text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900):where(:not([class*="dark:text-"])) { color: #5eead4; }
-  :where(.dark) :is(.text-emerald-500, .text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900):where(:not([class*="dark:text-"])) { color: #6ee7b7; }
-  :where(.dark) :is(.text-green-500, .text-green-600, .text-green-700, .text-green-800, .text-green-900):where(:not([class*="dark:text-"])) { color: #86efac; }
-  :where(.dark) :is(.text-lime-500, .text-lime-600, .text-lime-700, .text-lime-800, .text-lime-900):where(:not([class*="dark:text-"])) { color: #bef264; }
-  :where(.dark) :is(.text-yellow-500, .text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900):where(:not([class*="dark:text-"])) { color: #fde047; }
-  :where(.dark) :is(.text-amber-500, .text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900):where(:not([class*="dark:text-"])) { color: #fcd34d; }
-  :where(.dark) :is(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900):where(:not([class*="dark:text-"])) { color: #fdba74; }
-  :where(.dark) :is(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .text-red-900):where(:not([class*="dark:text-"])) { color: #fca5a5; }
-  :where(.dark) :is(.text-rose-500, .text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900):where(:not([class*="dark:text-"])) { color: #fda4af; }
-  :where(.dark) :is(.text-pink-500, .text-pink-600, .text-pink-700, .text-pink-800, .text-pink-900):where(:not([class*="dark:text-"])) { color: #f9a8d4; }
-  :where(.dark) :is(.text-fuchsia-500, .text-fuchsia-600, .text-fuchsia-700, .text-fuchsia-800, .text-fuchsia-900):where(:not([class*="dark:text-"])) { color: #f0abfc; }
+  html:where(.dark) :is(.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900):where(:not([class*="dark:text-"])) { color: #a5b4fc; }
+  html:where(.dark) :is(.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900):where(:not([class*="dark:text-"])) { color: #c4b5fd; }
+  html:where(.dark) :is(.text-purple-500, .text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900):where(:not([class*="dark:text-"])) { color: #d8b4fe; }
+  html:where(.dark) :is(.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900):where(:not([class*="dark:text-"])) { color: #93c5fd; }
+  html:where(.dark) :is(.text-sky-500, .text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900):where(:not([class*="dark:text-"])) { color: #7dd3fc; }
+  html:where(.dark) :is(.text-cyan-500, .text-cyan-600, .text-cyan-700, .text-cyan-800, .text-cyan-900):where(:not([class*="dark:text-"])) { color: #67e8f9; }
+  html:where(.dark) :is(.text-teal-500, .text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900):where(:not([class*="dark:text-"])) { color: #5eead4; }
+  html:where(.dark) :is(.text-emerald-500, .text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900):where(:not([class*="dark:text-"])) { color: #6ee7b7; }
+  html:where(.dark) :is(.text-green-500, .text-green-600, .text-green-700, .text-green-800, .text-green-900):where(:not([class*="dark:text-"])) { color: #86efac; }
+  html:where(.dark) :is(.text-lime-500, .text-lime-600, .text-lime-700, .text-lime-800, .text-lime-900):where(:not([class*="dark:text-"])) { color: #bef264; }
+  html:where(.dark) :is(.text-yellow-500, .text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900):where(:not([class*="dark:text-"])) { color: #fde047; }
+  html:where(.dark) :is(.text-amber-500, .text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900):where(:not([class*="dark:text-"])) { color: #fcd34d; }
+  html:where(.dark) :is(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900):where(:not([class*="dark:text-"])) { color: #fdba74; }
+  html:where(.dark) :is(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .text-red-900):where(:not([class*="dark:text-"])) { color: #fca5a5; }
+  html:where(.dark) :is(.text-rose-500, .text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900):where(:not([class*="dark:text-"])) { color: #fda4af; }
+  html:where(.dark) :is(.text-pink-500, .text-pink-600, .text-pink-700, .text-pink-800, .text-pink-900):where(:not([class*="dark:text-"])) { color: #f9a8d4; }
+  html:where(.dark) :is(.text-fuchsia-500, .text-fuchsia-600, .text-fuchsia-700, .text-fuchsia-800, .text-fuchsia-900):where(:not([class*="dark:text-"])) { color: #f0abfc; }
 
-  :where(.dark) :is(.border-indigo-200, .border-indigo-300, [class^="border-indigo-200/"], [class*=" border-indigo-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(99 102 241 / 0.35); }
-  :where(.dark) :is(.border-violet-200, .border-violet-300, [class^="border-violet-200/"], [class*=" border-violet-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(139 92 246 / 0.35); }
-  :where(.dark) :is(.border-purple-200, .border-purple-300, [class^="border-purple-200/"], [class*=" border-purple-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(168 85 247 / 0.35); }
-  :where(.dark) :is(.border-blue-200, .border-blue-300, [class^="border-blue-200/"], [class*=" border-blue-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(59 130 246 / 0.35); }
-  :where(.dark) :is(.border-sky-200, .border-sky-300, [class^="border-sky-200/"], [class*=" border-sky-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(14 165 233 / 0.35); }
-  :where(.dark) :is(.border-cyan-200, .border-cyan-300, [class^="border-cyan-200/"], [class*=" border-cyan-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(6 182 212 / 0.35); }
-  :where(.dark) :is(.border-teal-200, .border-teal-300, [class^="border-teal-200/"], [class*=" border-teal-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(20 184 166 / 0.35); }
-  :where(.dark) :is(.border-emerald-200, .border-emerald-300, [class^="border-emerald-200/"], [class*=" border-emerald-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(16 185 129 / 0.35); }
-  :where(.dark) :is(.border-green-200, .border-green-300, [class^="border-green-200/"], [class*=" border-green-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(34 197 94 / 0.35); }
-  :where(.dark) :is(.border-yellow-200, .border-yellow-300, [class^="border-yellow-200/"], [class*=" border-yellow-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(234 179 8 / 0.35); }
-  :where(.dark) :is(.border-amber-200, .border-amber-300, [class^="border-amber-200/"], [class*=" border-amber-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(245 158 11 / 0.35); }
-  :where(.dark) :is(.border-orange-200, .border-orange-300, [class^="border-orange-200/"], [class*=" border-orange-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(249 115 22 / 0.35); }
-  :where(.dark) :is(.border-red-200, .border-red-300, [class^="border-red-200/"], [class*=" border-red-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(239 68 68 / 0.35); }
-  :where(.dark) :is(.border-rose-200, .border-rose-300, [class^="border-rose-200/"], [class*=" border-rose-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(244 63 94 / 0.35); }
-  :where(.dark) :is(.ring-indigo-200, .ring-indigo-300) { --tw-ring-color: rgb(99 102 241 / 0.4); }
-  :where(.dark) :is(.ring-violet-200, .ring-violet-300) { --tw-ring-color: rgb(139 92 246 / 0.4); }
-  :where(.dark) :is(.ring-emerald-200, .ring-emerald-300) { --tw-ring-color: rgb(16 185 129 / 0.4); }
-  :where(.dark) :is(.ring-amber-200, .ring-amber-300) { --tw-ring-color: rgb(245 158 11 / 0.4); }
-  :where(.dark) :is(.ring-orange-200, .ring-orange-300) { --tw-ring-color: rgb(249 115 22 / 0.4); }
-  :where(.dark) :is(.ring-rose-200, .ring-rose-300) { --tw-ring-color: rgb(244 63 94 / 0.4); }
-  :where(.dark) :is(.ring-sky-200, .ring-sky-300) { --tw-ring-color: rgb(14 165 233 / 0.4); }
+  html:where(.dark) :is(.border-indigo-200, .border-indigo-300, [class^="border-indigo-200/"], [class*=" border-indigo-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(99 102 241 / 0.35); }
+  html:where(.dark) :is(.border-violet-200, .border-violet-300, [class^="border-violet-200/"], [class*=" border-violet-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(139 92 246 / 0.35); }
+  html:where(.dark) :is(.border-purple-200, .border-purple-300, [class^="border-purple-200/"], [class*=" border-purple-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(168 85 247 / 0.35); }
+  html:where(.dark) :is(.border-blue-200, .border-blue-300, [class^="border-blue-200/"], [class*=" border-blue-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(59 130 246 / 0.35); }
+  html:where(.dark) :is(.border-sky-200, .border-sky-300, [class^="border-sky-200/"], [class*=" border-sky-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(14 165 233 / 0.35); }
+  html:where(.dark) :is(.border-cyan-200, .border-cyan-300, [class^="border-cyan-200/"], [class*=" border-cyan-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(6 182 212 / 0.35); }
+  html:where(.dark) :is(.border-teal-200, .border-teal-300, [class^="border-teal-200/"], [class*=" border-teal-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(20 184 166 / 0.35); }
+  html:where(.dark) :is(.border-emerald-200, .border-emerald-300, [class^="border-emerald-200/"], [class*=" border-emerald-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(16 185 129 / 0.35); }
+  html:where(.dark) :is(.border-green-200, .border-green-300, [class^="border-green-200/"], [class*=" border-green-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(34 197 94 / 0.35); }
+  html:where(.dark) :is(.border-yellow-200, .border-yellow-300, [class^="border-yellow-200/"], [class*=" border-yellow-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(234 179 8 / 0.35); }
+  html:where(.dark) :is(.border-amber-200, .border-amber-300, [class^="border-amber-200/"], [class*=" border-amber-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(245 158 11 / 0.35); }
+  html:where(.dark) :is(.border-orange-200, .border-orange-300, [class^="border-orange-200/"], [class*=" border-orange-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(249 115 22 / 0.35); }
+  html:where(.dark) :is(.border-red-200, .border-red-300, [class^="border-red-200/"], [class*=" border-red-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(239 68 68 / 0.35); }
+  html:where(.dark) :is(.border-rose-200, .border-rose-300, [class^="border-rose-200/"], [class*=" border-rose-200/"]):where(:not([class*="dark:border-"])) { border-color: rgb(244 63 94 / 0.35); }
+  html:where(.dark) :is(.ring-indigo-200, .ring-indigo-300) { --tw-ring-color: rgb(99 102 241 / 0.4); }
+  html:where(.dark) :is(.ring-violet-200, .ring-violet-300) { --tw-ring-color: rgb(139 92 246 / 0.4); }
+  html:where(.dark) :is(.ring-emerald-200, .ring-emerald-300) { --tw-ring-color: rgb(16 185 129 / 0.4); }
+  html:where(.dark) :is(.ring-amber-200, .ring-amber-300) { --tw-ring-color: rgb(245 158 11 / 0.4); }
+  html:where(.dark) :is(.ring-orange-200, .ring-orange-300) { --tw-ring-color: rgb(249 115 22 / 0.4); }
+  html:where(.dark) :is(.ring-rose-200, .ring-rose-300) { --tw-ring-color: rgb(244 63 94 / 0.4); }
+  html:where(.dark) :is(.ring-sky-200, .ring-sky-300) { --tw-ring-color: rgb(14 165 233 / 0.4); }
   /* State hairlines: a pale `hover:border-indigo-300` would flash a glowing
      outline on a dark card; it becomes a slightly stronger wash instead. */
   @media (hover: hover) {
-    :where(.dark) :is(.hover\:border-indigo-200, .hover\:border-indigo-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(99 102 241 / 0.55); }
-    :where(.dark) :is(.hover\:border-violet-200, .hover\:border-violet-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(139 92 246 / 0.55); }
-    :where(.dark) :is(.hover\:border-purple-200, .hover\:border-purple-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(168 85 247 / 0.55); }
-    :where(.dark) :is(.hover\:border-blue-200, .hover\:border-blue-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(59 130 246 / 0.55); }
-    :where(.dark) :is(.hover\:border-sky-200, .hover\:border-sky-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(14 165 233 / 0.55); }
-    :where(.dark) :is(.hover\:border-emerald-200, .hover\:border-emerald-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(16 185 129 / 0.55); }
-    :where(.dark) :is(.hover\:border-amber-200, .hover\:border-amber-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(245 158 11 / 0.55); }
-    :where(.dark) :is(.hover\:border-rose-200, .hover\:border-rose-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(244 63 94 / 0.55); }
+    html:where(.dark) :is(.hover\:border-indigo-200, .hover\:border-indigo-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(99 102 241 / 0.55); }
+    html:where(.dark) :is(.hover\:border-violet-200, .hover\:border-violet-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(139 92 246 / 0.55); }
+    html:where(.dark) :is(.hover\:border-purple-200, .hover\:border-purple-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(168 85 247 / 0.55); }
+    html:where(.dark) :is(.hover\:border-blue-200, .hover\:border-blue-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(59 130 246 / 0.55); }
+    html:where(.dark) :is(.hover\:border-sky-200, .hover\:border-sky-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(14 165 233 / 0.55); }
+    html:where(.dark) :is(.hover\:border-emerald-200, .hover\:border-emerald-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(16 185 129 / 0.55); }
+    html:where(.dark) :is(.hover\:border-amber-200, .hover\:border-amber-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(245 158 11 / 0.55); }
+    html:where(.dark) :is(.hover\:border-rose-200, .hover\:border-rose-300):hover:where(:not([class*="dark:hover:border-"])) { border-color: rgb(244 63 94 / 0.55); }
   }
   /* Accent link hovers DARKEN in light mode (`text-indigo-700 hover:text-indigo-900`).
      On a dark surface that would sink the link into the card, so they BRIGHTEN
      to the family's 200 pastel instead — the mirror image of the light theme. */
   @media (hover: hover) {
-    :where(.dark) :is(.hover\:text-indigo-500, .hover\:text-indigo-600, .hover\:text-indigo-700, .hover\:text-indigo-800, .hover\:text-indigo-900, .hover\:text-indigo-950):hover:where(:not([class*="dark:hover:text-"])) { color: #c7d2fe; }
-    :where(.dark) :is(.hover\:text-violet-500, .hover\:text-violet-600, .hover\:text-violet-700, .hover\:text-violet-800, .hover\:text-violet-900):hover:where(:not([class*="dark:hover:text-"])) { color: #ddd6fe; }
-    :where(.dark) :is(.hover\:text-purple-500, .hover\:text-purple-600, .hover\:text-purple-700, .hover\:text-purple-800, .hover\:text-purple-900):hover:where(:not([class*="dark:hover:text-"])) { color: #e9d5ff; }
-    :where(.dark) :is(.hover\:text-blue-500, .hover\:text-blue-600, .hover\:text-blue-700, .hover\:text-blue-800, .hover\:text-blue-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bfdbfe; }
-    :where(.dark) :is(.hover\:text-sky-500, .hover\:text-sky-600, .hover\:text-sky-700, .hover\:text-sky-800, .hover\:text-sky-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bae6fd; }
-    :where(.dark) :is(.hover\:text-teal-500, .hover\:text-teal-600, .hover\:text-teal-700, .hover\:text-teal-800, .hover\:text-teal-900):hover:where(:not([class*="dark:hover:text-"])) { color: #99f6e4; }
-    :where(.dark) :is(.hover\:text-emerald-500, .hover\:text-emerald-600, .hover\:text-emerald-700, .hover\:text-emerald-800, .hover\:text-emerald-900):hover:where(:not([class*="dark:hover:text-"])) { color: #a7f3d0; }
-    :where(.dark) :is(.hover\:text-amber-500, .hover\:text-amber-600, .hover\:text-amber-700, .hover\:text-amber-800, .hover\:text-amber-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fde68a; }
-    :where(.dark) :is(.hover\:text-orange-500, .hover\:text-orange-600, .hover\:text-orange-700, .hover\:text-orange-800, .hover\:text-orange-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fed7aa; }
-    :where(.dark) :is(.hover\:text-red-500, .hover\:text-red-600, .hover\:text-red-700, .hover\:text-red-800, .hover\:text-red-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecaca; }
-    :where(.dark) :is(.hover\:text-rose-500, .hover\:text-rose-600, .hover\:text-rose-700, .hover\:text-rose-800, .hover\:text-rose-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecdd3; }
+    html:where(.dark) :is(.hover\:text-indigo-500, .hover\:text-indigo-600, .hover\:text-indigo-700, .hover\:text-indigo-800, .hover\:text-indigo-900, .hover\:text-indigo-950):hover:where(:not([class*="dark:hover:text-"])) { color: #c7d2fe; }
+    html:where(.dark) :is(.hover\:text-violet-500, .hover\:text-violet-600, .hover\:text-violet-700, .hover\:text-violet-800, .hover\:text-violet-900):hover:where(:not([class*="dark:hover:text-"])) { color: #ddd6fe; }
+    html:where(.dark) :is(.hover\:text-purple-500, .hover\:text-purple-600, .hover\:text-purple-700, .hover\:text-purple-800, .hover\:text-purple-900):hover:where(:not([class*="dark:hover:text-"])) { color: #e9d5ff; }
+    html:where(.dark) :is(.hover\:text-blue-500, .hover\:text-blue-600, .hover\:text-blue-700, .hover\:text-blue-800, .hover\:text-blue-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bfdbfe; }
+    html:where(.dark) :is(.hover\:text-sky-500, .hover\:text-sky-600, .hover\:text-sky-700, .hover\:text-sky-800, .hover\:text-sky-900):hover:where(:not([class*="dark:hover:text-"])) { color: #bae6fd; }
+    html:where(.dark) :is(.hover\:text-teal-500, .hover\:text-teal-600, .hover\:text-teal-700, .hover\:text-teal-800, .hover\:text-teal-900):hover:where(:not([class*="dark:hover:text-"])) { color: #99f6e4; }
+    html:where(.dark) :is(.hover\:text-emerald-500, .hover\:text-emerald-600, .hover\:text-emerald-700, .hover\:text-emerald-800, .hover\:text-emerald-900):hover:where(:not([class*="dark:hover:text-"])) { color: #a7f3d0; }
+    html:where(.dark) :is(.hover\:text-amber-500, .hover\:text-amber-600, .hover\:text-amber-700, .hover\:text-amber-800, .hover\:text-amber-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fde68a; }
+    html:where(.dark) :is(.hover\:text-orange-500, .hover\:text-orange-600, .hover\:text-orange-700, .hover\:text-orange-800, .hover\:text-orange-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fed7aa; }
+    html:where(.dark) :is(.hover\:text-red-500, .hover\:text-red-600, .hover\:text-red-700, .hover\:text-red-800, .hover\:text-red-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecaca; }
+    html:where(.dark) :is(.hover\:text-rose-500, .hover\:text-rose-600, .hover\:text-rose-700, .hover\:text-rose-800, .hover\:text-rose-900):hover:where(:not([class*="dark:hover:text-"])) { color: #fecdd3; }
   }
-  :where(.dark) :is(.focus\:border-indigo-200, .focus\:border-indigo-300):focus:where(:not([class*="dark:focus:border-"])) { border-color: rgb(129 140 248 / 0.8); }
-  :where(.dark) .open\:border-indigo-200:is([open], :popover-open):where(:not([class*="dark:open:border-"])) { border-color: rgb(99 102 241 / 0.55); }
-  :where(.dark) :is(.focus\:ring-indigo-200, .focus\:ring-indigo-300):focus:where(:not([class*="dark:focus:ring-"])) { --tw-ring-color: rgb(99 102 241 / 0.45); }
+  html:where(.dark) :is(.focus\:border-indigo-200, .focus\:border-indigo-300):focus:where(:not([class*="dark:focus:border-"])) { border-color: rgb(129 140 248 / 0.8); }
+  html:where(.dark) .open\:border-indigo-200:is([open], :popover-open):where(:not([class*="dark:open:border-"])) { border-color: rgb(99 102 241 / 0.55); }
+  html:where(.dark) :is(.focus\:ring-indigo-200, .focus\:ring-indigo-300):focus:where(:not([class*="dark:focus:ring-"])) { --tw-ring-color: rgb(99 102 241 / 0.45); }
 
   /* ---- Neutral safety net -------------------------------------------------
      Gray/neutral/zinc are independent Tailwind 4 tokens, not aliases for
      slate. Keep their ink readable and their pale fills on Tier 1. */
-  :where(.dark) :is([class~="text-black"], [class*="text-black/"], [class*="text-gray-"], [class*="text-neutral-"], [class*="text-zinc-"]) { color: var(--sb-ink-display); }
-  :where(.dark) :is([class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"], [class~="bg-neutral-50"], [class~="bg-neutral-100"], [class~="bg-neutral-200"], [class~="bg-zinc-50"], [class~="bg-zinc-100"], [class~="bg-zinc-200"]) { background-color: var(--sb-surface); }
+  html:where(.dark) :is([class~="text-black"], [class*="text-black/"], [class*="text-gray-"], [class*="text-neutral-"], [class*="text-zinc-"]) { color: var(--sb-ink-display); }
+  html:where(.dark) :is([class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"], [class~="bg-neutral-50"], [class~="bg-neutral-100"], [class~="bg-neutral-200"], [class~="bg-zinc-50"], [class~="bg-zinc-100"], [class~="bg-zinc-200"]) { background-color: var(--sb-surface); }
 
   /* ---- Fields — recessed wells (dark) -------------------------------------
      A text field written as a light card (`bg-white border-slate-300`) sits a
      step BELOW its card in dark mode. (0,1,1): above the base pins, below
      `focus:` / `hover:` variants. `.sb-field` (below) is the full treatment. */
-  :where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.bg-white, .bg-slate-50, .bg-slate-100, .dark\:bg-slate-800, .dark\:bg-slate-900, .dark\:bg-slate-950) {
+  html:where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.bg-white, .bg-slate-50, .bg-slate-100, .dark\:bg-slate-800, .dark\:bg-slate-900, .dark\:bg-slate-950) {
     background-color: var(--sb-field-bg);
   }
-  :where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.border-slate-200, .border-slate-300, .dark\:border-slate-600, .dark\:border-slate-700) {
+  html:where(.dark) :is(input, select, textarea):where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):is(.border-slate-200, .border-slate-300, .dark\:border-slate-600, .dark\:border-slate-700) {
     border-color: var(--sb-field-border);
   }
 
   /* Field text fallback for inputs without a text utility (0,0,1). */
-  :where(.dark) :is(input, textarea, select) { color: var(--sb-ink-display); }
+  html:where(.dark) :is(input, textarea, select) { color: var(--sb-ink-display); }
 
   /* ---- Light mode ---------------------------------------------------------
      Slate 400/500 are below 4.5:1 on the pale surfaces, so body copy and
