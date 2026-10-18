@@ -7,6 +7,7 @@ import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { eq } from "drizzle-orm";
 import { localeToLanguageName } from "@/i18n/config";
 import { buildSopDraftFallback, getSopProfileFacts, type SopDraftContext } from "@/lib/sopGuidance";
+import { rememberEssayPrivately } from "@/lib/privateEssayMemory";
 
 export async function POST(req: Request) {
   try {
@@ -90,6 +91,11 @@ FORMAT RULES (follow exactly):
 
     const aiUsed = Boolean(generated);
     const sopContent = normalizeAiReply(generated || buildSopDraftFallback(locale, context));
+    try {
+      await rememberEssayPrivately({ profileId, content: sopContent, targetName: targetUni || targetProg, source: "draft" });
+    } catch (memoryError) {
+      console.warn("Private essay memory save failed:", memoryError);
+    }
 
     return NextResponse.json({
       sopDraft: sopContent,
