@@ -41,6 +41,30 @@ database that cannot be repaired automatically keeps answering as before. The
 same statements are mirrored in `supabase/add_core_repair.sql` (regenerate with
 `npm run db:core-repair-sql`) for owners who prefer to run the SQL by hand.
 
+### "Boshqaruv paneli vaqtincha ishlamayapti" / "Authentication is temporarily unavailable."
+
+This card means the service is **up but its database queries fail** — it is
+never a password problem. The app now says so precisely: open
+
+    https://<your-domain>/api/health
+
+and read `code` + `hint` (host only is echoed; credentials never). Typical
+answers and the exact fix:
+
+| `code` | Meaning | Fix |
+| --- | --- | --- |
+| `ENOTFOUND` / `EAI_AGAIN` | The host in `DATABASE_URL` no longer exists — the classic case: **Render free Postgres is deleted after 30 days idle** (this is why `render.yaml` no longer maps `DATABASE_URL` to the blueprint database) | Create a database (Supabase recommended), paste its URI into Render → Environment → `DATABASE_URL`, redeploy |
+| `ETIMEDOUT` | Usually the Supabase **direct** host (`db.<ref>.supabase.co:5432`) — it is IPv6-only while Render is IPv4-only | Switch to the **Session pooler** URI (`aws-0-<region>.pooler.supabase.com:5432`, `?sslmode=require`) |
+| `ECONNREFUSED` | Wrong host/port, or the pooler connection is disabled | Re-paste the full URI from the provider dashboard |
+| `28P01` | Password rotated (Supabase reset, leaked-credential rotation) | Paste a fresh URI |
+| `3D000` | The database name in the URI does not exist (project deleted/restored) | Restore, or point at the new database and run `supabase/full_schema.sql` + seed |
+
+If `/api/health` says `ok: true` but `schema` lists missing objects, run
+`supabase/full_schema.sql` (additive and idempotent) — e.g. a missing
+`user_sessions` table 503s **every** authenticated request even while the
+database itself is healthy. Sign-in returns 503 with the same wording so the
+login form never pretends the credentials are wrong.
+
 ### Any other Node host (Railway, Fly.io, a VPS, Docker, …)
 
 | Setting | Value |
