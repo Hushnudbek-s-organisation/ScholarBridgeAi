@@ -39,8 +39,9 @@ export function RewardsSection({ activeProfile }: RewardsSectionProps) {
     if (!profileId) return;
     setLoading(true);
     try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
       const [gamRes, lbRes, refRes] = await Promise.all([
-        fetch(`/api/gamification?profileId=${profileId}`),
+        fetch(`/api/gamification?profileId=${profileId}&timeZone=${encodeURIComponent(timeZone)}`),
         fetch("/api/gamification/leaderboard"),
         fetch(`/api/referrals?profileId=${profileId}`),
       ]);

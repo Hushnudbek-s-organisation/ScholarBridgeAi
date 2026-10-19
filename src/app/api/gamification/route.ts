@@ -16,7 +16,10 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
-    const snapshot = await getGamification(profileId);
+    // Use the caller's calendar zone for streak day boundaries. The pure
+    // streak helper safely falls back to UTC for invalid timezone identifiers.
+    const timeZone = (searchParams.get("timeZone") ?? "UTC").slice(0, 100);
+    const snapshot = await getGamification(profileId, timeZone);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error("GET /api/gamification error:", error);

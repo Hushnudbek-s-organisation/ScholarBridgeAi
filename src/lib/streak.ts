@@ -11,9 +11,16 @@ export interface DailyStreak {
 
 export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365] as const;
 
-function isoDay(value: Date | string): string | null {
+function dayKey(value: Date | string, formatter: Intl.DateTimeFormat): string | null {
+  // A date-only value is already a calendar day, not a UTC timestamp. Keep
+  // it stable in every timezone; timestamps are projected into the student's
+  // local calendar day below.
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = value instanceof Date ? value : new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : null;
+  if (!Number.isFinite(date.getTime())) return null;
+  const parts = formatter.formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function shiftDay(day: string, amount: number): string {
@@ -22,9 +29,30 @@ function shiftDay(day: string, amount: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function computeDailyStreak(activityDates: readonly (Date | string)[], now: Date = new Date()): DailyStreak {
-  const today = now.toISOString().slice(0, 10);
-  const days = new Set(activityDates.map(isoDay).filter((day): day is string => !!day && day <= today));
+export function computeDailyStreak(
+  activityDates: readonly (Date | string)[],
+  now: Date = new Date(),
+  timeZone = "UTC",
+): DailyStreak {
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  } catch {
+    // An invalid/missing browser timezone must not break the rewards screen.
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
+  const today = dayKey(now, formatter)!;
+  const days = new Set(activityDates.map((value) => dayKey(value, formatter)).filter((day): day is string => !!day && day <= today));
   const ordered = [...days].sort();
 
   let longest = 0;

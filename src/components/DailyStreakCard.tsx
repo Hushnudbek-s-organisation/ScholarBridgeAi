@@ -50,7 +50,8 @@ export function DailyStreakCard({
   useEffect(() => {
     if (supplied !== undefined || !profileId) return;
     let alive = true;
-    fetch(`/api/gamification?profileId=${profileId}`, { cache: "no-store" })
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    fetch(`/api/gamification?profileId=${profileId}&timeZone=${encodeURIComponent(timeZone)}`, { cache: "no-store" })
       .then(async (response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (alive && data?.streak) setLoaded(data.streak);
