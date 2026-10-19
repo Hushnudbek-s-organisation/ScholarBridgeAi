@@ -56,6 +56,21 @@ export async function GET(req: Request) {
       }
     }
 
+    // The dashboard needs one number, not the full catalogue payload. Avoid
+    // generating localized reasons, coverage metadata, and serializing every
+    // scholarship just to count scores >= 60. The matching calculation itself
+    // remains identical to the regular personalized response.
+    if (searchParams.get("summary") === "match-count") {
+      const matchCount = matchProfile
+        ? bundle.entries.reduce(
+            (count, scholarship) =>
+              count + Number((calculateScholarshipMatch(matchProfile, scholarship).matchScore ?? 0) >= 60),
+            0,
+          )
+        : 0;
+      return NextResponse.json({ matchCount }, { headers: { "Cache-Control": "private, no-store" } });
+    }
+
     // Module 1 — awards that 100% cover a university the student SAVED lead
     // the personalised list. The saved rows are private data, so the refs
     // exist only on the owner/admin branch above; everything else keeps the
