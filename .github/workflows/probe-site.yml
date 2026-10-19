@@ -1,0 +1,66 @@
+name: Probe site endpoints
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Probe
+        run: |
+          mkdir -p site-audit/probe
+          cd site-audit/probe
+          BASE="https://cullen-food-studio.crypto-sabaraliev.chatgpt.site"
+          probe() {
+            name="$1"; shift
+            echo "===== $name =====" >> report.txt
+            curl -sS -o "resp_${name}.body" -D "resp_${name}.hdr" -w "STATUS %{http_code} | time %{time_total}s | size %{size_download}\n" "$@" >> report.txt 2>&1
+          }
+          # Content pages referenced by the app
+          probe root        "$BASE/"
+          probe admin       "$BASE/admin"
+          probe food        "$BASE/food/index.html"
+          probe food_ielts  "$BASE/food/ielts/index.html"
+          probe food_read   "$BASE/food/reading/index.html"
+          probe health      "$BASE/food/health/index.html"
+          probe health_std  "$BASE/food/health/study.html"
+          probe work        "$BASE/food/work/index.html"
+          probe sports      "$BASE/food/sports/index.html"
+          probe fashion     "$BASE/food/fashion/index.html"
+          probe housing     "$BASE/food/housing/index.html"
+          probe housing_pic "$BASE/food/housing/picture.html"
+          probe media       "$BASE/food/media/index.html"
+          probe art         "$BASE/food/art/index.html"
+          probe topicart    "$BASE/topic-art/food-photo.webp"
+          probe favicon     "$BASE/favicon.svg"
+          # API endpoints (unauthenticated behaviour)
+          probe api_platform_get "$BASE/api/platform"
+          probe api_auth_refresh -X POST -H "Content-Type: application/json" -d '{"action":"refresh"}' "$BASE/api/auth"
+          probe api_auth_logout -X POST -H "Content-Type: application/json" -d '{"action":"logout"}' "$BASE/api/auth"
+          probe api_student_bad -X POST -H "Content-Type: application/json" -d '{"action":"login","studentNumber":"+998901234567","password":"wrong-password-123","groupId":"ielts-senior-1"}' "$BASE/api/student-auth"
+          probe api_student_bad2 -X POST -H "Content-Type: application/json" -d '{"action":"login","studentNumber":"nonexistent-user","password":"another-wrong-pass","groupId":"ielts-senior-3"}' "$BASE/api/student-auth"
+          probe api_student_malformed -X POST -H "Content-Type: application/json" -d '{"action":"login"}' "$BASE/api/student-auth"
+          probe api_admin_bad -X POST -H "Content-Type: application/json" -d '{"action":"admin-login","studentNumber":"admin","password":"definitely-not-right"}' "$BASE/api/student-auth"
+          probe api_platform_post -X POST -H "Content-Type: application/json" -d '{"action":"profile","fullName":"x"}' "$BASE/api/platform"
+          probe api_studytime -X POST -H "Content-Type: application/json" -d '{"session":"11111111-1111-1111-1111-111111111111","sequence":1,"seconds":30,"lessonId":"balanced-diet","skill":"Listening"}' "$BASE/api/study-time"
+          echo "===== body sizes =====" >> report.txt
+          ls -la >> report.txt
+          echo "===== key response bodies =====" >> report.txt
+          for f in resp_api_*.body; do echo "--- $f ---" >> report.txt; head -c 600 "$f" >> report.txt; echo >> report.txt; done
+          cat report.txt
+      - name: Commit probe results
+        run: |
+          git config user.name "arena-agent"
+          git config user.email "actions@users.noreply.github.com"
+          git add site-audit/probe
+          git commit -m "chore: probe results [skip ci]" || echo "nothing to commit"
+          git push
