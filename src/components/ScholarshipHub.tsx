@@ -548,7 +548,7 @@ export function ScholarshipHub({
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
+          className={`grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
@@ -566,7 +566,7 @@ export function ScholarshipHub({
                 key={s.id}
                 data-scholarship-id={s.id}
                 data-focused-record={isFocused ? "true" : undefined}
-                className={`bg-white rounded-2xl border shadow-xs transition-all p-5 flex flex-col justify-between space-y-4 ${
+                className={`bg-white rounded-2xl border shadow-xs transition-all p-5 flex flex-col gap-4 ${
                   isFocused
                     ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
                     : "border-slate-200 hover:shadow-lg hover:border-indigo-300"
@@ -575,7 +575,7 @@ export function ScholarshipHub({
                 {/* Header */}
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       {/* inline-block: a long provider name wraps as ONE chip,
                           not a ragged box per line. Neutral, so amber stays
                           reserved for deadlines and match issues. */}
@@ -656,22 +656,22 @@ export function ScholarshipHub({
                 )}
 
                 {/* Key Details Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div>
+                <div className="grid grid-cols-2 gap-3 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div className="min-w-0">
                     <span className="text-slate-400 block font-medium">{t("awardValue")}</span>
-                    <strong className="text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
+                    <strong className="break-words text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-400 block font-medium">{t("coverage")}</span>
-                    <strong className="text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
+                    <strong className="break-words text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
                   </div>
 
-                  <div>
+                  <div className="col-span-2 min-w-0">
                     <span className="text-slate-400 block font-medium">{t("deadline")}</span>
-                    <strong className="text-amber-800 font-bold flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {s.deadline}
+                    <strong className="flex min-w-0 items-start gap-1 break-words text-amber-800 font-bold">
+                      <Calendar className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-words">{s.deadline}</span>
                     </strong>
                   </div>
                 </div>
