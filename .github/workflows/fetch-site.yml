@@ -1,0 +1,37 @@
+name: Fetch site source
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch pages and assets
+        run: |
+          mkdir -p out
+          BASE="https://cullen-food-studio.crypto-sabaraliev.chatgpt.site"
+          curl -sSL --compressed -D out/_headers_root.txt "$BASE/" -o out/index.html
+          curl -sSL --compressed -D out/_headers_admin.txt "$BASE/admin" -o out/admin.html
+          # Extract referenced assets (scripts, stylesheets, images) from both pages
+          cat out/index.html out/admin.html | grep -oE '(src|href)="[^"]+"' | sed -E 's/^(src|href)="//; s/"$//' | grep -vE '^(#|mailto:|tel:|javascript:)' | sort -u > out/_assets.txt || true
+          i=0
+          while IFS= read -r a; do
+            i=$((i+1))
+            case "$a" in
+              http*) url="$a" ;;
+              /*) url="$BASE$a" ;;
+              *) url="$BASE/$a" ;;
+            esac
+            code=$(curl -sSL --compressed -o "out/asset_${i}" -w "%{http_code}" "$url" || echo ERR)
+            echo "$code $a -> asset_${i}" >> out/_asset_map.txt
+            # keep extension info
+            cp "out/asset_${i}" "out/asset_${i}_$(echo "$a" | tr '/?&=' '____')" 2>/dev/null || true
+          done < out/_assets.txt
+          ls -la out
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-source
+          path: out
+          retention-days: 1
