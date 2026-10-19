@@ -405,8 +405,22 @@ export function Home({
    */
   const loadStoredProfile = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/session", { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
+      // A brief DB/network hiccup should not immediately strand a returning
+      // student on the outage screen. Retry transient failures before showing
+      // the recovery UI; a 401 is definitive and should return to sign-in now.
+      let res: Response | null = null;
+      let data: { profile?: StudentProfile; error?: string } = {};
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          res = await fetch("/api/auth/session", { cache: "no-store" });
+          data = await res.json().catch(() => ({}));
+          if (res.ok || res.status === 401 || res.status < 500 || attempt === 2) break;
+        } catch (err) {
+          if (attempt === 2) throw err;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+      }
+      if (!res) throw new Error("Session check did not return a response.");
       if (res.ok && data.profile) {
         const storedId = Number(data.profile.id);
         setActiveProfile(data.profile);
