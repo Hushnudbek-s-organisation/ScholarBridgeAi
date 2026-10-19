@@ -31,3 +31,7 @@ yarn-error.log*
 
 # local embedded postgres data directory (scripts/dev-db.mjs)
 /.pgdata/
+
+# pitch-deck QA renders (generated, not source)
+/deck/preview/
+/deck/__pycache__/
