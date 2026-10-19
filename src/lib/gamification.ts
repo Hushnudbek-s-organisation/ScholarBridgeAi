@@ -247,7 +247,7 @@ export async function grantBadges(profileId: number): Promise<(typeof badges.$in
 }
 
 /** Return the full gamification snapshot for a profile. */
-export async function getGamification(profileId: number) {
+export async function getGamification(profileId: number, timeZone = "UTC") {
   const row = await ensureUserPoints(profileId);
   const levelRows = await getLevels();
   const level = computeLevel(row.totalPoints, levelRows);
@@ -273,7 +273,7 @@ export async function getGamification(profileId: number) {
     .orderBy(desc(pointsLedger.createdAt))
     .limit(1000);
   const ledger = activityLedger.slice(0, 50);
-  const streak = computeDailyStreak(activityLedger.map((entry) => entry.createdAt));
+  const streak = computeDailyStreak(activityLedger.map((entry) => entry.createdAt), new Date(), timeZone);
 
   // Next level target for the progress bar.
   let nextLevel = null;
