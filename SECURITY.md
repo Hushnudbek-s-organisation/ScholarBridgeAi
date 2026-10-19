@@ -220,7 +220,7 @@ report: `docs/AUDIT_2026-09.md`.
 | --- | --- | --- |
 | Critical | `PATCH`/`DELETE /api/tasks` had no authentication: anyone (even anonymous) could edit or delete any student's tasks by id. | Row-owner check (`requireRowAccess`), validation, body cap. |
 | Critical | Premium was enforced only by the website's `PremiumGate`: essays, AI SOP, tasks, forum and course APIs answered free accounts directly; the gate even mounted the locked section underneath the overlay. | `premiumGate` / `requireFeatureSession` (`src/lib/premium.ts`, reusing `hasFeature`) on every Premium API → `403 premium_required`. `/api/premium/status` returns per-feature access, `PremiumGate` takes a `feature` and never mounts locked content. |
-| Critical | `GET /api/gamification/leaderboard` (public) returned the top students' e-mail addresses. | Name + major only. |
+| High | `GET /api/gamification/leaderboard` (public) exposed identifiable student fields and ran seed queries on reads. | Anonymous rank/points/level only, no profile IDs or majors, with a 60-second cache; profile publication consent remains future schema work. |
 | Critical | `POST /api/forum/categories` had no authentication. | Admin only, validated, duplicate slug → 409. |
 | High | `POST /api/gamification/award` let a student award themselves any number of points. | Admin only, 1–10 000 points. |
 | High | `POST /api/referrals` and `POST /api/consulting` accepted any `profileId` without a session (referral farming → free Premium; spoofed requests). | Caller's own profile only (`requireProfileAccess`), rate-limited. |

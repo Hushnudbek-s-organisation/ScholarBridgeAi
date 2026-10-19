@@ -402,6 +402,7 @@
     "currentLevel": "Current Level",
     "pointsToNextLevel": "points to next level",
     "leaderboard": "Leaderboard",
+    "anonymousLearner": "Learner #{rank}",
     "rank": "Rank",
     "points": "Points",
     "badges": "Badges",

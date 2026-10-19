@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -16,7 +17,7 @@ const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export function generateCertificateCode(): string {
   let code = "";
   for (let i = 0; i < 12; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    code += CODE_CHARS[randomInt(CODE_CHARS.length)];
   }
   return `SBC-${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`;
 }
