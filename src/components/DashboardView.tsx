@@ -60,13 +60,10 @@ export function DashboardView({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/scholarships?profileId=${profile.id}&limit=200`);
+        const res = await fetch(`/api/scholarships?profileId=${profile.id}&summary=match-count`);
         const data = await res.json();
-        if (!cancelled && res.ok && Array.isArray(data.scholarships)) {
-          const matches = data.scholarships.filter(
-            (s: any) => s.matchScore != null && s.matchScore >= 60
-          ).length;
-          setScholarshipMatchCount(matches);
+        if (!cancelled && res.ok && Number.isInteger(data.matchCount)) {
+          setScholarshipMatchCount(data.matchCount);
         }
       } catch {
         // keep null — the UI shows a neutral message instead of a number
