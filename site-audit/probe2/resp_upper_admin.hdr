@@ -1,8 +1,0 @@
-HTTP/2 404 
-date: Mon, 19 Oct 2026 04:16:18 GMT
-content-type: text/html; charset=utf-8
-vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
-set-cookie: __cf_bm=Vb7AkO8wfyzm.cg8bKrAotI31MUy0x_cOwHGvzjoqg0-1792383378.4957347-1.0.1.1-xU75jEnRc2kIgThdkIhkNWdOCCgabfKm4hQhenMl.qjhX6.pm5Soywh9EgvBABUbK0EGwUSc3zwa9TiakTS5YpuUGsv20bKDfw4mdkYR6cCO6CMXuX9lPfCbbza5ruMf; HttpOnly; SameSite=None; Secure; Path=/; Domain=chatgpt.site; Expires=Mon, 19 Oct 2026 04:46:18 GMT
-server: cloudflare
-cf-ray: a4ccf7739cddcce6-IAD
-

@@ -1,9 +1,0 @@
-HTTP/2 400 
-date: Mon, 19 Oct 2026 04:16:16 GMT
-content-type: application/json
-cache-control: no-store
-vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
-set-cookie: __cf_bm=3bGGMqA0bhV22mlsx.ybDFeEPN4YyhY6jfR8PcPMPqM-1792383376.3848903-1.0.1.1-SXWC7gOvzjRzf1RPhlxtlUc_rfcuhz6uOJwot.O6PlPHX8Ry6SmyIRwve3Zja5.Zqm4qrk8R5f2uRBtTO46TNzVpHyrojBOv7X0qCrq.GsOrukZWG.5g6Bx4oq3Ek.wC; HttpOnly; SameSite=None; Secure; Path=/; Domain=chatgpt.site; Expires=Mon, 19 Oct 2026 04:46:16 GMT
-server: cloudflare
-cf-ray: a4ccf7666818f27e-IAD
-
