@@ -6,22 +6,18 @@ import { Trophy } from "lucide-react";
 
 export interface LeaderboardEntry {
   rank: number;
-  profileId: number;
   totalPoints: number;
-  name: string;
-  targetMajor: string;
   levelName: string | null;
   levelIcon: string | null;
 }
 
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
-  highlightProfileId?: number | null;
 }
 
 const rankColors = ["from-amber-400 to-yellow-500", "from-slate-300 to-slate-400", "from-orange-400 to-amber-600"];
 
-export function Leaderboard({ entries, highlightProfileId }: LeaderboardProps) {
+export function Leaderboard({ entries }: LeaderboardProps) {
   const t = useTranslations("rewards");
 
   if (entries.length === 0) {
@@ -42,12 +38,11 @@ export function Leaderboard({ entries, highlightProfileId }: LeaderboardProps) {
 
       <div className="divide-y divide-slate-100">
         {entries.map((entry) => {
-          const isMe = highlightProfileId != null && entry.profileId === highlightProfileId;
           const medal = entry.rank <= 3;
           return (
             <div
-              key={entry.profileId}
-              className={`px-5 py-3 flex items-center gap-4 ${isMe ? "bg-indigo-50/60" : ""}`}
+              key={entry.rank}
+              className="px-5 py-3 flex items-center gap-4"
             >
               <div
                 className={`h-10 w-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
@@ -61,11 +56,13 @@ export function Leaderboard({ entries, highlightProfileId }: LeaderboardProps) {
 
               <div className="min-w-0 flex-1">
                 <p className="break-words text-sm font-bold text-slate-800">
-                  {entry.name} {isMe && <span className="text-indigo-600 text-xs font-semibold">({t("you")})</span>}
+                  {t("anonymousLearner", { rank: entry.rank })}
                 </p>
-                <p className="break-words text-[11px] text-slate-400">
-                  {entry.targetMajor} {entry.levelName ? `· ${entry.levelIcon} ${entry.levelName}` : ""}
-                </p>
+                {entry.levelName && (
+                  <p className="break-words text-[11px] text-slate-400">
+                    {entry.levelIcon} {entry.levelName}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

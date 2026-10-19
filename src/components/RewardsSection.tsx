@@ -135,7 +135,7 @@ export function RewardsSection({ activeProfile }: RewardsSectionProps) {
               referred users list */}
           <ReferralProgramCard activeProfile={activeProfile} />
           <BadgeShowcase badges={gamification.badges} />
-          <Leaderboard entries={leaderboard} highlightProfileId={activeProfile.id} />
+          <Leaderboard entries={leaderboard} />
         </div>
       </div>
     </div>

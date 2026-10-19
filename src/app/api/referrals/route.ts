@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { getReferralOverview, applyReferralCode } from "@/lib/referrals";
 import { clampString, readJsonBody } from "@/lib/request";
-import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 
 export async function GET(req: Request) {
   try {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const limit = checkRateLimit(`referral:apply:${access.session.profile.id}`, LIMITS.contact);
+    const limit = await checkSharedRateLimit(`referral:apply:${access.session.profile.id}`, LIMITS.contact);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
     const result = await applyReferralCode(access.targetId!, clampString(referralCode, 64));
     if (result.error) {

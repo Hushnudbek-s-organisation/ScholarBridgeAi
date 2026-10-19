@@ -72,32 +72,24 @@ export interface Session {
 let secretWarned = false;
 
 /**
- * Secret used to sign session tokens.
- *
- * Order: SESSION_SECRET → AI_KEYS_ENCRYPTION_SECRET → sha256(DATABASE_URL).
- * The last one only exists so local development works without setup; set
- * SESSION_SECRET explicitly in production (>= 32 chars) so sessions survive
- * unrelated env changes and are not tied to a database credential.
+ * Session signing key. Production must use a dedicated, explicitly configured
+ * secret; encryption keys and database credentials are never fallback keys.
+ * Local development/test keeps a stable, deliberately non-production key so
+ * isolated checks can issue and verify cookies without deployment secrets.
  */
 export function sessionSecret(
   env: Record<string, string | undefined> = process.env
 ): string {
-  const explicit = env.SESSION_SECRET?.trim();
-  if (explicit && explicit.length >= 16) return explicit;
-
-  const aiSecret = env.AI_KEYS_ENCRYPTION_SECRET?.trim();
-  if (aiSecret && aiSecret.length >= 16) return aiSecret;
+  if (hasExplicitSessionSecret(env)) return env.SESSION_SECRET!.trim();
+  if (env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET (at least 32 characters) is required in production");
+  }
 
   if (!secretWarned) {
     secretWarned = true;
-    console.warn(
-      "[auth] SESSION_SECRET is not set — deriving the session signing key from " +
-        "DATABASE_URL. Set SESSION_SECRET (>= 32 chars) in production."
-    );
+    console.warn("[auth] Using the development-only session key; configure SESSION_SECRET for deployment.");
   }
-  return createHash("sha256")
-    .update(env.DATABASE_URL || "scholarbridge-local-dev-secret")
-    .digest("hex");
+  return createHash("sha256").update("ScholarBridge local development session key only").digest("hex");
 }
 
 /** Whether an explicit, strong SESSION_SECRET is configured. */

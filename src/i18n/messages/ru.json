@@ -402,6 +402,7 @@
     "currentLevel": "Текущий уровень",
     "pointsToNextLevel": "баллов до следующего уровня",
     "leaderboard": "Рейтинг",
+    "anonymousLearner": "Ученик №{rank}",
     "rank": "Место",
     "points": "Баллы",
     "badges": "Значки",

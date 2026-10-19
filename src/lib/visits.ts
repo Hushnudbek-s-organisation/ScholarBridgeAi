@@ -13,6 +13,7 @@
  * bots/mobile/desktop apart, and `profile_id` is filled just for signed-in
  * users (who already have an account row).
  */
+import { randomBytes } from "crypto";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { siteVisits } from "@/db/schema";
@@ -79,13 +80,7 @@ export function visitorCookieHeader(visitorId: string): string {
 
 /** Random, URL-safe anonymous visitor id (no personal data). */
 export function makeVisitorId(): string {
-  const bytes = new Uint8Array(16);
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return randomBytes(16).toString("hex");
 }
 
 // ---------------------------------------------------------------------------

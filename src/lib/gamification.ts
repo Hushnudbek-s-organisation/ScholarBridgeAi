@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { computeDailyStreak } from "@/lib/streak";
@@ -17,8 +18,8 @@ import {
 export function generateReferralCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) {
+    code += chars[randomInt(chars.length)];
   }
   return code;
 }
@@ -305,22 +306,18 @@ export async function getGamification(profileId: number, timeZone = "UTC") {
 
 /** Fetch the leaderboard (top profiles by points). */
 export async function getLeaderboard(limit = 20) {
+  // Public leaderboard rows are deliberately anonymous until per-profile
+  // publication consent is modeled. Do not select names, majors, or profile ids.
   const rows = await db
     .select({
-      profileId: userPoints.profileId,
       totalPoints: userPoints.totalPoints,
-      levelId: userPoints.currentLevel,
-      // Public endpoint: display name + major only — never e-mail addresses.
-      name: studentProfiles.name,
-      targetMajor: studentProfiles.targetMajor,
       levelName: levels.name,
       levelIcon: levels.iconUrl,
     })
     .from(userPoints)
-    .innerJoin(studentProfiles, eq(userPoints.profileId, studentProfiles.id))
     .leftJoin(levels, eq(userPoints.currentLevel, levels.id))
     .orderBy(desc(userPoints.totalPoints))
     .limit(limit);
 
-  return rows.map((r, i) => ({ rank: i + 1, ...r }));
+  return rows.map((row, index) => ({ rank: index + 1, ...row }));
 }

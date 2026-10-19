@@ -177,6 +177,8 @@ export const LIMITS = {
   telegramVerify: { limit: 20, windowMs: 15 * 60_000 },
   /** Gemini Live visa-interview tokens (30-min paid sessions): 10 / hour per account. */
   visaLiveToken: { limit: 10, windowMs: 60 * 60_000 },
+  /** Public lookup endpoints: 30 / minute per IP. */
+  publicLookup: { limit: 30, windowMs: 60_000 },
   /** Analytics beacon: 60 / min per visitor. */
   beacon: { limit: 60, windowMs: 60_000 },
 } as const;

@@ -402,6 +402,7 @@
     "currentLevel": "Joriy daraja",
     "pointsToNextLevel": "keyingi darajagacha ball",
     "leaderboard": "Reyting",
+    "anonymousLearner": "O‘quvchi #{rank}",
     "rank": "O'rin",
     "points": "Ball",
     "badges": "Nishonlar",

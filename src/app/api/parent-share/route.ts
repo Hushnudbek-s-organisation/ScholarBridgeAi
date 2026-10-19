@@ -8,6 +8,8 @@ import { readJsonBody, clampString } from "@/lib/request";
 import { configuredAppUrl } from "@/lib/appUrl";
 import { buildParentSummary, parentShareLink, type ParentSource } from "@/lib/parentSummary";
 import { premiumGate } from "@/lib/premium";
+import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -186,6 +188,9 @@ export async function GET(req: Request) {
         linkUnavailable: settings.enabled && Boolean(settings.token) && !publicBaseUrl,
       });
     }
+
+    const publicLimit = await checkSharedRateLimit(`parent-share:${clientIp(req)}`, LIMITS.publicLookup);
+    if (!publicLimit.ok) return rateLimitedResponse(publicLimit.retryAfterSec);
 
     const token = url.searchParams.get("token") ?? "";
     if (token.length < 20 || token.length > 128) {

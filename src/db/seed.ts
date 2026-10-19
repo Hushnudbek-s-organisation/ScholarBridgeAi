@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { db } from "./index";
 import { seedProgramCatalog } from "./seedProgramCatalog";
 import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
@@ -31,8 +32,8 @@ import { MIN_PASSWORD_LENGTH, hashPassword } from "@/lib/password";
 function makeReferralCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) {
+    code += chars[randomInt(chars.length)];
   }
   return code;
 }

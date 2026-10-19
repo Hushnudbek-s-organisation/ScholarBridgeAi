@@ -43,27 +43,29 @@ same statements are mirrored in `supabase/add_core_repair.sql` (regenerate with
 
 ### "Boshqaruv paneli vaqtincha ishlamayapti" / "Authentication is temporarily unavailable."
 
-This card means the service is **up but its database queries fail** — it is
-never a password problem. The app now says so precisely: open
+This usually means a database query failed, not that the password is wrong. The public
+Render probe at `/api/health` deliberately exposes only `{ ok: true }` or `{ ok: false }`.
+For operator-only detail, set a strong `CRON_SECRET` and request:
 
-    https://<your-domain>/api/health
+    curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/health/diagnostics
 
-and read `code` + `hint` (host only is echoed; credentials never). Typical
-answers and the exact fix:
+The protected response reports the database driver code, whether the two auth-critical
+schema objects are visible, and whether a dedicated 32+ character `SESSION_SECRET` exists.
+It never returns the hostname, credentials, or full connection URI. The public health check
+will report not-ready until production has that session secret. Typical database codes:
 
 | `code` | Meaning | Fix |
 | --- | --- | --- |
-| `ENOTFOUND` / `EAI_AGAIN` | The host in `DATABASE_URL` no longer exists — the classic case: **Render free Postgres is deleted after 30 days idle** (this is why `render.yaml` no longer maps `DATABASE_URL` to the blueprint database) | Create a database (Supabase recommended), paste its URI into Render → Environment → `DATABASE_URL`, redeploy |
-| `ETIMEDOUT` | Usually the Supabase **direct** host (`db.<ref>.supabase.co:5432`) — it is IPv6-only while Render is IPv4-only | Switch to the **Session pooler** URI (`aws-0-<region>.pooler.supabase.com:5432`, `?sslmode=require`) |
-| `ECONNREFUSED` | Wrong host/port, or the pooler connection is disabled | Re-paste the full URI from the provider dashboard |
-| `28P01` | Password rotated (Supabase reset, leaked-credential rotation) | Paste a fresh URI |
-| `3D000` | The database name in the URI does not exist (project deleted/restored) | Restore, or point at the new database and run `supabase/full_schema.sql` + seed |
+| `ENOTFOUND` / `EAI_AGAIN` | Database hostname did not resolve; a provider project may be paused/deleted | Verify the database project and `DATABASE_URL` in the host environment |
+| `ETIMEDOUT` | Network path or database host unreachable | Verify network reachability and use the database provider's supported pooler URI |
+| `ECONNREFUSED` | Wrong host/port or pooler not listening | Recheck the full URI and provider status |
+| `28P01` | Postgres rejected the credentials | Paste a current database URI/password |
+| `3D000` | The database named in the URI does not exist | Restore or select the correct database |
 
-If `/api/health` says `ok: true` but `schema` lists missing objects, run
-`supabase/full_schema.sql` (additive and idempotent) — e.g. a missing
-`user_sessions` table 503s **every** authenticated request even while the
-database itself is healthy. Sign-in returns 503 with the same wording so the
-login form never pretends the credentials are wrong.
+If diagnostics show `userSessionsTable: false` or `passwordHashColumn: false`, review the
+schema against `supabase/full_schema.sql` and apply only an approved additive repair. Do not
+expose diagnostic output publicly. Sign-in returns a retryable 503 rather than falsely
+claiming that the user's password is wrong.
 
 ### Any other Node host (Railway, Fly.io, a VPS, Docker, …)
 
