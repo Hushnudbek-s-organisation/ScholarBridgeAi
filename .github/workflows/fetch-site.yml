@@ -2,6 +2,8 @@ name: Fetch site source
 
 on:
   workflow_dispatch:
+  push:
+    branches: [arena/ff470125-scholarbridgeai]
 
 jobs:
   fetch:
