@@ -715,7 +715,18 @@
     "essayLoadLatestSaved": "Загрузить последний сохранённый черновик",
     "chatCounselorTitle": "Консультант ScholarBridgeAI",
     "chatOnline": "В сети",
-    "chatPersonalized": "Персональные рекомендации для {name} · {major}"
+    "chatPersonalized": "Персональные рекомендации для {name} · {major}",
+    "essayBehaviorSignalsTitle": "Сигналы стиля письма (Respan)",
+    "essayBehaviorUnavailable": "Дополнительная оценка временно недоступна; основной разбор сохранён.",
+    "essayBehaviorNotScored": "Не оценено",
+    "essayBehavior_specificityAndEvidence": "Конкретика и личные свидетельства",
+    "essayBehavior_promptRelevance": "Соответствие заданию",
+    "essayBehavior_personalOwnership": "Личный голос и вклад",
+    "essayBehavior_unsupportedOrInconsistentClaims": "Неподтверждённые или противоречивые утверждения",
+    "essayBehaviorTip_specificityAndEvidence": "Добавьте конкретную и правдивую деталь из собственного опыта.",
+    "essayBehaviorTip_promptRelevance": "Связывайте каждый абзац с частью официального задания.",
+    "essayBehaviorTip_personalOwnership": "Опишите собственные решения и вклад, а не только команду или организацию.",
+    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Проверьте каждое утверждение и его согласованность с остальным текстом."
   },
   "landing": {
     "logoAlt": "Логотип ScholarBridge AI",
@@ -998,6 +1009,12 @@
     "answerRubric": "Разбор ответов",
     "rubricComputed": "Рассчитано по стенограмме: одинаковые ответы всегда дают одинаковый результат.",
     "rubricOverallReadiness": "Результат тренировки интервью",
+    "openRouterReviewTitle": "Дополнительная оценка моделей (OpenRouter)",
+    "openRouterInterviewDisclosure": "Если администратор настроил OpenRouter, стенограмма может передаваться внешним сервисам для генерации текста и дополнительной оценки качества. Не указывайте крайне чувствительные сведения. Это учебная обратная связь, а не визовая консультация.",
+    "openRouterReviewNotice": "Mercury и Respan дают дополнительные структурированные сигналы по стенограмме. Это ориентировочные оценки, а не визовая консультация или решение об иммиграции.",
+    "mercuryReviewLabel": "Структурированное решение Mercury",
+    "respanReviewLabel": "Показатели качества общения Respan",
+    "reviewNotScored": "Нет оценки",
     "unansweredPrefix": "Без содержательного ответа:",
     "turnFeedbackTitle": "Подсказки по каждому ответу",
     "turnFeedbackIntro": "Эти детерминированные сигналы показывают, что было в каждом записанном ответе. Это обратная связь для тренировки, а не решение по визе.",
@@ -1039,7 +1056,20 @@
     "loadModelAnswer": "Загрузить образец ответа 95/100",
     "modelAnswerHint": "Посмотрите ожидаемую глубину ответа и ответьте своими словами.",
     "modelAnswerTip": "Теперь перепишите его своими словами — заученный текст быстрее всего подрывает доверие.",
-    "modelAnswerLoaded": "Образец ответа загружен в поле — прочитайте и перепишите по-своему."
+    "modelAnswerLoaded": "Образец ответа загружен в поле — прочитайте и перепишите по-своему.",
+    "specialistReviewUnavailable": "Структурированные сигналы временно недоступны; основная оценка интервью сохранена.",
+    "review_academicPurposeClarity": "Ясность академической цели",
+    "review_financialSufficiencyCredibility": "Достоверность финансового обеспечения",
+    "review_homeCountryTiesStrength": "Планы и связи с родной страной",
+    "review_overallConsularReadiness": "Готовность к тренировочному интервью",
+    "review_directAndConfident": "Прямые и уверенные ответы",
+    "review_concreteFactsAndNumbers": "Конкретные факты и цифры",
+    "review_hesitationOrVagueness": "Неуверенность или расплывчатость",
+    "review_contradictionRisk": "Возможные противоречия",
+    "reviewTip_directAndConfident": "Сначала ответьте на вопрос, затем кратко объясните причину.",
+    "reviewTip_concreteFactsAndNumbers": "Приведите конкретное и правдивое имя, дату или сумму.",
+    "reviewTip_hesitationOrVagueness": "Замените общие слова личным конкретным примером.",
+    "reviewTip_contradictionRisk": "Проверьте согласованность дат, сумм и сведений о программе."
   },
   "strength": {
     "title": "Заполненность профиля данными",
@@ -4374,7 +4404,11 @@
     "manageApplications": "📋 Управлять заявками",
     "cardDetails": "Требования и детали балла",
     "coversSavedFull": "🎯 Покрывает {unis} на 100%",
-    "coversSaved": "✓ Применимо к {unis}"
+    "coversSaved": "✓ Применимо к {unis}",
+    "mercuryReviewTitle": "Дополнительная проверка соответствия с помощью ИИ (Mercury)",
+    "mercuryReviewDescription": "Это вспомогательная оценка только по указанным полям профиля и критериям награды. Это не решение о соответствии требованиям и не вероятность получения награды. Основными остаются детерминированное сопоставление каталога и официальные правила организатора.",
+    "mercuryReviewValue": "Модель оценивает вероятность соответствия указанного профиля всем известным критериям в {percent}%.",
+    "mercuryReviewUnavailable": "Дополнительная проверка модели недоступна; детерминированное сопоставление каталога не изменено."
   },
   "chancing": {
     "signIn": "Войдите, чтобы увидеть оценки соответствия профиля.",

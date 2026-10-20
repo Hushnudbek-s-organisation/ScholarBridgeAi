@@ -22,6 +22,29 @@ function embeddedSnapshot(): boolean {
 function embeddedServerSnapshot(): boolean {
   return false;
 }
+
+/** Missing or malformed next-intl messages must never take down the Visa hub. */
+type SafeTranslationValues = Record<string, string | number>;
+type SafeTranslator = (key: string, values?: SafeTranslationValues) => unknown;
+export function safeT(
+  translator: SafeTranslator,
+  key: string,
+  fallback: string,
+  values?: SafeTranslationValues,
+): string {
+  try {
+    const translated = translator(key, values);
+    return typeof translated === "string" ? translated : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeKeyFallback(key: string): string {
+  const leaf = key.split(".").pop() || key;
+  return leaf.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ");
+}
+
 import { GoogleGenAI, Modality, type LiveServerMessage } from "@google/genai";
 import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
@@ -461,7 +484,8 @@ function getTextParts(message: LiveServerMessage): string[] {
 }
 
 function Steps({ current }: { current: 0 | 1 | 2 }) {
-  const t = useTranslations("visa");
+  const rawT = useTranslations("visa");
+  const t = (key: string, values?: SafeTranslationValues) => safeT(rawT as unknown as SafeTranslator, key, safeKeyFallback(key), values);
   const labels = [t("stepSetup"), t("stepInterview"), t("stepResult")];
   return (
     <div className="flex items-center gap-2">
@@ -615,10 +639,13 @@ interface VisaSpeakingAssistantProps {
 export function VisaSpeakingAssistant({
   activeProfile,
 }: VisaSpeakingAssistantProps) {
-  const t = useTranslations("visa");
-  const ts = useTranslations("samples");
-  const tCountry = useTranslations("countryNames");
+  const rawT = useTranslations("visa");
+  const rawTs = useTranslations("samples");
+  const rawTCountry = useTranslations("countryNames");
   const locale = useLocale();
+  const t = (key: string, values?: SafeTranslationValues) => safeT(rawT as unknown as SafeTranslator, key, safeKeyFallback(key), values);
+  const ts = (key: string, values?: SafeTranslationValues) => safeT(rawTs as unknown as SafeTranslator, key, safeKeyFallback(key), values);
+  const tCountry = (key: string) => safeT(rawTCountry as unknown as SafeTranslator, key, safeKeyFallback(key));
 
   const [screen, setScreen] = useState<Screen>("setup");
   const [countryCode, setCountryCode] = useState<string | null>(null);
@@ -694,7 +721,118 @@ export function VisaSpeakingAssistant({
       averageAnswerWords: number;
     };
     chanceDisclaimer?: string;
+    openRouterReview?: {
+      mercury: { model: string; available: boolean; signals: Record<string, { probabilityPercent: number | null; score: number | null; status: "ok" | "fallback" }> } | null;
+      respan: { model: string; available: boolean; signals: Record<string, { probabilityPercent: number | null; score: number | null; status: "ok" | "fallback" }> } | null;
+    };
   };
+
+  function normalizeVisaAnalysis(value: unknown): VisaAnalysisResponse {
+    const source = value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+    const score = (item: unknown) => typeof item === "number" && Number.isFinite(item)
+      ? Math.max(0, Math.min(100, Math.round(item)))
+      : 0;
+    const text = (item: unknown) => typeof item === "string" ? item : "";
+    const rawRubric = source.rubric && typeof source.rubric === "object" && !Array.isArray(source.rubric)
+      ? source.rubric as Record<string, unknown>
+      : null;
+    let rubric: VisaAnalysisResponse["rubric"];
+    if (rawRubric) {
+      const rawScores = rawRubric.scores && typeof rawRubric.scores === "object" && !Array.isArray(rawRubric.scores)
+        ? rawRubric.scores as Record<string, unknown>
+        : {};
+      const rawRisks = Array.isArray(rawRubric.risks) ? rawRubric.risks : [];
+      const rawUnanswered = Array.isArray(rawRubric.unanswered) ? rawRubric.unanswered : [];
+      const rawFeedback = Array.isArray(rawRubric.turnFeedback) ? rawRubric.turnFeedback : [];
+      rubric = {
+        scores: {
+          purposeOfStudy: score(rawScores.purposeOfStudy),
+          funding: score(rawScores.funding),
+          homeTies: score(rawScores.homeTies),
+          nonImmigrantIntent: score(rawScores.nonImmigrantIntent),
+          specificity: score(rawScores.specificity),
+          languageClarity: score(rawScores.languageClarity),
+          total: score(rawScores.total),
+        },
+        risks: rawRisks.flatMap((risk) => {
+          if (!risk || typeof risk !== "object" || Array.isArray(risk)) return [];
+          const item = risk as Record<string, unknown>;
+          if (typeof item.code !== "string" || typeof item.message !== "string" || !["high", "medium", "low"].includes(String(item.severity))) return [];
+          const rawParams = item.params && typeof item.params === "object" && !Array.isArray(item.params) ? item.params as Record<string, unknown> : {};
+          const params = Object.fromEntries(Object.entries(rawParams).filter(([, v]) => typeof v === "string" || (typeof v === "number" && Number.isFinite(v)))) as Record<string, string | number>;
+          return [{ code: item.code, message: item.message, severity: item.severity as "high" | "medium" | "low", ...(Object.keys(params).length ? { params } : {}) }];
+        }),
+        unanswered: rawUnanswered.filter((item): item is string => typeof item === "string"),
+        turnFeedback: rawFeedback.flatMap((turn) => {
+          if (!turn || typeof turn !== "object" || Array.isArray(turn)) return [];
+          const item = turn as Record<string, unknown>;
+          if (typeof item.turnNumber !== "number" || !Number.isFinite(item.turnNumber)) return [];
+          const evidence = Array.isArray(item.evidence) ? item.evidence.filter((x): x is "purpose" | "funding" | "home_ties" | "specific_detail" => ["purpose", "funding", "home_ties", "specific_detail"].includes(String(x))) : [];
+          return [{
+            turnNumber: Math.max(1, Math.floor(item.turnNumber)),
+            question: typeof item.question === "string" ? item.question : null,
+            answerExcerpt: text(item.answerExcerpt),
+            answerWordCount: score(item.answerWordCount),
+            evidence,
+            concerns: Array.isArray(item.concerns) ? item.concerns.filter((x): x is string => typeof x === "string") : [],
+          }];
+        }),
+        answerCount: score(rawRubric.answerCount),
+        averageAnswerWords: score(rawRubric.averageAnswerWords),
+      };
+    }
+
+    const normalizeProviderReview = (input: unknown, kind: "mercury" | "respan") => {
+      if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+      const raw = input as Record<string, unknown>;
+      const rawSignals = raw.signals && typeof raw.signals === "object" && !Array.isArray(raw.signals)
+        ? raw.signals as Record<string, unknown>
+        : {};
+      const signals: Record<string, { probabilityPercent: number | null; score: number | null; status: "ok" | "fallback" }> = {};
+      for (const [key, value] of Object.entries(rawSignals)) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const signal = value as Record<string, unknown>;
+        const probabilityPercent = typeof signal.probabilityPercent === "number" && Number.isFinite(signal.probabilityPercent)
+          ? Math.max(0, Math.min(100, Math.round(signal.probabilityPercent)))
+          : null;
+        const scoreValue = typeof signal.score === "number" && Number.isFinite(signal.score)
+          ? Math.max(0, Math.min(100, Math.round(signal.score)))
+          : null;
+        signals[key] = {
+          probabilityPercent,
+          score: scoreValue,
+          status: signal.status === "ok" && (probabilityPercent !== null || scoreValue !== null) ? "ok" : "fallback",
+        };
+      }
+      return {
+        model: typeof raw.model === "string" ? raw.model : "",
+        available: raw.available === true && Object.values(signals).some((signal) => signal.status === "ok"),
+        signals,
+      };
+    };
+    const rawReview = source.openRouterReview && typeof source.openRouterReview === "object" && !Array.isArray(source.openRouterReview)
+      ? source.openRouterReview as Record<string, unknown>
+      : null;
+    const openRouterReview = rawReview ? {
+      mercury: normalizeProviderReview(rawReview.mercury, "mercury"),
+      respan: normalizeProviderReview(rawReview.respan, "respan"),
+    } : undefined;
+    return {
+      confidence: score(source.confidence),
+      persuasiveness: score(source.persuasiveness),
+      language_level: score(source.language_level),
+      estimated_visa_chance: score(source.estimated_visa_chance),
+      recommendations: text(source.recommendations),
+      ...(typeof source.aiAvailable === "boolean" ? { aiAvailable: source.aiAvailable } : {}),
+      ...(typeof source.aiError === "string" ? { aiError: source.aiError } : {}),
+      ...(typeof source.chanceDisclaimer === "string" ? { chanceDisclaimer: source.chanceDisclaimer } : {}),
+      ...(rubric ? { rubric } : {}),
+      ...(openRouterReview ? { openRouterReview } : {}),
+    };
+  }
+
   const [analysis, setAnalysis] = useState<VisaAnalysisResponse | null>(null);
   // Practice history (spec §13) — saved sessions from /api/visa/history,
   // oldest first. Shows the student their progress across sessions.
@@ -2046,7 +2184,7 @@ export function VisaSpeakingAssistant({
             typeof data?.error === "string" ? data.error : t("analyzeError"),
           );
         }
-        setAnalysis(data as VisaAnalysisResponse);
+        setAnalysis(normalizeVisaAnalysis(data));
         setScreen("result");
         // The session was just persisted server-side — refresh the trend.
         void loadPracticeHistory();
@@ -2377,6 +2515,9 @@ export function VisaSpeakingAssistant({
             </div>
           </div>
 
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+            {t("openRouterInterviewDisclosure")}
+          </div>
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
@@ -2898,6 +3039,40 @@ export function VisaSpeakingAssistant({
                   </div>
                 </section>
               )}
+            </div>
+          )}
+
+          {analysis.openRouterReview && (analysis.openRouterReview.mercury || analysis.openRouterReview.respan) && (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5">
+              <h3 className="text-sm font-extrabold text-slate-900">{t("openRouterReviewTitle")}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">{t("openRouterReviewNotice")}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {([
+                  ["mercury", analysis.openRouterReview.mercury, t("mercuryReviewLabel")],
+                  ["respan", analysis.openRouterReview.respan, t("respanReviewLabel")],
+                ] as const).map(([provider, review, label]) => review && (
+                  <section key={provider} className="rounded-xl border border-indigo-100 bg-white p-3">
+                    <h4 className="text-xs font-bold text-indigo-900">{label}</h4>
+                    {!review.available ? (
+                      <p className="mt-2 text-[11px] text-slate-500">{t("specialistReviewUnavailable")}</p>
+                    ) : (
+                      <dl className="mt-2 space-y-2">
+                        {Object.entries(review.signals).map(([name, signal]) => (
+                          <div key={name} className="rounded-lg bg-slate-50 px-2.5 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                              <dt className="font-semibold text-slate-700">{t(`review_${name}`)}</dt>
+                              <dd className="font-bold text-indigo-800">
+                                {signal.probabilityPercent !== null ? `${signal.probabilityPercent}%` : signal.score !== undefined && signal.score !== null ? `${signal.score}/100` : t("reviewNotScored")}
+                              </dd>
+                            </div>
+                            {provider === "respan" && <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t(`reviewTip_${name}`)}</p>}
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                  </section>
+                ))}
+              </div>
             </div>
           )}
 

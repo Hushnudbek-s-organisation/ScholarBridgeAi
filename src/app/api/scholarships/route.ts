@@ -17,6 +17,8 @@ import {
   type SavedUniRef,
 } from "@/lib/savedUniCoverage";
 import { expandMultilingualSearchTerms, localizeScholarshipRow } from "@/lib/catalogLocalizer";
+import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
+import { runMercuryDecision } from "@/lib/ai/decide";
 
 export async function GET(req: Request) {
   try {
@@ -166,6 +168,21 @@ export async function GET(req: Request) {
       };
     });
 
+    const semanticScores = new Map<number, number>();
+    if (search && results.length > 1) {
+      try {
+        const candidates = results.slice(0, 63).map((item) => [item.title, item.provider, item.country, item.description, item.coverageType, item.eligibleMajors, item.degreeLevels].filter(Boolean).join(". "));
+        const ranked = await rankSemanticTexts(search, candidates, { profileId: personalisedProfileId, timeoutMs: 3_500, limit: candidates.length });
+        for (const item of ranked) {
+          const result = results[item.index];
+          if (result) semanticScores.set(result.id, item.similarity);
+        }
+        if (!profileData) results.sort((a, b) => (semanticScores.get(b.id) ?? -1) - (semanticScores.get(a.id) ?? -1));
+      } catch {
+        // Embedding timeout or provider errors preserve deterministic text matches and ordering.
+      }
+    }
+
     if (profileData) {
       // Sort: the four coverage tiers first (full-coverage AT a saved
       // university → other saved-university awards → general full-coverage →
@@ -181,6 +198,8 @@ export async function GET(req: Request) {
         if (a.matchScore == null) return 1;
         if (b.matchScore == null) return -1;
         if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        const semanticDifference = (semanticScores.get(b.id) ?? -1) - (semanticScores.get(a.id) ?? -1);
+        if (semanticDifference !== 0) return semanticDifference;
         // `deadlineDate` arrives as a Date (json serialized to ISO) — turning
         // it into a string directly would compare "Wed Oct 15" lexicographically.
         const asYmd = (v: Date | string | null): string => {
@@ -216,19 +235,76 @@ export async function GET(req: Request) {
       results.sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId));
     }
 
+    // A Mercury signal is an auxiliary consistency check on one explicitly
+    // focused award. The deterministic eligibility engine remains the product
+    // result; unknown criteria stay unknown and the provider signal is never a
+    // guarantee. Only owner-authorized profile fields are sent, and failures
+    // leave the catalogue response intact.
+    let mercuryEligibilityReview: {
+      model: string;
+      available: boolean;
+      probabilityPercent: number | null;
+      deterministicEligibility: boolean | null;
+      disclaimer: string;
+    } | null = null;
+    const focusedScholarship = results.find((item) => item.id === focusId);
+    if (focusedScholarship && profileData && personalisedProfileId != null) {
+      const review = await runMercuryDecision({
+        profileId: personalisedProfileId,
+        timeoutMs: 3_500,
+        state: JSON.stringify({
+          applicant: {
+            degreeLevel: profileData.degreeLevel,
+            targetMajor: profileData.targetMajor,
+            gpa: profileData.gpa,
+            gpaScale: profileData.gpaScale,
+            ieltsScore: profileData.ieltsScore ?? null,
+            toeflScore: profileData.toeflScore ?? null,
+            preferredCountries: profileData.preferredCountries ?? null,
+            needsFinancialAid: profileData.needsFinancialAid ?? profileData.needScholarship ?? null,
+            requiresFullScholarship: profileData.requiresFullScholarship ?? null,
+          },
+          publishedAwardCriteria: {
+            title: focusedScholarship.title,
+            provider: focusedScholarship.provider,
+            country: focusedScholarship.country,
+            eligibilityText: focusedScholarship.requirements,
+            eligibleCountries: focusedScholarship.eligibleCountries,
+            eligibleMajors: focusedScholarship.eligibleMajors,
+            degreeLevels: focusedScholarship.degreeLevels,
+            coverageType: focusedScholarship.coverageType,
+          },
+        }),
+        questions: [{
+          key: "meetsAllKnownEligibilityCriteria",
+          type: "yes_no",
+          question: "Based only on the applicant facts and published award criteria supplied, does the applicant meet every explicitly stated eligibility requirement? Treat any missing, ambiguous, or unpublished requirement as unknown rather than assuming it is met. This is an auxiliary review, not a final eligibility ruling or award prediction.",
+        }],
+      });
+      const signal = review.signals.meetsAllKnownEligibilityCriteria;
+      mercuryEligibilityReview = {
+        model: review.model,
+        available: review.available && signal?.status === "ok",
+        probabilityPercent: signal?.probabilityPercent ?? null,
+        deterministicEligibility: typeof focusedScholarship.isEligible === "boolean" ? focusedScholarship.isEligible : null,
+        disclaimer: "Supplementary AI signal only; the deterministic catalogue match and official provider rules remain controlling.",
+      };
+    }
+
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
     // Without those params the full list is returned (admin tools, ...).
     // Rows are localized LAST — every filter above ran on canonical English
     // data, so canonical dropdown values like "Full Tuition" never break.
-    return NextResponse.json(
-      paginatedPayload(
+    return NextResponse.json({
+      ...paginatedPayload(
         "scholarships",
         // `covTier` is an internal ordering key — the payload carries the
         // honest booleans (`coversSavedUni`, `isFullForSavedUni`) instead.
         results.map(({ covTier: _covTier, ...row }) => localizeScholarshipRow(row, locale)),
         searchParams
       ),
-    );
+      ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),
+    });
   } catch (error) {
     console.error("GET /api/scholarships error:", error);
     return NextResponse.json({ error: "Failed to fetch scholarships" }, { status: 500 });

@@ -9,9 +9,9 @@
  *   1. admin panel (app_config: ai_provider_<task>, ai_default_provider)
  *   2. environment: AI_PROVIDER_<TASK>, AI_PROVIDER_DEFAULT
  *   3. auto: the first chat provider that has a key
- *      (groq → openrouter → openai → anthropic → google → custom)
+ *      (openrouter → groq → openai → anthropic → google → custom)
  *   4. "openrouter" (unconfigured — requests fail as not_configured)
- * Tasks with their own default (visa → groq) follow only their own mapping.
+ * Visa follows an explicit task mapping; otherwise it prefers configured OpenRouter and can fall back to Groq on transient outages.
  *
  * API keys resolve admin panel credential (AES-256-GCM in DB) → env var and
  * never leave the server: not in responses, not in logs, not in errors.
@@ -38,6 +38,7 @@ import {
   resolveProviderForTask,
   supportsCapability,
   taskProviderConfigKey,
+  TASK_PROVIDER_ENV,
   type AICapability,
   type AIProviderId,
 } from "./settings";
@@ -439,7 +440,16 @@ export async function resolveRuntimeProvider(taskType: string, runtime?: Runtime
     // One query for every stored credential (not one per provider).
     const all = await resolveAllProviderCredentials();
     const usable = new Set<AIProviderId>(AI_PROVIDER_IDS.filter((id) => isUsable(id, all[id], cfg.disabled)));
-    if (usable.has(taskDefault)) {
+    const taskKey = taskProviderConfigKey(taskType);
+    const envTaskChoice = process.env[TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general];
+    const globalChoice = cfg.dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || process.env.AI_PROVIDER_DEFAULT;
+    const taskWasAuto = !cfg.dbProviders[taskKey] && !envTaskChoice;
+    const openRouterChosenForVisa = taskType === "visa" && taskWasAuto && usable.has("openrouter") &&
+      (!globalChoice || globalChoice === "auto" || globalChoice === "openrouter");
+    if (openRouterChosenForVisa) {
+      name = "openrouter";
+      selection = globalChoice === "openrouter" ? (cfg.dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] ? "admin" : "env") : "auto";
+    } else if (usable.has(taskDefault)) {
       name = taskDefault;
       selection = "default";
     } else {
@@ -659,8 +669,16 @@ export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<
   // bad_request would most likely fail the same way elsewhere; budget_exhausted
   // must not be bypassed by another paid provider unless the admin chose one.
   // Everything else may go to the fallback — but only one the admin chose explicitly.
-  const fb = cfg.fallback;
+  let fb = cfg.fallback;
+  if (!fb && primary.name === "openrouter" && isTransientCategory(error.category) && !cfg.disabled.includes("groq")) {
+    const groqCredential = await usableCredential("groq", cfg.disabled);
+    if (groqCredential) fb = "groq";
+  }
   let fallbackAttempts = 0;
+  if (fb && fb !== primary.name && error.category !== "bad_request" && error.category !== "budget_exhausted") {
+    const fallbackCredential = await usableCredential(fb, cfg.disabled);
+    if (!fallbackCredential) fb = null;
+  }
   if (fb && fb !== primary.name && error.category !== "bad_request" && error.category !== "budget_exhausted") {
     const second = await callWithRetry(task, fb, req, cfg, { ...opts, maxAttempts: 1 }, true);
     fallbackAttempts = second.attempts;

@@ -59,6 +59,7 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
   const [reviewUni, setReviewUni] = useState(universityName || "");
   const [sopReview, setSopReview] = useState<string | null>(null);
   const [reviewUsedAi, setReviewUsedAi] = useState(false);
+  const [behaviorSignals, setBehaviorSignals] = useState<{ available: boolean; signals: Record<string, number | null> } | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
 
@@ -171,6 +172,7 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
     setIsReviewing(true);
     setReviewError("");
     setSopReview(null);
+    setBehaviorSignals(null);
 
     try {
       const res = await fetch("/api/ai/review-sop", {
@@ -186,8 +188,20 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("sopRequestError"));
       if (data.review) {
-        setSopReview(data.review);
+        setSopReview(typeof data.review === "string" ? data.review : "");
         setReviewUsedAi(data.aiUsed === true);
+        const rawSignals = data.behaviorSignals && typeof data.behaviorSignals === "object" && !Array.isArray(data.behaviorSignals)
+          ? data.behaviorSignals as Record<string, unknown>
+          : null;
+        const values = rawSignals?.signals && typeof rawSignals.signals === "object" && !Array.isArray(rawSignals.signals)
+          ? rawSignals.signals as Record<string, unknown>
+          : {};
+        const signals = Object.fromEntries(Object.entries(values).flatMap(([key, item]) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const probability = (item as Record<string, unknown>).probabilityPercent;
+          return [[key, typeof probability === "number" && Number.isFinite(probability) ? Math.max(0, Math.min(100, Math.round(probability))) : null]];
+        }));
+        if (rawSignals) setBehaviorSignals({ available: rawSignals.available === true, signals });
       }
     } catch (err) {
       setReviewError(err instanceof Error ? err.message : t("sopRequestError"));
@@ -500,6 +514,24 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                 <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900">
                   {reviewUsedAi ? t("sopReviewAiNotice") : t("sopReviewFallbackNotice")}
                 </p>
+                {behaviorSignals && (
+                  <section className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3" aria-label={t("essayBehaviorSignalsTitle")}>
+                    <h4 className="text-xs font-bold text-indigo-900">{t("essayBehaviorSignalsTitle")}</h4>
+                    {!behaviorSignals.available ? <p className="mt-1 text-[11px] text-slate-500">{t("essayBehaviorUnavailable")}</p> : (
+                      <dl className="mt-2 space-y-2">
+                        {Object.entries(behaviorSignals.signals).map(([key, percent]) => (
+                          <div key={key} className="rounded-lg bg-white px-2.5 py-2">
+                            <div className="flex justify-between gap-2 text-[11px]">
+                              <dt className="font-semibold text-slate-700">{t(`essayBehavior_${key}`)}</dt>
+                              <dd className="font-bold text-indigo-800">{percent === null ? t("essayBehaviorNotScored") : `${percent}%`}</dd>
+                            </div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t(`essayBehaviorTip_${key}`)}</p>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                  </section>
+                )}
                 <div className="max-h-[600px] overflow-y-auto pr-2">
                   <AiFormattedText text={sopReview} className="text-xs sm:text-sm text-slate-700" />
                 </div>

@@ -715,7 +715,18 @@
     "essayLoadLatestSaved": "Load latest saved draft",
     "chatCounselorTitle": "ScholarBridgeAI Counselor",
     "chatOnline": "Online",
-    "chatPersonalized": "Personalized for {name} · {major}"
+    "chatPersonalized": "Personalized for {name} · {major}",
+    "essayBehaviorSignalsTitle": "Writing behavior signals (Respan)",
+    "essayBehaviorUnavailable": "Auxiliary behavior scoring is temporarily unavailable; the writing review remains available.",
+    "essayBehaviorNotScored": "Not scored",
+    "essayBehavior_specificityAndEvidence": "Specificity and personal evidence",
+    "essayBehavior_promptRelevance": "Relevance to the prompt",
+    "essayBehavior_personalOwnership": "Personal voice and ownership",
+    "essayBehavior_unsupportedOrInconsistentClaims": "Unsupported or inconsistent claims",
+    "essayBehaviorTip_specificityAndEvidence": "Use a specific, truthful detail from your own experience.",
+    "essayBehaviorTip_promptRelevance": "Keep each paragraph tied to a part of the official prompt.",
+    "essayBehaviorTip_personalOwnership": "Describe your own choices and contribution, not only the team or institution.",
+    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Verify every claim and check it against the rest of the draft."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -998,6 +1009,12 @@
     "answerRubric": "Answer rubric",
     "rubricComputed": "Computed from your transcript — the same answers always receive the same score.",
     "rubricOverallReadiness": "Interview practice rubric",
+    "openRouterReviewTitle": "Additional model review (OpenRouter)",
+    "openRouterInterviewDisclosure": "If OpenRouter is configured by your administrator, your transcript may be sent to its external services for text generation and additional quality checks. Avoid sharing highly sensitive details. This is practice feedback, not visa advice.",
+    "openRouterReviewNotice": "Mercury and Respan provide auxiliary structured feedback on the transcript. These estimates are not visa advice or an immigration decision.",
+    "mercuryReviewLabel": "Mercury structured decision",
+    "respanReviewLabel": "Respan communication-quality signals",
+    "reviewNotScored": "Not scored",
     "unansweredPrefix": "Not substantively answered:",
     "turnFeedbackTitle": "Turn-by-turn coaching",
     "turnFeedbackIntro": "These deterministic cues point to what was present in each recorded answer. They are practice feedback, not a visa decision.",
@@ -1039,7 +1056,20 @@
     "loadModelAnswer": "Load a 95/100 model answer",
     "modelAnswerHint": "See the depth expected, then answer in your own words.",
     "modelAnswerTip": "Now rewrite it in your own words — a memorised script is the fastest way to lose credibility.",
-    "modelAnswerLoaded": "Model answer loaded into the text box — read it, then make it yours."
+    "modelAnswerLoaded": "Model answer loaded into the text box — read it, then make it yours.",
+    "specialistReviewUnavailable": "Structured specialist signals are temporarily unavailable; the interview rubric remains available.",
+    "review_academicPurposeClarity": "Clear academic purpose",
+    "review_financialSufficiencyCredibility": "Credible financial coverage",
+    "review_homeCountryTiesStrength": "Home-country plans and ties",
+    "review_overallConsularReadiness": "Practice interview readiness",
+    "review_directAndConfident": "Direct, confident answers",
+    "review_concreteFactsAndNumbers": "Concrete facts and figures",
+    "review_hesitationOrVagueness": "Vagueness or hesitation",
+    "review_contradictionRisk": "Possible inconsistencies",
+    "reviewTip_directAndConfident": "Answer the question first, then add one concise reason.",
+    "reviewTip_concreteFactsAndNumbers": "Use one specific, truthful name, date, or funding figure.",
+    "reviewTip_hesitationOrVagueness": "Replace broad claims with a personal, concrete example.",
+    "reviewTip_contradictionRisk": "Check dates, funding figures, and program details for consistency."
   },
   "strength": {
     "title": "Profile information coverage",
@@ -4374,7 +4404,11 @@
     "manageApplications": "📋 Manage applications",
     "cardDetails": "Requirements & score breakdown",
     "coversSavedFull": "🎯 Covers {unis} — 100% full",
-    "coversSaved": "✓ Applies to {unis}"
+    "coversSaved": "✓ Applies to {unis}",
+    "mercuryReviewTitle": "AI-assisted eligibility cross-check (Mercury)",
+    "mercuryReviewDescription": "This is a supplementary estimate based only on the profile fields and award criteria supplied. It is not an eligibility ruling or award probability. The deterministic catalogue match and official provider rules remain controlling.",
+    "mercuryReviewValue": "Model estimates {percent}% likelihood that the supplied profile meets all known criteria.",
+    "mercuryReviewUnavailable": "The supplementary model check is unavailable; the deterministic catalogue match is unchanged."
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",

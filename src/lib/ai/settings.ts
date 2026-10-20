@@ -12,6 +12,8 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
+import { OPENROUTER_MODEL_IDS } from "./openrouterModelIds";
+export { OPENROUTER_MODEL_IDS } from "./openrouterModelIds";
 
 // ---------------------------------------------------------------------------
 // Provider registry
@@ -32,9 +34,11 @@ export type AICapability =
   | "embeddings"
   | "streaming"
   | "audio"       // realtime voice (Gemini Live)
+  | "tts"         // text-to-speech endpoint
+  | "decisions"   // typed choices/scores via a dedicated decisions endpoint
   | "reasoning";  // reasoning-effort control
 
-export const AI_CAPABILITIES: AICapability[] = ["text", "structured", "tools", "vision", "embeddings", "streaming", "audio", "reasoning"];
+export const AI_CAPABILITIES: AICapability[] = ["text", "structured", "tools", "vision", "embeddings", "streaming", "audio", "tts", "decisions", "reasoning"];
 
 export interface AIProviderMeta {
   id: AIProviderId;
@@ -73,11 +77,11 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   openrouter: {
     id: "openrouter",
     label: "OpenRouter",
-    defaultModel: "meta-llama/llama-3.3-70b-instruct",
+    defaultModel: OPENROUTER_MODEL_IDS.chat,
     keyEnvVar: "OPENROUTER_API_KEY",
     modelEnvVar: "OPENROUTER_MODEL",
     keyShape: "sk-or-v1-…",
-    capabilities: ["text", "structured", "tools", "streaming"],
+    capabilities: ["text", "structured", "tools", "streaming", "embeddings", "tts", "decisions"],
     protocol: "openai",
     baseUrl: "https://openrouter.ai/api/v1",
   },
@@ -162,7 +166,9 @@ export function providerCapabilities(
   const extra = String(env.AI_CUSTOM_CAPABILITIES || "")
     .split(",")
     .map((c) => c.trim().toLowerCase())
-    .filter((c): c is AICapability => (AI_CAPABILITIES as string[]).includes(c) && c !== "audio");
+    .filter((c): c is AICapability =>
+      (AI_CAPABILITIES as string[]).includes(c) && !["audio", "tts", "decisions", "embeddings"].includes(c)
+    );
   return Array.from(new Set([...base, ...extra]));
 }
 
@@ -243,10 +249,9 @@ export const AI_TASKS: AITaskMeta[] = [
 ];
 
 /**
- * Tasks with their own default provider. They follow ONLY their own
- * mapping (ai_provider_<task> / AI_PROVIDER_<TASK>), not the global default:
- * the visa interview prompts were tuned for Groq's gpt-oss, so changing the
- * global chat provider must not silently change the visa interview.
+ * The historical visa default applies only if OpenRouter has not been
+ * selected or made available by automatic routing. Explicit per-task choices
+ * still win; otherwise OpenRouter is preferred platform-wide.
  */
 export const TASK_DEFAULT_PROVIDER: Partial<Record<AITaskId, AIProviderId>> = {
   visa: "groq",
@@ -311,7 +316,7 @@ export function parseDisabledProviders(raw: string | null | undefined): AIProvid
  * use Groq; if another provider is configured, use it". Deterministic order,
  * decided once per request — not a runtime failover.
  */
-export const AUTO_PROVIDER_ORDER: AIProviderId[] = ["groq", "openrouter", "openai", "anthropic", "google", "custom"];
+export const AUTO_PROVIDER_ORDER: AIProviderId[] = ["openrouter", "groq", "openai", "anthropic", "google", "custom"];
 
 export function autoSelectProvider(
   usable: (id: AIProviderId) => boolean,
@@ -331,8 +336,9 @@ export function hasExplicitProviderChoice(
 ): boolean {
   const taskDefault = TASK_DEFAULT_PROVIDER[taskType as AITaskId];
   const envVar = TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general;
+  const selectedDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || env.AI_PROVIDER_DEFAULT;
   const candidates = taskDefault
-    ? [dbProviders[taskProviderConfigKey(taskType)], env[envVar]]
+    ? [dbProviders[taskProviderConfigKey(taskType)], env[envVar], selectedDefault === "openrouter" ? selectedDefault : undefined]
     : [dbProviders[taskProviderConfigKey(taskType)], dbProviders[DEFAULT_PROVIDER_CONFIG_KEY], env[envVar], env.AI_PROVIDER_DEFAULT];
   return candidates.some((c) => isAIProviderId(String(c ?? "").trim().toLowerCase()));
 }
@@ -499,8 +505,10 @@ export function resolveProviderForTask(
   const envVar = TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general;
   const taskDefault = TASK_DEFAULT_PROVIDER[taskType as AITaskId];
   if (taskDefault) {
-    // Tasks with their own default ignore the GLOBAL default (see above).
-    const raw = String(dbTask || env[envVar] || taskDefault).trim().toLowerCase();
+    // The historical visa default remains Groq only when OpenRouter is not
+    // explicitly selected. OpenRouter is the platform default when requested.
+    const selectedDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || env.AI_PROVIDER_DEFAULT;
+    const raw = String(dbTask || env[envVar] || (selectedDefault === "openrouter" ? "openrouter" : taskDefault)).trim().toLowerCase();
     return isAIProviderId(raw) ? (raw as AIProviderId) : taskDefault;
   }
   const dbDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY];

@@ -43,6 +43,7 @@ import { AI_PROVIDERS, providerBaseUrl } from "@/lib/ai/settings";
 import { validateAIEvidence, aiEvidenceToSourceEvidence } from "./ai/validate";
 import { decideFinalClassification } from "./ai/decide";
 import { hasContentEvidenceFor } from "./extract";
+import { runMercuryDecision } from "@/lib/ai/decide";
 import type { AIExtractionResult, AIProvider } from "./ai/types";
 import type { RunRequest, RunStatus, AuditReport, SourceEvidence, FieldDecision } from "./types";
 
@@ -748,6 +749,28 @@ export async function runUniversity(
         });
         aiSession.calls++;
         if (aiRes) {
+          const verification = aiSession.calls < AGENT_CONFIG.aiMaxCallsPerRun
+            ? await runMercuryDecision({
+            timeoutMs: 3_500,
+            state: JSON.stringify({
+              officialSourceUrl: p.url,
+              officialPageTitle: p.structure.title || p.title || "",
+              sourceText: (p.structure.mainTextNoLinks || p.text).slice(0, 8_000),
+              proposedStructuredEvidence: (aiRes.evidence || []).slice(0, 20),
+            }),
+            questions: [{
+              key: "sourceEvidenceSupport",
+              type: "score",
+              question: "Score 0 to 100 how strongly the cited official page text directly supports every proposed extracted fact and exact evidence quote. Use a low score for unsupported, contradictory, or invented values; do not infer facts from unrelated page content.",
+            }],
+          })
+            : null;
+          if (verification) aiSession.calls++;
+          const verificationScore = verification?.signals.sourceEvidenceSupport?.score ?? null;
+          if (!verification || !verification.available || verificationScore === null || verificationScore < 80) {
+            aiSession.fallbacks++;
+            progress(`Mercury verification unavailable or below threshold for ${p.url} — using deterministic regex results`);
+          } else {
           aiExtractByUrl.set(p.url, aiRes);
           aiSession.extractedPages.push(p.url);
           const pageTextForQuote = p.structure.mainTextNoLinks || p.text;
@@ -796,6 +819,7 @@ export async function runUniversity(
                 confidence: s.confidence, aiGenerated: true,
               });
             }
+          }
           }
         } else {
           aiSession.fallbacks++;

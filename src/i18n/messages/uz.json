@@ -715,7 +715,18 @@
     "essayLoadLatestSaved": "Saqlangan so‘nggi qoralamani yuklash",
     "chatCounselorTitle": "ScholarBridgeAI maslahatchisi",
     "chatOnline": "Onlayn",
-    "chatPersonalized": "{name} · {major} uchun shaxsiy tavsiyalar"
+    "chatPersonalized": "{name} · {major} uchun shaxsiy tavsiyalar",
+    "essayBehaviorSignalsTitle": "Yozuv xulqi signallari (Respan)",
+    "essayBehaviorUnavailable": "Qo‘shimcha baholash vaqtincha mavjud emas; yozuv tahlili saqlanadi.",
+    "essayBehaviorNotScored": "Baholanmadi",
+    "essayBehavior_specificityAndEvidence": "Aniqlik va shaxsiy dalillar",
+    "essayBehavior_promptRelevance": "Topshiriqqa muvofiqlik",
+    "essayBehavior_personalOwnership": "Shaxsiy ovoz va hissangiz",
+    "essayBehavior_unsupportedOrInconsistentClaims": "Asossiz yoki nomuvofiq da’volar",
+    "essayBehaviorTip_specificityAndEvidence": "O‘z tajribangizdan aniq va rost tafsilot keltiring.",
+    "essayBehaviorTip_promptRelevance": "Har bir paragrafni rasmiy topshiriqning bir qismiga bog‘lang.",
+    "essayBehaviorTip_personalOwnership": "Faqat jamoa yoki tashkilotni emas, o‘z tanlovingiz va hissangizni tasvirlang.",
+    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Har bir da’voni tekshiring va matnning qolgan qismi bilan solishtiring."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -998,6 +1009,12 @@
     "answerRubric": "Javoblar tahlili",
     "rubricComputed": "Suhbat yozuvidan deterministik hisoblanadi — bir xil javoblar doim bir xil ball oladi.",
     "rubricOverallReadiness": "Suhbat mashqi mezoni",
+    "openRouterReviewTitle": "Qo‘shimcha model tahlili (OpenRouter)",
+    "openRouterInterviewDisclosure": "Agar administrator OpenRouter xizmatini sozlagan bo‘lsa, javoblaringiz matn yaratish va qo‘shimcha sifat tekshiruvlari uchun tashqi xizmatlarga yuborilishi mumkin. Juda maxfiy ma’lumotlarni kiritmang. Bu mashq uchun fikr-mulohaza, viza maslahati emas.",
+    "openRouterReviewNotice": "Mercury va Respan suhbat matni bo‘yicha qo‘shimcha tuzilgan fikr beradi. Bu taxminlar viza maslahati yoki immigratsion qaror emas.",
+    "mercuryReviewLabel": "Mercury tuzilgan qarori",
+    "respanReviewLabel": "Respan muloqot sifati ko‘rsatkichlari",
+    "reviewNotScored": "Baholanmagan",
     "unansweredPrefix": "Mazmunli javob berilmagan:",
     "turnFeedbackTitle": "Har bir javob bo‘yicha tavsiyalar",
     "turnFeedbackIntro": "Bu deterministik belgilar har bir yozib olingan javobda nimalar borligini ko‘rsatadi. Bu mashq uchun fikr-mulohaza, viza qarori emas.",
@@ -1039,7 +1056,20 @@
     "loadModelAnswer": "95/100 namuna javobni yuklash",
     "modelAnswerHint": "Kutilgan batafsil darajani ko'ring, so'ng o'z so'zlaringiz bilan javob bering.",
     "modelAnswerTip": "Endi uni o'z so'zlaringiz bilan qayta yozing — yodlangan matn ishonchni tez yo'qotadi.",
-    "modelAnswerLoaded": "Namuna javob matn maydoniga yuklandi — o'qib, o'zingizga moslashtiring."
+    "modelAnswerLoaded": "Namuna javob matn maydoniga yuklandi — o'qib, o'zingizga moslashtiring.",
+    "specialistReviewUnavailable": "Maxsus tuzilgan signallar hozircha mavjud emas; suhbat mezonlari natijasi saqlanadi.",
+    "review_academicPurposeClarity": "Akademik maqsadning aniqligi",
+    "review_financialSufficiencyCredibility": "Moliyaviy ta’minotning ishonchliligi",
+    "review_homeCountryTiesStrength": "Vatanga qaytish rejalari va aloqalar",
+    "review_overallConsularReadiness": "Suhbatga tayyorgarlik",
+    "review_directAndConfident": "Aniq va ishonchli javoblar",
+    "review_concreteFactsAndNumbers": "Aniq faktlar va raqamlar",
+    "review_hesitationOrVagueness": "Ikkiyoqlanish yoki mavhumlik",
+    "review_contradictionRisk": "Ehtimoliy nomuvofiqliklar",
+    "reviewTip_directAndConfident": "Avval savolga javob bering, so‘ng qisqa sabab qo‘shing.",
+    "reviewTip_concreteFactsAndNumbers": "Bitta aniq va rost ism, sana yoki moliyaviy raqamni keltiring.",
+    "reviewTip_hesitationOrVagueness": "Umumiy fikr o‘rniga shaxsiy, aniq misol keltiring.",
+    "reviewTip_contradictionRisk": "Sanalar, moliyaviy raqamlar va dastur tafsilotlarini muvofiqligini tekshiring."
   },
   "strength": {
     "title": "Profil ma’lumotlari qamrovi",
@@ -4374,7 +4404,11 @@
     "manageApplications": "📋 Arizalarni boshqarish",
     "cardDetails": "Talablar va ball tafsiloti",
     "coversSavedFull": "🎯 {unis} — 100% to'liq qoplaydi",
-    "coversSaved": "✓ {unis} uchun amal qiladi"
+    "coversSaved": "✓ {unis} uchun amal qiladi",
+    "mercuryReviewTitle": "AI yordamidagi muvofiqlik tekshiruvi (Mercury)",
+    "mercuryReviewDescription": "Bu faqat berilgan profil maydonlari va mukofot mezonlariga asoslangan qo‘shimcha bahodir. Bu muvofiqlik qarori yoki stipendiya yutish ehtimoli emas. Katalogning deterministik moslik natijasi va rasmiy tashkilot qoidalari asosiy hisoblanadi.",
+    "mercuryReviewValue": "Model berilgan profil barcha ma’lum mezonlarga mos kelish ehtimolini {percent}% deb baholadi.",
+    "mercuryReviewUnavailable": "Qo‘shimcha model tekshiruvi mavjud emas; katalogning deterministik moslik natijasi o‘zgarmaydi."
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",

@@ -15,6 +15,7 @@ import { db } from "@/db";
 import { aiEvaluations, fundingItems, studentProfiles } from "@/db/schema";
 import { authenticate } from "@/lib/auth";
 import { enforceFreeCap } from "@/lib/planLimits";
+import { reviewVisaConversation } from "@/lib/ai/visaReview";
 
 /**
  * POST /api/visa/analyze
@@ -94,6 +95,21 @@ export async function POST(req: Request) {
       if (savedProfile) profileContext = { ...savedProfile, fundingSources: savedFunding };
     }
 
+    // Independent typed signals add coaching only; a timeout/rate limit leaves
+    // the deterministic rubric and primary analysis untouched.
+    const openRouterReviewPromise = reviewVisaConversation({
+      destination: country.name,
+      homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
+      messages: history,
+      profileId: ownerId,
+      fundingContext: profileContext ? {
+        targetMajor: profileContext.targetMajor,
+        degreeLevel: profileContext.degreeLevel,
+        budgetAnnualUsd: profileContext.budgetAnnualUsd,
+        confirmedFunding: profileContext.fundingSources.map(({ name, kind, amountUsd }) => ({ name, kind, amountUsd })),
+      } : null,
+    });
+
     // Deterministic rubric — always computed, model or not.
     const rubric = scoreVisaInterview(history, {
       homeCountry: typeof body?.homeCountry === "string" ? body.homeCountry.slice(0, 60) : null,
@@ -138,6 +154,7 @@ export async function POST(req: Request) {
         estimated_visa_chance: null,
         chanceDisclaimer: visaChanceDisclaimer(null),
         recommendations: "",
+        openRouterReview: await openRouterReviewPromise,
       });
     }
     const uiLanguage =
@@ -172,6 +189,7 @@ export async function POST(req: Request) {
         estimated_visa_chance: null,
         chanceDisclaimer: visaChanceDisclaimer(null),
         recommendations: "",
+        openRouterReview: await openRouterReviewPromise,
       });
     }
 
@@ -189,6 +207,7 @@ export async function POST(req: Request) {
       rubric,
       // The model's number stays, but never unlabelled.
       chanceDisclaimer: visaChanceDisclaimer(analysis.estimated_visa_chance),
+      openRouterReview: await openRouterReviewPromise,
     });
   } catch (err) {
     console.error("Visa analyze error:", (err as Error)?.message);

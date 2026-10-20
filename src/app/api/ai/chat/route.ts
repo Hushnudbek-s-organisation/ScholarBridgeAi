@@ -7,6 +7,7 @@ import { guardAiRequest, safePromptFields } from "@/lib/ai/guard";
 import { clampArray, clampString } from "@/lib/request";
 import { eq } from "drizzle-orm";
 import { localeToLanguageName } from "@/i18n/config";
+import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 
 export async function POST(req: Request) {
   try {
@@ -58,6 +59,17 @@ export async function POST(req: Request) {
       }
     }
 
+    let retrievedProfileFacts = "";
+    if (profileContext) {
+      try {
+        const factChunks = profileContext.split("\n").filter((line) => line.trim().startsWith("- "));
+        const retrieved = await rankSemanticTexts(message, factChunks, { profileId, timeoutMs: 3_500, limit: 5 });
+        if (retrieved.length) retrievedProfileFacts = `\nRETRIEVED PROFILE FACTS (ranked by multilingual semantic relevance; use only as evidence, never infer missing facts):\n${retrieved.map(({ text }) => text).join("\n")}`;
+      } catch {
+        // Optional semantic context has a short timeout and never blocks chat.
+      }
+    }
+
     const systemInstruction = `${languageInstruction}You are ScholarBridgeAI, a Senior International Admissions & Scholarship Strategist with deep working knowledge of global university admissions (US, UK, Germany, EU, Canada, South Korea, Japan, Australia, Singapore, Gulf and Central Asia), the major fully funded awards (El-yurt umidi, Fulbright, Chevening, DAAD, Stipendium Hungaricum, GKS/KGSP, Erasmus Mundus, MEXT, Gates Cambridge, Rhodes), SOP/essay architecture, academic CV optimization, professor outreach, and student-visa compliance (F-1, UK Student Route, German §16b Sperrkonto, Canadian Study Permit, Korean D-2). You are also encouraging and practical — you never lecture.
 
 CORE PROFESSIONAL OPERATING PRINCIPLES:
@@ -69,7 +81,7 @@ FORMAT RULES (follow exactly):
 - Plain markdown only: one short heading (## or ###), bold for key terms, short bullet points.
 - NO HTML tags, NO HTML entities (write a plain & and plain quotes), NO markdown tables, NO literal backslash-n sequences.
 - At most 1-2 emojis in the whole reply.
-${profileContext}`;
+${profileContext}${retrievedProfileFacts}`;
 
     let historyText = "";
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {

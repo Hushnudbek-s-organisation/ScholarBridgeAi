@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { resolveProviderCredential } from "@/lib/ai/credentials";
+import { OPENROUTER_MODELS, isProviderEnabled, openRouterKey } from "@/lib/ai/openrouterModels";
 import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
@@ -86,56 +87,68 @@ export async function POST(req: Request) {
         ? rawLanguage
         : getVisaCountry(rawLanguage)?.locale ?? null;
 
-    // ---- Credential ---------------------------------------------------------
-    // Admin-panel key first, then env — same resolution order as every other
-    // AI surface, so one place configures the provider.
-    const credential = await resolveProviderCredential("openai");
-    const apiKey = credential.apiKey;
-    if (!apiKey) {
-      // No key: the client keeps using the browser voice. Not an error.
-      return new NextResponse(null, { status: 204 });
+    // OpenRouter is preferred when configured. Fish voice IDs are provider
+    // specific, so use optional admin-owned voice presets when supplied; when
+    // absent, Fish chooses its model default. OpenAI retains gender-specific
+    // voices as the automatic fallback.
+    const openRouterApiKey = await openRouterKey();
+    const openAiCredential = await isProviderEnabled("openai") ? await resolveProviderCredential("openai") : null;
+    const candidates: Array<{ provider: "openrouter" | "openai"; apiKey: string; model: string }> = [];
+    if (openRouterApiKey) candidates.push({
+      provider: "openrouter",
+      apiKey: openRouterApiKey,
+      model: process.env.OPENROUTER_TTS_MODEL?.trim() || OPENROUTER_MODELS.speech,
+    });
+    if (openAiCredential?.apiKey) candidates.push({
+      provider: "openai",
+      apiKey: openAiCredential.apiKey,
+      model: process.env.OPENAI_TTS_MODEL?.trim() || DEFAULT_MODEL,
+    });
+    if (candidates.length === 0) return new NextResponse(null, { status: 204 });
+
+    let audio: ArrayBuffer | null = null;
+    for (const candidate of candidates) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+      try {
+        const fishVoice = gender === "female"
+          ? process.env.OPENROUTER_TTS_VOICE_FEMALE?.trim()
+          : process.env.OPENROUTER_TTS_VOICE_MALE?.trim();
+        const body = candidate.provider === "openrouter"
+          ? { model: candidate.model, input: text, response_format: "mp3", ...(fishVoice ? { voice: fishVoice } : {}) }
+          : { model: candidate.model, voice: requestedVoice ?? VOICES[gender], input: text, response_format: "mp3", speed: 0.98, ...(language ? { instructions: `Speak in ${language}.` } : {}) };
+        const upstream = await fetch(
+          candidate.provider === "openrouter"
+            ? "https://openrouter.ai/api/v1/audio/speech"
+            : "https://api.openai.com/v1/audio/speech",
+          {
+            method: "POST",
+            signal: controller.signal,
+            headers: { authorization: `Bearer ${candidate.apiKey}`, "content-type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!upstream.ok || !upstream.body) {
+          console.warn(`visa/tts ${candidate.provider} upstream failed:`, upstream.status);
+          continue;
+        }
+        const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
+        if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+          console.warn(`visa/tts ${candidate.provider} returned a non-audio response`);
+          continue;
+        }
+        const candidateAudio = await upstream.arrayBuffer();
+        if (candidateAudio.byteLength === 0) continue;
+        audio = candidateAudio;
+        break;
+      } catch (error) {
+        console.warn(`visa/tts ${candidate.provider} request failed:`, error instanceof Error ? error.name : "unknown");
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    if (!audio) return new NextResponse(null, { status: 204 });
 
-    const model = process.env.OPENAI_TTS_MODEL?.trim() || DEFAULT_MODEL;
-    const voice = requestedVoice ?? VOICES[gender];
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-
-    let upstream: Response;
-    try {
-      upstream = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          voice,
-          input: text,
-          response_format: "mp3",
-          // A steady, unhurried consular register — closer to an interview than
-          // to a newsreader.
-          speed: 0.98,
-          ...(language ? { instructions: `Speak in ${language}.` } : {}),
-        }),
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (!upstream.ok || !upstream.body) {
-      // The upstream message can contain the request id but never the key; it
-      // is still not useful to a student, so it is logged and swallowed.
-      console.warn("visa/tts upstream failed:", upstream.status);
-      // 204 keeps the interview moving on the browser voice instead of showing
-      // an error for a cosmetic upgrade.
-      return new NextResponse(null, { status: 204 });
-    }
-
-    const audio = await upstream.arrayBuffer();
     return new NextResponse(audio, {
       status: 200,
       headers: {

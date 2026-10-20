@@ -17,8 +17,21 @@ import { SampleExemplarBar } from "./SampleExemplarBar";
 
 const GROUNDS = ["purposeOfStudy", "funding", "homeTies", "nonImmigrantIntent", "specificity", "languageClarity"] as const;
 
+type SampleTranslator = (key: string, values?: Record<string, string | number>) => unknown;
+function useSafeSampleT() {
+  const translate = useTranslations("samples") as unknown as SampleTranslator;
+  return (key: string, values?: Record<string, string | number>) => {
+    try {
+      const result = translate(key, values);
+      return typeof result === "string" ? result : key.split(".").pop()?.replaceAll("_", " ") || key;
+    } catch {
+      return key.split(".").pop()?.replaceAll("_", " ") || key;
+    }
+  };
+}
+
 function RubricPanel({ rubric }: { rubric: VisaRubric }) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const risks = rubric.risks.length;
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
@@ -99,7 +112,7 @@ export function VisaModelAnswers({
   onlyHinted?: boolean;
   className?: string;
 }) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const hinted = visaSampleCountryFor(countryHint);
   const hintedId = hinted ? VISA_SAMPLE_ID_BY_COUNTRY[hinted] : null;
   // A manual pick wins until the hint changes to another country.
