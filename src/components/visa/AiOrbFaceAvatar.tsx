@@ -252,7 +252,6 @@ export function AiOrbFaceAvatar({
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const ringId = `aiOrbRing${uid}`;
   const faceId = `aiOrbFace${uid}`;
-  const cheekId = `aiOrbCheek${uid}`;
   const eyeLId = `aiOrbEyeL${uid}`;
   const eyeRId = `aiOrbEyeR${uid}`;
 
@@ -316,14 +315,9 @@ export function AiOrbFaceAvatar({
 
             {/* Off-centre radial, so a flat circle reads as a lit sphere. */}
             <radialGradient id={faceId} cx="36%" cy="26%" r="82%">
-              <stop offset="0%" stopColor="#f0f9ff" />
-              <stop offset="55%" stopColor="#d8f0fe" />
-              <stop offset="100%" stopColor="#b6e0fe" />
-            </radialGradient>
-
-            <radialGradient id={cheekId}>
-              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#fb7185" stopOpacity="0" />
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="65%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#f1f5f9" />
             </radialGradient>
 
             {/* The angled upper lids. The dark eye geometry is clipped to these,
@@ -346,20 +340,6 @@ export function AiOrbFaceAvatar({
           <circle cx="110" cy="110" r="104" fill="none" stroke={`url(#${ringId})`} strokeWidth="8" />
           <circle cx="110" cy="110" r="100" fill={`url(#${faceId})`} />
 
-          {/* Specular arc across the top: the one highlight that sells a sphere. */}
-          <path
-            d="M 54 62 A 74 74 0 0 1 166 62"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="7"
-            strokeLinecap="round"
-            opacity="0.75"
-          />
-
-          {/* Cheek glows, kept low and soft so they never read as a blush mask. */}
-          <ellipse cx="66" cy="137" rx="19" ry="11" fill={`url(#${cheekId})`} />
-          <ellipse cx="154" cy="137" rx="19" ry="11" fill={`url(#${cheekId})`} />
-
           {/* Eyes. The ellipses are sized so their own curves bound the sides and
               bottom, leaving only the lid to clip them — no straight cut at the
               clip edge. Gaze and blink compose in one transform. */}
@@ -375,10 +355,6 @@ export function AiOrbFaceAvatar({
               <ellipse cx="136" cy="93" rx="5.5" ry="4.5" fill="#ffffff" opacity="0.85" />
             </g>
           </g>
-
-          {/* Bold upper-lid contours, drawn over the eyes. */}
-          <line x1="45" y1="88" x2="105" y2="76" stroke="#18181b" strokeWidth="5.5" strokeLinecap="round" />
-          <line x1="115" y1="76" x2="175" y2="88" stroke="#18181b" strokeWidth="5.5" strokeLinecap="round" />
 
           {/* Mouth. Speaks, or rests as a closed capsule. */}
           {speaking ? (

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aiChat, aiErrorStatus, describeAiError, isAiConfigured } from "@/lib/ai/index";
+import { aiChat, isAiConfigured } from "@/lib/ai/index";
 import { authenticate } from "@/lib/auth";
 import {
   buildInterviewUserPrompt,
@@ -105,11 +105,22 @@ export async function POST(req: Request) {
         temperature: 0.8,
         maxTokens: 2048,
         reasoningEffort: "low",
+        // Visa turns should fail over quickly rather than leave the officer thinking for minutes.
+        timeoutMs: 12_000,
       },
-      { maxAttempts: 3 },
+      { maxAttempts: 3, baseDelayMs: 100 },
     );
     if (!result.ok) {
-      return NextResponse.json({ error: describeAiError(result.error) }, { status: aiErrorStatus(result.error) });
+      // Keep practice usable when a configured provider is overloaded or its
+      // key/model is temporarily unusable. This is an explicit scripted reply,
+      // labelled to the client as offline rather than pretending it is AI.
+      const scripted = nextScriptedQuestion(country, history as VisaMessage[]);
+      return NextResponse.json({
+        reply: scripted.reply,
+        aiUsed: false,
+        source: "script",
+        closing: scripted.closing,
+      });
     }
 
     const reply = result.response.text.trim();

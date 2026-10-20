@@ -34,6 +34,8 @@ export interface ConnectionTestResult {
   provider: AIProviderId;
   message: string;
   latencyMs: number;
+  /** Identifies which credential was tested without exposing its value. */
+  keySource?: "typed" | "stored" | "environment";
   model?: string;
   checks?: HealthCheckStep[];
 }
@@ -91,18 +93,22 @@ export async function testProviderConnection(
   const started = Date.now();
   const meta = AI_PROVIDERS[provider];
   const checks: HealthCheckStep[] = [];
+  let key: string | undefined;
+  let keySource: ConnectionTestResult["keySource"];
   const done = (ok: boolean, message: string, model?: string): ConnectionTestResult => ({
     ok,
     provider,
     message: redactSecrets(message, [key]),
     latencyMs: Date.now() - started,
+    ...(keySource ? { keySource } : {}),
     ...(model ? { model } : {}),
     checks,
   });
 
   const cred = await resolveProviderCredential(provider);
-  let key = apiKey?.trim();
-  if (!key) key = cred.apiKey;
+  const typedKey = apiKey?.trim();
+  key = typedKey || cred.apiKey;
+  keySource = typedKey ? "typed" : cred.apiKeySource === "db" ? "stored" : cred.apiKeySource === "env" ? "environment" : undefined;
   const model = opts.model?.trim() || cred.model;
   if (!key) return done(false, "No API key configured for this provider");
 

@@ -204,9 +204,10 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
       if (modelDrafts[provider]?.trim()) body.model = modelDrafts[provider].trim();
       const json = await send("POST", body);
       const latency = json.latencyMs !== undefined ? ` (${json.latencyMs} ms)` : "";
+      const source = json.keySource === "typed" ? "typed key" : json.keySource === "stored" ? "saved key" : json.keySource === "environment" ? "environment key" : "no key";
       setTestResults((r) => ({
         ...r,
-        [provider]: { ok: Boolean(json.ok), text: `${json.ok ? "Connected ✓" : "Connection failed"} — ${String(json.message ?? "")}${latency}`, steps: (json.checks as HealthStep[]) ?? [] },
+        [provider]: { ok: Boolean(json.ok), text: `${json.ok ? "Connected ✓" : "Connection failed"} — ${String(json.message ?? "")} [tested ${source}]${latency}`, steps: (json.checks as HealthStep[]) ?? [] },
       }));
     } catch (err) {
       setTestResults((r) => ({ ...r, [provider]: { ok: false, text: errText(err, "Test failed") } }));
