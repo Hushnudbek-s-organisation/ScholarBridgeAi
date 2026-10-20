@@ -30,6 +30,7 @@
     "test:documents": "tsx scripts/check-documents.ts",
     "test:essays": "tsx scripts/check-essays.ts",
     "test:visa": "tsx scripts/check-visa-similar.ts && tsx scripts/check-visa-scoring.ts",
+    "test:visa-render": "tsx scripts/check-visa-render.tsx",
     "test:samples": "tsx scripts/check-samples.ts",
     "test:costs": "tsx scripts/check-costs.ts",
     "test:video": "tsx scripts/check-video-player.ts",

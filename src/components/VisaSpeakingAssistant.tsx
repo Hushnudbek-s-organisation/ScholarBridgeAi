@@ -45,6 +45,21 @@ function safeKeyFallback(key: string): string {
   return leaf.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ");
 }
 
+/** `preferredCountries` is stored as nullable text and may be JSON or a CSV. */
+function normalizePreferredCountries(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+  if (typeof value !== "string" || !value.trim()) return [];
+  const raw = value.trim();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+    if (typeof parsed === "string" && parsed.trim()) return [parsed.trim()];
+  } catch {
+    // Older profiles may store plain comma/semicolon-separated text.
+  }
+  return raw.split(/[,;|]/).map((item) => item.trim().replace(/^['\"]|['\"]$/g, "")).filter(Boolean);
+}
+
 import { GoogleGenAI, Modality, type LiveServerMessage } from "@google/genai";
 import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
@@ -957,7 +972,7 @@ export function VisaSpeakingAssistant({
 
   const countryPickerSearching = countrySearch.trim() !== "";
   const visibleVisaCountries = (() => {
-    const preferred = (activeProfile?.preferredCountries ?? []) as string[];
+    const preferred = normalizePreferredCountries(activeProfile?.preferredCountries);
     const ranked = rankCountryPicks(VISA_COUNTRIES, {
       isSelected: (c) => c.code === (countryCode ?? "") || matchesAnyCountry(c.name, preferred),
       priorityCodes: ["us", "gb", "de", "ca", "kr", "au", "sg", "jp"],
