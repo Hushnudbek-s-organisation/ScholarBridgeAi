@@ -24,6 +24,19 @@ import { useSampleLibrary } from "./useSampleLibrary";
 
 export type SampleVariant = "en" | "uz";
 
+type SampleTranslator = (key: string, values?: Record<string, string | number>) => unknown;
+function useSafeSampleT() {
+  const translate = useTranslations("samples") as unknown as SampleTranslator;
+  return (key: string, values?: Record<string, string | number>) => {
+    try {
+      const result = translate(key, values);
+      return typeof result === "string" ? result : key.split(".").pop()?.replaceAll("_", " ") || key;
+    } catch {
+      return key.split(".").pop()?.replaceAll("_", " ") || key;
+    }
+  };
+}
+
 const secondaryButton =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60";
 const primaryButton =
@@ -83,7 +96,7 @@ function HighlightedRun({ text }: { text: string }) {
 
 /** Numbered paragraphs, each with its structural badge and the localized reason it works. */
 export function AnnotatedSample({ text, roles }: { text: string; roles: SampleRole[] }) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const paragraphs = splitParagraphs(text);
   return (
     <ol className="space-y-2" aria-label={t("annotatedTitle")}>
@@ -124,7 +137,7 @@ export function AnnotatedSample({ text, roles }: { text: string; roles: SampleRo
 
 /** Words · evidence figures · placeholders left · practice limit. */
 export function SampleMeta({ text, wordLimit }: { text: string; wordLimit?: number | null }) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const placeholders = placeholderCount(text);
   const parts = [t("words", { n: sampleWordCount(text) }), t("evidence", { n: evidenceCount(text) })];
   return (
@@ -191,7 +204,7 @@ export function SampleExemplarBar<G extends SampleGroup>({
   renderExtra,
   className = "",
 }: SampleExemplarBarProps<G>) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const { lib, failed, retry } = useSampleLibrary();
   const baseId = useId();
   const [localId, setLocalId] = useState<string | null>(null);
@@ -370,7 +383,7 @@ export function SampleInlineCard({
   onLoad?: () => void;
   loadLabel?: string;
 }) {
-  const t = useTranslations("samples");
+  const t = useSafeSampleT();
   const { state: copyState, copy } = useCopy();
   return (
     <section

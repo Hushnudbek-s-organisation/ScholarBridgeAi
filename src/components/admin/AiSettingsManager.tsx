@@ -12,6 +12,7 @@
  * Keys are typed here but NEVER returned by the API.
  */
 import React, { useCallback, useEffect, useState } from "react";
+import { OPENROUTER_MODEL_IDS } from "@/lib/ai/openrouterModelIds";
 import {
   AlertTriangle,
   Bot,
@@ -97,6 +98,15 @@ async function send(method: "PUT" | "POST", body: Record<string, unknown>): Prom
 
 const errText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
 
+const OPENROUTER_FREE_STACK = [
+  ["Text / chat", OPENROUTER_MODEL_IDS.chat],
+  ["Text-to-speech", OPENROUTER_MODEL_IDS.speech],
+  ["Text embeddings", OPENROUTER_MODEL_IDS.textEmbedding],
+  ["Vision + document embeddings", OPENROUTER_MODEL_IDS.multimodalEmbedding],
+  ["Structured decisions", OPENROUTER_MODEL_IDS.decisions],
+  ["Behavior evaluation", OPENROUTER_MODEL_IDS.evaluation],
+] as const;
+
 export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -180,6 +190,9 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
 
   const toggleProvider = (provider: string, enabled: boolean) =>
     void run(provider, () => send("PUT", { provider, enabled }), enabled ? "Provider enabled" : "Provider disabled");
+
+  const routeAllToOpenRouter = () =>
+    void run("route-all", () => send("PUT", { routeAllTasks: true, provider: "openrouter" }), "All six tasks now route to OpenRouter");
 
   const testProvider = async (provider: string, deep: boolean) => {
     const key = `test:${provider}`;
@@ -321,6 +334,9 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
             : { label: "Not configured", cls: "bg-slate-100 text-slate-500 border-slate-200" };
           const keyId = `ai-key-${p.provider}`;
           const modelId = `ai-model-${p.provider}`;
+          const capabilityBadges = p.provider === "openrouter"
+            ? ["text", "structured", "tools", "streaming", "audio (TTS)", "embeddings", "vision-embed", "decision", "evaluation"]
+            : p.capabilities ?? [];
 
           return (
             <div key={p.provider} className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 ${enabled ? "" : "opacity-75"}`}>
@@ -342,13 +358,26 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                 </button>
               </div>
 
-              {p.capabilities && p.capabilities.length > 0 && (
+              {capabilityBadges.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {p.capabilities.map((c) => (
+                  {capabilityBadges.map((c) => (
                     <span key={c} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{c}</span>
                   ))}
                   {p.protocol === "live" && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">voice interview only</span>}
                 </div>
+              )}
+              {p.provider === "openrouter" && (
+                <section className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3" aria-label="Active OpenRouter Free Model Stack">
+                  <p className="text-[11px] font-extrabold text-indigo-950">Active OpenRouter Free Model Stack (1 API Key)</p>
+                  <ul className="mt-2 space-y-1">
+                    {OPENROUTER_FREE_STACK.map(([role, model]) => (
+                      <li key={model} className="flex flex-wrap gap-x-2 text-[10px] leading-relaxed">
+                        <span className="font-bold text-slate-700">{role}:</span>
+                        <code className="break-all text-indigo-800">{model}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
               {p.baseUrlConfigured === false && (
                 <p className="text-[11px] font-semibold text-amber-700">Set AI_CUSTOM_BASE_URL on the server to use this provider (the base URL is deployment configuration, not editable here).</p>
@@ -447,14 +476,23 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
 
       {/* --- Task → provider mapping --- */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
             <Zap className="h-4 w-4 text-amber-600" />
           </div>
           <h3 className="text-sm font-extrabold text-slate-800">Task → Provider mapping</h3>
+          <button
+            type="button"
+            onClick={routeAllToOpenRouter}
+            disabled={busy["route-all"] || !providerList.some((provider) => provider.provider === "openrouter")}
+            className="ml-auto rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {busy["route-all"] ? "Routing…" : "Route All Tasks to OpenRouter"}
+          </button>
+          {msgLine("route-all")}
         </div>
         <p className="text-xs text-slate-500">
-          “Auto” follows the default provider. The visa interview keeps Groq unless you map it explicitly.
+          “Auto” follows the configured default. Visa follows the same routing policy; when OpenRouter is active it is preferred, with Groq available as a transient-failure fallback.
         </p>
 
         <div className="divide-y divide-slate-100">

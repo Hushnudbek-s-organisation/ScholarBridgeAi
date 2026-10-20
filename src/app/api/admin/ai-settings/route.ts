@@ -134,6 +134,18 @@ export async function PUT(req: Request) {
     if (!parsed.ok) return bad(parsed.error, parsed.code, parsed.status);
     const body = parsed.body;
 
+    if (body.routeAllTasks === true) {
+      const provider = String(body.provider ?? "openrouter");
+      if (!isAIProviderId(provider) || !isChatProvider(provider)) return bad(`Unknown chat provider: ${provider}`);
+      for (const task of AI_TASKS) {
+        const key = taskProviderConfigKey(task.id);
+        const before = await getStoredConfig(key).catch(() => null);
+        await setConfig(key, provider, `AI provider for task "${task.id}" (managed via AI Settings)`);
+        await audit(`ai_provider_task_${task.id}`, before, provider, actorId);
+      }
+      return NextResponse.json({ success: true, ...(await snapshot()) });
+    }
+
     // --- Provider enable / disable ---
     if (body.provider !== undefined && typeof body.enabled === "boolean") {
       const provider = String(body.provider);

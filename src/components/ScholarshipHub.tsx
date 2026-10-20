@@ -130,6 +130,7 @@ export function ScholarshipHub({
   const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [mercuryEligibilityReview, setMercuryEligibilityReview] = useState<{ available: boolean; probabilityPercent: number | null; deterministicEligibility: boolean | null } | null>(null);
   // `loading` = first load (skeletons); `refreshing` = a later filter/page
   // change, where the current cards stay mounted instead of collapsing.
   const [loading, setLoading] = useState(true);
@@ -279,6 +280,7 @@ export function ScholarshipHub({
     if (cached) {
       hasLoadedRef.current = true;
       setScholarships(cached.data.scholarships);
+      setMercuryEligibilityReview(null);
       setTotalCount(cached.data.total);
       setTotalPages(cached.data.totalPages);
       setLoading(false);
@@ -296,6 +298,16 @@ export function ScholarshipHub({
       const res = await fetch(`/api/scholarships?${queryKey}`, { signal });
       const data = await res.json();
       hasLoadedRef.current = true;
+      const rawEligibility = data.mercuryEligibilityReview && typeof data.mercuryEligibilityReview === "object" && !Array.isArray(data.mercuryEligibilityReview)
+        ? data.mercuryEligibilityReview as Record<string, unknown>
+        : null;
+      setMercuryEligibilityReview(rawEligibility ? {
+        available: rawEligibility.available === true,
+        probabilityPercent: typeof rawEligibility.probabilityPercent === "number" && Number.isFinite(rawEligibility.probabilityPercent)
+          ? Math.max(0, Math.min(100, Math.round(rawEligibility.probabilityPercent)))
+          : null,
+        deterministicEligibility: typeof rawEligibility.deterministicEligibility === "boolean" ? rawEligibility.deterministicEligibility : null,
+      } : null);
       if (data.scholarships) {
         const nextTotal =
           typeof data.total === "number" ? data.total : data.scholarships.length;
@@ -522,6 +534,18 @@ export function ScholarshipHub({
         </span>
         <span className="shrink-0">{t("pageOf", { page, totalPages })}</span>
       </div>
+
+      {mercuryEligibilityReview && (
+        <aside className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs dark:border-indigo-300/20 dark:bg-indigo-300/10" aria-live="polite">
+          <h3 className="font-bold text-indigo-950 dark:text-indigo-100">{t("mercuryReviewTitle")}</h3>
+          <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{t("mercuryReviewDescription")}</p>
+          <p className="mt-2 font-semibold text-indigo-900 dark:text-indigo-100">
+            {mercuryEligibilityReview.available && mercuryEligibilityReview.probabilityPercent !== null
+              ? t("mercuryReviewValue", { percent: mercuryEligibilityReview.probabilityPercent })
+              : t("mercuryReviewUnavailable")}
+          </p>
+        </aside>
+      )}
 
       {/* Grid List */}
       {loading ? (

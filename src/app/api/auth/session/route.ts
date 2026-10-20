@@ -13,22 +13,37 @@ export const dynamic = "force-dynamic";
  *  - 401 when there is no (valid) session
  */
 export async function GET(req: Request) {
-  const auth = await authenticate(req);
-  if (!auth.ok) {
+  try {
+    const auth = await authenticate(req);
+    if (!auth.ok) {
+      return NextResponse.json(
+        { error: auth.error, code: auth.code, session: null },
+        { status: auth.status, headers: { "Cache-Control": "no-store" } }
+      );
+    }
     return NextResponse.json(
-      { error: auth.error, code: auth.code, session: null },
-      { status: auth.status, headers: { "Cache-Control": "no-store" } }
+      {
+        session: {
+          profileId: auth.session.profile.id,
+          isAdmin: auth.session.isAdmin,
+          expiresAt: new Date(auth.session.payload.exp * 1000).toISOString(),
+        },
+        profile: sanitizeProfile(auth.session.profile),
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    const missingSessionSecret = error instanceof Error && error.message.includes("SESSION_SECRET");
+    console.error("GET /api/auth/session failed:", missingSessionSecret ? "SESSION_SECRET is missing or too short" : (error as Error)?.message);
+    return NextResponse.json(
+      {
+        error: missingSessionSecret
+          ? "This deployment needs a SESSION_SECRET of at least 32 characters. Ask the site administrator to add it in Render Environment settings."
+          : "The session service could not be reached. Please try again; if this continues, contact the site administrator.",
+        code: missingSessionSecret ? "session_secret_required" : "session_service_unavailable",
+        session: null,
+      },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
     );
   }
-  return NextResponse.json(
-    {
-      session: {
-        profileId: auth.session.profile.id,
-        isAdmin: auth.session.isAdmin,
-        expiresAt: new Date(auth.session.payload.exp * 1000).toISOString(),
-      },
-      profile: sanitizeProfile(auth.session.profile),
-    },
-    { headers: { "Cache-Control": "no-store" } }
-  );
 }
