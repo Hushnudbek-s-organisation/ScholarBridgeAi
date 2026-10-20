@@ -78,6 +78,8 @@ export interface AIRequest {
   maxTokens?: number;
   /** Ask for a JSON object (only sent to providers with "structured"). */
   jsonMode?: boolean;
+  /** Optional per-request provider timeout; defaults to 60 seconds. */
+  timeoutMs?: number;
   /** Reasoning hint (only sent to model families that accept it). */
   reasoningEffort?: "low" | "medium" | "high";
   /**
@@ -213,14 +215,15 @@ async function readError(provider: string, res: Response, apiKey: string): Promi
   return new AIProviderError(provider, categorizeStatus(res.status), `HTTP ${res.status}${safe ? ` — ${safe}` : ""}`, res.status);
 }
 
-async function timedFetch(provider: string, url: string, init: RequestInit): Promise<Response> {
+async function timedFetch(provider: string, url: string, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const timeout = Math.max(1_000, Math.min(timeoutMs, REQUEST_TIMEOUT_MS));
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeout);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
     if ((err as Error)?.name === "AbortError") {
-      throw new AIProviderError(provider, "timeout", `Timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+      throw new AIProviderError(provider, "timeout", `Timed out after ${timeout / 1000}s`);
     }
     throw new AIProviderError(provider, "network", "Network error reaching the provider");
   } finally {
@@ -268,7 +271,7 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
           // OpenRouter returns the billed USD amount only when asked (usage accounting).
           ...(name === "openrouter" ? { usage: { include: true } } : {}),
         }),
-      });
+      }, req.timeoutMs);
       if (!res.ok) throw await readError(name, res, cfg.apiKey);
       const data = await res.json();
       const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;
@@ -310,7 +313,7 @@ const anthropic: AIProviderAdapter = {
         ...(system ? { system } : {}),
         messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
       }),
-    });
+    }, req.timeoutMs);
     if (!res.ok) throw await readError("anthropic", res, cfg.apiKey);
     const data = await res.json();
     const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;

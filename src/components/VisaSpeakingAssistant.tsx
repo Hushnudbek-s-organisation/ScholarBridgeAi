@@ -893,17 +893,6 @@ export function VisaSpeakingAssistant({
   const meterRafRef = useRef(0);
   /** Watchdog for a speechSynthesis utterance whose onend never fires. */
   const speakWatchdogRef = useRef<number | null>(null);
-  /**
-   * Neural-voice playback (POST /api/visa/tts). The audio is routed through an
-   * AnalyserNode so the officer's mouth is driven by the REAL waveform rather
-   * than by the synthetic syllable oscillator — which is only needed for
-   * browser speechSynthesis, since that API exposes no amplitude at all.
-   */
-  const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
-  const ttsRafRef = useRef(0);
-  /** Set once the server answers 204/no-key, so we stop re-asking every turn. */
-  const ttsUnavailableRef = useRef(false);
   /** Watchdog for a Gemini Live turn that stops producing audio mid-speech. */
   const liveSpeakWatchdogRef = useRef<number | null>(null);
   /** Retry timer for a `SpeechRecognition.start()` that threw (transient). */
@@ -921,6 +910,8 @@ export function VisaSpeakingAssistant({
   const liveSessionHandleRef = useRef<string | null>(null);
   const liveIntentionalCloseRef = useRef(false);
   const liveReconnectTimerRef = useRef<number | null>(null);
+  /** If Gemini Live connects but gives no kickoff question, start text fallback. */
+  const liveKickoffTimerRef = useRef<number | null>(null);
   /** Ends a Live session at the server's time cap; falls back to text practice. */
   const liveSessionLimitTimerRef = useRef<number | null>(null);
   const liveReconnectAttemptsRef = useRef(0);
@@ -1085,18 +1076,6 @@ export function VisaSpeakingAssistant({
       meterAudioCtxRef.current?.close().catch(() => {});
       meterAudioCtxRef.current = null;
 
-      // A neural clip still playing would keep talking over the next screen.
-      try {
-        ttsSourceRef.current?.stop();
-      } catch {
-        // already stopped
-      }
-      ttsSourceRef.current = null;
-      cancelAnimationFrame(ttsRafRef.current);
-      ttsRafRef.current = 0;
-      ttsAudioCtxRef.current?.close().catch(() => {});
-      ttsAudioCtxRef.current = null;
-
       if (speakWatchdogRef.current !== null) {
         window.clearTimeout(speakWatchdogRef.current);
         speakWatchdogRef.current = null;
@@ -1104,6 +1083,10 @@ export function VisaSpeakingAssistant({
       if (liveSpeakWatchdogRef.current !== null) {
         window.clearTimeout(liveSpeakWatchdogRef.current);
         liveSpeakWatchdogRef.current = null;
+      }
+      if (liveKickoffTimerRef.current !== null) {
+        window.clearTimeout(liveKickoffTimerRef.current);
+        liveKickoffTimerRef.current = null;
       }
       if (micRetryTimerRef.current !== null) {
         window.clearTimeout(micRetryTimerRef.current);
@@ -1215,6 +1198,13 @@ export function VisaSpeakingAssistant({
       }
     }
 
+    function clearLiveKickoffTimer(): void {
+      if (liveKickoffTimerRef.current !== null) {
+        window.clearTimeout(liveKickoffTimerRef.current);
+        liveKickoffTimerRef.current = null;
+      }
+    }
+
     /**
      * The officer's turn must always end. If the socket stops mid-speech (or
      * the audio player never drains), mic chunks stay suppressed forever — the
@@ -1239,6 +1229,7 @@ export function VisaSpeakingAssistant({
 
     function closeLiveSession(): void {
       clearLiveReconnectTimer();
+      clearLiveKickoffTimer();
       clearLiveSessionLimitTimer();
       liveIntentionalCloseRef.current = true;
       try {
@@ -1341,89 +1332,6 @@ export function VisaSpeakingAssistant({
       }
     }
 
-    /**
-     * Stop any neural clip that is still playing (barge-in, mute, unmount).
-     * speechSynthesis has its own cancel; this is the server-voice equivalent.
-     */
-    function stopNeuralSpeech(): void {
-      try {
-        ttsSourceRef.current?.stop();
-      } catch {
-        // already stopped — AudioBufferSourceNode.stop() throws if called twice
-      }
-      ttsSourceRef.current = null;
-      cancelAnimationFrame(ttsRafRef.current);
-      ttsRafRef.current = 0;
-      setOutputLevel(0);
-    }
-
-    /**
-     * Play a server-rendered voice clip and drive `outputLevel` from the real
-     * waveform, so the avatar's mouth tracks the actual audio.
-     *
-     * Returns false when playback could not start (no AudioContext, decode
-     * failure) — the caller then uses the browser voice instead of going silent.
-     */
-    async function playNeuralSpeech(
-      text: string,
-      bytes: ArrayBuffer,
-      token: number,
-      onDone: () => void
-    ): Promise<boolean> {
-      const Ctor = window.AudioContext || window.webkitAudioContext;
-      if (!Ctor) return false;
-      try {
-        const ctx = ttsAudioCtxRef.current ?? new Ctor();
-        ttsAudioCtxRef.current = ctx;
-        if (ctx.state === "suspended") await ctx.resume();
-        const buffer = await ctx.decodeAudioData(bytes.slice(0));
-        if (sessionRef.current !== token) return true;
-
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        analyser.connect(ctx.destination);
-        ttsSourceRef.current = source;
-
-        const bins = new Uint8Array(analyser.frequencyBinCount);
-        const tick = () => {
-          if (ttsSourceRef.current !== source) return;
-          analyser.getByteFrequencyData(bins);
-          let sum = 0;
-          for (let i = 0; i < bins.length; i += 1) sum += bins[i];
-          setOutputLevel(Math.max(0, Math.min(1, sum / bins.length / 140)));
-          ttsRafRef.current = requestAnimationFrame(tick);
-        };
-
-        source.onended = () => {
-          if (ttsSourceRef.current === source) {
-            ttsSourceRef.current = null;
-            cancelAnimationFrame(ttsRafRef.current);
-            ttsRafRef.current = 0;
-            setOutputLevel(0);
-          }
-          onDone();
-        };
-
-        setOfficer("speaking");
-        source.start();
-        ttsRafRef.current = requestAnimationFrame(tick);
-        // Same reasoning as the browser voice: if `onended` never fires the
-        // officer must not stay "speaking" with the mic disabled.
-        clearSpeakWatchdog();
-        speakWatchdogRef.current = window.setTimeout(() => {
-          stopNeuralSpeech();
-          onDone();
-        }, speakWatchdogMs(text));
-        return true;
-      } catch {
-        stopNeuralSpeech();
-        return false;
-      }
-    }
-
     function fallbackSpeak(text: string): void {
       const token = sessionRef.current;
       if (mutedRef.current || getSafeSpeechSynthesis() === null) {
@@ -1474,45 +1382,9 @@ export function VisaSpeakingAssistant({
         }
       };
 
-      // ---- 1. Neural officer voice from the server --------------------------
-      // POST /api/visa/tts returns audio/mpeg, or 204 when the deployment has
-      // no OpenAI key. 204 is not an error: it means "use the browser voice",
-      // which is exactly what the catch/all-other-status branches do too.
-      if (ttsUnavailableRef.current) {
-        browserSpeak();
-        return;
-      }
-      setOfficer("speaking");
-      void (async () => {
-        try {
-          const res = await fetch("/api/visa/tts", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              text,
-              gender: configRef.current?.gender ?? "male",
-              language: getVisaCountry(configRef.current?.countryCode)?.locale,
-            }),
-          });
-          if (sessionRef.current !== token || finished) return;
-          if (res.status === 204) {
-            // No key configured anywhere: stop asking for the rest of the session.
-            ttsUnavailableRef.current = true;
-            browserSpeak();
-            return;
-          }
-          if (!res.ok) {
-            browserSpeak();
-            return;
-          }
-          const bytes = await res.arrayBuffer();
-          if (sessionRef.current !== token || finished) return;
-          const ok = await playNeuralSpeech(text, bytes, token, finishSpeaking);
-          if (!ok) browserSpeak();
-        } catch {
-          if (sessionRef.current === token && !finished) browserSpeak();
-        }
-      })();
+      // Start browser speech immediately; the server-generated voice added a
+      // visible delay after the text arrived. This starts without another fetch.
+      browserSpeak();
     }
 
     async function fetchOfficerReply(history: VisaMessage[]): Promise<void> {
@@ -1965,7 +1837,12 @@ export function VisaSpeakingAssistant({
         setInterim("");
       }
 
-      for (const text of getTextParts(message)) {
+      const textParts = getTextParts(message);
+      const audioParts = getInlineAudioParts(message);
+      if (textParts.length || audioParts.length || server.outputTranscription?.text) {
+        clearLiveKickoffTimer();
+      }
+      for (const text of textParts) {
         liveOutputBufferRef.current = mergeTranscript(
           liveOutputBufferRef.current,
           text,
@@ -1982,7 +1859,7 @@ export function VisaSpeakingAssistant({
         setLiveOutputPartial(liveOutputBufferRef.current);
       }
 
-      for (const audio of getInlineAudioParts(message)) enqueueLiveAudio(audio);
+      for (const audio of audioParts) enqueueLiveAudio(audio);
 
       if (server.generationComplete) {
         liveGenerationActiveRef.current = false;
@@ -2020,6 +1897,10 @@ export function VisaSpeakingAssistant({
         model: token.model,
         config: {
           responseModalities: [Modality.AUDIO],
+          // Ask Live for the transcript events used by the interview UI; without
+          // these the mic could be active while no recognized words appeared.
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
           sessionResumption: {
             handle: liveSessionHandleRef.current || undefined,
             transparent: true,
@@ -2056,6 +1937,13 @@ export function VisaSpeakingAssistant({
         setListening(false);
         armLiveSpeakWatchdog();
         session.sendRealtimeInput({ text: buildInterviewUserPrompt(c, []) });
+        clearLiveKickoffTimer();
+        liveKickoffTimerRef.current = window.setTimeout(() => {
+          liveKickoffTimerRef.current = null;
+          if (engineModeRef.current === "gemini-live" && messagesRef.current.length === 0) {
+            void scheduleFallbackAfterLiveFailure(new Error("Live kickoff produced no first question"));
+          }
+        }, 15_000);
       }
     }
 
@@ -2146,7 +2034,6 @@ export function VisaSpeakingAssistant({
       }
       recognitionRef.current = null;
       safeCancelSpeech();
-      stopNeuralSpeech();
       stopFallbackMeter();
       resetConversation();
       setError(null);
@@ -2230,7 +2117,6 @@ export function VisaSpeakingAssistant({
         return;
       }
       safeCancelSpeech();
-      stopNeuralSpeech();
       clearSpeakWatchdog();
       stopListening();
       setOfficer("idle");
@@ -2244,7 +2130,6 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       safeCancelSpeech();
-      stopNeuralSpeech();
       setOfficer("idle");
       setAnalysis(null);
       setAnalyzeError(null);
@@ -2270,7 +2155,6 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       safeCancelSpeech();
-      stopNeuralSpeech();
       setOfficer("idle");
       resetConversation();
       setError(null);
@@ -2285,8 +2169,7 @@ export function VisaSpeakingAssistant({
       setMuted(next);
       if (next) {
         safeCancelSpeech();
-        stopNeuralSpeech();
-        clearLivePlayback();
+          clearLivePlayback();
       } else {
         liveOutputCtxRef.current?.resume().catch(() => {});
       }
