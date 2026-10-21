@@ -23,6 +23,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "./index";
 import { opportunities } from "./schema";
+import { invalidateCatalogCache } from "../lib/catalogCache";
 
 interface OpportunitySpec {
   type: "competition" | "research" | "internship" | "summer_school";
@@ -419,33 +420,43 @@ export interface SeedOpportunitiesSummary {
 }
 
 export async function seedOpportunities(): Promise<SeedOpportunitiesSummary> {
-  let inserted = 0;
+  // Several app instances may bootstrap the same database at once. The
+  // transaction-scoped lock keeps the existing title/provider idempotency
+  // check safe without adding a constraint or changing existing catalogue rows.
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('scholarbridge:seed:opportunities'))`);
+    let inserted = 0;
 
-  for (const spec of OPPORTUNITY_CATALOG) {
-    const existing = await db
-      .select({ id: opportunities.id })
-      .from(opportunities)
-      .where(and(eq(opportunities.title, spec.title), eq(opportunities.provider, spec.provider)))
-      .limit(1);
-    if (existing.length > 0) continue;
+    for (const spec of OPPORTUNITY_CATALOG) {
+      const existing = await tx
+        .select({ id: opportunities.id })
+        .from(opportunities)
+        .where(and(eq(opportunities.title, spec.title), eq(opportunities.provider, spec.provider)))
+        .limit(1);
+      if (existing.length > 0) continue;
 
-    await db.insert(opportunities).values({
-      type: spec.type,
-      title: spec.title,
-      provider: spec.provider,
-      country: spec.country,
-      fields: JSON.stringify(spec.fields),
-      level: spec.level,
-      // never guessed — the programme announces each cycle's dates itself
-      deadlineDate: null,
-      url: spec.url,
-      description: spec.description,
-      isVerified: true,
-    });
-    inserted += 1;
-  }
+      await tx.insert(opportunities).values({
+        type: spec.type,
+        title: spec.title,
+        provider: spec.provider,
+        country: spec.country,
+        fields: JSON.stringify(spec.fields),
+        level: spec.level,
+        // never guessed — the programme announces each cycle's dates itself
+        deadlineDate: null,
+        url: spec.url,
+        description: spec.description,
+        // The official provider link is a lead for the student to verify; it
+        // does not mean this catalogue row has been independently verified.
+        isVerified: false,
+      });
+      inserted += 1;
+    }
 
-  return { inserted };
+    return { inserted };
+  });
+  if (result.inserted > 0) invalidateCatalogCache("opportunities");
+  return result;
 }
 
 /** Row count, for the seed log. */

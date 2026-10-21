@@ -3,10 +3,9 @@ import { requireProfileAccess } from "@/lib/auth";
 import { getReferralStatus, activateReferralReward } from "@/lib/referrals";
 
 /**
- * Referral system v2 — per-profile columns on student_profiles.
- * NOTE: there is no auth yet, so the "current user" is the active profile
- * (profileId), matching how the rest of this app works. Once real auth is
- * added, profileId must come from the session, never from the client.
+ * Legacy referral status and activation endpoints backed by per-profile
+ * columns on student_profiles. `profileId` is only a selector: both handlers
+ * authorize it against the signed-in session with `requireProfileAccess`.
  */
 
 export async function GET(req: Request) {

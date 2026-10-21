@@ -1,11 +1,10 @@
 /**
  * In-memory catalogue cache (Priority 1 — 20×–50× faster catalogue reads).
  *
- * The university and scholarship dictionaries are read-mostly: 174
- * universities, 2,423 program fields, 251 scholarships and their source links
- * change only when an administrator edits them, yet every filter change,
- * search keystroke and pagination click used to re-run the full join set
- * against PostgreSQL (4–6 round trips each) before slicing 16–24 rows.
+ * The university, scholarship and opportunity dictionaries are read-mostly:
+ * catalogues and their source links change only when an administrator edits
+ * them, yet every filter change, search keystroke and pagination click used to
+ * re-run full catalogue reads against PostgreSQL before slicing the results.
  *
  * This module keeps the *unfiltered* base dataset in process memory for a
  * short TTL and hands out fresh copies, so the routes still perform every
@@ -16,9 +15,9 @@
  *
  * Invalidation:
  *   • TTL (60 s) is the safety net;
- *   • `invalidateCatalogCache()` is called by every admin write to
- *     universities / programs / scholarships, so an operator sees their own
- *     edit on the very next request;
+ *   • `invalidateCatalogCache()` is called by admin writes to universities,
+ *     programs, scholarships and opportunities, so an operator sees their own
+ *     catalogue edit on the very next request;
  *   • profile-dependent match inputs use a shorter 15 s cache keyed by profile
  *     id and are dropped by `invalidateProfileMatchCache()` whenever the
  *     student edits their profile or activity portfolio.
@@ -36,6 +35,7 @@ import {
   sources,
   scholarships,
   scholarshipSources,
+  opportunities,
 } from "@/db/schema";
 import { inArray, eq } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
@@ -78,12 +78,31 @@ export type ScholarshipsBundle = {
   sourceMap: Map<number, SourceSignal>;
 };
 
+type OpportunityRow = typeof opportunities.$inferSelect;
+export type OpportunitiesBundle = {
+  /** Feed fields only; long descriptions are not needed for matching/cards. */
+  entries: Pick<OpportunityRow,
+    | "id"
+    | "type"
+    | "title"
+    | "provider"
+    | "country"
+    | "fields"
+    | "level"
+    | "deadlineDate"
+    | "url"
+    | "isVerified"
+  >[];
+};
+
 type CacheEntry<T> = { expiresAt: number; value: T };
 
 let universitiesEntry: CacheEntry<UniversitiesBundle> | null = null;
 let universitiesInFlight: Promise<UniversitiesBundle> | null = null;
 let scholarshipsEntry: CacheEntry<ScholarshipsBundle> | null = null;
 let scholarshipsInFlight: Promise<ScholarshipsBundle> | null = null;
+let opportunitiesEntry: CacheEntry<OpportunitiesBundle> | null = null;
+let opportunitiesInFlight: Promise<OpportunitiesBundle> | null = null;
 
 type MatchProfile = Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
 type ChancingProfile = Awaited<ReturnType<typeof chancingProfileWithActivities>>;
@@ -329,6 +348,47 @@ export async function getCachedScholarshipsBundle(): Promise<ScholarshipsBundle>
   return run;
 }
 
+/* --------------------------------------------------------- opportunities */
+
+async function buildOpportunitiesBundle(): Promise<OpportunitiesBundle> {
+  const entries = await db
+    .select({
+      id: opportunities.id,
+      type: opportunities.type,
+      title: opportunities.title,
+      provider: opportunities.provider,
+      country: opportunities.country,
+      fields: opportunities.fields,
+      level: opportunities.level,
+      deadlineDate: opportunities.deadlineDate,
+      url: opportunities.url,
+      isVerified: opportunities.isVerified,
+    })
+    .from(opportunities)
+    .orderBy(opportunities.title);
+  return { entries };
+}
+
+/** Base opportunity feed dataset, cached with the same short TTL as catalogs. */
+export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundle> {
+  const cached = fresh(opportunitiesEntry);
+  if (cached) return cached;
+  if (opportunitiesInFlight) return opportunitiesInFlight;
+
+  const run = buildOpportunitiesBundle()
+    .then((value) => {
+      opportunitiesEntry = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
+      opportunitiesInFlight = null;
+      return value;
+    })
+    .catch((err) => {
+      opportunitiesInFlight = null;
+      throw err;
+    });
+  opportunitiesInFlight = run;
+  return run;
+}
+
 /* --------------------------------------------------------- profile matching */
 
 /**
@@ -357,7 +417,7 @@ export async function getCachedProfileForMatching(profileId: number): Promise<Pr
 /* ------------------------------------------------------------ invalidation */
 
 /** Drop the university and/or scholarship catalogue snapshots. */
-export function invalidateCatalogCache(kind: "universities" | "scholarships" | "all" = "all") {
+export function invalidateCatalogCache(kind: "universities" | "scholarships" | "opportunities" | "all" = "all") {
   if (kind === "universities" || kind === "all") {
     universitiesEntry = null;
     universitiesInFlight = null;
@@ -367,6 +427,10 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
     scholarshipsEntry = null;
     scholarshipsInFlight = null;
     universityDetailCache.clear();
+  }
+  if (kind === "opportunities" || kind === "all") {
+    opportunitiesEntry = null;
+    opportunitiesInFlight = null;
   }
 }
 
@@ -386,8 +450,10 @@ export function invalidateProfileMatchCache(profileId?: number) {
 export function resetCatalogCacheForTests() {
   universitiesEntry = null;
   scholarshipsEntry = null;
+  opportunitiesEntry = null;
   universitiesInFlight = null;
   scholarshipsInFlight = null;
+  opportunitiesInFlight = null;
   profileMatchCache.clear();
   universityDetailCache.clear();
 }
@@ -397,6 +463,7 @@ export function catalogCacheStats() {
   return {
     universitiesCached: fresh(universitiesEntry) !== null,
     scholarshipsCached: fresh(scholarshipsEntry) !== null,
+    opportunitiesCached: fresh(opportunitiesEntry) !== null,
     profileMatchEntries: [...profileMatchCache.values()].filter((e) => e.expiresAt > Date.now()).length,
   };
 }

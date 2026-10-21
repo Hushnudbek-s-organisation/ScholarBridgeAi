@@ -1020,20 +1020,12 @@ for (const locale of ["en", "uz", "ru"]) {
 }
 
 // ---------------------------------------------------------------------------
-section("12b. AI Face Orb — circular sphere, state-aware colours, no vendor names");
-// ---------------------------------------------------------------------------
-// The orb is pure presentation: no fetch, no effects on first paint. That makes
-// it exactly the kind of component `next build` can compile while it still
-// renders nothing — a duplicate gradient id, a clip path that clips everything
-// away, or a mouth that only exists in one branch. These render all four states.
+section("12b. AI Face Orb — pure white face, black features, no vendor names");
+// The Orb intentionally follows the supplied minimal white-face reference.
+// Its face has no colored ring, gradient, specular accent, or tongue; state is
+// still communicated by the surrounding status pill/equalizer and lip-sync.
 const ORB_STATES = ["IDLE", "LISTENING", "THINKING", "SPEAKING"] as const;
-const ORB_RING: Record<string, string[]> = {
-  IDLE: ["#3b82f6", "#4f46e5", "#06b6d4"],
-  SPEAKING: ["#3b82f6", "#4f46e5", "#06b6d4"],
-  LISTENING: ["#10b981", "#14b8a6"],
-  THINKING: ["#7c3aed", "#6366f1"],
-};
-const CLOSED_MOUTH = "M 91 132 C 91 120, 129 120, 129 132 C 129 136, 91 136, 91 132 Z";
+const CLOSED_MOUTH = "M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z";
 const orbRenders = ORB_STATES.map((state) =>
   renderLocalized(
     "en",
@@ -1051,79 +1043,25 @@ for (const [i, state] of ORB_STATES.entries()) {
   const r = orbRenders[i];
   check(`orb renders in ${state}`, r.error === null, r.error ?? "");
   check(`orb ${state} is a true 220x220 circle`, r.html.includes('viewBox="0 0 220 220"') && r.html.includes("rounded-full"));
-  check(`orb ${state} draws its own ring gradient`, ORB_RING[state].every((c) => r.html.includes(c)));
+  check(`orb ${state} has a solid white face`, /<circle[^>]*cx="110"[^>]*cy="110"[^>]*r="108"[^>]*fill="#ffffff"/.test(r.html));
   check(`orb ${state} carries the status pill copy`, r.html.includes(`status ${state}`));
-  check(
-    `orb ${state} names no AI vendor`,
-    !/(Gemini|Groq|OpenAI|Anthropic|Claude|GPT|gemini|groq|openai)/.test(r.html)
-  );
+  check(`orb ${state} names no AI vendor`, !/(Gemini|Groq|OpenAI|Anthropic|Claude|GPT|gemini|groq|openai)/.test(r.html));
+  check(`orb ${state} has no colored face treatment`, !/linearGradient|radialGradient|<stop |stroke=|#f43f5e/.test(r.html));
 }
-// The eyes are the feature: clipped to angled lids, with the bold contours over
-// them. A refactor that drops either is invisible at the type level.
 check(
-  "orb clips both eyes to their angled upper lids",
-  orbRenders[0].html.includes("45,88 105,76 105,130 45,130") &&
-    orbRenders[0].html.includes("115,76 175,88 175,130 115,130")
+  "orb has two solid black oval eyes and no eye highlights",
+  (orbRenders[0].html.match(/<ellipse[^>]*cx="(?:64|156)"[^>]*cy="110"[^>]*rx="17"[^>]*ry="22"[^>]*fill="#000000"/g) ?? []).length === 2 &&
+    !orbRenders[0].html.includes("opacity=\"0.85\"")
 );
-// Regression guard. The mirrored lid angle is also "angled" and also passes the
-// shape check above, but it renders as a scowl — the outer corner high and the
-// inner corner low is the universal angry-brow shape. This is the face a nervous
-// applicant rehearses against, so the upward slope is a product requirement, not
-// a style preference. Verified by rasterizing both variants.
+check("orb rests with a small black mouth", orbRenders[0].html.includes(CLOSED_MOUTH) && orbRenders[0].html.includes('fill="#000000"'));
 check(
-  "orb lid angle points up toward the centre, never down",
-  !/clipPath[^>]*>\s*<polygon points="45,76 105,88/.test(orbRenders[0].html) &&
-    !/45,76 105,88/.test(orbRenders[0].html) &&
-    !/115,88 175,76/.test(orbRenders[0].html)
+  "orb mouth lip-syncs in speaking state without a non-black tongue",
+  orbRenders[3].html.includes('fill="#000000"') && !orbRenders[3].html.includes("#f43f5e") && !orbRenders[3].html.includes(CLOSED_MOUTH)
 );
 check(
-  "orb draws no angry-brow shape (inner corner is the high end)",
-  orbRenders[0].html.indexOf("45,88 105,76") < orbRenders[0].html.indexOf("115,76 175,88") &&
-    /y1="88" x2="105" y2="76"/.test(orbRenders[0].html) &&
-    /y1="76" x2="175" y2="88"/.test(orbRenders[0].html)
-);
-check(
-  "orb draws both bold upper-lid contours",
-  (orbRenders[0].html.match(/stroke-width="5.5"/g) ?? []).length === 2
-);
-check(
-  "orb draws the top specular arc",
-  orbRenders[0].html.includes("M 54 62 A 74 74 0 0 1 166 62")
-);
-// Mouth: closed capsule at rest, open lip-synced aperture with a tongue while
-// speaking. If both ever render at once the face would have two mouths.
-check("orb rests as a closed mouth capsule", orbRenders[0].html.includes(CLOSED_MOUTH));
-check(
-  "orb opens a lip-synced mouth with a tongue while speaking",
-  orbRenders[3].html.includes("#f43f5e") && !orbRenders[3].html.includes(CLOSED_MOUTH)
-);
-check(
-  "orb shows no human hair, suit or skin tones",
-  !/#(?:f3d2bd|e8c3a6|e0b49c|d3a683|3b2a24|2b2118|1e2a5a|17204a)/i.test(orbRenders[0].html)
-);
-check(
-  "orb states resolve to three distinct rims (IDLE and SPEAKING share one)",
-  new Set(ORB_STATES.map((s) => ORB_RING[s].join())).size === 3
-);
-// Unique ids per instance: two orbs in one tree must not share gradient defs,
-// or the second orb would silently repaint with the first one's rim colour.
-// Both orbs go in a SINGLE render — separate renderToStaticMarkup calls reset
-// the useId counter, so they would collide for a reason that cannot occur in the
-// app and the check would prove nothing.
-const twoOrbs = renderLocalized(
-  "en",
-  React.createElement(
-    "div",
-    null,
-    React.createElement(AiOrbFaceAvatar, { state: "IDLE", level: 0, statusLabel: "a", roleLabel: "r" }),
-    React.createElement(AiOrbFaceAvatar, { state: "LISTENING", level: 0, statusLabel: "b", roleLabel: "r" })
-  )
-);
-const orbIds = twoOrbs.html.match(/id="aiOrb[A-Za-z0-9]+"/g) ?? [];
-check(
-  "two orbs in one tree get 10 distinct SVG def ids",
-  orbIds.length === 10 && new Set(orbIds).size === 10,
-  `found ${orbIds.length} ids, ${new Set(orbIds).size} distinct`
+  "two orb instances both render the same minimal face without SVG defs",
+  (orbRenders[0].html.match(/<circle[^>]*cx="110"[^>]*cy="110"[^>]*r="108"[^>]*fill="#ffffff"/g) ?? []).length === 1 &&
+    !orbRenders[0].html.includes("<defs>")
 );
 for (const locale of ["uz", "ru"]) {
   const r = renderLocalized(locale, React.createElement(AiOrbFaceAvatar, {

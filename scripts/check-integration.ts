@@ -101,6 +101,32 @@ async function main() {
   const schema = await import("../src/db/schema");
   const { signSessionToken } = await import("../src/lib/auth");
 
+  // Opportunity catalogue initialization is a startup/seed responsibility, not
+  // a public GET side effect. Exercise the seeder concurrently against an empty
+  // table to cover its transaction-level idempotency and truthful verification.
+  section("0a. opportunity catalogue seed — concurrency and verification state");
+  const { OPPORTUNITY_CATALOG, seedOpportunities } = await import("../src/db/seedOpportunities");
+  const seedResults = await Promise.all([seedOpportunities(), seedOpportunities()]);
+  const seededOpportunities = await db.select({
+    id: schema.opportunities.id,
+    title: schema.opportunities.title,
+    provider: schema.opportunities.provider,
+    isVerified: schema.opportunities.isVerified,
+  }).from(schema.opportunities);
+  const duplicateSeedPairs = await pool.query(
+    `SELECT title, provider, count(*)::int AS n FROM opportunities GROUP BY title, provider HAVING count(*) > 1`
+  );
+  check(
+    "concurrent seed calls insert the curated catalogue once",
+    seedResults.reduce((sum, result) => sum + result.inserted, 0) === OPPORTUNITY_CATALOG.length &&
+      seededOpportunities.length === OPPORTUNITY_CATALOG.length && duplicateSeedPairs.rows.length === 0,
+    `inserted=${JSON.stringify(seedResults)}, rows=${seededOpportunities.length}, duplicates=${duplicateSeedPairs.rows.length}`
+  );
+  check(
+    "curated provider URLs are not represented as independently verified",
+    seededOpportunities.length === OPPORTUNITY_CATALOG.length && seededOpportunities.every((row) => row.isVerified === false)
+  );
+
   // --- Seed ---------------------------------------------------------------
   const [profile] = await db
     .insert(schema.studentProfiles)
@@ -515,6 +541,14 @@ async function main() {
 
     await db.delete(schema.universities).where(eq(schema.universities.id, lateUni.id));
     invalidateCatalogCache("all");
+
+    resetCatalogCacheForTests();
+    const dashboardWithColdCatalog = await call(dashboardGet as any, `/api/dashboard?profileId=${profile.id}`);
+    check(
+      "dashboard recommendations use the shared university catalogue cache",
+      dashboardWithColdCatalog.status === 200 && catalogCacheStats().universitiesCached,
+      `status ${dashboardWithColdCatalog.status}`
+    );
   }
 
   // -----------------------------------------------------------------------
@@ -797,7 +831,7 @@ async function main() {
     })
     .returning();
 
-  const { PATCH: docPatch, DELETE: docDelete } = await import("../src/app/api/documents/route");
+  const { GET: docGet, PATCH: docPatch, DELETE: docDelete } = await import("../src/app/api/documents/route");
   const { PATCH: appPatch, DELETE: appDelete } = await import("../src/app/api/applications/route");
   const { POST: outcomePost } = await import("../src/app/api/applications/outcome/route");
   const { PATCH: suPatch, DELETE: suDelete } = await import("../src/app/api/saved-universities/route");
@@ -807,6 +841,34 @@ async function main() {
   const json = (o: unknown) => ({ "Content-Type": "application/json" });
 
   // -- documents ---------------------------------------------------------
+  // GET reconciliation batches the saved scholarship's requirements and
+  // serializes concurrent reconciliation without overwriting student state.
+  await db.update(schema.scholarships)
+    .set({ requiredDocuments: '["transcript","passport","recommendation","transcript"]' })
+    .where(eq(schema.scholarships.id, sch.id));
+  const [docsFirst, docsSecond] = await Promise.all([
+    call(docGet as any, `/api/documents?profileId=${profile.id}`),
+    call(docGet as any, `/api/documents?profileId=${profile.id}`),
+  ]);
+  const scholarshipDocs = await db.select().from(schema.applicationDocuments).where(and(
+    eq(schema.applicationDocuments.profileId, profile.id),
+    eq(schema.applicationDocuments.entityType, "scholarship"),
+    eq(schema.applicationDocuments.entityId, sch.id),
+  ));
+  check("documents GET: parallel requests both return the checklist", docsFirst.status === 200 && docsSecond.status === 200);
+  check("documents GET: duplicate requirements and concurrent reads create exactly three rows", scholarshipDocs.length === 3, `got ${scholarshipDocs.length}`);
+  const transcriptDoc = scholarshipDocs.find((doc) => doc.documentType === "transcript");
+  if (transcriptDoc) {
+    await db.update(schema.applicationDocuments)
+      .set({ status: "uploaded", fileName: "transcript.pdf" })
+      .where(eq(schema.applicationDocuments.id, transcriptDoc.id));
+  }
+  const docsAfterUpload = await call(docGet as any, `/api/documents?profileId=${profile.id}`);
+  const [transcriptAfterRead] = transcriptDoc
+    ? await db.select().from(schema.applicationDocuments).where(eq(schema.applicationDocuments.id, transcriptDoc.id))
+    : [];
+  check("documents GET: repeated reconciliation preserves uploaded status and metadata", docsAfterUpload.status === 200 && transcriptAfterRead?.status === "uploaded" && transcriptAfterRead?.fileName === "transcript.pdf");
+
   const docBlocked = await call(docPatch as any, "/api/documents", {
     method: "PATCH",
     headers: { ...json({}), cookie },
@@ -1379,8 +1441,15 @@ async function main() {
   ]);
 
   const { GET: oppGet } = await import("../src/app/api/opportunities/route");
+  const opportunityRowsBeforeRead = await db.select({ id: schema.opportunities.id }).from(schema.opportunities);
   const opp = await call(oppGet as any, "/api/opportunities");
+  const opportunityRowsAfterRead = await db.select({ id: schema.opportunities.id }).from(schema.opportunities);
   check("responds 200", opp.status === 200, `got ${opp.status} ${JSON.stringify(opp.body)?.slice(0, 200)}`);
+  check(
+    "public catalogue reads do not seed or mutate opportunity rows",
+    opportunityRowsAfterRead.length === opportunityRowsBeforeRead.length && opp.body?.count === opportunityRowsBeforeRead.length,
+    `before=${opportunityRowsBeforeRead.length}, after=${opportunityRowsAfterRead.length}, response=${opp.body?.count}`
+  );
   const oppCounts = opp.body?.counts ?? {};
   check(
     "counts by type cover both fixtures and add up to the total",
@@ -1411,6 +1480,44 @@ async function main() {
       oppFiltered.body.items.every((o: any) => o.type === "internship"),
     JSON.stringify({ count: oppFiltered.body?.count, byType: oppCounts.internship })
   );
+
+  const { catalogCacheStats } = await import("../src/lib/catalogCache");
+  check("opportunities warm the shared short-lived catalogue cache", catalogCacheStats().opportunitiesCached);
+  const [adminProfile] = await db.insert(schema.studentProfiles).values({
+    name: "Opportunity Cache Admin",
+    email: "opportunity-cache-admin@example.com",
+    isAdmin: true,
+  }).returning();
+  const adminToken = signSessionToken({ id: adminProfile.id, passwordHash: adminProfile.passwordHash });
+  const adminRequest = (method: string, body?: unknown, url = "http://localhost/api/admin/opportunities") => new Request(url, {
+    method,
+    headers: { cookie: `sb_session=${adminToken}`, ...(body ? { "content-type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const { POST: adminOpportunityPost, DELETE: adminOpportunityDelete } = await import("../src/app/api/admin/opportunities/route");
+  const created = await adminOpportunityPost(adminRequest("POST", {
+    type: "research",
+    title: "ADMIN-OPP-CACHE-TEST",
+    provider: "Test Admin",
+    country: null,
+    fields: ["Computer Science"],
+    level: "undergrad",
+    url: "https://example.com",
+    description: "Integration fixture",
+    isVerified: false,
+  }));
+  const createdBody = await created.json();
+  const createdId = Number(createdBody.id);
+  check("authorized opportunity creation succeeds", created.status === 200 && createdId > 0, `status=${created.status}`);
+  check("admin creation invalidates the opportunity cache", !catalogCacheStats().opportunitiesCached);
+  const refreshedFeed = await call(oppGet as any, "/api/opportunities");
+  check("the next public read contains the newly created opportunity", refreshedFeed.body?.items?.some((item: any) => item.id === createdId));
+  const deleted = await adminOpportunityDelete(adminRequest("DELETE", undefined, `http://localhost/api/admin/opportunities?id=${createdId}`));
+  check("authorized opportunity deletion succeeds", deleted.status === 200);
+  check("admin deletion invalidates the opportunity cache", !catalogCacheStats().opportunitiesCached);
+  const afterDeleteFeed = await call(oppGet as any, "/api/opportunities");
+  check("the next public read no longer contains the deleted opportunity", !afterDeleteFeed.body?.items?.some((item: any) => item.id === createdId));
+
   // Clean up the fixture rows so the student-facing feed keeps only real data.
   await db.delete(schema.opportunities).where(like(schema.opportunities.title, `${OPP_FIXTURE}%`));
 
@@ -2118,8 +2225,15 @@ async function main() {
 
   const visaChatRoute = await import("../src/app/api/visa/chat/route");
   const visaAnalyzeRoute = await import("../src/app/api/visa/analyze/route");
+  const interviewTurn = {
+    countryCode: "US",
+    messages: [
+      { role: "officer", text: "Why did you choose this university?" },
+      { role: "user", text: "Its computer science program fits my academic goals." },
+    ],
+  };
   const vchat = await call(visaChatRoute.POST as any, "/api/visa/chat", {
-    method: "POST", headers: jsonHdr, body: JSON.stringify({ countryCode: "US" }),
+    method: "POST", headers: jsonHdr, body: JSON.stringify(interviewTurn),
   });
   check("visa chat: a signed-in interview turn is answered", vchat.status === 200 && typeof vchat.body?.reply === "string" && vchat.body.reply.length > 0, JSON.stringify(vchat.body)?.slice(0, 120));
   const [visaUsage] = await db
@@ -2133,7 +2247,7 @@ async function main() {
     JSON.stringify(visaUsage)
   );
   const vchatAnon = await call(visaChatRoute.POST as any, "/api/visa/chat", {
-    method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify({ countryCode: "US" }),
+    method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify(interviewTurn),
   });
   const anonUsageRows = await db
     .select()

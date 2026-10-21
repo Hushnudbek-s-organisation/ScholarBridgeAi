@@ -101,7 +101,9 @@ function factsForPrompt(facts: ReportFacts): string {
 
 export async function POST(req: Request) {
   try {
-    const guarded = await guardAiRequest(req);
+    // The entitlement matrix classifies the deep profile audit as advanced AI.
+    // Enforce that policy here as well as in any client-side Premium UI.
+    const guarded = await guardAiRequest(req, { feature: "ai_advanced" });
     if (!guarded.ok) return guarded.response;
 
     const profileId = guarded.profileId;

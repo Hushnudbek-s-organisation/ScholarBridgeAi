@@ -9,7 +9,7 @@ import {
   scholarships,
   universities,
 } from "@/db/schema";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, sql } from "drizzle-orm";
 import { checkDocuments, expectedDocuments, type DocumentRow } from "@/lib/documents";
 import { matchMultimodalDocumentReadiness } from "@/lib/ai/embeddings";
 
@@ -37,49 +37,66 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
 
-    // Ensure checklist rows exist for saved scholarships' required documents.
+    // Keep the saved-scholarship checklist in sync without one SELECT and
+    // INSERT per required document. A profile row lock serializes concurrent
+    // checklist reconciliation for this profile; no schema/index change is
+    // needed, and existing statuses/uploads are never overwritten.
     const savedSch = await db
-      .select()
+      .select({ scholarshipId: savedScholarships.scholarshipId })
       .from(savedScholarships)
       .where(eq(savedScholarships.profileId, profileId));
     if (savedSch.length > 0) {
-      const schRows = await db
-        .select()
-        .from(scholarships)
-        .where(inArray(scholarships.id, savedSch.map((s) => s.scholarshipId)));
-      for (const sch of schRows) {
-        let required: string[] = [];
-        try {
-          required = JSON.parse(sch.requiredDocuments || "[]");
-        } catch {
-          required = [];
-        }
-        for (const docType of required) {
-          const [existing] = await db
-            .select()
-            .from(applicationDocuments)
-            .where(
-              and(
-                eq(applicationDocuments.profileId, profileId),
-                eq(applicationDocuments.entityType, "scholarship"),
-                eq(applicationDocuments.entityId, sch.id),
-                eq(applicationDocuments.documentType, docType)
-              )
-            );
-          if (!existing) {
-            await db.insert(applicationDocuments).values({
-              profileId,
-              entityType: "scholarship",
-              entityId: sch.id,
-              documentType: docType,
-              label: docType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-              isRequired: true,
-              status: "missing",
-              deadlineDate: sch.deadlineDate,
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR UPDATE`);
+        const schRows = await tx
+          .select({ id: scholarships.id, requiredDocuments: scholarships.requiredDocuments, deadlineDate: scholarships.deadlineDate })
+          .from(scholarships)
+          .where(inArray(scholarships.id, savedSch.map((s) => s.scholarshipId)));
+
+        const requiredEntries = new Map<string, { scholarshipId: number; documentType: string; deadlineDate: string | null }>();
+        for (const scholarship of schRows) {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(scholarship.requiredDocuments || "[]");
+          } catch {
+            parsed = [];
+          }
+          if (!Array.isArray(parsed)) continue;
+          for (const value of parsed) {
+            if (typeof value !== "string" || !value.trim()) continue;
+            const documentType = value.trim();
+            requiredEntries.set(`${scholarship.id}:${documentType}`, {
+              scholarshipId: scholarship.id,
+              documentType,
+              deadlineDate: scholarship.deadlineDate,
             });
           }
         }
-      }
+        if (!requiredEntries.size) return;
+
+        const existing = await tx
+          .select({ entityId: applicationDocuments.entityId, documentType: applicationDocuments.documentType })
+          .from(applicationDocuments)
+          .where(and(
+            eq(applicationDocuments.profileId, profileId),
+            eq(applicationDocuments.entityType, "scholarship"),
+            inArray(applicationDocuments.entityId, [...new Set([...requiredEntries.values()].map((entry) => entry.scholarshipId))]),
+          ));
+        const existingKeys = new Set(existing.map((row) => `${row.entityId}:${row.documentType}`));
+        const missing = [...requiredEntries.values()]
+          .filter((entry) => !existingKeys.has(`${entry.scholarshipId}:${entry.documentType}`))
+          .map((entry) => ({
+            profileId,
+            entityType: "scholarship",
+            entityId: entry.scholarshipId,
+            documentType: entry.documentType,
+            label: entry.documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            isRequired: true,
+            status: "missing",
+            deadlineDate: entry.deadlineDate,
+          }));
+        if (missing.length) await tx.insert(applicationDocuments).values(missing);
+      });
     }
 
     const rows = await db
