@@ -31,6 +31,8 @@ import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core
 import {
   aiEvaluations,
   aiProviderCredentials,
+  appConfig,
+  auditLogs,
   applicationCycles,
   applications,
   essayVersions,
@@ -77,8 +79,10 @@ export const CORE_TABLES: PgTable[] = [
   universitySources,
   applicationCycles,
   programRequirements,
-  // admin AI keys (the admin panel persists them; env vars remain the fallback)
+  // admin AI configuration, credentials and auditable changes
   aiProviderCredentials,
+  appConfig,
+  auditLogs,
   // Session revocation (audit A23): authenticate() checks this table on
   // EVERY authenticated request; when it is missing, checkSessionRecord's
   // SELECT throws and the whole site answers 503 "Authentication is

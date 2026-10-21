@@ -48,9 +48,18 @@ import {
 } from "@/lib/ai/credentials";
 import { loadRuntimeAIConfig, resolveRuntimeProvider } from "@/lib/ai/index";
 import { testProviderConnection } from "@/lib/ai/test";
+import { ensureCoreSchema } from "@/lib/core/db";
 
 function bad(error: string, code = "bad_request", status = 400) {
   return NextResponse.json({ error, code }, { status });
+}
+
+async function ensureSettingsStorage(): Promise<NextResponse | null> {
+  if (await ensureCoreSchema()) return null;
+  return NextResponse.json(
+    { error: "AI settings storage is temporarily unavailable. Please retry after the database recovers.", code: "database_unavailable" },
+    { status: 503 },
+  );
 }
 
 async function audit(fieldChanged: string, oldValue: unknown, newValue: unknown, actorId: number) {
@@ -114,6 +123,8 @@ export async function GET(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const schemaUnavailable = await ensureSettingsStorage();
+    if (schemaUnavailable) return schemaUnavailable;
     return NextResponse.json(await snapshot(), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("GET /api/admin/ai-settings error:", (error as Error)?.message);
@@ -127,6 +138,8 @@ export async function PUT(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const schemaUnavailable = await ensureSettingsStorage();
+    if (schemaUnavailable) return schemaUnavailable;
     const actorId = access.session.profile.id;
     const limit = await checkSharedRateLimit(`admin-ai:${actorId}`, LIMITS.adminWrite);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
@@ -236,7 +249,11 @@ export async function PUT(req: Request) {
 
     return bad("Provide a provider credential, enabled flag, task mapping, default or fallback provider");
   } catch (error) {
-    console.error("PUT /api/admin/ai-settings error:", (error as Error)?.message);
+    const message = error instanceof Error ? error.message : "";
+    console.error("PUT /api/admin/ai-settings error:", message || "unknown error");
+    if (message.startsWith("Could not persist the AI key or model")) {
+      return NextResponse.json({ error: message, code: "credential_persistence_failed" }, { status: 500 });
+    }
     return NextResponse.json({ error: "Failed to update AI settings" }, { status: 500 });
   }
 }
@@ -247,6 +264,8 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    const schemaUnavailable = await ensureSettingsStorage();
+    if (schemaUnavailable) return schemaUnavailable;
     const actorId = access.session.profile.id;
     const parsed = await readJsonBody<Record<string, unknown>>(req, 16 * 1024);
     if (!parsed.ok) return bad(parsed.error, parsed.code, parsed.status);

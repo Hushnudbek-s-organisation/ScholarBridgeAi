@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import { checkDocuments, expectedDocuments, type DocumentRow } from "@/lib/documents";
+import { matchMultimodalDocumentReadiness } from "@/lib/ai/embeddings";
 
 /** Valid `status` values — anything else is ignored rather than stored. */
 const DOC_STATUSES: readonly string[] = ["missing", "uploaded", "not_required"];
@@ -100,10 +101,32 @@ export async function GET(req: Request) {
       unis.forEach((u) => uniMap.set(u.id, u.name));
     }
 
-    const docs = rows.map((r) => ({
+    let docs = rows.map((r) => ({
       ...r,
       entityName: r.entityType === "scholarship" ? schMap.get(r.entityId as number) : r.entityType === "university" ? uniMap.get(r.entityId as number) : null,
     }));
+    if (searchParams.get("checkReadiness") === "1" && docs.length > 0) {
+      const readiness = await Promise.all(docs.slice(0, 5).map(async (doc) => {
+        try {
+          // Only document metadata is sent for this optional check; file URLs,
+          // uploaded bytes, and private document contents are never forwarded.
+          const result = await matchMultimodalDocumentReadiness({
+            title: doc.label,
+            docType: doc.documentType,
+            text: `Entity type: ${doc.entityType}. Current status: ${doc.status}.`,
+            timeoutMs: 3_500,
+          });
+          return [doc.id, result.matches] as const;
+        } catch {
+          return [doc.id, null] as const;
+        }
+      }));
+      const byId = new Map(readiness);
+      docs = docs.map((doc) => ({
+        ...doc,
+        ...(byId.get(doc.id) ? { readinessMatches: byId.get(doc.id), readinessSource: "document metadata" } : {}),
+      }));
+    }
 
     // --- Document checker (#7) --------------------------------------------
     // A checklist says what is missing; this says what is WRONG with what was
@@ -159,7 +182,21 @@ export async function POST(req: Request) {
         deadlineDate: body.deadlineDate || null,
       })
       .returning();
-    return NextResponse.json({ document: doc });
+    let readinessMatches: Array<{ key: string; similarityPercent: number }> | undefined;
+    if (body.checkReadiness === true && doc) {
+      try {
+        const readiness = await matchMultimodalDocumentReadiness({
+          title: doc.label,
+          docType: doc.documentType,
+          text: `Entity type: ${doc.entityType}. Current status: ${doc.status}.`,
+          timeoutMs: 3_500,
+        });
+        readinessMatches = readiness.matches;
+      } catch {
+        // A provider outage cannot roll back or fail the document save.
+      }
+    }
+    return NextResponse.json({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
   } catch (error) {
     console.error("POST /api/documents error:", error);
     return NextResponse.json({ error: "Failed to add document" }, { status: 500 });
@@ -201,7 +238,21 @@ export async function PATCH(req: Request) {
       })
       .where(eq(applicationDocuments.id, id))
       .returning();
-    return NextResponse.json({ document: doc });
+    let readinessMatches: Array<{ key: string; similarityPercent: number }> | undefined;
+    if (body.checkReadiness === true && doc) {
+      try {
+        const readiness = await matchMultimodalDocumentReadiness({
+          title: doc.label,
+          docType: doc.documentType,
+          text: `Entity type: ${doc.entityType}. Current status: ${doc.status}.`,
+          timeoutMs: 3_500,
+        });
+        readinessMatches = readiness.matches;
+      } catch {
+        // Readiness is advisory and cannot fail an update.
+      }
+    }
+    return NextResponse.json({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
   } catch (error) {
     console.error("PATCH /api/documents error:", error);
     return NextResponse.json({ error: "Failed to update document" }, { status: 500 });

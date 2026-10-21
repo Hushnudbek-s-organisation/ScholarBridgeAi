@@ -527,6 +527,39 @@ export const VISA_COUNTRIES: VisaCountry[] = [
 
 const byCode = new Map(VISA_COUNTRIES.map((c) => [c.code, c]));
 
+const OPENING_GREETINGS: Record<string, (name: string) => string> = {
+  English: (name) => `Good day${name ? `, ${name}` : ""}. Welcome to your student visa interview. Let's begin:`,
+  Deutsch: (name) => `Guten Tag${name ? `, ${name}` : ""}. Willkommen zu Ihrem Visumsgespräch. Beginnen wir:`,
+  Français: (name) => `Bonjour${name ? `, ${name}` : ""}. Bienvenue à votre entretien de visa étudiant. Commençons :`,
+  Español: (name) => `Buenos días${name ? `, ${name}` : ""}. Le doy la bienvenida a su entrevista para la visa de estudiante. Comencemos:`,
+  Italiano: (name) => `Buongiorno${name ? `, ${name}` : ""}. Benvenuto al colloquio per il visto studentesco. Cominciamo:`,
+  Nederlands: (name) => `Goedendag${name ? `, ${name}` : ""}. Welkom bij uw studentenvisumgesprek. Laten we beginnen:`,
+  Dansk: (name) => `Goddag${name ? `, ${name}` : ""}. Velkommen til din samtale om studievisum. Lad os begynde:`,
+  Norsk: (name) => `God dag${name ? `, ${name}` : ""}. Velkommen til visumintervjuet for studenter. La oss begynne:`,
+  Svenska: (name) => `God dag${name ? `, ${name}` : ""}. Välkommen till din intervju för studentvisum. Då börjar vi:`,
+  Suomi: (name) => `Hyvää päivää${name ? `, ${name}` : ""}. Tervetuloa opiskelijaviisumihaastatteluun. Aloitetaan:`,
+  "Português": (name) => `Bom dia${name ? `, ${name}` : ""}. Bem-vindo à sua entrevista para visto de estudante. Vamos começar:`,
+  "Bahasa Indonesia": (name) => `Selamat siang${name ? `, ${name}` : ""}. Selamat datang di wawancara visa pelajar Anda. Mari kita mulai:`,
+  Русский: (name) => `Здравствуйте${name ? `, ${name}` : ""}. Добро пожаловать на собеседование для студенческой визы. Начнём:`,
+  한국어: (name) => `안녕하세요${name ? `, ${name}` : ""}. 유학 비자 면접에 오신 것을 환영합니다. 시작하겠습니다:`,
+  日本語: (name) => `${name ? `${name}さん、` : ""}こんにちは。学生ビザの面接へようこそ。それでは始めましょう。`,
+  العربية: (name) => `مرحبًا${name ? `، ${name}` : ""}. أهلًا بك في مقابلة تأشيرة الطالب. لنبدأ:`,
+  普通话: (name) => `您好${name ? `，${name}` : ""}。欢迎参加学生签证面试。我们开始吧：`,
+  國語: (name) => `您好${name ? `，${name}` : ""}。歡迎參加學生簽證面試。我們開始吧：`,
+};
+
+/** Fast, deterministic, localized opening used before any provider round-trip. */
+export function buildInstantOpeningLine(
+  country: VisaCountry,
+  _gender: VisaOfficerGender,
+  applicantName?: string | null,
+): string {
+  const name = typeof applicantName === "string" ? applicantName.trim().slice(0, 80) : "";
+  const greeting = (OPENING_GREETINGS[country.language] ?? OPENING_GREETINGS.English)(name);
+  const firstQuestion = country.questions[0]?.trim() ?? "";
+  return [greeting, firstQuestion].filter(Boolean).join(" ");
+}
+
 /**
  * The officer's next line when no AI provider is configured.
  *

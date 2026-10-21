@@ -6,6 +6,7 @@ import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
+import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
 
 /**
  * Essay versions + rubric (#8).
@@ -128,6 +129,16 @@ export async function POST(req: Request) {
       targetName,
       prompt,
     });
+    const behaviorSignals = await scoreConversationBehaviors({
+      transcriptOrText: content,
+      profileId: access.session.profile.id,
+      timeoutMs: 3_500,
+      behaviors: [
+        { key: "specificityAndEvidence", description: "Uses concrete, verifiable personal evidence rather than generic claims." },
+        { key: "promptRelevance", description: "Directly answers the application prompt and stays focused." },
+        { key: "personalOwnership", description: "Communicates the student's own perspective rather than generic template language." },
+      ],
+    });
 
     const [last] = await db
       .select()
@@ -169,6 +180,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       version: row,
       feedback,
+      behaviorSignals,
       // What changed against the previous draft, so the history is readable.
       comparison: last
         ? compareVersions(last.content, content, {
@@ -215,8 +227,18 @@ export async function PUT(req: Request) {
       targetName: clampString(body.targetName, 200) || null,
       prompt: clampString(body.prompt, 2000) || null,
     });
+    const behaviorSignals = await scoreConversationBehaviors({
+      transcriptOrText: content,
+      profileId: access.session.profile.id,
+      timeoutMs: 3_500,
+      behaviors: [
+        { key: "specificityAndEvidence", description: "Uses concrete, verifiable personal evidence rather than generic claims." },
+        { key: "promptRelevance", description: "Directly answers the application prompt and stays focused." },
+        { key: "personalOwnership", description: "Communicates the student's own perspective rather than generic template language." },
+      ],
+    });
 
-    return NextResponse.json({ feedback, wordCount: countWords(content) });
+    return NextResponse.json({ feedback, wordCount: countWords(content), behaviorSignals });
   } catch (error) {
     console.error("PUT /api/essays error:", error);
     return NextResponse.json({ error: "Failed to score essay" }, { status: 500 });

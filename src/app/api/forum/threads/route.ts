@@ -10,6 +10,8 @@ import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { clampString, readJsonBody } from "@/lib/request";
 import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
+import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
+import { writeAudit } from "@/lib/audit";
 
 const PAGE_SIZE = 10;
 let forumSeededOnce = false;
@@ -161,6 +163,27 @@ export async function POST(req: Request) {
         viewCount: 0,
       })
       .returning();
+
+    // Advisory moderation runs out-of-band: provider latency or failure never
+    // blocks a valid forum post. Only the aggregate signals enter the audit;
+    // post text and model-generated prose are not logged there.
+    void scoreConversationBehaviors({
+      transcriptOrText: `${clampString(title, 200)}\n${clampString(threadBody, 20_000).slice(0, 4_000)}`,
+      profileId: thread.authorId,
+      timeoutMs: 3_500,
+      behaviors: [
+        { key: "constructiveAcademicQuestion", description: "The post raises a constructive question or offers relevant academic information to peers." },
+        { key: "spamOrAbusiveContent", description: "The post appears to be spam, promotional flooding, harassment, or abusive content rather than a good-faith academic discussion." },
+      ],
+    }).then((result) => writeAudit({
+      entityType: "forum_thread",
+      entityId: thread.id,
+      fieldChanged: "ai_moderation_advisory",
+      newValue: { available: result.available, signals: result.signals },
+      source: "OpenRouter behavior advisory",
+      actor: "AI",
+      verificationStatus: "unverified",
+    })).catch((err) => console.warn("Forum advisory scoring failed:", err instanceof Error ? err.message : String(err)));
 
     try {
       await awardPoints(thread.authorId, 5, "thread_created", thread.id);

@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 /** Output cap. The officer's longest line is a paragraph; 4096 chars is generous. */
 const MAX_TEXT_LENGTH = 4096;
 /** Hard upstream timeout — a stalled TTS call must not hold the interview open. */
-const UPSTREAM_TIMEOUT_MS = 20_000;
+const UPSTREAM_TIMEOUT_MS = 4_500;
 
 const DEFAULT_MODEL = "gpt-4o-mini-tts";
 
@@ -94,11 +94,15 @@ export async function POST(req: Request) {
     const openRouterApiKey = await openRouterKey();
     const openAiCredential = await isProviderEnabled("openai") ? await resolveProviderCredential("openai") : null;
     const candidates: Array<{ provider: "openrouter" | "openai"; apiKey: string; model: string }> = [];
-    if (openRouterApiKey) candidates.push({
-      provider: "openrouter",
-      apiKey: openRouterApiKey,
-      model: process.env.OPENROUTER_TTS_MODEL?.trim() || OPENROUTER_MODELS.speech,
-    });
+    if (openRouterApiKey) {
+      const models = [
+        process.env.OPENROUTER_TTS_MODEL?.trim(),
+        "fishaudio/fish-speech-2.1-pro:free",
+        "fish-audio/s2.1-pro-free:free",
+        "openai/gpt-4o-mini-tts",
+      ].filter((model): model is string => Boolean(model));
+      for (const model of [...new Set(models)]) candidates.push({ provider: "openrouter", apiKey: openRouterApiKey, model });
+    }
     if (openAiCredential?.apiKey) candidates.push({
       provider: "openai",
       apiKey: openAiCredential.apiKey,
@@ -129,7 +133,7 @@ export async function POST(req: Request) {
           },
         );
         if (!upstream.ok || !upstream.body) {
-          console.warn(`visa/tts ${candidate.provider} upstream failed:`, upstream.status);
+          console.warn(`visa/tts ${candidate.provider} model ${candidate.model} failed:`, upstream.status);
           continue;
         }
         const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";

@@ -547,7 +547,7 @@ export function resolveCredential(
     return {
       apiKey: envKey,
       apiKeySource: "env",
-      model: env[meta.modelEnvVar] || meta.defaultModel,
+      model: dbCredential?.model?.trim() || env[meta.modelEnvVar] || meta.defaultModel,
     };
   }
 
