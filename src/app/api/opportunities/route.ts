@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { opportunities, studentProfiles } from "@/db/schema";
-import { seedOpportunities } from "@/db/seedOpportunities";
 import { authenticate } from "@/lib/auth";
 import { countByType, rankOpportunities } from "@/lib/opportunities";
 import { localeFromRequest } from "@/lib/engineText";
@@ -11,8 +10,6 @@ import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 import { runMercuryDecision } from "@/lib/ai/decide";
 
 export const dynamic = "force-dynamic";
-
-let opportunitiesSeededOnce = false;
 
 /**
  * #26/#27/#28 — Personalized opportunities feed.
@@ -25,10 +22,6 @@ let opportunitiesSeededOnce = false;
  */
 export async function GET(req: Request) {
   try {
-    if (!opportunitiesSeededOnce) {
-      await seedOpportunities().catch(() => {});
-      opportunitiesSeededOnce = true;
-    }
     const url = new URL(req.url);
     const type = url.searchParams.get("type")?.trim();
     const search = (url.searchParams.get("search") ?? url.searchParams.get("q") ?? "").trim();
@@ -36,7 +29,24 @@ export async function GET(req: Request) {
     const sort = url.searchParams.get("sort")?.trim() || "match";
 
     const where = type ? and(eq(opportunities.type, type)) : undefined;
-    const rows = await db.select().from(opportunities).where(where).orderBy(asc(opportunities.title));
+    // The public feed does not use the long description or createdAt column;
+    // keep those payload/row bytes out of this full-catalogue projection.
+    const rows = await db
+      .select({
+        id: opportunities.id,
+        type: opportunities.type,
+        title: opportunities.title,
+        provider: opportunities.provider,
+        country: opportunities.country,
+        fields: opportunities.fields,
+        level: opportunities.level,
+        deadlineDate: opportunities.deadlineDate,
+        url: opportunities.url,
+        isVerified: opportunities.isVerified,
+      })
+      .from(opportunities)
+      .where(where)
+      .orderBy(asc(opportunities.title));
 
     // Optional profile scoring — the session decides, never a claimed id.
     // Anonymous callers get the plain catalog (match: null).

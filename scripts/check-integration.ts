@@ -101,6 +101,32 @@ async function main() {
   const schema = await import("../src/db/schema");
   const { signSessionToken } = await import("../src/lib/auth");
 
+  // Opportunity catalogue initialization is a startup/seed responsibility, not
+  // a public GET side effect. Exercise the seeder concurrently against an empty
+  // table to cover its transaction-level idempotency and truthful verification.
+  section("0a. opportunity catalogue seed — concurrency and verification state");
+  const { OPPORTUNITY_CATALOG, seedOpportunities } = await import("../src/db/seedOpportunities");
+  const seedResults = await Promise.all([seedOpportunities(), seedOpportunities()]);
+  const seededOpportunities = await db.select({
+    id: schema.opportunities.id,
+    title: schema.opportunities.title,
+    provider: schema.opportunities.provider,
+    isVerified: schema.opportunities.isVerified,
+  }).from(schema.opportunities);
+  const duplicateSeedPairs = await pool.query(
+    `SELECT title, provider, count(*)::int AS n FROM opportunities GROUP BY title, provider HAVING count(*) > 1`
+  );
+  check(
+    "concurrent seed calls insert the curated catalogue once",
+    seedResults.reduce((sum, result) => sum + result.inserted, 0) === OPPORTUNITY_CATALOG.length &&
+      seededOpportunities.length === OPPORTUNITY_CATALOG.length && duplicateSeedPairs.rows.length === 0,
+    `inserted=${JSON.stringify(seedResults)}, rows=${seededOpportunities.length}, duplicates=${duplicateSeedPairs.rows.length}`
+  );
+  check(
+    "curated provider URLs are not represented as independently verified",
+    seededOpportunities.length === OPPORTUNITY_CATALOG.length && seededOpportunities.every((row) => row.isVerified === false)
+  );
+
   // --- Seed ---------------------------------------------------------------
   const [profile] = await db
     .insert(schema.studentProfiles)
@@ -1415,8 +1441,15 @@ async function main() {
   ]);
 
   const { GET: oppGet } = await import("../src/app/api/opportunities/route");
+  const opportunityRowsBeforeRead = await db.select({ id: schema.opportunities.id }).from(schema.opportunities);
   const opp = await call(oppGet as any, "/api/opportunities");
+  const opportunityRowsAfterRead = await db.select({ id: schema.opportunities.id }).from(schema.opportunities);
   check("responds 200", opp.status === 200, `got ${opp.status} ${JSON.stringify(opp.body)?.slice(0, 200)}`);
+  check(
+    "public catalogue reads do not seed or mutate opportunity rows",
+    opportunityRowsAfterRead.length === opportunityRowsBeforeRead.length && opp.body?.count === opportunityRowsBeforeRead.length,
+    `before=${opportunityRowsBeforeRead.length}, after=${opportunityRowsAfterRead.length}, response=${opp.body?.count}`
+  );
   const oppCounts = opp.body?.counts ?? {};
   check(
     "counts by type cover both fixtures and add up to the total",
