@@ -254,6 +254,7 @@ export function AiOrbFaceAvatar({
   const faceId = `aiOrbFace${uid}`;
   const eyeLId = `aiOrbEyeL${uid}`;
   const eyeRId = `aiOrbEyeR${uid}`;
+  const specularId = `aiOrbSpecular${uid}`;
 
   // Real amplitude when the browser gives us one; a syllable-rate oscillator
   // when the voice is `speechSynthesis`, which exposes none.
@@ -319,6 +320,11 @@ export function AiOrbFaceAvatar({
               <stop offset="65%" stopColor="#ffffff" />
               <stop offset="100%" stopColor="#f1f5f9" />
             </radialGradient>
+            <linearGradient id={specularId} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
 
             {/* The angled upper lids. The dark eye geometry is clipped to these,
                 so the lid edge IS the top edge of the eye rather than a line
@@ -339,6 +345,13 @@ export function AiOrbFaceAvatar({
           {/* Outer gradient ring, then the sphere it rims. */}
           <circle cx="110" cy="110" r="104" fill="none" stroke={`url(#${ringId})`} strokeWidth="8" />
           <circle cx="110" cy="110" r="100" fill={`url(#${faceId})`} />
+          <path
+            d="M 54 62 A 74 74 0 0 1 166 62"
+            fill="none"
+            stroke={`url(#${specularId})`}
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
 
           {/* Eyes. The ellipses are sized so their own curves bound the sides and
               bottom, leaving only the lid to clip them — no straight cut at the
@@ -355,6 +368,24 @@ export function AiOrbFaceAvatar({
               <ellipse cx="136" cy="93" rx="5.5" ry="4.5" fill="#ffffff" opacity="0.85" />
             </g>
           </g>
+          <line
+            x1="45"
+            y1="88"
+            x2="105"
+            y2="76"
+            stroke="#18181b"
+            strokeWidth="5.5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="115"
+            y1="76"
+            x2="175"
+            y2="88"
+            stroke="#18181b"
+            strokeWidth="5.5"
+            strokeLinecap="round"
+          />
 
           {/* Mouth. Speaks, or rests as a closed capsule. */}
           {speaking ? (
