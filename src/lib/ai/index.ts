@@ -38,7 +38,6 @@ import {
   resolveProviderForTask,
   supportsCapability,
   taskProviderConfigKey,
-  TASK_PROVIDER_ENV,
   type AICapability,
   type AIProviderId,
 } from "./settings";
@@ -438,21 +437,12 @@ export async function resolveRuntimeProvider(taskType: string, runtime?: Runtime
     selection = fromDb ? "admin" : "env";
   } else {
     const taskDefault = resolveProviderForTask(taskType, {}, {});
-    // A task with its own default (visa → groq) keeps it when that provider
-    // is usable; otherwise, like every task, use the first usable provider.
+    // Visa prefers OpenRouter when usable; otherwise, like every task, use
+    // the first usable provider.
     // One query for every stored credential (not one per provider).
     const all = await resolveAllProviderCredentials();
     const usable = new Set<AIProviderId>(AI_PROVIDER_IDS.filter((id) => isUsable(id, all[id], cfg.disabled)));
-    const taskKey = taskProviderConfigKey(taskType);
-    const envTaskChoice = process.env[TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general];
-    const globalChoice = cfg.dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || process.env.AI_PROVIDER_DEFAULT;
-    const taskWasAuto = !cfg.dbProviders[taskKey] && !envTaskChoice;
-    const openRouterChosenForVisa = taskType === "visa" && taskWasAuto && usable.has("openrouter") &&
-      (!globalChoice || globalChoice === "auto" || globalChoice === "openrouter");
-    if (openRouterChosenForVisa) {
-      name = "openrouter";
-      selection = globalChoice === "openrouter" ? (cfg.dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] ? "admin" : "env") : "auto";
-    } else if (usable.has(taskDefault)) {
+    if (usable.has(taskDefault)) {
       name = taskDefault;
       selection = "default";
     } else {

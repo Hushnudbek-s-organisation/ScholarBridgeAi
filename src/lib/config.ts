@@ -60,7 +60,7 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
   ai_provider_general: "openrouter",
   ai_provider_search: "openrouter",
   ai_provider_document: "openrouter",
-  ai_provider_visa: "groq",
+  ai_provider_visa: "openrouter",
   // Free quantitative caps (Pro = unlimited via feature flags)
   free_saved_universities: "10",
   free_saved_scholarships: "10",

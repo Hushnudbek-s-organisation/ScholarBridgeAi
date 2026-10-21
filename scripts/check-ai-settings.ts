@@ -183,6 +183,7 @@ check("CONFIG_DEFAULTS has an ai_provider_<task> key for every task", () => {
   for (const t of AI_TASKS) {
     assert.ok(CONFIG_DEFAULTS[taskProviderConfigKey(t.id)], `missing ${taskProviderConfigKey(t.id)}`);
   }
+  assert.equal(CONFIG_DEFAULTS.ai_provider_visa, "openrouter");
 });
 
 // ---------------------------------------------------------------------------
@@ -483,9 +484,9 @@ check("reasoning_effort is only sent to models that accept it", () => {
   assert.equal(settings.acceptsReasoningEffort("anthropic", "claude-x"), false);
 });
 
-check("visa task defaults to groq and ignores the global default", () => {
-  assert.equal(resolveProviderForTask("visa", {}, {}), "groq");
-  assert.equal(resolveProviderForTask("visa", { [DEFAULT_PROVIDER_CONFIG_KEY]: "openai" }, {}), "groq");
+check("visa task defaults to OpenRouter and ignores unrelated global defaults", () => {
+  assert.equal(resolveProviderForTask("visa", {}, {}), "openrouter");
+  assert.equal(resolveProviderForTask("visa", { [DEFAULT_PROVIDER_CONFIG_KEY]: "openai" }, {}), "openrouter");
   assert.equal(resolveProviderForTask("visa", { ai_provider_visa: "anthropic" }, {}), "anthropic");
   assert.equal(resolveProviderForTask("visa", {}, { AI_PROVIDER_VISA: "openai" }), "openai");
   // Other tasks still follow the global default.
@@ -713,18 +714,23 @@ await checkAsync("aiChat: required capability is enforced before any request", a
   });
 });
 
-await checkAsync("resolveRuntimeProvider: auto-selects the first provider with a key; visa keeps groq", async () => {
+await checkAsync("resolveRuntimeProvider: auto-selects the first provider with a key; visa prefers OpenRouter", async () => {
   await withRouter({ ANTHROPIC_API_KEY: KEYS.anthropic }, () => okReply(""), async () => {
     const r = await aiCore.resolveRuntimeProvider("essay");
     assert.equal(r.name, "anthropic");
     assert.equal(r.selection, "auto");
     assert.equal(r.apiKeySource, "env");
     const visa = await aiCore.resolveRuntimeProvider("visa");
-    assert.equal(visa.name, "anthropic", "visa falls back to auto when groq has no key");
+    assert.equal(visa.name, "anthropic", "visa falls back to auto when OpenRouter has no key");
   });
   await withRouter({ ANTHROPIC_API_KEY: KEYS.anthropic, GROQ_API_KEY: KEYS.groq }, () => okReply(""), async () => {
     const visa = await aiCore.resolveRuntimeProvider("visa");
     assert.equal(visa.name, "groq");
+    assert.equal(visa.selection, "auto");
+  });
+  await withRouter({ OPENROUTER_API_KEY: "sk-or-v1-openrouterTESTKEY00000000004" }, () => okReply(""), async () => {
+    const visa = await aiCore.resolveRuntimeProvider("visa");
+    assert.equal(visa.name, "openrouter");
     assert.equal(visa.selection, "default");
   });
   await withRouter({ GROQ_API_KEY: KEYS.groq, AI_PROVIDER_DEFAULT: "openai" }, () => okReply(""), async () => {

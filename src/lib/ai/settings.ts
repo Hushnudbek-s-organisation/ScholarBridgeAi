@@ -249,12 +249,12 @@ export const AI_TASKS: AITaskMeta[] = [
 ];
 
 /**
- * The historical visa default applies only if OpenRouter has not been
- * selected or made available by automatic routing. Explicit per-task choices
- * still win; otherwise OpenRouter is preferred platform-wide.
+ * Visa uses OpenRouter by default. Explicit per-task choices still win;
+ * when the default provider has no usable key, automatic routing can choose
+ * the first configured provider.
  */
 export const TASK_DEFAULT_PROVIDER: Partial<Record<AITaskId, AIProviderId>> = {
-  visa: "groq",
+  visa: "openrouter",
 };
 
 export function isAITaskId(value: string | null | undefined): value is AITaskId {
@@ -505,8 +505,8 @@ export function resolveProviderForTask(
   const envVar = TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general;
   const taskDefault = TASK_DEFAULT_PROVIDER[taskType as AITaskId];
   if (taskDefault) {
-    // The historical visa default remains Groq only when OpenRouter is not
-    // explicitly selected. OpenRouter is the platform default when requested.
+    // Visa's task-level default remains OpenRouter unless an explicit task
+    // mapping/environment choice overrides it.
     const selectedDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || env.AI_PROVIDER_DEFAULT;
     const raw = String(dbTask || env[envVar] || (selectedDefault === "openrouter" ? "openrouter" : taskDefault)).trim().toLowerCase();
     return isAIProviderId(raw) ? (raw as AIProviderId) : taskDefault;
