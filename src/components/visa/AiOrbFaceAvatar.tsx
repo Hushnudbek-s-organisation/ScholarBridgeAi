@@ -10,37 +10,19 @@
  * that the role has a gender. An orb is the honest shape — it presents a voice
  * and a state, and nothing about a body.
  *
- * Everything here is one 220×220 viewBox so the sphere is a true circle rather
- * than a box with rounded corners:
+ * The face is intentionally minimal, matching the supplied reference: one
+ * solid-white circular face, two black oval eyes, and a small black mouth. No
+ * colored rim, gradients, eye highlights, or tongue. It is one 220×220 SVG so
+ * the silhouette stays circular at every size.
  *
- *   RING      the state, carried by a gradient rim — sapphire while speaking or
- *             idle, emerald while the student holds the floor, violet while the
- *             answer is being evaluated.
- *   SPHERE    an icy sky-blue radial face, offset so the flat circle reads as a
- *             lit 3D ball, with one white specular arc across the top.
- *   EYES      bold dark geometry clipped to an angled upper lid. They blink on a
- *             3.5s rhythm and once more on every state change, and they shift
- *             gaze with the state (up-and-right while thinking, down while
- *             listening).
- *   MOUTH     real-time lip-sync. `level` drives it when the browser exposes
- *             amplitude; when it does not, `useSpeechOscillator` supplies a
- *             syllable-rate cadence so the mouth still forms words.
- *
- * Deliberately no flames and no orange: an orange flare on a black box reads as
- * a fault condition, which is exactly what the previous stage looked like.
- *
- * The lid angle is load-bearing. Slanting each lid DOWN toward the centre is the
- * mirror of what is drawn here and renders as an unmistakable scowl — verified
- * by rasterizing both. This orb is the face a nervous applicant rehearses
- * against, so it leans friendly: lids angle up toward the nose, the resting
- * mouth is a calm capsule, and the cheeks carry a low warm glow.
- *
- * Colours are hex literals on SVG stops, not `dark:` utility classes. The orb is
- * a light source, so its own colours must not invert with the theme; the host
- * section already swaps its surface behind it.
+ * The eyes blink and shift gaze with the interview state. The mouth lip-syncs:
+ * `level` drives it when the browser exposes amplitude; otherwise
+ * `useSpeechOscillator` supplies a syllable-rate cadence. State color belongs to
+ * the surrounding waveform/status UI, not the face itself. Fixed SVG fills keep
+ * the face white and features black in both light and dark themes.
  */
 
-import React, { useEffect, useId, useState, useSyncExternalStore } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 
 export type AiOrbFaceState = "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
 
@@ -136,26 +118,6 @@ function useBlink(state: AiOrbFaceState, reduced: boolean): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Outer-ring gradient stops per state. IDLE and SPEAKING share the sapphire rim
- * — the sphere is at rest in one and talking in the other, and those are the two
- * states where a calm colour is right.
- */
-const RING_GRADIENT: Record<AiOrbFaceState, { from: string; via?: string; to: string }> = {
-  IDLE: { from: "#3b82f6", via: "#4f46e5", to: "#06b6d4" },
-  SPEAKING: { from: "#3b82f6", via: "#4f46e5", to: "#06b6d4" },
-  LISTENING: { from: "#10b981", to: "#14b8a6" },
-  THINKING: { from: "#7c3aed", to: "#6366f1" },
-};
-
-/** Soft halo behind the sphere. Opacity only, so it needs no `dark:` variant. */
-const GLOW: Record<AiOrbFaceState, string> = {
-  IDLE: "from-blue-500/20 via-indigo-500/20 to-cyan-500/20",
-  SPEAKING: "from-blue-500/30 via-indigo-500/25 to-cyan-500/30",
-  LISTENING: "from-emerald-500/25 via-teal-400/20 to-cyan-500/25",
-  THINKING: "from-violet-500/25 via-indigo-500/25 to-purple-500/25",
-};
-
-/**
  * Equalizer bars. Accent families, never slate: a `dark:bg-slate-*` utility
  * resolves to the INVERTED (light) slate token in this theme, which
  * scripts/dark-audit.mjs flags as an unreadable fill.
@@ -246,16 +208,6 @@ export function AiOrbFaceAvatar({
   const listening = state === "LISTENING";
   const thinking = state === "THINKING";
 
-  // Gradient/clip ids must be unique per instance or two orbs on one page would
-  // share defs. `useId` returns colons, which are awkward inside `url(#…)`, so
-  // they are stripped.
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const ringId = `aiOrbRing${uid}`;
-  const faceId = `aiOrbFace${uid}`;
-  const eyeLId = `aiOrbEyeL${uid}`;
-  const eyeRId = `aiOrbEyeR${uid}`;
-  const specularId = `aiOrbSpecular${uid}`;
-
   // Real amplitude when the browser gives us one; a syllable-rate oscillator
   // when the voice is `speechSynthesis`, which exposes none.
   const oscillator = useSpeechOscillator(speaking, level < 0.02);
@@ -279,140 +231,38 @@ export function AiOrbFaceAvatar({
   const eyeTransform = (cx: number) =>
     `translate(${gaze.x} ${gaze.y}) translate(${cx} 101) scale(1 ${blink ? 0.08 : 1}) translate(${-cx} -101)`;
 
-  const pulse = listening
-    ? 1 + Math.min(0.6, Math.max(0, level)) * 0.22
-    : speaking
-      ? 1 + Math.min(0.6, Math.max(0, level)) * 0.12
-      : 1;
-
-  const ring = RING_GRADIENT[state];
-
   return (
     <div className="flex w-full flex-col items-center gap-4">
       <div className="relative flex h-[248px] w-[248px] items-center justify-center">
-        {/* Halo: presence behind the sphere, and the only part that pulses. */}
-        <div
-          aria-hidden="true"
-          className={`absolute inset-6 rounded-full bg-gradient-to-br ${GLOW[state]} blur-2xl ${
-            reduced ? "" : "transition-transform duration-150"
-          }`}
-          style={{ transform: `scale(${pulse})` }}
-        />
-
-        {/* viewBox is 220×220 and the sphere fills it, so `rounded-full` here is
-            a true circle at every size. */}
+        {/* Minimal white face, matching the requested reference: no colored
+            rim, gradients, highlights, or skin tones. Only the features are black. */}
         <svg
           viewBox="0 0 220 220"
-          className="relative h-[208px] w-[208px] rounded-full"
+          className="relative h-[208px] w-[208px] rounded-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.12)]"
           role="img"
           aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}
         >
-          <defs>
-            <linearGradient id={ringId} x1="8%" y1="0%" x2="92%" y2="100%">
-              <stop offset="0%" stopColor={ring.from} />
-              {ring.via ? <stop offset="50%" stopColor={ring.via} /> : null}
-              <stop offset="100%" stopColor={ring.to} />
-            </linearGradient>
-
-            {/* Off-centre radial, so a flat circle reads as a lit sphere. */}
-            <radialGradient id={faceId} cx="36%" cy="26%" r="82%">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="65%" stopColor="#ffffff" />
-              <stop offset="100%" stopColor="#f1f5f9" />
-            </radialGradient>
-            <linearGradient id={specularId} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-
-            {/* The angled upper lids. The dark eye geometry is clipped to these,
-                so the lid edge IS the top edge of the eye rather than a line
-                drawn near it.
-
-                The angle points UP toward the centre. Down would be the exact
-                mirror of this and renders as a scowl — see the note above the
-                component. Same coordinate pairs as the upward version, with the
-                two `y` values swapped on each lid. */}
-            <clipPath id={eyeLId}>
-              <polygon points="45,88 105,76 105,130 45,130" />
-            </clipPath>
-            <clipPath id={eyeRId}>
-              <polygon points="115,76 175,88 175,130 115,130" />
-            </clipPath>
-          </defs>
-
-          {/* Outer gradient ring, then the sphere it rims. */}
-          <circle cx="110" cy="110" r="104" fill="none" stroke={`url(#${ringId})`} strokeWidth="8" />
-          <circle cx="110" cy="110" r="100" fill={`url(#${faceId})`} />
-          <path
-            d="M 54 62 A 74 74 0 0 1 166 62"
-            fill="none"
-            stroke={`url(#${specularId})`}
-            strokeWidth="5"
-            strokeLinecap="round"
-          />
-
-          {/* Eyes. The ellipses are sized so their own curves bound the sides and
-              bottom, leaving only the lid to clip them — no straight cut at the
-              clip edge. Gaze and blink compose in one transform. */}
-          <g clipPath={`url(#${eyeLId})`}>
-            <g transform={eyeTransform(76)}>
-              <ellipse cx="76" cy="101" rx="25" ry="23" fill="#18181b" />
-              <ellipse cx="68" cy="93" rx="5.5" ry="4.5" fill="#ffffff" opacity="0.85" />
-            </g>
+          <circle cx="110" cy="110" r="108" fill="#ffffff" />
+          <g transform={eyeTransform(64)}>
+            <ellipse cx="64" cy="110" rx="17" ry="22" fill="#000000" />
           </g>
-          <g clipPath={`url(#${eyeRId})`}>
-            <g transform={eyeTransform(144)}>
-              <ellipse cx="144" cy="101" rx="25" ry="23" fill="#18181b" />
-              <ellipse cx="136" cy="93" rx="5.5" ry="4.5" fill="#ffffff" opacity="0.85" />
-            </g>
+          <g transform={eyeTransform(156)}>
+            <ellipse cx="156" cy="110" rx="17" ry="22" fill="#000000" />
           </g>
-          <line
-            x1="45"
-            y1="88"
-            x2="105"
-            y2="76"
-            stroke="#18181b"
-            strokeWidth="5.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="115"
-            y1="76"
-            x2="175"
-            y2="88"
-            stroke="#18181b"
-            strokeWidth="5.5"
-            strokeLinecap="round"
-          />
 
-          {/* Mouth. Speaks, or rests as a closed capsule. */}
+          {/* Keep lip-sync, but use the same solid black as the resting mouth. */}
           {speaking ? (
-            <g>
-              <rect
-                x={110 - mouthW / 2}
-                y={128 - mouthH / 2}
-                width={mouthW}
-                height={mouthH}
-                rx={mouthW / 2}
-                ry={mouthH / 2}
-                fill="#18181b"
-              />
-              {/* Tongue: rides in the lower half of the aperture and only grows
-                  once the mouth is actually open. */}
-              <rect
-                x={110 - (mouthW * 0.62) / 2}
-                y={128 + mouthH * 0.05}
-                width={mouthW * 0.62}
-                height={Math.max(1, mouthH * 0.42)}
-                rx={(mouthW * 0.62) / 2}
-                ry={Math.max(0.5, (mouthH * 0.42) / 2)}
-                fill="#f43f5e"
-              />
-            </g>
+            <rect
+              x={110 - mouthW / 2}
+              y={132 - mouthH / 2}
+              width={mouthW}
+              height={mouthH}
+              rx={mouthW / 2}
+              ry={mouthW / 2}
+              fill="#000000"
+            />
           ) : (
-            <path d="M 91 132 C 91 120, 129 120, 129 132 C 129 136, 91 136, 91 132 Z" fill="#18181b" />
+            <path d="M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z" fill="#000000" />
           )}
         </svg>
 

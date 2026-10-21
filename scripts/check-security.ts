@@ -722,6 +722,9 @@ async function main() {
       const src = readFileSync(join(apiDir, `ai/${name}/route.ts`), "utf8");
       assert.match(src, /guardAiRequest/, `ai/${name} must use guardAiRequest`);
     }
+    const profileAudit = readFileSync(join(apiDir, "ai/evaluate-profile/route.ts"), "utf8");
+    assert.match(profileAudit, /guardAiRequest\(req,\s*\{\s*feature:\s*["']ai_advanced["']/,
+      "profile audit must enforce the centralized advanced-AI entitlement server-side");
   });
 
   check("payment webhooks authenticate the provider", () => {
