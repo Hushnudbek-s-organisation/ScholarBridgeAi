@@ -898,6 +898,9 @@ export function VisaSpeakingAssistant({
   const silenceSubmitTimerRef = useRef<number | null>(null);
   const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ttsAudioCtxRef = useRef<AudioContext | null>(null);
+  const ttsAudioElRef = useRef<HTMLAudioElement | null>(null);
+  const ttsObjectUrlRef = useRef<string | null>(null);
+  const ttsPlaybackIdRef = useRef(0);
   const ttsRafRef = useRef(0);
   const ttsAbortRef = useRef<AbortController | null>(null);
   /** Watchdog for a speechSynthesis utterance whose onend never fires. */
@@ -912,6 +915,27 @@ export function VisaSpeakingAssistant({
   const micDeniedRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VisaEngine | null>(null);
+
+  function stopNeuralSpeech(): void {
+    ttsPlaybackIdRef.current += 1;
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
+    try { ttsSourceRef.current?.stop(); } catch { /* already ended */ }
+    ttsSourceRef.current = null;
+    if (ttsAudioElRef.current) {
+      ttsAudioElRef.current.pause();
+      ttsAudioElRef.current.removeAttribute("src");
+      ttsAudioElRef.current.load();
+      ttsAudioElRef.current = null;
+    }
+    if (ttsObjectUrlRef.current) {
+      URL.revokeObjectURL(ttsObjectUrlRef.current);
+      ttsObjectUrlRef.current = null;
+    }
+    cancelAnimationFrame(ttsRafRef.current);
+    ttsRafRef.current = 0;
+    setOutputLevel(0);
+  }
 
   const liveSessionRef = useRef<LiveSessionLike | null>(null);
   const liveConnectedRef = useRef(false);
@@ -1079,10 +1103,9 @@ export function VisaSpeakingAssistant({
       }
       recognitionRef.current = null;
       safeCancelSpeech();
-      ttsAbortRef.current?.abort();
-      try { ttsSourceRef.current?.stop(); } catch { /* already ended */ }
-      cancelAnimationFrame(ttsRafRef.current);
+      stopNeuralSpeech();
       ttsAudioCtxRef.current?.close().catch(() => {});
+      ttsAudioCtxRef.current = null;
       if (silenceSubmitTimerRef.current !== null) window.clearTimeout(silenceSubmitTimerRef.current);
 
       if (speakWatchdogRef.current !== null) {
@@ -1285,21 +1308,7 @@ export function VisaSpeakingAssistant({
       }
     }
 
-    function stopNeuralSpeech(): void {
-      ttsAbortRef.current?.abort();
-      ttsAbortRef.current = null;
-      try {
-        ttsSourceRef.current?.stop();
-      } catch {
-        // AudioBufferSourceNode.stop() can throw after it already ended.
-      }
-      ttsSourceRef.current = null;
-      cancelAnimationFrame(ttsRafRef.current);
-      ttsRafRef.current = 0;
-      setOutputLevel(0);
-    }
-
-    async function playNeuralSpeech(bytes: ArrayBuffer, token: number, onDone: () => void, text: string): Promise<boolean> {
+    async function playNeuralSpeech(bytes: ArrayBuffer, token: number, playbackId: number, onDone: () => void, text: string): Promise<boolean> {
       const Ctor = window.AudioContext || window.webkitAudioContext;
       if (!Ctor) return false;
       try {
@@ -1307,25 +1316,30 @@ export function VisaSpeakingAssistant({
         ttsAudioCtxRef.current = ctx;
         if (ctx.state === "suspended") await ctx.resume();
         const buffer = await ctx.decodeAudioData(bytes.slice(0));
-        if (sessionRef.current !== token) return true;
+        if (sessionRef.current !== token || ttsPlaybackIdRef.current !== playbackId) return true;
         const source = ctx.createBufferSource();
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
+        analyser.fftSize = 1024;
         source.buffer = buffer;
         source.connect(analyser);
         analyser.connect(ctx.destination);
         ttsSourceRef.current = source;
-        const bins = new Uint8Array(analyser.frequencyBinCount);
+        const bins = new Uint8Array(analyser.fftSize);
         const tick = () => {
-          if (ttsSourceRef.current !== source) return;
-          analyser.getByteFrequencyData(bins);
-          let sum = 0;
-          for (const bin of bins) sum += bin;
-          setOutputLevel(Math.max(0, Math.min(1, sum / bins.length / 140)));
+          if (ttsSourceRef.current !== source || ttsPlaybackIdRef.current !== playbackId) return;
+          analyser.getByteTimeDomainData(bins);
+          let squaredSum = 0;
+          for (const bin of bins) {
+            const sample = (bin - 128) / 128;
+            squaredSum += sample * sample;
+          }
+          const rms = Math.sqrt(squaredSum / bins.length);
+          setOutputLevel(Math.max(0, Math.min(1, rms * 3.2)));
           ttsRafRef.current = requestAnimationFrame(tick);
         };
         source.onended = () => {
-          if (ttsSourceRef.current === source) stopNeuralSpeech();
+          if (ttsSourceRef.current !== source || ttsPlaybackIdRef.current !== playbackId) return;
+          stopNeuralSpeech();
           onDone();
         };
         setOfficer("speaking");
@@ -1333,23 +1347,82 @@ export function VisaSpeakingAssistant({
         ttsRafRef.current = requestAnimationFrame(tick);
         clearSpeakWatchdog();
         speakWatchdogRef.current = window.setTimeout(() => {
+          if (ttsPlaybackIdRef.current !== playbackId) return;
           stopNeuralSpeech();
           onDone();
         }, speakWatchdogMs(text));
         return true;
       } catch {
-        stopNeuralSpeech();
         return false;
       }
     }
 
-    function fallbackSpeak(text: string, speakImmediately = false): void {
+    async function playNeuralAudioElement(bytes: ArrayBuffer, token: number, playbackId: number, onDone: () => void, text: string): Promise<boolean> {
+      if (typeof Audio === "undefined" || ttsPlaybackIdRef.current !== playbackId) return false;
+      let objectUrl: string;
+      let audio: HTMLAudioElement;
+      try {
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+        audio = new Audio(objectUrl);
+      } catch {
+        return false;
+      }
+      ttsObjectUrlRef.current = objectUrl;
+      ttsAudioElRef.current = audio;
+      const cleanup = () => {
+        audio.onended = null;
+        audio.onerror = null;
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        if (ttsAudioElRef.current === audio) ttsAudioElRef.current = null;
+        if (ttsObjectUrlRef.current === objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          ttsObjectUrlRef.current = null;
+        }
+        setOutputLevel(0);
+      };
+      return await new Promise<boolean>((resolve) => {
+        audio.onended = () => {
+          const current = sessionRef.current === token && ttsPlaybackIdRef.current === playbackId;
+          cleanup();
+          if (current) {
+            clearSpeakWatchdog();
+            onDone();
+          }
+          resolve(true);
+        };
+        audio.onerror = () => {
+          cleanup();
+          resolve(false);
+        };
+        setOfficer("speaking");
+        clearSpeakWatchdog();
+        speakWatchdogRef.current = window.setTimeout(() => {
+          if (ttsPlaybackIdRef.current !== playbackId) return;
+          stopNeuralSpeech();
+          onDone();
+        }, speakWatchdogMs(text));
+        void audio.play().then(() => resolve(true)).catch(() => {
+          cleanup();
+          clearSpeakWatchdog();
+          resolve(false);
+        });
+      });
+    }
+
+    function fallbackSpeak(text: string): void {
       const token = sessionRef.current;
-      if (mutedRef.current || getSafeSpeechSynthesis() === null) {
+      if (mutedRef.current) {
         setOfficer("idle");
         autoListen(token);
         return;
       }
+      stopNeuralSpeech();
+      clearSpeakWatchdog();
+      safeCancelSpeech();
+      const playbackId = ttsPlaybackIdRef.current;
+      const isCurrent = () => sessionRef.current === token && ttsPlaybackIdRef.current === playbackId && !mutedRef.current;
       let finished = false;
       const finishSpeaking = () => {
         if (finished || sessionRef.current !== token) return;
@@ -1359,9 +1432,13 @@ export function VisaSpeakingAssistant({
         autoListen(token);
       };
       const browserSpeak = () => {
-        if (sessionRef.current !== token || finished) return;
+        if (!isCurrent() || finished) return;
+        const synth = getSafeSpeechSynthesis();
+        if (!synth || typeof SpeechSynthesisUtterance === "undefined") {
+          finishSpeaking();
+          return;
+        }
         try {
-          safeCancelSpeech();
           const c = getVisaCountry(configRef.current?.countryCode);
           const utter = new SpeechSynthesisUtterance(text);
           utter.lang = c?.locale ?? "en-US";
@@ -1372,7 +1449,7 @@ export function VisaSpeakingAssistant({
           setOfficer("speaking");
           utter.onend = finishSpeaking;
           utter.onerror = finishSpeaking;
-          getSafeSpeechSynthesis()?.speak(utter);
+          synth.speak(utter);
           clearSpeakWatchdog();
           speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
         } catch {
@@ -1380,39 +1457,48 @@ export function VisaSpeakingAssistant({
         }
       };
 
-      // The greeting must be audible immediately. Browser speech is local and
-      // starts in the click turn; subsequent replies prefer neural TTS.
-      if (speakImmediately) {
-        browserSpeak();
-        return;
-      }
+      // Keep the text and speaking state immediate; request natural neural
+      // audio in parallel with the already-rendered officer line.
       setOfficer("speaking");
       void (async () => {
         const controller = new AbortController();
         ttsAbortRef.current = controller;
-        const timer = window.setTimeout(() => controller.abort(), 3_500);
+        const timer = window.setTimeout(() => controller.abort(), 8_000);
         try {
           const res = await fetch("/api/visa/tts", {
             method: "POST",
             signal: controller.signal,
-            headers: { "content-type": "application/json" },
+            headers: { "content-type": "application/json", accept: "audio/mpeg, audio/*" },
             body: JSON.stringify({
               text,
               gender: configRef.current?.gender ?? "male",
               language: getVisaCountry(configRef.current?.countryCode)?.locale,
-              voice: configRef.current?.voice,
             }),
           });
-          if (sessionRef.current !== token || finished) return;
-          if (!res.ok || res.status === 204) {
+          if (!isCurrent() || ttsAbortRef.current !== controller || finished) return;
+          if (res.status === 204 || !res.ok) {
+            browserSpeak();
+            return;
+          }
+          const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+          if (!contentType.startsWith("audio/")) {
             browserSpeak();
             return;
           }
           const bytes = await res.arrayBuffer();
-          if (sessionRef.current !== token || finished) return;
-          if (!bytes.byteLength || !(await playNeuralSpeech(bytes, token, finishSpeaking, text))) browserSpeak();
+          if (!isCurrent() || ttsAbortRef.current !== controller || finished) return;
+          if (!bytes.byteLength) {
+            browserSpeak();
+            return;
+          }
+          if (await playNeuralSpeech(bytes, token, playbackId, finishSpeaking, text)) return;
+          if (!isCurrent() || finished) return;
+          if (await playNeuralAudioElement(bytes, token, playbackId, finishSpeaking, text)) return;
+          if (isCurrent() && !finished) browserSpeak();
         } catch {
-          if (sessionRef.current === token && !finished) browserSpeak();
+          // An explicit stop (mute/interrupt/new utterance) nulls the ref and
+          // must not restart speech. Timeout/network aborts still fall back.
+          if (isCurrent() && ttsAbortRef.current === controller && !finished) browserSpeak();
         } finally {
           window.clearTimeout(timer);
           if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
@@ -2158,7 +2244,7 @@ export function VisaSpeakingAssistant({
       setScreen("interview");
       const openingLine = buildInstantOpeningLine(c, gender, activeProfile?.name);
       pushMessage({ role: "officer", text: openingLine });
-      fallbackSpeak(openingLine, true);
+      fallbackSpeak(openingLine);
 
       // Live is opt-in: selecting a Live voice explicitly activates it. Start
       // connection in the background, never in front of the opening greeting.
@@ -2208,6 +2294,8 @@ export function VisaSpeakingAssistant({
     }
 
     function interruptAssistant(): void {
+      stopNeuralSpeech();
+      clearSpeakWatchdog();
       if (engineModeRef.current === "gemini-live") {
         const wasProducing =
           officerStateRef.current !== "idle" ||
@@ -2284,7 +2372,12 @@ export function VisaSpeakingAssistant({
       if (next) {
         safeCancelSpeech();
         stopNeuralSpeech();
+        clearSpeakWatchdog();
         clearLivePlayback();
+        if (engineModeRef.current !== "gemini-live" && officerStateRef.current === "speaking") {
+          setOfficer("idle");
+          autoListen(sessionRef.current);
+        }
       } else {
         liveOutputCtxRef.current?.resume().catch(() => {});
       }

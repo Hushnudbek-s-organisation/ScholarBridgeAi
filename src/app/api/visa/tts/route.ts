@@ -11,7 +11,7 @@ import { getVisaCountry, type VisaOfficerGender } from "@/lib/visa-interview";
  * POST /api/visa/tts — natural neural voice for the consular officer.
  *
  * Body: { text: string, gender?: "male" | "female", voice?: string, language?: string }
- * Returns: audio/mpeg bytes, or **204 No Content** when no OpenAI key is set.
+ * Returns: audio/mpeg bytes, or **204 No Content** when no configured TTS provider succeeds.
  *
  * WHY 204 AND NOT AN ERROR
  * The browser has a perfectly good built-in speech synthesiser. This endpoint
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
     if (openRouterApiKey) {
       const models = [
         process.env.OPENROUTER_TTS_MODEL?.trim(),
-        "fishaudio/fish-speech-2.1-pro:free",
         "fish-audio/s2.1-pro-free:free",
+        "fishaudio/fish-speech-2.1-pro:free",
         "openai/gpt-4o-mini-tts",
       ].filter((model): model is string => Boolean(model));
       for (const model of [...new Set(models)]) candidates.push({ provider: "openrouter", apiKey: openRouterApiKey, model });
@@ -111,6 +111,7 @@ export async function POST(req: Request) {
     if (candidates.length === 0) return new NextResponse(null, { status: 204 });
 
     let audio: ArrayBuffer | null = null;
+    let selectedCandidate: (typeof candidates)[number] | null = null;
     for (const candidate of candidates) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -128,7 +129,11 @@ export async function POST(req: Request) {
           {
             method: "POST",
             signal: controller.signal,
-            headers: { authorization: `Bearer ${candidate.apiKey}`, "content-type": "application/json" },
+            headers: {
+              authorization: `Bearer ${candidate.apiKey}`,
+              "content-type": "application/json",
+              accept: "audio/mpeg, application/octet-stream, */*",
+            },
             body: JSON.stringify(body),
           },
         );
@@ -144,6 +149,7 @@ export async function POST(req: Request) {
         const candidateAudio = await upstream.arrayBuffer();
         if (candidateAudio.byteLength === 0) continue;
         audio = candidateAudio;
+        selectedCandidate = candidate;
         break;
       } catch (error) {
         console.warn(`visa/tts ${candidate.provider} request failed:`, error instanceof Error ? error.name : "unknown");
@@ -160,6 +166,8 @@ export async function POST(req: Request) {
         "content-length": String(audio.byteLength),
         // Voice clips are per-utterance and must never be cached by a shared proxy.
         "cache-control": "no-store",
+        "x-tts-provider": selectedCandidate?.provider ?? "unknown",
+        "x-tts-model": selectedCandidate?.model ?? "unknown",
       },
     });
   } catch (err) {
