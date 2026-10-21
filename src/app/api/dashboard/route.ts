@@ -28,6 +28,7 @@ import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/re
 import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -82,6 +83,7 @@ export async function GET(req: Request) {
     // ---- A single query for the counters the rest of the page needs --------
     const [row] = await db
       .select({
+        profile: studentProfiles,
         savedUniversities: sql<number>`(SELECT COUNT(*)::int FROM saved_universities su WHERE su.profile_id = ${profileId})`,
         applications: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId})`,
         submittedApplications: sql<number>`(SELECT COUNT(*)::int FROM applications a WHERE a.profile_id = ${profileId} AND a.submitted_at IS NOT NULL)`,
@@ -103,7 +105,9 @@ export async function GET(req: Request) {
       .where(eq(studentProfiles.id, profileId))
       .limit(1);
 
-    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
+    // The aggregate query is already anchored to this profile row, so reuse
+    // its projection instead of issuing a second full-row SELECT.
+    const profile = row?.profile;
     const profileHasContext = Boolean(
       profile && (
         profile.degreeLevel?.trim() ||
@@ -632,10 +636,11 @@ async function recommendedFor(
     combinedScore: number;
   }[] = [];
   if (hasBasis) {
-    const pool = await db
-      .select()
-      .from(universities)
-      .where(eq(universities.isActive, true));
+    // Reuse the same short-lived, admin-invalidated catalogue snapshot as the
+    // discovery APIs rather than selecting the entire university table for
+    // every dashboard request.
+    const { unis: cachedUniversities } = await getCachedUniversitiesBundle();
+    const pool = cachedUniversities.filter((university) => university.isActive !== false);
 
     scored = pool
       .filter((u) => supportsDegreeLevel(u.degreeLevel, degreeLevel))

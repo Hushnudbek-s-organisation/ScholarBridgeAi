@@ -515,6 +515,14 @@ async function main() {
 
     await db.delete(schema.universities).where(eq(schema.universities.id, lateUni.id));
     invalidateCatalogCache("all");
+
+    resetCatalogCacheForTests();
+    const dashboardWithColdCatalog = await call(dashboardGet as any, `/api/dashboard?profileId=${profile.id}`);
+    check(
+      "dashboard recommendations use the shared university catalogue cache",
+      dashboardWithColdCatalog.status === 200 && catalogCacheStats().universitiesCached,
+      `status ${dashboardWithColdCatalog.status}`
+    );
   }
 
   // -----------------------------------------------------------------------
