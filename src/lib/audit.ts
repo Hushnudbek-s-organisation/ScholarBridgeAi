@@ -20,7 +20,8 @@ export type AuditEntityType =
   // Platform ownership + transfers (entityId = transfer id, 0 = singleton).
   | "ownership"
   // Admin role grants/revocations by the owner (entityId = profile id).
-  | "admin_role";
+  | "admin_role"
+  | "forum_thread";
 
 interface AuditEntry {
   entityType: AuditEntityType;

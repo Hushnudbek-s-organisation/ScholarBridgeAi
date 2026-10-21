@@ -5,9 +5,10 @@
  * any API — the public views expose only hasKey + a masked hint.
  * Resolution priority: DB (admin panel) → env vars → defaults.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiProviderCredentials } from "@/db/schema";
+import { ensureCoreSchema } from "@/lib/core/db";
 import {
   AI_PROVIDERS,
   AI_PROVIDER_IDS,
@@ -27,7 +28,7 @@ export interface StoredCredential {
   provider: string;
   apiKeyEnc: string | null;
   model: string | null;
-  updatedAt: Date;
+  updatedAt: Date | string | null;
 }
 
 /** Warn once per process when the DB is unreachable (keeps logs quiet on the hot path). */
@@ -66,17 +67,30 @@ export async function upsertCredential(
   provider: AIProviderId,
   opts: { apiKey?: string; model?: string }
 ): Promise<void> {
-  const existing = await getCredential(provider);
-  const apiKeyEnc = opts.apiKey ? encryptApiKey(opts.apiKey) : (existing?.apiKeyEnc ?? null);
-  const model = (opts.model?.trim() || existing?.model) ?? null;
-
-  if (existing) {
-    await db
-      .update(aiProviderCredentials)
-      .set({ apiKeyEnc, model, updatedAt: new Date() })
-      .where(eq(aiProviderCredentials.provider, provider));
-  } else {
-    await db.insert(aiProviderCredentials).values({ provider, apiKeyEnc, model });
+  try {
+    if (!(await ensureCoreSchema())) {
+      throw new Error("Core database schema could not be verified.");
+    }
+    const key = opts.apiKey?.trim();
+    const model = opts.model?.trim();
+    const encrypted = key ? encryptApiKey(key) : null;
+    await db.insert(aiProviderCredentials).values({
+      provider,
+      apiKeyEnc: encrypted,
+      model: model || null,
+    }).onConflictDoUpdate({
+      target: aiProviderCredentials.provider,
+      set: {
+        apiKeyEnc: encrypted ?? sql`${aiProviderCredentials.apiKeyEnc}`,
+        model: model || sql`${aiProviderCredentials.model}`,
+        updatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    // Drizzle errors can contain SQL parameters; log the diagnostic message
+    // only so encrypted credential payloads never enter the application log.
+    console.error("[AI credentials] database upsert failed:", error instanceof Error ? error.message : String(error));
+    throw new Error("Could not persist the AI key or model. Check database availability and encryption configuration.");
   }
 }
 
@@ -166,7 +180,11 @@ export async function getPublicCredentials(disabled: AIProviderId[] = []): Promi
           hasKey: true,
           keySource: "db",
           keyHint: maskApiKey(key),
-          updatedAt: row.updatedAt.toISOString(),
+          updatedAt: row.updatedAt instanceof Date
+            ? row.updatedAt.toISOString()
+            : typeof row.updatedAt === "string"
+              ? row.updatedAt
+              : null,
           needsReencrypt: rotated,
         };
       }

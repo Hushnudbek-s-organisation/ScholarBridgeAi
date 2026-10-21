@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { aiChat, isAiConfigured } from "@/lib/ai/index";
 import { authenticate } from "@/lib/auth";
 import {
+  buildInstantOpeningLine,
   buildInterviewUserPrompt,
   buildOfficerSystemPrompt,
   getVisaCountry,
@@ -52,25 +53,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Provider = admin's "visa" mapping (default Groq); see lib/ai/settings.
-    // Without one, the interview must still WORK: the officer asks the
-    // country's standard consular questions in order, and the final score is
-    // the deterministic rubric over the student's own transcript. It used to
-    // answer 503, so the voice interview could not start at all on a server
-    // with no AI keys — a dead end for the whole feature.
-    if (!(await isAiConfigured("visa"))) {
-      const history = sanitizeHistory(Array.isArray(body?.messages) ? body.messages : []);
-      const scripted = nextScriptedQuestion(country, history as VisaMessage[]);
-      return NextResponse.json({
-        reply: scripted.reply,
-        aiUsed: false,
-        source: "script",
-        closing: scripted.closing,
-      });
-    }
-
-    const gender: VisaOfficerGender =
-      body?.gender === "female" ? "female" : "male";
+    const gender: VisaOfficerGender = body?.gender === "female" ? "female" : "male";
     const history = sanitizeHistory(body?.messages);
     // The applicant file comes from the signed-in profile, never the request
     // body: client text must not be placed in the officer's system prompt.
@@ -81,6 +64,23 @@ export async function POST(req: Request) {
           targetMajor: typeof session.profile.targetMajor === "string" ? session.profile.targetMajor.slice(0, 120) : null,
         }
       : null;
+
+    // The deterministic opening is returned immediately, even when providers
+    // are unavailable; it is not falsely attributed to an AI model.
+    if (history.length === 0) {
+      return NextResponse.json({
+        reply: buildInstantOpeningLine(country, gender, profile?.name),
+        aiUsed: false,
+        source: "instant_opening",
+      });
+    }
+
+    // Provider = admin's visa mapping. When unavailable, keep the practice
+    // useful with the next clearly-labelled scripted consular question.
+    if (!(await isAiConfigured("visa"))) {
+      const scripted = nextScriptedQuestion(country, history as VisaMessage[]);
+      return NextResponse.json({ reply: scripted.reply, aiUsed: false, source: "script", closing: scripted.closing });
+    }
 
     // gpt-oss is a reasoning model: reasoning tokens share max_tokens, so a
     // 300-token cap returns an empty spoken line. 2048 + low effort keeps
@@ -105,10 +105,10 @@ export async function POST(req: Request) {
         temperature: 0.8,
         maxTokens: 2048,
         reasoningEffort: "low",
-        // Visa turns should fail over quickly rather than leave the officer thinking for minutes.
-        timeoutMs: 12_000,
+        // Keep follow-up turns bounded; the opening never pays for an LLM request.
+        timeoutMs: 8_000,
       },
-      { maxAttempts: 3, baseDelayMs: 100 },
+      { maxAttempts: 2, baseDelayMs: 100 },
     );
     if (!result.ok) {
       // Keep practice usable when a configured provider is overloaded or its

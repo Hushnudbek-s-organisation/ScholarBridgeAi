@@ -196,12 +196,15 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
 
   const testProvider = async (provider: string, deep: boolean) => {
     const key = `test:${provider}`;
+    const typedKey = keyDrafts[provider]?.trim() ?? "";
+    const typedModel = modelDrafts[provider]?.trim() ?? "";
+    const savedModel = data?.providers.find((item) => item.provider === provider)?.model ?? "";
     setBusy((b) => ({ ...b, [key]: true }));
     setTestResults((r) => ({ ...r, [provider]: { ok: true, text: deep ? "Running full check…" : "Testing…" } }));
     try {
       const body: Record<string, unknown> = { provider, deep };
-      if (keyDrafts[provider]?.trim()) body.apiKey = keyDrafts[provider].trim();
-      if (modelDrafts[provider]?.trim()) body.model = modelDrafts[provider].trim();
+      if (typedKey) body.apiKey = typedKey;
+      if (typedModel) body.model = typedModel;
       const json = await send("POST", body);
       const latency = json.latencyMs !== undefined ? ` (${json.latencyMs} ms)` : "";
       const source = json.keySource === "typed" ? "typed key" : json.keySource === "stored" ? "saved key" : json.keySource === "environment" ? "environment key" : "no key";
@@ -209,6 +212,23 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
         ...r,
         [provider]: { ok: Boolean(json.ok), text: `${json.ok ? "Connected ✓" : "Connection failed"} — ${String(json.message ?? "")} [tested ${source}]${latency}`, steps: (json.checks as HealthStep[]) ?? [] },
       }));
+
+      // A key that just passed its provider check should not disappear when
+      // the admin navigates away. Only save typed changes; never rewrite an
+      // existing credential merely because a saved key was tested.
+      if (json.ok && (typedKey || (typedModel && typedModel !== savedModel))) {
+        const saveBody: Record<string, unknown> = { provider };
+        if (typedKey) saveBody.apiKey = typedKey;
+        if (typedModel) saveBody.model = typedModel;
+        try {
+          const saved = await send("PUT", saveBody);
+          if (saved.providers) apply(saved as unknown as SettingsPayload);
+          if (typedKey) setKeyDrafts((drafts) => ({ ...drafts, [provider]: "" }));
+          setMessages((m) => ({ ...m, [provider]: { ok: true, text: "Connection passed; key/model saved (encrypted)" } }));
+        } catch (saveError) {
+          setMessages((m) => ({ ...m, [provider]: { ok: false, text: `Connection passed, but save failed: ${errText(saveError, "Database error")}` } }));
+        }
+      }
     } catch (err) {
       setTestResults((r) => ({ ...r, [provider]: { ok: false, text: errText(err, "Test failed") } }));
     } finally {
@@ -388,14 +408,19 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
               <div className="space-y-2">
                 <div>
                   <label htmlFor={keyId} className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-                    API key {p.keyHint && <span className="normal-case tracking-normal text-slate-400">— saved: {p.keyHint}</span>}
+                    API key
                   </label>
+                  {p.hasKey && (
+                    <div className="mb-2 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800">
+                      Saved key active ({p.keyHint} · source: {p.keySource === "db" ? "Admin Panel DB" : "Server .env"})
+                    </div>
+                  )}
                   <input
                     id={keyId}
                     type="password"
                     value={keyDrafts[p.provider] ?? ""}
                     onChange={(e) => setKeyDrafts((d) => ({ ...d, [p.provider]: e.target.value }))}
-                    placeholder={p.hasKey ? "Type a new key to replace (rotate)…" : "Enter API key"}
+                    placeholder={p.hasKey ? `✓ Key saved (${p.keyHint}) — paste a new key here only if you want to replace it` : "Enter API key"}
                     autoComplete="off"
                     spellCheck={false}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"

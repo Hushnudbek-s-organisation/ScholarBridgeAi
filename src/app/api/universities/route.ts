@@ -12,6 +12,7 @@ import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 
 /**
  * University discovery API (spec §16).
@@ -277,6 +278,36 @@ export async function GET(req: Request) {
         if (b.worldRanking == null) return -1;
         return a.worldRanking - b.worldRanking;
       });
+    }
+
+    // Best-effort multilingual semantic rerank: deterministic filters and
+    // profile relevance remain in force; vector similarity only nudges order.
+    if (search && results.length > 1 && !sort) {
+      try {
+        const candidates = results.slice(0, 63).map((uni) => [
+          uni.name,
+          uni.country,
+          uni.city,
+          uni.programMajor,
+          ...(programFieldsByUni.get(uni.id) ?? []),
+        ].filter(Boolean).join(". "));
+        const ranked = await rankSemanticTexts(search, candidates, { timeoutMs: 3_500, limit: candidates.length });
+        const semanticPosition = new Map(ranked.flatMap((item, position) => {
+          const university = results[item.index];
+          return university ? [[university.id, position] as const] : [];
+        }));
+        const lexicalPosition = new Map(results.map((item, position) => [item.id, position]));
+        const count = Math.max(1, results.length - 1);
+        results.sort((a, b) => {
+          const posA = lexicalPosition.get(a.id) ?? count;
+          const posB = lexicalPosition.get(b.id) ?? count;
+          const semA = semanticPosition.get(a.id) ?? count;
+          const semB = semanticPosition.get(b.id) ?? count;
+          return (posA / count) * 0.7 + (semA / count) * 0.3 - ((posB / count) * 0.7 + (semB / count) * 0.3);
+        });
+      } catch {
+        // Provider unavailable: preserve deterministic results and ordering.
+      }
     }
 
     // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).

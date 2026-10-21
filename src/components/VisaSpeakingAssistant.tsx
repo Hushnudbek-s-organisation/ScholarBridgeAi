@@ -70,6 +70,7 @@ import { CountryFlag } from "@/components/CountryFlag";
 import {
   VISA_COUNTRIES,
   VISA_LIVE_VOICES,
+  buildInstantOpeningLine,
   buildInterviewUserPrompt,
   getVisaCountry,
   normalizeVisaLiveVoice,
@@ -106,9 +107,10 @@ import {
   LIVE_SPEAK_WATCHDOG_MS,
   MAX_MIC_START_ATTEMPTS,
   MIC_RESTART_DELAY_MS,
-  shouldSubmitInterimOnEnd,
   speakWatchdogMs,
 } from "@/lib/visa-mic";
+
+const MAX_SILENCE_RECOVERY_ATTEMPTS = 5;
 
 // ---------------------------------------------------------------------------
 // Web Speech API typings (fallback mode; not in the TS DOM lib).
@@ -134,6 +136,10 @@ interface VisaSpeechRecognition extends EventTarget {
   maxAlternatives: number;
   continuous: boolean;
   onresult: ((e: VisaSpeechEvent) => void) | null;
+  onsoundstart: (() => void) | null;
+  onsoundend: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
   onerror: ((e: VisaSpeechErrorEvent) => void) | null;
   onend: (() => void) | null;
   start(): void;
@@ -673,13 +679,14 @@ export function VisaSpeakingAssistant({
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [gender, setGender] = useState<VisaOfficerGender | null>(null);
   const [voice, setVoice] = useState<VisaLiveVoice>("Kore");
+  const [liveVoiceSelected, setLiveVoiceSelected] = useState(false);
   const [messages, setMessages] = useState<VisaMessage[]>([]);
   const [officerState, setOfficerState] = useState<OfficerState>("idle");
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [liveOutputPartial, setLiveOutputPartial] = useState("");
   const [muted, setMuted] = useState(false);
-  const [engineMode, setEngineMode] = useState<EngineMode>("gemini-live");
+  const [engineMode, setEngineMode] = useState<EngineMode>("fallback");
   const [liveConnected, setLiveConnected] = useState(false);
   const [sttSupported, setSttSupported] = useState(
     () =>
@@ -877,7 +884,7 @@ export function VisaSpeakingAssistant({
   const listeningRef = useRef(false);
   const officerStateRef = useRef<OfficerState>("idle");
   const mutedRef = useRef(false);
-  const engineModeRef = useRef<EngineMode>("gemini-live");
+  const engineModeRef = useRef<EngineMode>("fallback");
   const configRef = useRef<{
     countryCode: string;
     gender: VisaOfficerGender;
@@ -887,10 +894,12 @@ export function VisaSpeakingAssistant({
   const micReadyRef = useRef(false);
   const recognitionRef = useRef<VisaSpeechRecognition | null>(null);
   const interimRef = useRef("");
-  const finalReceivedRef = useRef(false);
-  const meterAudioCtxRef = useRef<AudioContext | null>(null);
-  const meterStreamRef = useRef<MediaStream | null>(null);
-  const meterRafRef = useRef(0);
+  const accumulatedFinalRef = useRef("");
+  const silenceSubmitTimerRef = useRef<number | null>(null);
+  const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
+  const ttsRafRef = useRef(0);
+  const ttsAbortRef = useRef<AbortController | null>(null);
   /** Watchdog for a speechSynthesis utterance whose onend never fires. */
   const speakWatchdogRef = useRef<number | null>(null);
   /** Watchdog for a Gemini Live turn that stops producing audio mid-speech. */
@@ -1070,11 +1079,11 @@ export function VisaSpeakingAssistant({
       }
       recognitionRef.current = null;
       safeCancelSpeech();
-      cancelAnimationFrame(meterRafRef.current);
-      meterStreamRef.current?.getTracks().forEach((tr) => tr.stop());
-      meterStreamRef.current = null;
-      meterAudioCtxRef.current?.close().catch(() => {});
-      meterAudioCtxRef.current = null;
+      ttsAbortRef.current?.abort();
+      try { ttsSourceRef.current?.stop(); } catch { /* already ended */ }
+      cancelAnimationFrame(ttsRafRef.current);
+      ttsAudioCtxRef.current?.close().catch(() => {});
+      if (silenceSubmitTimerRef.current !== null) window.clearTimeout(silenceSubmitTimerRef.current);
 
       if (speakWatchdogRef.current !== null) {
         window.clearTimeout(speakWatchdogRef.current);
@@ -1157,16 +1166,8 @@ export function VisaSpeakingAssistant({
       }
     }
 
-    function stopFallbackMeter(): void {
-      cancelAnimationFrame(meterRafRef.current);
-      meterStreamRef.current?.getTracks().forEach((tr) => tr.stop());
-      meterStreamRef.current = null;
-      meterAudioCtxRef.current?.close().catch(() => {});
-      meterAudioCtxRef.current = null;
-      setVolume(0);
-    }
-
     function stopListening(): void {
+      clearSilenceSubmitTimer();
       if (micRetryTimerRef.current !== null) {
         window.clearTimeout(micRetryTimerRef.current);
         micRetryTimerRef.current = null;
@@ -1181,7 +1182,7 @@ export function VisaSpeakingAssistant({
       setListening(false);
       setInterim("");
       interimRef.current = "";
-      stopFallbackMeter();
+      accumulatedFinalRef.current = "";
     }
 
     function clearLivePlayback(): void {
@@ -1277,54 +1278,6 @@ export function VisaSpeakingAssistant({
       setLiveOutputPartial("");
     }
 
-    async function startFallbackMeter(): Promise<void> {
-      const token = sessionRef.current;
-      try {
-        stopFallbackMeter();
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        if (sessionRef.current !== token || !mountedRef.current) {
-          stream.getTracks().forEach((tr) => tr.stop());
-          return;
-        }
-        const Ctor = window.AudioContext || window.webkitAudioContext;
-        if (!Ctor) return;
-        const ctx = new Ctor();
-        if (ctx.state === "suspended") await ctx.resume().catch(() => {});
-        const src = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        src.connect(analyser);
-        const data = new Uint8Array(analyser.fftSize);
-        let lastPaint = 0;
-        const tick = () => {
-          analyser.getByteTimeDomainData(data);
-          let sum = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = (data[i] - 128) / 128;
-            sum += v * v;
-          }
-          const rms = Math.sqrt(sum / data.length);
-          const now = performance.now();
-          if (now - lastPaint > 80) {
-            lastPaint = now;
-            setVolume(Math.min(1, rms * 2.4));
-          }
-          meterRafRef.current = requestAnimationFrame(tick);
-        };
-        tick();
-        meterAudioCtxRef.current = ctx;
-        meterStreamRef.current = stream;
-      } catch {
-        // Decorative meter only.
-      }
-    }
-
     function clearSpeakWatchdog(): void {
       if (speakWatchdogRef.current !== null) {
         window.clearTimeout(speakWatchdogRef.current);
@@ -1332,18 +1285,71 @@ export function VisaSpeakingAssistant({
       }
     }
 
-    function fallbackSpeak(text: string): void {
+    function stopNeuralSpeech(): void {
+      ttsAbortRef.current?.abort();
+      ttsAbortRef.current = null;
+      try {
+        ttsSourceRef.current?.stop();
+      } catch {
+        // AudioBufferSourceNode.stop() can throw after it already ended.
+      }
+      ttsSourceRef.current = null;
+      cancelAnimationFrame(ttsRafRef.current);
+      ttsRafRef.current = 0;
+      setOutputLevel(0);
+    }
+
+    async function playNeuralSpeech(bytes: ArrayBuffer, token: number, onDone: () => void, text: string): Promise<boolean> {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return false;
+      try {
+        const ctx = ttsAudioCtxRef.current ?? new Ctor();
+        ttsAudioCtxRef.current = ctx;
+        if (ctx.state === "suspended") await ctx.resume();
+        const buffer = await ctx.decodeAudioData(bytes.slice(0));
+        if (sessionRef.current !== token) return true;
+        const source = ctx.createBufferSource();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.buffer = buffer;
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        ttsSourceRef.current = source;
+        const bins = new Uint8Array(analyser.frequencyBinCount);
+        const tick = () => {
+          if (ttsSourceRef.current !== source) return;
+          analyser.getByteFrequencyData(bins);
+          let sum = 0;
+          for (const bin of bins) sum += bin;
+          setOutputLevel(Math.max(0, Math.min(1, sum / bins.length / 140)));
+          ttsRafRef.current = requestAnimationFrame(tick);
+        };
+        source.onended = () => {
+          if (ttsSourceRef.current === source) stopNeuralSpeech();
+          onDone();
+        };
+        setOfficer("speaking");
+        source.start();
+        ttsRafRef.current = requestAnimationFrame(tick);
+        clearSpeakWatchdog();
+        speakWatchdogRef.current = window.setTimeout(() => {
+          stopNeuralSpeech();
+          onDone();
+        }, speakWatchdogMs(text));
+        return true;
+      } catch {
+        stopNeuralSpeech();
+        return false;
+      }
+    }
+
+    function fallbackSpeak(text: string, speakImmediately = false): void {
       const token = sessionRef.current;
       if (mutedRef.current || getSafeSpeechSynthesis() === null) {
         setOfficer("idle");
         autoListen(token);
         return;
       }
-      // Whatever ends the utterance — onend, onerror, a decode failure or the
-      // watchdog — the interview must continue the same way: officer idle, then
-      // LISTEN. (onerror used to reset the state without reopening the
-      // microphone, so after a question the student had to click the mic
-      // themselves; if that click also failed, typing was the only way forward.)
       let finished = false;
       const finishSpeaking = () => {
         if (finished || sessionRef.current !== token) return;
@@ -1352,8 +1358,6 @@ export function VisaSpeakingAssistant({
         setOfficer("idle");
         autoListen(token);
       };
-
-      /** The browser voice: always available, no amplitude to read. */
       const browserSpeak = () => {
         if (sessionRef.current !== token || finished) return;
         try {
@@ -1361,10 +1365,7 @@ export function VisaSpeakingAssistant({
           const c = getVisaCountry(configRef.current?.countryCode);
           const utter = new SpeechSynthesisUtterance(text);
           utter.lang = c?.locale ?? "en-US";
-          const selectedVoice = pickVoice(
-            utter.lang,
-            configRef.current?.gender ?? "male",
-          );
+          const selectedVoice = pickVoice(utter.lang, configRef.current?.gender ?? "male");
           if (selectedVoice) utter.voice = selectedVoice;
           utter.rate = 0.95;
           utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
@@ -1372,9 +1373,6 @@ export function VisaSpeakingAssistant({
           utter.onend = finishSpeaking;
           utter.onerror = finishSpeaking;
           getSafeSpeechSynthesis()?.speak(utter);
-          // Some browsers fire neither onend nor onerror (no user activation,
-          // throttled tab, cancelled utterance). Without this the officer stayed
-          // "speaking" forever and the microphone button stayed disabled.
           clearSpeakWatchdog();
           speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
         } catch {
@@ -1382,9 +1380,44 @@ export function VisaSpeakingAssistant({
         }
       };
 
-      // Start browser speech immediately; the server-generated voice added a
-      // visible delay after the text arrived. This starts without another fetch.
-      browserSpeak();
+      // The greeting must be audible immediately. Browser speech is local and
+      // starts in the click turn; subsequent replies prefer neural TTS.
+      if (speakImmediately) {
+        browserSpeak();
+        return;
+      }
+      setOfficer("speaking");
+      void (async () => {
+        const controller = new AbortController();
+        ttsAbortRef.current = controller;
+        const timer = window.setTimeout(() => controller.abort(), 3_500);
+        try {
+          const res = await fetch("/api/visa/tts", {
+            method: "POST",
+            signal: controller.signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              text,
+              gender: configRef.current?.gender ?? "male",
+              language: getVisaCountry(configRef.current?.countryCode)?.locale,
+              voice: configRef.current?.voice,
+            }),
+          });
+          if (sessionRef.current !== token || finished) return;
+          if (!res.ok || res.status === 204) {
+            browserSpeak();
+            return;
+          }
+          const bytes = await res.arrayBuffer();
+          if (sessionRef.current !== token || finished) return;
+          if (!bytes.byteLength || !(await playNeuralSpeech(bytes, token, finishSpeaking, text))) browserSpeak();
+        } catch {
+          if (sessionRef.current === token && !finished) browserSpeak();
+        } finally {
+          window.clearTimeout(timer);
+          if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
+        }
+      })();
     }
 
     async function fetchOfficerReply(history: VisaMessage[]): Promise<void> {
@@ -1424,7 +1457,7 @@ export function VisaSpeakingAssistant({
         // No AI provider on the server: the officer asks this country's
         // standard consular questions and the score still comes from the
         // rubric over the student's own answers. Say so — never pretend.
-        if (data?.source === "script" || data?.aiUsed === false) {
+        if (data?.source === "script" || (data?.aiUsed === false && data?.source !== "instant_opening")) {
           setNotice(t("offlinePractice"));
         }
         fallbackSpeak(reply);
@@ -1438,6 +1471,15 @@ export function VisaSpeakingAssistant({
     async function submitAnswer(text: string): Promise<void> {
       const clean = text.trim();
       if (!clean || submittingRef.current) return;
+      if (officerStateRef.current === "speaking") {
+        if (engineModeRef.current === "gemini-live") interruptAssistant();
+        else {
+          safeCancelSpeech();
+          stopNeuralSpeech();
+          clearSpeakWatchdog();
+          setOfficer("idle");
+        }
+      }
       submittingRef.current = true;
       if (engineModeRef.current === "fallback") stopListening();
       setNotice(null);
@@ -1459,6 +1501,36 @@ export function VisaSpeakingAssistant({
       }
     }
 
+    function transcriptText(): string {
+      return [accumulatedFinalRef.current, interimRef.current]
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function clearSilenceSubmitTimer(): void {
+      if (silenceSubmitTimerRef.current !== null) {
+        window.clearTimeout(silenceSubmitTimerRef.current);
+        silenceSubmitTimerRef.current = null;
+      }
+    }
+
+    function scheduleSilenceSubmit(token: number): void {
+      const answer = transcriptText();
+      if (answer.split(/\s+/).filter(Boolean).length < 3) return;
+      clearSilenceSubmitTimer();
+      silenceSubmitTimerRef.current = window.setTimeout(() => {
+        silenceSubmitTimerRef.current = null;
+        if (sessionRef.current !== token || !mountedRef.current || officerStateRef.current !== "idle") return;
+        const finalAnswer = transcriptText();
+        if (finalAnswer.split(/\s+/).filter(Boolean).length < 3) return;
+        stopListening();
+        void submitAnswer(finalAnswer);
+      }, 2_200);
+    }
+
     function startListening(): void {
       if (listeningRef.current || officerStateRef.current !== "idle") return;
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1467,33 +1539,65 @@ export function VisaSpeakingAssistant({
         return;
       }
       try {
-        const c = getVisaCountry(configRef.current?.countryCode);
+        const country = getVisaCountry(configRef.current?.countryCode);
         const rec = new SR();
-        rec.lang = c?.locale ?? "en-US";
+        const locale = country?.locale ?? "en-US";
+        rec.lang = locale.toLowerCase().startsWith("en-")
+          ? (country?.code === "UK" ? "en-GB" : "en-US")
+          : locale;
         rec.interimResults = true;
         rec.maxAlternatives = 1;
-        rec.continuous = false;
+        rec.continuous = true;
         const token = sessionRef.current;
         interimRef.current = "";
-        finalReceivedRef.current = false;
+        accumulatedFinalRef.current = "";
+        clearSilenceSubmitTimer();
 
+        const showCurrentSpeech = () => {
+          const transcript = transcriptText();
+          setInterim(transcript);
+          setTextAnswer(transcript);
+        };
+        const activity = () => {
+          if (sessionRef.current !== token) return;
+          micStartAttemptsRef.current = 0;
+          clearSilenceSubmitTimer();
+          setVolume((level) => Math.max(level, 0.48));
+        };
+        rec.onsoundstart = activity;
+        rec.onspeechstart = () => {
+          activity();
+          setVolume(0.82);
+        };
+        rec.onsoundend = () => setVolume(0.08);
+        rec.onspeechend = () => {
+          setVolume(0.08);
+          scheduleSilenceSubmit(token);
+        };
         rec.onresult = (e: VisaSpeechEvent) => {
           if (sessionRef.current !== token) return;
           let interimText = "";
-          let finalText = "";
+          const finalSegments: string[] = [];
           for (let i = e.resultIndex; i < e.results.length; i++) {
-            const r = e.results[i];
-            if (r.isFinal) finalText += r[0].transcript;
-            else interimText += r[0].transcript;
+            const result = e.results[i];
+            const transcript = result[0]?.transcript?.trim() ?? "";
+            if (!transcript) continue;
+            if (result.isFinal) finalSegments.push(transcript);
+            else interimText += `${interimText ? " " : ""}${transcript}`;
           }
-          if (interimText) {
-            interimRef.current = interimText;
-            setInterim(interimText);
+          if (finalSegments.length) {
+            accumulatedFinalRef.current = [accumulatedFinalRef.current, ...finalSegments]
+              .filter(Boolean)
+              .join(" ")
+              .replace(/\s+/g, " ")
+              .trim();
           }
-          if (finalText.trim()) {
-            finalReceivedRef.current = true;
-            micReadyRef.current = true;
-            void submitAnswer(finalText.trim());
+          interimRef.current = interimText.trim();
+          if (interimText || finalSegments.length) {
+            activity();
+            setVolume(0.72);
+            showCurrentSpeech();
+            scheduleSilenceSubmit(token);
           }
         };
         rec.onerror = (e: VisaSpeechErrorEvent) => {
@@ -1501,32 +1605,54 @@ export function VisaSpeakingAssistant({
           const kind = classifySpeechError(e.error);
           if (kind === "blocked") {
             micDeniedRef.current = true;
-            setMicBlocked(true);
             micReadyRef.current = false;
+            setMicBlocked(true);
+            listeningRef.current = false;
+            setListening(false);
           } else if (e.error === "no-speech") {
             setNotice(t("noSpeech"));
           } else if (kind === "transient") {
-            // "aborted" / "network" / empty: the session hiccuped. Voice must
-            // stay available — a transient error used to leave the student
-            // with nothing but the text box.
             setNotice(t("noSpeech"));
+          } else {
+            setNotice(t("micStartFailed"));
+            listeningRef.current = false;
+            setListening(false);
           }
-          stopListening();
         };
         rec.onend = () => {
           if (sessionRef.current !== token) return;
+          setVolume(0);
+          const enoughForAutoSubmit = transcriptText().split(/\s+/).filter(Boolean).length >= 3;
+          if (enoughForAutoSubmit) {
+            listeningRef.current = false;
+            setListening(false);
+            scheduleSilenceSubmit(token);
+            return;
+          }
+          if (
+            listeningRef.current &&
+            officerStateRef.current === "idle" &&
+            !submittingRef.current &&
+            micStartAttemptsRef.current < MAX_SILENCE_RECOVERY_ATTEMPTS
+          ) {
+            micStartAttemptsRef.current += 1;
+            if (micRetryTimerRef.current !== null) window.clearTimeout(micRetryTimerRef.current);
+            micRetryTimerRef.current = window.setTimeout(() => {
+              micRetryTimerRef.current = null;
+              if (sessionRef.current !== token || !mountedRef.current || !listeningRef.current || officerStateRef.current !== "idle") return;
+              try {
+                rec.start();
+                setListening(true);
+              } catch {
+                listeningRef.current = false;
+                setListening(false);
+                startListening();
+              }
+            }, MIC_RESTART_DELAY_MS);
+            return;
+          }
           listeningRef.current = false;
           setListening(false);
-          const pending = interimRef.current.trim();
-          interimRef.current = "";
-          setInterim("");
-          stopFallbackMeter();
-          // Chrome ends the session on a pause. The student's answer exists as
-          // an interim transcript at that moment and used to be thrown away —
-          // speak, see nothing happen, type instead. Submit it.
-          if (shouldSubmitInterimOnEnd(finalReceivedRef.current, pending)) {
-            void submitAnswer(pending);
-          }
         };
 
         recognitionRef.current = rec;
@@ -1535,25 +1661,19 @@ export function VisaSpeakingAssistant({
         setListening(true);
         setNotice(null);
         setMicBlocked(false);
+        micDeniedRef.current = false;
+        micReadyRef.current = true;
         micStartAttemptsRef.current = 0;
-        void startFallbackMeter();
       } catch {
-        // A start() that throws is NOT "this browser cannot listen": Chrome
-        // throws InvalidStateError while the previous session is still
-        // winding down. Marking STT unsupported here killed the voice path for
-        // the rest of the interview after a single hiccup — retry instead.
         recognitionRef.current = null;
         listeningRef.current = false;
         setListening(false);
-        stopFallbackMeter();
         if (micStartAttemptsRef.current < MAX_MIC_START_ATTEMPTS) {
           micStartAttemptsRef.current += 1;
           if (micRetryTimerRef.current !== null) window.clearTimeout(micRetryTimerRef.current);
           micRetryTimerRef.current = window.setTimeout(() => {
             micRetryTimerRef.current = null;
-            if (!mountedRef.current) return;
-            if (listeningRef.current || officerStateRef.current !== "idle") return;
-            startListening();
+            if (mountedRef.current && officerStateRef.current === "idle") startListening();
           }, MIC_RESTART_DELAY_MS);
         } else {
           setNotice(t("micStartFailed"));
@@ -1568,28 +1688,17 @@ export function VisaSpeakingAssistant({
      * permission probe at interview start failed.
      */
     async function ensureMicPermissionThenListen(token: number): Promise<void> {
-      if (sessionRef.current !== token || !mountedRef.current) return;
-      if (!micReadyRef.current) {
-        // Already denied this session? Do not pop the prompt on every single
-        // question — the student's explicit mic click retries it instead.
-        if (micDeniedRef.current) return;
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          });
-          stream.getTracks().forEach((tr) => tr.stop());
-          if (sessionRef.current !== token || !mountedRef.current) return;
-          micReadyRef.current = true;
-          setMicBlocked(false);
-        } catch {
-          micReadyRef.current = false;
-          micDeniedRef.current = true;
-          setMicBlocked(true);
-          return;
+      if (sessionRef.current !== token || !mountedRef.current || submittingRef.current) return;
+      if (engineModeRef.current === "gemini-live") {
+        if (liveConnectedRef.current) {
+          listeningRef.current = true;
+          setListening(true);
         }
+        return;
       }
-      if (sessionRef.current !== token || !mountedRef.current) return;
-      if (submittingRef.current) return;
+      // SpeechRecognition owns its microphone stream and triggers the browser
+      // permission prompt itself. Do not open a competing getUserMedia stream.
+      if (micDeniedRef.current) return;
       startListening();
     }
 
@@ -1818,6 +1927,7 @@ export function VisaSpeakingAssistant({
       if (interimText) {
         interimRef.current = interimText;
         setInterim(interimText);
+        setTextAnswer(interimText);
         if (officerStateRef.current === "idle") {
           listeningRef.current = true;
           setListening(true);
@@ -1829,6 +1939,7 @@ export function VisaSpeakingAssistant({
         const clean = cleanTranscript(inputText);
         if (clean) {
           pushMessage({ role: "user", text: clean });
+          setTextAnswer(clean);
           setOfficer("thinking");
           listeningRef.current = false;
           setListening(false);
@@ -1943,7 +2054,7 @@ export function VisaSpeakingAssistant({
           if (engineModeRef.current === "gemini-live" && messagesRef.current.length === 0) {
             void scheduleFallbackAfterLiveFailure(new Error("Live kickoff produced no first question"));
           }
-        }, 15_000);
+        }, 3_500);
       }
     }
 
@@ -1991,30 +2102,20 @@ export function VisaSpeakingAssistant({
       }, 600 + liveReconnectAttemptsRef.current * 350);
     }
 
-    async function startLiveInterview(): Promise<void> {
+    async function startLiveInterview(sendKickoff = false): Promise<void> {
       setMode("gemini-live");
       if (!browserSupportsGeminiLive()) throw new Error(t("liveUnsupported"));
       await ensureLiveAudio();
       liveTokenRef.current = await requestLiveToken();
-      await connectLiveSession(true);
+      await connectLiveSession(sendKickoff);
     }
 
     async function startFallbackInterview(fetchFirst = true): Promise<void> {
       setMode("fallback");
       setLiveConnectedState(false);
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        s.getTracks().forEach((tr) => tr.stop());
-        micReadyRef.current = true;
-      } catch {
-        micReadyRef.current = false;
-      }
+      // SpeechRecognition asks for permission on its own. Do not probe with
+      // getUserMedia here; that can contend with the recognizer's mic stream.
+      micReadyRef.current = false;
       if (fetchFirst) await fetchOfficerReply(messagesRef.current);
     }
 
@@ -2034,8 +2135,11 @@ export function VisaSpeakingAssistant({
       }
       recognitionRef.current = null;
       safeCancelSpeech();
-      stopFallbackMeter();
+      stopNeuralSpeech();
+      clearSilenceSubmitTimer();
       resetConversation();
+      accumulatedFinalRef.current = "";
+      interimRef.current = "";
       setError(null);
       setNotice(null);
       setAnalysis(null);
@@ -2049,12 +2153,19 @@ export function VisaSpeakingAssistant({
       micStartAttemptsRef.current = 0;
       micDeniedRef.current = false;
       micReadyRef.current = false;
+      setMode("fallback");
       setOfficer("thinking");
       setScreen("interview");
-      try {
-        await startLiveInterview();
-      } catch (err) {
-        await scheduleFallbackAfterLiveFailure(err);
+      const openingLine = buildInstantOpeningLine(c, gender, activeProfile?.name);
+      pushMessage({ role: "officer", text: openingLine });
+      fallbackSpeak(openingLine, true);
+
+      // Live is opt-in: selecting a Live voice explicitly activates it. Start
+      // connection in the background, never in front of the opening greeting.
+      if (liveVoiceSelected) {
+        void startLiveInterview(false).catch((err) => {
+          void scheduleFallbackAfterLiveFailure(err);
+        });
       }
     }
 
@@ -2117,6 +2228,7 @@ export function VisaSpeakingAssistant({
         return;
       }
       safeCancelSpeech();
+      stopNeuralSpeech();
       clearSpeakWatchdog();
       stopListening();
       setOfficer("idle");
@@ -2130,6 +2242,7 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       safeCancelSpeech();
+      stopNeuralSpeech();
       setOfficer("idle");
       setAnalysis(null);
       setAnalyzeError(null);
@@ -2155,6 +2268,7 @@ export function VisaSpeakingAssistant({
       stopListening();
       stopLiveAll();
       safeCancelSpeech();
+      stopNeuralSpeech();
       setOfficer("idle");
       resetConversation();
       setError(null);
@@ -2169,7 +2283,8 @@ export function VisaSpeakingAssistant({
       setMuted(next);
       if (next) {
         safeCancelSpeech();
-          clearLivePlayback();
+        stopNeuralSpeech();
+        clearLivePlayback();
       } else {
         liveOutputCtxRef.current?.resume().catch(() => {});
       }
@@ -2178,13 +2293,17 @@ export function VisaSpeakingAssistant({
     function onMicClick(): void {
       if (engineModeRef.current === "gemini-live") {
         if (!liveConnected) scheduleLiveReconnect("manual");
+        else if (officerStateRef.current === "speaking") interruptAssistant();
+        return;
+      }
+      if (officerStateRef.current === "speaking") {
+        interruptAssistant();
         return;
       }
       if (listeningRef.current) {
-        const pending = interimRef.current.trim();
-        const hadFinal = finalReceivedRef.current;
+        const pending = transcriptText();
         stopListening();
-        if (pending && !hadFinal) void submitAnswer(pending);
+        if (pending) void submitAnswer(pending);
         return;
       }
       if (officerStateRef.current !== "idle" || submittingRef.current) return;
@@ -2395,7 +2514,10 @@ export function VisaSpeakingAssistant({
                     <button
                       key={v}
                       type="button"
-                      onClick={() => setVoice(v)}
+                      onClick={() => {
+                        setVoice(v);
+                        setLiveVoiceSelected(true);
+                      }}
                       className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
                         selected
                           ? "border-cyan-400 bg-slate-950 text-white shadow-md"
@@ -2619,7 +2741,6 @@ export function VisaSpeakingAssistant({
                 <button
                   type="button"
                   onClick={() => engineRef.current?.onMicClick()}
-                  disabled={engineMode === "gemini-live" ? liveConnected : officerState !== "idle"}
                   className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black shadow-sm transition-all ${
                     engineMode === "gemini-live"
                       ? liveConnected
@@ -2690,8 +2811,7 @@ export function VisaSpeakingAssistant({
                         <button
                           type="button"
                           onClick={() => engineRef.current?.onMicClick()}
-                          disabled={officerState !== "idle"}
-                          className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400"
                         >
                           <Mic className="h-3.5 w-3.5" />
                           {t("micRetry")}
@@ -2724,13 +2844,12 @@ export function VisaSpeakingAssistant({
                       }
                     }}
                     placeholder={t("typePlaceholder")}
-                    disabled={officerState !== "idle"}
-                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400 disabled:bg-slate-100 dark:border-slate-700/70 dark:bg-[#0f1a30] dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400 dark:border-slate-700/70 dark:bg-[#0f1a30] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                   <button
                     type="button"
                     onClick={() => engineRef.current?.submitAnswer(textAnswer)}
-                    disabled={!textAnswer.trim() || officerState !== "idle"}
+                    disabled={!textAnswer.trim()}
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Send className="h-4 w-4" />

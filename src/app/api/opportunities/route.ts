@@ -7,6 +7,8 @@ import { authenticate } from "@/lib/auth";
 import { countByType, rankOpportunities } from "@/lib/opportunities";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeOpportunityRow } from "@/lib/catalogLocalizer";
+import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
+import { runMercuryDecision } from "@/lib/ai/decide";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,8 @@ export async function GET(req: Request) {
     }
     const url = new URL(req.url);
     const type = url.searchParams.get("type")?.trim();
+    const search = (url.searchParams.get("search") ?? url.searchParams.get("q") ?? "").trim();
+    const focusId = Number(url.searchParams.get("focusId") ?? url.searchParams.get("opportunityId"));
     const sort = url.searchParams.get("sort")?.trim() || "match";
 
     const where = type ? and(eq(opportunities.type, type)) : undefined;
@@ -79,6 +83,53 @@ export async function GET(req: Request) {
       items.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || a.title.localeCompare(b.title));
     }
 
+    // Multilingual semantic order is a small best-effort boost on the
+    // deterministic relevance/deadline order; provider failure is a no-op.
+    if (search && items.length > 1 && sort !== "deadline") {
+      try {
+        const candidates = items.slice(0, 63).map((item) => [item.title, item.provider, item.country, item.fields, item.level, item.type].filter(Boolean).join(". "));
+        const ranked = await rankSemanticTexts(search, candidates, { timeoutMs: 3_500, limit: candidates.length });
+        const semanticPosition = new Map(ranked.flatMap((entry, position) => {
+          const item = items[entry.index];
+          return item ? [[item.id, position] as const] : [];
+        }));
+        const baselinePosition = new Map(items.map((item, position) => [item.id, position]));
+        const denominator = Math.max(1, items.length - 1);
+        items.sort((a, b) => {
+          const baseA = (baselinePosition.get(a.id) ?? denominator) / denominator;
+          const baseB = (baselinePosition.get(b.id) ?? denominator) / denominator;
+          const semA = (semanticPosition.get(a.id) ?? denominator) / denominator;
+          const semB = (semanticPosition.get(b.id) ?? denominator) / denominator;
+          return baseA * 0.7 + semA * 0.3 - (baseB * 0.7 + semB * 0.3);
+        });
+      } catch {
+        // Keep deterministic matches and order when OpenRouter is unavailable.
+      }
+    }
+
+    // Optional Mercury check only for a signed-in user and one explicitly
+    // focused catalogue item. It is advisory and never changes eligibility.
+    let mercuryEligibilityReview: { available: boolean; probabilityPercent: number | null; model: string } | null = null;
+    if (Number.isSafeInteger(focusId) && focusId > 0 && profile) {
+      const focus = items.find((item) => item.id === focusId);
+      if (focus) {
+        const review = await runMercuryDecision({
+          timeoutMs: 3_500,
+          state: JSON.stringify({
+            applicant: { major: profile.major, country: profile.country, degreeLevel: profile.degreeLevel },
+            publishedOpportunity: { title: focus.title, provider: focus.provider, country: focus.country, fields: focus.fields, level: focus.level, type: focus.type, verified: focus.isVerified },
+          }),
+          questions: [{
+            key: "explicitEligibilityAlignment",
+            type: "yes_no",
+            question: "Based only on the listed applicant facts and published opportunity fields, is the applicant explicitly eligible? Treat missing or ambiguous criteria as unknown, never as eligible by assumption. This is advisory only.",
+          }],
+        });
+        const signal = review.signals.explicitEligibilityAlignment;
+        mercuryEligibilityReview = { available: review.available, probabilityPercent: signal?.probabilityPercent ?? null, model: review.model };
+      }
+    }
+
     // Localize seeded display content AFTER scoring/sorting — matching and
     // ranking above ran on canonical English rows.
     const locale = localeFromRequest(req);
@@ -87,6 +138,7 @@ export async function GET(req: Request) {
       counts: countByType(rows),
       items: items.map((item) => localizeOpportunityRow(item, locale)),
       scoredFor: profile ? profile.major ?? "your profile" : null,
+      ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),
     });
   } catch {
     return NextResponse.json({ error: "Failed to load opportunities" }, { status: 500 });
