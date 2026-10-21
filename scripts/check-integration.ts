@@ -797,7 +797,7 @@ async function main() {
     })
     .returning();
 
-  const { PATCH: docPatch, DELETE: docDelete } = await import("../src/app/api/documents/route");
+  const { GET: docGet, PATCH: docPatch, DELETE: docDelete } = await import("../src/app/api/documents/route");
   const { PATCH: appPatch, DELETE: appDelete } = await import("../src/app/api/applications/route");
   const { POST: outcomePost } = await import("../src/app/api/applications/outcome/route");
   const { PATCH: suPatch, DELETE: suDelete } = await import("../src/app/api/saved-universities/route");
@@ -807,6 +807,34 @@ async function main() {
   const json = (o: unknown) => ({ "Content-Type": "application/json" });
 
   // -- documents ---------------------------------------------------------
+  // GET reconciliation batches the saved scholarship's requirements and
+  // serializes concurrent reconciliation without overwriting student state.
+  await db.update(schema.scholarships)
+    .set({ requiredDocuments: '["transcript","passport","recommendation","transcript"]' })
+    .where(eq(schema.scholarships.id, sch.id));
+  const [docsFirst, docsSecond] = await Promise.all([
+    call(docGet as any, `/api/documents?profileId=${profile.id}`),
+    call(docGet as any, `/api/documents?profileId=${profile.id}`),
+  ]);
+  const scholarshipDocs = await db.select().from(schema.applicationDocuments).where(and(
+    eq(schema.applicationDocuments.profileId, profile.id),
+    eq(schema.applicationDocuments.entityType, "scholarship"),
+    eq(schema.applicationDocuments.entityId, sch.id),
+  ));
+  check("documents GET: parallel requests both return the checklist", docsFirst.status === 200 && docsSecond.status === 200);
+  check("documents GET: duplicate requirements and concurrent reads create exactly three rows", scholarshipDocs.length === 3, `got ${scholarshipDocs.length}`);
+  const transcriptDoc = scholarshipDocs.find((doc) => doc.documentType === "transcript");
+  if (transcriptDoc) {
+    await db.update(schema.applicationDocuments)
+      .set({ status: "uploaded", fileName: "transcript.pdf" })
+      .where(eq(schema.applicationDocuments.id, transcriptDoc.id));
+  }
+  const docsAfterUpload = await call(docGet as any, `/api/documents?profileId=${profile.id}`);
+  const [transcriptAfterRead] = transcriptDoc
+    ? await db.select().from(schema.applicationDocuments).where(eq(schema.applicationDocuments.id, transcriptDoc.id))
+    : [];
+  check("documents GET: repeated reconciliation preserves uploaded status and metadata", docsAfterUpload.status === 200 && transcriptAfterRead?.status === "uploaded" && transcriptAfterRead?.fileName === "transcript.pdf");
+
   const docBlocked = await call(docPatch as any, "/api/documents", {
     method: "PATCH",
     headers: { ...json({}), cookie },
