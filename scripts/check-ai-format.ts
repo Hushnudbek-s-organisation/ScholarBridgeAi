@@ -322,11 +322,13 @@ check("visa (groq) and research-agent paths are untouched", () => {
   assert.ok(!researchPrompts.includes("format-reply"));
 });
 
-check("OpenRouter default model id is unchanged", () => {
-  // Task 7: adapters read defaults from the provider registry (settings.ts)
-  // instead of repeating them in index.ts — the model id itself is unchanged.
+check("OpenRouter default model id is sourced from the central registry", () => {
+  // Provider defaults are intentionally centralized so the router, admin UI,
+  // and server routes cannot drift onto different model ids.
   const settingsSrc = read("src/lib/ai/settings.ts");
-  assert.match(settingsSrc, /openrouter: \{[^}]*defaultModel: "meta-llama\/llama-3\.3-70b-instruct"/);
+  const modelIdsSrc = read("src/lib/ai/openrouterModelIds.ts");
+  assert.match(settingsSrc, /defaultModel: OPENROUTER_MODEL_IDS\.chat/);
+  assert.match(modelIdsSrc, /chat: "minimax\/minimax-m3\.1-flash:free"/);
 });
 
 check("package.json exposes test:ai-format", () => {

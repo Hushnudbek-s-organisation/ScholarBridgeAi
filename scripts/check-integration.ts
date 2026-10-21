@@ -2118,8 +2118,15 @@ async function main() {
 
   const visaChatRoute = await import("../src/app/api/visa/chat/route");
   const visaAnalyzeRoute = await import("../src/app/api/visa/analyze/route");
+  const interviewTurn = {
+    countryCode: "US",
+    messages: [
+      { role: "officer", text: "Why did you choose this university?" },
+      { role: "user", text: "Its computer science program fits my academic goals." },
+    ],
+  };
   const vchat = await call(visaChatRoute.POST as any, "/api/visa/chat", {
-    method: "POST", headers: jsonHdr, body: JSON.stringify({ countryCode: "US" }),
+    method: "POST", headers: jsonHdr, body: JSON.stringify(interviewTurn),
   });
   check("visa chat: a signed-in interview turn is answered", vchat.status === 200 && typeof vchat.body?.reply === "string" && vchat.body.reply.length > 0, JSON.stringify(vchat.body)?.slice(0, 120));
   const [visaUsage] = await db
@@ -2133,7 +2140,7 @@ async function main() {
     JSON.stringify(visaUsage)
   );
   const vchatAnon = await call(visaChatRoute.POST as any, "/api/visa/chat", {
-    method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify({ countryCode: "US" }),
+    method: "POST", headers: { ...jsonHdr, ...anonHdr }, body: JSON.stringify(interviewTurn),
   });
   const anonUsageRows = await db
     .select()
