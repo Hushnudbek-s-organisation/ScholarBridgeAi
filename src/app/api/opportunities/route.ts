@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { opportunities, studentProfiles } from "@/db/schema";
+import { studentProfiles } from "@/db/schema";
 import { authenticate } from "@/lib/auth";
 import { countByType, rankOpportunities } from "@/lib/opportunities";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeOpportunityRow } from "@/lib/catalogLocalizer";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 import { runMercuryDecision } from "@/lib/ai/decide";
+import { getCachedOpportunitiesBundle } from "@/lib/catalogCache";
 
 export const dynamic = "force-dynamic";
 
@@ -28,25 +29,11 @@ export async function GET(req: Request) {
     const focusId = Number(url.searchParams.get("focusId") ?? url.searchParams.get("opportunityId"));
     const sort = url.searchParams.get("sort")?.trim() || "match";
 
-    const where = type ? and(eq(opportunities.type, type)) : undefined;
-    // The public feed does not use the long description or createdAt column;
-    // keep those payload/row bytes out of this full-catalogue projection.
-    const rows = await db
-      .select({
-        id: opportunities.id,
-        type: opportunities.type,
-        title: opportunities.title,
-        provider: opportunities.provider,
-        country: opportunities.country,
-        fields: opportunities.fields,
-        level: opportunities.level,
-        deadlineDate: opportunities.deadlineDate,
-        url: opportunities.url,
-        isVerified: opportunities.isVerified,
-      })
-      .from(opportunities)
-      .where(where)
-      .orderBy(asc(opportunities.title));
+    // Reuse the existing per-process catalogue cache: only the first cold read
+    // (or the 60-second refresh) queries the full curated feed. Filter the
+    // ordered snapshot locally so SQL sort order and the response contract stay stable.
+    const { entries } = await getCachedOpportunitiesBundle();
+    const rows = type ? entries.filter((row) => row.type === type) : [...entries];
 
     // Optional profile scoring — the session decides, never a claimed id.
     // Anonymous callers get the plain catalog (match: null).

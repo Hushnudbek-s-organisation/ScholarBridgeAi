@@ -23,6 +23,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "./index";
 import { opportunities } from "./schema";
+import { invalidateCatalogCache } from "../lib/catalogCache";
 
 interface OpportunitySpec {
   type: "competition" | "research" | "internship" | "summer_school";
@@ -422,7 +423,7 @@ export async function seedOpportunities(): Promise<SeedOpportunitiesSummary> {
   // Several app instances may bootstrap the same database at once. The
   // transaction-scoped lock keeps the existing title/provider idempotency
   // check safe without adding a constraint or changing existing catalogue rows.
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('scholarbridge:seed:opportunities'))`);
     let inserted = 0;
 
@@ -454,6 +455,8 @@ export async function seedOpportunities(): Promise<SeedOpportunitiesSummary> {
 
     return { inserted };
   });
+  if (result.inserted > 0) invalidateCatalogCache("opportunities");
+  return result;
 }
 
 /** Row count, for the seed log. */

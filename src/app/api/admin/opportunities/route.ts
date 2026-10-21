@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { auditRowChanges, writeAudit } from "@/lib/audit";
 import { readJsonBody } from "@/lib/request";
 import { eq } from "drizzle-orm";
+import { invalidateCatalogCache } from "@/lib/catalogCache";
 
 /**
  * #26/#27/#28 — Admin CRUD for the curated opportunities catalog.
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
     if (!parsed.ok) return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     const values = toValues(parsed.body ?? {});
     const [row] = await db.insert(opportunities).values(values).returning();
+    invalidateCatalogCache("opportunities");
     await writeAudit({
       entityType: "opportunity",
       entityId: row.id,
@@ -88,6 +90,7 @@ export async function PUT(req: Request) {
 
     const values = toValues(body);
     const [updated] = await db.update(opportunities).set(values).where(eq(opportunities.id, id)).returning();
+    invalidateCatalogCache("opportunities");
     await auditRowChanges("opportunity", id, existing[0] as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, {
       actor: "ADMIN",
     });
@@ -107,6 +110,7 @@ export async function DELETE(req: Request) {
     const existing = await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1);
     if (!existing.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
     await db.delete(opportunities).where(eq(opportunities.id, id));
+    invalidateCatalogCache("opportunities");
     await writeAudit({
       entityType: "opportunity",
       entityId: id,

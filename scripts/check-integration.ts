@@ -1480,6 +1480,44 @@ async function main() {
       oppFiltered.body.items.every((o: any) => o.type === "internship"),
     JSON.stringify({ count: oppFiltered.body?.count, byType: oppCounts.internship })
   );
+
+  const { catalogCacheStats } = await import("../src/lib/catalogCache");
+  check("opportunities warm the shared short-lived catalogue cache", catalogCacheStats().opportunitiesCached);
+  const [adminProfile] = await db.insert(schema.studentProfiles).values({
+    name: "Opportunity Cache Admin",
+    email: "opportunity-cache-admin@example.com",
+    isAdmin: true,
+  }).returning();
+  const adminToken = signSessionToken({ id: adminProfile.id, passwordHash: adminProfile.passwordHash });
+  const adminRequest = (method: string, body?: unknown, url = "http://localhost/api/admin/opportunities") => new Request(url, {
+    method,
+    headers: { cookie: `sb_session=${adminToken}`, ...(body ? { "content-type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const { POST: adminOpportunityPost, DELETE: adminOpportunityDelete } = await import("../src/app/api/admin/opportunities/route");
+  const created = await adminOpportunityPost(adminRequest("POST", {
+    type: "research",
+    title: "ADMIN-OPP-CACHE-TEST",
+    provider: "Test Admin",
+    country: null,
+    fields: ["Computer Science"],
+    level: "undergrad",
+    url: "https://example.com",
+    description: "Integration fixture",
+    isVerified: false,
+  }));
+  const createdBody = await created.json();
+  const createdId = Number(createdBody.id);
+  check("authorized opportunity creation succeeds", created.status === 200 && createdId > 0, `status=${created.status}`);
+  check("admin creation invalidates the opportunity cache", !catalogCacheStats().opportunitiesCached);
+  const refreshedFeed = await call(oppGet as any, "/api/opportunities");
+  check("the next public read contains the newly created opportunity", refreshedFeed.body?.items?.some((item: any) => item.id === createdId));
+  const deleted = await adminOpportunityDelete(adminRequest("DELETE", undefined, `http://localhost/api/admin/opportunities?id=${createdId}`));
+  check("authorized opportunity deletion succeeds", deleted.status === 200);
+  check("admin deletion invalidates the opportunity cache", !catalogCacheStats().opportunitiesCached);
+  const afterDeleteFeed = await call(oppGet as any, "/api/opportunities");
+  check("the next public read no longer contains the deleted opportunity", !afterDeleteFeed.body?.items?.some((item: any) => item.id === createdId));
+
   // Clean up the fixture rows so the student-facing feed keeps only real data.
   await db.delete(schema.opportunities).where(like(schema.opportunities.title, `${OPP_FIXTURE}%`));
 
