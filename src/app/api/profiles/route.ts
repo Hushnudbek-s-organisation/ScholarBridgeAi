@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   try {
     const auth = await authenticate(req);
     if (!auth.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: auth.error, code: auth.code },
         { status: auth.status, headers: { "Cache-Control": "no-store" } }
       );
@@ -49,14 +49,14 @@ export async function GET(req: Request) {
 
     if (auth.session.isAdmin) {
       const profiles = await db.select().from(studentProfiles);
-      return NextResponse.json({ profiles: profiles.map((p) => sanitizeProfile(p)) });
+      return privateNoStoreJson({ profiles: profiles.map((p) => sanitizeProfile(p)) });
     }
 
-    return NextResponse.json({ profiles: [sanitizeProfile(auth.session.profile)] });
+    return privateNoStoreJson({ profiles: [sanitizeProfile(auth.session.profile)] });
   } catch (error) {
     console.error("GET /api/profiles error:", error);
     if (isMissingColumnsError(error)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         {
           error:
             "Database schema is out of date. The application is configured to NEVER modify the database automatically. Please review the app schema vs your Supabase schema and align them manually.",
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
         { status: 500 }
       );
     }
-    return NextResponse.json({ error: "Failed to fetch student profiles" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to fetch student profiles" }, { status: 500 });
   }
 }
 
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
 
     const parsed = await readJsonBody<Record<string, any>>(req, 64 * 1024);
     if (!parsed.ok) {
-      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+      return privateNoStoreJson({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
     const hasStudyInterests = body.studyInterests !== undefined;
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       ? parseStudyInterestSelections(body.studyInterests)
       : null;
     if (hasStudyInterests && !submittedStudyInterests) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Choose at least one valid study interest", code: "study_interests_invalid" },
         { status: 400 }
       );
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
     // value must never fall back to a shared default address — that made the
     // first anonymous caller the owner of it and every later sign-up a 500.
     if (!emailInput || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailInput)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Please provide a valid email address", code: "invalid_email" },
         { status: 400 }
       );
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     // The Telegram placeholder domain is reserved for accounts created by the
     // bot — letting anyone claim tg<id>@… would hijack that Telegram sign-in.
     if (isTelegramPlaceholderEmail(emailInput)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Please provide a valid email address", code: "invalid_email" },
         { status: 400 }
       );
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
         .where(sql`lower(${studentProfiles.email}) = ${emailInput.toLowerCase()}`)
         .limit(1);
       if (existing) {
-        return NextResponse.json(
+        return privateNoStoreJson(
           {
             error:
               "An account with this email already exists. Close this window and use Sign in instead.",
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
     if (plainPassword) {
       const policyError = passwordPolicyError(plainPassword);
       if (policyError) {
-        return NextResponse.json(
+        return privateNoStoreJson(
           { error: policyError, code: "weak_password" },
           { status: 400 }
         );
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
       // Two sign-ups for the same address at the same moment: the earlier
       // existence check cannot cover this, so the unique index does.
       if (isUniqueViolation(err)) {
-        return NextResponse.json(
+        return privateNoStoreJson(
           {
             error:
               "An account with this email already exists. Close this window and use Sign in instead.",
@@ -275,7 +275,7 @@ export async function POST(req: Request) {
     // The new account is immediately the caller's session — the browser gets
     // a signed HttpOnly cookie, not just an id to keep in localStorage.
     const profileForClient = freshProfile ?? newProfile;
-    const response = NextResponse.json({ profile: sanitizeProfile(profileForClient) });
+    const response = privateNoStoreJson({ profile: sanitizeProfile(profileForClient) });
     response.headers.set("Set-Cookie", sessionCookieHeader(profileForClient, req));
     response.headers.set("Cache-Control", "no-store");
     return response;
@@ -283,7 +283,7 @@ export async function POST(req: Request) {
     console.error("POST /api/profiles error:", error);
     // Unique-violation on email (race, or the legacy default email reused).
     if (isUniqueViolation(error)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         {
           error:
             "An account with this email already exists. Close this window and use Sign in instead.",
@@ -292,7 +292,7 @@ export async function POST(req: Request) {
       );
     }
     if (isMissingColumnsError(error)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         {
           error:
             "Database schema is out of date. The application is configured to NEVER modify the database automatically. Please review the app schema vs your Supabase schema and align them manually.",
@@ -300,6 +300,6 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-    return NextResponse.json({ error: "Failed to create student profile" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to create student profile" }, { status: 500 });
   }
 }

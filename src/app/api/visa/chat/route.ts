@@ -85,8 +85,9 @@ export async function POST(req: Request) {
     // gpt-oss is a reasoning model: reasoning tokens share max_tokens, so a
     // 300-token cap returns an empty spoken line. 2048 + low effort keeps
     // the officer reply short without starving the visible answer.
-    // Transient failures retry on the same provider (3 attempts, backoff);
-    // an explicit admin fallback is used only after that.
+    // Transient failures retry once on the same provider (2 attempts total);
+    // an explicit admin fallback is used only after that. Keep the retry
+    // budget small because each attempt has an 8-second request timeout.
     const result = await aiChat(
       {
         taskType: "visa",

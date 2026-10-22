@@ -23,6 +23,11 @@ interface TaskRoadmapProps {
   activeProfile: StudentProfile | null;
 }
 
+function notifyTasksUpdated(profileId: number) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("scholarbridge:tasks-updated", { detail: { profileId } }));
+}
+
 export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   const tr = useTranslations("taskRoadmap");
   const locale = useLocale();
@@ -84,17 +89,17 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   }, [fetchTasks]);
 
   const handleToggleTask = async (id: number, currentCompleted: boolean) => {
-    // Optimistic
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isCompleted: !currentCompleted } : t))
-    );
-
+    if (!profileId) return;
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, isCompleted: !currentCompleted }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.task) return;
+      setTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...data.task } : task));
+      notifyTasksUpdated(profileId);
     } catch (err) {
       console.error(err);
     }
@@ -116,9 +121,10 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
           priority: newPriority,
         }),
       });
-      const data = await res.json();
-      if (data.task) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.task) {
         setTasks((prev) => [data.task, ...prev]);
+        notifyTasksUpdated(activeProfile.id);
         setNewTitle("");
         setShowAddForm(false);
       }
@@ -128,9 +134,12 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   };
 
   const handleDeleteTask = async (id: number) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    if (!profileId) return;
     try {
-      await fetch(`/api/tasks?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/tasks?id=${id}`, { method: "DELETE" });
+      if (!res.ok) return;
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+      notifyTasksUpdated(profileId);
     } catch (err) {
       console.error(err);
     }

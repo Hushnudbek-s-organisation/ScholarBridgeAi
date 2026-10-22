@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
 import {
@@ -10,7 +10,7 @@ import {
   universities,
 } from "@/db/schema";
 import { eq, inArray, and, sql } from "drizzle-orm";
-import { checkDocuments, expectedDocuments, type DocumentRow } from "@/lib/documents";
+import { checkDocuments, expectedDocuments, scholarshipChecklistDocuments, type DocumentRow } from "@/lib/documents";
 import { matchMultimodalDocumentReadiness } from "@/lib/ai/embeddings";
 
 /** Valid `status` values — anything else is ignored rather than stored. */
@@ -28,13 +28,13 @@ export async function GET(req: Request) {
     const profileId = Number(searchParams.get("profileId"));
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: access.error, code: access.code },
         { status: access.status }
       );
     }
     if (!profileId) {
-      return NextResponse.json({ error: "profileId is required" }, { status: 400 });
+      return privateNoStoreJson({ error: "profileId is required" }, { status: 400 });
     }
 
     // Keep the saved-scholarship checklist in sync without one SELECT and
@@ -49,25 +49,30 @@ export async function GET(req: Request) {
       await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR UPDATE`);
         const schRows = await tx
-          .select({ id: scholarships.id, requiredDocuments: scholarships.requiredDocuments, deadlineDate: scholarships.deadlineDate })
+          .select({
+            id: scholarships.id,
+            requiredDocuments: scholarships.requiredDocuments,
+            deadlineDate: scholarships.deadlineDate,
+            verificationStatus: scholarships.verificationStatus,
+            sourceUrl: scholarships.sourceUrl,
+          })
           .from(scholarships)
           .where(inArray(scholarships.id, savedSch.map((s) => s.scholarshipId)));
 
-        const requiredEntries = new Map<string, { scholarshipId: number; documentType: string; deadlineDate: string | null }>();
+        const requiredEntries = new Map<string, { scholarshipId: number; documentType: string; label: string; isRequired: boolean; deadlineDate: string | null }>();
         for (const scholarship of schRows) {
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(scholarship.requiredDocuments || "[]");
-          } catch {
-            parsed = [];
-          }
-          if (!Array.isArray(parsed)) continue;
-          for (const value of parsed) {
-            if (typeof value !== "string" || !value.trim()) continue;
-            const documentType = value.trim();
-            requiredEntries.set(`${scholarship.id}:${documentType}`, {
+          // Empty/malformed catalogue lists use explicitly optional generic
+          // preparation reminders; they are never represented as requirements.
+          const verifiedSource = scholarship.verificationStatus === "verified" && (() => {
+            try { return ["https:", "http:"].includes(new URL(scholarship.sourceUrl ?? "").protocol); }
+            catch { return false; }
+          })();
+          for (const document of scholarshipChecklistDocuments(scholarship.requiredDocuments, verifiedSource)) {
+            requiredEntries.set(`${scholarship.id}:${document.documentType}`, {
               scholarshipId: scholarship.id,
-              documentType,
+              documentType: document.documentType,
+              label: document.label,
+              isRequired: document.isRequired,
               deadlineDate: scholarship.deadlineDate,
             });
           }
@@ -90,8 +95,8 @@ export async function GET(req: Request) {
             entityType: "scholarship",
             entityId: entry.scholarshipId,
             documentType: entry.documentType,
-            label: entry.documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-            isRequired: true,
+            label: entry.label,
+            isRequired: entry.isRequired,
             status: "missing",
             deadlineDate: entry.deadlineDate,
           }));
@@ -105,18 +110,16 @@ export async function GET(req: Request) {
       .where(eq(applicationDocuments.profileId, profileId));
 
     // Attach entity names for display.
-    const schIds = rows.filter((r) => r.entityType === "scholarship" && r.entityId).map((r) => r.entityId as number);
-    const uniIds = rows.filter((r) => r.entityType === "university" && r.entityId).map((r) => r.entityId as number);
+    const schIds = [...new Set(rows.filter((r) => r.entityType === "scholarship" && r.entityId).map((r) => r.entityId as number))];
+    const uniIds = [...new Set(rows.filter((r) => r.entityType === "university" && r.entityId).map((r) => r.entityId as number))];
     const schMap = new Map<number, string>();
     const uniMap = new Map<number, string>();
-    if (schIds.length) {
-      const schs = await db.select().from(scholarships).where(inArray(scholarships.id, schIds));
-      schs.forEach((s) => schMap.set(s.id, s.title));
-    }
-    if (uniIds.length) {
-      const unis = await db.select().from(universities).where(inArray(universities.id, uniIds));
-      unis.forEach((u) => uniMap.set(u.id, u.name));
-    }
+    const [schs, unis] = await Promise.all([
+      schIds.length ? db.select({ id: scholarships.id, title: scholarships.title }).from(scholarships).where(inArray(scholarships.id, schIds)) : Promise.resolve([]),
+      uniIds.length ? db.select({ id: universities.id, name: universities.name }).from(universities).where(inArray(universities.id, uniIds)) : Promise.resolve([]),
+    ]);
+    schs.forEach((s) => schMap.set(s.id, s.title));
+    unis.forEach((u) => uniMap.set(u.id, u.name));
 
     let docs = rows.map((r) => ({
       ...r,
@@ -148,7 +151,12 @@ export async function GET(req: Request) {
     // --- Document checker (#7) --------------------------------------------
     // A checklist says what is missing; this says what is WRONG with what was
     // already uploaded — expired, oversized, the wrong format.
-    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+    // Authentication already loaded the caller's fresh profile. Reuse it for
+    // self-service requests; admins selecting another profile still load the
+    // explicit target rather than accidentally using their own profile.
+    const profile = access.session.profile.id === profileId
+      ? access.session.profile
+      : (await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)))[0];
     const intakeParam = searchParams.get("intakeDate");
     const intake = intakeParam && !Number.isNaN(new Date(intakeParam).getTime()) ? new Date(intakeParam) : null;
 
@@ -164,10 +172,10 @@ export async function GET(req: Request) {
       needsVisa: true,
     }).filter((d) => !existingTypes.has(d.documentType));
 
-    return NextResponse.json({ documents: docs, check, suggested });
+    return privateNoStoreJson({ documents: docs, check, suggested });
   } catch (error) {
     console.error("GET /api/documents error:", error);
-    return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to load documents" }, { status: 500 });
   }
 }
 
@@ -178,13 +186,13 @@ export async function POST(req: Request) {
     const profileId = Number(body.profileId);
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: access.error, code: access.code },
         { status: access.status }
       );
     }
     if (!profileId || !body.label) {
-      return NextResponse.json({ error: "profileId and label are required" }, { status: 400 });
+      return privateNoStoreJson({ error: "profileId and label are required" }, { status: 400 });
     }
     const [doc] = await db
       .insert(applicationDocuments)
@@ -213,10 +221,10 @@ export async function POST(req: Request) {
         // A provider outage cannot roll back or fail the document save.
       }
     }
-    return NextResponse.json({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
+    return privateNoStoreJson({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
   } catch (error) {
     console.error("POST /api/documents error:", error);
-    return NextResponse.json({ error: "Failed to add document" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to add document" }, { status: 500 });
   }
 }
 
@@ -226,7 +234,7 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const id = Number(body.id);
     if (!id) {
-      return NextResponse.json({ error: "document id is required" }, { status: 400 });
+      return privateNoStoreJson({ error: "document id is required" }, { status: 400 });
     }
 
     // Row ids are guessable — confirm the row belongs to the caller before
@@ -235,7 +243,7 @@ export async function PATCH(req: Request) {
     const [target] = await db.select().from(applicationDocuments).where(eq(applicationDocuments.id, id));
     const rowAccess = await requireRowAccess(req, target);
     if (!rowAccess.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: rowAccess.error, code: rowAccess.code },
         { status: rowAccess.status }
       );
@@ -269,10 +277,10 @@ export async function PATCH(req: Request) {
         // Readiness is advisory and cannot fail an update.
       }
     }
-    return NextResponse.json({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
+    return privateNoStoreJson({ document: doc, ...(readinessMatches ? { readinessMatches, readinessSource: "document metadata" } : {}) });
   } catch (error) {
     console.error("PATCH /api/documents error:", error);
-    return NextResponse.json({ error: "Failed to update document" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to update document" }, { status: 500 });
   }
 }
 
@@ -282,23 +290,23 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = Number(searchParams.get("id"));
     if (!id) {
-      return NextResponse.json({ error: "document id is required" }, { status: 400 });
+      return privateNoStoreJson({ error: "document id is required" }, { status: 400 });
     }
 
     // Same IDOR guard as PATCH — deletion by id must be scoped to the owner.
     const [target] = await db.select().from(applicationDocuments).where(eq(applicationDocuments.id, id));
     const rowAccess = await requireRowAccess(req, target);
     if (!rowAccess.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: rowAccess.error, code: rowAccess.code },
         { status: rowAccess.status }
       );
     }
 
     await db.delete(applicationDocuments).where(eq(applicationDocuments.id, id));
-    return NextResponse.json({ success: true });
+    return privateNoStoreJson({ success: true });
   } catch (error) {
     console.error("DELETE /api/documents error:", error);
-    return NextResponse.json({ error: "Failed to delete document" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to delete document" }, { status: 500 });
   }
 }

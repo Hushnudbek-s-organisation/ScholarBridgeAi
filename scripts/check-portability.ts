@@ -38,7 +38,26 @@ const PG_DIR = "/tmp/sb-port-pg";
 const ROOT = join(__dirname, "..");
 
 let pg: EmbeddedPostgres | null = null;
-const pools: { end: () => Promise<void> }[] = [];
+let shuttingDown = false;
+type TrackedPool = {
+  end: () => Promise<void>;
+  on: (event: "error", listener: (error: Error & { code?: string }) => void) => void;
+};
+const pools: TrackedPool[] = [];
+
+/**
+ * pg.Pool emits `error` on idle clients. Embedded Postgres can terminate one
+ * during its expected shutdown (SQLSTATE 57P01); handle that teardown event
+ * explicitly while still failing the test for unexpected pool errors.
+ */
+function trackPool(pool: TrackedPool) {
+  pool.on("error", (error) => {
+    if (shuttingDown && error.code === "57P01") return;
+    failed++;
+    console.error("\nPostgres pool error:", error);
+  });
+  pools.push(pool);
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -131,8 +150,7 @@ async function main() {
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
   const { db, pool } = await import("../src/db");
-  pools.push(pool as unknown as { end: () => Promise<void> });
-  (pool as unknown as { on: (e: string, f: () => void) => void }).on("error", () => undefined);
+  trackPool(pool as unknown as TrackedPool);
   const schema = await import("../src/db/schema");
   const { signSessionToken } = await import("../src/lib/auth");
   const { invalidateConfigCache } = await import("../src/lib/config");
@@ -247,7 +265,7 @@ async function main() {
     }
     const { Pool } = await import("pg");
     const su = new Pool({ connectionString: URL_ });
-    pools.push(su);
+    trackPool(su as unknown as TrackedPool);
     await su.query(`CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE app LOGIN PASSWORD 'app' NOSUPERUSER`);
     const { rows: tables } = await su.query<{ relname: string }>(`SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r'`);
     const { rows: seqs } = await su.query<{ relname: string }>(`SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='S'`);
@@ -275,7 +293,7 @@ async function main() {
     check("baseline: anon CAN read password hashes (the problem being fixed)", before.ok && before.rows.length >= 2);
 
     const appPool = new Pool({ connectionString: `postgresql://app:app@127.0.0.1:${PORT}/${DB}` });
-    pools.push(appPool);
+    trackPool(appPool as unknown as TrackedPool);
     const sql = readFileSync(join(ROOT, "supabase/enable_rls.sql"), "utf8");
     let ran = true;
     try {
@@ -315,8 +333,17 @@ main()
     console.error("\nFATAL:", err);
   })
   .finally(async () => {
+    shuttingDown = true;
+    for (const p of pools.reverse()) {
+      await p.end().catch((err) => {
+        failed++;
+        console.error("\nPostgres pool shutdown failed:", err);
+      });
+    }
+    await pg?.stop().catch((err) => {
+      failed++;
+      console.error("\nEmbedded Postgres shutdown failed:", err);
+    });
     console.log(`\n${passed} passed, ${failed} failed`);
-    for (const p of pools.reverse()) await p.end().catch(() => undefined);
-    await pg?.stop().catch(() => undefined);
     process.exit(failed ? 1 : 0);
   });

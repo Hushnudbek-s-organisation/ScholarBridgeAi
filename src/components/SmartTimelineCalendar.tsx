@@ -344,7 +344,12 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
         if (res.ok) written += 1;
       }
       setSynced((prev) => ({ ...prev, [key]: written }));
-      if (written > 0) onTasksSynced?.(written);
+      if (written > 0) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("scholarbridge:tasks-updated", { detail: { profileId } }));
+        }
+        onTasksSynced?.(written);
+      }
       if (written < drafts.length) setSyncError(t("syncPartial", { written, total: drafts.length }));
     } catch {
       setSyncError(t("syncError"));

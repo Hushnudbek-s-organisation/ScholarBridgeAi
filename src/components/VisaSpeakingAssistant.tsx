@@ -104,6 +104,7 @@ import { visaSampleCountryFor } from "@/lib/samples/visa";
 import { AiOrbFaceAvatar } from "@/components/visa/AiOrbFaceAvatar";
 import {
   classifySpeechError,
+  normalizeSpeechRecognitionLocale,
   LIVE_SPEAK_WATCHDOG_MS,
   MAX_MIC_START_ATTEMPTS,
   MIC_RESTART_DELAY_MS,
@@ -111,6 +112,13 @@ import {
 } from "@/lib/visa-mic";
 
 const MAX_SILENCE_RECOVERY_ATTEMPTS = 5;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("audio_timeout")), timeoutMs);
+    promise.then(resolve, reject).finally(() => window.clearTimeout(timer));
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Web Speech API typings (fallback mode; not in the TS DOM lib).
@@ -644,6 +652,7 @@ interface VisaEngine {
   submitAnswer: (text: string) => void;
   onMicClick: () => void;
   toggleMute: () => void;
+  replayOfficerVoice: () => void;
   interruptAssistant: () => void;
   endInterview: () => void;
   backToInterview: () => void;
@@ -686,6 +695,7 @@ export function VisaSpeakingAssistant({
   const [interim, setInterim] = useState("");
   const [liveOutputPartial, setLiveOutputPartial] = useState("");
   const [muted, setMuted] = useState(false);
+  const [audioNeedsGesture, setAudioNeedsGesture] = useState(false);
   const [engineMode, setEngineMode] = useState<EngineMode>("fallback");
   const [liveConnected, setLiveConnected] = useState(false);
   const [sttSupported, setSttSupported] = useState(
@@ -884,6 +894,7 @@ export function VisaSpeakingAssistant({
   const listeningRef = useRef(false);
   const officerStateRef = useRef<OfficerState>("idle");
   const mutedRef = useRef(false);
+  const audioNeedsGestureRef = useRef(false);
   const engineModeRef = useRef<EngineMode>("fallback");
   const configRef = useRef<{
     countryCode: string;
@@ -899,9 +910,11 @@ export function VisaSpeakingAssistant({
   const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ttsAudioCtxRef = useRef<AudioContext | null>(null);
   const ttsAudioElRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAudioElementCancelRef = useRef<(() => void) | null>(null);
   const ttsObjectUrlRef = useRef<string | null>(null);
   const ttsPlaybackIdRef = useRef(0);
   const ttsRafRef = useRef(0);
+  const ttsAudioAttemptRef = useRef(0);
   const ttsAbortRef = useRef<AbortController | null>(null);
   /** Watchdog for a speechSynthesis utterance whose onend never fires. */
   const speakWatchdogRef = useRef<number | null>(null);
@@ -918,10 +931,14 @@ export function VisaSpeakingAssistant({
 
   function stopNeuralSpeech(): void {
     ttsPlaybackIdRef.current += 1;
+    ttsAudioAttemptRef.current += 1;
     ttsAbortRef.current?.abort();
     ttsAbortRef.current = null;
     try { ttsSourceRef.current?.stop(); } catch { /* already ended */ }
     ttsSourceRef.current = null;
+    const cancelElementPlayback = ttsAudioElementCancelRef.current;
+    ttsAudioElementCancelRef.current = null;
+    cancelElementPlayback?.();
     if (ttsAudioElRef.current) {
       ttsAudioElRef.current.pause();
       ttsAudioElRef.current.removeAttribute("src");
@@ -1308,15 +1325,21 @@ export function VisaSpeakingAssistant({
       }
     }
 
+    function setAudioGestureRequired(required: boolean): void {
+      audioNeedsGestureRef.current = required;
+      setAudioNeedsGesture(required);
+    }
+
     async function playNeuralSpeech(bytes: ArrayBuffer, token: number, playbackId: number, onDone: () => void, text: string): Promise<boolean> {
       const Ctor = window.AudioContext || window.webkitAudioContext;
       if (!Ctor) return false;
+      const attempt = ++ttsAudioAttemptRef.current;
       try {
         const ctx = ttsAudioCtxRef.current ?? new Ctor();
         ttsAudioCtxRef.current = ctx;
-        if (ctx.state === "suspended") await ctx.resume();
-        const buffer = await ctx.decodeAudioData(bytes.slice(0));
-        if (sessionRef.current !== token || ttsPlaybackIdRef.current !== playbackId) return true;
+        if (ctx.state === "suspended") await withTimeout(ctx.resume(), 2_000);
+        const buffer = await withTimeout(ctx.decodeAudioData(bytes.slice(0)), 3_000);
+        if (sessionRef.current !== token || ttsPlaybackIdRef.current !== playbackId || ttsAudioAttemptRef.current !== attempt) return true;
         const source = ctx.createBufferSource();
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 1024;
@@ -1383,18 +1406,30 @@ export function VisaSpeakingAssistant({
         setOutputLevel(0);
       };
       return await new Promise<boolean>((resolve) => {
+        let pendingResolve: ((started: boolean) => void) | null = resolve;
+        function cancelPlayback() {
+          cleanup();
+          settle(false);
+        }
+        const settle = (started: boolean) => {
+          const pending = pendingResolve;
+          pendingResolve = null;
+          if (ttsAudioElementCancelRef.current === cancelPlayback) ttsAudioElementCancelRef.current = null;
+          pending?.(started);
+        }
+        ttsAudioElementCancelRef.current = cancelPlayback;
         audio.onended = () => {
           const current = sessionRef.current === token && ttsPlaybackIdRef.current === playbackId;
           cleanup();
+          settle(true);
           if (current) {
             clearSpeakWatchdog();
             onDone();
           }
-          resolve(true);
         };
         audio.onerror = () => {
           cleanup();
-          resolve(false);
+          settle(false);
         };
         setOfficer("speaking");
         clearSpeakWatchdog();
@@ -1403,10 +1438,14 @@ export function VisaSpeakingAssistant({
           stopNeuralSpeech();
           onDone();
         }, speakWatchdogMs(text));
-        void audio.play().then(() => resolve(true)).catch(() => {
+        void audio.play().then(() => {
+          setAudioGestureRequired(false);
+          settle(true);
+        }).catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "NotAllowedError") setAudioGestureRequired(true);
           cleanup();
           clearSpeakWatchdog();
-          resolve(false);
+          settle(false);
         });
       });
     }
@@ -1418,6 +1457,7 @@ export function VisaSpeakingAssistant({
         autoListen(token);
         return;
       }
+      setAudioGestureRequired(false);
       stopNeuralSpeech();
       clearSpeakWatchdog();
       safeCancelSpeech();
@@ -1429,7 +1469,7 @@ export function VisaSpeakingAssistant({
         finished = true;
         clearSpeakWatchdog();
         setOfficer("idle");
-        autoListen(token);
+        if (!audioNeedsGestureRef.current) autoListen(token);
       };
       const browserSpeak = () => {
         if (!isCurrent() || finished) return;
@@ -1439,6 +1479,7 @@ export function VisaSpeakingAssistant({
           return;
         }
         try {
+          setAudioGestureRequired(false);
           const c = getVisaCountry(configRef.current?.countryCode);
           const utter = new SpeechSynthesisUtterance(text);
           utter.lang = c?.locale ?? "en-US";
@@ -1448,7 +1489,10 @@ export function VisaSpeakingAssistant({
           utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
           setOfficer("speaking");
           utter.onend = finishSpeaking;
-          utter.onerror = finishSpeaking;
+          utter.onerror = (event) => {
+            if ((event as SpeechSynthesisErrorEvent).error === "not-allowed") setAudioGestureRequired(true);
+            finishSpeaking();
+          };
           synth.speak(utter);
           clearSpeakWatchdog();
           speakWatchdogRef.current = window.setTimeout(finishSpeaking, speakWatchdogMs(text));
@@ -1493,6 +1537,9 @@ export function VisaSpeakingAssistant({
           }
           if (await playNeuralSpeech(bytes, token, playbackId, finishSpeaking, text)) return;
           if (!isCurrent() || finished) return;
+          // Invalidate a decode/resume that outlived its budget before starting
+          // the element/browser fallback, preventing late duplicate audio.
+          ttsAudioAttemptRef.current += 1;
           if (await playNeuralAudioElement(bytes, token, playbackId, finishSpeaking, text)) return;
           if (isCurrent() && !finished) browserSpeak();
         } catch {
@@ -1627,13 +1674,18 @@ export function VisaSpeakingAssistant({
       try {
         const country = getVisaCountry(configRef.current?.countryCode);
         const rec = new SR();
-        const locale = country?.locale ?? "en-US";
-        rec.lang = locale.toLowerCase().startsWith("en-")
-          ? (country?.code === "UK" ? "en-GB" : "en-US")
-          : locale;
-        rec.interimResults = true;
+        rec.lang = normalizeSpeechRecognitionLocale(
+          country?.locale,
+          country?.code,
+          VISA_COUNTRIES.map((item) => item.locale),
+        );
+        try {
+          if ("interimResults" in rec) rec.interimResults = true;
+          if ("continuous" in rec) rec.continuous = true;
+        } catch {
+          // Partial Web Speech implementations can reject optional properties.
+        }
         rec.maxAlternatives = 1;
-        rec.continuous = true;
         const token = sessionRef.current;
         interimRef.current = "";
         accumulatedFinalRef.current = "";
@@ -1878,32 +1930,41 @@ export function VisaSpeakingAssistant({
           void outCtx.close().catch(() => {});
           throw new Error(t("liveUnsupported"));
         }
-        livePlayerWorkletUrlRef.current = createWorkletUrl(PLAYER_WORKLET_SOURCE);
-        await outCtx.audioWorklet.addModule(livePlayerWorkletUrlRef.current);
-        const player = new AudioWorkletNode(outCtx, "visa-pcm-player", {
-          numberOfInputs: 0,
-          numberOfOutputs: 1,
-          outputChannelCount: [1],
-        });
-        player.port.onmessage = (event: MessageEvent) => {
-          const data = event.data as { type?: unknown; level?: unknown };
-          if (data.type === "level" && typeof data.level === "number") {
-            setOutputLevel(Math.max(0, Math.min(1, data.level)));
-          }
-          if (data.type === "drain") {
-            livePlaybackActiveRef.current = false;
-            micHoldUntilRef.current = performance.now() + ECHO_GUARD_MS;
-            if (!liveGenerationActiveRef.current && engineModeRef.current === "gemini-live") {
-              setOfficer("idle");
-              listeningRef.current = true;
-              setListening(true);
+        let player: AudioWorkletNode | null = null;
+        try {
+          livePlayerWorkletUrlRef.current = createWorkletUrl(PLAYER_WORKLET_SOURCE);
+          await outCtx.audioWorklet.addModule(livePlayerWorkletUrlRef.current);
+          player = new AudioWorkletNode(outCtx, "visa-pcm-player", {
+            numberOfInputs: 0,
+            numberOfOutputs: 1,
+            outputChannelCount: [1],
+          });
+          player.port.onmessage = (event: MessageEvent) => {
+            const data = event.data as { type?: unknown; level?: unknown };
+            if (data.type === "level" && typeof data.level === "number") {
+              setOutputLevel(Math.max(0, Math.min(1, data.level)));
             }
-          }
-        };
-        player.connect(outCtx.destination);
-        if (outCtx.state === "suspended") await outCtx.resume().catch(() => {});
-        liveOutputCtxRef.current = outCtx;
-        livePlayerNodeRef.current = player;
+            if (data.type === "drain") {
+              livePlaybackActiveRef.current = false;
+              micHoldUntilRef.current = performance.now() + ECHO_GUARD_MS;
+              if (!liveGenerationActiveRef.current && engineModeRef.current === "gemini-live") {
+                setOfficer("idle");
+                listeningRef.current = true;
+                setListening(true);
+              }
+            }
+          };
+          player.connect(outCtx.destination);
+          if (outCtx.state === "suspended") await outCtx.resume().catch(() => {});
+          liveOutputCtxRef.current = outCtx;
+          livePlayerNodeRef.current = player;
+        } catch (error) {
+          player?.disconnect();
+          await outCtx.close().catch(() => {});
+          if (livePlayerWorkletUrlRef.current) URL.revokeObjectURL(livePlayerWorkletUrlRef.current);
+          livePlayerWorkletUrlRef.current = null;
+          throw error;
+        }
       }
 
       if (!liveInputCtxRef.current || !liveMicNodeRef.current) {
@@ -1916,49 +1977,65 @@ export function VisaSpeakingAssistant({
           },
         });
         const inCtx = new Ctor();
-        liveMicWorkletUrlRef.current = createWorkletUrl(MIC_WORKLET_SOURCE);
-        await inCtx.audioWorklet.addModule(liveMicWorkletUrlRef.current);
-        const src = inCtx.createMediaStreamSource(stream);
-        const micNode = new AudioWorkletNode(inCtx, "visa-mic-processor", {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [1],
-        });
-        const silence = inCtx.createGain();
-        silence.gain.value = 0;
-        micNode.port.onmessage = (event: MessageEvent) => {
-          const data = event.data as {
-            type?: unknown;
-            buffer?: unknown;
-            level?: unknown;
+        let src: MediaStreamAudioSourceNode | null = null;
+        let micNode: AudioWorkletNode | null = null;
+        let silence: GainNode | null = null;
+        try {
+          liveMicWorkletUrlRef.current = createWorkletUrl(MIC_WORKLET_SOURCE);
+          await inCtx.audioWorklet.addModule(liveMicWorkletUrlRef.current);
+          src = inCtx.createMediaStreamSource(stream);
+          micNode = new AudioWorkletNode(inCtx, "visa-mic-processor", {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [1],
+          });
+          silence = inCtx.createGain();
+          silence.gain.value = 0;
+          micNode.port.onmessage = (event: MessageEvent) => {
+            const data = event.data as { type?: unknown; buffer?: unknown; level?: unknown };
+            if (typeof data.level === "number") {
+              const level = Math.max(0, Math.min(1, data.level));
+              if (officerStateRef.current !== "speaking") setVolume(level);
+            }
+            if (data.type !== "audio" || !(data.buffer instanceof ArrayBuffer) || !shouldSendMicChunk()) return;
+            try {
+              liveSessionRef.current?.sendRealtimeInput({
+                audio: { data: arrayBufferToBase64(data.buffer), mimeType: `audio/pcm;rate=${GEMINI_INPUT_RATE}` },
+              });
+            } catch (err) {
+              console.warn("Gemini Live mic send failed:", err);
+            }
           };
-          if (typeof data.level === "number") {
-            const level = Math.max(0, Math.min(1, data.level));
-            if (officerStateRef.current !== "speaking") setVolume(level);
+          src.connect(micNode);
+          micNode.connect(silence);
+          silence.connect(inCtx.destination);
+          if (inCtx.state === "suspended") await inCtx.resume().catch(() => {});
+          liveMicStreamRef.current = stream;
+          liveInputCtxRef.current = inCtx;
+          liveMicNodeRef.current = micNode;
+          liveMicSilenceRef.current = silence;
+          const captureSession = sessionRef.current;
+          for (const track of stream.getAudioTracks()) {
+            track.addEventListener("ended", () => {
+              if (
+                sessionRef.current === captureSession &&
+                engineModeRef.current === "gemini-live" &&
+                !liveIntentionalCloseRef.current
+              ) {
+                void scheduleFallbackAfterLiveFailure(new Error("microphone_device_disconnected"));
+              }
+            }, { once: true });
           }
-          if (data.type !== "audio" || !(data.buffer instanceof ArrayBuffer)) {
-            return;
-          }
-          if (!shouldSendMicChunk()) return;
-          try {
-            liveSessionRef.current?.sendRealtimeInput({
-              audio: {
-                data: arrayBufferToBase64(data.buffer),
-                mimeType: `audio/pcm;rate=${GEMINI_INPUT_RATE}`,
-              },
-            });
-          } catch (err) {
-            console.warn("Gemini Live mic send failed:", err);
-          }
-        };
-        src.connect(micNode);
-        micNode.connect(silence);
-        silence.connect(inCtx.destination);
-        if (inCtx.state === "suspended") await inCtx.resume().catch(() => {});
-        liveMicStreamRef.current = stream;
-        liveInputCtxRef.current = inCtx;
-        liveMicNodeRef.current = micNode;
-        liveMicSilenceRef.current = silence;
+        } catch (error) {
+          src?.disconnect();
+          micNode?.disconnect();
+          silence?.disconnect();
+          stream.getTracks().forEach((track) => track.stop());
+          await inCtx.close().catch(() => {});
+          if (liveMicWorkletUrlRef.current) URL.revokeObjectURL(liveMicWorkletUrlRef.current);
+          liveMicWorkletUrlRef.current = null;
+          throw error;
+        }
       }
     }
 
@@ -2417,11 +2494,56 @@ export function VisaSpeakingAssistant({
       void fetchOfficerReply(messagesRef.current);
     }
 
+    function replayOfficerVoice(): void {
+      if (mutedRef.current || officerStateRef.current === "speaking") return;
+      const text = [...messagesRef.current].reverse().find((message) => message.role === "officer")?.text;
+      const synth = getSafeSpeechSynthesis();
+      if (!text || !synth || typeof SpeechSynthesisUtterance === "undefined") return;
+      safeCancelSpeech();
+      stopNeuralSpeech();
+      clearSpeakWatchdog();
+      stopListening();
+      const token = sessionRef.current;
+      const playbackId = ttsPlaybackIdRef.current;
+      let finished = false;
+      const finish = () => {
+        if (finished || sessionRef.current !== token || ttsPlaybackIdRef.current !== playbackId) return;
+        finished = true;
+        clearSpeakWatchdog();
+        setOfficer("idle");
+        if (!audioNeedsGestureRef.current) autoListen(token);
+      };
+      try {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = getVisaCountry(configRef.current?.countryCode)?.locale ?? "en-US";
+        const selectedVoice = pickVoice(utter.lang, configRef.current?.gender ?? "male");
+        if (selectedVoice) utter.voice = selectedVoice;
+        utter.rate = 0.95;
+        utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
+        utter.onend = () => {
+          setAudioGestureRequired(false);
+          finish();
+        };
+        utter.onerror = (event) => {
+          if ((event as SpeechSynthesisErrorEvent).error === "not-allowed") setAudioGestureRequired(true);
+          finish();
+        };
+        setAudioGestureRequired(false);
+        setOfficer("speaking");
+        synth.speak(utter);
+        speakWatchdogRef.current = window.setTimeout(finish, speakWatchdogMs(text));
+      } catch {
+        setAudioGestureRequired(true);
+        setOfficer("idle");
+      }
+    }
+
     engineRef.current = {
       startInterview,
       submitAnswer,
       onMicClick,
       toggleMute,
+      replayOfficerVoice,
       interruptAssistant,
       endInterview,
       backToInterview,
@@ -2766,6 +2888,17 @@ export function VisaSpeakingAssistant({
                     <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
                       {t("voiceUnavailable")}
                     </p>
+                  )}
+                  {audioNeedsGesture && !muted && !listening && lastOfficer && (
+                    <button
+                      type="button"
+                      onClick={() => engineRef.current?.replayOfficerVoice()}
+                      aria-live="polite"
+                      className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                      {t("tapToPlayOfficer")}
+                    </button>
                   )}
                 </div>
 

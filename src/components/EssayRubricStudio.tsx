@@ -67,6 +67,23 @@ interface Feedback {
   readingTimeSec: number;
 }
 
+interface AdvisoryBehaviorSignals {
+  available: boolean;
+  signals: Record<string, number | null>;
+}
+
+function normalizeBehaviorSignals(value: unknown): AdvisoryBehaviorSignals | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (!raw.signals || typeof raw.signals !== "object" || Array.isArray(raw.signals)) return null;
+  const signals = Object.fromEntries(Object.entries(raw.signals as Record<string, unknown>).map(([key, item]) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [key, null];
+    const probability = (item as Record<string, unknown>).probabilityPercent;
+    return [key, typeof probability === "number" && Number.isFinite(probability) ? Math.max(0, Math.min(100, Math.round(probability))) : null];
+  }));
+  return { available: raw.available === true, signals };
+}
+
 interface Comparison {
   delta: Partial<Record<keyof Scores, number>>;
   improved: boolean;
@@ -152,6 +169,7 @@ export function EssayRubricStudio({
   const [wordLimit, setWordLimit] = useState("");
   const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [behaviorSignals, setBehaviorSignals] = useState<AdvisoryBehaviorSignals | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [busy, setBusy] = useState(false);
@@ -251,6 +269,7 @@ export function EssayRubricStudio({
     if (!draft.content.trim()) return;
     setBusy(true);
     setError("");
+    setBehaviorSignals(null);
     try {
       const res = await fetch("/api/essays", {
         method: "PUT",
@@ -266,6 +285,7 @@ export function EssayRubricStudio({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not score the essay");
       setFeedback(data.feedback);
+      setBehaviorSignals(normalizeBehaviorSignals(data.behaviorSignals));
       setComparison(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not score the essay");
@@ -300,6 +320,7 @@ export function EssayRubricStudio({
     if (!text.trim() || textHoldsSample) return;
     setBusy(true);
     setError("");
+    setBehaviorSignals(null);
     try {
       const res = await fetch("/api/essays", {
         method: "POST",
@@ -318,6 +339,7 @@ export function EssayRubricStudio({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save the version");
       setFeedback(data.feedback);
+      setBehaviorSignals(normalizeBehaviorSignals(data.behaviorSignals));
       setComparison(data.comparison);
       await loadVersions();
     } catch (err) {
@@ -484,6 +506,28 @@ export function EssayRubricStudio({
               </div>
             )}
           </div>
+
+          {behaviorSignals && (
+            <section className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3" aria-label={t("essayBehaviorSignalsTitle")} aria-live="polite">
+              <h4 className="text-xs font-bold text-indigo-900">{t("essayBehaviorSignalsTitle")}</h4>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{t("essayBehaviorDisclaimer")}</p>
+              {!behaviorSignals.available ? (
+                <p className="mt-2 text-[11px] text-slate-500">{t("essayBehaviorUnavailable")}</p>
+              ) : (
+                <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {Object.entries(behaviorSignals.signals).map(([key, percent]) => (
+                    <div key={key} className="rounded-lg bg-white px-2.5 py-2">
+                      <div className="flex justify-between gap-2 text-[11px]">
+                        <dt className="font-semibold text-slate-700">{t(`essayBehavior_${key}` as never)}</dt>
+                        <dd className="font-bold text-indigo-800">{percent === null ? t("essayBehaviorNotScored") : `${percent}%`}</dd>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t(`essayBehaviorTip_${key}` as never)}</p>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </section>
+          )}
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {SUBSCORES.map(({ key, labelKey }) => (
@@ -740,6 +784,7 @@ export function EssayRubricStudio({
                     setWordLimit(v.wordLimit == null ? "" : String(v.wordLimit));
                     setEssayType(v.essayType);
                     setFeedback(null);
+                    setBehaviorSignals(null);
                     setComparison(null);
                   }}
                   className="min-h-11 shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"

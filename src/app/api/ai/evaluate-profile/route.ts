@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { aiEvaluations, scholarships, studentProfiles, universities } from "@/db/schema";
+import { aiEvaluations, studentProfiles } from "@/db/schema";
 import { callAI } from "@/lib/ai";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest } from "@/lib/ai/guard";
@@ -10,6 +10,7 @@ import { localeToLanguageName, type Locale } from "@/i18n/config";
 import { asLocale, translateReasons } from "@/lib/engineText";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import {
   buildProfileReport,
   type ReportFacts,
@@ -24,11 +25,15 @@ import {
  * inferred. The fallback and AI report use the same verified inputs.
  */
 async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: Locale): Promise<ReportFacts> {
-  const [uniRows, scholarshipRows] = await Promise.all([
-    db.select().from(universities).where(eq(universities.isActive, true)),
-    db.select().from(scholarships),
+  const [universityBundle, scholarshipBundle, matchProfile] = await Promise.all([
+    getCachedUniversitiesBundle(),
+    getCachedScholarshipsBundle(),
+    toMatchProfileWithActivities(profile),
   ]);
-  const matchProfile = await toMatchProfileWithActivities(profile);
+  // Both bundles contain the student-facing catalogue visibility boundary
+  // (active rows only) and are invalidated by admin catalogue writes.
+  const uniRows = universityBundle.unis.filter((row) => row.isActive !== false);
+  const scholarshipRows = scholarshipBundle.entries;
 
   const scored = uniRows
     .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, uni) }))

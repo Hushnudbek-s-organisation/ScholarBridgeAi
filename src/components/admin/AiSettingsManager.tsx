@@ -12,7 +12,7 @@
  * Keys are typed here but NEVER returned by the API.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { OPENROUTER_MODEL_IDS } from "@/lib/ai/openrouterModelIds";
+import { OPENROUTER_MODEL_REGISTRY } from "@/lib/ai/openrouterModelIds";
 import {
   AlertTriangle,
   Bot,
@@ -98,14 +98,7 @@ async function send(method: "PUT" | "POST", body: Record<string, unknown>): Prom
 
 const errText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
 
-const OPENROUTER_FREE_STACK = [
-  ["Text / chat", OPENROUTER_MODEL_IDS.chat],
-  ["Text-to-speech", OPENROUTER_MODEL_IDS.speech],
-  ["Text embeddings", OPENROUTER_MODEL_IDS.textEmbedding],
-  ["Vision + document embeddings", OPENROUTER_MODEL_IDS.multimodalEmbedding],
-  ["Structured decisions", OPENROUTER_MODEL_IDS.decisions],
-  ["Behavior evaluation", OPENROUTER_MODEL_IDS.evaluation],
-] as const;
+const OPENROUTER_MODEL_STACK = Object.values(OPENROUTER_MODEL_REGISTRY);
 
 export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
   const [data, setData] = useState<SettingsPayload | null>(null);
@@ -198,7 +191,6 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
     const key = `test:${provider}`;
     const typedKey = keyDrafts[provider]?.trim() ?? "";
     const typedModel = modelDrafts[provider]?.trim() ?? "";
-    const savedModel = data?.providers.find((item) => item.provider === provider)?.model ?? "";
     setBusy((b) => ({ ...b, [key]: true }));
     setTestResults((r) => ({ ...r, [provider]: { ok: true, text: deep ? "Running full check…" : "Testing…" } }));
     try {
@@ -208,27 +200,15 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
       const json = await send("POST", body);
       const latency = json.latencyMs !== undefined ? ` (${json.latencyMs} ms)` : "";
       const source = json.keySource === "typed" ? "typed key" : json.keySource === "stored" ? "saved key" : json.keySource === "environment" ? "environment key" : "no key";
+      const steps = (json.checks as HealthStep[]) ?? [];
+      const keyAccepted = steps.some((step) => step.name === "key" && step.status === "ok");
+      const statusLabel = json.ok
+        ? keyAccepted ? "Key accepted; see endpoint checks" : "Check passed"
+        : keyAccepted ? "Key accepted, but a later check failed" : "Connection check failed";
       setTestResults((r) => ({
         ...r,
-        [provider]: { ok: Boolean(json.ok), text: `${json.ok ? "Connected ✓" : "Connection failed"} — ${String(json.message ?? "")} [tested ${source}]${latency}`, steps: (json.checks as HealthStep[]) ?? [] },
+        [provider]: { ok: Boolean(json.ok), text: `${statusLabel} — ${String(json.message ?? "")} [tested ${source}]${latency}`, steps },
       }));
-
-      // A key that just passed its provider check should not disappear when
-      // the admin navigates away. Only save typed changes; never rewrite an
-      // existing credential merely because a saved key was tested.
-      if (json.ok && (typedKey || (typedModel && typedModel !== savedModel))) {
-        const saveBody: Record<string, unknown> = { provider };
-        if (typedKey) saveBody.apiKey = typedKey;
-        if (typedModel) saveBody.model = typedModel;
-        try {
-          const saved = await send("PUT", saveBody);
-          if (saved.providers) apply(saved as unknown as SettingsPayload);
-          if (typedKey) setKeyDrafts((drafts) => ({ ...drafts, [provider]: "" }));
-          setMessages((m) => ({ ...m, [provider]: { ok: true, text: "Connection passed; key/model saved (encrypted)" } }));
-        } catch (saveError) {
-          setMessages((m) => ({ ...m, [provider]: { ok: false, text: `Connection passed, but save failed: ${errText(saveError, "Database error")}` } }));
-        }
-      }
     } catch (err) {
       setTestResults((r) => ({ ...r, [provider]: { ok: false, text: errText(err, "Test failed") } }));
     } finally {
@@ -388,13 +368,16 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                 </div>
               )}
               {p.provider === "openrouter" && (
-                <section className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3" aria-label="Active OpenRouter Free Model Stack">
-                  <p className="text-[11px] font-extrabold text-indigo-950">Active OpenRouter Free Model Stack (1 API Key)</p>
-                  <ul className="mt-2 space-y-1">
-                    {OPENROUTER_FREE_STACK.map(([role, model]) => (
-                      <li key={model} className="flex flex-wrap gap-x-2 text-[10px] leading-relaxed">
-                        <span className="font-bold text-slate-700">{role}:</span>
-                        <code className="break-all text-indigo-800">{model}</code>
+                <section className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3" aria-label="OpenRouter model candidates and endpoint capabilities">
+                  <p className="text-[11px] font-extrabold text-indigo-950">OpenRouter model candidates · one credential, separate task endpoints</p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-indigo-900">A key check does not verify these models or their specialized endpoints. Full check tests only the configured chat model and structured output where supported. Free-tier availability and terms can change.</p>
+                  <ul className="mt-2 space-y-2">
+                    {OPENROUTER_MODEL_STACK.map((item) => (
+                      <li key={item.modelId} className="text-[10px] leading-relaxed">
+                        <span className="font-bold text-slate-700">{item.task}:</span>{" "}
+                        <code className="break-all text-indigo-800">{item.modelId}</code>
+                        <span className="block text-slate-600">{item.endpoint} · {item.modality} · official docs confirm pairing; this account/route is not tested here.</span>
+                        <span className="block text-amber-800">{item.operationalNote}{"sensitiveDataWarning" in item ? ` ${item.sensitiveDataWarning}` : ""}</span>
                       </li>
                     ))}
                   </ul>

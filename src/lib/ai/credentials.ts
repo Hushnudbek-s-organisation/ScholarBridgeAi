@@ -31,6 +31,13 @@ export interface StoredCredential {
   updatedAt: Date | string | null;
 }
 
+/** Normalize PostgreSQL driver Date/string values at the API boundary. */
+export function normalizeCredentialUpdatedAt(value: Date | string | null | undefined): string | null {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
 /** Warn once per process when the DB is unreachable (keeps logs quiet on the hot path). */
 let dbWarningShown = false;
 function warnDbUnavailable(operation: string, err: unknown): void {
@@ -180,11 +187,7 @@ export async function getPublicCredentials(disabled: AIProviderId[] = []): Promi
           hasKey: true,
           keySource: "db",
           keyHint: maskApiKey(key),
-          updatedAt: row.updatedAt instanceof Date
-            ? row.updatedAt.toISOString()
-            : typeof row.updatedAt === "string"
-              ? row.updatedAt
-              : null,
+          updatedAt: normalizeCredentialUpdatedAt(row.updatedAt),
           needsReencrypt: rotated,
         };
       }

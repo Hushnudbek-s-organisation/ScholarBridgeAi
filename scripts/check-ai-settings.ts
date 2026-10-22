@@ -19,6 +19,7 @@ const settings = await import("../src/lib/ai/settings");
 const { CONFIG_DEFAULTS } = await import("../src/lib/config");
 const aiCore = await import("../src/lib/ai/index");
 const credentials = await import("../src/lib/ai/credentials");
+const openRouterModels = await import("../src/lib/ai/openrouterModelIds");
 
 const {
   AI_PROVIDERS,
@@ -74,6 +75,29 @@ async function checkAsync(name: string, fn: () => Promise<void>) {
 // ---------------------------------------------------------------------------
 // Provider registry
 // ---------------------------------------------------------------------------
+check("OpenRouter capability registry covers six exact IDs and marks docs vs live-account verification", () => {
+  const registry = openRouterModels.OPENROUTER_MODEL_REGISTRY;
+  assert.deepEqual(Object.keys(registry), ["chat", "speech", "textEmbedding", "multimodalEmbedding", "decisions", "evaluation"]);
+  assert.deepEqual(Object.values(registry).map((item) => item.modelId), [
+    "minimax/minimax-m3.1-flash:free",
+    "fish-audio/s2.1-pro-free:free",
+    "nvidia/nemotron-3-embed-1b:free",
+    "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+    "inception/mercury-decide:free",
+    "respan/span-01-lite:free",
+  ]);
+  for (const item of Object.values(registry)) {
+    assert.equal(item.verification, "official_docs");
+    assert.match(item.sourceUrl, /^https:\/\/openrouter\.ai\//);
+    assert.ok(item.endpoint && item.modality && item.output && item.fallback && item.timeoutMs > 0);
+  }
+  assert.match(registry.decisions.endpoint, /alpha\/decisions/);
+  assert.match(registry.evaluation.endpoint, /alpha\/decisions/);
+  assert.match(registry.multimodalEmbedding.endpoint, /embeddings/);
+  assert.match(registry.speech.endpoint, /audio\/speech/);
+  assert.match(registry.chat.operationalNote, /retires/);
+  assert.ok(registry.multimodalEmbedding.sensitiveDataWarning);
+});
 // 6 chat providers + "gemini" (voice-only — powers the Gemini Live visa
 // speaking assistant; it deliberately has NO chat adapter in ai/index.ts).
 // Task 7 added "google" (Gemini via its OpenAI-compatible endpoint) and
@@ -385,6 +409,13 @@ check("gemini is registered for credentials but has no chat adapter", () => {
 
 await checkAsync("isAiConfigured resolves without a DB and reports false", async () => {
   assert.equal(await aiCore.isAiConfigured("essay"), false);
+});
+
+check("credential API timestamps normalize Date/string values to ISO and reject invalid dates", () => {
+  assert.equal(credentials.normalizeCredentialUpdatedAt(new Date("2026-01-02T03:04:05.000Z")), "2026-01-02T03:04:05.000Z");
+  assert.equal(credentials.normalizeCredentialUpdatedAt("2026-01-02T03:04:05Z"), "2026-01-02T03:04:05.000Z");
+  assert.equal(credentials.normalizeCredentialUpdatedAt("not-a-date"), null);
+  assert.equal(credentials.normalizeCredentialUpdatedAt(null), null);
 });
 
 await checkAsync("credentials.getPublicCredentials returns safe views (no raw keys)", async () => {
@@ -760,9 +791,121 @@ check("admin AI route: audit, rate limit, gemini rejected for chat tasks, no key
   assert.doesNotMatch(ui, /ai-settings\/test/, "UI must call the existing POST route (the /test path never existed)");
 });
 
-check("health check redacts provider snippets", () => {
+check("specialized OpenRouter calls enforce bounded responses and log metadata only", () => {
+  const src = readFileSync(join(ROOT, "src/lib/ai/openrouterModels.ts"), "utf8");
+  assert.match(src, /MAX_SPECIALIZED_RESPONSE_BYTES/);
+  assert.match(src, /reader\.cancel/);
+  assert.match(src, /costStatus: "usage_unreported"/);
+  assert.doesNotMatch(src, /console\.(info|warn)\([^\n]*(state|questions|input|apiKey)/i);
+});
+
+check("decision/evaluation inputs and timeouts are clamped", () => {
+  const decision = readFileSync(join(ROOT, "src/lib/ai/decide.ts"), "utf8");
+  const evaluation = readFileSync(join(ROOT, "src/lib/ai/behaviorScore.ts"), "utf8");
+  assert.match(decision, /slice\(0, 48_000\)/);
+  assert.match(decision, /questions\.length > 12/);
+  assert.match(decision, /q\.question\.length > 1_000/);
+  assert.match(decision, /Math\.min\(params\.timeoutMs \?\? 3_500, 3_500\)/);
+  assert.match(evaluation, /slice\(0, 48_000\)/);
+  assert.match(evaluation, /params\.behaviors\.length > 12/);
+  assert.match(evaluation, /description\.length > 1_000/);
+});
+
+check("health check redacts provider snippets and separates key/catalog/chat evidence", () => {
   const src = readFileSync(join(ROOT, "src/lib/ai/test.ts"), "utf8");
   assert.match(src, /redactSecrets\(/);
+  assert.match(src, /\/auth\/key/);
+  assert.match(src, /\/models/);
+  assert.match(src, /endpoint support is not tested/);
+  assert.match(src, /adapter\.call/);
+});
+
+await checkAsync("OpenRouter shallow/deep tests separate key acceptance from selected chat-model endpoint checks", async () => {
+  const providerTest = await import("../src/lib/ai/test");
+  const oldFetch = globalThis.fetch;
+  const key = "sk-or-v1-test-key-12345678901234567890";
+  const model = "minimax/minimax-m3.1-flash:free";
+  const calls: Array<{ url: string; body?: string }> = [];
+  const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
+      if (url.endsWith("/auth/key")) return response({ data: { label: "test" } });
+      if (url.endsWith("/models")) return response({ data: [{ id: model }] });
+      if (url.endsWith("/chat/completions")) {
+        const isJson = (init?.body as string | undefined)?.includes('"response_format"');
+        return response({ choices: [{ message: { content: isJson ? '{"ok":true}' : "OK" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    }) as typeof fetch;
+
+    const shallow = await providerTest.testProviderConnection("openrouter", key, { model });
+    assert.equal(shallow.ok, true);
+    assert.equal(shallow.keySource, "typed");
+    assert.deepEqual(shallow.checks?.map((item) => item.name), ["key", "model"]);
+    assert.equal(shallow.checks?.[1].status, "ok");
+    assert.doesNotMatch(JSON.stringify(shallow), new RegExp(key));
+    assert.equal(calls.length, 2, "shallow does not claim or run a chat completion");
+
+    calls.length = 0;
+    const deep = await providerTest.testProviderConnection("openrouter", key, { model, deep: true });
+    assert.equal(deep.ok, true);
+    assert.deepEqual(deep.checks?.map((item) => item.name), ["key", "model", "chat", "structured"]);
+    assert.equal(calls.length, 4);
+    assert.ok(calls.slice(2).every((call) => call.url.endsWith("/chat/completions")));
+    assert.ok(calls.slice(2).every((call) => call.body?.includes(model)));
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+check("admin test and save are separate, with no automatic credential/model persistence", () => {
+  const ui = readFileSync(join(ROOT, "src/components/admin/AiSettingsManager.tsx"), "utf8");
+  const testHandler = ui.slice(ui.indexOf("const testProvider ="), ui.indexOf("if (loading && !data)"));
+  assert.doesNotMatch(testHandler, /send\("PUT"/);
+  assert.match(ui, /onClick=\{\(\) => saveProvider\(p\.provider\)\}/);
+  assert.doesNotMatch(ui, /Connected ✓/);
+  assert.match(ui, /A key check does not verify these models/);
+});
+
+check("visa TTS has one OpenRouter attempt and safe browser fallback, no hidden provider/model retries", () => {
+  const tts = readFileSync(join(ROOT, "src/app/api/visa/tts/route.ts"), "utf8");
+  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1);
+  assert.doesNotMatch(tts, /api\.openai\.com|resolveProviderCredential|for \(const candidate/);
+  assert.match(tts, /status: 204/);
+  assert.match(tts, /MAX_AUDIO_BYTES/);
+});
+
+await checkAsync("embedding request without explicit data-handling opt-in fails before network access", async () => {
+  const embeddings = await import("../src/lib/ai/embeddings");
+  const oldOptIn = process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS;
+  const oldFetch = globalThis.fetch;
+  let fetched = false;
+  try {
+    delete process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS;
+    embeddings.clearEmbeddingCacheForTests();
+    globalThis.fetch = (async () => { fetched = true; throw new Error("unexpected network"); }) as typeof fetch;
+    const unique = `private test ${Date.now()}`;
+    await assert.rejects(embeddings.embedTexts([unique]), /operator explicitly sets OPENROUTER_ALLOW_REMOTE_EMBEDDINGS/);
+    process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS = "true";
+    await assert.rejects(embeddings.embedTexts([`${unique} free trial`]), /selected free embedding endpoint is documented as a trial/);
+    assert.equal(fetched, false, "must not transmit embedding input without a reviewed non-free endpoint");
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldOptIn === undefined) delete process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS;
+    else process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS = oldOptIn;
+  }
+});
+
+check("remote embeddings are unavailable by default due free-provider data handling", () => {
+  const embeddings = readFileSync(join(ROOT, "src/lib/ai/embeddings.ts"), "utf8");
+  const route = readFileSync(join(ROOT, "src/app/api/ai/embeddings/route.ts"), "utf8");
+  assert.match(embeddings, /OPENROUTER_ALLOW_REMOTE_EMBEDDINGS/);
+  assert.match(embeddings, /assertRemoteEmbeddingOptIn\(model\)/);
+  assert.match(embeddings, /model\.endsWith\(":free"\)/);
+  assert.match(route, /remote_embeddings_opt_in_required/);
+  assert.match(route, /status: 503/);
 });
 
 check("visa + research agent use the shared provider resolution", () => {

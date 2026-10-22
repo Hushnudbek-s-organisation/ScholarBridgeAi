@@ -374,7 +374,7 @@ export function TasksHub({ profile, pane, setPane, navigate, hidden }: HubProps)
       onPaneChange={setPane}
       hiddenPanes={hidden}
     >
-      {active === "tasks" && <TaskRoadmap activeProfile={profile} />}
+      {active === "tasks" && <TaskRoadmap key={profile.id} activeProfile={profile} />}
       {active === "deadlines" && <DeadlineCenter key={profile.id} profileId={profile.id} onNavigateTab={navigate} />}
     </HubPage>
   );

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import { calculateScholarshipMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -27,10 +27,11 @@ export async function GET(req: Request) {
     const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
-    const search = searchParams.get("search")?.toLowerCase();
-    const country = searchParams.get("country");
-    const coverageType = searchParams.get("coverageType");
-    const focusId = Number(searchParams.get("focusId"));
+    const search = searchParams.get("search")?.trim().slice(0, 200).toLowerCase();
+    const country = searchParams.get("country")?.trim().slice(0, 100);
+    const coverageType = searchParams.get("coverageType")?.trim().slice(0, 80);
+    const rawFocusId = searchParams.get("focusId");
+    const focusId = rawFocusId && rawFocusId.length <= 12 ? Number(rawFocusId) : Number.NaN;
 
     // Cached base catalogue — the same active-only visibility boundary, the
     // same resolved USD mirrors, without re-reading every scholarship (and its
@@ -43,12 +44,12 @@ export async function GET(req: Request) {
     /** Owner/admin-verified profile whose PRIVATE saved-university list may steer ordering. */
     let personalisedProfileId: number | null = null;
     if (profileIdStr) {
-      const pId = parseInt(profileIdStr, 10);
+      const pId = Number(profileIdStr);
       // Personalised matching reads private profile data (GPA, scores,
       // degree), so only the owner — or an admin — gets it. Anyone else
       // silently receives the public, unpersonalised list.
       const auth = await authenticate(req);
-      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+      if (Number.isSafeInteger(pId) && pId > 0 && auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
         const cached = await getCachedProfileForMatching(pId);
         if (cached) {
           profileData = cached.profileData;
@@ -66,11 +67,11 @@ export async function GET(req: Request) {
       const matchCount = matchProfile
         ? bundle.entries.reduce(
             (count, scholarship) =>
-              count + Number((calculateScholarshipMatch(matchProfile, scholarship).matchScore ?? 0) >= 60),
+              count + Number(scholarship.verificationStatus === "verified" && (calculateScholarshipMatch(matchProfile, scholarship).matchScore ?? 0) >= 60),
             0,
           )
         : 0;
-      return NextResponse.json({ matchCount }, { headers: { "Cache-Control": "private, no-store" } });
+      return privateNoStoreJson({ matchCount }, { headers: { "Cache-Control": "private, no-store" } });
     }
 
     // Module 1 — awards that 100% cover a university the student SAVED lead
@@ -127,6 +128,50 @@ export async function GET(req: Request) {
     const sourceMap = bundle.sourceMap;
 
     const results = allScholarships.map((s) => {
+      const isVerified = s.verificationStatus === "verified";
+      // Historical seed rows contain unsupported amounts, eligibility and
+      // cycles. Preserve them in storage (an admin may have edited them), but
+      // never publish those claims or derive a match/status from them until a
+      // source review is recorded.
+      const publicRow = isVerified ? s : {
+        ...s,
+        coverageType: "Unspecified",
+        amountUsdValue: null,
+        awardAmount: null,
+        awardCurrency: null,
+        awardPeriod: null,
+        awardBasis: null,
+        deadline: null,
+        openingDate: null,
+        deadlineDate: null,
+        deadlineType: "unknown",
+        deadlineRangeStart: null,
+        deadlineRangeEnd: null,
+        recurrence: "none",
+        expectedOpeningPeriod: null,
+        expectedDeadlinePeriod: null,
+        applicationStatus: "unknown",
+        rounds: "[]",
+        degreeLevels: "[]",
+        eligibleMajors: "[]",
+        eligibleCountries: "[]",
+        minGpa: null,
+        minIelts: null,
+        financialNeedBased: null,
+        meritBased: null,
+        description: "Current award details are unverified.",
+        requirements: "Confirm current eligibility, award coverage, required documents, and dates with the official provider.",
+        fundingType: "",
+        tuitionCoverage: "",
+        livingAllowance: null,
+        travelAllowance: null,
+        accommodation: "",
+        applicationFee: null,
+        englishRequirements: "",
+        requiredDocuments: "[]",
+        applicationUrl: null,
+        sourceUrl: null,
+      };
       let matchInfo: {
         matchScore: number | null;
         isEligible: boolean | null;
@@ -136,19 +181,17 @@ export async function GET(req: Request) {
         issueDetails?: ReasonDetail[];
         breakdown?: MatchBreakdown;
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
-      if (matchProfile) {
+      if (matchProfile && isVerified) {
         matchInfo = calculateScholarshipMatch(matchProfile, s);
       }
       // Computed application status from dates (spec §6) — never stale.
-      // Labels are localized for the caller's locale (default "en" callers,
-      // like the deadlines feed, keep the canonical English words).
-      const statusInfo = withStatus(s, locale);
+      const statusInfo = withStatus(publicRow, locale);
       const src = sourceMap.get(s.id) || null;
       // Saved-university coverage (Module 1) — empty refs means no private
       // saved list was available, and every flag below stays honestly false.
-      const cov = savedUniRefs.length > 0 ? evaluateScholarshipForSavedUnis(s, savedUniRefs) : null;
+      const cov = isVerified && savedUniRefs.length > 0 ? evaluateScholarshipForSavedUnis(s, savedUniRefs) : null;
       return {
-        ...s,
+        ...publicRow,
         coveredUniversities: cov?.coveredUniNames ?? [],
         coversSavedUni: cov?.coversSavedUni ?? false,
         isFullForSavedUni: cov?.isFullForSavedUni ?? false,
@@ -162,9 +205,9 @@ export async function GET(req: Request) {
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,
-        sourceUrl: src?.sourceUrl ?? null,
-        sourceTitle: src?.sourceTitle ?? null,
-        sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,
+        sourceUrl: isVerified ? (src?.sourceUrl ?? null) : null,
+        sourceTitle: isVerified ? (src?.sourceTitle ?? null) : null,
+        sourceLastVerifiedAt: isVerified ? (src?.lastVerifiedAt ?? null) : null,
       };
     });
 
@@ -295,7 +338,7 @@ export async function GET(req: Request) {
     // Without those params the full list is returned (admin tools, ...).
     // Rows are localized LAST — every filter above ran on canonical English
     // data, so canonical dropdown values like "Full Tuition" never break.
-    return NextResponse.json({
+    return privateNoStoreJson({
       ...paginatedPayload(
         "scholarships",
         // `covTier` is an internal ordering key — the payload carries the
@@ -307,6 +350,6 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error("GET /api/scholarships error:", error);
-    return NextResponse.json({ error: "Failed to fetch scholarships" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to fetch scholarships" }, { status: 500 });
   }
 }

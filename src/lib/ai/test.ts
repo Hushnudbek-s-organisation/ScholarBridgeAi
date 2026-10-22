@@ -140,20 +140,42 @@ export async function testProviderConnection(
     checks.push({ name: "key", status: keyOk ? "ok" : "failed", detail: describeProbe(res, key) });
     if (!keyOk) return done(false, describeProbe(res, key), model);
 
-    const models = provider === "openrouter" ? null : listedModels(res.body);
     if (!model) {
       checks.push({ name: "model", status: "failed", detail: "No model configured" });
       return done(false, "API key OK, but no model is configured", model);
     }
-    if (models && models.length) {
-      const listed = models.includes(model) || models.includes(`models/${model}`);
-      checks.push({ name: "model", status: listed ? "ok" : "failed", detail: listed ? `${model} is available` : `${model} is not offered by this key` });
-      if (!listed) return done(false, `API key OK, but model "${model}" is not available`, model);
+    if (provider === "openrouter") {
+      // /auth/key proves credential acceptance only. Check the public model
+      // catalog separately, and explicitly avoid claiming that catalog listing
+      // proves account access or support for chat/TTS/embeddings/decisions.
+      try {
+        const catalog = await probe(`${base}/models`, { method: "GET", headers: authHeaders(provider, key) });
+        const modelIds = catalog.status >= 200 && catalog.status < 300 ? listedModels(catalog.body) : null;
+        if (modelIds?.length) {
+          const listed = modelIds.includes(model);
+          checks.push({
+            name: "model",
+            status: listed ? "ok" : "skipped",
+            detail: listed ? `${model} appears in OpenRouter's catalog; endpoint support is not tested` : `${model} was not in the catalog response; account/endpoint availability remains unknown`,
+          });
+        } else {
+          checks.push({ name: "model", status: "skipped", detail: "Catalog unavailable or unparseable; model endpoint remains untested" });
+        }
+      } catch {
+        checks.push({ name: "model", status: "skipped", detail: "Catalog request failed; model endpoint remains untested" });
+      }
     } else {
-      checks.push({ name: "model", status: "skipped", detail: "Provider does not list models for this key" });
+      const models = listedModels(res.body);
+      if (models && models.length) {
+        const listed = models.includes(model) || models.includes(`models/${model}`);
+        checks.push({ name: "model", status: listed ? "ok" : "failed", detail: listed ? `${model} is available` : `${model} is not offered by this key` });
+        if (!listed) return done(false, `API key OK, but model "${model}" is not available`, model);
+      } else {
+        checks.push({ name: "model", status: "skipped", detail: "Provider does not list models for this key" });
+      }
     }
 
-    if (!opts.deep) return done(true, describeProbe(res, key), model);
+    if (!opts.deep) return done(true, provider === "openrouter" ? "API key accepted; model/endpoint not verified" : describeProbe(res, key), model);
 
     // 3: tiny real completion through the SAME adapter the app uses.
     const { PROVIDERS } = await import("./index");

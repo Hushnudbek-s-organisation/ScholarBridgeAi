@@ -12,9 +12,10 @@
  */
 
 import { scoreVisaInterview, visaChanceDisclaimer, type VisaTurn } from "../src/lib/visaScoring";
-import { getVisaCountry, nextScriptedQuestion, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
+import { buildInstantOpeningLine, getVisaCountry, nextScriptedQuestion, sanitizeApplicantName, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
 import {
   classifySpeechError,
+  normalizeSpeechRecognitionLocale,
   LIVE_SPEAK_WATCHDOG_MS,
   MAX_MIC_START_ATTEMPTS,
   MIC_RESTART_DELAY_MS,
@@ -346,8 +347,8 @@ check(
 );
 check(
   "the officer's turn always ends with a watchdog",
-  /speakWatchdogRef\.current = window\.setTimeout\(finishSpeaking, speakWatchdogMs\(text\)\)/.test(visaUi) &&
-    /utter\.onerror = finishSpeaking/.test(visaUi)
+  /speakWatchdogRef\.current = window\.setTimeout\([^;]*speakWatchdogMs\(text\)\)/.test(visaUi) &&
+    /utter\.onerror = \(event\) =>[\s\S]*?finishSpeaking\(\)/.test(visaUi)
 );
 check(
   "the voice path re-opens by itself after every question",
@@ -417,6 +418,29 @@ check(
   VISA_COUNTRIES.every((c) => Array.isArray(c.questions) && c.questions.length > 0) &&
     VISA_COUNTRIES.every((c) => nextScriptedQuestion(c, []).reply.length > 0),
   `${VISA_COUNTRIES.length} countries`
+);
+check(
+  "the instant opening includes the country's first verified question without waiting for chat",
+  VISA_COUNTRIES.every((country) => buildInstantOpeningLine(country, "male").includes(country.questions[0] ?? "\u0000")),
+);
+check(
+  "the instant greeting follows configured language and strips markup/control characters from names",
+  buildInstantOpeningLine(getVisaCountry("DE")!, "female", "<b>Zoë</b>\nAdmin").startsWith("Guten Tag, Zoë Admin.") &&
+    !/[<>\n]/.test(sanitizeApplicantName("<script>Zoë</script>\nAdmin")),
+);
+const noQuestions = { ...us, code: "ZZ", language: "unconfigured", questions: [] };
+check(
+  "an absent country question configuration never invents a first question",
+  buildInstantOpeningLine(noQuestions, "male", "A").includes("Welcome to your student visa interview") &&
+    !buildInstantOpeningLine(noQuestions, "male", "A").includes("Why do you want"),
+);
+const supportedLocales = VISA_COUNTRIES.map((country) => country.locale);
+check(
+  "recognition locales stay within the finite configured country locale set",
+  VISA_COUNTRIES.every((country) => normalizeSpeechRecognitionLocale(country.locale, country.code, supportedLocales) === country.locale) &&
+    normalizeSpeechRecognitionLocale("en-AU", "US", supportedLocales) === "en-AU" &&
+    normalizeSpeechRecognitionLocale("de-DE", "AT", supportedLocales) === "de-DE" &&
+    normalizeSpeechRecognitionLocale("xx-XX", "ZZ", supportedLocales) === "en-US",
 );
 check(
   "the script never repeats a question back-to-back",

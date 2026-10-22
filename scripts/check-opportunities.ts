@@ -10,7 +10,10 @@
  * Run: npm run test:opportunities
  */
 
-import { countByType, rankOpportunities, scoreOpportunity, type OpportunityInput } from "../src/lib/opportunities";
+import { countByType, mergeOpportunitySearchOrder, rankOpportunities, scoreOpportunity, type OpportunityInput } from "../src/lib/opportunities";
+import { expandMultilingualSearchTerms } from "../src/lib/catalogLocalizer";
+import { matchesUniversityType } from "../src/lib/universityType";
+import { haveCompatibleEmbeddingDimensions, isUsefulSemanticQuery } from "../src/lib/ai/semanticQuery";
 
 let passed = 0;
 let failed = 0;
@@ -119,6 +122,31 @@ section("6. Malformed fields JSON is safe");
 
 const broken = scoreOpportunity({ ...icpc, fields: "{broken" }, csProfile, NOW);
 check("broken JSON → treated as no fields, no crash", broken.match >= 10 && !Number.isNaN(broken.match));
+
+
+section("7. Discovery search is lexical-first with bounded optional semantic ranking");
+const typed = [
+  { id: 1, title: "Exact scholarship", match: 60 },
+  { id: 2, title: "Semantic neighbor", match: 80 },
+  { id: 3, title: "Unrelated", match: 100 },
+];
+const lexicalHits = new Set([1]);
+check("lexical fallback returns matching catalogue records only", mergeOpportunitySearchOrder(typed, lexicalHits, []).map((x) => x.id).join() === "1");
+check("semantic candidates can add a related result but never unrelated rows", mergeOpportunitySearchOrder(typed, lexicalHits, [{ id: 2, similarity: 0.8 }]).map((x) => x.id).sort().join() === "1,2");
+check("hybrid order has deterministic lexical/profile tie-breaks", mergeOpportunitySearchOrder(typed, lexicalHits, [{ id: 2, similarity: 0.5 }]).map((x) => x.id).join() === mergeOpportunitySearchOrder(typed, lexicalHits, [{ id: 2, similarity: 0.5 }]).map((x) => x.id).join());
+check("semantic top-k is capped at 63", mergeOpportunitySearchOrder(typed, new Set(), typed.map((x) => ({ id: x.id, similarity: 0.8 })), 999).length === 3);
+check("semantic gate ignores short fragments and accepts multilingual 4+ character queries", !isUsefulSemanticQuery("AI") && isUsefulSemanticQuery("stipendiya"));
+check("query and candidates require matching finite vector dimensions", haveCompatibleEmbeddingDimensions([[1, 0], [0, 1]]) && !haveCompatibleEmbeddingDimensions([[1, 0], [0, 1, 2]]) && !haveCompatibleEmbeddingDimensions([[1, Number.NaN], [0, 1]]));
+check("Uzbek scholarship query expands to canonical terms", expandMultilingualSearchTerms("stipendiya").includes("scholarship"));
+check("Russian scholarship query expands to canonical terms", expandMultilingualSearchTerms("стипендия").includes("scholarship"));
+
+
+section("8. University type filtering preserves unknown values");
+check("public records pass the Public filter", matchesUniversityType("Public Research University", "Public"));
+check("private records pass the Private filter", matchesUniversityType("Private Non-Profit", "Private"));
+check("unknown type does not pass Public or Private filters", !matchesUniversityType(null, "Public") && !matchesUniversityType("", "Private"));
+check("opposite published types do not cross-match", !matchesUniversityType("Public", "Private") && !matchesUniversityType("Private", "Public"));
+check("All/unsupported type values do not hide records", matchesUniversityType(null, "All") && matchesUniversityType("Public", "Other"));
 
 // ---------------------------------------------------------------------------
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);

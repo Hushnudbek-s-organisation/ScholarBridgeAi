@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: access.error, code: access.code },
         { status: access.status, headers: { "Cache-Control": "no-store" } }
       );
@@ -34,14 +34,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
 
     if (!profile) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+      return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
     }
 
     // Never send the password hash to the browser.
-    return NextResponse.json({ profile: sanitizeProfile(profile) });
+    return privateNoStoreJson({ profile: sanitizeProfile(profile) });
   } catch (error) {
     console.error("GET /api/profiles/[id] error:", error);
-    return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to fetch profile" }, { status: 500 });
   }
 }
 
@@ -123,7 +123,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // ignored — it was forgeable.
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: access.error, code: access.code },
         { status: access.status }
       );
@@ -131,7 +131,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const parsed = await readJsonBody<Record<string, any>>(req);
     if (!parsed.ok) {
-      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
+      return privateNoStoreJson({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
     const hasStudyInterests = body.studyInterests !== undefined;
@@ -139,7 +139,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       ? parseStudyInterestSelections(body.studyInterests)
       : null;
     if (hasStudyInterests && !submittedStudyInterests) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Choose at least one valid study interest", code: "study_interests_invalid" },
         { status: 400 }
       );
@@ -169,7 +169,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId));
     if (!current) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+      return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
     }
     if (
       typeof body.email === "string" &&
@@ -178,7 +178,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     ) {
       // Reserved for bot-created accounts (see /api/profiles POST).
       if (isTelegramPlaceholderEmail(body.email.trim())) {
-        return NextResponse.json(
+        return privateNoStoreJson(
           { error: "Please provide a valid email address", code: "invalid_email" },
           { status: 400 }
         );
@@ -189,7 +189,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         .where(sql`lower(${studentProfiles.email}) = ${body.email.trim().toLowerCase()} AND ${studentProfiles.id} != ${profileId}`)
         .limit(1);
       if (taken) {
-        return NextResponse.json(
+        return privateNoStoreJson(
           { error: "This email is already used by another account" },
           { status: 409 }
         );
@@ -203,7 +203,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (newPasswordPlain) {
       const policyError = passwordPolicyError(newPasswordPlain);
       if (policyError) {
-        return NextResponse.json({ error: policyError, code: "weak_password" }, { status: 400 });
+        return privateNoStoreJson({ error: policyError, code: "weak_password" }, { status: 400 });
       }
     }
     const newPasswordHash = newPasswordPlain ? hashPassword(newPasswordPlain) : undefined;
@@ -310,7 +310,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // The student's own view of every match/score must reflect the edit
     // immediately — drop the short-lived derived match inputs for this profile.
     invalidateProfileMatchCache(profileId);
-    const response = NextResponse.json({ profile: sanitizeProfile(updatedProfile) });
+    const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile) });
     // Changing the password rotates the session fingerprint — hand back a
     // freshly signed cookie so the owner is not logged out by their own edit.
     if (newPasswordHash && updatedProfile) {
@@ -325,12 +325,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     console.error("PUT /api/profiles/[id] error:", error);
     // Race on the unique email index.
     if (isUniqueViolation(error)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "This email is already used by another account" },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to update profile" }, { status: 500 });
   }
 }
 
@@ -342,15 +342,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     // Only a live admin may delete a profile (deleting is destructive).
     const access = await requireAdmin(req);
     if (!access.ok) {
-      return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
+      return privateNoStoreJson({ error: access.error, code: access.code }, { status: access.status });
     }
 
     if (!Number.isInteger(profileId) || profileId <= 0) {
-      return NextResponse.json({ error: "Invalid profile id" }, { status: 400 });
+      return privateNoStoreJson({ error: "Invalid profile id" }, { status: 400 });
     }
     // The platform owner cannot be deleted — transfer ownership first.
     if ((await currentOwnerId()) === profileId) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "This account owns the platform. Transfer ownership before deleting it.", code: "owner_protected" },
         { status: 409 }
       );
@@ -366,9 +366,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       source: `admin:${access.session.profile.id}`,
       actor: "ADMIN",
     }).catch(() => {});
-    return NextResponse.json({ success: true });
+    return privateNoStoreJson({ success: true });
   } catch (error) {
     console.error("DELETE /api/profiles/[id] error:", error);
-    return NextResponse.json({ error: "Failed to delete profile" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to delete profile" }, { status: 500 });
   }
 }

@@ -41,6 +41,10 @@ const source = {
   telegramMiniApp: read("src/components/telegram/MiniApp.tsx"),
   themeToggle: read("src/components/ThemeToggle.tsx"),
   themeScript: read("src/lib/theme.ts"),
+  documentChecklist: read("src/components/DocumentChecklist.tsx"),
+  nextActions: read("src/components/NextActionsPanel.tsx"),
+  smartVideoPlayer: read("src/components/SmartVideoPlayer.tsx"),
+  lessonNotes: read("src/components/LessonNotes.tsx"),
   globals: read("src/app/globals.css"),
 };
 
@@ -108,6 +112,12 @@ check("editing a profile preserves an unanswered financial-aid choice", /needsFi
 check("university catalogue requirements carry a programme-specific verification caveat", /catalogueRequirementsScope/.test(source.university));
 check("key catalogue cards wrap names, majors and descriptions", /break-words font-bold text-base/.test(source.explorer) && /break-words text-xs leading-relaxed/.test(source.explorer));
 check("global reduced-motion preference remains respected", /prefers-reduced-motion:\s*reduce/.test(source.globals));
+check("document checklist labels, placeholders and status controls use translations", source.documentChecklist.includes('useTranslations("documentChecklist")') && /placeholder=\{t\("placeholder"\)\}/.test(source.documentChecklist) && /aria-label=\{d\.status/.test(source.documentChecklist));
+check("document checklist actions meet 44px touch targets and wrap without horizontal overflow", /min-h-11 items-center/.test(source.documentChecklist) && /min-h-11 min-w-11/.test(source.documentChecklist) && /flex flex-wrap/.test(source.documentChecklist));
+check("next actions panel localizes dynamic action copy and exposes keyboard-focusable touch actions", source.nextActions.includes('useTranslations("nextActions")') && source.nextActions.includes("localizedActionCopy") && /min-h-11[^\"]*focus-visible:outline/.test(source.nextActions));
+check("next actions panel has translated loading, empty and retry states", /t\("loading"\)/.test(source.nextActions) && /t\("empty"\)/.test(source.nextActions) && /t\("loadFailed"\)/.test(source.nextActions));
+check("video player localizes its empty and generic provider labels", source.smartVideoPlayer.includes('useTranslations("courses")') && /emptyLabel \?\? t\("noVideoYet"\)/.test(source.smartVideoPlayer) && /t\("externalVideoPlayer"\)/.test(source.smartVideoPlayer));
+check("lesson notes render authored content only and do not inject English fallback copy", /if \(blocks\.length === 0\) return null/.test(source.lessonNotes) && !/No notes|No lesson content|Loading notes/.test(source.lessonNotes));
 // The dark-mode tokens are read from the `.dark { … }` block and judged by
 // value, so a palette tweak does not need a test edit — a light fill does fail.
 const darkBlock = source.globals.match(/\n\.dark \{([\s\S]*?)\n\}/)?.[1] ?? "";

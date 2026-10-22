@@ -22,6 +22,34 @@
  * Pure, dependency-free — asserted by `npm run test:visa`.
  */
 
+/**
+ * Normalize SpeechRecognition's regional locale against the finite locale set
+ * declared by the app's verified visa-country data. This is not a claim that
+ * every browser ships every recognition pack; it avoids sending arbitrary tags.
+ */
+export function normalizeSpeechRecognitionLocale(
+  requestedLocale: string | null | undefined,
+  countryCode: string | null | undefined,
+  supportedLocales: readonly string[],
+): string {
+  const exact = (requestedLocale ?? "").trim().replace(/_/g, "-").toLowerCase();
+  const match = (candidate: string) => supportedLocales.find((locale) => locale.toLowerCase() === candidate);
+  const exactMatch = exact ? match(exact) : undefined;
+  if (exactMatch) return exactMatch;
+
+  const language = exact.split("-")[0] ?? "";
+  if (language === "en") {
+    const preferredEnglish = countryCode?.toUpperCase() === "UK" ? "en-gb" : "en-us";
+    const englishMatch = match(preferredEnglish) ?? supportedLocales.find((locale) => locale.toLowerCase().startsWith("en-"));
+    if (englishMatch) return englishMatch;
+  }
+  if (language) {
+    const sameLanguage = supportedLocales.find((locale) => locale.toLowerCase().split("-")[0] === language);
+    if (sameLanguage) return sameLanguage;
+  }
+  return match("en-us") ?? supportedLocales[0] ?? "en-US";
+}
+
 /** Words per second an utterance is spoken at, used to size the watchdog. */
 const WORDS_PER_SECOND = 2.6;
 /** Never wait longer than this for a speech to finish (ms). */

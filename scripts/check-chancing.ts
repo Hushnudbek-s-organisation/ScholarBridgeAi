@@ -226,10 +226,9 @@ check("evaluateUniversityAndProgramChance computes program-specific 25th/50th/75
   process.env.DATABASE_URL ||= "postgresql://x:x@localhost:5432/x";
   const { ADDITIONAL_24_SUCCESS_STORIES } = await import("../src/db/seedOutcomesAndStories");
   const { RICH_SUCCESS_STORIES } = await import("../src/db/seedRichPlatformData");
-  check("36 multi-major verified success stories (12 flagship + 24 regional/program archetypes) are defined", () => {
-    assert.equal(RICH_SUCCESS_STORIES.length, 12);
-    assert.equal(ADDITIONAL_24_SUCCESS_STORIES.length, 24);
-    assert.equal(RICH_SUCCESS_STORIES.length + ADDITIONAL_24_SUCCESS_STORIES.length, 36);
+  check("synthetic success stories are not defined as verified public records", () => {
+    assert.equal(RICH_SUCCESS_STORIES.length, 0);
+    assert.equal(ADDITIONAL_24_SUCCESS_STORIES.length, 0);
   });
 
   console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);

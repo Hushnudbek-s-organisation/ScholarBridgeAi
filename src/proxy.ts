@@ -11,8 +11,8 @@ import {
 } from "@/lib/security";
 
 /**
- * Cryptographically random nonce using the Web Crypto API (the middleware runs
- * in the Edge runtime, where Node's `crypto` module is unavailable).
+ * Cryptographically random nonce using Web Crypto, keeping the Proxy entry
+ * portable and independent of Node-only APIs.
  */
 function randomNonce(): string {
   const bytes = new Uint8Array(16);

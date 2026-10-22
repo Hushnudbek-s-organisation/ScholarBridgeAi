@@ -515,8 +515,9 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                   {reviewUsedAi ? t("sopReviewAiNotice") : t("sopReviewFallbackNotice")}
                 </p>
                 {behaviorSignals && (
-                  <section className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3" aria-label={t("essayBehaviorSignalsTitle")}>
+                  <section className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3" aria-label={t("essayBehaviorSignalsTitle")} aria-live="polite">
                     <h4 className="text-xs font-bold text-indigo-900">{t("essayBehaviorSignalsTitle")}</h4>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{t("essayBehaviorDisclaimer")}</p>
                     {!behaviorSignals.available ? <p className="mt-1 text-[11px] text-slate-500">{t("essayBehaviorUnavailable")}</p> : (
                       <dl className="mt-2 space-y-2">
                         {Object.entries(behaviorSignals.signals).map(([key, percent]) => (

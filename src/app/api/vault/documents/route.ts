@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
       byDoc.get(l.documentId)!.push(l);
     }
 
-    return NextResponse.json({
+    return privateNoStoreJson({
       docTypes: DOC_TYPES,
       documents: docs.map((d) => {
         const expiresAt = d.expiresAt ? String(d.expiresAt).slice(0, 10) : null;
