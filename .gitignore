@@ -35,3 +35,7 @@ yarn-error.log*
 
 # local embedded postgres data directory (scripts/dev-db.mjs)
 /.pgdata/
+
+# python bytecode (import scripts)
+__pycache__/
+*.pyc
