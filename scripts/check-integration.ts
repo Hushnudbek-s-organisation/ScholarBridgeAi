@@ -2445,12 +2445,12 @@ async function main() {
     await setConfig("ai_budget_daily_usd", "0.001");
     const dailyVerdict = await budgetGate.evaluateAiBudget("custom");
     check("budget: spend already at the daily limit → blocked with scope daily",
-      !dailyVerdict.allowed && dailyVerdict.scope === "daily", JSON.stringify(dailyVerdict));
+      !dailyVerdict.allowed && "scope" in dailyVerdict && dailyVerdict.scope === "daily", JSON.stringify(dailyVerdict));
     await setConfig("ai_budget_daily_usd", "");
     await setConfig("ai_budget_provider_daily_usd", '{"custom": 0.001}');
     const providerVerdict = await budgetGate.evaluateAiBudget("custom");
     check("budget: a per-provider daily cap blocks only that provider",
-      !providerVerdict.allowed && providerVerdict.scope === "provider" && (await budgetGate.evaluateAiBudget("openrouter")).allowed === true,
+      !providerVerdict.allowed && "scope" in providerVerdict && providerVerdict.scope === "provider" && (await budgetGate.evaluateAiBudget("openrouter")).allowed === true,
       JSON.stringify(providerVerdict));
     await setConfig("ai_budget_provider_daily_usd", "{}");
     await setConfig("ai_budget_monthly_usd", "0.0095"); // spend is 0.008 by now → ~84%: a warning, not a block

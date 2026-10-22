@@ -1,4 +1,15 @@
-import { GoogleGenerativeAI, type GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI, type GenerateContentParameters, type GenerateContentResponse } from "@google/genai";
+
+/** Small compatibility surface for older internal callers, implemented by the canonical Google Gen AI SDK. */
+export interface GenerativeModel {
+  generateContent(request: Pick<GenerateContentParameters, "contents" | "config">): Promise<{
+    response: {
+      text(): string;
+      candidates?: GenerateContentResponse["candidates"];
+      usageMetadata?: GenerateContentResponse["usageMetadata"];
+    };
+  }>;
+}
 
 /**
  * Direct Google Gemini client (server-side ONLY — never import from Client
@@ -33,11 +44,26 @@ export function createGeminiModel(
 ): GenerativeModel | null {
   const key = getGeminiApiKey();
   if (!key) return null;
-  const genAI = new GoogleGenerativeAI(key);
-  return genAI.getGenerativeModel({
-    model: getGeminiModelName(),
-    ...(systemInstruction ? { systemInstruction } : {}),
-  });
+  const genAI = new GoogleGenAI({ apiKey: key });
+  return {
+    async generateContent(request) {
+      const response = await genAI.models.generateContent({
+        model: getGeminiModelName(),
+        contents: request.contents,
+        config: {
+          ...request.config,
+          ...(systemInstruction ? { systemInstruction } : {}),
+        },
+      });
+      return {
+        response: {
+          text: () => response.text ?? "",
+          candidates: response.candidates,
+          usageMetadata: response.usageMetadata,
+        },
+      };
+    },
+  };
 }
 
 /** HTTP statuses that are worth retrying (rate-limit + Google-side faults). */

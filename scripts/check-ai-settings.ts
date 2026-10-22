@@ -18,6 +18,8 @@ async function main() {
 const settings = await import("../src/lib/ai/settings");
 const { CONFIG_DEFAULTS } = await import("../src/lib/config");
 const aiCore = await import("../src/lib/ai/index");
+const budgetGate = await import("../src/lib/ai/budget-gate");
+const geminiCompat = await import("../src/lib/gemini");
 const credentials = await import("../src/lib/ai/credentials");
 const openRouterModels = await import("../src/lib/ai/openrouterModelIds");
 
@@ -98,6 +100,25 @@ check("OpenRouter capability registry covers six exact IDs and marks docs vs liv
   assert.match(registry.chat.operationalNote, /retires/);
   assert.ok(registry.multimodalEmbedding.sensitiveDataWarning);
 });
+check("named OpenRouter model exports and ordered free-chat fallback candidates stay exact", () => {
+  assert.equal(openRouterModels.OPENROUTER_DEFAULT_CHAT_MODEL, "minimax/minimax-m3.1-flash:free");
+  assert.deepEqual(openRouterModels.OPENROUTER_FREE_CHAT_FALLBACK_MODELS, [
+    "minimax/minimax-m3.1-flash:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen3-32b:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+  ]);
+  assert.deepEqual([
+    openRouterModels.OPENROUTER_DEFAULT_CHAT_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_SPEECH_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_TEXT_EMBEDDING_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_MULTIMODAL_EMBEDDING_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_DECISIONS_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_EVALUATION_MODEL,
+  ], Object.values(openRouterModels.OPENROUTER_MODEL_IDS));
+});
+
 // 6 chat providers + "gemini" (voice-only — powers the Gemini Live visa
 // speaking assistant; it deliberately has NO chat adapter in ai/index.ts).
 // Task 7 added "google" (Gemini via its OpenAI-compatible endpoint) and
@@ -466,6 +487,28 @@ check("AdminPanel wires the AI Settings tab", () => {
   assert.match(panel, /id: "ai"/);
 });
 
+check("Google AI SDK dependency is consolidated on @google/genai", () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
+  assert.ok(pkg.dependencies["@google/genai"]);
+  assert.equal(pkg.dependencies["@google/generative-ai"], undefined);
+  assert.equal(lock.packages["node_modules/@google/generative-ai"], undefined);
+  assert.match(readFileSync(join(ROOT, "src/lib/gemini.ts"), "utf8"), /from "@google\/genai"/);
+  assert.match(readFileSync(join(ROOT, "README.md"), "utf8"), /canonical Google Generative AI\s+JavaScript SDK is `@google\/genai`/);
+});
+check("Gemini compatibility wrapper uses @google/genai without contacting a provider", () => {
+  const oldKey = process.env.GEMINI_API_KEY;
+  try {
+    delete process.env.GEMINI_API_KEY;
+    assert.equal(geminiCompat.createGeminiModel(), null);
+    process.env.GEMINI_API_KEY = "AIzaUnitTestKey000000000000000000";
+    const model = geminiCompat.createGeminiModel();
+    assert.equal(typeof model?.generateContent, "function");
+  } finally {
+    if (oldKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = oldKey;
+  }
+});
 check("package.json has test:ai-settings script", () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   assert.ok(pkg.scripts["test:ai-settings"].startsWith("tsx "));
@@ -575,6 +618,7 @@ check("redactSecrets removes known keys and key-shaped tokens", () => {
 check("categorizeStatus + transient classification", () => {
   assert.equal(aiCore.categorizeStatus(401), "auth");
   assert.equal(aiCore.categorizeStatus(403), "auth");
+  assert.equal(aiCore.categorizeStatus(402), "payment_required");
   assert.equal(aiCore.categorizeStatus(404), "model_not_found");
   assert.equal(aiCore.categorizeStatus(429), "rate_limited");
   assert.equal(aiCore.categorizeStatus(400), "bad_request");
@@ -606,6 +650,11 @@ async function withRouter(
   const savedEnv: Record<string, string | undefined> = {};
   for (const k of AI_ENV_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
   Object.assign(process.env, env);
+  budgetGate.setBudgetStateReaderForTests(async () => [
+    { dailyUsd: null, monthlyUsd: null, providerDailyUsd: {}, warnPercent: 80 },
+    { dayUsd: 0, monthUsd: 0, dayByProviderUsd: {} },
+  ]);
+  budgetGate.resetBudgetGateLogThrottleForTests();
   const realFetch = globalThis.fetch;
   const calls: Call[] = [];
   const logs: string[] = [];
@@ -629,6 +678,8 @@ async function withRouter(
     globalThis.fetch = realFetch;
     Object.assign(console, saved);
     for (const k of AI_ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
+    budgetGate.setBudgetStateReaderForTests();
+    budgetGate.resetBudgetGateLogThrottleForTests();
   }
 }
 const okReply = (text: string) => ({ status: 200, body: { model: "m", choices: [{ message: { content: text } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } });

@@ -46,12 +46,18 @@ import { resolveAllProviderCredentials, resolveProviderCredential } from "./cred
 import {
   AI_PRICING_CONFIG_KEY,
   costForUsage,
+  mergePricingTables,
   parsePricingJson,
+  VERIFIED_DEFAULT_PRICING,
   type AICostStatus,
   type PricingTable,
 } from "./pricing";
 import { evaluateAiBudget } from "./budget-gate";
 import { logAIUsage } from "./usage";
+import {
+  OPENROUTER_DEFAULT_CHAT_MODEL,
+  OPENROUTER_FREE_CHAT_FALLBACK_MODELS,
+} from "./openrouterModelIds";
 
 export { TASK_PROVIDER_ENV } from "./settings";
 export type { AIProviderId, AITaskId, AICapability, PublicCredential, ResolvedCredential } from "./settings";
@@ -103,6 +109,8 @@ export interface AIAdapterResponse {
   usageReported: boolean;
   /** USD the provider itself billed for this call, when it reports one (OpenRouter usage.cost). */
   providerCostUsd?: number;
+  /** True when the OpenRouter adapter succeeded on a later free-chat model. */
+  modelFallbackUsed?: boolean;
 }
 
 export interface AIResponse {
@@ -120,6 +128,8 @@ export interface AIResponse {
    */
   costEstimate: number | null;
   costStatus: AICostStatus;
+  /** True when OpenRouter's initial free-chat model was unavailable and another free candidate served the request. */
+  modelFallbackUsed?: boolean;
 }
 
 export type AIProviderName = Exclude<AIProviderId, "gemini">;
@@ -130,6 +140,7 @@ export type AIErrorCategory =
   | "unsupported_capability"
   | "auth"
   | "model_not_found"
+  | "payment_required"
   | "rate_limited"
   | "bad_request"
   | "provider_unavailable"
@@ -179,6 +190,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 
 export function categorizeStatus(status: number): AIErrorCategory {
   if (status === 401 || status === 403) return "auth";
+  if (status === 402) return "payment_required";
   if (status === 404) return "model_not_found";
   if (status === 429) return "rate_limited";
   if (status === 408) return "timeout";
@@ -257,22 +269,40 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
         if (site) headers["HTTP-Referer"] = site;
         headers["X-Title"] = "ScholarBridge";
       }
-      const res = await timedFetch(name, `${base}/chat/completions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model,
-          messages: chatMessages(req),
-          temperature: req.temperature ?? 0.6,
-          max_tokens: req.maxTokens ?? 4096,
-          ...(req.jsonMode && supportsCapability(name, "structured") ? { response_format: { type: "json_object" } } : {}),
-          ...(req.reasoningEffort && acceptsReasoningEffort(name, model) ? { reasoning_effort: req.reasoningEffort } : {}),
-          // OpenRouter returns the billed USD amount only when asked (usage accounting).
-          ...(name === "openrouter" ? { usage: { include: true } } : {}),
-        }),
-      }, req.timeoutMs);
-      if (!res.ok) throw await readError(name, res, cfg.apiKey);
-      const data = await res.json();
+      const shouldTryFreeChatModels = name === "openrouter" && (model.endsWith(":free") || model === OPENROUTER_DEFAULT_CHAT_MODEL);
+      const candidates = shouldTryFreeChatModels
+        ? [model, ...OPENROUTER_FREE_CHAT_FALLBACK_MODELS.filter((candidate) => candidate !== model)]
+        : [model];
+      let data: any;
+      let usedModel = model;
+      let fallbackError: AIProviderError | undefined;
+      for (let index = 0; index < candidates.length; index++) {
+        const candidateModel = candidates[index];
+        const res = await timedFetch(name, `${base}/chat/completions`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: candidateModel,
+            messages: chatMessages(req),
+            temperature: req.temperature ?? 0.6,
+            max_tokens: req.maxTokens ?? 4096,
+            ...(req.jsonMode && supportsCapability(name, "structured") ? { response_format: { type: "json_object" } } : {}),
+            ...(req.reasoningEffort && acceptsReasoningEffort(name, candidateModel) ? { reasoning_effort: req.reasoningEffort } : {}),
+            // OpenRouter returns the billed USD amount only when asked (usage accounting).
+            ...(name === "openrouter" ? { usage: { include: true } } : {}),
+          }),
+        }, req.timeoutMs);
+        if (res.ok) {
+          data = await res.json();
+          usedModel = candidateModel;
+          break;
+        }
+        const error = await readError(name, res, cfg.apiKey);
+        const retryableFreeModelStatus = [402, 404, 429, 503].includes(error.status ?? 0);
+        if (!shouldTryFreeChatModels || !retryableFreeModelStatus || index === candidates.length - 1) throw error;
+        fallbackError = error;
+      }
+      if (!data) throw fallbackError ?? new AIProviderError(name, "provider_unavailable", "OpenRouter did not return a response");
       const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;
       const prompt = reportedCount(usage?.prompt_tokens);
       const completion = reportedCount(usage?.completion_tokens);
@@ -280,7 +310,8 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
       return {
         text: data?.choices?.[0]?.message?.content ?? "",
         provider: name,
-        model: data?.model || model,
+        model: data?.model || usedModel,
+        modelFallbackUsed: usedModel !== model,
         promptTokens: prompt ?? 0,
         completionTokens: completion ?? 0,
         cachedPromptTokens: reportedCount(usage?.prompt_tokens_details?.cached_tokens) ?? 0,
@@ -388,7 +419,7 @@ export async function loadRuntimeAIConfig(taskType: string): Promise<RuntimeAICo
     dbProviders,
     disabled: parseDisabledProviders(disabledRaw ?? process.env.AI_PROVIDERS_DISABLED),
     fallback: resolveFallbackProvider(fallbackRaw),
-    pricing: priced.ok ? priced.table : {},
+    pricing: mergePricingTables(VERIFIED_DEFAULT_PRICING, priced.ok ? priced.table : {}),
   };
 }
 
@@ -513,7 +544,7 @@ async function callOnce(
   // The one place a reply's cost is decided: provider-reported > estimate > unknown.
   const priced = costForUsage(
     provider,
-    cred.model,
+    adapted.model,
     {
       promptTokens: adapted.promptTokens,
       completionTokens: adapted.completionTokens,
@@ -533,6 +564,7 @@ async function callOnce(
     usageReported: adapted.usageReported,
     costEstimate: priced.costUsd,
     costStatus: priced.costStatus,
+    ...(adapted.modelFallbackUsed ? { modelFallbackUsed: true } : {}),
   };
 }
 
@@ -561,8 +593,9 @@ async function callWithRetry(
     try {
       // Budget is re-checked before EVERY paid attempt: a retry chain must not
       // keep spending after the platform has crossed its limit mid-request.
-      const verdict = await evaluateAiBudget(provider);
-      if (!verdict.allowed) throw budgetError(provider, verdict.scope);
+      const budgetModel = (await resolveProviderCredential(provider)).model;
+      const verdict = await evaluateAiBudget(provider, budgetModel);
+      if (!verdict.allowed) throw budgetError(provider, "scope" in verdict ? verdict.scope : verdict.reason);
       const response = await callOnce(provider, req, cfg, require);
       logAiRequest({
         task,
@@ -570,7 +603,7 @@ async function callWithRetry(
         model: response.model,
         status: "ok",
         latencyMs: Date.now() - started,
-        fallback: isFallback,
+        fallback: isFallback || Boolean(response.modelFallbackUsed),
         attempt,
         costStatus: response.costStatus,
       });
@@ -654,8 +687,9 @@ export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<
   const primary = await resolveRuntimeProvider(task, cfg);
   const first = await callWithRetry(task, primary.name, req, cfg, opts, false);
   if (first.response) {
-    await recordUsage({ profileId, task, provider: primary.name, model: first.response.model, response: first.response, attempts: first.attempts, fallbackUsed: false });
-    return { ok: true, response: first.response, fallbackUsed: false, attempts: first.attempts };
+    const modelFallbackUsed = Boolean(first.response.modelFallbackUsed);
+    await recordUsage({ profileId, task, provider: primary.name, model: first.response.model, response: first.response, attempts: first.attempts, fallbackUsed: modelFallbackUsed });
+    return { ok: true, response: first.response, fallbackUsed: modelFallbackUsed, attempts: first.attempts };
   }
 
   const error = first.error ?? new AIProviderError(primary.name, "unknown", "AI request failed");
@@ -663,7 +697,8 @@ export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<
   // must not be bypassed by another paid provider unless the admin chose one.
   // Everything else may go to the fallback — but only one the admin chose explicitly.
   let fb = cfg.fallback;
-  if (!fb && primary.name === "openrouter" && isTransientCategory(error.category) && !cfg.disabled.includes("groq")) {
+  const openRouterModelUnavailable = error.category === "payment_required" || error.category === "model_not_found";
+  if (!fb && primary.name === "openrouter" && (isTransientCategory(error.category) || openRouterModelUnavailable) && !cfg.disabled.includes("groq")) {
     const groqCredential = await usableCredential("groq", cfg.disabled);
     if (groqCredential) fb = "groq";
   }
@@ -747,6 +782,8 @@ export function describeAiError(error: AIProviderError): string {
       return `The AI provider (${label}) rejected the API key. An administrator needs to update it.`;
     case "model_not_found":
       return `The configured ${label} model was not found — it may be deprecated. An administrator needs to pick a current model.`;
+    case "payment_required":
+      return `The configured ${label} model is no longer available under the current account terms. An administrator needs to review the model selection.`;
     case "rate_limited":
       return `The AI provider (${label}) is rate limiting requests. Please wait a moment and try again.`;
     case "timeout":
