@@ -71,7 +71,8 @@ export async function POST(req: Request) {
     const apiKey = await openRouterKey();
     if (!apiKey) return new NextResponse(null, { status: 204 });
 
-    // The official model card's current slug is fish-audio/s2.1-pro-free:free.
+    // Official model card (verified 2026-10-22): https://openrouter.ai/fish-audio/s2.1-pro-free:free
+    // Its current model slug is fish-audio/s2.1-pro-free:free.
     // The similarly named `fishaudio/fish-speech-2.1-pro:free` alias returned
     // 404 when checked on 2026-10-22, so do not add it as a retry candidate.
     const candidates = Array.from(new Set([
