@@ -198,12 +198,30 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
       if (typedKey) body.apiKey = typedKey;
       if (typedModel) body.model = typedModel;
       const json = await send("POST", body);
+      let typedKeySaved = false;
+      if (Boolean(json.ok) && typedKey) {
+        const saveBody: Record<string, unknown> = { provider, apiKey: typedKey };
+        if (typedModel) saveBody.model = typedModel;
+        try {
+          const saved = await send("PUT", saveBody);
+          if (!Array.isArray(saved.providers)) throw new Error("The save response did not include refreshed settings.");
+          apply(saved as unknown as SettingsPayload);
+          setKeyDrafts((drafts) => ({ ...drafts, [provider]: "" }));
+          typedKeySaved = true;
+        } catch (saveError) {
+          setTestResults((results) => ({
+            ...results,
+            [provider]: { ok: false, text: `Connection test passed, but the key was not saved: ${errText(saveError, "Save failed")}` },
+          }));
+          return;
+        }
+      }
       const latency = json.latencyMs !== undefined ? ` (${json.latencyMs} ms)` : "";
       const source = json.keySource === "typed" ? "typed key" : json.keySource === "stored" ? "saved key" : json.keySource === "environment" ? "environment key" : "no key";
       const steps = (json.checks as HealthStep[]) ?? [];
       const keyAccepted = steps.some((step) => step.name === "key" && step.status === "ok");
       const statusLabel = json.ok
-        ? keyAccepted ? "Key accepted; see endpoint checks" : "Check passed"
+        ? typedKeySaved ? "Key accepted and saved" : keyAccepted ? "Key accepted; see endpoint checks" : "Check passed"
         : keyAccepted ? "Key accepted, but a later check failed" : "Connection check failed";
       setTestResults((r) => ({
         ...r,
@@ -395,7 +413,7 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                   </label>
                   {p.hasKey && (
                     <div className="mb-2 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800">
-                      Saved key active ({p.keyHint} · source: {p.keySource === "db" ? "Admin Panel DB" : "Server .env"})
+                      ✓ Active key saved ({p.keyHint} · source: {p.keySource === "db" ? "Admin Panel DB" : "Server Environment"})
                     </div>
                   )}
                   <input

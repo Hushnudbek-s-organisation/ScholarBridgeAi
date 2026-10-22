@@ -417,7 +417,7 @@ export function EssayRubricStudio({
             onChange={(e) => setWordLimit(e.target.value)}
           />
           <div className={`rounded-lg border px-3 py-2 text-sm font-bold ${overLimit ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 text-slate-600"}`}>
-            {t("essayWordCount", { words: wordCount })}
+            {t("essayWordCount", { words: wordCount })} · {text.length} characters
             {limit ? ` / ${limit}` : ""}
           </div>
         </div>

@@ -9,6 +9,9 @@ import { requireFeatureSession, premiumGate } from "@/lib/premium";
 import { LIMITS, checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { NOTIFY_TEXTS, someoneName } from "@/lib/notificationTexts";
 import { readJsonBody } from "@/lib/request";
+import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
+import { writeAudit } from "@/lib/audit";
+import { clampString } from "@/lib/request";
 
 export async function GET(req: Request) {
   try {
@@ -97,6 +100,22 @@ export async function POST(req: Request) {
         body: replyBody,
       })
       .returning();
+
+    // Advisory reply scoring is deliberately fire-and-forget; never delay a
+    // successful reply. Audit contains only aggregate labels, not reply text.
+    void scoreConversationBehaviors({
+      transcriptOrText: clampString(String(replyBody), 4_000),
+      profileId: reply.authorId,
+      timeoutMs: 3_500,
+      behaviors: [
+        { key: "constructiveAcademicReply", description: "The reply is constructive, relevant, and helpful to the academic discussion." },
+        { key: "spamOrAbusiveContent", description: "The reply appears to be spam, harassment, or abusive content." },
+      ],
+    }).then((result) => writeAudit({
+      entityType: "forum_reply", entityId: reply.id, fieldChanged: "ai_moderation_advisory",
+      newValue: { available: result.available, signals: result.signals },
+      source: "OpenRouter behavior advisory", actor: "AI", verificationStatus: "unverified",
+    })).catch((err) => console.warn("Forum reply advisory scoring failed:", err instanceof Error ? err.message : String(err)));
 
     // Bump the thread's updatedAt so "Latest" sorting reflects new activity.
     await db.update(forumThreads).set({ updatedAt: new Date() }).where(eq(forumThreads.id, Number(threadId)));

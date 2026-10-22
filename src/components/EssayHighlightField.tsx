@@ -18,6 +18,7 @@
  * no AI call, no network, no cost. It runs on every keystroke in a memo.
  */
 import React from "react";
+import { sanitizePastedPlainText } from "@/lib/plainTextSanitizer";
 import { useTranslations } from "next-intl";
 import { Highlighter } from "lucide-react";
 import { annotateEssay, type EssayAnnotation, type SentenceTone } from "@/lib/essayInsights";
@@ -162,7 +163,16 @@ export function EssayHighlightField({
           className={`relative w-full rounded-xl border border-transparent bg-transparent p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none ${className}`}
           placeholder={placeholder}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => onChange(sanitizePastedPlainText(event.target.value))}
+          onPaste={(event) => {
+            event.preventDefault();
+            const field = event.currentTarget;
+            const start = field.selectionStart;
+            const end = field.selectionEnd;
+            const pasted = sanitizePastedPlainText(event.clipboardData.getData("text/plain"));
+            onChange(value.slice(0, start) + pasted + value.slice(end));
+            requestAnimationFrame(() => field.setSelectionRange(start + pasted.length, start + pasted.length));
+          }}
         />
       </div>
     </div>

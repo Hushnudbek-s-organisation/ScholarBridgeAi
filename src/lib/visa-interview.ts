@@ -40,6 +40,12 @@ export interface VisaCountry {
   locale: string;
   /** Typical consular questions, written IN the interview language. */
   questions: string[];
+  /** Current official student-visa guidance, dated and sourced for roleplay prompts. */
+  officialGuidance?: {
+    verifiedAt: string;
+    summary: string;
+    sourceUrls: string[];
+  };
 }
 
 export const VISA_COUNTRIES: VisaCountry[] = [
@@ -69,6 +75,11 @@ export const VISA_COUNTRIES: VisaCountry[] = [
       "How will you fund your studies and living costs?",
       "What are your plans after graduation?",
     ],
+    officialGuidance: {
+      verifiedAt: "2026-10-22",
+      summary: "UK Student route maintenance is £1,529 per month for up to 9 months in London (£13,761 maximum) or £1,171 per month outside London (£10,539 maximum). Funds generally must be held for 28 consecutive days, with the 28-day period ending within 31 days before application. Individual exemptions and evidence rules apply; confirm current GOV.UK guidance.",
+      sourceUrls: ["https://www.gov.uk/student-visa/money"],
+    },
   },
   {
     code: "CA",
@@ -82,6 +93,15 @@ export const VISA_COUNTRIES: VisaCountry[] = [
       "Who is sponsoring your education?",
       "What ties do you have to your home country?",
     ],
+    officialGuidance: {
+      verifiedAt: "2026-10-22",
+      summary: "For applications on or after 2026-09-01, IRCC lists CAD $23,448 for one applicant's first-year living expenses outside Quebec, excluding tuition and transportation; Quebec has separate amounts and family size changes the threshold. First-year tuition, living costs and travel must be covered, with a plan for longer programs. A PAL/TAL is usually required, but exemptions apply (including eligible master's and doctoral students at public DLIs in 2026). IRCC recommends a letter of explanation about why Canada and understanding student responsibilities; applicants must also satisfy the officer they will leave at the end of their authorized stay. A GIC is one possible proof-of-funds document, not the only option.",
+      sourceUrls: [
+        "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/study-permit/get-documents/financial-support.html",
+        "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/study-permit/get-documents/provincial-attestation-letter.html",
+        "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/study-permit/get-documents.html",
+      ],
+    },
   },
   {
     code: "DE",
@@ -108,6 +128,14 @@ export const VISA_COUNTRIES: VisaCountry[] = [
       "How will you support yourself financially?",
       "Are you a genuine student? Convince me.",
     ],
+    officialGuidance: {
+      verifiedAt: "2026-10-22",
+      summary: "For Student visa (subclass 500), the Genuine Student (GS) criterion replaced GTE. Current Study Australia guidance states individual student applicants must show at least AUD $29,710 in financial capacity; it describes funds for course costs and living/travel costs, so do not treat this as a complete tuition quote. Overseas Student Health Cover (OSHC) is required for the stay unless an exemption applies. Confirm the latest Department of Home Affairs evidence settings for each application.",
+      sourceUrls: [
+        "https://www.studyaustralia.gov.au/en/plan-your-move/visa-application-process",
+        "https://www.studyaustralia.gov.au/en/plan-your-move/overseas-student-health-cover-oshc",
+      ],
+    },
   },
   {
     code: "SG",
@@ -624,16 +652,16 @@ export interface VisaApplicantProfile {
 const VISA_OFFICER_FRAMEWORKS: Record<string, string> = {
   US:
     "FRAMEWORK (F-1): the interview turns on INA §214(b) non-immigrant intent — probe why THIS specific university over the alternatives the applicant could have chosen, whether the I-20 and stated finances are coherent to the cent, and what the concrete post-graduation plan is (including why the applicant will return home).",
-  GB:
-    "FRAMEWORK (Student route): apply the UKVI Genuine Student test in question form — course progression logic (why this level after the previous one), the applicant's own academic rationale without a script, and awareness of maintenance funds including the 28-day rule.",
+  UK:
+    "FRAMEWORK (Student route): probe course progression and the applicant's own academic rationale. Ask how they will meet the applicable maintenance requirement and explain the 28-day funds rule; amounts vary by study location and can change.",
   DE:
     "FRAMEWORK (§16b national visa): probe why Germany for this field, real familiarity with the module handbook and admission restrictions (NC), the financing model — blocked account (currently €11,904 per year; the applicant should know their own actual figure and that it changes) or scholarship such as DAAD — and the language of instruction.",
   KR:
     "FRAMEWORK (D-2): why Korea and why this university, language preparation (TOPIK level or the English-track evidence), proof of the sponsor's income supporting tuition and living costs, and a clear plan after graduation.",
   CA:
-    "FRAMEWORK (Study Permit): acceptance and level coherence, tuition prepayment and GIC or equivalent proof, a GTE-style explanation of purpose in the applicant's own words, and family, employment and economic ties to the home country.",
+    "FRAMEWORK (Study Permit): acceptance and level coherence, the applicable PAL/TAL or exemption, first-year tuition/living/travel funding and a credible plan for longer programs. Ask the applicant to explain their study purpose in their own words and their ties and plan at the end of their authorized stay; do not imply a GIC is mandatory.",
   AU:
-    "FRAMEWORK (Subclass 500, Genuine Student criterion): previous study record versus the chosen course, financial capacity stated exactly, the career value of the degree back home, and any ties the applicant can name.",
+    "FRAMEWORK (Subclass 500, Genuine Student criterion): GS replaced GTE. Probe study history versus the chosen course, financial capacity, the career value of the course, and OSHC for the stay; verify the current amount and any exceptions rather than treating a single figure as universal.",
   SG:
     "FRAMEWORK (Student's Pass): the institution's standing, tuition already settled or arranged, the applicant's study plan in their own words, and what they return home to.",
   JP:
@@ -654,6 +682,9 @@ export function buildOfficerSystemPrompt(
   // These are interview angles for the roleplay — the officer never lectures
   // about law, it asks the questions the real desk asks.
   const framework = VISA_OFFICER_FRAMEWORKS[country.code.toUpperCase()] ?? "";
+  const guidanceLine = country.officialGuidance
+    ? `DATED OFFICIAL VISA CONTEXT (verified ${country.officialGuidance.verifiedAt}): ${country.officialGuidance.summary} Ask about how the applicant's situation fits; do not present this as individualized legal advice or assume every exemption/evidence route applies.`
+    : "";
   const profileLine =
     profile && (profile.name || profile.degreeLevel || profile.targetMajor)
       ? `APPLICANT FILE (use naturally, do not read aloud): name ${profile.name || "unknown"}, applying for ${profile.degreeLevel || "unknown"} in ${profile.targetMajor || "unknown"}.`
@@ -668,7 +699,7 @@ You are a ${officerWord} officer — use grammatically correct ${officerWord} fo
 INTERVIEW STYLE:
 - Ask ONE short question at a time (1-2 sentences, under 55 words) so it can be read aloud by text-to-speech.
 - Begin with a brief formal greeting, then your first question.
-- ${framework}Ask realistic follow-up questions based on the applicant's answers. Probe the classic refusal grounds: unclear study purpose, weak funding proof, weak ties to the home country, immigration intent after studies, inconsistent answers.
+- ${framework}${guidanceLine ? `${guidanceLine}\n- ` : ""}Ask realistic follow-up questions based on the applicant's answers. Probe the classic refusal grounds: unclear study purpose, weak funding proof, weak ties to the home country, immigration intent after studies, inconsistent answers.
 - Typical questions asked at this post (use as inspiration, never read as a list):
 ${country.questions.map((q) => `  - ${q}`).join("\n")}
 - Be realistic, not cruel: a neutral tone with short reactions ("I see.", "Understood.") before the next question is fine.

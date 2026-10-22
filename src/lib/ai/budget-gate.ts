@@ -44,25 +44,68 @@ export async function loadBudgetLimits(): Promise<BudgetLimits> {
 let lastWarnAt = 0;
 let lastBlockAt = 0;
 const LOG_EVERY_MS = 60_000;
+const DEGRADED_FREE_CALLS_PER_MINUTE = 20;
+let degradedFreeCallTimes: number[] = [];
+type BudgetStateReader = (now: Date) => Promise<[BudgetLimits, SpendSnapshot]>;
+let budgetStateReader: BudgetStateReader = (now) => Promise.all([loadBudgetLimits(), aiSpendSnapshot(now)]);
 
-/** Tests only: re-arm the once-a-minute log throttle. */
+/** Test-only injection: production always reads persisted limits and spend. */
+export function setBudgetStateReaderForTests(reader?: BudgetStateReader): void {
+  budgetStateReader = reader ?? ((now) => Promise.all([loadBudgetLimits(), aiSpendSnapshot(now)]));
+}
+
+/** Only explicitly free OpenRouter IDs, or a Groq key the operator identifies as Free, are zero-cost. */
+export function isZeroCostModel(provider: string, model?: string | null): boolean {
+  if (provider === "openrouter" && typeof model === "string" && model.endsWith(":free")) return true;
+  return provider === "groq" && process.env.GROQ_API_PLAN?.trim().toLowerCase() === "free";
+}
+
+function allowDegradedFreeCall(now: Date): boolean {
+  const cutoff = now.getTime() - LOG_EVERY_MS;
+  degradedFreeCallTimes = degradedFreeCallTimes.filter((at) => at > cutoff);
+  if (degradedFreeCallTimes.length >= DEGRADED_FREE_CALLS_PER_MINUTE) return false;
+  degradedFreeCallTimes.push(now.getTime());
+  return true;
+}
+
+/** Tests only: re-arm the once-a-minute log throttle and degraded free-call cap. */
 export function resetBudgetGateLogThrottleForTests(): void {
   lastWarnAt = 0;
   lastBlockAt = 0;
+  degradedFreeCallTimes = [];
 }
 
-/** Verdict for one paid call to `provider`. Never throws. */
-export async function evaluateAiBudget(provider: string, now: Date = new Date()): Promise<BudgetVerdict> {
+/** Verdict before one provider attempt. A Date as the second argument remains supported for old callers/tests. */
+export async function evaluateAiBudget(
+  provider: string,
+  modelOrNow?: string | null | Date,
+  suppliedNow: Date = new Date(),
+): Promise<BudgetVerdict> {
+  const model = modelOrNow instanceof Date ? undefined : modelOrNow;
+  const now = modelOrNow instanceof Date ? modelOrNow : suppliedNow;
   let limits: BudgetLimits;
   let spend: SpendSnapshot;
   try {
-    [limits, spend] = await Promise.all([loadBudgetLimits(), aiSpendSnapshot(now)]);
+    [limits, spend] = await budgetStateReader(now);
   } catch (err) {
+    const zeroCost = isZeroCostModel(provider, model);
+    const allowed = zeroCost && allowDegradedFreeCall(now);
     if (now.getTime() - lastWarnAt > LOG_EVERY_MS) {
       lastWarnAt = now.getTime();
-      console.warn(JSON.stringify({ evt: "ai_budget_unavailable", action: "allowed", reason: (err as Error)?.message?.slice(0, 120) }));
+      console.warn(JSON.stringify({
+        evt: "ai_budget_unavailable",
+        action: allowed ? "allowed" : "blocked",
+        degradedMode: true,
+        reason: zeroCost ? (allowed ? "verified_zero_cost_model" : "degraded_free_rate_limit") : "budget_verification_unavailable",
+        ...(zeroCost ? {} : { provider }),
+      }));
     }
-    return { allowed: true, warning: null };
+    if (allowed) return { allowed: true, warning: null };
+    return {
+      allowed: false,
+      reason: zeroCost ? "degraded_free_rate_limit" : "budget_verification_unavailable",
+      degradedMode: true,
+    };
   }
   const verdict = budgetVerdict(provider, spend, limits);
   if (!verdict.allowed) {

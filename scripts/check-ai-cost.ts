@@ -23,6 +23,7 @@ async function main() {
   const aiCore = await import("../src/lib/ai/index");
   const settings = await import("../src/lib/ai/settings");
   const quota = await import("../src/lib/ai/quota");
+  const gate = await import("../src/lib/ai/budget-gate");
   const { validateConfigValue } = await import("../src/lib/configPortability");
   const { CONFIG_DEFAULTS } = await import("../src/lib/config");
 
@@ -62,10 +63,27 @@ async function main() {
   });
 
   console.log("\nPrice table (admin input)");
-  check("empty config = no prices (nothing invented)", () => {
+  check("empty admin config stays empty; verified default-model prices are explicit and timestamped", () => {
     const r = pricing.parsePricingJson("", isChat);
     assert.ok(r.ok && Object.keys(r.table).length === 0);
-    assert.equal(CONFIG_DEFAULTS.ai_model_pricing, "{}", "the shipped default must contain no prices");
+    assert.equal(CONFIG_DEFAULTS.ai_model_pricing, "{}", "admin overrides remain separate from shipped defaults");
+    assert.deepEqual(pricing.VERIFIED_DEFAULT_PRICING.openrouter["minimax/minimax-m3.1-flash:free"], { inputPerMTok: 0, outputPerMTok: 0 });
+    assert.deepEqual(pricing.VERIFIED_DEFAULT_PRICING.openai["gpt-6-luna"], { inputPerMTok: 0.1, outputPerMTok: 0.5, cachedInputPerMTok: 0.01 });
+    assert.deepEqual(pricing.VERIFIED_DEFAULT_PRICING.anthropic["claude-sonnet-4-6"], { inputPerMTok: 3, outputPerMTok: 15 });
+    assert.deepEqual(pricing.VERIFIED_DEFAULT_PRICING.google["gemini-2.5-flash"], { inputPerMTok: 0.3, outputPerMTok: 2.5 });
+    assert.deepEqual(pricing.VERIFIED_DEFAULT_PRICING.google["gemini-2.5-pro"], {
+      inputPerMTok: 1.25, outputPerMTok: 10, inputThresholdTokens: 200_000,
+      inputOverThresholdPerMTok: 2.5, outputOverThresholdPerMTok: 15,
+    });
+    assert.equal(pricing.VERIFIED_DEFAULT_PRICING.openai["gpt-4o"], undefined, "unverified historical prices are not seeded");
+  });
+  check("operator pricing overrides verified defaults model-by-model", () => {
+    const merged = pricing.mergePricingTables(pricing.VERIFIED_DEFAULT_PRICING, {
+      google: { "gemini-2.5-flash": { inputPerMTok: 0.31, outputPerMTok: 2.51 }, "operator-model": { inputPerMTok: 1, outputPerMTok: 2 } },
+    });
+    assert.deepEqual(merged.google["gemini-2.5-flash"], { inputPerMTok: 0.31, outputPerMTok: 2.51 });
+    assert.deepEqual(merged.google["operator-model"], { inputPerMTok: 1, outputPerMTok: 2 });
+    assert.deepEqual(merged.openai["gpt-6-luna"], { inputPerMTok: 0.1, outputPerMTok: 0.5, cachedInputPerMTok: 0.01 });
   });
   check("a valid table parses", () => {
     const r = pricing.parsePricingJson(
@@ -88,6 +106,17 @@ async function main() {
     assert.equal(bad({ inputPerMTok: 1, outputPerMTok: 5000 }), false);
     assert.equal(bad({ inputPerMTok: 1 }), false);
     assert.equal(bad({ inputPerMTok: 1, outputPerMTok: 1, typo: 2 }), false);
+  });
+  check("tiered prices require a positive threshold and both higher rates", () => {
+    const valid = pricing.parsePricingJson(JSON.stringify({ google: { pro: {
+      inputPerMTok: 1.25, outputPerMTok: 10, inputThresholdTokens: 200_000,
+      inputOverThresholdPerMTok: 2.5, outputOverThresholdPerMTok: 15,
+    } } }), isChat);
+    assert.equal(valid.ok, true);
+    const partial = pricing.parsePricingJson(JSON.stringify({ google: { pro: {
+      inputPerMTok: 1.25, outputPerMTok: 10, inputThresholdTokens: 200_000,
+    } } }), isChat);
+    assert.equal(partial.ok, false);
   });
   check("model ids with unsafe characters are rejected", () => {
     assert.equal(pricing.parsePricingJson(JSON.stringify({ groq: { "a b": { inputPerMTok: 1, outputPerMTok: 1 } } }), isChat).ok, false);
@@ -115,6 +144,12 @@ async function main() {
     assert.equal(r.costStatus, "estimated");
     assert.ok(Math.abs((r.costUsd ?? -1) - 0.00164) < 1e-12, `got ${r.costUsd}`);
   });
+  check("Gemini 2.5 Pro switches to official >200k prompt pricing at the documented boundary", () => {
+    const price = pricing.VERIFIED_DEFAULT_PRICING.google["gemini-2.5-pro"];
+    assert.equal(pricing.computeCost(usage({ promptTokens: 200_000, completionTokens: 0 }), price), 0.25);
+    assert.equal(pricing.computeCost(usage({ promptTokens: 200_001, completionTokens: 0 }), price), 0.5000025);
+    assert.equal(pricing.computeCost(usage({ promptTokens: 200_001, completionTokens: 1_000_000 }), price), 15.5000025);
+  });
   check("cached price defaults to the input price", () => {
     const flat = { groq: { m: { inputPerMTok: 1, outputPerMTok: 0 } } };
     const r = pricing.costForUsage("groq", "m", usage({ cachedPromptTokens: 1000, completionTokens: 0 }), flat);
@@ -140,6 +175,7 @@ async function main() {
     "AI_PROVIDER_DEFAULT",
     "AI_PROVIDER_FALLBACK",
     "AI_PROVIDERS_DISABLED",
+    "GROQ_API_PLAN",
   ];
   type Call = { url: string; body: Record<string, unknown>; auth: string };
   async function withMock(
@@ -150,6 +186,11 @@ async function main() {
     const saved: Record<string, string | undefined> = {};
     for (const k of ENV_KEYS) { saved[k] = process.env[k]; delete process.env[k]; }
     Object.assign(process.env, env);
+    gate.setBudgetStateReaderForTests(async () => [
+      { dailyUsd: null, monthlyUsd: null, providerDailyUsd: {}, warnPercent: 80 },
+      { dayUsd: 0, monthUsd: 0, dayByProviderUsd: {} },
+    ]);
+    gate.resetBudgetGateLogThrottleForTests();
     const realFetch = globalThis.fetch;
     const calls: Call[] = [];
     const logs: string[] = [];
@@ -173,6 +214,8 @@ async function main() {
       globalThis.fetch = realFetch;
       console.error = origErr; console.warn = origWarn; console.info = origInfo;
       for (const k of ENV_KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+      gate.setBudgetStateReaderForTests();
+      gate.resetBudgetGateLogThrottleForTests();
     }
   }
   const noSleep = async () => {};
@@ -240,6 +283,69 @@ async function main() {
     );
   });
 
+  await checkAsync("OpenRouter free-model fallback tries the ordered free candidates after 402/404/429/503", async () => {
+    const recoverable = [402, 404, 429, 503];
+    const expected = [
+      "minimax/minimax-m3.1-flash:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemma-3-27b-it:free",
+      "qwen/qwen3-32b:free",
+      "deepseek/deepseek-chat-v3-0324:free",
+    ];
+    for (const status of recoverable) {
+      await withMock(
+        { OPENROUTER_API_KEY: KEYS.openrouter, OPENROUTER_MODEL: expected[0], AI_PROVIDER_GENERAL: "openrouter" },
+        (_call, n) => n < expected.length
+          ? { status: n === 1 ? status : 404, body: { error: { message: "candidate unavailable" } } }
+          : { status: 200, body: { model: expected.at(-1), choices: [{ message: { content: "recovered" } }], usage: { prompt_tokens: 2, completion_tokens: 2, cost: 0 } } },
+        async (calls) => {
+          const result = await aiCore.aiChat({ taskType: "general", prompt: "hello" }, { sleep: noSleep });
+          assert.ok(result.ok, `expected recovery after HTTP ${status}`);
+          assert.deepEqual(calls.map((call) => call.body.model), expected);
+          if (result.ok) assert.equal(result.fallbackUsed, true);
+        },
+      );
+    }
+  });
+
+  await checkAsync("non-free OpenRouter model is not replaced by the free-model candidate list", async () => {
+    await withMock(
+      { OPENROUTER_API_KEY: KEYS.openrouter, OPENROUTER_MODEL: "minimax/minimax-m3.1-flash", GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "openrouter" },
+      (call) => call.url.includes("openrouter.ai")
+        ? { status: 503, body: { error: { message: "paid model temporarily unavailable" } } }
+        : { status: 200, body: { choices: [{ message: { content: "groq fallback" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+      async (calls) => {
+        const result = await aiCore.aiChat({ taskType: "general", prompt: "hello" }, { sleep: noSleep });
+        assert.ok(result.ok);
+        assert.equal(calls.filter((call) => call.url.includes("openrouter.ai")).length, 1);
+        assert.equal(calls[0].body.model, "minimax/minimax-m3.1-flash");
+        assert.equal(calls[1].url.startsWith("https://api.groq.com/"), true);
+      },
+    );
+  });
+
+  await checkAsync("all OpenRouter free-model candidates are attempted before Groq provider fallback", async () => {
+    await withMock(
+      { OPENROUTER_API_KEY: KEYS.openrouter, GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "openrouter" },
+      (call) => call.url.includes("openrouter.ai")
+        ? { status: 503, body: { error: { message: "no free endpoints" } } }
+        : { status: 200, body: { choices: [{ message: { content: "groq fallback" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+      async (calls) => {
+        const result = await aiCore.aiChat({ taskType: "general", prompt: "hello" }, { sleep: noSleep });
+        assert.ok(result.ok);
+        assert.deepEqual(calls.slice(0, 5).map((call) => call.body.model), [
+          "minimax/minimax-m3.1-flash:free",
+          "meta-llama/llama-3.3-70b-instruct:free",
+          "google/gemma-3-27b-it:free",
+          "qwen/qwen3-32b:free",
+          "deepseek/deepseek-chat-v3-0324:free",
+        ]);
+        assert.equal(calls[5].url.startsWith("https://api.groq.com/"), true);
+        if (result.ok) assert.equal(result.fallbackUsed, true);
+      },
+    );
+  });
+
   await checkAsync("non-OpenRouter providers are NOT sent the OpenRouter-only usage flag", async () => {
     await withMock(
       { GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "groq" },
@@ -247,6 +353,21 @@ async function main() {
       async (calls) => {
         await aiCore.aiChat({ taskType: "general", prompt: "hi" }, { sleep: noSleep });
         assert.equal("usage" in calls[0].body, false);
+      },
+    );
+  });
+
+  await checkAsync("router uses verified current-default prices when admin config is empty", async () => {
+    await withMock(
+      { GOOGLE_AI_API_KEY: "AIzaGoogleTEST000000000000000000001", AI_PROVIDER_GENERAL: "google" },
+      () => ({ status: 200, body: { model: "gemini-2.5-flash", choices: [{ message: { content: "ok" } }], usage: { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 } } }),
+      async () => {
+        const result = await aiCore.aiChat({ taskType: "general", prompt: "hi" }, { sleep: noSleep });
+        assert.ok(result.ok);
+        if (result.ok) {
+          assert.equal(result.response.costEstimate, 2.8);
+          assert.equal(result.response.costStatus, "estimated");
+        }
       },
     );
   });
@@ -318,18 +439,44 @@ async function main() {
     );
   });
 
-  const gate = await import("../src/lib/ai/budget-gate");
-  await checkAsync("budget gate fails OPEN without a database (documented; the call proceeds and is logged)", async () => {
-    gate.resetBudgetGateLogThrottleForTests();
+  await checkAsync("budget verification outage fails closed before any paid provider request", async () => {
     await withMock(
-      { GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "groq" },
-      () => ({ status: 200, body: { choices: [{ message: { content: "ok" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } }),
-      async (_calls, logs) => {
+      { OPENAI_API_KEY: "sk-openaiTESTKEY0000000000000000005", AI_PROVIDER_GENERAL: "openai" },
+      () => ({ status: 200, body: { choices: [{ message: { content: "must not be called" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } }),
+      async (calls, logs) => {
+        gate.setBudgetStateReaderForTests(async () => { throw new Error("simulated budget store outage"); });
         const r = await aiCore.aiChat({ taskType: "general", prompt: "hi" }, { sleep: noSleep });
-        assert.ok(r.ok);
-        assert.ok(logs.some((l) => l.includes("ai_budget_unavailable")), "the fail-open decision must be logged");
+        assert.equal(r.ok, false);
+        if (!r.ok) assert.equal(r.error.category, "budget_exhausted");
+        assert.equal(calls.length, 0, "paid provider must never be contacted while budget verification is unavailable");
+        assert.ok(logs.some((l) => l.includes("budget_verification_unavailable")), "degraded block must be logged");
       },
     );
+  });
+
+  check("only explicitly marked OpenRouter :free models or an explicitly Free Groq plan are zero-cost", () => {
+    assert.equal(gate.isZeroCostModel("openrouter", "qwen/qwen3-32b:free"), true);
+    assert.equal(gate.isZeroCostModel("openrouter", "qwen/qwen3-32b"), false);
+    assert.equal(gate.isZeroCostModel("openai", "anything:free"), false);
+    assert.equal(gate.isZeroCostModel("groq", "openai/gpt-oss-120b"), false);
+    process.env.GROQ_API_PLAN = "free";
+    assert.equal(gate.isZeroCostModel("groq", "openai/gpt-oss-120b"), true);
+    delete process.env.GROQ_API_PLAN;
+  });
+
+  await checkAsync("degraded free model access is capped at 20 calls per minute and reopens after the window", async () => {
+    gate.setBudgetStateReaderForTests(async () => { throw new Error("simulated budget store outage"); });
+    gate.resetBudgetGateLogThrottleForTests();
+    const start = new Date("2026-10-22T12:00:00.000Z");
+    for (let n = 0; n < 20; n++) {
+      assert.deepEqual(await gate.evaluateAiBudget("openrouter", "qwen/qwen3-32b:free", start), { allowed: true, warning: null });
+    }
+    assert.deepEqual(await gate.evaluateAiBudget("openrouter", "qwen/qwen3-32b:free", start), {
+      allowed: false, reason: "degraded_free_rate_limit", degradedMode: true,
+    });
+    assert.deepEqual(await gate.evaluateAiBudget("openrouter", "qwen/qwen3-32b:free", new Date(start.getTime() + 60_001)), { allowed: true, warning: null });
+    gate.setBudgetStateReaderForTests();
+    gate.resetBudgetGateLogThrottleForTests();
   });
 
   await checkAsync("a budget-exhausted failure maps to a neutral 503 message with no billing detail", async () => {

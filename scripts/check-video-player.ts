@@ -14,7 +14,9 @@
  * Run: npm run test:video
  */
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import { NextIntlClientProvider } from "next-intl";
 import { parseVideoEmbed, youtubeThumbnailUrl, isPlayableVideoUrl, SmartVideoPlayer } from "../src/components/SmartVideoPlayer";
 import { LessonNotes } from "../src/components/LessonNotes";
 import { COURSE_TRACKS, courseMatchesTrack, courseTrackOf } from "../src/lib/courseTracks";
@@ -31,6 +33,17 @@ function check(name: string, condition: boolean, detail = "") {
   }
 }
 const section = (t: string) => console.log(`\n${t}`);
+const englishMessages = JSON.parse(readFileSync(new URL("../src/i18n/messages/en.json", import.meta.url), "utf8"));
+const TestIntlProvider = NextIntlClientProvider as React.ComponentType<
+  React.PropsWithChildren<{ locale: string; messages: typeof englishMessages; timeZone: string }>
+>;
+const renderWithIntl = (node: React.ReactElement) => renderToStaticMarkup(
+  React.createElement(TestIntlProvider, {
+    locale: "en",
+    messages: englishMessages,
+    timeZone: "UTC",
+  }, node),
+);
 
 section("parseVideoEmbed — YouTube");
 {
@@ -84,7 +97,7 @@ section("parseVideoEmbed — Vimeo, Loom and direct files");
 
 section("SmartVideoPlayer rendering");
 {
-  const youtube = renderToStaticMarkup(React.createElement(SmartVideoPlayer, { url: "https://www.youtube.com/watch?v=rM2x2j03haU", title: "Common App setup" }));
+  const youtube = renderWithIntl(React.createElement(SmartVideoPlayer, { url: "https://www.youtube.com/watch?v=rM2x2j03haU", title: "Common App setup" }));
   check("a YouTube lesson renders an iframe", youtube.includes("<iframe") && youtube.includes("youtube-nocookie.com/embed/rM2x2j03haU"));
   check(
     "the iframe carries the permissions the players need",
@@ -92,11 +105,11 @@ section("SmartVideoPlayer rendering");
   );
   check("the iframe is titled for screen readers", youtube.includes('title="Common App setup"'));
 
-  const file = renderToStaticMarkup(React.createElement(SmartVideoPlayer, { url: "https://cdn.example.com/lesson.mp4", title: "Lesson" }));
+  const file = renderWithIntl(React.createElement(SmartVideoPlayer, { url: "https://cdn.example.com/lesson.mp4", title: "Lesson" }));
   check("a media file renders the native <video> element", file.includes("<video") && file.includes('src="https://cdn.example.com/lesson.mp4"'));
   check("the native player keeps controls and inline playback", file.includes("controls") && /playsinline/i.test(file));
 
-  const empty = renderToStaticMarkup(React.createElement(SmartVideoPlayer, { url: "", title: "Lesson", emptyLabel: "No video attached to this lesson yet" }));
+  const empty = renderWithIntl(React.createElement(SmartVideoPlayer, { url: "", title: "Lesson", emptyLabel: "No video attached to this lesson yet" }));
   check("an empty lesson shows the empty label, not a broken player", empty.includes("No video attached") && !empty.includes("<video") && !empty.includes("<iframe>"));
 }
 

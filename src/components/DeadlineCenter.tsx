@@ -35,6 +35,7 @@ interface DeadlineItem {
   rawCountry?: string | null;
   universityId?: number | null;
   recommended?: boolean | null;
+  verificationStatus?: string | null;
   chanceScore?: number | null;
   matchScore?: number | null;
   coversSavedUni?: boolean | null;
@@ -306,6 +307,11 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700"}`}>
                         {statusText(item.status)}
                       </span>
+                      {item.type === "scholarship" && item.saved && item.verificationStatus !== "verified" && (
+                        <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                          {t("unverifiedDeadline")}
+                        </span>
+                      )}
                       {urgency && (
                         <span
                           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${urgency.chip}`}

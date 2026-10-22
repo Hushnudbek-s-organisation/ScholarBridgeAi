@@ -578,6 +578,7 @@ export function ApplicationWorkspacePanel({
                 Submitted {new Date(app.submittedAt).toLocaleDateString()}
               </p>
               <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">{t("awConfirmationNote")}</p>
+              <p className="mt-2 text-xs leading-relaxed text-emerald-900 dark:text-emerald-100">{t("awPostSubmitPortal")}</p>
             </div>
           ) : (
             <>

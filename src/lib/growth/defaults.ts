@@ -189,7 +189,7 @@ export const GOAL_LEVELS = ["any", "high_school", "undergrad", "grad"] as const;
 
 export const PROMPT_CATEGORIES = ["general", "motivation", "career", "leadership", "challenge", "community"] as const;
 
-export const CHECKLIST_PHASES = ["offer", "visa", "money", "housing", "travel", "arrival"] as const;
+export const CHECKLIST_PHASES = ["application", "offer", "visa", "money", "housing", "travel", "arrival"] as const;
 export type ChecklistPhase = (typeof CHECKLIST_PHASES)[number];
 
 export const STORY_STATUSES = ["pending", "approved", "rejected"] as const;
@@ -302,6 +302,24 @@ export const SEED_GOAL_TEMPLATES: {
     level: "any",
     estWeeks: 6,
   },
+  {
+    pillar: "academic", title: "Prepare your application profile and family details",
+    description: "Prepare privately before opening application sections. Each platform and college asks different questions; enter only what the official form requests and never share sensitive family records unnecessarily.",
+    steps: ["Check the current Common App or Apply with Scoir guide for the cycle you are using", "Privately gather likely parent or guardian details: legal name, contact, address, education, institutions and completion years, occupation, employer, and any other field the portal specifically asks", "Check whether country of birth or household-size questions apply to your account and cycle", "Enter only the requested information in the official secure application", "Review spellings and answers against primary records before submission"],
+    level: "high_school", estWeeks: 2,
+  },
+  {
+    pillar: "academic", title: "Build a transcript-matched coursework and honors inventory",
+    description: "Use the exact school transcript and the target platform's current labels. Dual-credit and current-course rules differ by application; verify each screen and never invent a course status or award tier.",
+    steps: ["Copy course titles and codes exactly from the official transcript", "Check how the current application labels first- and second-semester courses in progress or not yet started", "For dual-enrollment credit, follow the platform's instructions for both high-school coursework and college information", "Select up to the platform's allowed number of honors and prioritize those most meaningful to your record", "Check each award's official title, level and grade/year against evidence"],
+    level: "high_school", estWeeks: 3,
+  },
+  {
+    pillar: "activities", title: "Prepare concise activity entries with verified scope",
+    description: "Build an inventory before entering the portal. Up to ten Common App activity slots are available in the current guide, but fewer meaningful entries are fine; report actual hours, weeks, years and outcomes.",
+    steps: ["List activities, responsibilities, work, hobbies and service that genuinely matter to you", "For each, verify role, organization, grade years, hours per week and weeks per year", "Draft an action-led description within the current portal character limit", "Use metrics only when you can support them and state your own contribution precisely", "Order entries by significance to your story rather than padding the list"],
+    level: "high_school", estWeeks: 3,
+  },
 ];
 
 export const SEED_ANSWER_PROMPTS: {
@@ -322,6 +340,9 @@ export const SEED_ANSWER_PROMPTS: {
   { category: "career", question: "How will your degree contribute to Uzbekistan's development upon your return?", hint: "Name the specific sector, institution or reform where you will apply your skills in years 1–5.", wordLimit: 250 },
   { category: "leadership", question: "Describe a time you built a network or partnership to solve a problem.", hint: "Essential for Chevening and GKS: show how you brought different people or groups together.", wordLimit: 250 },
   { category: "general", question: "Explain any financial need or family circumstances relevant to your scholarship application.", hint: "State factual income, household dependents and confirmed family contribution clearly.", wordLimit: 200 },
+  { category: "challenge", question: "What is an idea or subject you explored out of curiosity?", hint: "Show the question, what you did to investigate it, and how your understanding changed.", wordLimit: 200 },
+  { category: "community", question: "Describe a time you changed how you learned or contributed to a group.", hint: "Explain what you noticed, how you adapted, and what you learned from the people around you.", wordLimit: 200 },
+  { category: "general", question: "What small detail would help a future roommate get to know you?", hint: "Choose a concrete, human detail and let your own voice come through.", wordLimit: 200 },
 ];
 
 export const SEED_CHECKLIST_ITEMS: {
@@ -360,4 +381,11 @@ export const SEED_CHECKLIST_ITEMS: {
   { phase: "travel", title: "Print and separately store key documents", description: "Carry the passport, visa or permit decision, admission letter and insurance proof; keep digital copies somewhere you can reach without the originals.", linkTab: null },
   { phase: "arrival", title: "Open a local bank account and phone line", description: "Most destinations need a local address or registration number first, so sequence these after the registration step rather than before it.", linkTab: null },
   { phase: "arrival", title: "Register with the student support office", description: "Introduce yourself to the international student office in your first week: they handle the permits, extensions and institutional paperwork you will need later.", linkTab: null },
+  { phase: "application", title: "Prepare family information privately before opening the application", description: "Use the current platform guide. You may want to locate a parent or guardian's legal name, email, address, phone, education and degrees, institutions and years, occupation/title, employer, and any birthplace or household-size fields only if the official form asks. Do not store or share sensitive family details in ScholarBridge.", linkTab: "applications" },
+  { phase: "application", title: "Match coursework entries to the official transcript", description: "Copy course codes and titles exactly from the transcript. Check the current portal's labels for first- and second-semester senior courses. For dual-enrollment credit, follow that platform's instructions for high-school coursework and college information; do not assume the same workflow across portals.", linkTab: "applications" },
+  { phase: "application", title: "Choose and verify academic honors", description: "Common App's current first-year materials say applicants may report up to five academic honors. Prioritize by significance to your record; the International → National → State/Regional → School sequence is a planning heuristic, not an official admissions ranking. Confirm titles, years and recognition levels.", linkTab: "applications" },
+  { phase: "application", title: "Draft a focused activity list with accurate time scope", description: "Common App materials allow up to ten activities, but ten are not required. Track grades/years, actual hours per week and weeks per year in their designated fields; keep descriptions concise, action-led and evidence-based. Do not inflate scope or impact.", linkTab: "applications" },
+  { phase: "application", title: "Prepare a recommender packet and ask early", description: "Ask respectfully around a month or more before the earliest deadline where possible; this is a planning buffer, not a universal platform rule. Share a concise reflection/brag sheet and deadlines. Provide legal name, application ID, date of birth, high-school name and location only if the recommender or official portal needs them, using a secure channel rather than ordinary email.", linkTab: "applications" },
+  { phase: "application", title: "Paste essays as plain text and check upload formats", description: "Remove rich-text formatting before pasting into portal text boxes. Keep a clean text copy; export a PDF only when the college accepts or requests it. Check each portal's current file types, size limits and word/character counters—there is no universal PDF-only rule.", linkTab: "materials/essays" },
+  { phase: "application", title: "After submission, check each college's applicant portal", description: "A submitted Common App or Apply with Scoir application may be followed by college-specific status instructions. Watch the email used on the application, open the official portal when invited, note any college-issued ID separately, and verify required scores, recommendations, portfolios and response dates. Invitation timing and decision deadlines vary; do not assume 24–72 hours or a universal May 1 date.", linkTab: "applications" },
 ];

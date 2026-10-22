@@ -220,8 +220,10 @@ for (const { sample, result } of exemplarRows) {
   check(`${sample.id}: 0 blocker issues`, blockers.length === 0, blockers.join(", "));
   if (sample.origin === "authored") {
     check(`${sample.id}: authored exemplar scores ≥ ${AUTHORED_TARGET} (got ${result.scores.total})`, result.scores.total >= AUTHORED_TARGET);
-  } else {
+  } else if (sample.origin === "brief") {
     check(`${sample.id}: verbatim brief text scores ≥ ${BRIEF_FLOOR} (got ${result.scores.total})`, result.scores.total >= BRIEF_FLOOR);
+  } else {
+    check(`${sample.id}: fictional composite is not represented as a verified applicant outcome`, /fictional(?: teaching)? composite/i.test(sample.sourceNote ?? ""));
   }
   check(`${sample.id}: no cliché detected`, result.cliches.length === 0, result.cliches.map((c) => c.phrase).join(", "));
   check(

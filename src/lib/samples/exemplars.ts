@@ -109,7 +109,7 @@ export const SAMPLE_ROLES = [
 export type SampleRole = (typeof SAMPLE_ROLES)[number];
 
 /** `brief` = verbatim from the product brief; `authored` = written to fill a gap in it. */
-export type SampleOrigin = "brief" | "authored";
+export type SampleOrigin = "brief" | "authored" | "composite";
 
 interface SampleBase {
   /** Stable id and the i18n key under `samples.tracks` (camelCase, no dots). */
@@ -119,6 +119,10 @@ interface SampleBase {
   text: string;
   /** One structural role per paragraph of `text`, in order. */
   roles: SampleRole[];
+  /** Composite examples are invented teaching material, never verified admission stories. */
+  sourceNote?: string;
+  /** Official pages checked for factual references; timestamp is an ISO date. */
+  sourceChecks?: { url: string; checkedAt: string; note: string }[];
 }
 
 export interface OnboardingCvSample extends SampleBase {
@@ -181,18 +185,27 @@ export type AnswerVaultCategory = "general" | "motivation" | "leadership" | "car
 export interface AnswerVaultSample extends SampleBase {
   group: "answerVault";
   category: AnswerVaultCategory;
+  /** Exact optional vault prompt this sample is intended to illustrate. */
+  forQuestion?: string;
 }
 
 /** The fields of the Activity Portfolio form (src/components/journey/PreparePanels.tsx). */
 export interface ActivityFields {
   /** One of ACTIVITY_CATEGORIES in src/app/api/activities/route.ts. */
-  category: "research" | "leadership" | "volunteering" | "competition";
+  category: "research" | "leadership" | "volunteering" | "competition" | "project" | "club" | "work" | "community" | "sport" | "creative";
   title: string;
   role: string;
   organization: string;
+  /** Total hours in the existing activity form. */
   hours: number;
   description: string;
   achievements: string;
+  /** Illustrative Common App scope metadata; not persisted by the activity API. */
+  hoursPerWeek?: number;
+  weeksPerYear?: number;
+  grades?: string;
+  commonAppDescription?: string;
+  portfolioCategory?: string;
 }
 
 export interface ActivitySample extends SampleBase {
@@ -252,10 +265,28 @@ function transcript(turns: VisaTurn[]): string {
 /** Builds the copyable/annotated text of an activity record from its fields. */
 function activityText(a: ActivityFields): string {
   return [
-    `${a.title}\n${a.role} · ${a.organization} · ${a.hours} hours\n${a.description}`,
+    `${a.title}\n${a.role} · ${a.organization} · ${a.hours} hours\n${a.description}${a.commonAppDescription ? `\nCommon App draft (${a.commonAppDescription.length}/150): ${a.commonAppDescription}` : ""}${a.hoursPerWeek && a.weeksPerYear ? `\nIllustrative scope: ${a.hoursPerWeek} hr/wk · ${a.weeksPerYear} wk/yr · grades ${a.grades ?? "not specified"}` : ""}`,
     `Achievements: ${a.achievements}`,
   ].join("\n\n");
 }
+
+/** Fictional composite teaching benchmark; these are not a real student's verified record. */
+export const COMPOSITE_ADMISSIONS_BENCHMARK = {
+  label: "Fictional composite — admissions-style example, not an admitted-student record",
+  academic: {
+    gpa: 4.0, gpaScale: 4.0, gpaType: "unweighted", classRank: "2 / 518 (weighted)",
+    dualEnrollment: "University of Texas at Austin — UT OnRamps Computer Science (COMPSCI)",
+    apCourses: ["AP Chemistry", "AP Calculus BC", "AP English Literature", "AP U.S. Government & Politics", "AP Macroeconomics", "AP Seminar"],
+  },
+  honors: [
+    { title: "YoungArts Winner With Distinction — Classical Music", tier: "National", grades: "12" },
+    { title: "TMEA All-State Band — 6A Percussion, first chair (composite illustration)", tier: "State / regional", grades: "10–11" },
+    { title: "UIL Texas State Solo and Ensemble — Outstanding Performer (composite illustration)", tier: "State / regional", grades: "10–11" },
+    { title: "National Merit / National Recognition Program Scholar (award wording must match actual award)", tier: "National", grades: "10" },
+    { title: "Principal's Outstanding Scholar Leadership Award (composite illustration)", tier: "School", grades: "11" },
+  ],
+  awardOrdering: "International → National → Regional/State → School; use only recognitions actually earned and preserve their official names.",
+} as const;
 
 // ===========================================================================
 // 3.1 SOP / MOTIVATION LETTERS — SOP_SAMPLES (brief, verbatim)
@@ -355,6 +386,24 @@ export const SOP_SAMPLES: SopSample[] = [
     text: SOP_LSE_TEXT,
     roles: ["hook", "evidence", "gap", "fit", "impact"],
   },
+  {
+    id: "sopWindsorAppliedComputingComposite",
+    group: "sop",
+    origin: "composite",
+    sourceNote: "Fictional teaching composite based on the outline supplied in the request; the named PDF was not present in the workspace. Verify programme details and replace every personal fact.",
+    sourceChecks: [{ url: "https://www.future.uwindsor.ca/program/master-of-applied-computing-mac-artificial-intelligence-stream/", checkedAt: "2026-10-22", note: "Official programme listing checked; individual course availability and current calendar must still be confirmed." }],
+    degreeLevel: "Master",
+    fields: {
+      targetUni: "University of Windsor (illustrative target; verify current programme name)",
+      targetProgram: "Master of Applied Computing (illustrative title; verify the current official catalogue)",
+      personalHook: "A fictional B.E. Information Technology graduate wants to build secure, reliable software systems and has learned to connect coursework to practical projects.",
+      experienceExample: "For practice only: describe a Personal Time Management App you actually built, the technical decisions you made, and evidence of testing or user feedback. Do not claim this placeholder project as your own.",
+      programEvidence: "Use the current official curriculum to select relevant modules. The user-provided outline mentions Advanced Computing Concepts, Network & Data Security, and Advanced Systems Programming; verify whether these exact course titles are currently offered before naming them.",
+      careerGoals: "Explain a specific, realistic role in your home-country IT sector and connect it to demonstrated skills. A ‘techno-functional computer engineer’ is only an illustrative role phrase, not a promised job or outcome.",
+    },
+    text: `Fictional practice statement — not a real applicant or admission record. Replace all claims with your own evidence.\n\nI became interested in applied computing while trying to make everyday planning less error-prone. For this fictional example, a Personal Time Management App is the starting point: the useful question is not simply how to build a calendar, but how to design a dependable system that protects user data, handles conflicting schedules, and remains understandable when plans change.\n\nMy imagined undergraduate preparation is a B.E. in Information Technology with a stated 7.07 CGPA and IELTS 7.0 overall. These are illustrative values taken from the supplied outline only; a real applicant must report the exact grading scale, official result, test date, and accepted-score rules.\n\nA graduate programme in Applied Computing would be a next step only if its current curriculum matches the applicant’s goals. The outline names Advanced Computing Concepts, Network and Data Security, and Advanced Systems Programming. Before using any course name, check the university’s current official calendar and explain the skill gap it addresses. A Personal Time Management App or a PHP workshop for junior learners can illustrate applied work only when the applicant actually completed it; describe the contribution, technical choices, and verifiable result rather than adopting this composite’s placeholder.\n\nThe academic statement should make a case to an admissions committee: preparation, intellectual direction, programme fit, and capacity to contribute to the learning community. It should not turn course titles into a list or promise a particular outcome.\n\nAfter graduation, this fictional applicant hopes to pursue a techno-functional computer-engineering role in the home-country IT sector, translating technical requirements between developers and users. A real study plan should connect a credible role to evidence about the home context and should not claim guaranteed employment or invent employer demand.`,
+    roles: ["reflection", "hook", "evidence", "fit", "community", "impact"],
+  },
 ];
 
 // ===========================================================================
@@ -433,6 +482,10 @@ As a result, I changed both my question and my method. Instead of asking why wom
 Building on that, I presented the evidence to three commercial banks and to the Inter-Ministerial Working Group. Two banks now accept cash-flow verification instead of real-estate collateral for verified exporters, and approvals for rural women entrepreneurs rose by 31 percent within 12 months, while repayment stayed above 98 percent.
 
 This work taught me to treat my first idea as a hypothesis, not a conclusion. I want to sharpen that habit with the causal-inference training of LSE's M.Sc. in Economic Policy for International Development, and my goal is to design credit policies that are tested before they are scaled.`;
+
+const SOP_WINDSOR_RUBRIC_SOURCE = SOP_SAMPLES.find(
+  (sample) => sample.id === "sopWindsorAppliedComputingComposite",
+)!;
 
 export const ESSAY_RUBRIC_SAMPLES: EssaySample[] = [
   {
@@ -547,6 +600,36 @@ export const ESSAY_RUBRIC_SAMPLES: EssaySample[] = [
     prompt: "Describe a time when evidence changed your mind. What did you do next?",
     text: SUPP_EVIDENCE_TEXT,
     roles: ["hook", "evidence", "evidence", "reflection"],
+  },
+  {
+    id: "essayTrianglePianissimoComposite",
+    group: "essay",
+    origin: "composite",
+    sourceNote: "Fictional composite inspired by application-writing structures in the supplied outline; it is not a verified Harvard applicant, admitted student, or real personal statement.",
+    sourceChecks: [
+      { url: "https://music.fas.harvard.edu/about", checkedAt: "2026-10-22", note: "Official Music concentration overview; check current offerings." },
+      { url: "https://projects.iq.harvard.edu/epl/people/samuel-mehr", checkedAt: "2026-10-22", note: "Harvard source identifies Samuel Mehr as Music Lab director; no specific undergraduate research access is promised." },
+      { url: "https://gsas.harvard.edu/policy/mind-brain-and-behavior", checkedAt: "2026-10-22", note: "Official MBB programme information; participation/eligibility details require checking." },
+    ],
+    essayType: "personal_statement",
+    targetName: "",
+    wordLimit: null,
+    prompt: "Practice prompt: share an experience that reveals how you think, learn, or contribute. Check each college's current prompt and limit.",
+    text: `At Interlochen, five identical pianissimo notes on a bronze triangle sounded different to me. The first seemed to hover; the last left a thin shimmer in the room. I had been asked to repeat the same motion, but listening closely turned repetition into a question: what changes when the instrument, the room, or the listener changes?\n\nI used to think my interests needed separate shelves. In jazz and mariachi, I liked the moment when a melody bent away from expectation. In music theory, I liked the certainty of a V–I cadence: tension, then resolution. At home, I drew clock hands on a TI-Nspire and tested equations against the time on the kitchen wall. Reading Feynman on light gave me another language for asking how a wave can be both measurable and felt. None of these pursuits made the others less rigorous; each gave me a different way to notice patterns.\n\nThat lesson became practical when I moved from classical percussion, where the page tells me what comes next, to armonía in a mariachi ensemble. A vocalist might change keys in the middle of a song. I could not wait for a marked note. I listened for the bass, watched the singer breathe, and adjusted my part while the music continued. My first attempts were late. Rehearsal taught me to hear relationships, not just isolated notes.\n\nI began treating other unfamiliar subjects the same way. A folder of Japanese marimba music led me beyond short kana tutorials into a longer routine of listening, reading, and asking what the score assumed I already knew. I later helped lead bilingual school tours, where I learned to explain a room or an instrument differently depending on the visitor’s questions. Curiosity became less like collecting facts and more like building a bridge between two ways of understanding.\n\nI still return to the triangle’s five quiet notes. Precision gives me a way to repeat an experiment; imagination helps me notice when the same result is not the whole story. I want to keep studying where music, cognition, and psychology meet, while remembering that any claim about a programme, faculty member, or research opportunity must be checked against current official sources. The most useful question is often the one that lets two disciplines listen to each other.`,
+    roles: ["hook", "evidence", "evidence", "reflection", "impact"],
+  },
+  {
+    id: "essaySopWindsorAppliedComputingComposite",
+    group: "essay",
+    origin: "composite",
+    sourceNote: SOP_WINDSOR_RUBRIC_SOURCE.sourceNote ?? "Fictional teaching composite; replace every personal fact and verify the official programme before use.",
+    sourceChecks: SOP_WINDSOR_RUBRIC_SOURCE.sourceChecks ?? [],
+    essayType: "sop",
+    targetName: SOP_WINDSOR_RUBRIC_SOURCE.fields.targetProgram,
+    wordLimit: null,
+    prompt: "",
+    text: SOP_WINDSOR_RUBRIC_SOURCE.text,
+    roles: SOP_WINDSOR_RUBRIC_SOURCE.roles,
   },
 ];
 
@@ -949,6 +1032,36 @@ export const ANSWER_VAULT_SAMPLES: AnswerVaultSample[] = [
     text: "To bridge the digital divide between Tashkent and rural provinces, I co-created an open-source repository of 150 bilingual (Uzbek/English) competitive-programming and physics simulation problems that run offline on low-spec school computers. In addition to leading weekly online code reviews for 90 high-school students, I organized the annual Qarshi Youth STEM Hackathon, securing $3,000 in local sponsorship to provide microcontroller kits to twelve rural school teams.",
     roles: ["answer"],
   },
+  {
+    id: "answerHarvardMusicResearchComposite", group: "answerVault", origin: "composite", category: "motivation",
+    forQuestion: "Why did you choose this specific university and programme?",
+    sourceNote: "Fictional practice response; named institution/programme details require current official verification and do not imply admission or research access.",
+    sourceChecks: [{ url: "https://projects.iq.harvard.edu/epl/people/samuel-mehr", checkedAt: "2026-10-22", note: "Music Lab is directed by Samuel Mehr; Max Krasnow's current profile describes different research, so the supplied outline's claimed Krasnow music-perception lab was not repeated." }],
+    text: "I am interested in the intersection of music, cognition, and psychology because performing has taught me to notice how people hear patterns differently. At Harvard, I would first verify the current undergraduate Music concentration and opportunities connected with Mind, Brain, and Behavior. The Music Lab's published work on music cognition is a starting point for reading, not a promise of a place in a lab. I would build the academic foundation through coursework and approach faculty only after confirming their current research and student opportunities. My long-term question is how musical engagement relates to cognition and wellbeing; I would treat any health claim as a research question, not an outcome I can promise.",
+    roles: ["answer"],
+  },
+  {
+    id: "answerJapaneseCuriosityComposite", group: "answerVault", origin: "composite", category: "challenge",
+    forQuestion: "What is an idea or subject you explored out of curiosity?",
+    sourceNote: "Fictional composite; study duration and tour examples are illustrative and must be replaced with the student's own record.",
+    sourceChecks: [{ url: "https://www.state.gov/national-foreign-affairs-training-center/foreign-language-training", checkedAt: "2026-10-22", note: "The U.S. Department of State currently calls Japanese a super-hard Category IV language; 2,200 class-hours describes an FSI training estimate for its context, not a student's personal requirement." }],
+    text: "A folder of Japanese marimba music in a file cabinet made me curious about how notation travels between languages. I began with kana, then replaced quick tutorial browsing with a regular listening routine using beginner podcasts such as Nihongo con Teppei. I read that the U.S. Department of State currently places Japanese in its super-hard Category IV group and cites 2,200 class hours in the Foreign Service training context; that is an institutional estimate, not a personal target or a category students should copy as an achievement. I tracked what I could understand each week instead. Later, I helped lead bilingual school tours when invited, using music as a shared point of reference. The process taught me to build a habit, notice what I do not understand, and ask for feedback rather than claim fluency too early.",
+    roles: ["answer"],
+  },
+  {
+    id: "answerMariachiListeningComposite", group: "answerVault", origin: "composite", category: "community",
+    forQuestion: "Describe a time you changed how you learned or contributed to a group.",
+    sourceNote: "Fictional composite; no real performer, ensemble, or admissions outcome is represented.",
+    text: "In classical percussion, I learned to trust the printed part. In a mariachi ensemble, armonía asked me to listen differently: a vocalist could shift keys, and the paper could not tell me the next move. I followed the bass, watched the singer, and adjusted my accompaniment in real time. I missed changes at first, so I practised identifying the harmonic movement before playing. That experience changed how I contribute to groups. I prepare carefully, but I also pay attention to what other people are doing and leave room to adapt.",
+    roles: ["answer"],
+  },
+  {
+    id: "answerRoommateMusicComposite", group: "answerVault", origin: "composite", category: "general",
+    forQuestion: "What small detail would help a future roommate get to know you?",
+    sourceNote: "Fictional practice response, not a real applicant's personal answer.",
+    text: "My ideal shared evening has a soundtrack that changes with the hour: Bach's Well-Tempered Clavier while I am settling into a task, then Mac DeMarco when it is time to stop pretending I will finish one more page. I like morning cafecito with pan dulce, and I sometimes tap a rhythm on a teacup or spoon before I remember to write it down. I would ask before borrowing kitchenware for percussion, promise to wash it, and happily trade playlists. The important roommate skill may be knowing when to share a song and when to use headphones.",
+    roles: ["answer"],
+  },
 ];
 
 // ===========================================================================
@@ -1012,12 +1125,23 @@ const ACTIVITIES: { id: string; activity: ActivityFields }[] = [
         "Won 1st Place ($3,000 R&D Grant) at AgroTech National Hackathon 2024 and placed 4th nationally among 85 university teams in ICPC Regionals.",
     },
   },
+  { id: "activityMusicLeadershipComposite", activity: { category: "leadership", portfolioCategory: "Music", title: "Band President & two-time Drumline Captain", role: "President / Captain", organization: "Fictional composite band program", hours: 480, hoursPerWeek: 8, weeksPerYear: 15, grades: "9–12", description: "Directed communication across four band classes and helped lead halftime performances.", achievements: "Pioneered fundraising and social events for a 200+ member programme.", commonAppDescription: "Directed 4 band classes; 8 hr/wk × 15 wk/yr; led shows and fundraising for 200+ members, grades 9–12." } },
+  { id: "activityKeyClubComposite", activity: { category: "volunteering", portfolioCategory: "Community service", title: "Two-time Secretary, Key Club International", role: "Secretary", organization: "Fictional composite Key Club", hours: 243, hoursPerWeek: 3, weeksPerYear: 27, grades: "10–12", description: "Recorded meeting minutes and attendance while coordinating a charity concert.", achievements: "The illustrative concert featured 10 local bands and raised $10,000 for Food4Kids; replace all claims with verified personal results.", commonAppDescription: "Recorded minutes; 3 hr/wk × 27 wk/yr; organized 10-band benefit raising $10,000 for Food4Kids, grades 10–12." } },
+  { id: "activityClassVicePresidentComposite", activity: { category: "leadership", portfolioCategory: "Student government", title: "Two-time Student Body Class Vice President", role: "Class Vice President", organization: "Fictional composite student body", hours: 108, hoursPerWeek: 2, weeksPerYear: 27, grades: "11–12", description: "Coordinated senior events and hosted a pre-school-year gathering.", achievements: "Raised more than $1,000 and welcomed 120+ students to the event.", commonAppDescription: "Raised >$1,000; 2 hr/wk × 27 wk/yr; hosted 120+ students and planned senior events, grades 11–12." } },
+  { id: "activityNhsPresidentComposite", activity: { category: "volunteering", portfolioCategory: "Community service", title: "President, National Honor Society", role: "President", organization: "Fictional composite chapter", hours: 324, hoursPerWeek: 2, weeksPerYear: 36, grades: "10–12", description: "Reviewed member service records and organized weekly agendas.", achievements: "Checked volunteering-hour records for 211 members and maintained a service-form database.", commonAppDescription: "Verified records for 211 members; 2 hr/wk × 36 wk/yr; ran agendas and service database, grades 10–12." } },
+  { id: "activitySteelPanComposite", activity: { category: "creative", portfolioCategory: "Music", title: "Two-time Lead Pan Section Leader, Steel Band", role: "Lead section leader", organization: "Fictional composite steel band", hours: 108, hoursPerWeek: 4, weeksPerYear: 27, grades: "9–12", description: "Performed at civic festivals and supported music-learning activities.", achievements: "Played for festival audiences of 450+ and promoted music education across 7 elementary schools.", commonAppDescription: "Performed at festivals for 450+; 4 hr/wk × 27 wk/yr; promoted music at 7 elementary schools, grades 9–12." } },
+  { id: "activityWindEnsembleComposite", activity: { category: "creative", portfolioCategory: "Music", title: "Three-time Percussion Section Leader, Wind Ensemble", role: "Section leader", organization: "Fictional composite wind ensemble", hours: 180, hoursPerWeek: 5, weeksPerYear: 36, grades: "9–12", description: "Led student-run sectionals, prepared concerts, and maintained shared instruments.", achievements: "Supported a three-year state-sweepstakes run, 7 concerts, and instrument repairs.", commonAppDescription: "Led 7 concert sectionals; 5 hr/wk × 36 wk/yr; repaired instruments during a 3-year sweepstakes run, grades 9–12." } },
+  { id: "activityMariachiComposite", activity: { category: "work", portfolioCategory: "Work (paid)", title: "Vihuela Musician, Traditional Mariachi Ensemble", role: "Paid ensemble musician", organization: "Fictional composite metro-area ensemble", hours: 48, hoursPerWeek: 8, weeksPerYear: 6, grades: "11–12", description: "Performed at community events, masses, and cultural celebrations.", achievements: "Contributed live accompaniment across the metro area; list only engagements actually performed.", commonAppDescription: "Played vihuela; 8 hr/wk × 6 wk/yr; accompanied community events, masses and celebrations, grades 11–12." } },
+  { id: "activityPercussionTeacherComposite", activity: { category: "work", portfolioCategory: "Work (paid)", title: "Private Percussion Instructor", role: "Instructor", organization: "Independent teaching (fictional composite)", hours: 54, hoursPerWeek: 6, weeksPerYear: 9, grades: "11–12", description: "Provided weekly, individual lessons with repertoire suited to each learner.", achievements: "Taught 6 students from beginner through advanced levels.", commonAppDescription: "Taught 6 percussion students; 6 hr/wk × 9 wk/yr; tailored weekly repertoire, grades 11–12." } },
+  { id: "activityUilCalculatorComposite", activity: { category: "competition", portfolioCategory: "Science / math", title: "Member, UIL Calculator Applications", role: "Team member / outreach volunteer", organization: "Fictional composite UIL team", hours: 54, hoursPerWeek: 1.5, weeksPerYear: 36, grades: "10–12", description: "Practised applied calculations and engineering-problem solving with teammates.", achievements: "Placed second as a team in Region and doubled club participation through outreach.", commonAppDescription: "Placed 2nd team in Region; 1.5 hr/wk × 36 wk/yr; doubled club participation via outreach, grades 10–12." } },
+  { id: "activityJapaneseToursComposite", activity: { category: "club", portfolioCategory: "Language / cultural learning", title: "Independent Japanese Study & Bilingual School Tours", role: "Self-directed learner / tour volunteer", organization: "Fictional composite school", hours: 72, hoursPerWeek: 2, weeksPerYear: 36, grades: "10–12", description: "Studied Japanese through listening practice and helped explain school spaces on bilingual tours.", achievements: "Practised sustained language learning and supported visitor engagement; all scope figures are fictional teaching values.", commonAppDescription: "Studied Japanese; 2 hr/wk × 36 wk/yr; led bilingual tours, grades 10–12 (fictional practice scope)." } },
 ];
 
 export const ACTIVITY_PORTFOLIO_SAMPLES: ActivitySample[] = ACTIVITIES.map(({ id, activity }) => ({
   id,
   group: "activity",
-  origin: "brief",
+  origin: id.endsWith("Composite") ? "composite" : "brief",
+  ...(id.endsWith("Composite") ? { sourceNote: "Fictional composite activity entries derived from the user-provided outline; values are illustrative, no uploaded PDF was available to verify them. Replace all metrics with your own records." } : {}),
   activity,
   text: activityText(activity),
   roles: ["activity", "evidence"],

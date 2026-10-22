@@ -152,7 +152,9 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
               const over = i.wordLimit != null && words > i.wordLimit;
               const isOpen = open === i.promptId;
               const done = draft.trim().length > 0;
-              const example = sampleLib?.ANSWER_VAULT_SAMPLES.find((sample) => sample.category === i.category) ?? null;
+              const example = sampleLib?.ANSWER_VAULT_SAMPLES.find((sample) => sample.forQuestion === i.question)
+                ?? sampleLib?.ANSWER_VAULT_SAMPLES.find((sample) => !sample.forQuestion && sample.category === i.category)
+                ?? null;
               const holdsExample = isUnmodifiedSample(draft, loadedExample[i.promptId]);
               return (
                 <li key={i.promptId} className={`overflow-hidden rounded-2xl border bg-white dark:bg-slate-900 ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>

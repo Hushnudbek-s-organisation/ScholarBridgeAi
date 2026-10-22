@@ -33,8 +33,9 @@ export interface StoredCredential {
 
 /** Normalize PostgreSQL driver Date/string values at the API boundary. */
 export function normalizeCredentialUpdatedAt(value: Date | string | null | undefined): string | null {
-  if (value == null) return null;
-  const date = value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString() : null;
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
@@ -103,6 +104,9 @@ export async function upsertCredential(
 
 /** Remove a stored credential (admin cleared the key → env fallback only). */
 export async function removeCredential(provider: AIProviderId): Promise<void> {
+  if (!(await ensureCoreSchema())) {
+    throw new Error("Core database schema could not be verified.");
+  }
   await db.delete(aiProviderCredentials).where(eq(aiProviderCredentials.provider, provider));
 }
 

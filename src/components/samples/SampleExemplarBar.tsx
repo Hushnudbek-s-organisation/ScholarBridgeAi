@@ -344,6 +344,9 @@ export function SampleExemplarBar<G extends SampleGroup>({
             </div>
           )}
 
+          {sample.origin === "composite" && <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
+      {sample.sourceChecks && <details className="mt-2 text-[11px] text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
+          {sample.sourceChecks && <details className="mt-2 text-[11px] text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
           <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
             <ShieldCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
             <span>{t("honesty")}</span>
@@ -416,6 +419,7 @@ export function SampleInlineCard({
         <AnnotatedSample text={sample.text} roles={sample.roles} />
         <SampleMeta text={sample.text} />
       </div>
+      {sample.origin === "composite" && <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
       <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
         <ShieldCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
         <span>{t("honesty")}</span>

@@ -153,13 +153,16 @@ async function main() {
   const [uniA] = await db
     .insert(schema.universities)
     .values({
-      name: "Technical University of Munich",
+      name: "Phase12 Fixture Technical University",
       country: "Germany",
-      city: "Munich",
+      city: "Fixture City",
       worldRanking: 50,
       programMajor: "Computer Science",
-      description: "A public research university in Bavaria.",
-      websiteUrl: "https://www.tum.de",
+      description: "A verified integration-test university fixture.",
+      websiteUrl: "https://phase12-tum-fixture.example",
+      sourceUrl: "https://phase12-tum-fixture.example/admissions",
+      verificationStatus: "verified",
+      lastVerifiedAt: new Date("2026-10-22T00:00:00.000Z"),
       annualTuitionUsd: 1500,
       annualLivingEstUsd: 11000,
       acceptanceRate: 8,
@@ -171,13 +174,16 @@ async function main() {
   const [uniB] = await db
     .insert(schema.universities)
     .values({
-      name: "LMU Munich",
+      name: "Phase12 Fixture LMU",
       country: "Germany",
-      city: "Munich",
+      city: "Fixture City",
       worldRanking: 60,
       programMajor: "Computer Science",
-      description: "A public research university in Munich.",
-      websiteUrl: "https://www.lmu.de",
+      description: "A verified integration-test university fixture.",
+      websiteUrl: "https://phase12-lmu-fixture.example",
+      sourceUrl: "https://phase12-lmu-fixture.example/admissions",
+      verificationStatus: "verified",
+      lastVerifiedAt: new Date("2026-10-22T00:00:00.000Z"),
       annualTuitionUsd: 1500,
       annualLivingEstUsd: 12000,
       acceptanceRate: 10,
@@ -218,7 +224,7 @@ async function main() {
     .values({
       displayName: "Dilnoza",
       country: "Germany",
-      university: "Technical University of Munich",
+      university: "Phase12 Fixture Technical University",
       program: "Computer Science",
       scholarshipName: "DAAD Scholarship",
       languages: '["English","German"]',
@@ -302,6 +308,55 @@ async function main() {
     dash.status === 200,
     `got ${dash.status} ${JSON.stringify(dash.body)?.slice(0, 200)}`
   );
+
+  // The dashboard response remains live; only the short-lived derived
+  // recommendation sub-result is cached. Successful profile-owned mutations
+  // invalidate every locale/date variant for that profile, while rejected
+  // requests leave the still-valid cached result alone.
+  const {
+    dashboardRecommendationCacheKey,
+    getCachedDashboardRecommendations,
+    invalidateDashboardRecommendationsForProfile,
+  } = await import("../src/lib/dashboardRecommendationCache");
+  const cacheKey = dashboardRecommendationCacheKey(profile.id, "en", new Date().toISOString().slice(0, 10));
+  invalidateDashboardRecommendationsForProfile(profile.id);
+  await getCachedDashboardRecommendations(cacheKey, async () => ({ version: "before-failed-mutation" }));
+  const { POST: activityPost } = await import("../src/app/api/activities/route");
+  const failedMutation = await call(activityPost as any, "/api/activities", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profileId: profile.id, title: "" }),
+  });
+  const afterFailedMutation = await getCachedDashboardRecommendations(cacheKey, async () => ({ version: "unexpected-recompute" }));
+  check(
+    "failed activity mutation preserves the valid profile recommendation cache",
+    failedMutation.status === 400 && afterFailedMutation.version === "before-failed-mutation",
+    `status=${failedMutation.status}, value=${afterFailedMutation.version}`
+  );
+
+  const { PUT: profilePut } = await import("../src/app/api/profiles/[id]/route");
+  const profilePutResponse = await profilePut(
+    new Request(`http://localhost/api/profiles/${profile.id}`, {
+      method: "PUT",
+      headers: { cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Cache invalidation integration profile" }),
+    }),
+    { params: Promise.resolve({ id: String(profile.id) }) },
+  );
+  const afterSuccessfulMutation = await getCachedDashboardRecommendations(cacheKey, async () => ({ version: "after-profile-update" }));
+  check(
+    "successful profile mutation invalidates the profile-scoped recommendation result",
+    profilePutResponse.status === 200 && afterSuccessfulMutation.version === "after-profile-update",
+    `status=${profilePutResponse.status}, value=${afterSuccessfulMutation.version}`
+  );
+  await profilePut(
+    new Request(`http://localhost/api/profiles/${profile.id}`, {
+      method: "PUT",
+      headers: { cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: profile.name }),
+    }),
+    { params: Promise.resolve({ id: String(profile.id) }) },
+  );
   check("the journey summary is present", typeof dash.body?.journey?.current === "string");
   check("the profile summary names the real student", dash.body?.profile?.name === "Aziza Karimova");
 
@@ -343,6 +398,9 @@ async function main() {
     id: number;
     degreeLevel: string | null;
     annualTuitionUsd: number | null;
+    annualLivingEstUsd: number | null;
+    minIelts: number | null;
+    postStudyWorkVisaYears: number | null;
     worldRanking: number | null;
     matchScore: number | null;
   };
@@ -353,7 +411,8 @@ async function main() {
     // same contract: a write is followed by a read that must reflect it.
     const { resetCatalogCacheForTests } = await import("../src/lib/catalogCache");
     resetCatalogCacheForTests();
-    const result = await call(universitiesGet, `/api/universities${query ? `?${query}` : ""}`, init);
+    const scopedQuery = query ? `${query}&search=Phase12` : "search=Phase12";
+    const result = await call(universitiesGet, `/api/universities?${scopedQuery}`, init);
     const rows: DiscoveryUniversity[] = Array.isArray(result.body?.universities) ? result.body.universities : [];
     return { ...result, rows };
   };
@@ -473,20 +532,38 @@ async function main() {
 
     for (const numericFilter of ["maxTuition=2000", "minRank=1", "maxRank=100"]) {
       const list = await catalogue(`${bachelorQuery}&${numericFilter}`);
-      check(`universities: ${numericFilter} still excludes NULL, not the verified row`, includesUniversity(list, uniB.id) && !list.rows.some((row) => row.id === uniA.id));
+      check(`universities: ${numericFilter} still excludes NULL, not the verified row`, includesUniversity(list, uniB.id) && !list.rows.some((row) => row.id === uniA.id), `status ${list.status}; expected ${uniB.id}; rows ${JSON.stringify(list.rows.map((row) => ({ id: row.id, tuition: row.annualTuitionUsd, rank: row.worldRanking })))}`);
     }
     const zeroTuition = await catalogue(`${bachelorQuery}&maxTuition=0`);
     check("universities: NULL tuition is never treated as free", zeroTuition.status === 200 && zeroTuition.rows.length === 0);
     for (const sort of ["tuition_asc", "tuition_desc"]) {
       const list = await catalogue(`${bachelorQuery}&sort=${sort}`);
-      check(`universities: ${sort} still puts NULL tuition last`, list.status === 200 && list.rows[0]?.id === uniB.id && list.rows.at(-1)?.id === uniA.id);
+      check(`universities: ${sort} still puts NULL tuition last`, list.status === 200 && list.rows[0]?.id === uniB.id && list.rows.at(-1)?.id === uniA.id, `status ${list.status}; expected first=${uniB.id}, last=${uniA.id}; rows ${JSON.stringify(list.rows.map((row) => ({ id: row.id, tuition: row.annualTuitionUsd })))}`);
     }
     const firstPage = await catalogue("degreeLevel=Bachelor&page=1&perPage=1");
     const lastPage = await catalogue("degreeLevel=Bachelor&page=2&perPage=1");
-    check("universities: public rank sorting keeps NULL rank on the final page, not missing", firstPage.status === 200 && firstPage.rows[0]?.id === uniB.id && firstPage.body?.total === 2 && includesUniversity(lastPage, uniA.id) && lastPage.body?.page === 2);
+    check("universities: public rank sorting keeps NULL rank on the final page, not missing", firstPage.status === 200 && firstPage.rows[0]?.id === uniB.id && firstPage.body?.total === 2 && includesUniversity(lastPage, uniA.id) && lastPage.body?.page === 2, `first=${JSON.stringify(firstPage.body)} last=${JSON.stringify(lastPage.body)}`);
+
+    await db.update(schema.universities).set({
+      verificationStatus: "unverified",
+      worldRanking: 1,
+      annualTuitionUsd: 12345,
+      annualLivingEstUsd: 23456,
+      minIelts: 8,
+      postStudyWorkVisaYears: 7,
+    }).where(eq(schema.universities.id, uniA.id));
+    const undisclosedNumbers = await catalogue();
+    const undisclosedRow = undisclosedNumbers.rows.find((row) => row.id === uniA.id);
+    check(
+      "universities: unverified ranks, costs, IELTS and visa years are withheld from the API",
+      undisclosedRow?.worldRanking === null && undisclosedRow.annualTuitionUsd === null &&
+        undisclosedRow.annualLivingEstUsd === null && undisclosedRow.minIelts === null &&
+        undisclosedRow.postStudyWorkVisaYears === null,
+      JSON.stringify(undisclosedRow)
+    );
   } finally {
     for (const uni of [uniA, uniB]) {
-      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking }).where(eq(schema.universities.id, uni.id));
+      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));
     }
     await db.update(schema.studentProfiles).set({ degreeLevel: profile.degreeLevel }).where(eq(schema.studentProfiles.id, profile.id));
     await pool.query("ALTER TABLE universities ALTER COLUMN degree_level SET NOT NULL");
@@ -542,12 +619,97 @@ async function main() {
     await db.delete(schema.universities).where(eq(schema.universities.id, lateUni.id));
     invalidateCatalogCache("all");
 
+    const [cacheProfile] = await db.insert(schema.studentProfiles).values({
+      name: "Cache Isolation Fixture",
+      email: "cache-isolation@example.com",
+      passwordHash: "$2b$10$integration.test.cache.fixture.hash.abcdefghijklmnop",
+      targetMajor: "Computer Science",
+      degreeLevel: "Bachelor",
+      country: "Germany",
+      gpa: 3.6,
+      gpaScale: 4,
+      budgetAnnualUsd: 20000,
+    }).returning();
+    const cacheCookie = `sb_session=${signSessionToken({ id: cacheProfile.id, passwordHash: cacheProfile.passwordHash })}`;
     resetCatalogCacheForTests();
-    const dashboardWithColdCatalog = await call(dashboardGet as any, `/api/dashboard?profileId=${profile.id}`);
+    const dashboardWithColdCatalog = await call(dashboardGet as any, `/api/dashboard?profileId=${cacheProfile.id}`, {
+      headers: { cookie: cacheCookie },
+    });
     check(
-      "dashboard recommendations use the shared university catalogue cache",
-      dashboardWithColdCatalog.status === 200 && catalogCacheStats().universitiesCached,
-      `status ${dashboardWithColdCatalog.status}`
+      "dashboard recommendations use the shared university catalogue cache on a cold profile key",
+      dashboardWithColdCatalog.status === 200 &&
+        dashboardWithColdCatalog.body?.recommended?.personalised === true &&
+        catalogCacheStats().universitiesCached,
+      `status ${dashboardWithColdCatalog.status}; personalised=${dashboardWithColdCatalog.body?.recommended?.personalised}; cached=${catalogCacheStats().universitiesCached}; body=${JSON.stringify(dashboardWithColdCatalog.body?.recommended).slice(0, 600)}`
+    );
+    const dashboardWarmRepeat = await call(dashboardGet as any, `/api/dashboard?profileId=${cacheProfile.id}`, {
+      headers: { cookie: cacheCookie },
+    });
+    check(
+      "dashboard repeated request keeps the same profile-scoped recommendation result",
+      dashboardWarmRepeat.status === 200 &&
+        JSON.stringify(dashboardWarmRepeat.body?.recommended) === JSON.stringify(dashboardWithColdCatalog.body?.recommended),
+      `first=${JSON.stringify(dashboardWithColdCatalog.body?.recommended).slice(0, 400)} repeat=${JSON.stringify(dashboardWarmRepeat.body?.recommended).slice(0, 400)}`
+    );
+    const [emptyCacheProfile] = await db.insert(schema.studentProfiles).values({
+      name: "Empty Cache Isolation Fixture",
+      email: "empty-cache-isolation@example.com",
+      passwordHash: "$2b$10$integration.test.empty.cache.fixture.abcdefghijklmnop",
+    }).returning();
+    const emptyCacheCookie = `sb_session=${signSessionToken({ id: emptyCacheProfile.id, passwordHash: emptyCacheProfile.passwordHash })}`;
+    const emptyDashboard = await call(dashboardGet as any, `/api/dashboard?profileId=${emptyCacheProfile.id}`, {
+      headers: { cookie: emptyCacheCookie },
+    });
+    check(
+      "dashboard recommendation cache does not reuse a personalized result for another profile",
+      emptyDashboard.status === 200 && emptyDashboard.body?.recommended?.personalised === false &&
+        (emptyDashboard.body?.recommended?.universities ?? []).length === 0,
+      `status=${emptyDashboard.status} recommended=${JSON.stringify(emptyDashboard.body?.recommended).slice(0, 500)}`
+    );
+
+    const { dashboardRecommendationCacheKey, getCachedDashboardRecommendations, invalidateDashboardRecommendationsForProfile } =
+      await import("../src/lib/dashboardRecommendationCache");
+    const savedItemsCacheKey = dashboardRecommendationCacheKey(cacheProfile.id, "en", new Date().toISOString().slice(0, 10));
+    const { POST: savedUniversityPost } = await import("../src/app/api/saved-universities/route");
+    invalidateDashboardRecommendationsForProfile(cacheProfile.id);
+    await getCachedDashboardRecommendations(savedItemsCacheKey, async () => ({ version: "before-failed-saved-university" }));
+    const failedSavedUniversity = await call(savedUniversityPost as any, "/api/saved-universities", {
+      method: "POST",
+      headers: { cookie: cacheCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: cacheProfile.id, universityId: -1 }),
+    });
+    const afterFailedSavedUniversity = await getCachedDashboardRecommendations(savedItemsCacheKey, async () => ({ version: "unexpected" }));
+    check(
+      "failed saved-university mutation preserves cached recommendations",
+      failedSavedUniversity.status === 400 && afterFailedSavedUniversity.version === "before-failed-saved-university",
+      `status=${failedSavedUniversity.status}, value=${afterFailedSavedUniversity.version}`
+    );
+
+    const savedUniversity = await call(savedUniversityPost as any, "/api/saved-universities", {
+      method: "POST",
+      headers: { cookie: cacheCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: cacheProfile.id, universityId: uniA.id }),
+    });
+    const afterSavedUniversity = await getCachedDashboardRecommendations(savedItemsCacheKey, async () => ({ version: "after-saved-university" }));
+    check(
+      "successful saved-university mutation invalidates profile recommendations",
+      savedUniversity.status === 200 && afterSavedUniversity.version === "after-saved-university",
+      `status=${savedUniversity.status}, value=${afterSavedUniversity.version}`
+    );
+
+    invalidateDashboardRecommendationsForProfile(cacheProfile.id);
+    await getCachedDashboardRecommendations(savedItemsCacheKey, async () => ({ version: "before-saved-scholarship" }));
+    const { POST: savedScholarshipPost } = await import("../src/app/api/saved-scholarships/route");
+    const savedScholarship = await call(savedScholarshipPost as any, "/api/saved-scholarships", {
+      method: "POST",
+      headers: { cookie: cacheCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: cacheProfile.id, scholarshipId: sch.id }),
+    });
+    const afterSavedScholarship = await getCachedDashboardRecommendations(savedItemsCacheKey, async () => ({ version: "after-saved-scholarship" }));
+    check(
+      "successful saved-scholarship mutation invalidates profile recommendations",
+      savedScholarship.status === 200 && afterSavedScholarship.version === "after-saved-scholarship",
+      `status=${savedScholarship.status}, value=${afterSavedScholarship.version}`
     );
   }
 
@@ -580,7 +742,7 @@ async function main() {
   section("1. /api/planning — costs, portfolio, CV and comparison from real rows");
 
   const { GET: planningGet } = await import("../src/app/api/planning/route");
-  const plan = await call(planningGet as any, `/api/planning?profileId=${profile.id}`);
+  const plan = await call(planningGet as any, `/api/planning?profileId=${profile.id}&universityId=${uniA.id}`);
 
   check("responds 200", plan.status === 200, `got ${plan.status} ${JSON.stringify(plan.body)?.slice(0, 200)}`);
   check("returns a cost breakdown", Array.isArray(plan.body?.costs?.lines) && plan.body.costs.lines.length > 0);
@@ -591,7 +753,8 @@ async function main() {
   );
   check(
     "the published living figure beats the country estimate",
-    plan.body?.costs?.lines?.some((l: any) => l.key === "living" && l.annualUsd === 11000)
+    plan.body?.costs?.lines?.some((l: any) => l.key === "living" && l.annualUsd === 11000),
+    JSON.stringify(plan.body?.costs?.lines)
   );
   check("both saved universities come back", plan.body?.universities?.length === 2);
   check("the saved scholarship is in the portfolio", plan.body?.portfolio?.count === 1);
@@ -599,7 +762,7 @@ async function main() {
   // renderCvText uppercases the header, so match the rendered form.
   check("a CV is built from the profile", /AZIZA KARIMOVA/.test(plan.body?.cvText ?? ""), plan.body?.cvText?.slice(0, 60));
   check("the CV names the real major", /Computer Science/.test(plan.body?.cvText ?? ""));
-  check("costTarget identifies the university used", plan.body?.costTarget?.name === "Technical University of Munich");
+  check("costTarget identifies the university used", plan.body?.costTarget?.name === "Phase12 Fixture Technical University", JSON.stringify(plan.body?.costTarget));
 
   section("2. /api/planning — authorisation");
 
@@ -637,7 +800,7 @@ async function main() {
   );
   check(
     "the shared university is named as a reason",
-    fixtureMatch?.reasons?.some((r: string) => /Technical University of Munich/.test(r)),
+    fixtureMatch?.reasons?.some((r: string) => /Phase12 Fixture Technical University/.test(r)),
     JSON.stringify(fixtureMatch?.reasons)
   );
   check(
@@ -856,8 +1019,22 @@ async function main() {
     eq(schema.applicationDocuments.entityId, sch.id),
   ));
   check("documents GET: parallel requests both return the checklist", docsFirst.status === 200 && docsSecond.status === 200);
-  check("documents GET: duplicate requirements and concurrent reads create exactly three rows", scholarshipDocs.length === 3, `got ${scholarshipDocs.length}`);
-  const transcriptDoc = scholarshipDocs.find((doc) => doc.documentType === "transcript");
+  const genericScholarshipDocumentTypes = new Set([
+    "suggested_scholarship_transcript",
+    "suggested_scholarship_essay",
+    "suggested_scholarship_recommendation",
+    "suggested_scholarship_language_evidence",
+    "suggested_scholarship_financial_evidence",
+  ]);
+  check(
+    "documents GET: unverified scholarship gets the five optional generic reminders, deduplicated and scoped",
+    scholarshipDocs.length === 5 &&
+      scholarshipDocs.every((doc) => doc.profileId === profile.id && doc.entityType === "scholarship" && doc.entityId === sch.id && !doc.isRequired && doc.status === "missing") &&
+      scholarshipDocs.every((doc) => genericScholarshipDocumentTypes.has(doc.documentType)) &&
+      new Set(scholarshipDocs.map((doc) => doc.documentType)).size === genericScholarshipDocumentTypes.size,
+    `got ${scholarshipDocs.length}: ${JSON.stringify(scholarshipDocs.map((doc) => ({ id: doc.id, type: doc.documentType, required: doc.isRequired, status: doc.status, entityType: doc.entityType, entityId: doc.entityId })))}`
+  );
+  const transcriptDoc = scholarshipDocs.find((doc) => doc.documentType === "suggested_scholarship_transcript");
   if (transcriptDoc) {
     await db.update(schema.applicationDocuments)
       .set({ status: "uploaded", fileName: "transcript.pdf" })
@@ -867,7 +1044,7 @@ async function main() {
   const [transcriptAfterRead] = transcriptDoc
     ? await db.select().from(schema.applicationDocuments).where(eq(schema.applicationDocuments.id, transcriptDoc.id))
     : [];
-  check("documents GET: repeated reconciliation preserves uploaded status and metadata", docsAfterUpload.status === 200 && transcriptAfterRead?.status === "uploaded" && transcriptAfterRead?.fileName === "transcript.pdf");
+  check("documents GET: repeated reconciliation preserves uploaded status and metadata", docsAfterUpload.status === 200 && transcriptAfterRead?.status === "uploaded" && transcriptAfterRead?.fileName === "transcript.pdf", `status=${docsAfterUpload.status} document=${JSON.stringify(transcriptAfterRead)}`);
 
   const docBlocked = await call(docPatch as any, "/api/documents", {
     method: "PATCH",
@@ -2320,11 +2497,15 @@ async function main() {
   const deadlinesRoute = await import("../src/app/api/deadlines/route");
   const freeDeadlines = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
   check("deadlines: a FREE account gets the full deadline list from the web API", freeDeadlines.status === 200 && Array.isArray(freeDeadlines.body?.items), `got ${freeDeadlines.status}`);
-  const savedUniversityEntries = (freeDeadlines.body?.items ?? []).filter((item: any) => item.type === "university");
+  const fixtureUniversityIds = new Set([uniA.id, uniB.id, uniC.id]);
+  const fixtureUniversityDeadlines = (freeDeadlines.body?.items ?? []).filter(
+    (item: any) => item.type === "university" && fixtureUniversityIds.has(item.universityId),
+  );
   check(
-    "deadlines: saved universities without a deadline are not falsely marked OPEN",
-    savedUniversityEntries.length > 0 && savedUniversityEntries.every((item: any) => item.date === null && item.status === "NO DEADLINE ON FILE"),
-    JSON.stringify(savedUniversityEntries.map((item: any) => ({ status: item.status, date: item.date })))
+    "deadlines: fixture universities with no associated application cycle remain undated",
+    fixtureUniversityDeadlines.length === fixtureUniversityIds.size &&
+      fixtureUniversityDeadlines.every((item: any) => item.date === null && item.status === "NO DEADLINE ON FILE"),
+    JSON.stringify(fixtureUniversityDeadlines.map((item: any) => ({ id: item.id, universityId: item.universityId, title: item.title, status: item.status, date: item.date, saved: item.saved, source: item.source })))
   );
   const { readFileSync: readFile2 } = await import("node:fs");
   const deadlinesSrc = readFile2("src/app/api/deadlines/route.ts", "utf8");
@@ -2445,12 +2626,12 @@ async function main() {
     await setConfig("ai_budget_daily_usd", "0.001");
     const dailyVerdict = await budgetGate.evaluateAiBudget("custom");
     check("budget: spend already at the daily limit → blocked with scope daily",
-      !dailyVerdict.allowed && dailyVerdict.scope === "daily", JSON.stringify(dailyVerdict));
+      !dailyVerdict.allowed && "scope" in dailyVerdict && dailyVerdict.scope === "daily", JSON.stringify(dailyVerdict));
     await setConfig("ai_budget_daily_usd", "");
     await setConfig("ai_budget_provider_daily_usd", '{"custom": 0.001}');
     const providerVerdict = await budgetGate.evaluateAiBudget("custom");
     check("budget: a per-provider daily cap blocks only that provider",
-      !providerVerdict.allowed && providerVerdict.scope === "provider" && (await budgetGate.evaluateAiBudget("openrouter")).allowed === true,
+      !providerVerdict.allowed && "scope" in providerVerdict && providerVerdict.scope === "provider" && (await budgetGate.evaluateAiBudget("openrouter")).allowed === true,
       JSON.stringify(providerVerdict));
     await setConfig("ai_budget_provider_daily_usd", "{}");
     await setConfig("ai_budget_monthly_usd", "0.0095"); // spend is 0.008 by now → ~84%: a warning, not a block

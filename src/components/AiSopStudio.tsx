@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { sanitizePastedPlainText } from "@/lib/plainTextSanitizer";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
@@ -270,6 +271,19 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
       </div>
 
       {/* Gold-standard samples — fill the active tab on an explicit click. */}
+      <details className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-950/20">
+        <summary className="cursor-pointer text-sm font-bold text-indigo-900 dark:text-indigo-100">{t("sopGuideTitle")}</summary>
+        <div className="mt-2 space-y-3 text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+          <p>{t("sopGuideIntro")}</p>
+          <section><h3 className="font-bold">{t("sopGuideAcademicTitle")}</h3><p>{t("sopGuideAcademicBody")}</p></section>
+          <section><h3 className="font-bold">{t("sopGuideVisaTitle")}</h3><p>{t("sopGuideVisaBody")}</p><p className="mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("sopGuideFinanceCaution")}</p><p className="mt-1">{t("sopGuideReturn")}</p></section>
+          <div><p className="font-semibold">{t("sopGuideSources")}</p><ul className="mt-1 list-inside list-disc">
+            <li><a className="underline" href="https://www.future.uwindsor.ca/program/master-of-applied-computing-mac-artificial-intelligence-stream/" target="_blank" rel="noopener noreferrer">{t("sopGuideSourceWindsor")}</a></li>
+            <li><a className="underline" href="https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/study-permit/get-documents/financial-support.html" target="_blank" rel="noopener noreferrer">{t("sopGuideSourceIrcc")}</a></li>
+          </ul></div>
+        </div>
+      </details>
+
       <div className="space-y-2">
         <SampleExemplarBar group="sop" onLoad={loadSopSample} />
         {sampleNotice && (
@@ -477,10 +491,20 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
                   required
                   placeholder="Paste your paragraph text here..."
                   value={existingDraft}
-                  onChange={(e) => setExistingDraft(e.target.value)}
+                  onChange={(e) => setExistingDraft(sanitizePastedPlainText(e.target.value))}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const pasted = sanitizePastedPlainText(e.clipboardData.getData("text/plain"));
+                    const target = e.currentTarget;
+                    const start = target.selectionStart;
+                    const end = target.selectionEnd;
+                    const next = existingDraft.slice(0, start) + pasted + existingDraft.slice(end);
+                    setExistingDraft(next);
+                    requestAnimationFrame(() => target.setSelectionRange(start + pasted.length, start + pasted.length));
+                  }}
                   className="w-full p-3 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Word Count: {existingDraft.trim().split(/\s+/).filter(Boolean).length} words</p>
+                <p className="text-[11px] text-slate-400 mt-1">Word Count: {existingDraft.trim().split(/\s+/).filter(Boolean).length} words · {existingDraft.length} characters</p>
                 {/* Priority 4.4 — structure feedback while the draft is still on
                     the left, before the reader spends a review on it. */}
                 <SopStructureBar

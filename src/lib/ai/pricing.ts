@@ -13,10 +13,11 @@
  *                         request failed before it could): tokens and cost are
  *                         unknown — they are stored as 0 but flagged, never
  *                         presented as a measured zero
- *  - Prices are NOT in the code. The admin enters them in app_config
- *    (`ai_model_pricing`, USD per 1,000,000 tokens) so they can be updated
- *    without a deploy. No default price is shipped, so until an administrator
- *    enters one, cost stays `unknown_pricing` instead of an invented number.
+ *  - The app ships a small, timestamped set of official text-token list prices
+ *    for its current default models. Operators can override/add model prices in
+ *    app_config (`ai_model_pricing`, USD per 1,000,000 tokens). Unknown, retired,
+ *    modality-dependent, or tier-dependent models remain unknown unless an
+ *    operator configures a model-specific price.
  */
 
 export const AI_PRICING_CONFIG_KEY = "ai_model_pricing";
@@ -25,8 +26,12 @@ export const AI_PRICING_CONFIG_KEY = "ai_model_pricing";
 export interface ModelPrice {
   inputPerMTok: number;
   outputPerMTok: number;
-  /** Price of prompt tokens served from the provider's prompt cache. Defaults to inputPerMTok. */
+  /** Price of prompt tokens served from the provider's prompt cache. Defaults to the applicable input rate. */
   cachedInputPerMTok?: number;
+  /** Optional prompt-length tier (e.g. Gemini Pro charges a higher rate above 200k prompt tokens). */
+  inputThresholdTokens?: number;
+  inputOverThresholdPerMTok?: number;
+  outputOverThresholdPerMTok?: number;
 }
 
 /** provider id → model id → price. */
@@ -53,9 +58,55 @@ export const MAX_PRICE_PER_MTOK = 1000; // USD — far above any real list price
 const MAX_PRICING_ENTRIES = 200;
 const MODEL_ID_RE = /^[A-Za-z0-9._:/@+-]{1,200}$/;
 
-/** Empty / missing config = no prices (every cost is unknown_pricing). */
+/** Empty / missing config = no admin-entered prices. */
 export function emptyPricing(): PricingTable {
   return {};
+}
+
+/**
+ * Provider list prices verified against official pricing pages on 2026-10-22.
+ * Only current model IDs with text-token schedules representable here are
+ * included. Historical aliases, modality-dependent prices, and tiers this
+ * estimator cannot represent stay unconfigured rather than fabricating a cost.
+ */
+export const VERIFIED_DEFAULT_PRICING: PricingTable = {
+  // OpenRouter's official model cards list zero input/output price for these free variants (checked 2026-10-22).
+  openrouter: {
+    "minimax/minimax-m3.1-flash:free": { inputPerMTok: 0, outputPerMTok: 0 },
+    "meta-llama/llama-3.3-70b-instruct:free": { inputPerMTok: 0, outputPerMTok: 0 },
+    "google/gemma-3-27b-it:free": { inputPerMTok: 0, outputPerMTok: 0 },
+    "qwen/qwen3-32b:free": { inputPerMTok: 0, outputPerMTok: 0 },
+    "deepseek/deepseek-chat-v3-0324:free": { inputPerMTok: 0, outputPerMTok: 0 },
+  },
+  // https://developers.openai.com/api/docs/pricing (standard tier)
+  openai: {
+    "gpt-6-luna": { inputPerMTok: 0.1, outputPerMTok: 0.5, cachedInputPerMTok: 0.01 },
+  },
+  // https://platform.claude.com/docs/en/about-claude/pricing (global standard)
+  anthropic: {
+    "claude-sonnet-4-6": { inputPerMTok: 3, outputPerMTok: 15 },
+  },
+  // https://ai.google.dev/gemini-api/docs/pricing (Gemini Developer API, standard text)
+  google: {
+    "gemini-2.5-flash": { inputPerMTok: 0.3, outputPerMTok: 2.5 },
+    "gemini-2.5-pro": {
+      inputPerMTok: 1.25,
+      outputPerMTok: 10,
+      inputThresholdTokens: 200_000,
+      inputOverThresholdPerMTok: 2.5,
+      outputOverThresholdPerMTok: 15,
+    },
+  },
+};
+
+/** Operator-entered prices override verified defaults model-by-model. */
+export function mergePricingTables(defaults: PricingTable, configured: PricingTable): PricingTable {
+  const merged: PricingTable = {};
+  for (const [provider, models] of Object.entries(defaults)) merged[provider] = { ...models };
+  for (const [provider, models] of Object.entries(configured)) {
+    merged[provider] = { ...(merged[provider] ?? {}), ...models };
+  }
+  return merged;
 }
 
 /**
@@ -93,18 +144,31 @@ export function parsePricingJson(
       const input = p.inputPerMTok;
       const output = p.outputPerMTok;
       const cached = p.cachedInputPerMTok;
+      const threshold = p.inputThresholdTokens;
+      const inputOver = p.inputOverThresholdPerMTok;
+      const outputOver = p.outputOverThresholdPerMTok;
+      const hasAnyTier = threshold !== undefined || inputOver !== undefined || outputOver !== undefined;
+      const hasAllTiers = threshold !== undefined && inputOver !== undefined && outputOver !== undefined;
       if (!validPrice(input) || !validPrice(output)) {
         return { ok: false, error: `${provider}/${model}: inputPerMTok and outputPerMTok must be numbers from 0 to ${MAX_PRICE_PER_MTOK}` };
       }
       if (cached !== undefined && !validPrice(cached)) {
         return { ok: false, error: `${provider}/${model}: cachedInputPerMTok must be a number from 0 to ${MAX_PRICE_PER_MTOK}` };
       }
-      const unknownKeys = Object.keys(p).filter((k) => !["inputPerMTok", "outputPerMTok", "cachedInputPerMTok"].includes(k));
+      if (hasAnyTier && (!hasAllTiers || typeof threshold !== "number" || !Number.isInteger(threshold) || threshold <= 0 || !validPrice(inputOver) || !validPrice(outputOver))) {
+        return { ok: false, error: `${provider}/${model}: inputThresholdTokens and both over-threshold prices must be configured together` };
+      }
+      const unknownKeys = Object.keys(p).filter((k) => !["inputPerMTok", "outputPerMTok", "cachedInputPerMTok", "inputThresholdTokens", "inputOverThresholdPerMTok", "outputOverThresholdPerMTok"].includes(k));
       if (unknownKeys.length) return { ok: false, error: `${provider}/${model}: unknown field "${unknownKeys[0]}"` };
       table[provider][model] = {
         inputPerMTok: input as number,
         outputPerMTok: output as number,
         ...(cached !== undefined ? { cachedInputPerMTok: cached as number } : {}),
+        ...(hasAnyTier ? {
+          inputThresholdTokens: threshold as number,
+          inputOverThresholdPerMTok: inputOver as number,
+          outputOverThresholdPerMTok: outputOver as number,
+        } : {}),
       };
       entries += 1;
       if (entries > MAX_PRICING_ENTRIES) return { ok: false, error: `at most ${MAX_PRICING_ENTRIES} model prices` };
@@ -124,11 +188,15 @@ export function lookupPrice(table: PricingTable, provider: string, model: string
 
 /** USD for one request at a given price. */
 export function computeCost(usage: UsageFigures, price: ModelPrice): number {
-  const cached = Math.min(Math.max(0, usage.cachedPromptTokens), Math.max(0, usage.promptTokens));
-  const uncached = Math.max(0, usage.promptTokens) - cached;
-  const cachedRate = price.cachedInputPerMTok ?? price.inputPerMTok;
+  const promptTokens = Math.max(0, usage.promptTokens);
+  const cached = Math.min(Math.max(0, usage.cachedPromptTokens), promptTokens);
+  const uncached = promptTokens - cached;
+  const overThreshold = price.inputThresholdTokens !== undefined && promptTokens > price.inputThresholdTokens;
+  const inputRate = overThreshold ? (price.inputOverThresholdPerMTok ?? price.inputPerMTok) : price.inputPerMTok;
+  const outputRate = overThreshold ? (price.outputOverThresholdPerMTok ?? price.outputPerMTok) : price.outputPerMTok;
+  const cachedRate = price.cachedInputPerMTok ?? inputRate;
   const usd =
-    (uncached * price.inputPerMTok + cached * cachedRate + Math.max(0, usage.completionTokens) * price.outputPerMTok) /
+    (uncached * inputRate + cached * cachedRate + Math.max(0, usage.completionTokens) * outputRate) /
     1_000_000;
   // Round to 1e-9 USD (a nanodollar): removes float noise, keeps tiny costs visible.
   return Math.round(usd * 1e9) / 1e9;

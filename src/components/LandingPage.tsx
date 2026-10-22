@@ -570,7 +570,7 @@ function PhotoCraftKineticHud() {
   }, [locale]);
 
   const ticks = [];
-  for (let val = 0; val <= 100; val++) {
+  for (let val = 0; val <= 100; val += 5) {
     const major = val % 5 === 0;
     ticks.push(
       <div

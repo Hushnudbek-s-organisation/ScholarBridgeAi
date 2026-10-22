@@ -13,6 +13,13 @@ Put `DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge` and a
 `SESSION_SECRET` in `.env.local` (see `.env.example`). No Docker needed —
 the database comes from the `embedded-postgres` dev dependency.
 
+## AI providers and Google SDK
+
+Provider-specific AI calls are server-side. The canonical Google Generative AI
+JavaScript SDK is `@google/genai`; Gemini Live uses it directly, and
+`src/lib/gemini.ts` keeps a small compatibility wrapper on that same SDK. Do
+not add the legacy `@google/generative-ai` package.
+
 ## Deployment, handover, security
 
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md) — any Node host + PostgreSQL/Supabase, domain (`APP_URL`), AI providers, Telegram webhook/Mini App, moving hosts, full environment table.

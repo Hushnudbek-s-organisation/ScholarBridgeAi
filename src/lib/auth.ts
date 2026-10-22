@@ -186,6 +186,27 @@ export function sessionTokenHash(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
+/** Successful web-auth burst cache: intentionally tiny and process-local. */
+const AUTH_CACHE_TTL_MS = 3_000;
+const AUTH_CACHE_MAX = 1_000;
+const successfulAuthCache = new Map<string, { profileId: number; expiresAt: number; result: AuthResult }>();
+
+export function invalidateAuthCacheForProfile(profileId: number): void {
+  for (const [key, entry] of successfulAuthCache) {
+    if (entry.profileId === profileId) successfulAuthCache.delete(key);
+  }
+}
+
+function cacheSuccessfulAuth(token: string, profileId: number, result: AuthResult): void {
+  const now = Date.now();
+  for (const [key, entry] of successfulAuthCache) if (entry.expiresAt <= now) successfulAuthCache.delete(key);
+  if (successfulAuthCache.size >= AUTH_CACHE_MAX) {
+    const oldest = successfulAuthCache.keys().next().value;
+    if (oldest) successfulAuthCache.delete(oldest);
+  }
+  successfulAuthCache.set(sessionTokenHash(token), { profileId, expiresAt: now + AUTH_CACHE_TTL_MS, result });
+}
+
 /** last_seen_at is refreshed at most this often per active session. */
 const LAST_SEEN_THROTTLE_MS = 60_000;
 
@@ -244,6 +265,7 @@ export async function checkSessionRecord(
 /** Revoke one token server-side (sign-out, "revoke this device"). Best-effort. */
 export async function revokeSessionToken(token: string | null): Promise<void> {
   if (!token) return;
+  successfulAuthCache.delete(sessionTokenHash(token));
   try {
     await db
       .update(userSessions)
@@ -494,6 +516,13 @@ export async function authenticate(req: Request): Promise<AuthResult> {
     };
   }
 
+  const tokenForCache = readSessionToken(req);
+  if (tokenForCache) {
+    const cached = successfulAuthCache.get(sessionTokenHash(tokenForCache));
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    if (cached) successfulAuthCache.delete(sessionTokenHash(tokenForCache));
+  }
+
   let row: typeof studentProfiles.$inferSelect | undefined;
   try {
     const rows = await db
@@ -555,7 +584,7 @@ export async function authenticate(req: Request): Promise<AuthResult> {
   }
 
   const { passwordHash: _secret, ...safeProfile } = row;
-  return {
+  const result: AuthResult = {
     ok: true,
     session: {
       payload,
@@ -564,6 +593,8 @@ export async function authenticate(req: Request): Promise<AuthResult> {
       channel: "web",
     },
   };
+  if (token) cacheSuccessfulAuth(token, row.id, result);
+  return result;
 }
 
 /** Require any signed-in profile. */

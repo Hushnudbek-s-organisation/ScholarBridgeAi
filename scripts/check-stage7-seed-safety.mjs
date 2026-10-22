@@ -22,14 +22,22 @@ assert.match(seed, /deadline: null/);
 assert.match(seed, /minGpa: null/);
 assert.match(seed, /requiredDocuments: JSON\.stringify\(\[\]\)/);
 
-// A prior cycle is never advanced to a guessed future date.
-assert.doesNotMatch(cycles, /\.update\(scholarships\)/);
-assert.match(cycles, /rolledForward: 0/);
+// Cycle refresh is title-scoped, clears stale unverified legacy dates, and does not overwrite verified/admin-managed rows.
+assert.match(cycles, /inArray\(scholarships\.title, SEEDED_SCHOLARSHIP_TITLES\)/);
+assert.match(cycles, /if \(row\.verificationStatus === "verified"\) continue/);
+assert.match(cycles, /staleLegacyDate/);
+assert.match(cycles, /lastVerifiedAt: new Date\("2026-10-22T00:00:00\.000Z"\)/);
+assert.match(cycles, /verificationStatus: "estimated"/);
+assert.match(cycles, /verificationStatus: "unverified"/);
 
-// Programme candidate dataset is quarantined behind a non-writing compatibility
-// entry point until current official pages can be reviewed.
-assert.doesNotMatch(programs, /db\.(insert|update)\(/);
-assert.match(programs, /programsInserted: 0/);
+// Only exact programmes backed by a programme-specific official URL are inserted as verified; the seeder is additive and idempotent.
+assert.match(programs, /VERIFIED_PROGRAM_SEEDS/);
+assert.match(programs, /programUrl: spec\.programUrl/);
+assert.match(programs, /verificationStatus: "verified"/);
+assert.match(programs, /\.onConflictDoNothing\(\)/);
+assert.doesNotMatch(programs, /db\.update\(universityPrograms\)/);
+assert.match(programs, /requirementsInserted/);
+assert.match(programs, /cyclesInserted/);
 
 // Unsupported legacy visa, story, and mentor candidates cannot be newly seeded.
 assert.match(rich, /const ENABLE_SOURCE_REVIEWED_PUBLIC_CATALOG_SEEDS = false/);
@@ -45,7 +53,7 @@ assert.doesNotMatch(outcomes, /db\.(insert|update)\(/);
 // dates or award terms to user-facing claims.
 assert.match(cache, /s\.verificationStatus === "verified" \? s/);
 assert.match(cache, /deadlineDate: null/);
-assert.match(deadlines, /filter\(\(s\) => s\.verificationStatus === "verified"\)/);
+assert.match(deadlines, /datedScholarships\.filter\(\(\{ s \}\) => s\.isActive && s\.verificationStatus === "verified"\)/);
 assert.match(autopilot, /rows\.filter\(\(s\) => s\.verificationStatus === "verified"\)/);
 
 // Existing unverified scholarship rows are sanitized at the API boundary without

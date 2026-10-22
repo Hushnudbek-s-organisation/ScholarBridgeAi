@@ -16,6 +16,7 @@ import { and, asc, desc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ownershipTransfers, platformOwnership, studentProfiles } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
+import { invalidateAuthCacheForProfile } from "@/lib/auth";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { createLocalizedNotification } from "@/lib/notifications";
 import type { NotifyLang } from "@/lib/notificationTexts";
@@ -338,6 +339,7 @@ export async function confirmTransfer(transferId: number, actorId: number): Prom
       .where(eq(platformOwnership.id, 1));
     if (!done.retainPreviousAdmin) {
       await tx.update(studentProfiles).set({ isAdmin: false }).where(eq(studentProfiles.id, actorId));
+      invalidateAuthCacheForProfile(actorId);
     }
     return done;
   });
@@ -384,6 +386,7 @@ export async function setAdminRole(input: { ownerId: number; targetEmail: string
     if (open) throw new OwnershipError("transfer_open", 409, "This admin is the recipient of an open transfer. Cancel it first.");
   }
   await db.update(studentProfiles).set({ isAdmin: input.isAdmin }).where(eq(studentProfiles.id, target.id));
+  invalidateAuthCacheForProfile(target.id);
   await writeAudit({
     entityType: "admin_role",
     entityId: target.id,

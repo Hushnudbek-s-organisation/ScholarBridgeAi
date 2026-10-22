@@ -11,11 +11,9 @@ import type { VisaOfficerGender } from "@/lib/visa-interview";
  * POST /api/visa/tts — optional neural voice upgrade for the consular officer.
  *
  * Returns audio/mpeg bytes, or 204 when unavailable. The client falls back to
- * browser speech synthesis. This endpoint makes one configured OpenRouter
- * request only: it does not silently switch models/providers after a failure.
- * The selected speech capability and OpenRouter audio-speech endpoint are
- * recorded together in the verified model registry; a provider outage or an
- * incompatible operator override still produces 204 so the browser can fall back.
+ * browser speech synthesis. Try the configured OpenRouter model and then the
+ * verified free Fish Audio model, within one 6-second deadline; never switch
+ * providers. The same-provider model retry stays bounded and status-only.
  */
 export const dynamic = "force-dynamic";
 
@@ -73,80 +71,97 @@ export async function POST(req: Request) {
     const apiKey = await openRouterKey();
     if (!apiKey) return new NextResponse(null, { status: 204 });
 
-    const configuredModel = process.env.OPENROUTER_TTS_MODEL?.trim();
-    const model = configuredModel || OPENROUTER_MODEL_REGISTRY.speech.modelId;
-    if (!/^[A-Za-z0-9._:/@+-]{1,200}$/.test(model)) {
-      console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model: "invalid_model", status: "error", category: "configuration", costStatus: "usage_unreported" }));
-      return new NextResponse(null, { status: 204 });
-    }
-    const controller = new AbortController();
-    const upstreamStartedAt = Date.now();
-    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-    try {
-      const upstream = await fetch("https://openrouter.ai/api/v1/audio/speech", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-          accept: "audio/mpeg, application/octet-stream",
-        },
-        body: JSON.stringify({
+    // Official model card (verified 2026-10-22): https://openrouter.ai/fish-audio/s2.1-pro-free:free
+    // Its current model slug is fish-audio/s2.1-pro-free:free.
+    // The similarly named `fishaudio/fish-speech-2.1-pro:free` alias returned
+    // 404 when checked on 2026-10-22, so do not add it as a retry candidate.
+    const candidates = Array.from(new Set([
+      process.env.OPENROUTER_TTS_MODEL?.trim(),
+      OPENROUTER_MODEL_REGISTRY.speech.modelId,
+    ].filter((model): model is string => typeof model === "string" && model.length > 0)))
+      .map((model) => ({ provider: "openrouter" as const, model }));
+    const deadline = Date.now() + UPSTREAM_TIMEOUT_MS;
+    const retryableStatuses = new Set([400, 402, 404, 429, 500, 502, 503, 504]);
+
+    for (const candidate of candidates) {
+      const { provider, model } = candidate;
+      if (!/^[A-Za-z0-9._:/@+-]{1,200}$/.test(model)) {
+        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model: "invalid_model", status: "error", category: "configuration", costStatus: "usage_unreported" }));
+        continue;
+      }
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) break;
+      const controller = new AbortController();
+      const upstreamStartedAt = Date.now();
+      const timer = setTimeout(() => controller.abort(), remainingMs);
+      try {
+        const upstream = await fetch("https://openrouter.ai/api/v1/audio/speech", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            "content-type": "application/json",
+            accept: "audio/mpeg, application/octet-stream",
+          },
+          body: JSON.stringify({
+            model,
+            input: text,
+            response_format: "mp3",
+            ...(fishVoice ? { voice: fishVoice } : {}),
+          }),
+        });
+        if (!upstream.ok || !upstream.body) {
+          // Never log provider response bodies: they can contain sensitive data.
+          console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: `http_${upstream.status}${upstream.ok ? "_empty_body" : ""}`, latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
+          if (retryableStatuses.has(upstream.status) || (upstream.ok && !upstream.body)) continue;
+          return new NextResponse(null, { status: 204 });
+        }
+        const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
+        if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+          console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "invalid_content_type", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
+          continue;
+        }
+        const lengthHeader = upstream.headers.get("content-length");
+        if (lengthHeader && Number(lengthHeader) > MAX_AUDIO_BYTES) {
+          await upstream.body.cancel().catch(() => undefined);
+          console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "audio_too_large", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
+          continue;
+        }
+        const audio = await readBoundedAudio(upstream.body, MAX_AUDIO_BYTES);
+        if (!audio) {
+          console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "empty_or_oversize_audio", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
+          continue;
+        }
+        console.info(JSON.stringify({
+          evt: "ai_request",
+          task: "visa_tts",
+          provider,
           model,
-          input: text,
-          response_format: "mp3",
-          ...(fishVoice ? { voice: fishVoice } : {}),
-        }),
-      });
-      if (!upstream.ok || !upstream.body) {
-        // Status only: upstream error text can contain sensitive data. No retry
-        // for invalid key/model/request; the browser voice is the safe fallback.
-        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model, status: "error", category: `http_${upstream.status}`, latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
-        return new NextResponse(null, { status: 204 });
+          status: "ok",
+          latencyMs: Date.now() - upstreamStartedAt,
+          costStatus: "usage_unreported",
+        }));
+        const audioBody = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength) as ArrayBuffer;
+        return new NextResponse(audioBody, {
+          status: 200,
+          headers: {
+            "content-type": "audio/mpeg",
+            "content-length": String(audio.byteLength),
+            "cache-control": "no-store",
+            "x-tts-provider": provider,
+            "x-tts-model": model,
+          },
+        });
+      } catch (error) {
+        // A transport/timeout failure is endpoint-wide, so do not duplicate the
+        // same text in another model request after the shared 6s deadline.
+        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: error instanceof Error && error.name === "AbortError" ? "timeout" : "transport", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
+        break;
+      } finally {
+        clearTimeout(timer);
       }
-      const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
-      if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
-        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model, status: "error", category: "invalid_content_type", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
-        return new NextResponse(null, { status: 204 });
-      }
-      const lengthHeader = upstream.headers.get("content-length");
-      if (lengthHeader && Number(lengthHeader) > MAX_AUDIO_BYTES) {
-        await upstream.body.cancel().catch(() => undefined);
-        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model, status: "error", category: "audio_too_large", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
-        return new NextResponse(null, { status: 204 });
-      }
-      const audio = await readBoundedAudio(upstream.body, MAX_AUDIO_BYTES);
-      if (!audio) {
-        console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model, status: "error", category: "empty_or_oversize_audio", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
-        return new NextResponse(null, { status: 204 });
-      }
-      console.info(JSON.stringify({
-        evt: "ai_request",
-        task: "visa_tts",
-        provider: "openrouter",
-        model,
-        status: "ok",
-        latencyMs: Date.now() - upstreamStartedAt,
-        costStatus: "usage_unreported",
-      }));
-      const audioBody = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength) as ArrayBuffer;
-      return new NextResponse(audioBody, {
-        status: 200,
-        headers: {
-          "content-type": "audio/mpeg",
-          "content-length": String(audio.byteLength),
-          "cache-control": "no-store",
-          "x-tts-provider": "openrouter",
-          "x-tts-model": model,
-        },
-      });
-    } catch (error) {
-      // Do not expose provider details or attempt another provider/model.
-      console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "openrouter", model, status: "error", category: error instanceof Error && error.name === "AbortError" ? "timeout" : "transport", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
-      return new NextResponse(null, { status: 204 });
-    } finally {
-      clearTimeout(timer);
     }
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
     console.error("POST /api/visa/tts error:", err instanceof Error ? err.name : "unknown");
     return new NextResponse(null, { status: 204 });
