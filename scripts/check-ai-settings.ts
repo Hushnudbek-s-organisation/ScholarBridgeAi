@@ -393,6 +393,13 @@ check("resolveCredential: model priority db → env → default", () => {
   const enc = encryptApiKey("sk-db-key-1234567890", secret);
   const fromDb = resolveCredential("openrouter", { apiKeyEnc: enc, model: "db-model" }, { OPENROUTER_MODEL: "env-model" }, secret);
   assert.equal(fromDb.model, "db-model");
+  const envKeyWithDbModel = resolveCredential(
+    "openrouter",
+    { apiKeyEnc: null, model: "db-model" },
+    { OPENROUTER_API_KEY: "sk-env-key-1234567890", OPENROUTER_MODEL: "env-model" },
+  );
+  assert.equal(envKeyWithDbModel.apiKeySource, "env");
+  assert.equal(envKeyWithDbModel.model, "db-model", "Admin Panel model must override env model even when the key is from env");
   const fromEnv = resolveCredential("openrouter", null, { OPENROUTER_MODEL: "env-model" });
   assert.equal(fromEnv.model, "env-model");
   const fromDefault = resolveCredential("openrouter", null, {});
@@ -436,6 +443,8 @@ check("credential API timestamps normalize Date/string values to ISO and reject 
   assert.equal(credentials.normalizeCredentialUpdatedAt(new Date("2026-01-02T03:04:05.000Z")), "2026-01-02T03:04:05.000Z");
   assert.equal(credentials.normalizeCredentialUpdatedAt("2026-01-02T03:04:05Z"), "2026-01-02T03:04:05.000Z");
   assert.equal(credentials.normalizeCredentialUpdatedAt("not-a-date"), null);
+  assert.equal(credentials.normalizeCredentialUpdatedAt(new Date(Number.NaN)), null);
+  assert.equal(credentials.normalizeCredentialUpdatedAt(Symbol("invalid") as unknown as string), null);
   assert.equal(credentials.normalizeCredentialUpdatedAt(null), null);
 });
 
@@ -461,16 +470,29 @@ check("schema.ts defines ai_provider_credentials table", () => {
   assert.match(schema, /apiKeyEnc: text\("api_key_enc"\)/);
 });
 
-check("admin API route exists with GET/PUT/POST + session-based admin guard", () => {
+check("credential upsert/removal verify core schema before touching the table", () => {
+  const credentialsSource = readFileSync(join(ROOT, "src/lib/ai/credentials.ts"), "utf8");
+  assert.match(credentialsSource, /upsertCredential\([\s\S]*?if \(!\(await ensureCoreSchema\(\)\)\)/);
+  assert.match(credentialsSource, /removeCredential\([\s\S]*?if \(!\(await ensureCoreSchema\(\)\)\)/);
+});
+
+check("admin API route exists with GET/PUT/POST + session-based admin guard and schema readiness", () => {
   const route = readFileSync(join(ROOT, "src/app/api/admin/ai-settings/route.ts"), "utf8");
   assert.match(route, /export async function GET/);
   assert.match(route, /export async function PUT/);
   assert.match(route, /export async function POST/);
   // Admin access is verified from the signed session cookie (requireAdmin),
-  // never from a client-supplied id.
+  // never from a client-supplied id. Schema repair is guarded by the same auth.
   assert.match(route, /requireAdmin\(/);
   assert.match(route, /from "@\/lib\/auth"/);
   assert.match(route, /validateApiKey/);
+  assert.match(route, /async function ensureSettingsStorage\(\): Promise<NextResponse \| null> \{[\s\S]*?await ensureCoreSchema\(\)/);
+  for (const method of ["GET", "PUT", "POST"]) {
+    const start = route.indexOf(`export async function ${method}(`);
+    const nextExport = route.indexOf("export async function ", start + 1);
+    const handler = route.slice(start, nextExport < 0 ? undefined : nextExport);
+    assert.match(handler, /await ensureSettingsStorage\(\)/, `${method} must verify schema before settings access`);
+  }
   assert.doesNotMatch(route, /await isAdmin\(/);
 });
 
@@ -911,12 +933,18 @@ await checkAsync("OpenRouter shallow/deep tests separate key acceptance from sel
   }
 });
 
-check("admin test and save are separate, with no automatic credential/model persistence", () => {
+check("successful Test/Full check persists a typed key and shows saved-key provenance", () => {
   const ui = readFileSync(join(ROOT, "src/components/admin/AiSettingsManager.tsx"), "utf8");
   const testHandler = ui.slice(ui.indexOf("const testProvider ="), ui.indexOf("if (loading && !data)"));
-  assert.doesNotMatch(testHandler, /send\("PUT"/);
+  const testRequest = testHandler.indexOf('send("POST", body)');
+  const saveRequest = testHandler.indexOf('send("PUT", saveBody)');
+  assert.ok(testRequest >= 0 && saveRequest > testRequest, "test first; persist only after its response");
+  assert.match(testHandler, /Boolean\(json\.ok\) && typedKey/);
+  assert.match(testHandler, /apiKey: typedKey/);
+  assert.match(testHandler, /if \(typedModel\) saveBody\.model = typedModel/);
+  assert.match(testHandler, /setKeyDrafts\(\(drafts\) => \(\{ \.\.\.drafts, \[provider\]: "" \}\)\)/);
   assert.match(ui, /onClick=\{\(\) => saveProvider\(p\.provider\)\}/);
-  assert.doesNotMatch(ui, /Connected ✓/);
+  assert.match(ui, /✓ Active key saved \(\{p\.keyHint\} · source:/);
   assert.match(ui, /A key check does not verify these models/);
 });
 
