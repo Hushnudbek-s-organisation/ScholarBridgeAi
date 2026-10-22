@@ -5427,6 +5427,7 @@
     "daysLeft": "Осталось {days} дн.",
     "dateTba": "Дата не указана",
     "openReference": "Открыть страницу источника",
+    "unverifiedDeadline": "Дата не подтверждена — проверьте источник",
     "filterMine": "⭐ Мои сроки ({count})",
     "filterAll": "🌐 Все сроки грантов ({count})"
   },

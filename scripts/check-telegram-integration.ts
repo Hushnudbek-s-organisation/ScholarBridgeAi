@@ -152,7 +152,11 @@ async function main() {
   };
   const [daad] = await db
     .insert(schema.scholarships)
-    .values({ title: "DAAD Study Scholarship", provider: "DAAD", country: "Germany", amountUsdValue: 12000, deadline: inDays(3), deadlineDate: new Date(`${inDays(3)}T00:00:00Z`), description: "d", requirements: "r", websiteUrl: "https://www.daad.de" } as any)
+    .values({ title: "DAAD Study Scholarship", provider: "DAAD", country: "Germany", amountUsdValue: 12000, deadline: inDays(3), deadlineDate: new Date(`${inDays(3)}T00:00:00Z`), description: "d", requirements: "r", websiteUrl: "https://www.daad.de", sourceUrl: "https://www.daad.de/en/study-and-research-in-germany/scholarships/daad-scholarships/", verificationStatus: "verified", lastVerifiedAt: new Date(), isActive: true } as any)
+    .returning();
+  const [unverifiedScholarship] = await db
+    .insert(schema.scholarships)
+    .values({ title: "Unverified Deadline Fixture", provider: "Fixture", country: "Germany", deadline: inDays(4), deadlineDate: new Date(`${inDays(4)}T00:00:00Z`), description: "d", requirements: "r", websiteUrl: "https://example.test", verificationStatus: "unverified", isActive: true } as any)
     .returning();
 
   // ===========================================================================
@@ -389,10 +393,39 @@ async function main() {
       "/deadlines is FREE for a free account (policy: visibility is not locked)",
       /DAAD/.test(freeList?.body.text ?? "") && !buttonsOf(freeList).some((b) => /#payments$/.test(String(b.url ?? "")))
     );
+    const { GET: deadlinesGet } = await import("../src/app/api/deadlines/route");
+    const deadlineFeed = async () => deadlinesGet(new Request(`http://x/api/deadlines?profileId=${aziza.id}`, {
+      headers: { cookie: `sb_session=${auth.signSessionToken(aziza)}` },
+    }));
+    const beforeSavingUnverified = await deadlineFeed();
+    const beforeSavingBody = await beforeSavingUnverified.json();
+    check(
+      "unverified unsaved scholarship is never recommended in the deadline feed",
+      beforeSavingUnverified.status === 200 && !beforeSavingBody.items.some((item: any) => item.id === `sch-${unverifiedScholarship.id}`)
+    );
+    await db.insert(schema.savedScholarships).values({ profileId: aziza.id, scholarshipId: unverifiedScholarship.id } as any);
+    const afterSavingUnverified = await deadlineFeed();
+    const afterSavingBody = await afterSavingUnverified.json();
+    const savedUnverifiedDeadline = afterSavingBody.items.find((item: any) => item.id === `sch-${unverifiedScholarship.id}`);
+    check(
+      "saved unverified scholarship with a valid date remains visible and carries provenance",
+      afterSavingUnverified.status === 200 && savedUnverifiedDeadline?.saved === true && savedUnverifiedDeadline?.recommended === false && savedUnverifiedDeadline?.verificationStatus === "unverified"
+    );
+    m = mark();
+    await service.handleUpdate(msg(1001, "/deadlines"));
+    const transparentSavedList = since(m).find((c) => c.method === "sendMessage")?.body.text ?? "";
+    check(
+      "Telegram /deadlines labels a saved unverified scholarship",
+      /Unverified Deadline Fixture/.test(transparentSavedList) && /Date not verified/.test(transparentSavedList)
+    );
     await db.update(schema.studentProfiles).set({ isPremium: true, premiumUntil: new Date(Date.now() + 7 * 86_400_000) } as any).where(eq(schema.studentProfiles.id, aziza.id));
     m = mark();
     await service.handleUpdate(msg(1001, "/deadlines"));
-    check("/deadlines gives the same list to Premium accounts (consistency)", /DAAD/.test(since(m).find((c) => c.method === "sendMessage")?.body.text ?? ""));
+    const premiumList = since(m).find((c) => c.method === "sendMessage")?.body.text ?? "";
+    check(
+      "/deadlines gives Premium accounts the same saved verified and unverified items",
+      /DAAD/.test(premiumList) && /Unverified Deadline Fixture/.test(premiumList) && /Date not verified/.test(premiumList)
+    );
     await db.update(schema.studentProfiles).set({ isPremium: false, premiumUntil: null } as any).where(eq(schema.studentProfiles.id, aziza.id));
 
     m = mark();

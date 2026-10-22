@@ -5427,6 +5427,7 @@
     "daysLeft": "{days} kun qoldi",
     "dateTba": "Sana kiritilmagan",
     "openReference": "Manba sahifasini ochish",
+    "unverifiedDeadline": "Sana tasdiqlanmagan — manbani tekshiring",
     "filterMine": "⭐ Mening muddatlarim ({count})",
     "filterAll": "🌐 Barcha grant muddatlari ({count})"
   },

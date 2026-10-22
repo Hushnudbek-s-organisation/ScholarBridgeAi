@@ -5427,6 +5427,7 @@
     "daysLeft": "{days, plural, one {# day left} other {# days left}}",
     "dateTba": "No date on file",
     "openReference": "Open reference page",
+    "unverifiedDeadline": "Date not verified — check the source",
     "filterMine": "⭐ My deadlines ({count})",
     "filterAll": "🌐 All deadlines ({count})"
   },
