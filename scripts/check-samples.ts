@@ -30,6 +30,7 @@ import {
   allSamples,
   findSample,
   type SampleExemplar,
+  COMPOSITE_ADMISSIONS_BENCHMARK,
 } from "../src/lib/samples/exemplars";
 import { isUnmodifiedSample, placeholderCount, segmentSampleText, splitParagraphs } from "../src/lib/samples/text";
 import { extractProfileFields, toProfileFields, type ExtractedKey } from "../src/lib/profileExtract";
@@ -59,12 +60,12 @@ section("1. Library shape");
 
 const expectedSizes: Record<string, number> = {
   onboardingCv: 3,
-  sop: 3,
-  essay: 10,
+  sop: 4,
+  essay: 12,
   lor: 4,
   cvBuilder: 3,
-  answerVault: 6,
-  activity: 4,
+  answerVault: 10,
+  activity: 14,
   document: 3,
   visa: 4,
 };
@@ -151,7 +152,9 @@ for (const { id, activity } of ACTIVITY_PORTFOLIO_SAMPLES) {
       activity.organization.length <= 160 &&
       activity.description.length <= 4000 &&
       activity.achievements.length <= 4000 &&
-      activity.hours > 0
+      activity.hours > 0 &&
+      (!activity.commonAppDescription || (activity.commonAppDescription.length <= 150 && /^[A-Z][A-Za-z]+/.test(activity.commonAppDescription))) &&
+      (!activity.commonAppDescription || (typeof activity.hoursPerWeek === "number" && typeof activity.weeksPerYear === "number" && Boolean(activity.grades)))
   );
 }
 check(
@@ -159,9 +162,12 @@ check(
   SOP_SAMPLES.every((s) => Object.values(s.fields).every((value) => value.trim().length > 20))
 );
 check(
-  "the Answer Vault has one example for each of its six categories",
-  ["general", "motivation", "leadership", "career", "challenge", "community"].every((c) => ANSWER_VAULT_SAMPLES.filter((s) => s.category === c).length === 1)
+  "the Answer Vault has at least one example for each category and routes its four composite prompts",
+  ["general", "motivation", "leadership", "career", "challenge", "community"].every((c) => ANSWER_VAULT_SAMPLES.some((s) => s.category === c)) &&
+    ["answerHarvardMusicResearchComposite", "answerJapaneseCuriosityComposite", "answerMariachiListeningComposite", "answerRoommateMusicComposite"].every((id) => ANSWER_VAULT_SAMPLES.some((s) => s.id === id && s.origin === "composite" && Boolean(s.forQuestion)))
 );
+check("the admitted-applicant-style data is explicitly a fictional composite", COMPOSITE_ADMISSIONS_BENCHMARK.label.includes("Fictional composite") && !COMPOSITE_ADMISSIONS_BENCHMARK.label.toLowerCase().includes("admitted student"));
+check("the composite portfolio provides 10 bounded activity drafts", ACTIVITY_PORTFOLIO_SAMPLES.filter((s) => s.origin === "composite").length === 10 && ACTIVITY_PORTFOLIO_SAMPLES.filter((s) => s.origin === "composite").every((s) => (s.activity.commonAppDescription?.length ?? 999) <= 150));
 
 // ---------------------------------------------------------------------------
 section("5. Every label exists in en, uz and ru");

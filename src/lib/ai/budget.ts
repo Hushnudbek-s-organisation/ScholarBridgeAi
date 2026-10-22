@@ -45,7 +45,11 @@ export type BudgetVerdict =
       allowed: true;
       warning: { scope: BudgetScope; provider?: string; spendUsd: number; limitUsd: number; percent: number } | null;
     }
-  | { allowed: false; scope: BudgetScope; provider?: string; spendUsd: number; limitUsd: number };
+  | { allowed: false; scope: BudgetScope; provider?: string; spendUsd: number; limitUsd: number }
+  | { allowed: false; reason: "budget_verification_unavailable" | "degraded_free_rate_limit"; degradedMode: true };
+
+/** Verdict returned by the pure budget calculation (no degraded DB state). */
+export type CalculatedBudgetVerdict = Exclude<BudgetVerdict, { reason: string }>;
 
 /** Parse a USD budget. "" → null (no limit); invalid → the fallback's value. */
 export function parseBudgetUsd(raw: string | null | undefined, fallback: string): number | null {
@@ -117,7 +121,7 @@ export function validateProviderBudgetJson(raw: string, isKnownProvider: (id: st
  * already reached its limit (the call that crosses the line is the one that
  * is refused next). Warnings report the scope closest to its limit.
  */
-export function budgetVerdict(provider: string, spend: SpendSnapshot, limits: BudgetLimits): BudgetVerdict {
+export function budgetVerdict(provider: string, spend: SpendSnapshot, limits: BudgetLimits): CalculatedBudgetVerdict {
   const scopes: { scope: BudgetScope; provider?: string; spendUsd: number; limitUsd: number | null }[] = [];
   if (provider in limits.providerDailyUsd) {
     scopes.push({

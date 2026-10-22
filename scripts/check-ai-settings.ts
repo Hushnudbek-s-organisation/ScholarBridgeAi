@@ -18,6 +18,8 @@ async function main() {
 const settings = await import("../src/lib/ai/settings");
 const { CONFIG_DEFAULTS } = await import("../src/lib/config");
 const aiCore = await import("../src/lib/ai/index");
+const budgetGate = await import("../src/lib/ai/budget-gate");
+const geminiCompat = await import("../src/lib/gemini");
 const credentials = await import("../src/lib/ai/credentials");
 const openRouterModels = await import("../src/lib/ai/openrouterModelIds");
 
@@ -98,6 +100,25 @@ check("OpenRouter capability registry covers six exact IDs and marks docs vs liv
   assert.match(registry.chat.operationalNote, /retires/);
   assert.ok(registry.multimodalEmbedding.sensitiveDataWarning);
 });
+check("named OpenRouter model exports and ordered free-chat fallback candidates stay exact", () => {
+  assert.equal(openRouterModels.OPENROUTER_DEFAULT_CHAT_MODEL, "minimax/minimax-m3.1-flash:free");
+  assert.deepEqual(openRouterModels.OPENROUTER_FREE_CHAT_FALLBACK_MODELS, [
+    "minimax/minimax-m3.1-flash:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen3-32b:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+  ]);
+  assert.deepEqual([
+    openRouterModels.OPENROUTER_DEFAULT_CHAT_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_SPEECH_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_TEXT_EMBEDDING_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_MULTIMODAL_EMBEDDING_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_DECISIONS_MODEL,
+    openRouterModels.OPENROUTER_DEFAULT_EVALUATION_MODEL,
+  ], Object.values(openRouterModels.OPENROUTER_MODEL_IDS));
+});
+
 // 6 chat providers + "gemini" (voice-only — powers the Gemini Live visa
 // speaking assistant; it deliberately has NO chat adapter in ai/index.ts).
 // Task 7 added "google" (Gemini via its OpenAI-compatible endpoint) and
@@ -372,6 +393,13 @@ check("resolveCredential: model priority db → env → default", () => {
   const enc = encryptApiKey("sk-db-key-1234567890", secret);
   const fromDb = resolveCredential("openrouter", { apiKeyEnc: enc, model: "db-model" }, { OPENROUTER_MODEL: "env-model" }, secret);
   assert.equal(fromDb.model, "db-model");
+  const envKeyWithDbModel = resolveCredential(
+    "openrouter",
+    { apiKeyEnc: null, model: "db-model" },
+    { OPENROUTER_API_KEY: "sk-env-key-1234567890", OPENROUTER_MODEL: "env-model" },
+  );
+  assert.equal(envKeyWithDbModel.apiKeySource, "env");
+  assert.equal(envKeyWithDbModel.model, "db-model", "Admin Panel model must override env model even when the key is from env");
   const fromEnv = resolveCredential("openrouter", null, { OPENROUTER_MODEL: "env-model" });
   assert.equal(fromEnv.model, "env-model");
   const fromDefault = resolveCredential("openrouter", null, {});
@@ -415,6 +443,8 @@ check("credential API timestamps normalize Date/string values to ISO and reject 
   assert.equal(credentials.normalizeCredentialUpdatedAt(new Date("2026-01-02T03:04:05.000Z")), "2026-01-02T03:04:05.000Z");
   assert.equal(credentials.normalizeCredentialUpdatedAt("2026-01-02T03:04:05Z"), "2026-01-02T03:04:05.000Z");
   assert.equal(credentials.normalizeCredentialUpdatedAt("not-a-date"), null);
+  assert.equal(credentials.normalizeCredentialUpdatedAt(new Date(Number.NaN)), null);
+  assert.equal(credentials.normalizeCredentialUpdatedAt(Symbol("invalid") as unknown as string), null);
   assert.equal(credentials.normalizeCredentialUpdatedAt(null), null);
 });
 
@@ -440,16 +470,29 @@ check("schema.ts defines ai_provider_credentials table", () => {
   assert.match(schema, /apiKeyEnc: text\("api_key_enc"\)/);
 });
 
-check("admin API route exists with GET/PUT/POST + session-based admin guard", () => {
+check("credential upsert/removal verify core schema before touching the table", () => {
+  const credentialsSource = readFileSync(join(ROOT, "src/lib/ai/credentials.ts"), "utf8");
+  assert.match(credentialsSource, /upsertCredential\([\s\S]*?if \(!\(await ensureCoreSchema\(\)\)\)/);
+  assert.match(credentialsSource, /removeCredential\([\s\S]*?if \(!\(await ensureCoreSchema\(\)\)\)/);
+});
+
+check("admin API route exists with GET/PUT/POST + session-based admin guard and schema readiness", () => {
   const route = readFileSync(join(ROOT, "src/app/api/admin/ai-settings/route.ts"), "utf8");
   assert.match(route, /export async function GET/);
   assert.match(route, /export async function PUT/);
   assert.match(route, /export async function POST/);
   // Admin access is verified from the signed session cookie (requireAdmin),
-  // never from a client-supplied id.
+  // never from a client-supplied id. Schema repair is guarded by the same auth.
   assert.match(route, /requireAdmin\(/);
   assert.match(route, /from "@\/lib\/auth"/);
   assert.match(route, /validateApiKey/);
+  assert.match(route, /async function ensureSettingsStorage\(\): Promise<NextResponse \| null> \{[\s\S]*?await ensureCoreSchema\(\)/);
+  for (const method of ["GET", "PUT", "POST"]) {
+    const start = route.indexOf(`export async function ${method}(`);
+    const nextExport = route.indexOf("export async function ", start + 1);
+    const handler = route.slice(start, nextExport < 0 ? undefined : nextExport);
+    assert.match(handler, /await ensureSettingsStorage\(\)/, `${method} must verify schema before settings access`);
+  }
   assert.doesNotMatch(route, /await isAdmin\(/);
 });
 
@@ -466,6 +509,28 @@ check("AdminPanel wires the AI Settings tab", () => {
   assert.match(panel, /id: "ai"/);
 });
 
+check("Google AI SDK dependency is consolidated on @google/genai", () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
+  assert.ok(pkg.dependencies["@google/genai"]);
+  assert.equal(pkg.dependencies["@google/generative-ai"], undefined);
+  assert.equal(lock.packages["node_modules/@google/generative-ai"], undefined);
+  assert.match(readFileSync(join(ROOT, "src/lib/gemini.ts"), "utf8"), /from "@google\/genai"/);
+  assert.match(readFileSync(join(ROOT, "README.md"), "utf8"), /canonical Google Generative AI\s+JavaScript SDK is `@google\/genai`/);
+});
+check("Gemini compatibility wrapper uses @google/genai without contacting a provider", () => {
+  const oldKey = process.env.GEMINI_API_KEY;
+  try {
+    delete process.env.GEMINI_API_KEY;
+    assert.equal(geminiCompat.createGeminiModel(), null);
+    process.env.GEMINI_API_KEY = "AIzaUnitTestKey000000000000000000";
+    const model = geminiCompat.createGeminiModel();
+    assert.equal(typeof model?.generateContent, "function");
+  } finally {
+    if (oldKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = oldKey;
+  }
+});
 check("package.json has test:ai-settings script", () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   assert.ok(pkg.scripts["test:ai-settings"].startsWith("tsx "));
@@ -575,6 +640,7 @@ check("redactSecrets removes known keys and key-shaped tokens", () => {
 check("categorizeStatus + transient classification", () => {
   assert.equal(aiCore.categorizeStatus(401), "auth");
   assert.equal(aiCore.categorizeStatus(403), "auth");
+  assert.equal(aiCore.categorizeStatus(402), "payment_required");
   assert.equal(aiCore.categorizeStatus(404), "model_not_found");
   assert.equal(aiCore.categorizeStatus(429), "rate_limited");
   assert.equal(aiCore.categorizeStatus(400), "bad_request");
@@ -606,6 +672,11 @@ async function withRouter(
   const savedEnv: Record<string, string | undefined> = {};
   for (const k of AI_ENV_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
   Object.assign(process.env, env);
+  budgetGate.setBudgetStateReaderForTests(async () => [
+    { dailyUsd: null, monthlyUsd: null, providerDailyUsd: {}, warnPercent: 80 },
+    { dayUsd: 0, monthUsd: 0, dayByProviderUsd: {} },
+  ]);
+  budgetGate.resetBudgetGateLogThrottleForTests();
   const realFetch = globalThis.fetch;
   const calls: Call[] = [];
   const logs: string[] = [];
@@ -629,6 +700,8 @@ async function withRouter(
     globalThis.fetch = realFetch;
     Object.assign(console, saved);
     for (const k of AI_ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
+    budgetGate.setBudgetStateReaderForTests();
+    budgetGate.resetBudgetGateLogThrottleForTests();
   }
 }
 const okReply = (text: string) => ({ status: 200, body: { model: "m", choices: [{ message: { content: text } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } });
@@ -860,21 +933,35 @@ await checkAsync("OpenRouter shallow/deep tests separate key acceptance from sel
   }
 });
 
-check("admin test and save are separate, with no automatic credential/model persistence", () => {
+check("successful Test/Full check persists a typed key and shows saved-key provenance", () => {
   const ui = readFileSync(join(ROOT, "src/components/admin/AiSettingsManager.tsx"), "utf8");
   const testHandler = ui.slice(ui.indexOf("const testProvider ="), ui.indexOf("if (loading && !data)"));
-  assert.doesNotMatch(testHandler, /send\("PUT"/);
+  const testRequest = testHandler.indexOf('send("POST", body)');
+  const saveRequest = testHandler.indexOf('send("PUT", saveBody)');
+  assert.ok(testRequest >= 0 && saveRequest > testRequest, "test first; persist only after its response");
+  assert.match(testHandler, /Boolean\(json\.ok\) && typedKey/);
+  assert.match(testHandler, /apiKey: typedKey/);
+  assert.match(testHandler, /if \(typedModel\) saveBody\.model = typedModel/);
+  assert.match(testHandler, /setKeyDrafts\(\(drafts\) => \(\{ \.\.\.drafts, \[provider\]: "" \}\)\)/);
   assert.match(ui, /onClick=\{\(\) => saveProvider\(p\.provider\)\}/);
-  assert.doesNotMatch(ui, /Connected ✓/);
+  assert.match(ui, /✓ Active key saved \(\{p\.keyHint\} · source:/);
   assert.match(ui, /A key check does not verify these models/);
 });
 
-check("visa TTS has one OpenRouter attempt and safe browser fallback, no hidden provider/model retries", () => {
+check("visa TTS uses a bounded OpenRouter model retry and safe browser fallback, never another provider", () => {
   const tts = readFileSync(join(ROOT, "src/app/api/visa/tts/route.ts"), "utf8");
-  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1);
-  assert.doesNotMatch(tts, /api\.openai\.com|resolveProviderCredential|for \(const candidate/);
+  const registry = readFileSync(join(ROOT, "src/lib/ai/openrouterModelIds.ts"), "utf8");
+  const candidateBlock = tts.slice(tts.indexOf("const candidates ="), tts.indexOf("const deadline ="));
+  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1, "one bounded upstream call shape is used for sequential candidates");
+  assert.match(candidateBlock, /process\.env\.OPENROUTER_TTS_MODEL\?\.trim\(\)/);
+  assert.match(candidateBlock, /OPENROUTER_MODEL_REGISTRY\.speech\.modelId/);
+  assert.doesNotMatch(candidateBlock, /fishaudio\/fish-speech-2\.1-pro:free/, "reject the unverified/404 alias");
+  assert.match(tts, /retryableStatuses = new Set\(\[400, 402, 404, 429, 500, 502, 503, 504\]\)/);
+  assert.match(tts, /x-tts-provider": provider/);
+  assert.match(tts, /x-tts-model": model/);
   assert.match(tts, /status: 204/);
   assert.match(tts, /MAX_AUDIO_BYTES/);
+  assert.match(registry, /timeoutMs: 6_000/);
 });
 
 await checkAsync("embedding request without explicit data-handling opt-in fails before network access", async () => {

@@ -33,6 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
 interface UniversityRow {
   id: number;
   name: string;
+  verification_status: string;
   country: string;
   city: string | null;
   flag_emoji: string | null;
@@ -72,8 +73,8 @@ export default async function UniversitiesPage({
       const activeUnis = bundle.unis
         .filter((u) => u.isActive !== false)
         .sort((a, b) => {
-          const ar = a.worldRanking ?? Number.MAX_SAFE_INTEGER;
-          const br = b.worldRanking ?? Number.MAX_SAFE_INTEGER;
+          const ar = a.verificationStatus === "verified" ? a.worldRanking ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+          const br = b.verificationStatus === "verified" ? b.worldRanking ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
           return ar !== br ? ar - br : a.id - b.id;
         });
       totalItems = activeUnis.length;
@@ -83,19 +84,21 @@ export default async function UniversitiesPage({
       }
       rows = activeUnis.slice(from, from + ITEMS_PER_PAGE).map((university) => {
         const costs = resolvedUsdUniversityCosts(university);
+        const verified = university.verificationStatus === "verified";
         return {
           id: university.id,
           name: university.name,
+          verification_status: university.verificationStatus,
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: university.worldRanking,
+          world_ranking: verified ? university.worldRanking : null,
           program_major: university.programMajor,
           university_type: university.universityType,
-          annual_tuition_usd: costs.annualTuitionUsd,
-          annual_living_est_usd: costs.annualLivingEstUsd,
-          min_ielts: university.minIelts,
-          post_study_work_visa_years: university.postStudyWorkVisaYears,
+          annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
+          annual_living_est_usd: verified ? costs.annualLivingEstUsd : null,
+          min_ielts: verified ? university.minIelts : null,
+          post_study_work_visa_years: verified ? university.postStudyWorkVisaYears : null,
           official_website_url: university.officialWebsiteUrl || university.websiteUrl,
         };
       });
@@ -113,6 +116,7 @@ export default async function UniversitiesPage({
           .select({
             id: universitiesTable.id,
             name: universitiesTable.name,
+            verificationStatus: universitiesTable.verificationStatus,
             country: universitiesTable.country,
             city: universitiesTable.city,
             flagEmoji: universitiesTable.flagEmoji,
@@ -134,7 +138,10 @@ export default async function UniversitiesPage({
           })
           .from(universitiesTable)
           .where(eq(universitiesTable.isActive, true))
-          .orderBy(asc(universitiesTable.worldRanking), asc(universitiesTable.id))
+          .orderBy(
+            asc(sql`CASE WHEN ${universitiesTable.verificationStatus} = 'verified' THEN ${universitiesTable.worldRanking} ELSE NULL END`),
+            asc(universitiesTable.id),
+          )
           .limit(ITEMS_PER_PAGE)
           .offset(from),
       ]);
@@ -148,19 +155,21 @@ export default async function UniversitiesPage({
       // rather than pretending a ranking/focus exists.
       rows = data.map((university) => {
         const costs = resolvedUsdUniversityCosts(university);
+        const verified = university.verificationStatus === "verified";
         return {
           id: university.id,
           name: university.name,
+          verification_status: university.verificationStatus,
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: university.worldRanking,
+          world_ranking: verified ? university.worldRanking : null,
           program_major: university.programMajor,
           university_type: university.universityType,
-          annual_tuition_usd: costs.annualTuitionUsd,
-          annual_living_est_usd: costs.annualLivingEstUsd,
-          min_ielts: university.minIelts,
-          post_study_work_visa_years: university.postStudyWorkVisaYears,
+          annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
+          annual_living_est_usd: verified ? costs.annualLivingEstUsd : null,
+          min_ielts: verified ? university.minIelts : null,
+          post_study_work_visa_years: verified ? university.postStudyWorkVisaYears : null,
           official_website_url: university.officialWebsiteUrl || university.websiteUrl,
         };
       });

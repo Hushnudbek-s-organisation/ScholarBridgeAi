@@ -49,6 +49,7 @@ import {
   telegramDisplayName,
   hashStartToken,
 } from "../src/lib/telegram/core";
+import { CMD_TEXTS } from "../src/lib/telegram/botTexts";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
 
 let passed = 0;
@@ -213,6 +214,15 @@ check("language pick + bot texts exist in uz/ru/en; code message warns not to sh
     assert.ok(/hech kimga|никому|never share/i.test(msg), `${lang} warns not to share`);
     assert.ok(T.help.length > 20);
   }
+});
+
+check("saved unverified deadlines carry localized warnings in the Telegram bot", () => {
+  for (const lang of ["uz", "ru", "en"] as const) {
+    assert.ok(CMD_TEXTS[lang].deadlinesUnverified.length > 10, `${lang} warning is present`);
+  }
+  const bot = read("src/lib/telegram/bot.ts");
+  assert.match(bot, /i\.type === "scholarship" && i\.saved && i\.verificationStatus !== "verified"/);
+  assert.match(bot, /t\.deadlinesUnverified/);
 });
 
 check("placeholder email: legacy addresses recognised, never generated", () => {

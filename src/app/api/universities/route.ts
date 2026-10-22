@@ -54,6 +54,7 @@ export async function GET(req: Request) {
       if (uni.verificationStatus === "verified") return { ...uni };
       return {
         ...uni,
+        worldRanking: null,
         annualTuitionUsd: null,
         annualLivingEstUsd: null,
         accommodationCostUsd: null,
@@ -313,7 +314,7 @@ export async function GET(req: Request) {
 
     // Best-effort multilingual semantic rerank: deterministic filters and
     // profile relevance remain in force; vector similarity only nudges order.
-    if (search && results.length > 1 && !sort) {
+    if (search && search.trim().length >= 4 && results.length > 1 && !sort) {
       try {
         const candidates = results.slice(0, 63).map((uni) => [
           uni.name,

@@ -212,7 +212,7 @@ export async function GET(req: Request) {
     });
 
     const semanticScores = new Map<number, number>();
-    if (search && results.length > 1) {
+    if (search && search.trim().length >= 4 && results.length > 1) {
       try {
         const candidates = results.slice(0, 63).map((item) => [item.title, item.provider, item.country, item.description, item.coverageType, item.eligibleMajors, item.degreeLevels].filter(Boolean).join(". "));
         const ranked = await rankSemanticTexts(search, candidates, { profileId: personalisedProfileId, timeoutMs: 3_500, limit: candidates.length });

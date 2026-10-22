@@ -29,6 +29,7 @@ import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { dashboardRecommendationCacheKey, getCachedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -55,6 +56,9 @@ import { summarizeApplications } from "@/lib/journey/applicationSummary";
 
 export const dynamic = "force-dynamic";
 
+// Recommendation computation is independent of the live dashboard counters.
+// Cache only that profile-scoped sub-result briefly; the dashboard response
+// itself remains private/no-store and fresh.
 /**
  * GET /api/dashboard?profileId= — the control center (spec §3).
  *
@@ -330,7 +334,7 @@ export async function GET(req: Request) {
     // assembly runs. It is profile-scoped and has independent data sources.
     const locale = localeFromRequest(req);
     const recommendedPromise = profile && matchProfile && chancingProfile
-      ? recommendedFor(profileId, profile, locale, todayIso, { matchProfile, chancingProfile })
+      ? cachedRecommendedFor(profileId, profile, locale, todayIso, { matchProfile, chancingProfile })
       : Promise.resolve({
           personalised: false,
           basis: [] as string[],
@@ -530,6 +534,23 @@ async function testGapsFor(profileId: number, profile: typeof studentProfiles.$i
  * Opportunities are filtered by the student's level and field and sorted by the
  * nearest deadline — the previous query sorted by the FURTHEST deadline.
  */
+function cachedRecommendedFor(
+  profileId: number,
+  profile: typeof studentProfiles.$inferSelect,
+  locale: Locale,
+  todayIso: string,
+  derivedProfiles: {
+    matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
+    chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
+  },
+): Promise<Awaited<ReturnType<typeof recommendedFor>>> {
+  const key = dashboardRecommendationCacheKey(profileId, locale, todayIso);
+  return getCachedDashboardRecommendations(
+    key,
+    () => recommendedFor(profileId, profile, locale, todayIso, derivedProfiles),
+  );
+}
+
 async function recommendedFor(
   profileId: number,
   profile: typeof studentProfiles.$inferSelect,

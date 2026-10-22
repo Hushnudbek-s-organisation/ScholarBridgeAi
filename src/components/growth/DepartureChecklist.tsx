@@ -25,6 +25,7 @@ interface Phase {
 }
 
 const PHASE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  application: FileCheck2,
   offer: FileCheck2,
   visa: Stamp,
   money: Banknote,
@@ -81,7 +82,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
   const total = phases?.reduce((s, p) => s + p.total, 0) ?? 0;
   const done = phases?.reduce((s, p) => s + p.done, 0) ?? 0;
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const knownPhase = (p: string) => ["offer", "visa", "money", "housing", "travel", "arrival"].includes(p);
+  const knownPhase = (p: string) => ["application", "offer", "visa", "money", "housing", "travel", "arrival"].includes(p);
 
   return (
     <div className="space-y-4">
@@ -108,7 +109,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
           </div>
 
           {/* Phase overview — horizontal on phones, grid on larger screens */}
-          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 sm:grid sm:grid-cols-3 lg:grid-cols-6">
+          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 sm:grid sm:grid-cols-3 lg:grid-cols-7">
             {phases.map((p) => {
               const Icon = PHASE_ICON[p.phase] ?? Plane;
               const complete = p.done === p.total;

@@ -728,7 +728,18 @@
     "essayBehaviorTip_specificityAndEvidence": "Use a specific, truthful detail from your own experience.",
     "essayBehaviorTip_promptRelevance": "Keep each paragraph tied to a part of the official prompt.",
     "essayBehaviorTip_personalOwnership": "Describe your own choices and contribution, not only the team or institution.",
-    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Verify every claim and check it against the rest of the draft."
+    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Verify every claim and check it against the rest of the draft.",
+    "sopGuideTitle": "Academic SOP vs. visa study plan",
+    "sopGuideIntro": "These documents have different readers and purposes. Use the university’s current instructions for the academic SOP; prepare a visa study plan or letter of explanation only when relevant to that application.",
+    "sopGuideAcademicTitle": "Academic university SOP — admissions committee",
+    "sopGuideAcademicBody": "Connect academic preparation, a specific intellectual direction, verified coursework/projects, current programme fit, and realistic goals. The Windsor course names in this composite are drawn from its official programme listing checked 22 October 2026; confirm the current calendar and available courses before using them.",
+    "sopGuideVisaTitle": "Visa study plan / letter of explanation — officer",
+    "sopGuideVisaBody": "Explain why the programme fits your history and plan, how you are academically and linguistically prepared, how documented funds cover the actual costs, and what credible next step you plan at home. Use only actual receipts, deposits and bank documents; this is not a universal required document or a guarantee of approval.",
+    "sopGuideFinanceCaution": "The outline’s figures (7.07 CGPA, IELTS 7.0, CAD 11,360 tuition paid and CAD 10,035–20,635 for a GIC) are unverified illustrative examples, not figures to copy. IRCC’s page checked 22 October 2026 states that for applications made on/after 1 September 2026, one applicant outside Quebec needs CAD 23,448 for living expenses, in addition to tuition and transportation; family size and destination affect the amount, and rules can change.",
+    "sopGuideReturn": "Describe a specific, evidence-grounded home-country career direction, without claiming a guaranteed job or economic outcome.",
+    "sopGuideSourceWindsor": "University of Windsor — official programme listing",
+    "sopGuideSourceIrcc": "IRCC — current proof-of-funds guidance",
+    "sopGuideSources": "Official reference pages (checked 22 October 2026)"
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -1229,7 +1240,9 @@
     "loading": "Building brief…",
     "copy": "Copy all",
     "copied": "Copied",
-    "rmEmptyHint": "Letter count, type and submission rules vary by programme. Check each official instruction and agree a request and delivery schedule with your recommender."
+    "rmEmptyHint": "Letter count, type and submission rules vary by programme. Check each official instruction and agree a request and delivery schedule with your recommender.",
+    "packetTiming": "Aim to ask about a month or more before the earliest deadline where possible; this is a planning buffer, not a universal rule. Share a concise reflection/brag sheet and deadlines.",
+    "packetPrivacy": "Only share legal name, application ID, date of birth, school name and location if needed, through a secure channel—not ordinary email."
   },
   "countryNames": {
     "argentina": "Argentina",
@@ -2349,7 +2362,8 @@
     "ccSaveError": "Could not save this recommendation",
     "ccBuildingJourney": "Building your journey…",
     "ccDashboardLoadFailed": "We could not load your dashboard",
-    "ccTryAgain": "Try again"
+    "ccTryAgain": "Try again",
+    "awPostSubmitPortal": "After submission, check the college’s official status portal when invited. Track its own ID and required materials; timing and reply dates vary, so verify each college’s instructions."
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -2496,7 +2510,8 @@
       "money": "Money",
       "housing": "Housing",
       "travel": "Travel",
-      "arrival": "Arrival"
+      "arrival": "Arrival",
+      "application": "Application preparation"
     }
   },
   "stories": {
@@ -2774,7 +2789,8 @@
       "money": "Money",
       "housing": "Housing",
       "travel": "Travel",
-      "arrival": "Arrival"
+      "arrival": "Arrival",
+      "application": "Application preparation"
     }
   },
   "appError": {
@@ -2998,7 +3014,48 @@
     "c23t": "Open a local bank account and phone line",
     "c23d": "Most destinations need a local address or registration number first, so sequence these after the registration step rather than before it.",
     "c24t": "Register with the student support office",
-    "c24d": "Introduce yourself to the international student office in your first week: they handle the permits, extensions and institutional paperwork you will need later."
+    "c24d": "Introduce yourself to the international student office in your first week: they handle the permits, extensions and institutional paperwork you will need later.",
+    "g12t": "Prepare your application profile and family details",
+    "g12d": "Prepare privately before opening application sections. Each platform and college asks different questions; enter only what the official form requests and never share sensitive family records unnecessarily.",
+    "g12s0": "Check the current Common App or Apply with Scoir guide for the cycle you are using",
+    "g12s1": "Privately gather likely parent or guardian details: legal name, contact, address, education, institutions and completion years, occupation, employer, and any other field the portal specifically asks",
+    "g12s2": "Check whether country of birth or household-size questions apply to your account and cycle",
+    "g12s3": "Enter only the requested information in the official secure application",
+    "g12s4": "Review spellings and answers against primary records before submission",
+    "g13t": "Build a transcript-matched coursework and honors inventory",
+    "g13d": "Use the exact school transcript and the target platform's current labels. Dual-credit and current-course rules differ by application; verify each screen and never invent a course status or award tier.",
+    "g13s0": "Copy course titles and codes exactly from the official transcript",
+    "g13s1": "Check how the current application labels first- and second-semester courses in progress or not yet started",
+    "g13s2": "For dual-enrollment credit, follow the platform's instructions for both high-school coursework and college information",
+    "g13s3": "Select up to the platform's allowed number of honors and prioritize those most meaningful to your record",
+    "g13s4": "Check each award's official title, level and grade/year against evidence",
+    "g14t": "Prepare concise activity entries with verified scope",
+    "g14d": "Build an inventory before entering the portal. Up to ten Common App activity slots are available in the current guide, but fewer meaningful entries are fine; report actual hours, weeks, years and outcomes.",
+    "g14s0": "List activities, responsibilities, work, hobbies and service that genuinely matter to you",
+    "g14s1": "For each, verify role, organization, grade years, hours per week and weeks per year",
+    "g14s2": "Draft an action-led description within the current portal character limit",
+    "g14s3": "Use metrics only when you can support them and state your own contribution precisely",
+    "g14s4": "Order entries by significance to your story rather than padding the list",
+    "p12q": "What is an idea or subject you explored out of curiosity?",
+    "p12h": "Show the question, what you did to investigate it, and how your understanding changed.",
+    "p13q": "Describe a time you changed how you learned or contributed to a group.",
+    "p13h": "Explain what you noticed, how you adapted, and what you learned from the people around you.",
+    "p14q": "What small detail would help a future roommate get to know you?",
+    "p14h": "Choose a concrete, human detail and let your own voice come through.",
+    "c25t": "Prepare family information privately before opening the application",
+    "c25d": "Use the current platform guide. You may want to locate a parent or guardian's legal name, email, address, phone, education and degrees, institutions and years, occupation/title, employer, and any birthplace or household-size fields only if the official form asks. Do not store or share sensitive family details in ScholarBridge.",
+    "c26t": "Match coursework entries to the official transcript",
+    "c26d": "Copy course codes and titles exactly from the transcript. Check the current portal's labels for first- and second-semester senior courses. For dual-enrollment credit, follow that platform's instructions for high-school coursework and college information; do not assume the same workflow across portals.",
+    "c27t": "Choose and verify academic honors",
+    "c27d": "Common App's current first-year materials say applicants may report up to five academic honors. Prioritize by significance to your record; the International → National → State/Regional → School sequence is a planning heuristic, not an official admissions ranking. Confirm titles, years and recognition levels.",
+    "c28t": "Draft a focused activity list with accurate time scope",
+    "c28d": "Common App materials allow up to ten activities, but ten are not required. Track grades/years, actual hours per week and weeks per year in their designated fields; keep descriptions concise, action-led and evidence-based. Do not inflate scope or impact.",
+    "c29t": "Prepare a recommender packet and ask early",
+    "c29d": "Ask respectfully around a month or more before the earliest deadline where possible; this is a planning buffer, not a universal platform rule. Share a concise reflection/brag sheet and deadlines. Provide legal name, application ID, date of birth, high-school name and location only if the recommender or official portal needs them, using a secure channel rather than ordinary email.",
+    "c30t": "Paste essays as plain text and check upload formats",
+    "c30d": "Remove rich-text formatting before pasting into portal text boxes. Keep a clean text copy; export a PDF only when the college accepts or requests it. Check each portal's current file types, size limits and word/character counters—there is no universal PDF-only rule.",
+    "c31t": "After submission, check each college's applicant portal",
+    "c31d": "A submitted Common App or Apply with Scoir application may be followed by college-specific status instructions. Watch the email used on the application, open the official portal when invited, note any college-issued ID separately, and verify required scores, recommendations, portfolios and response dates. Invitation timing and decision deadlines vary; do not assume 24–72 hours or a universal May 1 date."
   },
   "bell": {
     "title": "Notifications",
@@ -5427,6 +5484,7 @@
     "daysLeft": "{days, plural, one {# day left} other {# days left}}",
     "dateTba": "No date on file",
     "openReference": "Open reference page",
+    "unverifiedDeadline": "Date not verified — check the source",
     "filterMine": "⭐ My deadlines ({count})",
     "filterAll": "🌐 All deadlines ({count})"
   },
@@ -5787,6 +5845,7 @@
       "essaySopTum": "SOP · Master's AI — TUM",
       "essaySopKaist": "SOP · Bachelor's CS — KAIST",
       "essaySopLse": "SOP · Master's Economics — LSE",
+      "essaySopWindsorAppliedComputingComposite": "Windsor Applied Computing — shared SOP and rubric practice (fictional composite)",
       "essayPersonalStatement": "Personal statement · Bachelor's engineering",
       "essayChevening": "Scholarship · Chevening (UCL)",
       "essayGks": "Scholarship · Global Korea Scholarship",
@@ -5817,7 +5876,23 @@
       "visaUsF1": "USA — F-1 student visa",
       "visaGermanyStudent": "Germany — student visa (blocked account)",
       "visaKoreaD2": "South Korea — D-2 visa (GKS scholar)",
-      "visaUkStudent": "UK — Student Route (El-yurt umidi scholar)"
+      "visaUkStudent": "UK — Student Route (El-yurt umidi scholar)",
+      "sopWindsorAppliedComputingComposite": "University of Windsor Applied Computing — dual-purpose statement practice (composite)",
+      "essayTrianglePianissimoComposite": "The Triangle & Pianissimo — music and cognition (fictional composite)",
+      "answerHarvardMusicResearchComposite": "Music, cognition and research fit (fictional composite)",
+      "answerJapaneseCuriosityComposite": "Japanese study and intellectual curiosity (fictional composite)",
+      "answerMariachiListeningComposite": "Learning to listen in a mariachi ensemble (fictional composite)",
+      "answerRoommateMusicComposite": "Roommate answer — music and cafecito (fictional composite)",
+      "activityMusicLeadershipComposite": "Band leadership — fictional composite portfolio",
+      "activityKeyClubComposite": "Key Club service — fictional composite portfolio",
+      "activityClassVicePresidentComposite": "Student government — fictional composite portfolio",
+      "activityNhsPresidentComposite": "Honor society service — fictional composite portfolio",
+      "activitySteelPanComposite": "Steel band — fictional composite portfolio",
+      "activityWindEnsembleComposite": "Wind ensemble — fictional composite portfolio",
+      "activityMariachiComposite": "Mariachi musician — fictional composite portfolio",
+      "activityPercussionTeacherComposite": "Percussion instructor — fictional composite portfolio",
+      "activityUilCalculatorComposite": "Calculator applications — fictional composite portfolio",
+      "activityJapaneseToursComposite": "Japanese study and tours — fictional composite portfolio"
     },
     "fields": {
       "gpa": "GPA",
@@ -5846,7 +5921,9 @@
       "funding": "funding",
       "home_ties": "home ties",
       "specific_detail": "specific detail"
-    }
+    },
+    "compositeNotice": "Fictional composite for practice—not a real or verified applicant, award record, admission story, or student outcome. Numbers and details are illustrative; verify institutional facts and replace every claim with your own evidence.",
+    "sourceRefs": "Official sources checked"
   },
   "feeWaiver": {
     "title": "Fee Waiver & $0-Application Finder",

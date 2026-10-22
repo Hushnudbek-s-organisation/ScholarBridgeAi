@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { enforceFreeCap } from "@/lib/planLimits";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeUniversityRow } from "@/lib/catalogLocalizer";
+import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
 
 const SAVED_UNIVERSITY_STATUSES = new Set([
   "Shortlisted",
@@ -145,6 +146,7 @@ export async function POST(req: Request) {
       status,
       notes,
     }).returning();
+    invalidateDashboardRecommendationsForProfile(profileId);
 
     return NextResponse.json({ saved: newSaved });
   } catch (error) {
@@ -192,6 +194,7 @@ export async function PATCH(req: Request) {
       })
       .where(eq(savedUniversities.id, id))
       .returning();
+    if (target) invalidateDashboardRecommendationsForProfile(target.profileId);
 
     return NextResponse.json({ saved: updated });
   } catch (error) {
@@ -222,6 +225,7 @@ export async function DELETE(req: Request) {
     }
 
     await db.delete(savedUniversities).where(eq(savedUniversities.id, id));
+    if (target) invalidateDashboardRecommendationsForProfile(target.profileId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

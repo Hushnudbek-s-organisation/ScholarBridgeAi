@@ -22,6 +22,9 @@ const FEATURE_VALUE_PREVIEW: Partial<Record<FeatureKey, readonly [string, string
   documents_upload: ["pvDocs1", "pvDocs2", "pvDocs3"],
 };
 
+const PREMIUM_MEMORY_TTL_MS = 15_000;
+const premiumMemory = new Map<string, { value: boolean; expiresAt: number }>();
+
 interface PremiumGateProps {
   profileId: number | null;
   /** The entitlement this section needs — the same key its APIs check with premiumGate. */
@@ -46,17 +49,27 @@ export function PremiumGate(props: PremiumGateProps) {
  */
 function FeatureGateContent({ profileId, feature, title, description, onUpgrade, children }: PremiumGateProps) {
   const t = useTranslations("premiumGate");
-  const [isPremium, setIsPremium] = useState<boolean | null>(profileId ? null : false);
+  const [isPremium, setIsPremium] = useState<boolean | null>(() => {
+    if (!profileId) return false;
+    const cached = premiumMemory.get(`${profileId}:${feature}`);
+    return cached && cached.expiresAt > Date.now() ? cached.value : null;
+  });
 
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
+    const cacheKey = `${profileId}:${feature}`;
+    const cached = premiumMemory.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return;
+    premiumMemory.delete(cacheKey);
     fetch(`/api/premium/status?profileId=${profileId}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
         // Unknown/missing feature data fails closed; the server remains the source of truth.
         setIsPremium(data?.features?.[feature] === true);
+        const value = data?.features?.[feature] === true;
+        premiumMemory.set(cacheKey, { value, expiresAt: Date.now() + PREMIUM_MEMORY_TTL_MS });
       })
       .catch(() => {
         if (!cancelled) setIsPremium(false);

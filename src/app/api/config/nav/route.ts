@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_HIDDEN_NAV_ITEMS, parseHiddenNav } from "@/lib/navSections";
 
-// The sidebar reads this on every app load — never cache the answer.
+// The configuration changes only through explicit admin actions; cache briefly
+// to avoid a DB read on every app-shell mount.
 export const dynamic = "force-dynamic";
 
 /**
@@ -19,12 +20,12 @@ export async function GET() {
     const raw = await getConfig("nav_hidden_items");
     return NextResponse.json(
       { hidden: parseHiddenNav(raw) },
-      { headers: { "Cache-Control": "no-store" } }
+      { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" } }
     );
   } catch {
     return NextResponse.json(
       { hidden: DEFAULT_HIDDEN_NAV_ITEMS },
-      { headers: { "Cache-Control": "no-store" } }
+      { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" } }
     );
   }
 }

@@ -6,6 +6,9 @@
 # Postgres), i18n parity and a production build.
 name: CI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   push:
     branches: [main]
@@ -92,6 +95,42 @@ jobs:
 
       - name: Differentiator tests — pills, waivers, outreach, timeline, apostille, twin
         run: bash ci/run-step.sh "Differentiator tests — pills, waivers, outreach, timeline, apostille, twin" npm run test:differentiators
+
+      - name: Visa speaking simulator tests
+        run: bash ci/run-step.sh "Visa speaking simulator tests" npm run test:visa
+
+      - name: Document checker tests
+        run: bash ci/run-step.sh "Document checker tests" npm run test:documents
+
+      - name: Essay rubric tests
+        run: bash ci/run-step.sh "Essay rubric tests" npm run test:essays
+
+      - name: CV builder tests
+        run: bash ci/run-step.sh "CV builder tests" npm run test:cv
+
+      # This audit probes every API handler over HTTP, so it needs a live server.
+      # Use Next dev here to keep this gate before the final production build;
+      # ubuntu-latest has enough memory for the serial route compilation.
+      - name: Anonymous API security tests
+        run: |
+          set -e
+          DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/ci SESSION_SECRET=ci-session-secret-for-api-audit-0123456789 ./node_modules/.bin/next dev --hostname 127.0.0.1 > /tmp/scholarbridge-next-dev.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 90); do
+            if curl --silent --output /dev/null --max-time 2 http://127.0.0.1:3000/api/health; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/scholarbridge-next-dev.log
+            echo "Next.js did not start for the API security audit" >&2
+            exit 1
+          fi
+          API_BASE_URL=http://127.0.0.1:3000 bash ci/run-step.sh "Anonymous API security tests" npm run test:api-security
 
       - name: i18n message parity
         run: bash ci/run-step.sh "i18n message parity" npm run check:i18n

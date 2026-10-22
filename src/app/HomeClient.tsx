@@ -249,7 +249,7 @@ export function Home({
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/config/nav", { cache: "no-store" });
+        const res = await fetch("/api/config/nav");
         const data = await res.json();
         if (alive) setHiddenNav(parseHiddenNav(JSON.stringify(data.hidden ?? [])));
       } catch {
@@ -366,6 +366,18 @@ export function Home({
     void fetchSavedScholarships(profileId);
     void fetchSavedProgramCount(profileId);
   }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount]);
+
+  // Keep shell-level profile summaries in sync with task workflows that may
+  // update linked saved-item context; ignore events for another active profile.
+  useEffect(() => {
+    const onTasksUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ profileId?: number }>).detail;
+      const id = Number(detail?.profileId);
+      if (Number.isSafeInteger(id) && id > 0 && id === activeProfile?.id) hydrateProfileData(id);
+    };
+    window.addEventListener("scholarbridge:tasks-updated", onTasksUpdated);
+    return () => window.removeEventListener("scholarbridge:tasks-updated", onTasksUpdated);
+  }, [activeProfile?.id, hydrateProfileData]);
 
   /** Load the full profile list — only used by the profile picker. */
   const loadAllProfiles = useCallback(async () => {

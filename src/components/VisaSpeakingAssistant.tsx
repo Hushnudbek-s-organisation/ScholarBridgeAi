@@ -1507,7 +1507,7 @@ export function VisaSpeakingAssistant({
       void (async () => {
         const controller = new AbortController();
         ttsAbortRef.current = controller;
-        const timer = window.setTimeout(() => controller.abort(), 8_000);
+        const timer = window.setTimeout(() => controller.abort(), 6_000);
         try {
           const res = await fetch("/api/visa/tts", {
             method: "POST",
@@ -1680,8 +1680,8 @@ export function VisaSpeakingAssistant({
           VISA_COUNTRIES.map((item) => item.locale),
         );
         try {
-          if ("interimResults" in rec) rec.interimResults = true;
-          if ("continuous" in rec) rec.continuous = true;
+          rec.interimResults = true;
+          rec.continuous = true;
         } catch {
           // Partial Web Speech implementations can reject optional properties.
         }

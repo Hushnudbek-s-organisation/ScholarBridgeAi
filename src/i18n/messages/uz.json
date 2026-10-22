@@ -728,7 +728,18 @@
     "essayBehaviorTip_specificityAndEvidence": "O‘z tajribangizdan aniq va rost tafsilot keltiring.",
     "essayBehaviorTip_promptRelevance": "Har bir paragrafni rasmiy topshiriqning bir qismiga bog‘lang.",
     "essayBehaviorTip_personalOwnership": "Faqat jamoa yoki tashkilotni emas, o‘z tanlovingiz va hissangizni tasvirlang.",
-    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Har bir da’voni tekshiring va matnning qolgan qismi bilan solishtiring."
+    "essayBehaviorTip_unsupportedOrInconsistentClaims": "Har bir da’voni tekshiring va matnning qolgan qismi bilan solishtiring.",
+    "sopGuideTitle": "Universitet SOP’i va viza o‘qish rejasining farqi",
+    "sopGuideIntro": "Bu hujjatlarning o‘quvchisi va maqsadi boshqa-boshqa. Akademik SOP uchun universitetning joriy ko‘rsatmalariga amal qiling; viza o‘qish rejasi yoki izoh xatini faqat tegishli ariza talab qilsa tayyorlang.",
+    "sopGuideAcademicTitle": "Universitet uchun akademik SOP — qabul komissiyasiga",
+    "sopGuideAcademicBody": "Akademik tayyorgarlik, aniq intellektual yo‘nalish, tekshirilgan kurs/loyihalar, joriy dasturga moslik va real maqsadlarni bog‘lang. Kompozitdagi Windsor kurs nomlari 2026-yil 22-oktabrda ko‘rilgan rasmiy dastur ro‘yxatidan olingan; ishlatishdan oldin joriy katalog va mavjud kurslarni tekshiring.",
+    "sopGuideVisaTitle": "Viza o‘qish rejasi / izoh xati — viza xodimiga",
+    "sopGuideVisaBody": "Dastur nega ta’lim yo‘lingiz va rejangizga mosligini, akademik va til tayyorgarligingizni, hujjatlashtirilgan mablag‘ haqiqiy xarajatlarni qanday qoplashini va vatandagi ishonchli keyingi qadamingizni tushuntiring. Faqat haqiqiy kvitansiya, depozit va bank hujjatlaridan foydalaning; bu hamma uchun majburiy hujjat yoki tasdiq kafolati emas.",
+    "sopGuideFinanceCaution": "Berilgan matndagi raqamlar (GPA 7.07, IELTS 7.0, 11 360 CAD kontrakt to‘lovi va GIC uchun 10 035–20 635 CAD) tekshirilmagan namunaviy misollar, ularni ko‘chirmang. 2026-yil 22-oktabrda ko‘rilgan IRCC sahifasida 2026-yil 1-sentabrdan keyingi arizalar uchun Kvebekdan tashqarida bir arizachining yashash xarajati 23 448 CAD, kontrakt va yo‘l xarajatlaridan tashqari, deb ko‘rsatilgan; oila tarkibi va manzil summaga ta’sir qiladi, qoidalar o‘zgarishi mumkin.",
+    "sopGuideReturn": "Vatandagi aniq, dalillarga asoslangan kasbiy yo‘nalishni bayon qiling; kafolatlangan ish yoki iqtisodiy natijani va’da qilmang.",
+    "sopGuideSourceWindsor": "Windsor universiteti — rasmiy dastur sahifasi",
+    "sopGuideSourceIrcc": "IRCC — mablag‘ni tasdiqlash bo‘yicha joriy ko‘rsatma",
+    "sopGuideSources": "Rasmiy manbalar (2026-yil 22-oktabrda tekshirilgan)"
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -1229,7 +1240,9 @@
     "loading": "Brif tayyorlanmoqda…",
     "copy": "Hammasini nusxalash",
     "copied": "Nusxalandi",
-    "rmEmptyHint": "Tavsiya xatlarining soni, turi va yuborish tartibi dasturga qarab farq qiladi. Har bir dasturning rasmiy talabini tekshiring va tavsiya beruvchi bilan so‘rov hamda yuborish jadvalini kelishib oling."
+    "rmEmptyHint": "Tavsiya xatlarining soni, turi va yuborish tartibi dasturga qarab farq qiladi. Har bir dasturning rasmiy talabini tekshiring va tavsiya beruvchi bilan so‘rov hamda yuborish jadvalini kelishib oling.",
+    "packetTiming": "Imkon bo‘lsa, eng erta muddatdan taxminan bir oy yoki oldinroq so‘rang; bu rejalashtirish tavsiyasi, universal qoida emas. Qisqa yutuqlar varag‘i va muddatlarni ulashing.",
+    "packetPrivacy": "To‘liq ism, ariza IDsi, tug‘ilgan sana, maktab nomi va joylashuvni faqat zarur bo‘lsa, xavfsiz kanal orqali yuboring; oddiy e-pochta orqali emas."
   },
   "countryNames": {
     "argentina": "Argentina",
@@ -2349,7 +2362,8 @@
     "ccSaveError": "Tavsiyani saqlab bo‘lmadi",
     "ccBuildingJourney": "Rejangiz tayyorlanmoqda…",
     "ccDashboardLoadFailed": "Boshqaruv panelini yuklab bo‘lmadi",
-    "ccTryAgain": "Qayta urinish"
+    "ccTryAgain": "Qayta urinish",
+    "awPostSubmitPortal": "Arizani yuborgach, taklif kelganda kollejning rasmiy holat portalini tekshiring. Uning ID raqami va talab qilingan hujjatlarni kuzating; muddatlar farq qiladi, har bir kollej ko‘rsatmasini tekshiring."
   },
   "autopilot": {
     "title": "Stipendiya avtopiloti",
@@ -2496,7 +2510,8 @@
       "money": "Pul",
       "housing": "Turar joy",
       "travel": "Yo'l",
-      "arrival": "Yetib borish"
+      "arrival": "Yetib borish",
+      "application": "Arizaga tayyorgarlik"
     }
   },
   "stories": {
@@ -2774,7 +2789,8 @@
       "money": "Pul",
       "housing": "Turar joy",
       "travel": "Yo'l",
-      "arrival": "Yetib borish"
+      "arrival": "Yetib borish",
+      "application": "Arizaga tayyorgarlik"
     }
   },
   "appError": {
@@ -2998,7 +3014,48 @@
     "c23t": "Mahalliy bank hisobi va telefon liniyasini oching",
     "c23d": "Ko‘p davlatlarda avval mahalliy manzil yoki ro‘yxat raqami talab qilinadi, shuning uchun buni ro‘yxatdan o‘tishdan keyin bajaring, oldin emas.",
     "c24t": "Talabalarni qo‘llab-quvvatlash bo‘limida ro‘yxatdan o‘ting",
-    "c24d": "Birinchi haftada xalqaro talabalar bo‘limi bilan tanishing: ruxsatnomalar, uzaytirishlar va keyinchalik kerak bo‘ladigan institutsional hujjatlar ular orqali hal bo‘ladi."
+    "c24d": "Birinchi haftada xalqaro talabalar bo‘limi bilan tanishing: ruxsatnomalar, uzaytirishlar va keyinchalik kerak bo‘ladigan institutsional hujjatlar ular orqali hal bo‘ladi.",
+    "g12t": "Ariza profilingiz va oila ma’lumotlarini tayyorlang",
+    "g12d": "Ariza bo‘limlarini ochishdan oldin ma’lumotlarni shaxsiy ravishda tayyorlang. Platforma va kollej savollari farq qiladi; faqat rasmiy forma so‘raganini kiriting va oilaviy maxfiy ma’lumotlarni keraksiz ulashmang.",
+    "g12s0": "Foydalanayotgan davringiz uchun Common App yoki Apply with Scoir joriy qo‘llanmasini tekshiring",
+    "g12s1": "Ota-ona yoki vasiy ma’lumotlarini shaxsiy ravishda aniqlang: ism, aloqa, manzil, ta’lim, o‘qigan muassasalar va yillar, kasb, ish beruvchi hamda portal aniq so‘ragan boshqa maydonlar",
+    "g12s2": "Tug‘ilgan mamlakat yoki oila a’zolari soni savollari profilingiz va davringizga tegishli ekanini tekshiring",
+    "g12s3": "Faqat rasmiy xavfsiz arizada so‘ralgan ma’lumotlarni kiriting",
+    "g12s4": "Yuborishdan oldin yozilish va javoblarni asosiy hujjatlar bilan solishtiring",
+    "g13t": "Transkriptga mos kurslar va mukofotlar ro‘yxatini tuzing",
+    "g13d": "Maktab transkripti va platformaning joriy yorliqlariga amal qiling. Dual-kredit va joriy kurs qoidalari arizaga qarab farq qiladi; har bir bosqichni tekshiring, kurs holati yoki mukofotni uydirmang.",
+    "g13s0": "Kurs nomi va kodlarini rasmiy transkriptdan aynan ko‘chiring",
+    "g13s1": "Joriy arizada yuqori sinfning birinchi va ikkinchi semestr kurslari qanday belgilanishini tekshiring",
+    "g13s2": "Dual-enrollment uchun platformaning maktab kurslari va kollej ma’lumotlari bo‘yicha ko‘rsatmasiga amal qiling",
+    "g13s3": "Platforma ruxsat bergan miqdorgacha mukofot tanlab, eng muhimlarini ustuvor qiling",
+    "g13s4": "Har bir mukofot nomi, darajasi va yilini dalil bilan tekshiring",
+    "g14t": "Faoliyatlarni qisqa va tekshirilgan ko‘lam bilan yozing",
+    "g14d": "Portalga kiritishdan oldin faoliyatlar ro‘yxatini tuzing. Joriy qo‘llanmada Common App uchun o‘ntagacha joy bor, ammo hammasini to‘ldirish shart emas; haqiqiy soat, hafta, yil va natijalarni yozing.",
+    "g14s0": "Siz uchun muhim bo‘lgan faoliyat, mas’uliyat, ish, hobbi va xizmatlarni sanang",
+    "g14s1": "Har birida rol, tashkilot, sinf/yillar, haftalik soat va yillik haftalarni tekshiring",
+    "g14s2": "Joriy portal belgilar chegarasiga mos, harakat fe’li bilan boshlanuvchi tavsif yozing",
+    "g14s3": "Faqat tasdiqlay oladigan ko‘rsatkichlarni ishlatib, o‘z hissangizni aniq yozing",
+    "g14s4": "Ro‘yxatni sonni ko‘paytirish uchun emas, hikoyangizdagi ahamiyatiga qarab tartiblang",
+    "p12q": "Qaysi g‘oya yoki mavzuni qiziqish bilan o‘rgandingiz?",
+    "p12h": "Savolni, uni o‘rganish uchun qilgan ishlaringizni va tushunchangiz qanday o‘zgarganini ko‘rsating.",
+    "p13q": "Jamoaga hissa qo‘shish yoki o‘rganish usulingizni o‘zgartirgan holatni tasvirlang.",
+    "p13h": "Nimani payqaganingizni, qanday moslashganingizni va boshqalardan nimalarni o‘rganganingizni tushuntiring.",
+    "p14q": "Bo‘lajak xonadoshingiz siz haqingizda qaysi kichik tafsilotni bilishini istaysiz?",
+    "p14h": "Aniq va samimiy tafsilotni tanlab, o‘z ovozingizni ko‘rsating.",
+    "c25t": "Arizani ochishdan oldin oila ma’lumotlarini shaxsiy tayyorlang",
+    "c25d": "Joriy platforma qo‘llanmasidan foydalaning. Ota-ona yoki vasiyning ismi, e-pochta, manzil, telefon, ta’lim/darajalar, muassasalar va yillar, kasb/lavozim, ish beruvchi, tug‘ilgan joy yoki oila sonini faqat rasmiy forma so‘rasa aniqlang. ScholarBridge’da maxfiy oila ma’lumotlarini saqlamang yoki ulashmang.",
+    "c26t": "Kurslarni rasmiy transkriptga mos kiriting",
+    "c26d": "Kurs kodlari va nomlarini transkriptdan aynan ko‘chiring. Yuqori sinf semestrlari uchun joriy portal yorliqlarini tekshiring. Dual-enrollment kurslarida shu platformaning maktab kurslari va kollej ma’lumotlari bo‘yicha ko‘rsatmasiga amal qiling; hamma portal bir xil deb o‘ylamang.",
+    "c27t": "Akademik mukofotlarni tanlang va tekshiring",
+    "c27d": "Common App’ning joriy birinchi kurs qo‘llanmasida beshtagacha akademik mukofot kiritish mumkinligi aytiladi. Muhimligiga qarab ustuvor qiling; Xalqaro → Milliy → Hududiy/Shtat → Maktab tartibi maslahat usuli, rasmiy qabul reytingi emas. Nom, yil va darajani tasdiqlang.",
+    "c28t": "Faoliyatlarni aniq vaqt ko‘lami bilan yozing",
+    "c28d": "Common App qo‘llanmasida o‘ntagacha faoliyat keltirilgan, lekin o‘ntasini to‘ldirish shart emas. Sinf/yillar, haqiqiy haftalik soat va yillik haftalarni alohida maydonlarga kiriting; tavsifni ixcham, harakatga yo‘naltirilgan va dalilli qiling. Ko‘lam yoki ta’sirni oshirib ko‘rsatmang.",
+    "c29t": "Tavsiyanoma paketi tayyorlang va oldindan so‘rang",
+    "c29d": "Imkon bo‘lsa eng erta muddatdan taxminan bir oy oldin so‘rang; bu rejalashtirish zaxirasi, universal platforma qoidasi emas. Qisqa yutuqlar varag‘i va muddatlarni ulashing. To‘liq ism, ariza IDsi, tug‘ilgan sana, maktab nomi va joylashuvni faqat tavsiyanoma beruvchi yoki rasmiy portal so‘rasa, oddiy e-pochta emas, xavfsiz kanal bilan yuboring.",
+    "c30t": "Inshoni oddiy matn sifatida joylang va fayl talabini tekshiring",
+    "c30d": "Portal matn maydoniga joylashdan oldin boy formatni olib tashlang. Toza matn nusxasini saqlang; PDFni faqat kollej qabul qilsa yoki so‘rasa yuklang. Har bir portalning fayl turi, hajmi va so‘z/belgi sanagichini tekshiring — universal PDF-talab yo‘q.",
+    "c31t": "Yuborgach, har bir kollej portalini tekshiring",
+    "c31d": "Common App yoki Apply with Scoir orqali ariza yuborilgach, kollej alohida portal ko‘rsatmalarini berishi mumkin. Arizada ishlatilgan e-pochtani kuzating; rasmiy portalga taklif qilinganda kiring, kollej ID raqamini alohida yozing va testlar, tavsiyanomalar, portfolio hamda javob muddatlarini tekshiring. Taklif va qaror sanalari farq qiladi; 24–72 soat yoki universal 1-may sanasini taxmin qilmang."
   },
   "bell": {
     "title": "Bildirishnomalar",
@@ -5427,6 +5484,7 @@
     "daysLeft": "{days} kun qoldi",
     "dateTba": "Sana kiritilmagan",
     "openReference": "Manba sahifasini ochish",
+    "unverifiedDeadline": "Sana tasdiqlanmagan — manbani tekshiring",
     "filterMine": "⭐ Mening muddatlarim ({count})",
     "filterAll": "🌐 Barcha grant muddatlari ({count})"
   },
@@ -5787,6 +5845,7 @@
       "essaySopTum": "SOP · Magistratura, sun’iy intellekt — TUM",
       "essaySopKaist": "SOP · Bakalavriat, informatika — KAIST",
       "essaySopLse": "SOP · Magistratura, iqtisodiyot — LSE",
+      "essaySopWindsorAppliedComputingComposite": "Windsor amaliy hisoblash — SOP va mezonlar uchun umumiy mashq (xayoliy kompozit)",
       "essayPersonalStatement": "Shaxsiy insho · Bakalavriat, muhandislik",
       "essayChevening": "Stipendiya · Chevening (UCL)",
       "essayGks": "Stipendiya · Global Korea Scholarship (GKS)",
@@ -5817,7 +5876,23 @@
       "visaUsF1": "AQSh — F-1 talaba vizasi",
       "visaGermanyStudent": "Germaniya — talaba vizasi (bloklangan hisob)",
       "visaKoreaD2": "Janubiy Koreya — D-2 viza (GKS stipendiati)",
-      "visaUkStudent": "Buyuk Britaniya — Student Route (El-yurt umidi stipendiati)"
+      "visaUkStudent": "Buyuk Britaniya — Student Route (El-yurt umidi stipendiati)",
+      "sopWindsorAppliedComputingComposite": "Windsor amaliy hisoblash — ikki maqsadli bayonot mashqi (kompozit)",
+      "essayTrianglePianissimoComposite": "Uchburchak va pianissimo — musiqa va idrok (xayoliy kompozit)",
+      "answerHarvardMusicResearchComposite": "Musiqa, idrok va tadqiqotga moslik (xayoliy kompozit)",
+      "answerJapaneseCuriosityComposite": "Yapon tilini o‘rganish va qiziquvchanlik (xayoliy kompozit)",
+      "answerMariachiListeningComposite": "Mariachi ansamblida tinglab o‘rganish (xayoliy kompozit)",
+      "answerRoommateMusicComposite": "Xonadoshga javob — musiqa va cafecito (xayoliy kompozit)",
+      "activityMusicLeadershipComposite": "Orkestr rahbarligi — xayoliy kompozit portfolio",
+      "activityKeyClubComposite": "Key Club xizmati — xayoliy kompozit portfolio",
+      "activityClassVicePresidentComposite": "O‘quvchilar kengashi — xayoliy kompozit portfolio",
+      "activityNhsPresidentComposite": "Faxriy jamiyat xizmati — xayoliy kompozit portfolio",
+      "activitySteelPanComposite": "Steel band — xayoliy kompozit portfolio",
+      "activityWindEnsembleComposite": "Puflama cholg‘ular ansambli — xayoliy kompozit portfolio",
+      "activityMariachiComposite": "Mariachi musiqachisi — xayoliy kompozit portfolio",
+      "activityPercussionTeacherComposite": "Zarbli cholg‘u o‘qituvchisi — xayoliy kompozit portfolio",
+      "activityUilCalculatorComposite": "Kalkulyator qo‘llanmalari — xayoliy kompozit portfolio",
+      "activityJapaneseToursComposite": "Yapon tili va maktab sayohatlari — xayoliy kompozit portfolio"
     },
     "fields": {
       "gpa": "GPA",
@@ -5846,7 +5921,9 @@
       "funding": "moliyalash",
       "home_ties": "vatan bilan bog‘liqlik",
       "specific_detail": "aniq tafsilot"
-    }
+    },
+    "compositeNotice": "Mashq uchun yaratilgan xayoliy kompozit namuna — bu haqiqiy yoki tekshirilgan abituriyent, mukofotlar, qabul hikoyasi yoki talaba natijasi emas. Raqamlar va tafsilotlar namunaviy; muassasa ma’lumotlarini tekshiring va har bir da’voni o‘z dalillaringiz bilan almashtiring.",
+    "sourceRefs": "Tekshirilgan rasmiy manbalar"
   },
   "feeWaiver": {
     "title": "Ariza to'lovini bekor qilish va $0 ariza qidiruvi",

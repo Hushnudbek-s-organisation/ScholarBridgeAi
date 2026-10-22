@@ -21,7 +21,8 @@ export type AuditEntityType =
   | "ownership"
   // Admin role grants/revocations by the owner (entityId = profile id).
   | "admin_role"
-  | "forum_thread";
+  | "forum_thread"
+  | "forum_reply";
 
 interface AuditEntry {
   entityType: AuditEntityType;

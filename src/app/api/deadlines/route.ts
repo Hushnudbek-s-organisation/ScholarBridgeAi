@@ -170,12 +170,21 @@ export async function GET(req: Request) {
 
     // --- Catalogue rows + cycles + published deadlines for the candidate set
     //     (saved universities and, below, the high-chance shortlist) ---
-    const [uniRows, allScholarships] = await Promise.all([
+    const [uniRows, activeScholarships, savedScholarshipsRows] = await Promise.all([
       savedUniIds.length > 0
         ? db.select().from(universities).where(inArray(universities.id, savedUniIds))
         : Promise.resolve([] as UniRow[]),
       db.select().from(scholarships).where(eq(scholarships.isActive, true)),
+      savedSchIds.length > 0
+        ? db.select().from(scholarships).where(inArray(scholarships.id, savedSchIds))
+        : Promise.resolve([]),
     ]);
+    // A student's explicit save remains part of their personal timeline even
+    // if the catalogue record later becomes inactive. Recommendations below
+    // still come only from the active, verified catalogue.
+    const allScholarships = Array.from(
+      new Map([...activeScholarships, ...savedScholarshipsRows].map((s) => [s.id, s])).values()
+    );
     const uniById = new Map<number, UniRow>(uniRows.map((u) => [u.id, u]));
 
     // Coverage refs — the SAME rules the dashboard and the Scholarship Hub
@@ -303,9 +312,6 @@ export async function GET(req: Request) {
     // --- Scholarships: the student's saved awards (+ a small recommended
     //     full-coverage shortlist when they have barely saved anything) ---
     const datedScholarships = allScholarships
-      // Unverified dates may be stale or merely copied from prior cycles.
-      // They do not belong in a personal upcoming-deadline feed.
-      .filter((s) => s.verificationStatus === "verified")
       .map((s) => {
         let date: Date | null = null;
         if (s.deadlineDate) date = new Date(s.deadlineDate);
@@ -313,7 +319,11 @@ export async function GET(req: Request) {
         else if (s.deadlineRangeStart) date = new Date(s.deadlineRangeStart);
         return { s, date };
       })
-      .filter((x) => x.date && x.date.getTime() > now.getTime() - 365 * 86400000);
+      .filter((x) => x.date && Number.isFinite(x.date.getTime()) && x.date.getTime() > now.getTime() - 365 * 86400000);
+    // Unverified dates may be stale or copied from prior cycles. Keep an
+    // explicitly saved item visible with its provenance, but recommend only
+    // verified dates from the active catalogue.
+    const verifiedDatedScholarships = datedScholarships.filter(({ s }) => s.isActive && s.verificationStatus === "verified");
     const coverageOf = new Map<number, SavedUniCoverage | null>();
     const coverageFor = (s: (typeof scholarships.$inferSelect)) => {
       if (!coverageOf.has(s.id)) {
@@ -341,6 +351,7 @@ export async function GET(req: Request) {
         source: s.sourceUrl || s.websiteUrl || null,
         saved: true,
         recommended: false,
+        verificationStatus: s.verificationStatus ?? "unverified",
         coversSavedUni: cov?.coversSavedUni ?? false,
         isFullCoverage: cov?.isFullCoverage ?? false,
       });
@@ -350,7 +361,7 @@ export async function GET(req: Request) {
       // no saved universities yet, simply the published full-coverage ones).
       // Maximum three, flagged `recommended`, so a brand-new student still
       // sees WHAT could fund their plan without drowning in the catalogue.
-      const candidates = datedScholarships
+      const candidates = verifiedDatedScholarships
         .filter(({ s }) => !savedSchSet.has(s.id))
         .map(({ s, date }) => ({ s, date, cov: coverageFor(s) }))
         .filter((x) => (savedUniRefs.length > 0 ? (x.cov ? coverageTier(x.cov) >= 2 : false) : /\bfull\b/i.test(x.s.coverageType || "") ))
@@ -375,6 +386,7 @@ export async function GET(req: Request) {
           source: s.sourceUrl || s.websiteUrl || null,
           saved: false,
           recommended: true,
+          verificationStatus: s.verificationStatus ?? "unverified",
           coversSavedUni: cov?.coversSavedUni ?? false,
           isFullCoverage: cov?.isFullCoverage ?? false,
         });

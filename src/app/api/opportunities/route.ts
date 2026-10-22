@@ -102,7 +102,7 @@ export async function GET(req: Request) {
       const lexicalItems = searchUniverse.filter((item) => lexicalIds.has(item.id));
       items = lexicalItems;
 
-      if (sort !== "deadline" && isUsefulSemanticQuery(search) && searchUniverse.length > 1) {
+      if (sort !== "deadline" && search.trim().length >= 4 && isUsefulSemanticQuery(search) && searchUniverse.length > 1) {
         try {
           // Favor lexical hits in the batch, then fill from the profile-ranked
           // and type-filtered catalogue. One query + at most 63 records.

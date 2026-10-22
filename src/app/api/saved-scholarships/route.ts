@@ -8,6 +8,7 @@ import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeScholarshipRow } from "@/lib/catalogLocalizer";
+import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
 
 const SAVED_SCHOLARSHIP_STATUSES = new Set([
   "Saved",
@@ -134,6 +135,7 @@ export async function POST(req: Request) {
       status,
       notes,
     }).returning();
+    invalidateDashboardRecommendationsForProfile(profileId);
 
     return NextResponse.json({ saved: newSaved });
   } catch (error) {
@@ -181,6 +183,7 @@ export async function PATCH(req: Request) {
       })
       .where(eq(savedScholarships.id, id))
       .returning();
+    if (target) invalidateDashboardRecommendationsForProfile(target.profileId);
 
     return NextResponse.json({ saved: updated });
   } catch (error) {
@@ -214,6 +217,7 @@ export async function DELETE(req: Request) {
     }
 
     await db.delete(savedScholarships).where(eq(savedScholarships.id, id));
+    if (target) invalidateDashboardRecommendationsForProfile(target.profileId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

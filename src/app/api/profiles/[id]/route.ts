@@ -4,7 +4,7 @@ import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
-import { requireAdmin, requireProfileAccess, sessionCookieHeader } from "@/lib/auth";
+import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { currentOwnerId } from "@/lib/ownership/service";
@@ -12,6 +12,7 @@ import { writeAudit } from "@/lib/audit";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { parseStudyInterestSelections } from "@/lib/studyInterests";
 import { invalidateProfileMatchCache } from "@/lib/catalogCache";
+import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -310,6 +311,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // The student's own view of every match/score must reflect the edit
     // immediately — drop the short-lived derived match inputs for this profile.
     invalidateProfileMatchCache(profileId);
+    if (updatedProfile) {
+      invalidateAuthCacheForProfile(profileId);
+      invalidateDashboardRecommendationsForProfile(profileId);
+    }
     const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile) });
     // Changing the password rotates the session fingerprint — hand back a
     // freshly signed cookie so the owner is not logged out by their own edit.
@@ -357,6 +362,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     await db.delete(studentProfiles).where(eq(studentProfiles.id, profileId));
+    invalidateDashboardRecommendationsForProfile(profileId);
     await writeAudit({
       entityType: "admin_role",
       entityId: profileId,

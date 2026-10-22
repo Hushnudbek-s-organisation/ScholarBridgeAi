@@ -34,6 +34,8 @@ export function normalizeSpeechRecognitionLocale(
 ): string {
   const exact = (requestedLocale ?? "").trim().replace(/_/g, "-").toLowerCase();
   const match = (candidate: string) => supportedLocales.find((locale) => locale.toLowerCase() === candidate);
+  const normalizeEnglishToUs = new Set(["en-be", "en-sg", "en-my", "en-hk", "en-in", "en-za"]);
+  if (normalizeEnglishToUs.has(exact)) return match("en-us") ?? "en-US";
   const exactMatch = exact ? match(exact) : undefined;
   if (exactMatch) return exactMatch;
 

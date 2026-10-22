@@ -51,6 +51,7 @@ type Dict = {
   appStatus: Record<string, string>;
   deadlinesHeader: string;
   deadlinesEmpty: string;
+  deadlinesUnverified: string;
   daysLeft: (n: number) => string;
   premiumLocked: string;
   btnUpgrade: string;
@@ -131,6 +132,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     appStatus: { not_started: "boshlanmagan", in_progress: "jarayonda", submitted: "topshirilgan", interview: "suhbat", decision: "qaror kutilmoqda", accepted: "qabul qilindi", rejected: "rad etildi", waitlisted: "kutish ro'yxati", withdrawn: "qaytarib olingan" },
     deadlinesHeader: "⏰ <b>Yaqin muddatlar</b>",
     deadlinesEmpty: "Yaqin muddatlar yo'q. Stipendiya yoki ariza saqlasangiz, shu yerda ko'rinadi.",
+    deadlinesUnverified: "⚠️ Sana tasdiqlanmagan — manbani tekshiring",
     daysLeft: (n) => (n < 0 ? "o'tib ketgan" : n === 0 ? "bugun" : `${n} kun qoldi`),
     premiumLocked: "🔒 Muddatlar ro'yxati bepul. Kengaytirilgan eslatmalar (3/7/14 kun) — Pro.",
     btnUpgrade: "⭐ Premium",
@@ -200,6 +202,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     appStatus: { not_started: "не начата", in_progress: "в работе", submitted: "подана", interview: "интервью", decision: "ждёт решения", accepted: "принят", rejected: "отказ", waitlisted: "лист ожидания", withdrawn: "отозвана" },
     deadlinesHeader: "⏰ <b>Ближайшие дедлайны</b>",
     deadlinesEmpty: "Ближайших дедлайнов нет. Сохраните стипендию или заявку — они появятся здесь.",
+    deadlinesUnverified: "⚠️ Дата не подтверждена — проверьте источник",
     daysLeft: (n) => (n < 0 ? "прошёл" : n === 0 ? "сегодня" : `осталось ${n} дн.`),
     premiumLocked: "🔒 Список дедлайнов бесплатный. Расширенные напоминания (3/7/14 дней) — Pro.",
     btnUpgrade: "⭐ Premium",
@@ -269,6 +272,7 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     appStatus: { not_started: "not started", in_progress: "in progress", submitted: "submitted", interview: "interview", decision: "awaiting decision", accepted: "accepted", rejected: "rejected", waitlisted: "waitlisted", withdrawn: "withdrawn" },
     deadlinesHeader: "⏰ <b>Upcoming deadlines</b>",
     deadlinesEmpty: "No upcoming deadlines. Save a scholarship or an application and it shows up here.",
+    deadlinesUnverified: "⚠️ Date not verified — check the source",
     daysLeft: (n) => (n < 0 ? "passed" : n === 0 ? "today" : `${n} days left`),
     premiumLocked: "🔒 The deadline list is free. Extended reminders (3/7/14 days) are Pro.",
     btnUpgrade: "⭐ Premium",

@@ -326,7 +326,12 @@ async function deadlines(ctx: BotCtx) {
   );
   if (!items.length) return void (await send(ctx, t.deadlinesEmpty, appButtons(ctx)));
   const icon: Record<string, string> = { critical: "🔴", soon: "🟠" };
-  const lines = items.slice(0, 10).map((i) => `${icon[i.urgency] ?? "🟡"} <b>${clamp(i.title)}</b>\n   ${fmtDate(i.date)} · ${t.daysLeft(i.daysRemaining)}`);
+  const lines = items.slice(0, 10).map((i) => {
+    const unverified = i.type === "scholarship" && i.saved && i.verificationStatus !== "verified"
+      ? ` · ${t.deadlinesUnverified}`
+      : "";
+    return `${icon[i.urgency] ?? "🟡"} <b>${clamp(i.title)}</b>\n   ${fmtDate(i.date)} · ${t.daysLeft(i.daysRemaining)}${unverified}`;
+  });
   await send(ctx, `${t.deadlinesHeader}\n\n${lines.join("\n")}`, appButtons(ctx));
 }
 

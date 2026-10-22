@@ -29,10 +29,30 @@ export type OpenRouterModelCapability = {
   sensitiveDataWarning?: string;
 };
 
+/**
+ * Stable named IDs for integrations/tests that need a particular OpenRouter path.
+ * These are identifiers, not a promise that the provider keeps them available.
+ */
+export const OPENROUTER_DEFAULT_CHAT_MODEL = "minimax/minimax-m3.1-flash:free";
+export const OPENROUTER_DEFAULT_SPEECH_MODEL = "fish-audio/s2.1-pro-free:free";
+export const OPENROUTER_DEFAULT_TEXT_EMBEDDING_MODEL = "nvidia/nemotron-3-embed-1b:free";
+export const OPENROUTER_DEFAULT_MULTIMODAL_EMBEDDING_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2:free";
+export const OPENROUTER_DEFAULT_DECISIONS_MODEL = "inception/mercury-decide:free";
+export const OPENROUTER_DEFAULT_EVALUATION_MODEL = "respan/span-01-lite:free";
+
+/** Ordered free chat candidates. These OpenRouter cards listed $0 pricing when checked 2026-10-22. */
+export const OPENROUTER_FREE_CHAT_FALLBACK_MODELS = [
+  OPENROUTER_DEFAULT_CHAT_MODEL,
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemma-3-27b-it:free",
+  "qwen/qwen3-32b:free",
+  "deepseek/deepseek-chat-v3-0324:free",
+] as const;
+
 /** One typed source of truth for requested IDs and their distinct endpoint intent. */
 export const OPENROUTER_MODEL_REGISTRY = {
   chat: {
-    modelId: "minimax/minimax-m3.1-flash:free",
+    modelId: OPENROUTER_DEFAULT_CHAT_MODEL,
     task: "general reasoning, adviser and essay chat",
     endpoint: "/api/v1/chat/completions",
     modality: "text and multimodal model; this application sends text → text",
@@ -47,14 +67,14 @@ export const OPENROUTER_MODEL_REGISTRY = {
     operationalNote: "Official card says this free launch variant retires 2026-10-22 12:00 UTC; do not silently switch to the paid base model.",
   },
   speech: {
-    modelId: "fish-audio/s2.1-pro-free:free",
+    modelId: OPENROUTER_DEFAULT_SPEECH_MODEL,
     task: "visa officer neural speech",
     endpoint: "/api/v1/audio/speech",
     modality: "text input → raw audio stream (MP3 requested)",
-    timeoutMs: 4_500,
+    timeoutMs: 6_000,
     maxInput: "4,096 characters per request; response capped at 8 MiB",
     output: "Non-empty audio/mpeg (or application/octet-stream) bytes",
-    fallback: "Browser speech synthesis; no automatic second-provider/model attempt",
+    fallback: "Browser speech synthesis; bounded same-provider model retry, no provider switching",
     optional: true,
     modelEnvVar: "OPENROUTER_TTS_MODEL",
     verification: "official_docs",
@@ -62,7 +82,7 @@ export const OPENROUTER_MODEL_REGISTRY = {
     operationalNote: "OpenRouter describes the free model as for testing/prototyping/low-volume only, with no production latency or availability guarantees.",
   },
   textEmbedding: {
-    modelId: "nvidia/nemotron-3-embed-1b:free",
+    modelId: OPENROUTER_DEFAULT_TEXT_EMBEDDING_MODEL,
     task: "semantic text ranking for university, scholarship and opportunity search",
     endpoint: "/api/v1/embeddings",
     modality: "text input → numeric vectors",
@@ -78,7 +98,7 @@ export const OPENROUTER_MODEL_REGISTRY = {
     sensitiveDataWarning: "NVIDIA's OpenRouter card warns free-endpoint inputs are logged for service improvement and says not to upload personal or confidential data.",
   },
   multimodalEmbedding: {
-    modelId: "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+    modelId: OPENROUTER_DEFAULT_MULTIMODAL_EMBEDDING_MODEL,
     task: "optional document-readiness similarity using metadata/text and optional image input",
     endpoint: "/api/v1/embeddings",
     modality: "text, image, or combined document input → numeric vectors",
@@ -94,7 +114,7 @@ export const OPENROUTER_MODEL_REGISTRY = {
     sensitiveDataWarning: "The card warns free-endpoint prompts/outputs are logged and says not to upload personal or confidential data; remote use requires explicit operator opt-in.",
   },
   decisions: {
-    modelId: "inception/mercury-decide:free",
+    modelId: OPENROUTER_DEFAULT_DECISIONS_MODEL,
     task: "optional small eligibility/alignment signals",
     endpoint: "/api/alpha/decisions",
     modality: "text state + typed questions → structured choice/score/yes-no probabilities",
@@ -109,7 +129,7 @@ export const OPENROUTER_MODEL_REGISTRY = {
     operationalNote: "Official card uses the Decisions API, not chat completions. Keep outputs advisory and human-reviewable.",
   },
   evaluation: {
-    modelId: "respan/span-01-lite:free",
+    modelId: OPENROUTER_DEFAULT_EVALUATION_MODEL,
     task: "optional writing/forum/visa behavior signals (advisory only)",
     endpoint: "/api/alpha/decisions",
     modality: "text transcript + typed questions → structured behavior probabilities",

@@ -1,6 +1,8 @@
 import { randomInt } from "crypto";
 import { db } from "./index";
 import { seedProgramCatalog } from "./seedProgramCatalog";
+import { seedRegionalUniversities } from "./seedUniversityCatalog";
+import { seedVerifiedUniversityFacts } from "./seedVerifiedUniversityFacts";
 import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
 import { seedOpportunities } from "./seedOpportunities";
 import { seedRichPlatformData, ensureRichPlatformDataSeeded } from "./seedRichPlatformData";
@@ -25,7 +27,7 @@ import {
   levels,
   badges,
 } from "./schema";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { MIN_PASSWORD_LENGTH, hashPassword } from "@/lib/password";
 
 /** Local 8-char referral code generator (avoids importing gamification here). */
@@ -118,6 +120,38 @@ async function topUpVerifiedSeedUniversityTypes(): Promise<void> {
       or(sql`${universities.universityType} IS NULL`, sql`btrim(${universities.universityType}) = ''`),
     ));
   }
+}
+
+
+const ADDITIONAL_SCHOLARSHIP_IDENTITIES = [
+  { title: "Stipendium Hungaricum", provider: "Tempus Public Foundation / Government of Hungary", country: "Hungary", websiteUrl: "https://stipendiumhungaricum.hu/apply/" },
+  { title: "Türkiye Bursları Scholarship", provider: "Presidency for Turks Abroad and Related Communities (YTB)", country: "Türkiye", websiteUrl: "https://www.turkiyeburslari.gov.tr/calendar" },
+  { title: "Global Korea Scholarship (GKS Graduate 2027)", provider: "National Institute for International Education (NIIED)", country: "South Korea", websiteUrl: "https://www.studyinkorea.go.kr/en/plan/scholarship.do" },
+  { title: "Chinese Government Scholarship (CSC 2027/28)", provider: "China Scholarship Council", country: "China", websiteUrl: "https://www.campuschina.org/content/details27_100758.html" },
+  { title: "France Excellence Eiffel Scholarship", provider: "French Ministry for Europe and Foreign Affairs / Campus France", country: "France", websiteUrl: "https://www.campusfrance.org/en/actu/call-for-france-excellence-eiffel-applications-2027" },
+  { title: "Australia Awards Scholarships", provider: "Australian Department of Foreign Affairs and Trade", country: "Australia", websiteUrl: "https://www.dfat.gov.au/people-to-people/australia-awards/participating-countries", isActive: false },
+] as const;
+
+async function seedAdditionalScholarshipIdentities(): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('scholarbridge:seed:scholarship-identities'))`);
+    const titles = ADDITIONAL_SCHOLARSHIP_IDENTITIES.map((item) => item.title);
+    const existing = await tx.select({ title: scholarships.title }).from(scholarships).where(inArray(scholarships.title, titles));
+    const present = new Set(existing.map((row) => row.title));
+    const missing = ADDITIONAL_SCHOLARSHIP_IDENTITIES.filter((item) => !present.has(item.title));
+    if (missing.length) await tx.insert(scholarships).values(missing.map((item) => ({
+      ...item,
+      coverageType: "Unspecified",
+      degreeLevels: "[]",
+      eligibleMajors: "[]",
+      description: "Current award terms and dates are not yet verified; consult the linked official programme page.",
+      requirements: "Confirm current eligibility, award details, country availability, and application dates with the official provider.",
+      sourceUrl: item.websiteUrl,
+      verificationStatus: "unverified",
+      applicationStatus: "unknown",
+      deadlineType: "unknown",
+    })));
+  });
 }
 
 async function runSeedDatabase(force = false) {
@@ -250,6 +284,9 @@ async function runSeedDatabase(force = false) {
         // catalogue (programs/requirements/cycles), which the recommender reads
         // exclusively. The call is idempotent — it only inserts what is missing.
         try {
+          await seedRegionalUniversities();
+          await seedVerifiedUniversityFacts();
+          await seedAdditionalScholarshipIdentities();
           await seedProgramCatalog();
         } catch (err) {
           console.error("Program catalogue top-up failed:", err);
@@ -331,7 +368,7 @@ async function runSeedDatabase(force = false) {
         country: "United Kingdom",
         city: "Oxford",
         flagEmoji: "🇬🇧",
-        worldRanking: 3,
+        worldRanking: 4,
         degreeLevel: "Master",
         programMajor: "Advanced Computer Science & Data Science",
         annualTuitionUsd: 41200,
@@ -351,17 +388,17 @@ async function runSeedDatabase(force = false) {
         country: "Germany",
         city: "Munich",
         flagEmoji: "🇩🇪",
-        worldRanking: 28,
+        worldRanking: 25,
         degreeLevel: "Master",
         programMajor: "Informatics & Data Engineering",
-        annualTuitionUsd: 3200,
+        annualTuitionUsd: null,
         annualLivingEstUsd: 13500,
         minGpa: 3.2,
         minIelts: 6.5,
         minSat: 1280,
         acceptanceRate: 22.5,
         postStudyWorkVisaYears: 1.5,
-        description: "Europe's leading technical university with virtually free/low tuition, top European industry partnerships (BMW, Siemens, Google Munich), and English-taught Master's.",
+        description: "Top German technical university (QS World University Rankings 2027 #25). For non-EU students, TUM's current published tuition is typically €2,000–€3,000 per semester for Bachelor's and €4,000–€6,000 per semester for Master's programmes. Programme-specific fees and waivers vary; TUM lists institutional waivers and scholarships. See official TUM fee and programme pages.",
         highlights: JSON.stringify(["Ultra Low Tuition Fees", "18-Month Post-Study Job Seeker Visa", "Strong Tech Ecosystem", "DAAD Eligible"]),
         universityType: "Public",
         websiteUrl: "https://www.tum.de",
@@ -372,7 +409,7 @@ async function runSeedDatabase(force = false) {
         country: "Canada",
         city: "Toronto, ON",
         flagEmoji: "🇨🇦",
-        worldRanking: 21,
+        worldRanking: 32,
         degreeLevel: "All",
         programMajor: "Applied Computing & Software Engineering",
         annualTuitionUsd: 38500,
@@ -581,6 +618,9 @@ async function runSeedDatabase(force = false) {
       verificationStatus: "unverified",
     }))).returning();
 
+    await seedRegionalUniversities();
+    await seedVerifiedUniversityFacts();
+
     // Program catalogue for the universities above (programs, per-program
     // requirements, application cycles, provenance links). Without this the
     // recommender has no programmes to rank on a fresh install.
@@ -779,8 +819,9 @@ async function runSeedDatabase(force = false) {
       lastVerifiedAt: null,
     })))
 
-    // Legacy cycle refresh is intentionally non-mutating: past deadlines are
-    // not rolled forward without a current official publication.
+    // Top up identity-only scholarship records, then apply only currently
+    // source-backed cycle dates (and clear expired unverified legacy dates).
+    await seedAdditionalScholarshipIdentities();
     try {
       await refreshSeededScholarshipCycles();
     } catch (err) {
@@ -931,7 +972,7 @@ const FORUM_THREAD_SPECS = [
   {
     categorySlug: "scholarships",
     title: "Complete Calendar of Fully Funded Scholarships for Uzbek Students (2026–2027 Cycle)",
-    body: "Here is our master calendar of fully funded scholarships open to applicants from Uzbekistan:\n\n1. **Chevening Scholarship (UK Master's)** — Opens August, closes early November.\n2. **DAAD Study Scholarships (Germany Master's)** — Closes October/November via DAAD Portal.\n3. **Gates Cambridge & Knight-Hennessy (UK/US)** — October to December.\n4. **Stipendium Hungaricum (Hungary BSc/MSc/PhD)** — Closes January 15 on DreamApply + Uzbek Ministry registration.\n5. **Türkiye Bursları (Turkey BSc/MSc/PhD)** — January 10 to February 20 on TBBS.\n6. **Global Korea Scholarship (GKS Undergrad & Grad)** — Undergrad in Sept/Oct; Graduate in Feb/March.\n7. **MEXT Embassy Track (Japan)** — Embassy of Japan in Tashkent call opens in April/May.\n8. **El-Yurt Umidi Foundation (Uzbekistan Presidential Grant)** — Multiple calls per year for Top-300 QS/THE admit holders.",
+    body: "Cycle dates change and several providers set deadlines by country, course, or institution. As checked on 22 October 2026: **Chevening Uzbekistan 2027/28 is closed** (the official country page listed 6 October 2026, 11:00 UTC); **Gates Cambridge 2027/28** uses course-dependent deadlines of 8 December 2026 or 6 January 2027 for applicants outside the US-resident round; **France Excellence Eiffel 2027** has an institution-submission deadline of 6 January 2027. The 2027/28 Stipendium Hungaricum call was not yet published, DAAD EPOS deadlines vary by course, and GKS Graduate dates vary by first-round embassy/university. Always follow the linked official provider and local partner; do not rely on an old calendar or treat estimates as confirmed deadlines.",
     isPinned: true,
     viewCount: 685,
     replies: [
@@ -2981,6 +3022,30 @@ You need an **admission or conditional admission letter** from a currently opera
     ],
   },
 ];
+
+// Phase 7 walkthrough: additive and idempotent by course title in seedCourses.
+// The references below are official sources; students must re-check each portal
+// and cycle because field names, limits and workflows can change.
+COURSE_CATALOG_SPECS.push({
+  title: "To'liq Hujjat Topshirish Strategiyasi / Common App & Coalition Walkthrough",
+  description: "A practical, source-linked walkthrough for preparing a first-year application with Common App or Apply with Scoir. Examples are instructional only; use your own records and each college's current requirements.",
+  instructorName: "ScholarBridge Application Advising Team",
+  level: "Beginner",
+  thumbnailUrl: "",
+  modules: [{
+    title: "Prepare, report, submit and follow up",
+    description: "Seven short lessons for accurate application preparation and post-submission follow-up.",
+    lessons: [
+      { title: "1. Gather family information privately", videoUrl: "", durationSeconds: 0, content: `## Prepare without over-collecting\n\nBefore opening the application, privately locate likely information for parents or guardians: legal names, contact details, education and degrees, attended institutions and years, occupation/title and employer. Some platforms or applicant circumstances may ask for birthplace or household-size details; check the current form first.\n\nEnter only what the official application actually requests. Do not paste family identifiers into ScholarBridge notes or send sensitive documents through ordinary email.\n\nOfficial starting points (checked 2026-10-22): Common App first-year guide — https://www.commonapp.org/apply/first-year-students/ ; Apply with Scoir student guide — https://help.scoir.com/article/qqnplr6x2u-for-students-how-to-apply-with-scoir`, quizQuestions: [{ question: "What should you do with family details while preparing?", options: ["Gather privately, check the current official form, and enter only what it requests", "Store every family document in an unrelated student application", "Guess missing facts", "Send identity details to every recommender by email"], correctOptionIndex: 0 }] },
+      { title: "2. Match coursework to the transcript", videoUrl: "", durationSeconds: 0, content: `## Report the academic record faithfully\n\nCopy course names and codes from the official transcript, not from memory. Check the platform's current instructions for senior-year courses and status labels such as in progress or not yet started. Do not change a status to make a schedule look more advanced.\n\nFor dual-enrollment courses, read the exact instructions for the platform you use. Apply with Scoir's student guide distinguishes high-school and college information and includes college coursework; individual application configurations can vary.\n\nCommon App Academic Record Reporting resource (official): https://www.commonapp.org/files/webinar_decks/Academic-Record-Reporting.pdf ; Scoir guide: https://help.scoir.com/article/qqnplr6x2u-for-students-how-to-apply-with-scoir (checked 2026-10-22).`, quizQuestions: [{ question: "How should coursework titles be entered?", options: ["Match the official transcript and follow the current portal's status instructions", "Expand titles from memory", "Mark all future courses as completed", "Use a translation that changes the course meaning"], correctOptionIndex: 0 }] },
+      { title: "3. Select and order academic honors", videoUrl: "", durationSeconds: 0, content: `## Choose recognitions, do not invent a tier\n\nThe Common App Gather Materials resource says applicants may include up to five academic honors. The cap is an interface limit, not a recommendation to fill every slot. Use the honor's accurate name, year and recognition level.\n\nA practical prioritization order—international, national, regional/state, school—can help compare items, but it is a coaching heuristic, not an official admissions rule or a ranking of a student's worth. Put the most significant and best-supported recognitions first.\n\nOfficial Common App resource (last revised 2025-06-25, accessed 2026-10-22): https://www.commonapp.org/static/b3bf7d597fc06144ea6e0ff4673eb6b2/Resource_FY_GatherMaterials_ENG_2025.06.25_1.pdf`, quizQuestions: [{ question: "How should you use an honors limit?", options: ["Select the most meaningful verified honors within the current portal limit", "Invent a fifth honor to fill every slot", "Treat a coaching tier order as an official rule", "List an award without checking its exact title"], correctOptionIndex: 0 }] },
+      { title: "4. Build a focused activities list", videoUrl: "", durationSeconds: 0, content: `## Depth, accuracy and the portal's separate fields\n\nThe current Common App guidance allows up to ten activity entries; it does not require ten. Include work, family responsibilities, hobbies, community engagement and other experiences that genuinely represent you. Show progression where it happened.\n\nReport years/grades, hours per week and weeks per year in their designated fields. Keep the 150-character activity-description field concise and evidence-based. Action-led drafts can help, but do not force a fabricated metric or duplicate time fields if the portal already collects them separately.\n\nOfficial Common App Activities resource, last revised 2025-06-25 and accessed 2026-10-22: https://www.commonapp.org/static/a5d59a915bdc2031e62c468ad35e0de9/Resource_FY_Activities_ENG_2025.06.25_0.pdf`, quizQuestions: [{ question: "Must every applicant fill all ten activity slots?", options: ["No; choose the meaningful experiences that best represent the applicant", "Yes; ten is an admissions requirement", "Only paid work counts", "Hours and weeks should be guessed"], correctOptionIndex: 0 }] },
+      { title: "5. Prepare a respectful recommender packet", videoUrl: "", durationSeconds: 0, content: `## Ask early, share context securely\n\nAsk whether the recommender is willing before sending an application invitation. Aim for about a month or more before the earliest deadline when feasible; official Common App guidance advises asking at least three weeks ahead. Follow each college's own recommender types and deadlines.\n\nOffer a short reflection or brag sheet, an accurate CV, programme/deadline list and examples the recommender may consider. Share a legal name, application ID, date of birth, high-school name and city/country only when needed to identify the correct record, and use the official secure portal or another agreed secure channel.\n\nCommon App recommendation process resource (2025-06-25): https://www.commonapp.org/static/088c92645a5827f61016fd81ac42b3f4/Resource_FY_RecProcess_ENG_2025.06.25_1.pdf`, quizQuestions: [{ question: "What is a good recommender packet practice?", options: ["Ask early, provide concise context and use secure channels for identifiers", "Require a letter regardless of college policy", "Send passport scans and birth dates in an unsolicited email", "Ask the night before every deadline"], correctOptionIndex: 0 }] },
+      { title: "6. Keep essays clean and honor upload rules", videoUrl: "", durationSeconds: 0, content: `## Plain text first; follow each portal's accepted formats\n\nRich-text paste can carry unwanted fonts, spacing or hidden formatting. Paste plain text into portal text boxes and review the result, word count and character count. Keep a clean copy in your own files.\n\nUpload a PDF only when the college accepts or requests it; there is no universal PDF-only rule. Check the live portal for file types, size limits, naming rules and whether a document belongs in an upload field. A sample locker essay is not evidence of an applicant's work until it is personally written and checked.`, quizQuestions: [{ question: "Which upload format should you choose?", options: ["The format the specific college portal currently accepts or requests", "Always PDF regardless of portal instructions", "A rich-text file pasted into every text box", "Any format under any size limit"], correctOptionIndex: 0 }] },
+      { title: "7. Submit, then check the college's own portal", videoUrl: "", durationSeconds: 0, content: `## Submission is one milestone, not proof every item arrived\n\nAfter submitting through Common App or Apply with Scoir, watch the email address used on the application and follow the college's official instructions to open its applicant status portal. Invitation timing varies; do not promise a 24–72-hour arrival window.\n\nRecord the college-issued application ID separately from a Common App or Scoir ID. Check the portal's checklist for required scores, recommendations, portfolios or other documents, and record each college's actual response deadline. Do not assume every institution uses the same May 1 reply date. If a required item is missing, use the college's official contact channel.\n\nCommon App explains colleges download/import records on their own timelines: https://membersupport.commonapp.org/s/article/I-submitted-my-application-successfully-Why-does-the-college-say-they-didn-t-receive-my-information-yet (accessed 2026-10-22).`, quizQuestions: [{ question: "What should you do after submission?", options: ["Use the college's official portal to verify its checklist and deadlines", "Assume all recommendations and scores arrived immediately", "Assume every college uses May 1", "Ignore a separate college-issued ID"], correctOptionIndex: 0 }] },
+    ],
+  }],
+});
 
 export async function seedCourses() {
   try {
