@@ -1,8 +1,8 @@
 /**
  * Shared security-header policy.
  *
- * Imported by both `next.config.ts` (Node) and `src/proxy.ts` (Edge), so
- * it must stay free of Node-only APIs.
+ * Imported by both `next.config.ts` and `src/proxy.ts`, so it must stay free
+ * of Node-only APIs.
  *
  * The one environment-dependent decision is framing:
  *
@@ -145,7 +145,7 @@ export function isCrossSiteApiWrite(req: {
  * enforces its own (smaller) cap — the biggest legitimate payload in the app is
  * the admin config import at 512 KB. This global ceiling exists for the routes
  * that still call `await request.json()` directly: it is enforced in the
- * middleware, BEFORE the route runs, so an attacker cannot make the server
+ * Proxy, BEFORE the route runs, so an attacker cannot make the server
  * buffer an arbitrarily large JSON document.
  *
  * `multipart/form-data` (the branding logo upload) is exempt — that path has
@@ -156,8 +156,8 @@ export const MAX_API_JSON_BODY_BYTES = 1024 * 1024;
 /**
  * Should this API request be refused for carrying an oversized JSON body?
  *
- * Only a *declared* Content-Length can be checked in the middleware (the Edge
- * runtime does not read the body here). That is enough to stop the ordinary
+ * Only a *declared* Content-Length is checked in Proxy; it intentionally does
+ * not buffer request bodies. That is enough to stop the ordinary
  * attack: a client that streams an unbounded body while declaring nothing is
  * still caught by `readJsonBody`'s streaming cap on the routes that use it.
  */

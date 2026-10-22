@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -10,6 +10,7 @@ import { countriesMatch } from "@/lib/countries";
 import { expandMultilingualSearchTerms, localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { matchesUniversityType } from "@/lib/universityType";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
@@ -25,21 +26,48 @@ export async function GET(req: Request) {
     const locale = localeFromRequest(req);
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
-    const search = searchParams.get("search")?.toLowerCase();
-    const country = searchParams.get("country");
-    const degreeLevel = searchParams.get("degreeLevel");
-    const maxTuition = searchParams.get("maxTuition");
-    const sort = searchParams.get("sort");
-    const uniType = searchParams.get("type"); // Public | Private
-    const ieltsFilter = searchParams.get("ielts"); // e.g. "6.5" → only unis with minIelts <= 6.5
-    const minRank = searchParams.get("minRank") ? Number(searchParams.get("minRank")) : null;
-    const maxRank = searchParams.get("maxRank") ? Number(searchParams.get("maxRank")) : null;
+    const search = searchParams.get("search")?.trim().slice(0, 200).toLowerCase();
+    const country = searchParams.get("country")?.trim().slice(0, 100);
+    const degreeLevel = searchParams.get("degreeLevel")?.trim().slice(0, 50);
+    const maxTuition = searchParams.get("maxTuition")?.slice(0, 24);
+    const sort = searchParams.get("sort")?.slice(0, 24);
+    const uniType = searchParams.get("type")?.trim().slice(0, 24); // Public | Private
+    const ieltsFilter = searchParams.get("ielts")?.slice(0, 12); // e.g. "6.5" → only unis with minIelts <= 6.5
+    const rank = (name: string) => {
+      const raw = searchParams.get(name);
+      if (!raw || raw.length > 12) return null;
+      const value = Number(raw);
+      return Number.isSafeInteger(value) && value > 0 && value <= 1_000_000 ? value : null;
+    };
+    const minRank = rank("minRank");
+    const maxRank = rank("maxRank");
 
     // One cached read of the base catalogue (all universities + program fields
     // + source links) instead of 3 full joins per filter change; the returned
     // array/map are copies, so filtering and sorting below are unaffected.
     const bundle = await getCachedUniversitiesBundle();
-    let allUnis = [...bundle.unis];
+    // Values on an unverified university row are not suitable for filters,
+    // ordering, or chancing inputs. Preserve the database row; sanitize only
+    // this response-local copy. Institution type is handled separately and
+    // remains unknown unless its own evidence says otherwise.
+    let allUnis = bundle.unis.map((uni) => {
+      if (uni.verificationStatus === "verified") return { ...uni };
+      return {
+        ...uni,
+        annualTuitionUsd: null,
+        annualLivingEstUsd: null,
+        accommodationCostUsd: null,
+        annualTuition: null,
+        annualLivingEst: null,
+        accommodationCost: null,
+        applicationFee: null,
+        minGpa: null,
+        minIelts: null,
+        minSat: null,
+        acceptanceRate: null,
+        postStudyWorkVisaYears: null,
+      };
+    });
 
     // Get profile for match calculation if provided. The same mapping is used
     // by Explorer, Chancing and the dashboard, including the structured
@@ -49,12 +77,12 @@ export async function GET(req: Request) {
     /** Same student read through the 5-layer positioning engine (chance). */
     let chancingProfile = null;
     if (profileIdStr) {
-      const pId = parseInt(profileIdStr, 10);
+      const pId = Number(profileIdStr);
       // Personalised matching reads private profile data (GPA, scores,
       // degree), so only the owner — or an admin — gets it. Anyone else
       // silently receives the public, unpersonalised list.
       const auth = await authenticate(req);
-      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+      if (Number.isSafeInteger(pId) && pId > 0 && auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
         // 15 s memo of the derived match inputs — the profile and its
         // activity portfolio are edited far less often than they are read.
         const cached = await getCachedProfileForMatching(pId);
@@ -95,8 +123,7 @@ export async function GET(req: Request) {
     // Type is a published catalogue filter; an unpublished type stays unknown
     // and is not silently treated as either Public or Private.
     if (uniType && ["Public", "Private"].includes(uniType)) {
-      const wantedType = uniType.toLocaleLowerCase();
-      allUnis = allUnis.filter((u) => u.universityType?.trim().toLocaleLowerCase().includes(wantedType));
+      allUnis = allUnis.filter((u) => matchesUniversityType(u.universityType, uniType));
     }
 
     // Keep the owner's target degree authoritative and recognise equivalent
@@ -110,21 +137,25 @@ export async function GET(req: Request) {
     }
 
     // Tuition filter: only universities with VERIFIED tuition (NULL excluded, spec §16).
-    if (maxTuition && !isNaN(Number(maxTuition))) {
+    if (maxTuition != null && maxTuition !== "") {
       const maxT = Number(maxTuition);
-      allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
+      if (Number.isFinite(maxT) && maxT >= 0 && maxT <= 100_000_000) {
+        allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
+      }
     }
 
-    if (ieltsFilter && !isNaN(Number(ieltsFilter))) {
+    if (ieltsFilter != null && ieltsFilter !== "") {
       const minI = Number(ieltsFilter);
-      allUnis = allUnis.filter(u => u.minIelts != null && u.minIelts <= minI);
+      if (Number.isFinite(minI) && minI >= 0 && minI <= 9) {
+        allUnis = allUnis.filter(u => u.minIelts != null && u.minIelts <= minI);
+      }
     }
 
     if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
     // Program search: universities offering a program in the searched field (exact).
-    const programFilter = searchParams.get("program");
+    const programFilter = searchParams.get("program")?.trim().slice(0, 120);
     if (programFilter && programFilter !== "All") {
       const uniIds = new Set<number>();
       for (const [uniId, fields] of programFieldsByUni) {
@@ -314,7 +345,7 @@ export async function GET(req: Request) {
     // Without those params the full list is returned (admin tools, ...).
     // Rows are localized LAST — every filter/match above ran on canonical
     // English data, so canonical dropdown values never break (spec §3 STEP 3.1).
-    return NextResponse.json(
+    return privateNoStoreJson(
       paginatedPayload("universities", results.map((u) => localizeUniversityRow(u, locale)), searchParams),
     );
   } catch (error) {
@@ -323,7 +354,7 @@ export async function GET(req: Request) {
     // would be shown made-up data as if it were real. Clients show the error
     // (the website's explorer / detail views, and the Telegram bot's
     // \"temporarily unavailable\" message for 503).
-    return NextResponse.json(
+    return privateNoStoreJson(
       { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
       { status: 503 },
     );

@@ -357,25 +357,21 @@ void (async () => {
   } = await import("../src/db/seedRichPlatformData");
   const { OPPORTUNITY_CATALOG } = await import("../src/db/seedOpportunities");
 
-  check("12 verified Uzbek student success stories across major destinations", () => {
-    assert.equal(RICH_SUCCESS_STORIES.length, 12);
-    assert.ok(RICH_SUCCESS_STORIES.every((s) => s.status === "approved" && s.isVerified && s.proofUrl.startsWith("https://")));
+  check("unverified synthetic student stories are excluded from public seed data", () => {
+    assert.equal(RICH_SUCCESS_STORIES.length, 0);
   });
-  check("50+ official source-linked visa requirements across 10 countries", () => {
-    assert.ok(RICH_VISA_REQUIREMENTS.length >= 50);
-    const countries = new Set(RICH_VISA_REQUIREMENTS.map((r) => r.country));
-    assert.ok(countries.size >= 10);
-    assert.ok(RICH_VISA_REQUIREMENTS.every((r) => r.sourceUrl.startsWith("http") && r.sourceName.length > 3));
+  check("visa requirements are not published without current official-source review", () => {
+    assert.equal(RICH_VISA_REQUIREMENTS.length, 0);
   });
   check("34 verified global & Uzbekistan-eligible opportunities in OPPORTUNITY_CATALOG", () => {
     assert.equal(OPPORTUNITY_CATALOG.length, 34);
     assert.ok(OPPORTUNITY_CATALOG.every((o) => o.url.startsWith("https://") && o.description.length >= 40));
   });
-  check("12 verified alumni mentors & 8 official learning/test-prep providers", () => {
-    assert.equal(RICH_MENTORS.length, 12);
-    assert.ok(RICH_MENTORS.every((m) => m.isVerified && m.isActive));
+  check("unverified alumni identities are excluded; provider candidates remain separate", () => {
+    assert.equal(RICH_MENTORS.length, 0);
     assert.equal(RICH_LEARNING_PROVIDERS.length, 8);
     assert.ok(RICH_LEARNING_PROVIDERS.every((p) => p.isEnabled && p.status === "sandbox"));
+    assert.ok(RICH_LEARNING_PROVIDERS.every((p) => !JSON.parse(p.config).lastVerifiedAt));
   });
   check("14 localized FAQ items in en, uz, and ru", () => {
     for (const l of ["en", "uz", "ru"]) {

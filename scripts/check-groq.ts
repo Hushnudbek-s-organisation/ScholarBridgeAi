@@ -484,9 +484,10 @@ async function main() {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
-  for (const [name, src] of [["chat", chat], ["analyze", analyze]] as const) {
-    if (!src.includes("aiChat(") || !src.includes('taskType: "visa"') || !/maxAttempts:\s*3/.test(src)) {
-      throw new Error(`visa ${name} route must call aiChat({ taskType: "visa" }, { maxAttempts: 3 })`);
+  for (const [name, src, attempts] of [["chat", chat, 2], ["analyze", analyze, 3]] as const) {
+    const opts = new RegExp(`maxAttempts:\\s*${attempts}`);
+    if (!src.includes("aiChat(") || !src.includes('taskType: "visa"') || !opts.test(src)) {
+      throw new Error(`visa ${name} route must use aiChat task routing with a bounded ${attempts}-attempt retry policy`);
     }
     if (src.includes("groqChatComplete")) {
       throw new Error(`visa ${name} route must not call Groq directly (provider is admin-selected)`);

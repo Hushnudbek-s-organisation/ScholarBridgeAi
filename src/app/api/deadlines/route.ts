@@ -303,6 +303,9 @@ export async function GET(req: Request) {
     // --- Scholarships: the student's saved awards (+ a small recommended
     //     full-coverage shortlist when they have barely saved anything) ---
     const datedScholarships = allScholarships
+      // Unverified dates may be stale or merely copied from prior cycles.
+      // They do not belong in a personal upcoming-deadline feed.
+      .filter((s) => s.verificationStatus === "verified")
       .map((s) => {
         let date: Date | null = null;
         if (s.deadlineDate) date = new Date(s.deadlineDate);

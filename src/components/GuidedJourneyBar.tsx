@@ -58,7 +58,7 @@ export function GuidedJourneyBar({
   // during render would flash the expanded bar on mobile (spec render rules).
   const [collapsed, setCollapsed] = useState(false);
   const [applicationCount, setApplicationCount] = useState<number | null>(null);
-  const [taskCount, setTaskCount] = useState<number | null>(null);
+  const [taskCount, setTaskCount] = useState<{ profileId: number; count: number } | null>(null);
 
   useEffect(() => {
     void Promise.resolve().then(() => setCollapsed(readCollapsed()));
@@ -78,11 +78,11 @@ export function GuidedJourneyBar({
 
   const profileId = activeProfile?.id ?? null;
 
-  // The two counts the shell does not already own (applications, pending
-  // roadmap tasks) are read once per profile — the same endpoints the
-  // tracker and the roadmap screens use, so numbers can never disagree.
+  // Application counts are loaded on profile changes; task counts additionally
+  // refresh after successful task mutations across the journey UI.
   useEffect(() => {
     let cancelled = false;
+    let taskRequest = 0;
     if (!profileId) {
       void Promise.resolve().then(() => {
         if (cancelled) return;
@@ -93,39 +93,46 @@ export function GuidedJourneyBar({
         cancelled = true;
       };
     }
+
+    const refreshTaskCount = async () => {
+      const request = ++taskRequest;
+      try {
+        const res = await fetch(`/api/tasks?profileId=${profileId}`);
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || request !== taskRequest) return;
+        setTaskCount(Array.isArray(data?.tasks)
+          ? { profileId, count: data.tasks.filter((task: { isCompleted?: boolean }) => task.isCompleted !== true).length }
+          : null);
+      } catch {
+        if (!cancelled && request === taskRequest) setTaskCount(null);
+      }
+    };
+
+    void refreshTaskCount();
+    const onTasksUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ profileId?: unknown }>).detail;
+      if (detail?.profileId === profileId) void refreshTaskCount();
+    };
+    window.addEventListener("scholarbridge:tasks-updated", onTasksUpdated);
+
     (async () => {
       try {
-        const [appsRes, tasksRes] = await Promise.all([
-          fetch(`/api/applications?profileId=${profileId}`),
-          fetch(`/api/tasks?profileId=${profileId}`),
-        ]);
-        const apps = appsRes.ok ? await appsRes.json() : null;
-        const tasks = tasksRes.ok ? await tasksRes.json() : null;
+        const res = await fetch(`/api/applications?profileId=${profileId}`);
+        const data = res.ok ? await res.json() : null;
         if (cancelled) return;
-        if (Array.isArray(apps?.applications)) {
-          setApplicationCount(
-            apps.applications.filter(
+        setApplicationCount(Array.isArray(data?.applications)
+          ? data.applications.filter(
               (a: { status?: string }) => !["decision", "withdrawn"].includes(String(a.status))
             ).length
-          );
-        } else {
-          setApplicationCount(null);
-        }
-        if (Array.isArray(tasks?.tasks)) {
-          setTaskCount(tasks.tasks.filter((task: { isCompleted?: boolean }) => task.isCompleted !== true).length);
-        } else {
-          setTaskCount(null);
-        }
+          : null);
       } catch {
-        // Unreachable counts render as "—", never as zero.
-        if (!cancelled) {
-          setApplicationCount(null);
-          setTaskCount(null);
-        }
+        if (!cancelled) setApplicationCount(null);
       }
     })();
+
     return () => {
       cancelled = true;
+      window.removeEventListener("scholarbridge:tasks-updated", onTasksUpdated);
     };
   }, [profileId]);
 
@@ -136,7 +143,7 @@ export function GuidedJourneyBar({
   const savedTotal = savedUniversityCount + savedScholarshipCount;
   // Step 3 counts document tasks in progress when the roadmap is readable;
   // NULL (request failed) renders "—", never a fabricated 0.
-  const docsInProgress = taskCount;
+  const docsInProgress = taskCount?.profileId === profileId ? taskCount.count : null;
   const appsActive = applicationCount;
 
   const steps = [

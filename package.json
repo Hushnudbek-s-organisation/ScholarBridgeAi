@@ -15,6 +15,7 @@
     "test:ai-settings": "tsx scripts/check-ai-settings.ts",
     "test:ai-format": "tsx scripts/check-ai-format.ts",
     "test:ai-cost": "tsx scripts/check-ai-cost.ts",
+    "test:stage3-performance": "tsx scripts/check-stage3-performance.ts",
     "test:groq": "tsx scripts/check-groq.ts",
     "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
     "test:schema": "tsx scripts/check-supabase-schema.ts",
@@ -70,7 +71,9 @@
     "test:calculations": "tsx scripts/check-calculations.ts",
     "test:streak": "tsx scripts/check-streak.ts",
     "test:responsive": "node scripts/check-responsive.mjs",
-    "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs"
+    "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs",
+    "test:stage7-seed-safety": "node scripts/check-stage7-seed-safety.mjs",
+    "test:task-sync": "node scripts/check-task-sync.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

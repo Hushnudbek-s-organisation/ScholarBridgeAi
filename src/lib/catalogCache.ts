@@ -88,6 +88,7 @@ export type OpportunitiesBundle = {
     | "provider"
     | "country"
     | "fields"
+    | "description"
     | "level"
     | "deadlineDate"
     | "url"
@@ -272,16 +273,60 @@ async function buildScholarshipsBundle(): Promise<ScholarshipsBundle> {
   // The public catalogue and global search share one visibility boundary:
   // inactive records stay out of student-facing lists and search results.
   const rows = await db.select().from(scholarships).where(eq(scholarships.isActive, true));
-  const entries = rows.map((s) => ({
-    ...s,
-    // Keep canonical awardAmount/awardCurrency intact, but make the
-    // compatibility field explicitly USD-safe for existing displays.
-    amountUsdValue: resolvedUsdScholarshipAmount(s),
-  }));
+  const entries = rows.map((s) => {
+    const publicRow = s.verificationStatus === "verified" ? s : {
+      ...s,
+      coverageType: "Unspecified",
+      amountUsdValue: null,
+      awardAmount: null,
+      awardCurrency: null,
+      awardPeriod: null,
+      awardBasis: null,
+      deadline: null,
+      openingDate: null,
+      deadlineDate: null,
+      deadlineType: "unknown",
+      deadlineRangeStart: null,
+      deadlineRangeEnd: null,
+      recurrence: "none",
+      expectedOpeningPeriod: null,
+      expectedDeadlinePeriod: null,
+      applicationStatus: "unknown",
+      rounds: "[]",
+      degreeLevels: "[]",
+      eligibleMajors: "[]",
+      eligibleCountries: "[]",
+      minGpa: null,
+      minIelts: null,
+      financialNeedBased: null,
+      meritBased: null,
+      description: "Current award details are unverified.",
+      requirements: "Confirm current eligibility, award coverage, required documents, and dates with the official provider.",
+      fundingType: "",
+      tuitionCoverage: "",
+      livingAllowance: null,
+      travelAllowance: null,
+      accommodation: "",
+      applicationFee: null,
+      englishRequirements: "",
+      requiredDocuments: "[]",
+      applicationUrl: null,
+      sourceUrl: null,
+      lastVerifiedAt: null,
+    };
+    return {
+      ...publicRow,
+      // Keep canonical award fields intact only for verified rows; unverified
+      // mirrors stay null instead of being inferred from legacy USD values.
+      amountUsdValue: publicRow.verificationStatus === "verified"
+        ? resolvedUsdScholarshipAmount(publicRow)
+        : null,
+    };
+  });
 
   const sourceMap = new Map<number, SourceSignal>();
   try {
-    const ids = entries.map((s) => s.id);
+    const ids = entries.filter((s) => s.verificationStatus === "verified").map((s) => s.id);
     if (ids.length > 0) {
       const links = await db
         .select()
@@ -359,6 +404,7 @@ async function buildOpportunitiesBundle(): Promise<OpportunitiesBundle> {
       provider: opportunities.provider,
       country: opportunities.country,
       fields: opportunities.fields,
+      description: opportunities.description,
       level: opportunities.level,
       deadlineDate: opportunities.deadlineDate,
       url: opportunities.url,

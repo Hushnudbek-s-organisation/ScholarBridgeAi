@@ -16,6 +16,7 @@
  *   - video   → the HTML5 `<video>` element for real media files.
  */
 import React from "react";
+import { useTranslations } from "next-intl";
 import { ExternalLink } from "lucide-react";
 
 export type VideoEmbed =
@@ -157,6 +158,7 @@ export function SmartVideoPlayer({
   className = "",
   compact = false,
 }: SmartVideoPlayerProps) {
+  const t = useTranslations("courses");
   const embed = parseVideoEmbed(url);
   const frame = compact ? "aspect-video w-full" : "w-full aspect-video";
 
@@ -165,7 +167,7 @@ export function SmartVideoPlayer({
       <div
         className={`flex items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs font-medium text-slate-500 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400 ${frame} ${className}`}
       >
-        {emptyLabel ?? "—"}
+        {emptyLabel ?? t("noVideoYet")}
       </div>
     );
   }
@@ -184,8 +186,8 @@ export function SmartVideoPlayer({
           className={`${frame} border-0 bg-black`}
         />
         <p className="flex items-center justify-end gap-1 px-1 pt-1 text-[10px] font-semibold text-slate-400">
-          {embed.provider}
-          <ExternalLink className="h-3 w-3" />
+          {embed.provider === "Embed" ? t("externalVideoPlayer") : embed.provider}
+          <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </p>
       </div>
     );

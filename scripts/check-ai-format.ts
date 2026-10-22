@@ -328,7 +328,10 @@ check("OpenRouter default model id is sourced from the central registry", () => 
   const settingsSrc = read("src/lib/ai/settings.ts");
   const modelIdsSrc = read("src/lib/ai/openrouterModelIds.ts");
   assert.match(settingsSrc, /defaultModel: OPENROUTER_MODEL_IDS\.chat/);
-  assert.match(modelIdsSrc, /chat: "minimax\/minimax-m3\.1-flash:free"/);
+  // IDs now live in the typed capability registry; the compatibility alias
+  // must reference that registry instead of duplicating the literal.
+  assert.match(modelIdsSrc, /chat: \{\s*modelId: "minimax\/minimax-m3\.1-flash:free"/);
+  assert.match(modelIdsSrc, /chat: OPENROUTER_MODEL_REGISTRY\.chat\.modelId/);
 });
 
 check("package.json exposes test:ai-format", () => {

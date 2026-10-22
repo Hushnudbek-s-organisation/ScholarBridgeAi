@@ -65,12 +65,32 @@ async function main() {
   const request = await import("../src/lib/request");
   const payments = await import("../src/lib/payments");
   const { contentSecurityPolicy, proxy: middleware } = await import("../src/proxy");
+  const { shouldRetrySessionRestore } = await import("../src/lib/sessionRestore");
   const { NextRequest } = await import("next/server");
   // The exact function the App Router uses to pull the nonce out of the request
   // CSP header — used below to prove our policy format is compatible.
   const { getScriptNonceFromHeader } = await import(
     "next/dist/server/app-render/get-script-nonce-from-header.js"
   );
+
+  console.log("\n— session restoration retry policy —");
+
+  check("session_secret_required is not retried", () => {
+    assert.equal(shouldRetrySessionRestore(503, "session_secret_required", 0), false);
+  });
+  check("transient 5xx session failures retry before the bounded final attempt", () => {
+    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 0), true);
+    assert.equal(shouldRetrySessionRestore(502, undefined, 1), true);
+    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 2), false);
+  });
+  check("client errors are not retried", () => {
+    assert.equal(shouldRetrySessionRestore(401, "unauthorized", 0), false);
+    assert.equal(shouldRetrySessionRestore(429, "rate_limited", 0), false);
+  });
+  check("session restoration applies the tested status/code/attempt policy", () => {
+    const home = readFileSync(join(ROOT, "src/app/HomeClient.tsx"), "utf8");
+    assert.match(home, /shouldRetrySessionRestore\(res\.status,\s*data\.code,\s*attempt\)/);
+  });
 
   console.log("\n— session tokens —");
 

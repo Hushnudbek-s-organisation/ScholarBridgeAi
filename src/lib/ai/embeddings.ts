@@ -3,6 +3,16 @@ import { callOpenRouterEmbeddings, OPENROUTER_MODELS } from "@/lib/ai/openrouter
 
 const LRU_LIMIT = 512;
 const DEFAULT_TIMEOUT_MS = 3_500;
+const REMOTE_EMBEDDINGS_OPT_IN_ENV = "OPENROUTER_ALLOW_REMOTE_EMBEDDINGS";
+
+function assertRemoteEmbeddingOptIn(model: string): void {
+  if (process.env[REMOTE_EMBEDDINGS_OPT_IN_ENV] !== "true") {
+    throw new Error(`Remote embeddings are disabled until the operator explicitly sets ${REMOTE_EMBEDDINGS_OPT_IN_ENV}=true after reviewing provider data handling.`);
+  }
+  if (model.endsWith(":free")) {
+    throw new Error("The selected free embedding endpoint is documented as a trial and may log input; configure a reviewed non-free endpoint for production use.");
+  }
+}
 const textVectorCache = new Map<string, number[]>();
 
 function normalizeText(value: string): string {
@@ -45,14 +55,26 @@ export async function embedTexts(
   });
   const missingIndexes = vectors.flatMap((vector, index) => vector ? [] : [index]);
   if (missingIndexes.length) {
+    assertRemoteEmbeddingOptIn(model);
     const response = await callOpenRouterEmbeddings({
       model,
       input: missingIndexes.map((index) => texts[index]),
       timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      taskType: "text_embedding",
     });
     if (response.data.length !== missingIndexes.length) throw new Error("OpenRouter returned an unexpected embedding count");
+    const indexedRows = response.data.some((row) => row.index !== undefined);
+    let orderedRows = response.data;
+    if (indexedRows) {
+      if (response.data.some((row) => !Number.isSafeInteger(row.index) || (row.index as number) < 0 || (row.index as number) >= missingIndexes.length)) {
+        throw new Error("OpenRouter returned invalid embedding indexes");
+      }
+      const byIndex = new Map(response.data.map((row) => [row.index as number, row]));
+      if (byIndex.size !== missingIndexes.length) throw new Error("OpenRouter returned duplicate embedding indexes");
+      orderedRows = Array.from({ length: missingIndexes.length }, (_, index) => byIndex.get(index)!);
+    }
     missingIndexes.forEach((inputIndex, responseIndex) => {
-      const embedding = response.data[responseIndex]?.embedding;
+      const embedding = orderedRows[responseIndex]?.embedding;
       if (!embedding?.length || embedding.some((value) => !Number.isFinite(value))) throw new Error("OpenRouter returned an invalid vector");
       vectors[inputIndex] = embedding;
       remember(keys[inputIndex], embedding);
@@ -114,6 +136,7 @@ export async function matchMultimodalDocumentReadiness(input: {
   }
   if (content.length === 0) throw new Error("Provide document text or an image");
   const model = process.env.OPENROUTER_VL_EMBEDDING_MODEL?.trim() || OPENROUTER_MODELS.multimodalEmbedding;
+  assertRemoteEmbeddingOptIn(model);
   const response = await callOpenRouterEmbeddings({
     model,
     input: [
@@ -121,6 +144,7 @@ export async function matchMultimodalDocumentReadiness(input: {
       ...DOCUMENT_READINESS_REFERENCES.map((reference) => ({ content: [{ type: "text", text: reference.text }] })),
     ],
     timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    taskType: "document_readiness_embedding",
   });
   if (response.data.length !== DOCUMENT_READINESS_REFERENCES.length + 1) throw new Error("OpenRouter returned an unexpected readiness vector count");
   const embedding = response.data[0]?.embedding;
@@ -158,10 +182,12 @@ export async function embedMultimodalDocument(input: {
   }
   if (content.length === 0) throw new Error("Provide document text or an image");
   const model = process.env.OPENROUTER_VL_EMBEDDING_MODEL?.trim() || OPENROUTER_MODELS.multimodalEmbedding;
+  assertRemoteEmbeddingOptIn(model);
   const response = await callOpenRouterEmbeddings({
     model,
     input: [{ content }],
     timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    taskType: "multimodal_document_embedding",
   });
   const vector = response.data[0]?.embedding;
   if (!vector?.length || vector.some((value) => !Number.isFinite(value))) throw new Error("OpenRouter returned an invalid document vector");

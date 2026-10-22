@@ -14,6 +14,7 @@ import {
   checkDocuments,
   expectedDocuments,
   parseDate,
+  scholarshipChecklistDocuments,
   type DocumentIssue,
   type DocumentRow,
 } from "../src/lib/documents";
@@ -55,6 +56,16 @@ const doc = (over: Partial<DocumentRow>): DocumentRow => ({
 });
 
 const codes = (issues: DocumentIssue[]) => issues.map((i) => i.code);
+
+section("0. Scholarship checklist fallback is transparent");
+const verifiedChecklist = scholarshipChecklistDocuments('["transcript", "recommendation_letter"]', true);
+check("a verified per-scholarship list remains required", verifiedChecklist.length === 2 && verifiedChecklist.every((item) => item.isRequired));
+check("an unverified per-scholarship list is not presented as a requirement", scholarshipChecklistDocuments('["passport"]', false).every((item) => !item.isRequired));
+const genericChecklist = scholarshipChecklistDocuments("[]");
+check("an absent list yields generic checklist items, not zero rows", genericChecklist.length > 0);
+check("generic suggestions are never marked required", genericChecklist.every((item) => !item.isRequired));
+check("generic labels tell students to verify official award requirements", genericChecklist.every((item) => /Suggested preparation only.*official award page/i.test(item.label)));
+check("malformed catalogue JSON also uses the optional fallback", scholarshipChecklistDocuments("{bad").every((item) => !item.isRequired));
 const has = (issues: DocumentIssue[], code: string) => codes(issues).includes(code);
 
 // ---------------------------------------------------------------------------

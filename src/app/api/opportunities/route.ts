@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { authenticate } from "@/lib/auth";
-import { countByType, rankOpportunities } from "@/lib/opportunities";
+import { countByType, mergeOpportunitySearchOrder, rankOpportunities } from "@/lib/opportunities";
 import { localeFromRequest } from "@/lib/engineText";
-import { localizeOpportunityRow } from "@/lib/catalogLocalizer";
+import { expandMultilingualSearchTerms, localizeOpportunityRow } from "@/lib/catalogLocalizer";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
+import { isUsefulSemanticQuery } from "@/lib/ai/semanticQuery";
 import { runMercuryDecision } from "@/lib/ai/decide";
 import { getCachedOpportunitiesBundle } from "@/lib/catalogCache";
 
@@ -24,10 +25,16 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const type = url.searchParams.get("type")?.trim();
-    const search = (url.searchParams.get("search") ?? url.searchParams.get("q") ?? "").trim();
-    const focusId = Number(url.searchParams.get("focusId") ?? url.searchParams.get("opportunityId"));
-    const sort = url.searchParams.get("sort")?.trim() || "match";
+    const type = url.searchParams.get("type")?.trim() || "";
+    const rawSearch = url.searchParams.get("search") ?? url.searchParams.get("q") ?? "";
+    if (rawSearch.length > 200) return NextResponse.json({ error: "search must be at most 200 characters" }, { status: 400 });
+    if (type && !["competition", "research", "internship", "summer_school"].includes(type)) {
+      return NextResponse.json({ error: "type is not supported" }, { status: 400 });
+    }
+    const search = rawSearch.trim();
+    const focusRaw = url.searchParams.get("focusId") ?? url.searchParams.get("opportunityId");
+    const focusId = focusRaw && /^\d{1,12}$/.test(focusRaw) ? Number(focusRaw) : Number.NaN;
+    const sort = url.searchParams.get("sort") === "deadline" ? "deadline" : "match";
 
     // Reuse the existing per-process catalogue cache: only the first cold read
     // (or the 60-second refresh) queries the full curated feed. Filter the
@@ -52,7 +59,7 @@ export async function GET(req: Request) {
     }
 
     const now = new Date();
-    const items = rows.map((r) => {
+    let items = rows.map((r) => {
       const opp = {
         id: r.id,
         type: r.type,
@@ -60,6 +67,7 @@ export async function GET(req: Request) {
         provider: r.provider,
         country: r.country,
         fields: r.fields,
+        description: r.description,
         level: r.level,
         deadlineDate: r.deadlineDate || null,
         url: r.url,
@@ -80,28 +88,44 @@ export async function GET(req: Request) {
       items.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || a.title.localeCompare(b.title));
     }
 
-    // Multilingual semantic order is a small best-effort boost on the
-    // deterministic relevance/deadline order; provider failure is a no-op.
-    if (search && items.length > 1 && sort !== "deadline") {
-      try {
-        const candidates = items.slice(0, 63).map((item) => [item.title, item.provider, item.country, item.fields, item.level, item.type].filter(Boolean).join(". "));
-        const ranked = await rankSemanticTexts(search, candidates, { timeoutMs: 3_500, limit: candidates.length });
-        const semanticPosition = new Map(ranked.flatMap((entry, position) => {
-          const item = items[entry.index];
-          return item ? [[item.id, position] as const] : [];
-        }));
-        const baselinePosition = new Map(items.map((item, position) => [item.id, position]));
-        const denominator = Math.max(1, items.length - 1);
-        items.sort((a, b) => {
-          const baseA = (baselinePosition.get(a.id) ?? denominator) / denominator;
-          const baseB = (baselinePosition.get(b.id) ?? denominator) / denominator;
-          const semA = (semanticPosition.get(a.id) ?? denominator) / denominator;
-          const semB = (semanticPosition.get(b.id) ?? denominator) / denominator;
-          return baseA * 0.7 + semA * 0.3 - (baseB * 0.7 + semB * 0.3);
-        });
-      } catch {
-        // Keep deterministic matches and order when OpenRouter is unavailable.
+    // Search is lexical-first and always works without a model. The explicit
+    // type filter and owner-authorized profile selection above are applied
+    // before a bounded semantic candidate set is formed.
+    if (search) {
+      const terms = expandMultilingualSearchTerms(search).map((term) => term.toLocaleLowerCase());
+      const lexicalIds = new Set(items.filter((item) => {
+        const haystack = [item.title, item.provider, item.country, item.fields, item.level, item.type, item.description]
+          .filter(Boolean).join(" ").normalize("NFKC").toLocaleLowerCase();
+        return terms.some((term) => term && haystack.includes(term));
+      }).map((item) => item.id));
+      const searchUniverse = items;
+      const lexicalItems = searchUniverse.filter((item) => lexicalIds.has(item.id));
+      items = lexicalItems;
+
+      if (sort !== "deadline" && isUsefulSemanticQuery(search) && searchUniverse.length > 1) {
+        try {
+          // Favor lexical hits in the batch, then fill from the profile-ranked
+          // and type-filtered catalogue. One query + at most 63 records.
+          const candidateUniverse = [
+            ...searchUniverse.filter((item) => lexicalIds.has(item.id)),
+            ...searchUniverse.filter((item) => !lexicalIds.has(item.id)),
+          ].slice(0, 63);
+          const semanticCandidates = candidateUniverse.map((item) => [item.title, item.provider, item.country, item.fields, item.level, item.type, item.description].filter(Boolean).join(". "));
+          const ranked = await rankSemanticTexts(search, semanticCandidates, { timeoutMs: 3_500, limit: 10 });
+          const semanticRows = ranked.flatMap((entry) => {
+            const item = candidateUniverse[entry.index];
+            return item ? [{ id: item.id, similarity: entry.similarity }] : [];
+          });
+          const merged = mergeOpportunitySearchOrder(searchUniverse, lexicalIds, semanticRows, 10);
+          if (merged.length) items = merged;
+        } catch {
+          // Keep only lexical matches in their deterministic profile order.
+        }
       }
+    }
+
+    if (sort === "deadline") {
+      items.sort((a, b) => (a.deadlineDate ?? "9999").localeCompare(b.deadlineDate ?? "9999") || a.title.localeCompare(b.title));
     }
 
     // Optional Mercury check only for a signed-in user and one explicitly

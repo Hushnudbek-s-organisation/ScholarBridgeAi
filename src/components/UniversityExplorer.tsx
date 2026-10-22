@@ -109,6 +109,7 @@ export interface University {
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   sourceLastVerifiedAt?: string | null;
+  universityType?: string | null;
 }
 
 const UNIVERSITY_FILTER_COUNTRIES = withQsTop200Countries([
@@ -1078,6 +1079,11 @@ export function UniversityExplorer({
                       {remainingMajorFields > 0 && <span> +{remainingMajorFields}</span>}
                     </div>
 
+                    {uni.universityType && (
+                      <span className="mb-2 inline-flex rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 dark:border-[#46536b] dark:bg-[#202b42] dark:text-[#e2e8f0]">
+                        {uni.universityType}
+                      </span>
+                    )}
                     <p className="text-[11px] text-slate-500 mb-2">
                       <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
                     </p>

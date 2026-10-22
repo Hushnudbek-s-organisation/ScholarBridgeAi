@@ -61,6 +61,25 @@ export async function POST(req: Request) {
     model = process.env.OPENROUTER_VL_EMBEDDING_MODEL?.trim() || OPENROUTER_MODELS.multimodalEmbedding;
   }
 
+  // The default free OpenRouter embedding cards explicitly warn that user
+  // input may be logged and must not include personal/confidential data. Do
+  // not transmit query or document content until the operator has reviewed
+  // those terms and deliberately opted in. Local lexical search remains usable.
+  if (process.env.OPENROUTER_ALLOW_REMOTE_EMBEDDINGS !== "true") {
+    return NextResponse.json({
+      error: "Optional remote embeddings are disabled until the operator reviews provider data handling and enables them.",
+      code: "remote_embeddings_opt_in_required",
+      model,
+    }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  if (model.endsWith(":free")) {
+    return NextResponse.json({
+      error: "Free embedding trials are not enabled for production use; configure a reviewed non-free model.",
+      code: "free_embedding_trial_not_supported",
+      model,
+    }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+
   try {
     const result = kind === "text"
       ? {

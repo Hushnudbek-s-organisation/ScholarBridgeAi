@@ -25,7 +25,7 @@ import {
   levels,
   badges,
 } from "./schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { MIN_PASSWORD_LENGTH, hashPassword } from "@/lib/password";
 
 /** Local 8-char referral code generator (avoids importing gamification here). */
@@ -94,6 +94,30 @@ export async function seedDatabase(options?: { force?: boolean }): Promise<void>
 
   seedDatabasePromise = run;
   return run;
+}
+
+/** Source-verified type top-ups for exact seed identities only. Unknown schools stay unknown. */
+const VERIFIED_SEED_UNIVERSITY_TYPES = [
+  // MIT describes itself as privately endowed: https://policies.mit.edu/policies-procedures/10-institute/12-description
+  { name: "Massachusetts Institute of Technology (MIT)", websiteUrl: "https://www.mit.edu", type: "Private" },
+  // Stanford identifies itself as a private university: https://freespeech.stanford.edu/policies-and-guidance/events-and-spaces/visitors-stanford
+  { name: "Stanford University", websiteUrl: "https://www.stanford.edu", type: "Private" },
+  // TUM legal notice says it is a public-law corporation and state institution: https://www.tum.de/en/about-tum/contact-directions/legal-notice
+  { name: "Technical University of Munich (TUM)", websiteUrl: "https://www.tum.de", type: "Public" },
+  // U of T calls itself a public research university: https://www.utoronto.ca/
+  { name: "University of Toronto", websiteUrl: "https://www.utoronto.ca", type: "Public" },
+  // UBC calls itself a public university: https://www.ubc.ca/
+  { name: "University of British Columbia (UBC)", websiteUrl: "https://www.ubc.ca", type: "Public" },
+] as const;
+
+async function topUpVerifiedSeedUniversityTypes(): Promise<void> {
+  for (const row of VERIFIED_SEED_UNIVERSITY_TYPES) {
+    await db.update(universities).set({ universityType: row.type }).where(and(
+      eq(universities.name, row.name),
+      eq(universities.websiteUrl, row.websiteUrl),
+      or(sql`${universities.universityType} IS NULL`, sql`btrim(${universities.universityType}) = ''`),
+    ));
+  }
 }
 
 async function runSeedDatabase(force = false) {
@@ -259,11 +283,18 @@ async function runSeedDatabase(force = false) {
         }
       };
 
+      // This small, exact-identity update repairs only blank type fields; it
+      // never overwrites administrator-supplied values or guesses from names.
+      try {
+        await topUpVerifiedSeedUniversityTypes();
+      } catch (err) {
+        console.error("Verified university-type top-up failed:", err);
+      }
       if (force) {
         await runExistingCatalogTopUps();
       } else {
         // Do not block student-facing GET /api/universities or GET /api/scholarships
-        // when the primary catalogue already exists in PostgreSQL.
+        // on the heavier catalogue/schema top-ups.
         seedDatabaseCompleted = true;
         void runExistingCatalogTopUps();
       }
@@ -273,7 +304,7 @@ async function runSeedDatabase(force = false) {
     console.log("Seeding database with ScholarBridge dataset...");
 
     // Insert Default Universities
-    const insertedUnis = await db.insert(universities).values([
+    const insertedUnis = await db.insert(universities).values(([
       {
         name: "Massachusetts Institute of Technology (MIT)",
         country: "United States",
@@ -291,6 +322,7 @@ async function runSeedDatabase(force = false) {
         postStudyWorkVisaYears: 3.0,
         description: "World leader in technology, AI research, and engineering. MIT provides cutting-edge labs, startup incubators, and unmatched industry connections.",
         highlights: JSON.stringify(["OPT STEM 3-Year Extension", "World #1 CS Program", "Generous Need-Blind Aid", "CSAIL Research Lab"]),
+        universityType: "Private",
         websiteUrl: "https://www.mit.edu",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG"
       },
@@ -331,6 +363,7 @@ async function runSeedDatabase(force = false) {
         postStudyWorkVisaYears: 1.5,
         description: "Europe's leading technical university with virtually free/low tuition, top European industry partnerships (BMW, Siemens, Google Munich), and English-taught Master's.",
         highlights: JSON.stringify(["Ultra Low Tuition Fees", "18-Month Post-Study Job Seeker Visa", "Strong Tech Ecosystem", "DAAD Eligible"]),
+        universityType: "Public",
         websiteUrl: "https://www.tum.de",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg"
       },
@@ -351,6 +384,7 @@ async function runSeedDatabase(force = false) {
         postStudyWorkVisaYears: 3.0,
         description: "Canada's top research university offering PGWP up to 3 years, direct pathways to Canadian Permanent Residency, and premier Vector Institute AI partnerships.",
         highlights: JSON.stringify(["3-Year Post-Graduation Work Permit (PGWP)", "Express Entry PR Bonus Points", "Vector Institute AI Hub", "Co-op Internship Options"]),
+        universityType: "Public",
         websiteUrl: "https://www.utoronto.ca",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg"
       },
@@ -431,6 +465,7 @@ async function runSeedDatabase(force = false) {
         postStudyWorkVisaYears: 3.0,
         description: "Silicon Valley's powerhouse university. Unrivaled ecosystem for venture capital, technology commercialization, AI breakthrough labs, and founders.",
         highlights: JSON.stringify(["Knight-Hennessy Scholars Program", "Silicon Valley Venture Access", "3-Year STEM OPT", "Pioneer AI Research"]),
+        universityType: "Private",
         websiteUrl: "https://www.stanford.edu",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/6/64/Stanford_University_Quad_Memorial_Church.JPG"
       },
@@ -451,6 +486,7 @@ async function runSeedDatabase(force = false) {
         postStudyWorkVisaYears: 3.0,
         description: "Premier West Coast Canadian university surrounded by mountains and sea, renowned for sustainability, health tech, and AI co-op programs.",
         highlights: JSON.stringify(["3-Year PGWP Work Visa", "Vancouver Tech Hub", "International Leader Award", "Scenic Campus"]),
+        universityType: "Public",
         websiteUrl: "https://www.ubc.ca",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/3/30/Irving_K._Barber_Learning_Centre_-_University_of_British_Columbia_Vancouver_-_DSC09305.jpg"
       },
@@ -514,7 +550,36 @@ async function runSeedDatabase(force = false) {
         websiteUrl: "https://www.u-tokyo.ac.jp",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fa/2024_Yasuda_Auditorium_-_Tokyo_University.jpg"
       }
-    ]).returning();
+    ]) .map((candidate) => ({
+      // Keep the institution identity and candidate official website only.
+      // The legacy metrics, requirements, visa promises, descriptions and
+      // rankings have not been reviewed against current official pages.
+      ...candidate,
+      worldRanking: null,
+      degreeLevel: "All",
+      programMajor: null,
+      annualTuitionUsd: null,
+      annualLivingEstUsd: null,
+      accommodationCostUsd: null,
+      annualTuition: null,
+      annualLivingEst: null,
+      accommodationCost: null,
+      applicationFee: null,
+      minGpa: null,
+      minIelts: null,
+      minSat: null,
+      acceptanceRate: null,
+      postStudyWorkVisaYears: null,
+      foundedYear: null,
+      universityType: null,
+      internationalStudentsCount: null,
+      internationalStudentsPercentage: null,
+      description: "Institution record; current programme, cost, ranking, and admissions details are not source-verified.",
+      highlights: JSON.stringify([]),
+      sourceUrl: null,
+      lastVerifiedAt: null,
+      verificationStatus: "unverified",
+    }))).returning();
 
     // Program catalogue for the universities above (programs, per-program
     // requirements, application cycles, provenance links). Without this the
@@ -534,7 +599,7 @@ async function runSeedDatabase(force = false) {
     }
 
     // Insert Default Scholarships
-    await db.insert(scholarships).values([
+    await db.insert(scholarships).values(([
       {
         title: "Fulbright Foreign Student Program",
         provider: "United States Department of State",
@@ -671,12 +736,51 @@ async function runSeedDatabase(force = false) {
         requirements: "School nomination required, outstanding leadership traits, application to U of T undergraduate program.",
         websiteUrl: "https://future.utoronto.ca/pearson"
       }
-    ]);
+    ]) .map((candidate) => ({
+      // Retain only the identity and candidate official website from this
+      // legacy list. No current eligibility, award, currency, or cycle data
+      // has been source-reviewed, so fresh seeds must leave those unknown.
+      ...candidate,
+      coverageType: "Unspecified",
+      amountUsdValue: null,
+      awardAmount: null,
+      awardCurrency: null,
+      awardPeriod: null,
+      awardBasis: null,
+      tuitionCoverage: "",
+      fundingType: "",
+      livingAllowance: null,
+      travelAllowance: null,
+      accommodation: "",
+      applicationFee: null,
+      englishRequirements: "",
+      openingDate: null,
+      deadlineRangeStart: null,
+      deadlineRangeEnd: null,
+      rounds: JSON.stringify([]),
+      deadline: null,
+      deadlineDate: null,
+      deadlineType: "unknown",
+      recurrence: "none",
+      expectedDeadlinePeriod: null,
+      applicationStatus: "unknown",
+      degreeLevels: JSON.stringify([]),
+      eligibleMajors: JSON.stringify([]),
+      eligibleCountries: JSON.stringify([]),
+      minGpa: null,
+      minIelts: null,
+      financialNeedBased: null,
+      meritBased: null,
+      description: "Current award details have not been reviewed against an official source.",
+      requirements: "Check the official programme page for current eligibility, coverage, required documents, and application dates.",
+      requiredDocuments: JSON.stringify([]),
+      sourceUrl: null,
+      verificationStatus: "unverified",
+      lastVerifiedAt: null,
+    })))
 
-    // Fill dynamic lifecycle fields for seeded scholarships (spec §4):
-    // the seed ships fixed published dates; roll them to the next annual
-    // occurrence and label the cycle as recurring + unverified, so a fresh
-    // install does not present eight annual programmes as permanently CLOSED.
+    // Legacy cycle refresh is intentionally non-mutating: past deadlines are
+    // not rolled forward without a current official publication.
     try {
       await refreshSeededScholarshipCycles();
     } catch (err) {

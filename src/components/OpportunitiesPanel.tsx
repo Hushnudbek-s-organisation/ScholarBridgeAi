@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
-import { AlertTriangle, Compass, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, Compass, ExternalLink, Loader2, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
 import { ShowMoreToggle } from "@/components/hubs/ui";
@@ -63,30 +63,48 @@ export function OpportunitiesPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchDebounceRef = useRef<number | null>(null);
   // Six feed cards at a time — a curated first screen instead of dozens of
   // stacked boxes. The pill below unfolds the rest of the ranked list.
   const [visibleCount, setVisibleCount] = useState(6);
 
-  // setState only inside promise callbacks — never synchronously in the
-  // effect body (loading starts as `true` in state).
+  // Debounce the text input and abort superseded fetches so the latest query
+  // owns the panel even when an earlier network response is slow.
   useEffect(() => {
-    let live = true;
-    const qs = type ? `?type=${type}` : "";
-    fetch(`/api/opportunities${qs}`, { cache: "no-store" })
+    if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      searchDebounceRef.current = null;
+      setDebouncedSearch(search.trim());
+    }, 250);
+    return () => {
+      if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    };
+  }, [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    if (type) params.set("type", type);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    void Promise.resolve().then(() => {
+      setVisibleCount(6);
+      setLoading(true);
+      setError(null);
+      return fetch(`/api/opportunities?${params.toString()}`, { cache: "no-store", signal: controller.signal });
+    })
       .then((r) => r.json().then((b) => (r.ok ? b : Promise.reject(new Error(b?.error ?? `HTTP ${r.status}`)))))
-      .then((b) => {
-        if (live) setData(b);
-      })
-      .catch((e) => {
-        if (live) setError(e.message);
+      .then((b) => setData(b))
+      .catch((e: unknown) => {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setError(e instanceof Error ? e.message : "Request failed");
       })
       .finally(() => {
-        if (live) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
-    return () => {
-      live = false;
-    };
-  }, [type]);
+    return () => controller.abort();
+  }, [type, debouncedSearch]);
 
   const typeLabel = (k: string) =>
     k === "competition" ? t("competition") : k === "research" ? t("research") : k === "internship" ? t("internship") : t("summerSchool");
@@ -102,6 +120,20 @@ export function OpportunitiesPanel({
           {data?.scoredFor ? ` · ${t("scoredFor")}: ${data.scoredFor}` : ""}
         </p>
       </div>
+
+      <label className="relative mt-3 block max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value.slice(0, 120))}
+          placeholder={t("searchPlaceholder")}
+          aria-label={t("searchPlaceholder")}
+          maxLength={120}
+          className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-[#46536b] dark:bg-[#111a2e] dark:text-white dark:placeholder:text-[#a9b4c7]"
+        />
+      </label>
+      {loading && data && <p className="mt-1 text-[10px] text-slate-500" aria-live="polite">{t("loading")}</p>}
 
       {/* NEW FOR YOU — counts by type */}
       {data && (

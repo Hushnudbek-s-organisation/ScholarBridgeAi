@@ -913,7 +913,10 @@ async function main() {
   pg = null;
 
   console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
-  process.exitCode = failed === 0 ? 0 : 1;
+  // embedded-postgres installs an async-exit hook that can force exit(0),
+  // overriding process.exitCode. Exit explicitly so a failed payment suite
+  // cannot appear green in CI.
+  process.exit(failed === 0 ? 0 : 1);
 }
 
 main().catch(async (err) => {
@@ -929,5 +932,5 @@ main().catch(async (err) => {
   } catch {
     // ignore
   }
-  process.exitCode = 1;
+  process.exit(1);
 });

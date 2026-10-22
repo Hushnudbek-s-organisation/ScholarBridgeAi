@@ -171,6 +171,33 @@ export function rankOpportunities(
     .sort((a, b) => b.match - a.match || a.opportunity.id - b.opportunity.id);
 }
 
+/**
+ * Deterministically merge already-filtered lexical matches with a bounded
+ * semantic top-k. Weights are explicit: 35% lexical hit, 55% cosine similarity
+ * (negative similarity floors at zero), 10% existing profile match. With no
+ * semantic scores the exact lexical/profile ordering is left untouched.
+ */
+export function mergeOpportunitySearchOrder<T extends { id: number; match: number | null }>(
+  candidates: T[],
+  lexicalIds: ReadonlySet<number>,
+  semantic: readonly { id: number; similarity: number }[],
+  semanticLimit = 10,
+): T[] {
+  if (semantic.length === 0) return candidates.filter((item) => lexicalIds.has(item.id));
+  const semanticScores = new Map(semantic.slice(0, Math.max(1, Math.min(semanticLimit, 63))).map(({ id, similarity }) => [id, Math.max(0, Math.min(1, similarity))]));
+  return candidates
+    .filter((item) => lexicalIds.has(item.id) || semanticScores.has(item.id))
+    .sort((a, b) => {
+      const score = (item: T) =>
+        0.35 * Number(lexicalIds.has(item.id)) +
+        0.55 * (semanticScores.get(item.id) ?? 0) +
+        0.10 * ((item.match ?? 0) / 100);
+      return score(b) - score(a) ||
+        Number(lexicalIds.has(b.id)) - Number(lexicalIds.has(a.id)) ||
+        (b.match ?? -1) - (a.match ?? -1) || a.id - b.id;
+    });
+}
+
 /** "NEW FOR YOU" counts by type across the catalog. */
 export function countByType(opps: OpportunityInput[]): Record<string, number> {
   const out: Record<string, number> = { competition: 0, research: 0, internship: 0, summer_school: 0 };

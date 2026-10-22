@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { optionalProfileAccess } from "@/lib/auth";
 import { featureAccess, getPremiumStatus } from "@/lib/premium";
 import { DEFAULT_FEATURE_PLAN, type FeatureKey } from "@/lib/entitlements";
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;
     const access = await optionalProfileAccess(req, profileId);
     if (!access.ok) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: access.error, code: access.code },
         { status: access.status }
       );
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
     ];
 
     if (!profileId) {
-      return NextResponse.json({
+      return privateNoStoreJson({
         isPremium: false,
         plan: "free",
         features: {},
@@ -90,9 +90,9 @@ export async function GET(req: Request) {
       featureAccess(profileId, FEATURES),
       planCapsSnapshot(profileId),
     ]);
-    return NextResponse.json({ ...status, features, caps, packages });
+    return privateNoStoreJson({ ...status, features, caps, packages });
   } catch (error) {
     console.error("GET /api/premium/status error:", error);
-    return NextResponse.json({ error: "Failed to check premium status" }, { status: 500 });
+    return privateNoStoreJson({ error: "Failed to check premium status" }, { status: 500 });
   }
 }

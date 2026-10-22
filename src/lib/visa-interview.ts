@@ -548,13 +548,26 @@ const OPENING_GREETINGS: Record<string, (name: string) => string> = {
   國語: (name) => `您好${name ? `，${name}` : ""}。歡迎參加學生簽證面試。我們開始吧：`,
 };
 
+/** Keep profile-controlled names printable and speech-safe for the instant greeting. */
+export function sanitizeApplicantName(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .normalize("NFKC")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[\p{Cc}\p{Cf}]/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N} '\u2019-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+}
+
 /** Fast, deterministic, localized opening used before any provider round-trip. */
 export function buildInstantOpeningLine(
   country: VisaCountry,
   _gender: VisaOfficerGender,
   applicantName?: string | null,
 ): string {
-  const name = typeof applicantName === "string" ? applicantName.trim().slice(0, 80) : "";
+  const name = sanitizeApplicantName(applicantName);
   const greeting = (OPENING_GREETINGS[country.language] ?? OPENING_GREETINGS.English)(name);
   const firstQuestion = country.questions[0]?.trim() ?? "";
   return [greeting, firstQuestion].filter(Boolean).join(" ");

@@ -65,7 +65,7 @@ export async function GET(req: Request) {
     const decisionById = new Map(decisions.map((d) => [d.scholarshipId, d.status]));
     const savedIds = new Set(saved.map((s) => s.scholarshipId));
 
-    const all = rows.map((s) => {
+    const all = rows.filter((s) => s.verificationStatus === "verified").map((s) => {
       const m = calculateScholarshipMatch(matchProfile, s);
       const st = withStatus(s);
       const cov = evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) }, savedUniRefs);

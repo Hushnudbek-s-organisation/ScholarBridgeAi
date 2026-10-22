@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import {
   universities,
@@ -242,7 +242,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       uni = row;
     }
     if (!uni) {
-      return NextResponse.json({ error: "University not found" }, { status: 404 });
+      return privateNoStoreJson({ error: "University not found" }, { status: 404 });
+    }
+    // Do not return or use unverified institutional figures as factual data.
+    // This is a response-local copy; persisted catalogue/user data is untouched.
+    if (uni.verificationStatus !== "verified") {
+      uni = {
+        ...uni,
+        annualTuitionUsd: null,
+        annualLivingEstUsd: null,
+        accommodationCostUsd: null,
+        annualTuition: null,
+        annualLivingEst: null,
+        accommodationCost: null,
+        applicationFee: null,
+        minGpa: null,
+        minIelts: null,
+        minSat: null,
+        acceptanceRate: null,
+        postStudyWorkVisaYears: null,
+      };
     }
 
     // ---- Profile match (same engine + same row shape as the explorer) -----
@@ -271,9 +290,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const locale = localeFromRequest(req);
     const profileIdParam = new URL(req.url).searchParams.get("profileId");
     if (profileIdParam) {
-      const pId = Number.parseInt(profileIdParam, 10);
+      const pId = Number(profileIdParam);
       const auth = await authenticate(req);
-      if (auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
+      if (Number.isSafeInteger(pId) && pId > 0 && auth.ok && (auth.session.profile.id === pId || auth.session.isAdmin)) {
         const cachedProfile = await getCachedProfileForMatching(pId);
         if (cachedProfile) {
           const bundle = await getCachedUniversitiesBundle().catch(() => null);
@@ -312,7 +331,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const cachedBase = getCachedUniversityDetailBase(uniId);
     if (cachedBase) {
       // Localize the OUTGOING copy — the cache keeps canonical English rows.
-      return NextResponse.json(
+      return privateNoStoreJson(
         localizeDetailPayload(
           {
             ...cachedBase,
@@ -496,6 +515,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       let programMinGpa: number | null = null;
       let programMinAct: number | null = null;
       for (const r of reqRows) {
+        // Requirements without row-level verification are not facts. Keep them
+        // out of the response and out of the program minima consumed by
+        // matching/chancing; provenance alone (for example, a university root
+        // URL) does not verify a numeric requirement.
+        if (r.verificationStatus !== "verified" || !r.sourceUrl) continue;
         const prov = reqProvenance(r);
         if (r.minIelts != null) {
           reqs.push({ requirementType: "ielts", minimumValue: r.minIelts, valueText: null, ...prov });
@@ -528,24 +552,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         if (r.otherRequirements) reqs.push({ requirementType: "other", minimumValue: null, valueText: r.otherRequirements, ...prov });
       }
 
-      const flags = reqRows[0] ?? null;
+      const flags = reqRows.find((r) => r.verificationStatus === "verified" && Boolean(r.sourceUrl)) ?? null;
+      const programVerified = p.verificationStatus === "verified" && Boolean(p.sourceUrl);
       programsWithReqs.push({
         id: p.id,
         name: p.name,
         field: p.field,
         degree: p.degree,
-        durationYears: p.durationYears != null ? Number(p.durationYears) : null,
+        durationYears: programVerified && p.durationYears != null ? Number(p.durationYears) : null,
         durationUnit: p.durationUnit ?? "years",
         studyMode: p.studyMode,
         language: p.language,
-        tuitionAmount: p.tuitionAmount != null ? Number(p.tuitionAmount) : null,
+        tuitionAmount: programVerified && p.tuitionAmount != null ? Number(p.tuitionAmount) : null,
         tuitionCurrency: p.tuitionCurrency,
         tuitionPeriod: p.tuitionPeriod,
         description: p.description,
         // The published programme deadline (from `programs.application_deadline`).
         // NULL means the catalogue has no date for this programme — the UI
         // says "not announced" instead of showing a made-up one.
-        applicationDeadline: programDeadlineByProgramId.get(p.id) ?? null,
+        applicationDeadline: programVerified ? programDeadlineByProgramId.get(p.id) ?? null : null,
         minIelts: programMinIelts,
         minToefl: programMinToefl,
         minDuolingo: programMinDet,
@@ -899,7 +924,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     setCachedUniversityDetailBase(uniId, basePayload);
 
     // Localize the OUTGOING copy — the cache keeps canonical English rows.
-    return NextResponse.json(
+    return privateNoStoreJson(
       localizeDetailPayload(
         {
           ...basePayload,
@@ -915,7 +940,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // would be shown made-up data as if it were real. Clients show the error
     // (the website's explorer / detail views, and the Telegram bot's
     // "temporarily unavailable" message for 503).
-    return NextResponse.json(
+    return privateNoStoreJson(
       { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
       { status: 503 },
     );

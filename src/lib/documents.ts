@@ -27,6 +27,40 @@ export interface DocumentRow {
   uploadedAt: string | null;
 }
 
+/**
+ * A per-award verified list is authoritative when it contains valid strings.
+ * Otherwise provide optional preparation reminders, explicitly not award rules.
+ */
+export interface ScholarshipChecklistDocument {
+  documentType: string;
+  label: string;
+  isRequired: boolean;
+}
+
+const GENERIC_SCHOLARSHIP_PREPARATION: readonly ScholarshipChecklistDocument[] = [
+  { documentType: "suggested_scholarship_transcript", label: "Suggested preparation only — verify with the official award page: academic transcript", isRequired: false },
+  { documentType: "suggested_scholarship_essay", label: "Suggested preparation only — verify with the official award page: statement or essay, if requested", isRequired: false },
+  { documentType: "suggested_scholarship_recommendation", label: "Suggested preparation only — verify with the official award page: recommendation, if requested", isRequired: false },
+  { documentType: "suggested_scholarship_language_evidence", label: "Suggested preparation only — verify with the official award page: language-test evidence, if requested", isRequired: false },
+  { documentType: "suggested_scholarship_financial_evidence", label: "Suggested preparation only — verify with the official award page: financial evidence, if requested", isRequired: false },
+];
+
+export function scholarshipChecklistDocuments(rawRequiredDocuments: string | null | undefined, verifiedSource = false): ScholarshipChecklistDocument[] {
+  let parsed: unknown;
+  try { parsed = JSON.parse(rawRequiredDocuments || "[]"); } catch { parsed = null; }
+  const verified = Array.isArray(parsed)
+    ? [...new Set(parsed.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
+    : [];
+  if (verified.length && verifiedSource) {
+    return verified.map((documentType) => ({
+      documentType,
+      label: documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      isRequired: true,
+    }));
+  }
+  return GENERIC_SCHOLARSHIP_PREPARATION.map((item) => ({ ...item }));
+}
+
 export type Severity = "blocker" | "warning" | "info";
 
 export interface DocumentIssue {

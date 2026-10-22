@@ -24,6 +24,7 @@ import { AppNote } from "@/components/AppNote";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
 import { PanelSkeleton } from "@/components/hubs/ui";
+import { shouldRetrySessionRestore } from "@/lib/sessionRestore";
 
 /**
  * Every heavy screen is a separate chunk: the admin panel, the payments and
@@ -212,7 +213,6 @@ export function Home({
   const [savedUniversities, setSavedUniversities] = useState<SavedUniversityItem[]>([]);
   const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
   const [savedProgramCount, setSavedProgramCount] = useState(0);
-  const [taskCount, setTaskCount] = useState(0);
   /**
    * The one navigation entry point. It accepts anything the product has ever
    * used as a destination: a section id (`materials`), a pane deep link
@@ -350,23 +350,6 @@ export function Home({
     }
   }, []);
 
-  const fetchTaskCount = useCallback(async (profileId: number) => {
-    // The badge is decorative: a failed lookup (e.g. a profile this session
-    // may not read) must not log console errors or show a fake number
-    // (audit A24). Unknown stays "unknown" — we simply keep the previous 0.
-    try {
-      const res = await fetch(`/api/tasks?profileId=${profileId}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data.tasks)) {
-        const pending = data.tasks.filter((t: { isCompleted: boolean }) => !t.isCompleted);
-        setTaskCount(pending.length);
-      }
-    } catch {
-      /* non-fatal — the badge just keeps its previous value */
-    }
-  }, []);
-
   // Spec §24 — how many specific programmes the student has shortlisted.
   const fetchSavedProgramCount = useCallback(async (profileId: number) => {
     try {
@@ -382,8 +365,7 @@ export function Home({
     void fetchSavedUniversities(profileId);
     void fetchSavedScholarships(profileId);
     void fetchSavedProgramCount(profileId);
-    void fetchTaskCount(profileId);
-  }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount, fetchTaskCount]);
+  }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount]);
 
   /** Load the full profile list — only used by the profile picker. */
   const loadAllProfiles = useCallback(async () => {
@@ -409,12 +391,12 @@ export function Home({
       // student on the outage screen. Retry transient failures before showing
       // the recovery UI; a 401 is definitive and should return to sign-in now.
       let res: Response | null = null;
-      let data: { profile?: StudentProfile; error?: string } = {};
+      let data: { profile?: StudentProfile; error?: string; code?: string } = {};
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           res = await fetch("/api/auth/session", { cache: "no-store" });
           data = await res.json().catch(() => ({}));
-          if (res.ok || res.status === 401 || res.status < 500 || attempt === 2) break;
+          if (!shouldRetrySessionRestore(res.status, data.code, attempt)) break;
         } catch (err) {
           if (attempt === 2) throw err;
         }
@@ -457,6 +439,10 @@ export function Home({
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ profileId: storedId }),
+            }).then((res) => {
+              if (res.ok) {
+                window.dispatchEvent(new CustomEvent("scholarbridge:tasks-updated", { detail: { profileId: storedId } }));
+              }
             }).catch(() => {});
           } catch {
             // ignore
@@ -655,7 +641,6 @@ export function Home({
     setActiveProfile(null);
     setSavedUniversities([]);
     setSavedScholarships([]);
-    setTaskCount(0);
     setActiveTab("dashboard");
     setIsProfileModalOpen(false);
     setIsPickerOpen(false);

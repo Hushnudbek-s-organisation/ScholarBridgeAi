@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -26,7 +26,7 @@ import { guardStudent, serverError } from "@/lib/journey/api";
 import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/journey/stages";
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
 import { countActivities, profileStrength } from "@/lib/chancing";
-import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, toMatchProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
@@ -119,9 +119,11 @@ export async function GET(req: Request) {
       ),
     );
 
-    // ---- Applications for the progress summary + the next deadline ---------
-    const appRows = await db
-      .select({
+    // Independent bounded dashboard reads share one round trip rather than
+    // serializing unrelated profile tables. Keep this fan-out at four queries
+    // (the pool is capped at 15) and preserve dependencies below.
+    const [appRows, fundingRows, deadlineRows, expiring] = await Promise.all([
+      db.select({
         id: applications.id,
         universityId: applications.universityId,
         universityName: applications.universityName,
@@ -129,19 +131,34 @@ export async function GET(req: Request) {
         deadline: applications.deadline,
         status: applications.status,
         submittedAt: applications.submittedAt,
-      })
-      .from(applications)
-      .where(eq(applications.profileId, profileId))
-      .orderBy(desc(applications.updatedAt))
-      .limit(50);
+      }).from(applications).where(eq(applications.profileId, profileId))
+        .orderBy(desc(applications.updatedAt)).limit(50),
+      db.select().from(fundingItems).where(eq(fundingItems.profileId, profileId))
+        .orderBy(desc(fundingItems.updatedAt)).limit(50),
+      db.select().from(journeyDeadlines)
+        .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false)))
+        .orderBy(journeyDeadlines.dueDate).limit(12),
+      db.select({ id: userDocuments.id, title: userDocuments.title, docType: userDocuments.docType, expiresAt: userDocuments.expiresAt })
+        .from(userDocuments)
+        .where(and(eq(userDocuments.profileId, profileId), isNotNull(userDocuments.expiresAt), lte(userDocuments.expiresAt, addDaysIso(todayIso, 120))))
+        .orderBy(userDocuments.expiresAt).limit(5),
+    ]);
 
     const appIds = appRows.map((a) => a.id);
-    const offerRows = appIds.length
-      ? await db
-          .select({ applicationId: admissionOffers.applicationId, status: admissionOffers.status })
-          .from(admissionOffers)
-          .where(and(eq(admissionOffers.profileId, profileId), inArray(admissionOffers.applicationId, appIds)))
-      : [];
+    const [offerRows, recRows, providerRows, linkRows] = await Promise.all([
+      appIds.length
+        ? db.select({ applicationId: admissionOffers.applicationId, status: admissionOffers.status })
+            .from(admissionOffers).where(and(eq(admissionOffers.profileId, profileId), inArray(admissionOffers.applicationId, appIds)))
+        : Promise.resolve([]),
+      appIds.length
+        ? db.select({ status: recommendationRequests.status, applicationId: recommendationRequests.applicationId })
+            .from(recommendationRequests).where(and(eq(recommendationRequests.profileId, profileId), inArray(recommendationRequests.applicationId, appIds)))
+        : Promise.resolve([]),
+      db.select().from(learningProviders).where(eq(learningProviders.isEnabled, true)),
+      db.select({ providerKey: learningProviders.providerKey, externalUserRef: learningProviderLinks.externalUserRef })
+        .from(learningProviderLinks).innerJoin(learningProviders, eq(learningProviders.id, learningProviderLinks.providerId))
+        .where(eq(learningProviderLinks.profileId, profileId)),
+    ]);
 
     const appProgress = summarizeApplications(appRows, offerRows);
 
@@ -172,13 +189,6 @@ export async function GET(req: Request) {
     // ---- Journey stage (spec §1, §3) --------------------------------------
     const acceptedOffer = offerRows.find((o) => o.status === "accepted") ?? null;
     const acceptedApp = acceptedOffer ? appRows.find((a) => a.id === acceptedOffer.applicationId) : null;
-
-    const fundingRows = await db
-      .select()
-      .from(fundingItems)
-      .where(eq(fundingItems.profileId, profileId))
-      .orderBy(desc(fundingItems.updatedAt))
-      .limit(50);
 
     let fundingGapClosed = false;
     let annualCost: number | null = null;
@@ -218,13 +228,6 @@ export async function GET(req: Request) {
     const journey = resolveJourney(journeyCounts);
 
     // ---- Deadlines (spec §3, §21) -----------------------------------------
-    const deadlineRows = await db
-      .select()
-      .from(journeyDeadlines)
-      .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false)))
-      .orderBy(journeyDeadlines.dueDate)
-      .limit(12);
-
     const applicationDeadlines = appRows
       .filter((a) => a.deadline && !a.submittedAt)
       .map((a) => ({
@@ -254,8 +257,21 @@ export async function GET(req: Request) {
     // ONE mapped profile row feeds every scoring engine on this page: the
     // readiness categories here and the profile strength below. Two mappings
     // would be two chances for the same student to be counted differently.
-    const chancingProfile = profile ? await chancingProfileWithActivities(profile) : null;
+    const [chancingProfile, latestEssay, gapResult] = await Promise.all([
+      profile ? chancingProfileWithActivities(profile) : Promise.resolve(null),
+      profile
+        ? db.select({ rubricTotal: essayVersions.rubricTotal }).from(essayVersions)
+            .where(eq(essayVersions.profileId, profile.id))
+            .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id)).limit(1).then((rows) => rows[0])
+        : Promise.resolve(undefined),
+      testGapsFor(profileId, profile),
+    ]);
     const activityFacts = chancingProfile ? countActivities(chancingProfile) : null;
+    const matchProfile = profile && chancingProfile
+      ? { ...toMatchProfile(profile), savedActivities: chancingProfile.savedActivities }
+      : null;
+    const gaps = gapResult.gaps;
+    const highestIeltsTarget = gapResult.highestIeltsTarget;
 
     const readinessInput: ReadinessInput = {
       gpa: profile?.gpa ?? null,
@@ -288,14 +304,6 @@ export async function GET(req: Request) {
     // linked across documents/applications/funding), so the two are exposed
     // separately and the UI labels them as different things. Previously both
     // were called "readiness" and showed different numbers for one student.
-    const [latestEssay] = profile
-      ? await db
-          .select({ rubricTotal: essayVersions.rubricTotal })
-          .from(essayVersions)
-          .where(eq(essayVersions.profileId, profile.id))
-          .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
-          .limit(1)
-      : [];
     const strength = chancingProfile
       ? profileStrength(chancingProfile, {
           essayScore: latestEssay?.rubricTotal ?? null,
@@ -318,30 +326,19 @@ export async function GET(req: Request) {
         : null,
     };
 
-    // ---- Test gaps against the student's own target universities -----------
-    const gaps = await testGapsFor(profileId, profile);
-
-    // ---- Recommendations in flight (spec §19) -----------------------------
-    const recRows = appIds.length
-      ? await db
-          .select({ status: recommendationRequests.status, applicationId: recommendationRequests.applicationId })
-          .from(recommendationRequests)
-          .where(and(eq(recommendationRequests.profileId, profileId), inArray(recommendationRequests.applicationId, appIds)))
-      : [];
-
-    // ---- Open documents that are expiring (spec §7) ------------------------
-    const expiring = await db
-      .select({ id: userDocuments.id, title: userDocuments.title, docType: userDocuments.docType, expiresAt: userDocuments.expiresAt })
-      .from(userDocuments)
-      .where(
-        and(
-          eq(userDocuments.profileId, profileId),
-          isNotNull(userDocuments.expiresAt),
-          lte(userDocuments.expiresAt, addDaysIso(todayIso, 120))
-        )
-      )
-      .orderBy(userDocuments.expiresAt)
-      .limit(5);
+    // Start recommendation catalogue work while deterministic next-step
+    // assembly runs. It is profile-scoped and has independent data sources.
+    const locale = localeFromRequest(req);
+    const recommendedPromise = profile && matchProfile && chancingProfile
+      ? recommendedFor(profileId, profile, locale, todayIso, { matchProfile, chancingProfile })
+      : Promise.resolve({
+          personalised: false,
+          basis: [] as string[],
+          missing: ["degreeLevel", "major", "countries", "gpa", "budget"],
+          universities: [],
+          scholarships: [],
+          opportunities: [],
+        });
 
     // ---- Next steps (spec §3) ---------------------------------------------
     const nextSteps = computeNextActions({
@@ -367,7 +364,7 @@ export async function GET(req: Request) {
       },
       tests: {
         ielts: profile?.ieltsScore ?? null,
-        target: (await highestTestTarget(profileId, "ielts")) ?? null,
+        target: highestIeltsTarget,
       },
       funding: fundingSummary?.fundingGap != null
         ? { gap: fundingSummary.fundingGap, covered: fundingSummary.isCovered === true }
@@ -375,28 +372,9 @@ export async function GET(req: Request) {
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
-    // Built from this profile's own facts — see recommendedFor() for the rules.
-    const locale = localeFromRequest(req);
-    const recommended = profile
-      ? await recommendedFor(profileId, profile, locale, todayIso)
-      : {
-          personalised: false,
-          basis: [] as string[],
-          missing: ["degreeLevel", "major", "countries", "gpa", "budget"],
-          universities: [],
-          scholarships: [],
-          opportunities: [],
-        };
+    const recommended = await recommendedPromise;
 
-    // ---- External learning providers (spec §32) ---------------------------
-    const providerRows = await db.select().from(learningProviders).where(eq(learningProviders.isEnabled, true));
-    const linkRows = await db
-      .select({ providerKey: learningProviders.providerKey, externalUserRef: learningProviderLinks.externalUserRef })
-      .from(learningProviderLinks)
-      .innerJoin(learningProviders, eq(learningProviders.id, learningProviderLinks.providerId))
-      .where(eq(learningProviderLinks.profileId, profileId));
-
-    return NextResponse.json({
+    return privateNoStoreJson({
       profile: {
         id: profileId,
         name: profile?.name ?? "",
@@ -485,16 +463,17 @@ function tabForKind(kind: string): string {
  * university catalogue explicitly identifies undergraduate admission.
  */
 async function testGapsFor(profileId: number, profile: typeof studentProfiles.$inferSelect | undefined) {
-  const apps = await db
-    .select({ universityId: applications.universityId, universityName: applications.universityName })
-    .from(applications)
-    .where(and(eq(applications.profileId, profileId), isNotNull(applications.universityId)))
-    .limit(8);
+  const [apps, plans] = await Promise.all([
+    db.select({ universityId: applications.universityId, universityName: applications.universityName })
+      .from(applications).where(and(eq(applications.profileId, profileId), isNotNull(applications.universityId))).limit(8),
+    db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
+  ]);
   const ids = [...new Set(apps.map((a) => a.universityId).filter((x): x is number => x != null))];
-  if (!ids.length) return [];
+  const highestIeltsTarget = plans
+    .filter((plan) => plan.testType === "ielts" && typeof plan.targetScore === "number" && Number.isFinite(plan.targetScore))
+    .reduce<number | null>((highest, plan) => highest == null ? plan.targetScore : Math.max(highest, plan.targetScore!), null);
+  if (!ids.length) return { gaps: [], highestIeltsTarget };
   const unis = await db.select().from(universities).where(inArray(universities.id, ids));
-
-  const plans = await db.select().from(testPlans).where(eq(testPlans.profileId, profileId));
   const planned = (type: string) => plans.find((p) => p.testType === type)?.currentScore ?? null;
 
   const out: ReturnType<typeof testGap>[] = [];
@@ -513,16 +492,7 @@ async function testGapsFor(profileId: number, profile: typeof studentProfiles.$i
       highest.set(comparison.testType, comparison);
     }
   }
-  return [...highest.values()];
-}
-
-async function highestTestTarget(profileId: number, testType: string): Promise<number | null> {
-  const rows = await db
-    .select({ targetScore: testPlans.targetScore })
-    .from(testPlans)
-    .where(and(eq(testPlans.profileId, profileId), eq(testPlans.testType, testType)));
-  const values = rows.map((r) => r.targetScore).filter((v): v is number => typeof v === "number");
-  return values.length ? Math.max(...values) : null;
+  return { gaps: [...highest.values()], highestIeltsTarget };
 }
 
 /**
@@ -564,7 +534,11 @@ async function recommendedFor(
   profileId: number,
   profile: typeof studentProfiles.$inferSelect,
   locale: Locale,
-  todayIso: string
+  todayIso: string,
+  derivedProfiles?: {
+    matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
+    chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
+  },
 ) {
   const countries = parseList(profile.preferredCountries);
   const major = (profile.targetMajor ?? "").trim();
@@ -572,10 +546,10 @@ async function recommendedFor(
   const degreeLevel = profile.degreeLevel ?? null;
   const applicantCountry = profile.country ?? null;
 
-  const matchProfile = await toMatchProfileWithActivities(profile);
-  // The 5-layer positioning engine reads the same person, so it gets the same
-  // profile (including the Activities pane) — never a second, divergent copy.
-  const chancingProfile = await chancingProfileWithActivities(profile);
+  // Both engines share the same activity rows loaded by the dashboard's
+  // readiness calculation; avoid two duplicate profile-activity queries.
+  const matchProfile = derivedProfiles?.matchProfile ?? await toMatchProfileWithActivities(profile);
+  const chancingProfile = derivedProfiles?.chancingProfile ?? await chancingProfileWithActivities(profile);
 
   // Which profile facts exist, and which would unlock a better list.
   const basis: string[] = [];
@@ -597,13 +571,15 @@ async function recommendedFor(
   const hasBasis = countries.length > 0 || !!major || gpa != null;
   const uniLimit = 6;
 
-  const savedIds = new Set(
-    (await db
-      .select({ universityId: savedUniversities.universityId })
-      .from(savedUniversities)
-      .where(eq(savedUniversities.profileId, profileId))
-    ).map((s) => s.universityId)
-  );
+  const [savedUniversityRows, savedScholarshipRows, universityBundle] = await Promise.all([
+    db.select({ universityId: savedUniversities.universityId }).from(savedUniversities)
+      .where(eq(savedUniversities.profileId, profileId)),
+    db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships)
+      .where(eq(savedScholarships.profileId, profileId)),
+    hasBasis ? getCachedUniversitiesBundle() : Promise.resolve(null),
+  ]);
+  const savedIds = new Set(savedUniversityRows.map((row) => row.universityId));
+  const savedScholarshipIds = new Set(savedScholarshipRows.map((row) => row.scholarshipId));
 
   // Module 1 — which saved universities a scholarship would actually pay for.
   // The full rows (name + country + resolved annual tuition) drive the
@@ -613,7 +589,6 @@ async function recommendedFor(
     savedIds.size > 0
       ? await db.select().from(universities).where(inArray(universities.id, [...savedIds]))
       : [];
-  const savedScholarshipIds = new Set((await db.select({ scholarshipId: savedScholarships.scholarshipId }).from(savedScholarships).where(eq(savedScholarships.profileId, profileId))).map((row) => row.scholarshipId));
   const savedUniRefs: SavedUniRef[] = savedUniRows.map((u) => ({
     id: u.id,
     name: u.name,
@@ -639,8 +614,7 @@ async function recommendedFor(
     // Reuse the same short-lived, admin-invalidated catalogue snapshot as the
     // discovery APIs rather than selecting the entire university table for
     // every dashboard request.
-    const { unis: cachedUniversities } = await getCachedUniversitiesBundle();
-    const pool = cachedUniversities.filter((university) => university.isActive !== false);
+    const pool = (universityBundle?.unis ?? []).filter((university) => university.isActive !== false);
 
     scored = pool
       .filter((u) => supportsDegreeLevel(u.degreeLevel, degreeLevel))

@@ -1078,8 +1078,10 @@ export function localizeProgramName(name: string | null | undefined, locale: Loc
     const prefix = base === "bachelor" ? "Бакалавриат" : base === "master" ? "Магистратура" : "Докторантура (PhD)";
     return `${prefix} — ${field}`;
   }
-  // "X" alone — treat the whole string as a field-ish name.
-  return localizeMajorOrField(trimmed, locale);
+  // Unknown programme titles may be official names or distinctive wording.
+  // Do not token-translate them: keep the canonical name verbatim unless the
+  // deterministic degree-prefix parser above can safely reconstruct it.
+  return name;
 }
 
 /* ============================================================================
@@ -1502,6 +1504,7 @@ export function localizeUniversityRow<T extends UniversityRowLike>(uni: T, local
     ...uni,
     city: typeof uni.city === "string" ? localizeCity(uni.city, locale) : uni.city,
     country: typeof uni.country === "string" ? localizeCountry(uni.country, locale) : uni.country,
+    universityType: typeof uni.universityType === "string" ? localizeUniversityType(uni.universityType, locale) : uni.universityType,
     programMajor: typeof uni.programMajor === "string" ? localizeMajorOrField(uni.programMajor, locale) : uni.programMajor,
     description: typeof uni.description === "string" ? localizeUniversityDescription(uni.description, locale) : uni.description,
     highlights: localizeHighlights(uni.highlights as Str, locale),
@@ -1563,6 +1566,10 @@ export function localizeScholarshipRow<T extends ScholarshipRowLike>(s: T, local
   if (!tl) return s;
   return {
     ...s,
+    // Preserve canonical institution/award nomenclature alongside the
+    // translated display field, so a student can still recognize official
+    // names and source-page wording.
+    officialTitle: s.title ?? null,
     title: typeof s.title === "string" ? localizeScholarshipTitle(s.title, locale) : s.title,
     provider: typeof s.provider === "string" ? localizeScholarshipProvider(s.provider, locale) : s.provider,
     country: typeof s.country === "string" ? localizeCountry(s.country, locale) : s.country,
@@ -1612,6 +1619,9 @@ export function localizeProgramRow<T extends ProgramRowLike>(p: T, locale: Local
     : p.requirements;
   return {
     ...p,
+    // Keep the original catalogue/programme name available as well as the
+    // localized display form; official application links may use it verbatim.
+    officialName: p.name ?? null,
     name: typeof p.name === "string" ? localizeProgramName(p.name, locale) : p.name,
     field: typeof p.field === "string" ? localizeMajorOrField(p.field, locale) : p.field,
     degree: typeof p.degree === "string" ? localizeDegreeLevel(p.degree, locale) : p.degree,

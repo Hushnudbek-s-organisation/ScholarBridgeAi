@@ -129,7 +129,7 @@ export async function POST(req: Request) {
       targetName,
       prompt,
     });
-    const behaviorSignals = await scoreConversationBehaviors({
+    const behaviorSignalsPromise = scoreConversationBehaviors({
       transcriptOrText: content,
       profileId: access.session.profile.id,
       timeoutMs: 3_500,
@@ -177,6 +177,7 @@ export async function POST(req: Request) {
       })
       .returning();
 
+    const behaviorSignals = await behaviorSignalsPromise;
     return NextResponse.json({
       version: row,
       feedback,
