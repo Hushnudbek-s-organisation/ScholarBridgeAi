@@ -12,7 +12,7 @@
  */
 
 import { scoreVisaInterview, visaChanceDisclaimer, type VisaTurn } from "../src/lib/visaScoring";
-import { buildInstantOpeningLine, getVisaCountry, nextScriptedQuestion, sanitizeApplicantName, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
+import { buildInstantOpeningLine, buildOfficerSystemPrompt, getVisaCountry, nextScriptedQuestion, sanitizeApplicantName, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
 import {
   classifySpeechError,
   normalizeSpeechRecognitionLocale,
@@ -355,6 +355,36 @@ check(
   /void ensureMicPermissionThenListen\(token\)/.test(visaUi) &&
     /micDeniedRef\.current = false;\n\s*micStartAttemptsRef\.current = 0;/.test(visaUi)
 );
+const listeningStart = visaUi.slice(visaUi.indexOf("function startListening()"), visaUi.indexOf("async function ensureMicPermissionThenListen"));
+const micPermissionPath = visaUi.slice(visaUi.indexOf("async function ensureMicPermissionThenListen"), visaUi.indexOf("function autoListen"));
+check(
+  "fallback SpeechRecognition never opens a competing getUserMedia stream",
+  !/navigator\.mediaDevices\.getUserMedia|startFallbackMeter/.test(listeningStart) && !/navigator\.mediaDevices\.getUserMedia\s*\(/.test(micPermissionPath) && /rec\.start\(\)/.test(listeningStart),
+);
+check(
+  "SpeechRecognition is continuous with interim results and live transcript is mirrored to both inputs",
+  /rec\.continuous = true/.test(listeningStart) && /rec\.interimResults = true/.test(listeningStart) && /setInterim\(transcript\)/.test(listeningStart) && /setTextAnswer\(transcript\)/.test(listeningStart),
+);
+check(
+  "fallback speech volume responds to speech events and auto-submits after 2.2 seconds at three words",
+  /rec\.onspeechstart = \(\) =>[\s\S]*?setVolume\(0\.82\)/.test(listeningStart) && /split\(\/\\s\+\/\)\.filter\(Boolean\)\.length < 3/.test(visaUi) && /}, 2_200\)/.test(visaUi),
+);
+const startInterviewSource = visaUi.slice(visaUi.indexOf("async function startInterview()"), visaUi.indexOf("async function runAnalysis()"));
+check(
+  "interview start immediately renders and speaks the deterministic opening without awaiting Live or chat",
+  /setMode\("fallback"\)/.test(startInterviewSource) && /buildInstantOpeningLine\(c, gender, activeProfile\?\.name\)/.test(startInterviewSource) && /pushMessage\(\{ role: "officer", text: openingLine \}\)/.test(startInterviewSource) && /fallbackSpeak\(openingLine\)/.test(startInterviewSource) && !/await (?:startLiveInterview|fetchOfficerReply)/.test(startInterviewSource),
+);
+const fallbackSpeakSource = visaUi.slice(visaUi.indexOf("function fallbackSpeak(text: string)"), visaUi.indexOf("async function fetchOfficerReply"));
+check(
+  "fallbackSpeak tries the neural TTS endpoint with a six-second abort and only short-circuits on mute",
+  /if \(mutedRef\.current\)/.test(fallbackSpeakSource) && /fetch\("\/api\/visa\/tts"/.test(fallbackSpeakSource) && /controller\.abort\(\), 6_000\)/.test(fallbackSpeakSource) && /gender: configRef\.current\?\.gender/.test(fallbackSpeakSource) && /language: getVisaCountry/.test(fallbackSpeakSource) && !/if \(!getSafeSpeechSynthesis\(\)\) return/.test(fallbackSpeakSource),
+);
+const ttsRouteSource = readFileSync(new URL("../src/app/api/visa/tts/route.ts", import.meta.url), "utf8");
+const ttsCandidateSource = ttsRouteSource.slice(ttsRouteSource.indexOf("const candidates ="), ttsRouteSource.indexOf("const deadline ="));
+check(
+  "TTS tries the configured model then the verified free Fish model in a bounded same-provider retry",
+  ttsCandidateSource.indexOf("process.env.OPENROUTER_TTS_MODEL") < ttsCandidateSource.indexOf("OPENROUTER_MODEL_REGISTRY.speech.modelId") && /retryableStatuses = new Set\(\[400, 402, 404, 429, 500, 502, 503, 504\]\)/.test(ttsRouteSource) && /UPSTREAM_TIMEOUT_MS = OPENROUTER_MODEL_REGISTRY\.speech\.timeoutMs/.test(ttsRouteSource) && /x-tts-provider": provider/.test(ttsRouteSource) && /x-tts-model": model/.test(ttsRouteSource) && /MAX_AUDIO_BYTES/.test(ttsRouteSource) && !/fishaudio\/fish-speech-2\.1-pro:free/.test(ttsCandidateSource),
+);
 // THE root cause: the site's own security header forbade the microphone that
 // this voice feature requires (`microphone=()` disables it for the document
 // itself). Assert BOTH places that set it, and that the unused features stay off.
@@ -419,6 +449,25 @@ check(
     VISA_COUNTRIES.every((c) => nextScriptedQuestion(c, []).reply.length > 0),
   `${VISA_COUNTRIES.length} countries`
 );
+const ukGuidance = getVisaCountry("UK")?.officialGuidance;
+const australiaGuidance = getVisaCountry("AU")?.officialGuidance;
+const canadaGuidance = getVisaCountry("CA")?.officialGuidance;
+check(
+  "UK financial requirements use the current GOV.UK location rates and 28-day rule",
+  ukGuidance?.verifiedAt === "2026-10-22" && ukGuidance.summary.includes("£1,529") && ukGuidance.summary.includes("£1,171") && ukGuidance.summary.includes("£13,761") && ukGuidance.summary.includes("£10,539") && ukGuidance.summary.includes("28 consecutive days") && ukGuidance.sourceUrls.includes("https://www.gov.uk/student-visa/money"),
+);
+check(
+  "Australia guidance distinguishes GS from GTE and includes current funds and OSHC context",
+  australiaGuidance?.verifiedAt === "2026-10-22" && australiaGuidance.summary.includes("AUD $29,710") && australiaGuidance.summary.includes("replaced GTE") && australiaGuidance.summary.includes("OSHC") && australiaGuidance.sourceUrls.every((url) => url.startsWith("https://www.studyaustralia.gov.au/")),
+);
+check(
+  "Canada guidance uses the 2026 threshold, PAL/TAL exceptions, and does not claim GIC is mandatory",
+  canadaGuidance?.verifiedAt === "2026-10-22" && canadaGuidance.summary.includes("CAD $23,448") && canadaGuidance.summary.includes("2026-09-01") && canadaGuidance.summary.includes("outside Quebec") && canadaGuidance.summary.includes("PAL/TAL") && canadaGuidance.summary.includes("not the only option") && canadaGuidance.sourceUrls.every((url) => url.startsWith("https://www.canada.ca/")),
+);
+check(
+  "official visa guidance is included in dated roleplay context, not asserted as individualized legal advice",
+  buildOfficerSystemPrompt(getVisaCountry("UK")!, "female").includes("DATED OFFICIAL VISA CONTEXT (verified 2026-10-22)") && buildOfficerSystemPrompt(getVisaCountry("UK")!, "female").includes("do not present this as individualized legal advice"),
+);
 check(
   "the instant opening includes the country's first verified question without waiting for chat",
   VISA_COUNTRIES.every((country) => buildInstantOpeningLine(country, "male").includes(country.questions[0] ?? "\u0000")),
@@ -436,8 +485,14 @@ check(
 );
 const supportedLocales = VISA_COUNTRIES.map((country) => country.locale);
 check(
-  "recognition locales stay within the finite configured country locale set",
-  VISA_COUNTRIES.every((country) => normalizeSpeechRecognitionLocale(country.locale, country.code, supportedLocales) === country.locale) &&
+  "recognition locales stay finite and unsupported regional English packs normalize to en-US",
+  VISA_COUNTRIES.every((country) => {
+    const expected = ["en-BE", "en-SG", "en-MY", "en-HK", "en-IN", "en-ZA"].includes(country.locale)
+      ? "en-US"
+      : country.locale;
+    return normalizeSpeechRecognitionLocale(country.locale, country.code, supportedLocales) === expected;
+  }) &&
+    ["en-BE", "en-SG", "en-MY", "en-HK", "en-IN", "en-ZA"].every((locale) => normalizeSpeechRecognitionLocale(locale, "", supportedLocales) === "en-US") &&
     normalizeSpeechRecognitionLocale("en-AU", "US", supportedLocales) === "en-AU" &&
     normalizeSpeechRecognitionLocale("de-DE", "AT", supportedLocales) === "de-DE" &&
     normalizeSpeechRecognitionLocale("xx-XX", "ZZ", supportedLocales) === "en-US",
@@ -456,6 +511,10 @@ check(
 );
 
 const chatRoute = readFileSync(new URL("../src/app/api/visa/chat/route.ts", import.meta.url), "utf8");
+check(
+  "first chat turn returns the instant opening before provider availability or an LLM call",
+  /if \(history\.length === 0\)[\s\S]*?buildInstantOpeningLine\(country, gender, profile\?\.name\)[\s\S]*?aiUsed: false[\s\S]*?source: "instant_opening"/.test(chatRoute) && chatRoute.indexOf("if (history.length === 0)") < chatRoute.indexOf('isAiConfigured("visa")') && chatRoute.indexOf("if (history.length === 0)") < chatRoute.indexOf("await aiChat("),
+);
 check(
   "the chat route serves the script instead of 503 when no provider is configured",
   /isAiConfigured\("visa"\)/.test(chatRoute) &&

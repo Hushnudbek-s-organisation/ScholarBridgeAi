@@ -948,12 +948,20 @@ check("successful Test/Full check persists a typed key and shows saved-key prove
   assert.match(ui, /A key check does not verify these models/);
 });
 
-check("visa TTS has one OpenRouter attempt and safe browser fallback, no hidden provider/model retries", () => {
+check("visa TTS uses a bounded OpenRouter model retry and safe browser fallback, never another provider", () => {
   const tts = readFileSync(join(ROOT, "src/app/api/visa/tts/route.ts"), "utf8");
-  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1);
-  assert.doesNotMatch(tts, /api\.openai\.com|resolveProviderCredential|for \(const candidate/);
+  const registry = readFileSync(join(ROOT, "src/lib/ai/openrouterModelIds.ts"), "utf8");
+  const candidateBlock = tts.slice(tts.indexOf("const candidates ="), tts.indexOf("const deadline ="));
+  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1, "one bounded upstream call shape is used for sequential candidates");
+  assert.match(candidateBlock, /process\.env\.OPENROUTER_TTS_MODEL\?\.trim\(\)/);
+  assert.match(candidateBlock, /OPENROUTER_MODEL_REGISTRY\.speech\.modelId/);
+  assert.doesNotMatch(candidateBlock, /fishaudio\/fish-speech-2\.1-pro:free/, "reject the unverified/404 alias");
+  assert.match(tts, /retryableStatuses = new Set\(\[400, 402, 404, 429, 500, 502, 503, 504\]\)/);
+  assert.match(tts, /x-tts-provider": provider/);
+  assert.match(tts, /x-tts-model": model/);
   assert.match(tts, /status: 204/);
   assert.match(tts, /MAX_AUDIO_BYTES/);
+  assert.match(registry, /timeoutMs: 6_000/);
 });
 
 await checkAsync("embedding request without explicit data-handling opt-in fails before network access", async () => {
