@@ -856,11 +856,25 @@ function scholarshipCountryVerdict(
   raw: string | null | undefined,
   applicantCountry: string | null
 ): "open-to-all" | "citizenship-match" | "unknown" | "out" {
-  const eligible = parseList(raw).map((v) => v.toLowerCase().replace(/[^a-z]/g, ""));
+  const eligible = parseList(raw);
   if (!eligible.length) return "unknown";
-  if (eligible.some((value) => /^(all|allcountries|international|worldwide|anycountry)$/.test(value))) {
+
+  // "No restriction" can be written many ways in the catalogue. Anything that
+  // describes a class rather than naming countries is NOT a refusal — treating
+  // it as one used to hide the award from the dashboard entirely (e.g.
+  // "All Countries", "International (Non-UK)", "180+ Countries (varies)" are
+  // not country names, so the student could never match them).
+  // Deliberately does NOT match a bare "countries": "ASEAN Countries" names a bloc
+  // that genuinely excludes Uzbekistan, while "All Countries" / "180+ Countries"
+  // describe the absence of a restriction.
+  const openToAllRe =
+    /^(all|any|worldwide|international|global|all \/ any|no restriction)\b|\ball countries\b|\ball nationalities\b|\bany country\b|\bany nationality\b|\bworldwide\b|\binternational\b|\bglobal\b|\bdeveloping\b|\bemerging\b|\bvaries\b|\bcountries \(varies\)|countries \(varies/i;
+  const normalised = eligible.map((v) => v.toLowerCase().replace(/[^a-z]/g, ""));
+  if (normalised.some((value) => /^(all|allcountries|international|worldwide|anycountry|anynationality|global)$/.test(value))) {
     return "open-to-all";
   }
+  if (eligible.some((entry) => openToAllRe.test(entry.trim()))) return "open-to-all";
+
   if (!applicantCountry) return "unknown";
   return countryMatches(raw, applicantCountry) ? "citizenship-match" : "out";
 }

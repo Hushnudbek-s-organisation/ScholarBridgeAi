@@ -142,6 +142,30 @@ check("major mismatch costs points", mm.fit <= perfect.fit - 5, `${mm.fit} vs ${
 const ci = scoreEssayFit(essay, countryIneligible, strongProfile);
 check("country not eligible → country_ineligible", ci.codes.includes("country_ineligible"));
 
+// The catalogue has stored country rules as prose ("All Countries",
+// "International (Non-UK)", "180+ Countries (varies)"). Read literally none of
+// them equals the student's country, so every applicant was marked ineligible for
+// a worldwide award. Those phrases mean "no restriction" and must not produce a gap.
+for (const [label, raw] of [
+  ["the legacy plain-text \"All Countries\"", "All Countries"],
+  ["\"International (Non-UK)\"", "International (Non-UK)"],
+  ["\"180+ Countries (varies)\"", "180+ Countries (varies)"],
+  ["\"Developing & Emerging Countries\"", "Developing & Emerging Countries"],
+  ["the canonical [\"All\"]", '["All"]'],
+] as const) {
+  const worldwide = scoreEssayFit(essay, { ...fullMatch, id: 90, eligibleCountries: raw }, strongProfile);
+  check(`${label} is not a country refusal`, !worldwide.codes.includes("country_ineligible"), worldwide.codes.join(","));
+}
+
+// A named country list still filters, and a regional bloc must not be widened.
+// (The fixture student is from Germany, so that is the country that must match.)
+const named = scoreEssayFit(essay, { ...fullMatch, id: 91, eligibleCountries: '["Germany"]' }, strongProfile);
+check("a named eligible country matches", !named.codes.includes("country_ineligible"), named.codes.join(","));
+const otherCountry = scoreEssayFit(essay, { ...fullMatch, id: 93, eligibleCountries: '["Uzbekistan"]' }, strongProfile);
+check("a named ineligible country still refuses", otherCountry.codes.includes("country_ineligible"));
+const asean = scoreEssayFit(essay, { ...fullMatch, id: 92, eligibleCountries: '["ASEAN"]' }, strongProfile);
+check("a regional bloc still excludes a non-member country", asean.codes.includes("country_ineligible"));
+
 const lowGpa = scoreEssayFit(essay, fullMatch, { ...strongProfile, gpa: 3.2 });
 check("GPA 3.2 vs 3.5 minimum → gpa_below_min", lowGpa.codes.includes("gpa_below_min"));
 

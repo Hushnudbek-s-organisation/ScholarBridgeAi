@@ -832,12 +832,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           const sameCountry = countriesMatch(s.country, uniCountry);
           if (!linked && !providerMatch && !sameCountry) return null;
           const source = schBundle.sourceMap.get(s.id);
-          const amountUsdValue =
-            s.amountUsdValue != null
-              ? Number(s.amountUsdValue)
-              : s.awardAmount != null
-                ? Number(s.awardAmount)
-                : null;
+          // A stored 0 means "no fixed amount is published" (the column is NOT
+          // NULL, so programme-wide and merit scholarships use 0 as the
+          // sentinel). It must never reach the UI as "$0" — an award of zero
+          // dollars does not exist and it made national scholarships look empty.
+          const positive = (value: number | string | null | undefined) => {
+            if (value == null) return null;
+            const n = Number(value);
+            return Number.isFinite(n) && n > 0 ? n : null;
+          };
+          const amountUsdValue = positive(s.amountUsdValue) ?? positive(s.awardAmount);
           return {
             linked,
             providerMatch,
@@ -851,12 +855,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               degreeLevels: s.degreeLevels ?? null,
               coverageType: s.coverageType ?? null,
               amountUsdValue,
-              awardAmount:
-                s.awardAmount != null
-                  ? Number(s.awardAmount)
-                  : s.amountUsdValue != null
-                    ? Number(s.amountUsdValue)
-                    : null,
+              awardAmount: positive(s.awardAmount) ?? positive(s.amountUsdValue),
               awardCurrency: s.awardCurrency ?? "USD",
               awardPeriod: s.awardPeriod ?? "year",
               deadline: s.deadline ?? s.deadlineDate ?? null,

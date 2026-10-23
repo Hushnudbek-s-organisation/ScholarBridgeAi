@@ -281,7 +281,18 @@ export function scoreEssayFit(essay: EssayInput, sh: ScholarshipInput, profile: 
   }
 
   // 4. Country (0–10).
-  const countries = parseListColumn(sh.eligibleCountries);
+  //
+  // `eligible_countries` has held prose as well as JSON ("All Countries",
+  // "International (Non-UK)", "180+ Countries (varies)"). Read literally, none of
+  // those equals the student's country, so every applicant — including an Uzbek
+  // applicant for a worldwide award — was marked country_ineligible. Those
+  // phrases mean "no restriction" and are normalised before the comparison; the
+  // literal list is only used when it names actual countries.
+  const unrestrictedRe =
+    /\b(all|any|worldwide|international|global|developing|emerging|varies|countries)\b/i;
+  const countries = parseListColumn(sh.eligibleCountries).filter(
+    (entry) => !unrestrictedRe.test(entry)
+  );
   if (countries.length === 0) {
     fit += 8;
     matched.push("no country restriction published");
