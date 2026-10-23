@@ -2510,6 +2510,38 @@ async function main() {
   const { readFileSync: readFile2 } = await import("node:fs");
   const deadlinesSrc = readFile2("src/app/api/deadlines/route.ts", "utf8");
   check("deadlines: the web API has no premium gate (policy: visibility is free)", !/premiumGate|requireFeatureSession/.test(deadlinesSrc));
+
+  // An UNVERIFIED cycle must never become a countdown. The catalogue import once
+  // wrote one identical "Fall 2027, 15 January" row for every programme of 217
+  // universities and marked it verified; the date is a constant, not a deadline.
+  const unverifiedDeadline = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+  const insertedCycle = await pool.query<{ id: number }>(
+    `INSERT INTO application_cycles (university_id, academic_year, intake, application_type, deadline, verification_status)
+     VALUES ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'unverified') RETURNING id`,
+    [uniA.id, unverifiedDeadline],
+  );
+  const cycleId = insertedCycle.rows[0]?.id;
+  const afterUnverified = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
+  const unverifiedItem = (afterUnverified.body?.items ?? []).find(
+    (item: any) => item.type === "university" && item.universityId === uniA.id,
+  );
+  check(
+    "deadlines: an UNVERIFIED application cycle never becomes a countdown",
+    unverifiedItem?.date === null && unverifiedItem?.status === "NO DEADLINE ON FILE",
+    JSON.stringify({ date: unverifiedItem?.date, status: unverifiedItem?.status, seeded: unverifiedDeadline }),
+  );
+
+  await pool.query("UPDATE application_cycles SET verification_status = 'verified' WHERE id = $1", [cycleId]);
+  const afterVerified = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
+  const verifiedItem = (afterVerified.body?.items ?? []).find(
+    (item: any) => item.type === "university" && item.universityId === uniA.id,
+  );
+  check(
+    "deadlines: a VERIFIED application cycle does produce the date",
+    verifiedItem?.date === unverifiedDeadline,
+    JSON.stringify({ date: verifiedItem?.date, expected: unverifiedDeadline }),
+  );
+  await pool.query("DELETE FROM application_cycles WHERE id = $1", [cycleId]);
   const botSrc = readFile2("src/lib/telegram/bot.ts", "utf8");
   const botDeadlinesFn = botSrc.slice(botSrc.indexOf("async function deadlines"), botSrc.indexOf("async function next"));
   check("deadlines: the Telegram /deadlines list is FREE (policy: same data, every channel)", botDeadlinesFn.length > 0 && !/hasFeature|premium/.test(botDeadlinesFn));
