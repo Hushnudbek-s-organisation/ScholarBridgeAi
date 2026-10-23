@@ -1,0 +1,165 @@
+id,name,country,city,qs_ranking,image_url,programs_count,scholarships_count,application_cycles_count,verification_status,data_source,website_url
+228,Curtin University,Australia,Perth,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.curtin.edu.au
+232,Deakin University,Australia,Melbourne / Geelong,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.deakin.edu.au
+256,Griffith University,Australia,Brisbane / Gold Coast,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.griffith.edu.au
+242,La Trobe University,Australia,Melbourne,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.latrobe.edu.au
+326,Queensland University of Technology,Australia,Brisbane,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.qut.edu.au
+271,Swinburne University of Technology,Australia,Melbourne,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.swinburne.edu.au
+310,University of Newcastle (Australia),Australia,"Newcastle, NSW",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.newcastle.edu.au
+290,University of Tasmania,Australia,Hobart,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.utas.edu.au
+318,Université libre de Bruxelles,Belgium,Brussels,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.ulb.be
+300,Vrije Universiteit Brussel,Belgium,Brussels,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.vub.be
+246,University of Campinas,Brazil,Campinas,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unicamp.br
+284,Dalhousie University,Canada,"Halifax, NS",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.dal.ca
+229,Western University,Canada,"London, ON",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.uwo.ca
+303,Universidad de Chile,Chile,Santiago,NULL,NULL,1,1,1,verified,Top 300 PDF,https://uchile.cl
+266,Beijing Normal University,China,Beijing,NULL,NULL,1,1,1,verified,Top 300 PDF,https://english.bnu.edu.cn
+280,Harbin Institute of Technology,China,Harbin,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.hit.edu.cn
+295,Huazhong University of Science and Technology,China,Wuhan,NULL,NULL,1,1,1,verified,Top 300 PDF,https://english.hust.edu.cn
+301,Southern University of Science and Technology,China,Shenzhen,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.sustech.edu.cn
+265,Tianjin University,China,Tianjin,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.tju.edu.cn
+227,Tongji University,China,Shanghai,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.tongji.edu.cn
+230,Wuhan University,China,Wuhan,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.whu.edu.cn
+291,Xi’an Jiaotong University,China,Xi'an,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.xjtu.edu.cn
+212,Charles University,Czechia,Prague,NULL,NULL,1,1,1,verified,Top 300 PDF,https://cuni.cz/UKEN-1.html
+213,Czech Technical University in Prague (CTU),Czechia,Prague,NULL,NULL,0,0,0,unverified,Placeholder (bo'sh),https://www.cvut.cz/en
+302,Institut Polytechnique de Paris,France,Palaiseau (Paris),NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ip-paris.fr
+324,Université Paris 1 Panthéon-Sorbonne,France,Paris,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.pantheonsorbonne.fr
+297,École Normale Supérieure de Lyon,France,Lyon,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ens-lyon.fr
+298,École des Ponts ParisTech,France,Champs-sur-Marne (Paris),NULL,NULL,1,1,1,verified,Top 300 PDF,https://ecoledesponts.fr
+220,Karlsruhe Institute of Technology,Germany,Karlsruhe,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.kit.edu
+320,Technical University of Darmstadt,Germany,Darmstadt,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.tu-darmstadt.de
+218,Technische Universität Berlin,Germany,Berlin,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.tu.berlin
+244,University of Bonn,Germany,Bonn,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.uni-bonn.de
+243,University of Erlangen-Nürnberg,Germany,Erlangen / Nuremberg,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.fau.eu
+239,University of Freiburg,Germany,Freiburg im Breisgau,NULL,NULL,1,1,2,verified,Top 300 PDF,https://uni-freiburg.de
+275,University of Tübingen,Germany,Tübingen,NULL,NULL,1,1,2,verified,Top 300 PDF,https://uni-tuebingen.de
+321,Hong Kong Baptist University,Hong Kong SAR,Hong Kong,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.hkbu.edu.hk
+217,The Hong Kong University of Science and Technology,Hong Kong SAR,Hong Kong,NULL,NULL,1,1,1,verified,Top 300 PDF,https://hkust.edu.hk
+206,Budapest University of Technology and Economics (BME),Hungary,Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://www.bme.hu/?language=en
+341,Corvinus University of Budapest,Hungary,Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://www.uni-corvinus.hu
+205,Eötvös Loránd University (ELTE),Hungary,Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://www.elte.hu/en/
+343,Hungarian University of Agriculture and Life Sciences (MATE),Hungary,Gödöllő / Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://en.uni-mate.hu
+342,Semmelweis University,Hungary,Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://semmelweis.hu
+345,Széchenyi István University,Hungary,Győr,NULL,NULL,1,1,2,verified,13-davlat PDF,https://admissions.sze.hu
+207,University of Debrecen,Hungary,Debrecen,NULL,NULL,1,1,2,verified,13-davlat PDF,https://unideb.hu/en
+340,University of Pécs,Hungary,Pécs,NULL,NULL,1,1,2,verified,13-davlat PDF,https://international.pte.hu
+339,University of Szeged (SZTE),Hungary,Szeged,NULL,NULL,1,1,2,verified,13-davlat PDF,https://u-szeged.hu
+344,Óbuda University,Hungary,Budapest,NULL,NULL,1,1,2,verified,13-davlat PDF,https://uni-obuda.hu
+315,Indian Institute of Science,India,Bengaluru,NULL,NULL,1,1,1,verified,Top 300 PDF,https://iisc.ac.in
+322,Indian Institute of Technology Kanpur,India,Kanpur,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.iitk.ac.in
+316,Indian Institute of Technology Kharagpur,India,Kharagpur,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.iitkgp.ac.in
+317,Indian Institute of Technology Madras,India,Chennai,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.iitm.ac.in
+257,Bandung Institute of Technology,Indonesia,Bandung,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.itb.ac.id
+250,Gadjah Mada University,Indonesia,Yogyakarta,NULL,NULL,1,1,1,verified,Top 300 PDF,https://ugm.ac.id
+236,Universitas Indonesia,Indonesia,Depok / Jakarta,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ui.ac.id
+282,University College Cork,Ireland,Cork,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ucc.ie
+283,University of Galway,Ireland,Galway,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.universityofgalway.ie
+237,Tel Aviv University,Israel,Tel Aviv,NULL,NULL,1,1,1,verified,Top 300 PDF,https://english.tau.ac.il
+287,The Hebrew University of Jerusalem,Israel,Jerusalem,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.huji.ac.il
+319,Politecnico di Torino,Italy,Turin,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.polito.it
+337,University of Florence (UNIFI),Italy,Florence,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.unifi.it
+269,University of Milan,Italy,Milan,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unimi.it
+335,University of Naples Federico II,Italy,Naples,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.unina.it
+248,University of Padua,Italy,Padua,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unipd.it
+336,University of Pisa (UNIPI),Italy,Pisa,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.unipi.it
+338,University of Turin (UniTo),Italy,Turin,NULL,NULL,1,1,1,verified,13-davlat PDF,https://en.unito.it
+209,Al-Farabi Kazakh National University (KazNU),Kazakhstan,Almaty,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.kaznu.kz/en/
+208,Nazarbayev University,Kazakhstan,Astana,NULL,NULL,1,1,1,verified,13-davlat PDF,https://nu.edu.kz/
+278,American University of Beirut,Lebanon,Beirut,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.aub.edu.lb
+254,University of Macau,Macau SAR,Macau,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.um.edu.mo
+355,International Islamic University Malaysia (IIUM),Malaysia,Kuala Lumpur (Gombak),NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.iium.edu.my
+354,Sunway University,Malaysia,Bandar Sunway (Selangor),NULL,NULL,1,1,1,verified,13-davlat PDF,https://sunwayuniversity.edu.my
+279,Taylor’s University,Malaysia,Subang Jaya (Selangor),NULL,NULL,1,1,1,verified,Top 300 PDF,https://university.taylors.edu.my
+263,UCSI University,Malaysia,Kuala Lumpur,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ucsiuniversity.edu.my
+323,Universiti Teknologi PETRONAS,Malaysia,Seri Iskandar (Perak),NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.utp.edu.my
+226,Tecnológico de Monterrey,Mexico,Monterrey,NULL,NULL,1,1,1,verified,Top 300 PDF,https://tec.mx
+245,Maastricht University,Netherlands,Maastricht,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.maastrichtuniversity.nl
+281,Radboud University,Netherlands,Nijmegen,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.ru.nl
+224,Wageningen University & Research,Netherlands,Wageningen,NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.wur.nl
+251,Massey University,New Zealand,Palmerston North,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.massey.ac.nz
+261,University of Canterbury,New Zealand,Christchurch,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.canterbury.ac.nz
+247,University of Waikato,New Zealand,Hamilton,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.waikato.ac.nz
+253,Victoria University of Wellington,New Zealand,Wellington,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.wgtn.ac.nz
+262,Norwegian University of Science and Technology,Norway,Trondheim,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ntnu.edu
+272,University of Bergen,Norway,Bergen,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.uib.no
+357,AGH University of Krakow,Poland,Krakow,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.agh.edu.pl
+358,"Adam Mickiewicz University, Poznań",Poland,Poznań,NULL,NULL,1,1,1,verified,13-davlat PDF,https://amu.edu.pl
+359,Gdańsk University of Technology (Gdańsk Tech),Poland,Gdańsk,NULL,NULL,1,1,1,verified,13-davlat PDF,https://pg.edu.pl
+211,Jagiellonian University,Poland,Kraków,NULL,NULL,1,1,1,verified,13-davlat PDF,https://en.uj.edu.pl/
+363,Lodz University of Technology (TUL),Poland,Łódź,NULL,NULL,1,1,1,verified,13-davlat PDF,https://p.lodz.pl
+362,Poznań University of Technology (PUT),Poland,Poznań,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.put.poznan.pl
+210,University of Warsaw,Poland,Warsaw,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.uw.edu.pl/
+361,University of Wrocław,Poland,Wrocław,NULL,NULL,1,1,1,verified,13-davlat PDF,https://uwr.edu.pl
+356,Warsaw University of Technology (WUT),Poland,Warsaw,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.pw.edu.pl
+360,Wrocław University of Science and Technology,Poland,Wrocław,NULL,NULL,1,1,1,verified,13-davlat PDF,https://pwr.edu.pl
+259,University of Lisbon,Portugal,Lisbon,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ulisboa.pt
+285,University of Porto,Portugal,Porto,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.up.pt
+296,Hamad Bin Khalifa University,Qatar,Doha,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.hbku.edu.qa
+325,Bauman Moscow State Technical University,Russia,Moscow,NULL,NULL,1,1,1,verified,Top 300 PDF,https://bmstu.ru
+348,HSE University (Higher School of Economics),Russia,Moscow / St. Petersburg,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.hse.ru
+353,Kazan Federal University (KFU),Russia,Kazan,NULL,NULL,1,1,1,verified,13-davlat PDF,https://eng.kpfu.ru
+349,Moscow Institute of Physics and Technology (MIPT / Phystech),Russia,Dolgoprudny (Moscow),NULL,NULL,1,1,1,verified,13-davlat PDF,https://eng.mipt.ru
+352,National Research Nuclear University MEPhI,Russia,Moscow,NULL,NULL,1,1,1,verified,13-davlat PDF,https://eng.mephi.ru
+350,Novosibirsk State University (NSU),Russia,Novosibirsk,NULL,NULL,1,1,1,verified,13-davlat PDF,https://english.nsu.ru
+346,RUDN University (Peoples' Friendship University),Russia,Moscow,NULL,NULL,1,1,1,verified,13-davlat PDF,https://eng.rudn.ru
+347,Saint Petersburg State University (SPbU),Russia,Saint Petersburg,NULL,NULL,1,1,1,verified,13-davlat PDF,https://english.spbu.ru
+351,Tomsk State University (TSU),Russia,Tomsk,NULL,NULL,1,1,1,verified,13-davlat PDF,https://en.tsu.ru
+304,King Abdulaziz University,Saudi Arabia,Jeddah,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.kau.edu.sa
+312,King Saud University,Saudi Arabia,Riyadh,NULL,NULL,1,1,1,verified,Top 300 PDF,https://ksu.edu.sa
+292,Stellenbosch University,South Africa,Stellenbosch,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.sun.ac.za
+264,University of the Witwatersrand,South Africa,Johannesburg,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.wits.ac.za
+328,Gwangju Institute of Science and Technology (GIST),South Korea,Gwangju,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.gist.ac.kr
+327,Kyung Hee University,South Korea,Seoul / Suwon,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.khu.ac.kr
+221,Sungkyunkwan University (SKKU),South Korea,Seoul / Suwon,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.skku.edu
+286,Ulsan National Institute of Science and Technology,South Korea,Ulsan,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unist.ac.kr
+233,Autonomous University of Madrid,Spain,Madrid,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.uam.es
+225,Complutense University of Madrid,Spain,Madrid,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ucm.es
+267,Universidad Carlos III de Madrid,Spain,Madrid,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.uc3m.es
+307,University of Barcelona,Spain,Barcelona,NULL,NULL,1,1,1,verified,Top 300 PDF,https://web.ub.edu
+277,University of Navarra,Spain,Pamplona,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unav.edu
+240,National Cheng Kung University,Taiwan,Tainan,NULL,NULL,1,1,1,verified,Top 300 PDF,https://web.ncku.edu.tw
+238,National Tsing Hua University,Taiwan,Hsinchu,NULL,NULL,1,1,1,verified,Top 300 PDF,https://nthu-en.site.nthu.edu.tw
+274,National Yang Ming Chiao Tung University,Taiwan,Hsinchu / Taipei,NULL,NULL,1,1,1,verified,Top 300 PDF,https://en.nycu.edu.tw
+334,Ankara University,Turkey,Ankara,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.ankara.edu.tr
+330,Bilkent University,Turkey,Ankara,NULL,NULL,1,1,1,verified,13-davlat PDF,https://w3.bilkent.edu.tr
+203,Boğaziçi University,Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.bogazici.edu.tr/en
+331,Hacettepe University,Turkey,Ankara,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.hacettepe.edu.tr
+329,Istanbul Technical University (İTÜ),Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.itu.edu.tr
+332,Istanbul University,Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.istanbul.edu.tr
+202,Koç University,Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.ku.edu.tr/en/
+201,Middle East Technical University (METU),Turkey,Ankara,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.metu.edu.tr/en
+204,Sabancı University,Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.sabanciuniv.edu/en
+333,Yıldız Technical University (YTÜ),Turkey,Istanbul,NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.yildiz.edu.tr
+234,American University of Sharjah,United Arab Emirates,Sharjah,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.aus.edu
+260,Canadian University Dubai,United Arab Emirates,Dubai,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.cud.ac.ae
+364,United Arab Emirates University (UAEU),United Arab Emirates,Al Ain (Abu Dhabi),NULL,NULL,1,1,1,verified,13-davlat PDF,https://www.uaeu.ac.ae
+258,Heriot-Watt University,United Kingdom,Edinburgh,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.hw.ac.uk
+222,Lancaster University,United Kingdom,Lancaster,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.lancaster.ac.uk
+313,Queen’s University Belfast,United Kingdom,Belfast,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.qub.ac.uk
+294,Swansea University,United Kingdom,Swansea,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.swansea.ac.uk
+268,University of Leicester,United Kingdom,Leicester,NULL,NULL,1,1,1,verified,Top 300 PDF,https://le.ac.uk
+288,University of Strathclyde,United Kingdom,Glasgow,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.strath.ac.uk
+270,University of Surrey,United Kingdom,Guildford,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.surrey.ac.uk
+255,University of Sussex,United Kingdom,Brighton,NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.sussex.ac.uk
+311,Arizona State University,United States,"Tempe, AZ",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.asu.edu
+299,Case Western Reserve University,United States,"Cleveland, OH",NULL,NULL,1,1,2,verified,Top 300 PDF,https://case.edu
+252,Dartmouth College,United States,"Hanover, NH",NULL,NULL,1,1,2,verified,Top 300 PDF,https://home.dartmouth.edu
+231,Emory University,United States,"Atlanta, GA",NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.emory.edu
+305,Michigan State University,United States,"East Lansing, MI",NULL,NULL,1,1,1,verified,Top 300 PDF,https://msu.edu
+219,Northwestern University,United States,"Evanston, IL",NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.northwestern.edu
+306,Texas A&M University,United States,"College Station, TX",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.tamu.edu
+314,The Ohio State University,United States,"Columbus, OH",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.osu.edu
+289,The University of Arizona,United States,"Tucson, AZ",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.arizona.edu
+309,"University of California, Santa Barbara",United States,"Santa Barbara, CA",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ucsb.edu
+241,University of Florida,United States,"Gainesville, FL",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.ufl.edu
+273,"University of Maryland, College Park",United States,"College Park, MD",NULL,NULL,1,1,1,verified,Top 300 PDF,https://umd.edu
+235,University of Minnesota Twin Cities,United States,"Minneapolis, MN",NULL,NULL,1,1,2,verified,Top 300 PDF,https://twin-cities.umn.edu
+223,University of North Carolina at Chapel Hill,United States,"Chapel Hill, NC",NULL,NULL,1,1,1,verified,Top 300 PDF,https://www.unc.edu
+249,University of Rochester,United States,"Rochester, NY",NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.rochester.edu
+293,University of Virginia,United States,"Charlottesville, VA",NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.virginia.edu
+276,Vanderbilt University,United States,"Nashville, TN",NULL,NULL,1,1,2,verified,Top 300 PDF,https://www.vanderbilt.edu
+308,Washington University in St. Louis,United States,"St. Louis, MO",NULL,NULL,1,1,2,verified,Top 300 PDF,https://wustl.edu
+215,Inha University in Tashkent (IUT),Uzbekistan,Tashkent,NULL,NULL,0,0,0,unverified,Placeholder (bo'sh),https://inha.uz/en/
+216,New Uzbekistan University,Uzbekistan,Tashkent,NULL,NULL,0,0,0,unverified,Placeholder (bo'sh),https://newuu.uz/en
+214,Westminster International University in Tashkent (WIUT),Uzbekistan,Tashkent,NULL,NULL,0,0,0,unverified,Placeholder (bo'sh),https://wiut.uz/
