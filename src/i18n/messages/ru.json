@@ -6704,6 +6704,7 @@
     "applyNote": "Заявка подаётся на портале организатора — ScholarBridge не принимает заявки.",
     "allMajors": "Все направления",
     "allCountries": "Все страны",
-    "applicationFeeFree": "Бесплатно"
+    "applicationFeeFree": "Бесплатно",
+    "applyOnOfficialPage": "Подать на официальной странице"
   }
 }

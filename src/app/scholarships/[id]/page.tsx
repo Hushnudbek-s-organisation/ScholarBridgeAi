@@ -165,6 +165,12 @@ export default async function ScholarshipDetailPage({ params }: DetailPageProps)
           : t.statusUnknown;
 
   const verifiedOn = formatDate(s.lastVerifiedAt, locale);
+  // The apply button must exist on every award. When the provider publishes a
+  // dedicated application URL we use it; otherwise we send the student to the
+  // official page (source first), and the label says exactly that - we never
+  // invent an /apply deep link.
+  const applyHref = s.applicationUrl ?? s.sourceUrl ?? s.websiteUrl ?? null;
+  const applyLabel = s.applicationUrl ? t.applyNow : t.applyOnOfficialPage;
   // A stored 0 means "no fee"; a NULL means the source did not say.
   const feeLabel =
     s.applicationFee == null ? t.noFee : s.applicationFee === 0 ? t.applicationFeeFree : formatMoney(s.applicationFee, "USD");
@@ -302,14 +308,14 @@ export default async function ScholarshipDetailPage({ params }: DetailPageProps)
               <p className="mt-4 text-xs text-slate-500">{t.applyNote}</p>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {s.applicationUrl && (
+                {applyHref && (
                   <a
-                    href={s.applicationUrl}
+                    href={applyHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
                   >
-                    {t.applyNow}
+                    {applyLabel}
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </a>
                 )}
@@ -396,14 +402,14 @@ export default async function ScholarshipDetailPage({ params }: DetailPageProps)
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </a>
               )}
-              {s.applicationUrl && (
+              {applyHref && (
                 <a
-                  href={s.applicationUrl}
+                  href={applyHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-rose-700 px-3 text-sm font-bold text-white hover:bg-rose-800"
                 >
-                  {t.applyNow}
+                  {applyLabel}
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </a>
               )}

@@ -6704,6 +6704,7 @@
     "applyNote": "Applications go through the provider's own portal — ScholarBridge does not collect them.",
     "allMajors": "All fields",
     "allCountries": "All countries",
-    "applicationFeeFree": "Free"
+    "applicationFeeFree": "Free",
+    "applyOnOfficialPage": "Apply on the official page"
   }
 }
