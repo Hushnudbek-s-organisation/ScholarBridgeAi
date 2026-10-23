@@ -233,3 +233,13 @@ FROM (VALUES
         'Hacettepe University''s own FAQ states it offers no scholarships specifically for international students. Türkiye Bursları is a national YTB programme and is recorded as scholarship id 865.')
 ) AS v(id, name, max_award, aspect, url, availability, elig)
 WHERE us.id = v.id;
+
+-- The retired row must not keep feeding the invented USD 13 800 to any query that
+-- forgets to filter on is_active, so its money columns are zeroed as well.
+UPDATE scholarships SET
+  amount_usd_value = 0,
+  award_amount = NULL,
+  coverage_type = 'Unspecified',
+  tuition_coverage = 'Retired 2026-10-23 - Hacettepe offers no scholarship for international students',
+  last_updated_at = NOW()
+WHERE id = 856;
