@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
+import { ArrowRight, Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
@@ -247,17 +247,26 @@ export default async function ScholarshipsPage({
                   )}
                 </div>
 
-                {scholarship.website_url && (
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
                   <Link
-                    href={scholarship.website_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-auto inline-flex min-h-11 items-center gap-1 pt-4 text-xs font-semibold text-blue-700 hover:text-blue-900 sm:text-sm"
+                    href={`/scholarships/${scholarship.id}`}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-blue-700 px-3 text-xs font-semibold text-white hover:bg-blue-800 sm:text-sm"
                   >
                     {copy.viewDetails}
-                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                   </Link>
-                )}
+                  {scholarship.website_url && (
+                    <Link
+                      href={scholarship.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900 sm:text-sm"
+                    >
+                      {copy.website}
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  )}
+                </div>
               </article>
             ))}
           </div>
