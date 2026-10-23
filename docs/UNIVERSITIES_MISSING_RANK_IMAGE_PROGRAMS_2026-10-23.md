@@ -122,3 +122,23 @@ Bu 4 ta eski "placeholder" qator. To'liq o'quv katalogini yig'ish uchun research
 | `data/universities_missing_rank_image_programs_2026-10-23.csv` | 364 qator, `rank_missing` / `image_missing` / `programs_missing` ustunlari |
 | `supabase/campus_images_wikimedia_2026-10-23.sql` | 93 ta rasmning to'liq ro'yxati (Commons sahifasi bilan) |
 | `supabase/qs_2026_rank_correction.sql` | QS 2026 reyting tuzatishlari |
+
+---
+
+## Yangilanish (2026-10-23, ma'lumot bo'shliqlarini to'ldirishdan keyin)
+
+Rasmiy manbalardan to'ldirilgandan keyingi holat (`docs/DATA_GAPS_FILLED_2026-10-23.md`):
+
+| Mezon | Oldin | Keyin |
+| --- | ---: | ---: |
+| QS reytingi yo'q | 8 | 8 |
+| Rasm yo'q | 71 | **57** |
+| Kontrakt narxi yo'q | 4 | **0** |
+| Asos (yil/tur) yo'q | 4 | **0** |
+| Dastur yo'q | 4 | **0** |
+| Grant yo'q | 19 | **16** |
+
+Ya'ni 4 ta "placeholder" (CTU, WIUT, IUT, NewUU) endi to'liq profilli va `verified`.
+CSV fayl (`data/universities_missing_rank_image_programs_2026-10-23.csv`) eski holatni
+ko'rsatadi — yangi holat uchun `supabase/fill_data_gaps_official_sources_2026-10-23.sql`
+oxiridagi tekshiruv so'rovlaridan foydalaning.
