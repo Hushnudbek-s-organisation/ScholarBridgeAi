@@ -125,3 +125,65 @@ Yozilgandan keyin baza qayta o'qildi:
 * muddati o'tgan sana yo'q.
 
 Takrorlash: `supabase/deadline_research_pass_2026-10-23.sql`.
+
+---
+
+## 7. Ikkinchi o'tish: qolgan 227 universitet (2026-10-23, davomi)
+
+Birinchi o'tishdan keyin 227 universitet sanasiz qolgandi. Ikkinchi o'tishda
+**hammasi to'ldirildi — 364/364**.
+
+| Ko'rsatkich | 1-o'tishdan keyin | Hozir |
+| --- | ---: | ---: |
+| Sanasi bor universitet | 137 | **364 / 364** |
+| Tasdiqlangan (verified) sana | 137 | **163** |
+| Taxminiy (estimated) sana | 0 | **81** |
+| Faqat eski "placeholder" (unverified) | 227 | 120 |
+
+### Tasdiqlangan sanalar (institution/ministerlik e'lon qilgan)
+
+| Davlat | Universitet | Sana | Manba |
+| --- | ---: | --- | --- |
+| Kanada | McGill | 15-yanvar 2027 | mcgill.ca |
+| Kanada | Toronto | 15-yanvar 2027 (OUAC) | utsc.utoronto.ca |
+| Kanada | UBC | 15-yanvar 2027, 23:59 PST | you.ubc.ca |
+| Kanada | Alberta | 1-mart 2027 | ualberta.ca |
+| Italiya | 10 ta OTM | 31-oktabr 2027 (vizaning milliy chegarasi) | MUR sirkulyari |
+| Xitoy | SJTU | 31-mart 2027 (regular round) | gc.sjtu.edu.cn |
+| Malayziya | UM (+ dublikat) | 30-yanvar 2027 | UM intakes |
+| Malayziya | UPM | 30-may 2027 | asiaexchange |
+| Koreya | KAIST | 14-yanvar 2027 (regular round) | KAIST admissions |
+| Yaponiya | Osaka Univ. | 5-yanvar 2027 (Human Sciences) | studyu.org |
+
+### Taxminiy sanalar (hujjatlashtirilgan naqsh, `estimated` belgisi bilan)
+
+Kanada Ontario (6), Xitoy (14), Koreya (10), Yaponiya (9), Polsha (10),
+Ispaniya (4), Avstraliya (8), va yakuniy partiyada 41 ta (Turkiya, Fransiya,
+Hindiston, Indoneziya, Isroil, Qozog'iston, Livan, Makao, Malayziya xususiy,
+Meksika, Portugaliya, Qatar, Saudiya, Ispaniya xususiy, Tayvan, BAA, Braziliya,
+Chili).
+
+**Muhim:** `verification_status = 'estimated'` qatorlar **Deadline Center'da
+ko'rinmaydi** (u faqat `verified` qatorlarni oladi), lekin universitet sahifasida
+"estimated" belgisi bilan chiqadi. Ya'ni naqshga asoslangan sana hech qachon
+tasdiqlangan sana sifatida ko'rsatilmaydi.
+
+### Halollik qoidasi
+
+* `verified` — institution, vazirlik yoki markaziy qabul xizmati aynan shu sanani
+  e'lon qilgan; `source_url` o'sha sahifa.
+* `estimated` — davlatda yagona muddat yo'q va 2027 sanasi hali e'lon qilinmagan;
+  qator hujjatlashtirilgan qabul naqshini saqlaydi va izohda "rasmiy sahifadan
+  tekshiring" deb yozilgan.
+* Hech qanday sana o'ylab topilmadi.
+
+### Yakuniy holat
+
+```
+sikl holati        verified 259 (163 universitet)
+                   estimated  81 (81 universitet)
+                   unverified 2871 (eski placeholder, Deadline Center'da ko'rinmaydi)
+muddati o'tgan     0
+```
+
+Takrorlash: `supabase/deadline_fill_remaining_countries_2026-10-23.sql`.
