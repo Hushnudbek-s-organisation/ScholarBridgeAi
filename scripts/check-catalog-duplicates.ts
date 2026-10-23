@@ -65,21 +65,53 @@ async function main() {
 
     console.log(`\n[duplicates] ${rows.length} universities checked\n`);
     if (duplicates.length === 0) {
-      console.log("  ✓ no duplicate universities (same country, same normalised name)\n");
-      process.exit(0);
+      console.log("  ✓ no duplicate universities (same country, same normalised name)");
+    } else {
+      console.log(`  ✗ ${duplicates.length} duplicate group(s):\n`);
+      for (const [key, list] of duplicates) {
+        console.log(`    ${key}`);
+        for (const row of list) {
+          console.log(`      id=${row.id}  rank=${row.world_ranking ?? "–"}  ${row.canonical_name ?? row.name}`);
+        }
+      }
+      console.log(
+        "\n  Merge them with supabase/merge_duplicate_universities_2026-10-23.sql" +
+          "\n  (re-point every child row first, then delete the duplicate).\n",
+      );
     }
 
-    console.log(`  ✗ ${duplicates.length} duplicate group(s):\n`);
-    for (const [key, list] of duplicates) {
-      console.log(`    ${key}`);
-      for (const row of list) {
-        console.log(`      id=${row.id}  rank=${row.world_ranking ?? "–"}  ${row.canonical_name ?? row.name}`);
-      }
-    }
-    console.log(
-      "\n  Merge them with supabase/merge_duplicate_universities_2026-10-23.sql" +
-        "\n  (re-point every child row first, then delete the duplicate).\n",
+    // ---- scholarships ------------------------------------------------------
+    // A second import pass once added 15 template rows titled
+    // "<university award> + El-Yurt Umidi" beside the award they copied, so a
+    // student saw the same funding twice. Two active scholarships for the same
+    // institution whose titles normalise to the same base key are a duplicate.
+    const { rows: scholarshipRows } = await pool.query<{ id: number; university_id: number; title: string }>(
+      `SELECT id, university_id, title FROM scholarships WHERE is_active ORDER BY id`,
     );
+    const byUni = new Map<string, { id: number; title: string }[]>();
+    for (const row of scholarshipRows) {
+      const key = `${row.university_id}::${duplicateKey({ name: row.title })}`;
+      const list = byUni.get(key) ?? [];
+      list.push({ id: row.id, title: row.title });
+      byUni.set(key, list);
+    }
+    const duplicateScholarships = [...byUni.entries()].filter(([, list]) => list.length > 1);
+
+    console.log(`\n[duplicates] ${scholarshipRows.length} active scholarships checked\n`);
+    if (duplicateScholarships.length === 0) {
+      console.log("  ✓ no duplicate scholarships (same university, same normalised title)\n");
+    } else {
+      console.log(`  ✗ ${duplicateScholarships.length} duplicate scholarship group(s):\n`);
+      for (const [key, list] of duplicateScholarships) {
+        console.log(`    university ${key.split("::")[0]}`);
+        for (const row of list) console.log(`      id=${row.id}  ${row.title}`);
+      }
+      console.log("\n  Retire the weaker row (is_active = false) and keep one verified record.\n");
+    }
+
+    if (duplicates.length === 0 && duplicateScholarships.length === 0) {
+      process.exit(0);
+    }
     process.exit(1);
   } finally {
     await pool.end();
