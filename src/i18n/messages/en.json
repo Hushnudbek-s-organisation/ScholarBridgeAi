@@ -444,6 +444,7 @@
     "streakBest": "Best: {count}",
     "streakDoneToday": "Done today",
     "streakContinueToday": "Continue today",
+    "streakStartToday": "Start today",
     "streakLastSeven": "Activity during the last seven days",
     "streakActiveDay": "Active on {date}",
     "streakMilestone": "{days} more active days to reach the {milestone}-day milestone.",

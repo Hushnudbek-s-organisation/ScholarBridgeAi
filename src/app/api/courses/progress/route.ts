@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { lessonProgress, lessons, courseModules, courses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { maybeIssueCertificate } from "@/lib/certificates";
-import { awardPoints } from "@/lib/gamification";
+import { awardPoints, recordDailyActivity } from "@/lib/gamification";
 
 export async function POST(req: Request) {
   try {
@@ -65,6 +65,15 @@ export async function POST(req: Request) {
           isCompleted,
         })
         .returning();
+    }
+
+    // Finishing a lesson counts as study even when that lesson already paid out
+    // its one-off points — otherwise a re-watched lesson never reaches the daily
+    // streak, which is the normal way students revise. Merely opening a video
+    // does NOT count (see the streak rule in src/lib/streak.ts).
+    // recordDailyActivity never throws, so a tracking hiccup cannot fail the save.
+    if (isCompleted) {
+      await recordDailyActivity(Number(profileId));
     }
 
     let award = null;

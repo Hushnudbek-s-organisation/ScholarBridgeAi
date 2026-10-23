@@ -444,6 +444,7 @@
     "streakBest": "Рекорд: {count}",
     "streakDoneToday": "Сегодня выполнено",
     "streakContinueToday": "Продолжить сегодня",
+    "streakStartToday": "Начните сегодня",
     "streakLastSeven": "Активность за последние семь дней",
     "streakActiveDay": "Активность {date}",
     "streakMilestone": "Ещё {days} активных дн. до серии в {milestone} дн.",

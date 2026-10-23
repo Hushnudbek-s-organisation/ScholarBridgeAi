@@ -80,6 +80,11 @@ export function DailyStreakCard({
   const milestoneProgress =
     nextMilestone && nextMilestone > 0 ? Math.min(100, (current / nextMilestone) * 100) : 0;
 
+  // A streak that already lapsed (nothing counted yesterday either) cannot be
+  // "continued" — the honest call to action is to start a new one. The pill used
+  // to say "Continue today" even at 0, which read as if the old run were still
+  // alive.
+  const streakLapsed = !activeToday && current === 0;
   const statusPill = (
     <span
       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -88,7 +93,11 @@ export function DailyStreakCard({
           : "bg-white text-orange-700 ring-1 ring-orange-200 dark:bg-slate-900 dark:text-orange-200 dark:ring-orange-500/40"
       }`}
     >
-      {activeToday ? t("streakDoneToday") : t("streakContinueToday")}
+      {activeToday
+        ? t("streakDoneToday")
+        : streakLapsed
+          ? t("streakStartToday")
+          : t("streakContinueToday")}
     </span>
   );
 

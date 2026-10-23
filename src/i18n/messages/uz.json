@@ -444,6 +444,7 @@
     "streakBest": "Rekord: {count}",
     "streakDoneToday": "Bugun bajarildi",
     "streakContinueToday": "Bugun davom eting",
+    "streakStartToday": "Bugun boshlang",
     "streakLastSeven": "Oxirgi yetti kundagi faollik",
     "streakActiveDay": "{date} kuni faol",
     "streakMilestone": "{milestone} kunlik marraga yetish uchun yana {days} faol kun.",
