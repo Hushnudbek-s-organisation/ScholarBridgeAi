@@ -3,9 +3,11 @@
  *
  * Why this exists: `npm audit --audit-level=high` fails the whole CI job on ANY
  * high advisory — including ones that have no released fix and no path to one.
- * GHSA-vfj7-8cjw-p6xm (`braces` <= 3.0.3, `first_patched_version: null`) is one,
- * and because it hangs off the ESLint toolchain it made the very first CI step
- * of every branch fail, so the other 22 gates never ran at all.
+ * GHSA-vfj7-8cjw-p6xm (`braces` <= 3.0.3, `first_patched_version: null`) was
+ * one, and because it hung off the ESLint toolchain it made the very first CI
+ * step of every branch fail, so the other 22 gates never ran at all.
+ * (That advisory was withdrawn from the npm database on 2026-10-23 and the
+ * exception list is now empty, but the split gate is what surfaced it.)
  *
  * The gate is therefore split in two, and nothing is hidden:
  *

@@ -20,6 +20,12 @@ This document separates two things that are easy to confuse:
 > the exception list can only shrink, because the gate fails on a stale entry.
 > Still read CI status off the Actions run for the commit in question. The
 > operator steps to make the gate *blocking* are in
+>
+> **Update (2026-10-23):** GHSA-vfj7-8cjw-p6xm has been withdrawn from the npm
+> advisory database — `npm audit` no longer reports it at all, for `braces@3.0.3`
+> or any other version. The gate caught its own stale entry as designed, and
+> `audit-exceptions.json` is now **empty**: every high and critical advisory is
+> gated with no exceptions in either half.
 > [Activate the gate](#activate-the-gate).
 
 ---
