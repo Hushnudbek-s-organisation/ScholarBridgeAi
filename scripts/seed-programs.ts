@@ -24,7 +24,7 @@
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 
 import { db } from "../src/db";
-import { programs, universities } from "../src/db/schema";
+import { universities, universityPrograms } from "../src/db/schema";
 import { runBatch } from "../src/lib/research-agent/run-batch";
 import type { ResearchScope } from "../src/lib/research-agent/types";
 
@@ -57,7 +57,7 @@ async function main() {
         and(
           eq(universities.isActive, true),
           sql`(
-            SELECT count(*) FROM ${programs} p WHERE p.university_id = ${universities.id}
+            SELECT count(*) FROM ${universityPrograms} p WHERE p.university_id = ${universities.id}
           ) < ${minPrograms}`
         )
       )
