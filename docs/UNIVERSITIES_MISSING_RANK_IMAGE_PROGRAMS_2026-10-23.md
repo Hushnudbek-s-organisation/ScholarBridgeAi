@@ -142,3 +142,104 @@ Ya'ni 4 ta "placeholder" (CTU, WIUT, IUT, NewUU) endi to'liq profilli va `verifi
 CSV fayl (`data/universities_missing_rank_image_programs_2026-10-23.csv`) eski holatni
 ko'rsatadi — yangi holat uchun `supabase/fill_data_gaps_official_sources_2026-10-23.sql`
 oxiridagi tekshiruv so'rovlaridan foydalaning.
+
+---
+
+## Yangilanish (2026-10-23, 6 juft dublikat birlashtirilgandan keyin)
+
+Olti juft dublikat universitet birlashtirildi (`docs/MERGE_DUPLICATE_UNIVERSITIES_2026-10-23.md`),
+shu sababli jami son 364 → **358**. Bu bo'limdagi raqamlar — joriy holat.
+
+### Xulosa
+
+| Mezon | Oldin (364) | **Hozir (358)** |
+| --- | ---: | ---: |
+| QS 2026 reytingi bor | 356 | **350** |
+| Reyting yo'q | 8 | **8** |
+| Kampus rasmi bor | 293 | **301** |
+| Rasm yo'q | 71 | **57** |
+| Dasturi yo'q | 4 | **0** |
+| `verified` muddati bor | 227 | **224** |
+
+> Dublikatlar birlashganda ularning dasturlari, muddatlari va rasmlari keeperga
+> o'tdi — shuning uchun ba'zi ko'rsatkichlar "kamaygandek" ko'rinadi, aslida
+> takrorlar yo'qoldi.
+
+### Rasm yo'q — 57 ta
+
+Wikimedia Commons'da aynan shu universitetning **kampus fotosi** topilmadi.
+`pageimages` API ko'p hollarda gerb yoki logotip qaytaradi — bunday rasm
+qo'yilmadi. **Noto'g'ri rasm qo'yishdan ko'ra bo'sh qoldirish to'g'ri.**
+
+| id | Universitet | Davlat |
+| ---: | --- | --- |
+| 290 | University of Tasmania | Australia |
+| 310 | University of Newcastle (Australia) | Australia |
+| 326 | Queensland University of Technology | Australia |
+| 300 | Vrije Universiteit Brussel | Belgium |
+| 318 | Université libre de Bruxelles | Belgium |
+| 229 | Western University | Canada |
+| 284 | Dalhousie University | Canada |
+| 303 | Universidad de Chile | Chile |
+| 291 | Xi'an Jiaotong University | China |
+| 295 | Huazhong University of Science and Technology | China |
+| 301 | Southern University of Science and Technology | China |
+| 297 | École Normale Supérieure de Lyon | France |
+| 298 | École des Ponts ParisTech | France |
+| 302 | Institut Polytechnique de Paris | France |
+| 324 | Université Paris 1 Panthéon-Sorbonne | France |
+| 239 | University of Freiburg | Germany |
+| 320 | Technical University of Darmstadt | Germany |
+| 321 | Hong Kong Baptist University | Hong Kong SAR |
+| 315 | Indian Institute of Science | India |
+| 316 | Indian Institute of Technology Kharagpur | India |
+| 317 | Indian Institute of Technology Madras | India |
+| 322 | Indian Institute of Technology Kanpur | India |
+| 282 | University College Cork | Ireland |
+| 283 | University of Galway | Ireland |
+| 287 | The Hebrew University of Jerusalem | Israel |
+| 319 | Politecnico di Torino | Italy |
+| 208 | Nazarbayev University | Kazakhstan |
+| 279 | Taylor's University | Malaysia |
+| 323 | Universiti Teknologi PETRONAS | Malaysia |
+| 226 | Tecnológico de Monterrey | Mexico |
+| 272 | University of Bergen | Norway |
+| 358 | Adam Mickiewicz University, Poznań | Poland |
+| 285 | University of Porto | Portugal |
+| 296 | Hamad Bin Khalifa University | Qatar |
+| 325 | Bauman Moscow State Technical University | Russia |
+| 348 | HSE University (Higher School of Economics) | Russia |
+| 304 | King Abdulaziz University | Saudi Arabia |
+| 312 | King Saud University | Saudi Arabia |
+| 286 | Ulsan National Institute of Science and Technology | South Korea |
+| 328 | Gwangju Institute of Science and Technology (GIST) | South Korea |
+| 277 | University of Navarra | Spain |
+| 307 | University of Barcelona | Spain |
+| 274 | National Yang Ming Chiao Tung University | Taiwan |
+| 234 | American University of Sharjah | United Arab Emirates |
+| 260 | Canadian University Dubai | United Arab Emirates |
+| 364 | United Arab Emirates University (UAEU) | United Arab Emirates |
+| 313 | Queen's University Belfast | United Kingdom |
+| 273 | University of Maryland, College Park | United States |
+| 299 | Case Western Reserve University | United States |
+| 305 | Michigan State University | United States |
+| 306 | Texas A&M University | United States |
+| 308 | Washington University in St. Louis | United States |
+| 309 | University of California, Santa Barbara | United States |
+| 311 | Arizona State University | United States |
+| 314 | The Ohio State University | United States |
+| 215 | Inha University in Tashkent | Uzbekistan |
+| 216 | New Uzbekistan University | Uzbekistan |
+
+### Nima uchun avtomatik to'ldirilmadi
+
+- `pageimages` API 57 tadan faqat 4 tasida bino fotosi qaytardi, qolganida
+  **logotip/gerb**. Logotipni kampus fotosi o'rniga qo'yish noto'g'ri.
+- Commons qidiruvi har bir universitet uchun alohida so'rov talab qiladi va
+  natijalari ko'pincha boshqa OTM binosini beradi.
+- Wikidata P18 so'rovi (`query.wikidata.org`) bu muhitdan **bloklangan**
+  ("Automated SPARQL traffic ... is not permitted").
+
+Shu sababli bu 57 ta rasm **qo'lda tanlanishi** kerak: Wikimedia Commons'da
+universitet nomi bilan qidirib, `File:` sahifasidagi haqiqiy fayl nomini olish va
+`upload.wikimedia.org/wikipedia/commons/<hash>/<hash>/<fayl>` ko'rinishida yozish.
