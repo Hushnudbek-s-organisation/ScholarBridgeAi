@@ -58,3 +58,29 @@ record set (programs / requirements / cycles / sources) for the 46 universities 
 The `_pdf_13c` / `_pdf_13c_cycles` staging tables could **not** be dropped through the connector
 (the provider's security filter blocked the statement); `supabase/uzbek_13c_pdf_import.sql` has the
 cleanup lines to run manually.
+
+## Third PDF — 11 programmes + QS ranking + campus images (430 rows)
+
+`top_universities_programs_qs_rankings_master.pdf` (113 pages) re-prints both registries and adds
+four layers (11 programmes per university, QS rank, image URL, research-agent catalogue scanner).
+The table dropped to **4 columns** (`31.5 / 203.2 / 366.7 / 632.2 / 811.5`):
+
+| Step | Script | Output |
+| --- | --- | --- |
+| 1 | `extract_pdf_11progs.py <pdf> raw.json 5 113` | 430 rows (sec 4: 130, Top 1–200: 200, Top 201–300: 100) |
+| 2 | `parse_rows_11progs.py raw.json parsed.json` | name, QS rank, country/city, type/founded, PSW, website, image file, tuition/living/housing/fee, acceptance/GPA/SAT/IELTS/TOEFL/DET, PS/Rec/Int/Port, the 11 programmes, deadline/intake/timezone, "Fokus", grant + max coverage |
+
+Committed output: `data/top_universities_11progs_qs_pdf_2026.json`.
+
+**What was verified before writing anything** (`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`):
+
+* the QS ranks in the PDF are the **2025** edition (Oxford #3, Cambridge #5, KAIST #53). The DB's own
+  ranks were also not real QS data — 181 of 200 were wrong (UPenn #11 vs 15, Columbia #18 vs 38 …).
+  Both were replaced with the official **QS 2026** table: `data/qs_2026_top499.tsv`,
+  `supabase/qs_2026_rank_correction.sql` (336 verified ranks, 28 left `NULL`, KAIST cleared — QS
+  excluded it from the 2026 edition);
+* the image URLs are **constructed** (`Special:FilePath/<Name>_Campus.jpg`) — 4/4 sampled files do not
+  exist on Commons, so **no image_url was written**;
+* the "11 programmes" are **archetype templates** (identical lists per profile) with fabricated
+  `/programs`, `/apply`, `/admissions` URLs, and the app lists every `programs` row without a
+  verification filter → **not inserted**.
