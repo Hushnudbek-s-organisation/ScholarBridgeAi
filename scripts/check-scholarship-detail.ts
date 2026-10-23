@@ -110,6 +110,14 @@ const SOFT: Check[] = [
     sql: `SELECT COUNT(*)::int AS n FROM scholarships WHERE ${SCOPE} AND deadline_date IS NULL`,
   },
   {
+    name: "description still in the importer's template phrasing",
+    sql: `SELECT COUNT(*)::int AS n FROM scholarships WHERE ${SCOPE} AND description ~ 'offers .*Maximum award:'`,
+  },
+  {
+    name: "website_url is a bare domain (home page, not the award page)",
+    sql: `SELECT COUNT(*)::int AS n FROM scholarships WHERE ${SCOPE} AND website_url ~ '^https?://(www\\.)?[^/]+/?$'`,
+  },
+  {
     name: "round-number USD amount (possible legacy estimate)",
     sql: `SELECT COUNT(*)::int AS n FROM scholarships WHERE ${SCOPE} AND amount_usd_value > 0 AND amount_usd_value % 5000 = 0`,
   },
