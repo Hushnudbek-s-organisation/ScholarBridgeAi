@@ -2,7 +2,7 @@
 
 **Branch:** `arena/99b0c7fe-scholarbridgeai`
 **Nima qilindi:** butun kod bazasi typecheck, lint, 40+ test to'plami, production
-build va API xavfsizlik auditi orqali o'tkazildi. Uchta haqiqiy muammo topildi va
+build va API xavfsizlik auditi orqali o'tkazildi. Beshta haqiqiy muammo topildi va
 tuzatildi; bittasi muhit cheklovi.
 
 ---
@@ -98,6 +98,55 @@ Install the browser's system libraries … sudo apt-get install -y libnspr4 libn
 
 Exit kodi **3** — "muhit" uchun alohida kod, "test yiqildi" (1) bilan
 aralashtirilmaydi.
+
+### 2.4 Har sahifa yuklanishida yiqiladigan SQL so'rov
+
+Mahalliy dev serverni ishga tushirib, Postgres logini o'qiganimda ko'rindi:
+
+```
+ERROR: column "application_deadline" does not exist
+STATEMENT: SELECT id, application_deadline FROM programs
+           WHERE university_id = $1 AND application_deadline IS NOT NULL
+```
+
+Kod himoyalangan edi (`try/catch` → bo'sh massiv), lekin **har bir universitet
+sahifasi** yuklanganda bu so'rov yuborilardi va **doim yiqilardi** — `programs.
+application_deadline` kanonik sxemada yo'q, uni faqat boyitilgan o'rnatishlar
+qo'shadi (`data/supabase_enrichment.sql`).
+
+Ya'ni: behuda round-trip + DB logida doimiy xato + monitoringda shovqin.
+
+**Tuzatish:** ustun bor-yo'qligi **bir marta** `information_schema` dan
+so'raladi va jarayon xotirasida keshlanadi (`hasProgramDeadlineColumn()`).
+Ustun bo'lmasa, so'rov umuman yuborilmaydi. Kesh faqat muvaffaqiyatli javobni
+saqlaydi — DB vaqtincha ishlamasa, keyingi so'rov qayta tekshiradi (uzilish
+muddatlarni butun jarayon umriga o'chirib qo'ymasin).
+
+Tekshirildi: server qayta ko'tarildi, 6 marta so'rov yuborildi — DB logida
+**bitta ham xato yo'q**, javob 200, `applicationDeadline: null` (sxemada ustun
+yo'qligi uchun to'g'ri).
+
+### 2.5 Seed ham xato qatorlar yozardi
+
+`npm run test:deadlines` ni **yangi o'rnatilgan** bazada ishlatganimda 3 ta
+tekshiruv yiqildi:
+
+```
+✗ a verified deadline always explains what was published — 2 rows
+✗ is_verified agrees with verification_status — 2 rows
+✗ academic_year and cycle_year describe the same entry year — 1 row
+```
+
+Sabab: `seedProgramCatalog.ts` tsikl qo'shganda `is_verified`, `notes` va
+`cycle_year` ni yozmasdi. Ya'ni **har bir yangi o'rnatish** shu xatolar bilan
+boshlanardi — faqat Supabase bazasi qo'lda tuzatilgani uchun ko'rinmasdi.
+
+**Tuzatish:** seed endi `cycle_year` ni `academic_year` dan oladi, `is_verified`
+/ `is_estimated` / `is_active` ni to'g'ri qo'yadi va `notes` ga manba URL va
+o'qilgan sanani yozadi.
+
+Tekshirildi: `.pgdata` o'chirilib, baza **noldan** seed qilindi →
+`✅ deadline integrity: 10 checks passed`.
 
 ---
 

@@ -138,6 +138,46 @@ function parseOtherRequirements(texts: string[]) {
  * No verification flags are invented: they come from the DB columns only.
  */
 
+/**
+ * Does this database have the optional `programs.application_deadline` column?
+ *
+ * The canonical schema does not define it; enriched deployments (see
+ * data/supabase_enrichment.sql) add it. The old code just ran the SELECT and
+ * relied on the catch, which meant *every* university page load fired a query
+ * that was guaranteed to fail on a stock database — visible as a steady stream
+ * of `column "application_deadline" does not exist` in the Postgres log, plus one
+ * wasted round-trip per request.
+ *
+ * The answer cannot change while the process lives, so it is probed once and
+ * memoised. `null` means "not yet known"; the promise is cached so concurrent
+ * first requests share the single probe instead of racing.
+ */
+let programDeadlineColumnProbe: Promise<boolean> | null = null;
+
+function hasProgramDeadlineColumn(): Promise<boolean> {
+  if (!programDeadlineColumnProbe) {
+    programDeadlineColumnProbe = db
+      .execute(sql`
+        SELECT 1 AS present
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'programs'
+          AND column_name = 'application_deadline'
+        LIMIT 1
+      `)
+      .then((res) => (res.rows as unknown[]).length > 0)
+      .catch(() => {
+        // The probe could not run (database not ready, transient error). Answer
+        // "no column" for THIS request so the page still renders, but clear the
+        // memo so the next request asks again — a momentary outage must not
+        // disable program deadlines until the process restarts.
+        programDeadlineColumnProbe = null;
+        return false;
+      });
+  }
+  return programDeadlineColumnProbe;
+}
+
 /** Words that never identify an institution on their own. */
 const INSTITUTION_STOPWORDS = new Set([
   "university",
@@ -449,11 +489,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       })(),
       // ---------- Program deadlines ----------
       // The canonical schema has no `programs.application_deadline` column, but
-      // enriched deployments add one (see data/supabase_enrichment.sql). The
-      // read is defensive: when the column is missing the query fails, the
-      // deadlines stay null and the page still renders. A published date is
-      // never invented here — it is either in the column or nowhere.
+      // enriched deployments add one (see data/supabase_enrichment.sql). Probe
+      // the column once (memoised) instead of running a query that is known to
+      // fail on a stock database — see hasProgramDeadlineColumn(). A published
+      // date is never invented here: it is either in the column or nowhere.
       (async () => {
+        if (!(await hasProgramDeadlineColumn())) {
+          return [] as { id: number; application_deadline: string | null }[];
+        }
         try {
           const res = await db.execute(sql`
             SELECT id, application_deadline
