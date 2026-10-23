@@ -693,31 +693,50 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    const cycles = cycleRows.map((c) => {
-      let year: number | null = null;
-      const m = /^(\d{4})/.exec(c.academicYear || "");
-      if (m) year = parseInt(m[1], 10);
-      return {
-        id: c.id,
-        cycleYear: year,
-        academicYear: c.academicYear,
-        intake: c.intake,
-        applicationType: c.applicationType,
-        openingDate: c.openingDate,
-        deadline: c.deadline,
-        deadlineTimezone: c.deadlineTimezone,
-        applicationFee: c.applicationFee != null ? Number(c.applicationFee) : null,
-        applicationFeeCurrency: c.applicationFeeCurrency,
-        applicationUrl: c.applicationUrl,
-        isVerified: c.verificationStatus === "verified",
-        // A deadline only counts as "confirmed" when the DB row is verified.
-        // Anything else is surfaced as "estimated / not confirmed" so a
-        // student never mistakes an unverified date for an official one.
-        isEstimated: c.verificationStatus !== "verified",
-        sourceUrl: c.sourceUrl ?? null,
-        lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
-      };
-    });
+    /*
+     * One card per distinct deadline.
+     *
+     * application_cycles is written per programme, so a university whose
+     * undergraduate deadline is the same for every major carries a dozen
+     * identical rows. The page renders only the first two cycles, so without
+     * this collapse the student saw the same "Fall 2027 · 1 January" card
+     * twice and never reached the second (e.g. graduate) cycle. Rows that
+     * differ in any displayed field — deadline, intake, plan, verification —
+     * stay separate; only exact duplicates collapse.
+     */
+    const seenCycleKeys = new Set<string>();
+    const cycles = cycleRows
+      .map((c) => {
+        let year: number | null = null;
+        const m = /^(\d{4})/.exec(c.academicYear || "");
+        if (m) year = parseInt(m[1], 10);
+        return {
+          id: c.id,
+          cycleYear: year,
+          academicYear: c.academicYear,
+          intake: c.intake,
+          applicationType: c.applicationType,
+          openingDate: c.openingDate,
+          deadline: c.deadline,
+          deadlineTimezone: c.deadlineTimezone,
+          applicationFee: c.applicationFee != null ? Number(c.applicationFee) : null,
+          applicationFeeCurrency: c.applicationFeeCurrency,
+          applicationUrl: c.applicationUrl,
+          isVerified: c.verificationStatus === "verified",
+          // A deadline only counts as "confirmed" when the DB row is verified.
+          // Anything else is surfaced as "estimated / not confirmed" so a
+          // student never mistakes an unverified date for an official one.
+          isEstimated: c.verificationStatus !== "verified",
+          sourceUrl: c.sourceUrl ?? null,
+          lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
+        };
+      })
+      .filter((c) => {
+        const key = [c.deadline, c.intake, c.applicationType, c.isVerified].join("|");
+        if (seenCycleKeys.has(key)) return false;
+        seenCycleKeys.add(key);
+        return true;
+      });
 
     // ---------- Sources (resilient: unknown table shape must not crash the page) ----------
     let uniSources: {

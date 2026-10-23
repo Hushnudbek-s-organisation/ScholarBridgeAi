@@ -2542,6 +2542,36 @@ async function main() {
     JSON.stringify({ date: verifiedItem?.date, expected: unverifiedDeadline }),
   );
   await pool.query("DELETE FROM application_cycles WHERE id = $1", [cycleId]);
+
+  // application_cycles is written per programme, so one undergraduate deadline
+  // arrives as a dozen identical rows. The detail page only renders the first
+  // two cycles, so duplicates used to fill the card list with the same date.
+  const dupDeadline = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+  const dupCycles = await pool.query<{ id: number }>(
+    `INSERT INTO application_cycles (university_id, academic_year, intake, application_type, deadline, verification_status)
+     VALUES ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Spring', 'Regular Decision', $3, 'verified')
+     RETURNING id`,
+    [uniA.id, dupDeadline, new Date(Date.now() + 200 * 86400000).toISOString().slice(0, 10)],
+  );
+  const uniDetailRoute = await import("../src/app/api/universities/[id]/route");
+  const uniDetail = await call(
+    ((request: Request) =>
+      uniDetailRoute.GET(request, { params: Promise.resolve({ id: String(uniA.id) }) })) as any,
+    `/api/universities/${uniA.id}`,
+  );
+  const detailCycles: any[] = uniDetail.body?.applicationCycles ?? [];
+  check(
+    "universities: identical cycles collapse to one card, a different intake stays",
+    detailCycles.length === 2 && detailCycles[0]?.deadline === dupDeadline,
+    JSON.stringify(detailCycles.map((c) => `${c.intake}:${c.deadline}`)),
+  );
+  await pool.query("DELETE FROM application_cycles WHERE id = ANY($1::int[])", [
+    dupCycles.rows.map((r) => r.id),
+  ]);
+
   const botSrc = readFile2("src/lib/telegram/bot.ts", "utf8");
   const botDeadlinesFn = botSrc.slice(botSrc.indexOf("async function deadlines"), botSrc.indexOf("async function next"));
   check("deadlines: the Telegram /deadlines list is FREE (policy: same data, every channel)", botDeadlinesFn.length > 0 && !/hasFeature|premium/.test(botDeadlinesFn));

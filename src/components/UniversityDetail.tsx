@@ -785,7 +785,9 @@ export function UniversityDetail({
               <div key={c.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-extrabold text-slate-800">
-                    {c.intake || t("applicationTitle")} {c.academicYear || c.cycleYear}
+                    {/* "Fall 2027" already carries the year — repeating the
+                        academic year after it read as "Fall 2027 2027-2028". */}
+                    {c.intake || c.academicYear || c.cycleYear || t("applicationTitle")}
                   </span>
                   {c.applicationType && (
                     <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold">
