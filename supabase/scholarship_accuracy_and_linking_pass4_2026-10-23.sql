@@ -253,3 +253,22 @@ SELECT (SELECT COUNT(*) FROM universities)                                      
        (SELECT COUNT(*) FROM university_scholarships)                             AS link_rows,
        (SELECT COUNT(*) FROM scholarships WHERE is_active)                        AS active_scholarships,
        (SELECT COUNT(*) FROM scholarships WHERE NOT is_active)                    AS retired_scholarships;
+
+-- ---------------------------------------------------------------------------
+-- 7. UNAM duplicate records (91 and 176)
+--    UNAM appears twice in the catalogue and the merge is a separate task, so
+--    each duplicate now carries one of the two real UNAM awards. Before this,
+--    record 176 had no active scholarship of its own and fell back to
+--    country-level matches on its page.
+-- ---------------------------------------------------------------------------
+UPDATE scholarships
+SET university_id = 176,
+    notes = COALESCE(notes, '') || ' Moved 2026-10-23: UNAM appears twice in the catalogue (91 and 176), so one of the two real UNAM awards is attached to each duplicate record - both pages render the institution''s scholarships until the duplicates are merged.',
+    last_updated_at = now() AT TIME ZONE 'UTC'
+WHERE id = 343;
+
+SELECT COUNT(*) AS universities_without_an_owned_active_scholarship
+FROM universities u
+WHERE NOT EXISTS (
+  SELECT 1 FROM scholarships s WHERE s.university_id = u.id AND s.is_active
+);

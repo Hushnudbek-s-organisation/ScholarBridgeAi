@@ -24,8 +24,12 @@ to'qib yozilgan edi**. Ular rasmiy sahifalardagi raqamlar bilan almashtirildi.
 | Nafaqaga chiqarilgan (retired) qatorlar | 5 | 9 |
 
 Uch bo'shliq yopildi: **McGill (26)**, **PSL (44)** va **UNAM (176)**.
-UNAM ikki nusxa (91 va 176) — birlashtirish alohida vazifa, shuning uchun 176 ga
-ham 91 dagi haqiqiy mukofotlar bog'landi.
+UNAM ikki nusxa (91 va 176) — birlashtirish alohida vazifa, shuning uchun ikki
+haqiqiy UNAM mukofotidan biri (343) 176 ga ko'chirildi: endi ikkala sahifada ham
+UNAMning o'z mukofoti chiqadi.
+
+Natija: **364/364 universitetda kamida bitta aktiv, o'zi beradigan scholarship
+bor** (`universities_without_an_owned_active_scholarship = 0`).
 
 ### Sahifada qanday ko'rinadi
 `GET /api/universities/[id]` scholarxiplarni shunday tartiblaydi:
