@@ -93,3 +93,47 @@ shuni bajaraman.
 
 `supabase/link_university_scholarships_2026-10-23.sql` — CTU grantlari, 3 ta tuzatish,
 15 ta bog'lama (begin/commit + tekshiruv so'rovlari).
+
+---
+
+## 7. Ikkinchi o'tish: sahifada nima ko'rinishini tekshirish (2026-10-23)
+
+Birinchi o'tishdan keyin **har bir universitet sahifasidagi `Scholarships` bo'limida
+nima chiqishini** API mantig'ini aynan takrorlab tekshirdim
+(`src/app/api/universities/[id]/route.ts`: `university_id` bo'yicha bog'langan grant
+birinchi, keyin `provider` mosligi, keyin shu davlat grantlari; 6 taga cheklangan,
+UI birinchi 3 tasini ko'rsatadi).
+
+| Tekshiruv | Natija |
+| --- | ---: |
+| Grant ro'yxati bo'sh bo'lgan universitetlar | **0** |
+| Ro'yxatda **o'z granti birinchi** turgan universitetlar | **363 / 364** |
+| Faqat davlat darajasidagi grant ko'rsatadigan | 1 (id 176 — dublikat qator) |
+| Faol grantlar | 646 |
+
+### Tuzatilgan 4 ta noto'g'ri qator
+
+| id | Universitet | Eski (noto'g'ri) | Yangi (rasmiy manba) |
+| ---: | --- | --- | --- |
+| 485 | University of Münster | "International Excellence Scholarship", $5 000 Full Tuition | **ProTalent** — €300/oy (Germaniyada kontrakt yo'q, shuning uchun "fee waiver" bo'lishi mumkin emas) |
+| 506 | University of Iceland | $5 000 Full Tuition | UI o'zi "prospective students uchun grant yo'q" deb yozgan → **Icelandic Government Scholarship** (ro'yxat yig'imi + oylik stipendiya) |
+| 399 | PUC Chile (dublikat 174) | **PUCV** (Valparaíso) granti — boshqa universitet | o'chirildi (asosiy qator 89 da haqiqiy grantlar bor) |
+| 496 | UNAM-CU (dublikat 176) | $5 000 Full Tuition | o'chirildi (asosiy qator 91 da UNAM grantlari bor) |
+
+Qo'shildi: **UC Tuition Scholarship for Exchange Students** (CINDA va Lotin Amerikasi
+katolik universitetlari) — 174-qator uchun, uc.cl manbasi bilan.
+
+### Diqqat: dublikat universitet qatorlari
+
+399/496 ni tekshirganda ma'lum bo'ldiki, ular **dublikat qatorlarga** bog'langan:
+
+| Dublikat | Asosiy qator |
+| ---: | ---: |
+| 174 PUC Chile (UC Santiago) | 89 PUC Chile (UC Chile) |
+| 176 UNAM (… - CU) | 91 UNAM |
+
+Bundan oldin topilgan yana 5 juft: 114/143 (DTU), 116/135 (UNIL), 87/170 (POSTECH),
+91/176 (UNAM), 77/187 (Universiti Malaya). Bular katalogda bir universitet ikki marta
+ko'rinishiga olib keladi va grantlarining bo'linishiga sabab bo'ladi. Birlashtirish
+(programs, cycles, applications, university_scholarships FK'larini ko'chirish) alohida
+ish sifatida qoldirilgan — bu commitda tegilmagan.
