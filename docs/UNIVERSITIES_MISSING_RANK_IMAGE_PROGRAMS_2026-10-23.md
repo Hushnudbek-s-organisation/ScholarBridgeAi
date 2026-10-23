@@ -1,84 +1,124 @@
-# Supabase universitetlar — QS reyting, rasm va dastur holati (2026-10-23, QS 2026 tekshiruvidan keyin)
+# Supabase universitetlar — QS reyting, rasm va dastur holati (2026-10-23, yakuniy)
 
-Loyiha: Supabase `zkdguzbdopfedkffsatk`, jadval `public.universities` (364 qator). Reyting ustuni `world_ranking` + `qs_rank_year`, rasm — `image_url`, dastur — `programs` jadvali.
-
-> Bu hisobot 2026-10-23 dagi QS 2026 tekshiruvidan **keyingi** holatni ko'rsatadi (avvalgi nusxada 164 ta reytingsiz edi). Tekshiruv tafsilotlari: `docs/QS2026_RANK_VERIFICATION_2026-10-23.md`.
+**Yangilangan:** shu kuni bajarilgan uch ishdan keyin — QS 2026 tekshiruvi, 93 ta kampus rasmi, qolgan 20 ta reyting. Batafsil: `docs/QS2026_RANK_VERIFICATION_2026-10-23.md`.
 
 ## 1. Xulosa
 
-| Mezon | Oldin | Hozir |
-| --- | ---: | ---: |
-| QS reytingi bor (`world_ranking`, QS 2026) | 200 (tekshirilmagan) | **336** (rasmiy QS 2026 ro'yxati bo'yicha) |
-| QS reytingi yo'q | 164 | **28** |
-| Rasmi yo'q (`image_url` bo'sh) | 164 | **164** |
-| Dasturi yo'q (`programs` bo'sh) | 4 | **4** |
+| Mezon | Boshida | Hozir | Izoh |
+| --- | ---: | ---: | --- |
+| Jami universitetlar | 364 | 364 | |
+| QS 2026 reytingi bor | 200 (tekshirilmagan) | **356** | rasmiy QS 2026 ro'yxatiga muvofiq |
+| Reyting yo'q | 164 | **8** | QAIST 2026 dan chiqarilgan + 500+ / reytingda yo'q |
+| Kampus rasmi bor | 200 | **293** | +93 ta Wikimedia Commons fotosi qo'shildi |
+| Rasm yo'q | 164 | **71** | Commons'da mos foto topilmadi |
+| Dasturi yo'q | 4 | **4** | `programs` jadvalida bitta ham qator yo'q |
 
-## 2. QS reytingi yo'q — 28 ta
+## 2. Reytingi yo'q — 8 ta
 
-Bularda 2026-yil nashri bo'yicha tasdiqlangan o'rin yo'q: yo QS 2026 ro'yxatining 500+ qismida (bizda 1–499 qismi tasdiqlangan), yo umuman reytingda yo'q. **KAIST** 2026 nashridan QS tomonidan chiqarib tashlangan (so'rovnomada qoidabuzarlik) — shuning uchun reytingi ataylab `NULL`.
+| id | Universitet | Davlat | Sabab |
+| ---: | --- | --- | --- |
+| 37 | KAIST (Korea Advanced Institute of Science & Technology) | South Korea | QS 2026 nashridan chiqarilgan (anti-canvassing qoidasi) |
+| 208 | Nazarbayev University | Kazakhstan | QS 2026 ro'yxatida yo'q |
+| 214 | Westminster International University in Tashkent (WIUT) | Uzbekistan | QS reytingida yo'q (milliy OTM) |
+| 215 | Inha University in Tashkent (IUT) | Uzbekistan | QS reytingida yo'q (milliy OTM) |
+| 216 | New Uzbekistan University | Uzbekistan | QS reytingida yo'q (yangi OTM) |
+| 298 | École des Ponts ParisTech | France | QS 2026 ro'yxatida topilmadi |
+| 341 | Corvinus University of Budapest | Hungary | QS 2026 ro'yxatida yo'q |
+| 342 | Semmelweis University | Hungary | QS 2026 ro'yxatida yo'q (faqat subject reytinglarda) |
 
-| id | Universitet | Davlat | Eski (tekshirilmagan) reyting |
-| ---: | --- | --- | ---: |
-| 298 | École des Ponts ParisTech | France | — |
-| 206 | Budapest University of Technology and Economics (BME) | Hungary | — |
-| 341 | Corvinus University of Budapest | Hungary | — |
-| 343 | Hungarian University of Agriculture and Life Sciences (MATE) | Hungary | — |
-| 342 | Semmelweis University | Hungary | — |
-| 345 | Széchenyi István University | Hungary | — |
-| 340 | University of Pécs | Hungary | — |
-| 344 | Óbuda University | Hungary | — |
-| 198 | University of Iceland | Iceland | 198 |
-| 208 | Nazarbayev University | Kazakhstan | — |
-| 200 | University of Latvia | Latvia | 200 |
-| 355 | International Islamic University Malaysia (IIUM) | Malaysia | — |
-| 357 | AGH University of Krakow | Poland | — |
-| 358 | Adam Mickiewicz University, Poznań | Poland | — |
-| 359 | Gdańsk University of Technology (Gdańsk Tech) | Poland | — |
-| 363 | Lodz University of Technology (TUL) | Poland | — |
-| 362 | Poznań University of Technology (PUT) | Poland | — |
-| 361 | University of Wrocław | Poland | — |
-| 360 | Wrocław University of Science and Technology | Poland | — |
-| 352 | National Research Nuclear University MEPhI | Russia | — |
-| 37 | KAIST (Korea Advanced Institute of Science & Technology) | South Korea | 37 |
-| 334 | Ankara University | Turkey | — |
-| 332 | Istanbul University | Turkey | — |
-| 333 | Yıldız Technical University (YTÜ) | Turkey | — |
-| 260 | Canadian University Dubai | United Arab Emirates | — |
-| 215 | Inha University in Tashkent (IUT) | Uzbekistan | — |
-| 216 | New Uzbekistan University | Uzbekistan | — |
-| 214 | Westminster International University in Tashkent (WIUT) | Uzbekistan | — |
+## 3. Rasmi yo'q — 71 ta
 
-## 3. Rasmi yo'q — 164 ta
+Wikimedia Commons'da shu universitetning aniq kampus fotosi topilmadi (qidiruv natijalari logo, gerb yoki boshqa OTM binosi bo'ldi). **Noto'g'ri rasm qo'yishdan ko'ra bo'sh qoldirish to'g'ri.**
 
-Ilova `image_url`dan Wikimedia Commons kampus fotosini kutadi (thumbnail + `/api/image` proksi). PDF'dagi `Special:FilePath/<Universitet>_Campus.jpg` ko'rinishidagi manzillar **uydirma** — tekshirilgan 4 tadan 4 tasi Commons'da mavjud emas, shuning uchun yozilmadi. Haqiqiy rasm topilmaguncha ustun bo'sh qoladi (noto'g'ri rasm qo'yishdan ko'ra bo'sh — to'g'ri).
-
-Davlatlar bo'yicha: United States — 18, Hungary — 10, Poland — 10, Turkey — 10, Russia — 9, Australia — 8, China — 8, United Kingdom — 8, Germany — 7, Italy — 7, Malaysia — 5, Spain — 5 …
-
-To'liq ro'yxat CSV'da (`image_missing = yes`).
+| id | Universitet | Davlat |
+| ---: | --- | --- |
+| 208 | Nazarbayev University | Kazakhstan |
+| 215 | Inha University in Tashkent (IUT) | Uzbekistan |
+| 216 | New Uzbekistan University | Uzbekistan |
+| 226 | Tecnológico de Monterrey | Mexico |
+| 229 | Western University | Canada |
+| 234 | American University of Sharjah | United Arab Emirates |
+| 239 | University of Freiburg | Germany |
+| 254 | University of Macau | Macau SAR |
+| 255 | University of Sussex | United Kingdom |
+| 256 | Griffith University | Australia |
+| 260 | Canadian University Dubai | United Arab Emirates |
+| 271 | Swinburne University of Technology | Australia |
+| 272 | University of Bergen | Norway |
+| 273 | University of Maryland, College Park | United States |
+| 274 | National Yang Ming Chiao Tung University | Taiwan |
+| 275 | University of Tübingen | Germany |
+| 276 | Vanderbilt University | United States |
+| 277 | University of Navarra | Spain |
+| 278 | American University of Beirut | Lebanon |
+| 279 | Taylor’s University | Malaysia |
+| 280 | Harbin Institute of Technology | China |
+| 281 | Radboud University | Netherlands |
+| 282 | University College Cork | Ireland |
+| 283 | University of Galway | Ireland |
+| 284 | Dalhousie University | Canada |
+| 285 | University of Porto | Portugal |
+| 286 | Ulsan National Institute of Science and Technology | South Korea |
+| 287 | The Hebrew University of Jerusalem | Israel |
+| 288 | University of Strathclyde | United Kingdom |
+| 289 | The University of Arizona | United States |
+| 290 | University of Tasmania | Australia |
+| 291 | Xi’an Jiaotong University | China |
+| 292 | Stellenbosch University | South Africa |
+| 293 | University of Virginia | United States |
+| 294 | Swansea University | United Kingdom |
+| 295 | Huazhong University of Science and Technology | China |
+| 296 | Hamad Bin Khalifa University | Qatar |
+| 297 | École Normale Supérieure de Lyon | France |
+| 298 | École des Ponts ParisTech | France |
+| 299 | Case Western Reserve University | United States |
+| 300 | Vrije Universiteit Brussel | Belgium |
+| 301 | Southern University of Science and Technology | China |
+| 302 | Institut Polytechnique de Paris | France |
+| 303 | Universidad de Chile | Chile |
+| 304 | King Abdulaziz University | Saudi Arabia |
+| 305 | Michigan State University | United States |
+| 306 | Texas A&M University | United States |
+| 307 | University of Barcelona | Spain |
+| 308 | Washington University in St. Louis | United States |
+| 309 | University of California, Santa Barbara | United States |
+| 310 | University of Newcastle (Australia) | Australia |
+| 311 | Arizona State University | United States |
+| 312 | King Saud University | Saudi Arabia |
+| 313 | Queen’s University Belfast | United Kingdom |
+| 314 | The Ohio State University | United States |
+| 315 | Indian Institute of Science | India |
+| 316 | Indian Institute of Technology Kharagpur | India |
+| 317 | Indian Institute of Technology Madras | India |
+| 318 | Université libre de Bruxelles | Belgium |
+| 319 | Politecnico di Torino | Italy |
+| 320 | Technical University of Darmstadt | Germany |
+| 321 | Hong Kong Baptist University | Hong Kong SAR |
+| 322 | Indian Institute of Technology Kanpur | India |
+| 323 | Universiti Teknologi PETRONAS | Malaysia |
+| 324 | Université Paris 1 Panthéon-Sorbonne | France |
+| 325 | Bauman Moscow State Technical University | Russia |
+| 326 | Queensland University of Technology | Australia |
+| 328 | Gwangju Institute of Science and Technology (GIST) | South Korea |
+| 348 | HSE University (Higher School of Economics) | Russia |
+| 358 | Adam Mickiewicz University, Poznań | Poland |
+| 364 | United Arab Emirates University (UAEU) | United Arab Emirates |
 
 ## 4. Dasturi yo'q — 4 ta
 
 | id | Universitet | Davlat | QS 2026 |
 | ---: | --- | --- | ---: |
-| 213 | Czech Technical University in Prague (CTU) | Czechia | 416 |
+| 213 | Czech Technical University in Prague (CTU) | Czechia | — |
+| 214 | Westminster International University in Tashkent (WIUT) | Uzbekistan | — |
 | 215 | Inha University in Tashkent (IUT) | Uzbekistan | — |
 | 216 | New Uzbekistan University | Uzbekistan | — |
-| 214 | Westminster International University in Tashkent (WIUT) | Uzbekistan | — |
 
-Bu 4 ta eski "placeholder" qator: hali dastur, muddat, grant, manba yo'q.
+Bu 4 ta eski "placeholder" qator. To'liq o'quv katalogini yig'ish uchun research-agent kerak: `npm run db:seed:programs -- --ids 213,214,215,216` (qarang: `docs/PROGRAMS_CATALOG_SEEDING_2026-10-23.md`).
 
-## 5. Mashina o'qiydigan nusxa
+## 5. Fayllar
 
-`data/universities_missing_rank_image_programs_2026-10-23.csv` — 364 qator, ustunlar: `qs_2026_rank`, `image_url_present`, `programs_count`, `rank_missing`, `image_missing`, `programs_missing`.
-
-## 6. Takrorlash uchun SQL
-
-```sql
-SELECT u.id, u.name, u.country, u.world_ranking, u.qs_rank_year, u.image_url,
-       (SELECT count(*) FROM public.programs p WHERE p.university_id = u.id) AS programs
-FROM public.universities u
-WHERE u.world_ranking IS NULL
-   OR NULLIF(trim(coalesce(u.image_url, '')), '') IS NULL
-   OR NOT EXISTS (SELECT 1 FROM public.programs p WHERE p.university_id = u.id)
-ORDER BY u.country, u.name;
-```
+| Fayl | Mazmun |
+| --- | --- |
+| `data/universities_missing_rank_image_programs_2026-10-23.csv` | 364 qator, `rank_missing` / `image_missing` / `programs_missing` ustunlari |
+| `supabase/campus_images_wikimedia_2026-10-23.sql` | 93 ta rasmning to'liq ro'yxati (Commons sahifasi bilan) |
+| `supabase/qs_2026_rank_correction.sql` | QS 2026 reyting tuzatishlari |

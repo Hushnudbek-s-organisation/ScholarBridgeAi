@@ -154,3 +154,27 @@ programs               3008   |  application_cycles 3038
    (hozir `NULL` — taxmin yozilmaydi).
 3. **Haqiqiy dasturlar** — research-agentni ishga tushirib, 360 universitet uchun katalogdan dasturlarni
    `review_required` bilan yig'ish.
+
+## 9. Qo'shimcha ishlar (2026-10-23, davomi)
+
+Foydalanuvchi so'rovi bilan uchta ish bajarildi:
+
+1. **Rasmlar (93 ta qo'shildi).** 164 ta rasmsiz universitetning har biri uchun Wikimedia Commons'da
+   nom bo'yicha qidiruv o'tkazildi (6 tadan guruhlab, OR-qidiruv), faqat **aynan shu universitet binosi/kampusi**
+   ko'rsatilgan fayl tanlandi; logo/gerb/aloqasiz natijalar rad etildi. 93 tasiga rasm topildi
+   (`universities.image_url`, 200 → 293). Har bir URL Commons'ning MD5 yo'l sxemasi bo'yicha qurildi va
+   6 tasi `imageinfo` API bilan solishtirib tasdiqlandi. To'liq ro'yxat + Commons sahifalari:
+   `supabase/campus_images_wikimedia_2026-10-23.sql`. Qolgan 71 tasiga mos foto topilmadi — bo'sh qoldirildi.
+2. **QS 500–1500 (20 ta qo'shildi).** Rasmiy QS 2026 jadvali (1504 qator, `data/qs2026_top1500.csv`) topildi va
+   avval tasdiqlangan 336 reyting bilan solishtirildi: **326 tasi aynan mos**, 6 tasida ±1 (teng o'rinlar
+   boshqacha yozilgan). Shundan keyin 28 ta reytingsiz universitetdan 20 tasiga o'rin yozildi
+   (masalan IIUM 613, MEPhI 591, BME 711–720, Pécs 741–750, Ankara 697). Bandali o'rinlar (`711-720`)
+   pastki chegarasi bilan saqlandi (`711`) — ilova butun son bo'yicha saralaydi.
+   **8 tasi `NULL` qoldi:** KAIST (QS 2026 dan chiqarilgan), Nazarbayev, WIUT, IUT, New Uzbekistan University,
+   École des Ponts, Corvinus, Semmelweis (2026 ro'yxatida yo'q).
+3. **Dasturlar.** 11 talik shablon yozilmadi (yuqorida §4). Buning o'rniga to'liq katalogni yig'uvchi
+   vosita qo'shildi: `scripts/seed-programs.ts` + `npm run db:seed:programs`
+   (qarang: `docs/PROGRAMS_CATALOG_SEEDING_2026-10-23.md`). Sandbox'da universitet saytlariga chiqish
+   yopiq bo'lgani uchun uni sizning serveringizda ishga tushirish kerak.
+
+Yakuniy holat: 364 universitet, **356** reytingli (QS 2026), **293** rasmli, 4 tasida dastur yo'q.

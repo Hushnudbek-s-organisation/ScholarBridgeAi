@@ -1,365 +1,365 @@
-id,name,country,qs_2026_rank,image_url_present,programs_count,rank_missing,image_missing,programs_missing
-168,Universidad de Buenos Aires (UBA),Argentina,84,1,8,no,no,no
-27,Australian National University (ANU),Australia,32,1,16,no,no,no
-228,Curtin University,Australia,183,0,1,no,yes,no
-232,Deakin University,Australia,207,0,1,no,yes,no
-256,Griffith University,Australia,268,0,1,no,yes,no
-242,La Trobe University,Australia,233,0,1,no,yes,no
-119,Macquarie University,Australia,138,1,17,no,no,no
-42,Monash University,Australia,36,1,16,no,no,no
-326,Queensland University of Technology,Australia,226,0,1,no,yes,no
-109,RMIT University,Australia,125,1,18,no,no,no
-271,Swinburne University of Technology,Australia,294,0,1,no,yes,no
-191,The University of Adelaide,Australia,82,1,10,no,no,no
-15,The University of Melbourne,Australia,19,1,21,no,no,no
-56,The University of Queensland (UQ),Australia,42,1,15,no,no,no
-35,The University of Sydney,Australia,25,1,16,no,no,no
-167,The University of Western Australia (UWA),Australia,77,1,8,no,no,no
-34,UNSW Sydney (University of New South Wales),Australia,20,1,15,no,no,no
-310,University of Newcastle (Australia),Australia,227,0,1,no,yes,no
-290,University of Tasmania,Australia,314,0,1,no,yes,no
-169,University of Technology Sydney (UTS),Australia,96,1,8,no,no,no
-139,University of Wollongong (UOW),Australia,184,1,10,no,no,no
-133,TU Wien (Vienna University of Technology),Austria,197,1,10,no,no,no
-125,University of Vienna,Austria,152,1,17,no,no,no
-142,Ghent University (UGent),Belgium,162,1,6,no,no,no
-48,KU Leuven,Belgium,60,1,18,no,no,no
-112,UCLouvain (Université catholique de Louvain),Belgium,191,1,16,no,no,no
-157,University of Antwerp,Belgium,280,1,8,no,no,no
-318,Université libre de Bruxelles,Belgium,227,0,1,no,yes,no
-300,Vrije Universiteit Brussel,Belgium,294,0,1,no,yes,no
-185,Universidade de São Paulo (USP),Brazil,108,1,9,no,no,no
-246,University of Campinas,Brazil,233,0,1,no,yes,no
-284,Dalhousie University,Canada,283,0,1,no,yes,no
-26,McGill University,Canada,27,1,18,no,no,no
-145,McMaster University,Canada,173,1,6,no,no,no
-153,Queen's University at Kingston,Canada,191,1,8,no,no,no
-65,University of Alberta,Canada,94,1,15,no,no,no
-49,University of British Columbia (UBC),Canada,40,1,20,no,no,no
-113,University of Calgary,Canada,211,1,16,no,no,no
-178,University of Ottawa,Canada,219,1,8,no,no,no
-23,University of Toronto,Canada,29,1,22,no,no,no
-66,University of Waterloo,Canada,119,1,19,no,no,no
-94,Université de Montréal,Canada,168,1,17,no,no,no
-229,Western University,Canada,151,0,1,no,yes,no
-89,Pontificia Universidad Católica de Chile (UC Chile),Chile,116,1,17,no,no,no
-174,Pontificia Universidad Católica de Chile (UC Santiago),Chile,116,1,8,no,no,no
-303,Universidad de Chile,Chile,173,0,1,no,yes,no
-266,Beijing Normal University,China,247,0,1,no,yes,no
-40,Fudan University,China,30,1,18,no,no,no
-280,Harbin Institute of Technology,China,256,0,1,no,yes,no
-295,Huazhong University of Science and Technology,China,319,0,1,no,yes,no
-111,Nanjing University,China,103,1,17,no,no,no
-22,Peking University,China,14,1,14,no,no,no
-41,Shanghai Jiao Tong University (SJTU),China,47,1,18,no,no,no
-301,Southern University of Science and Technology,China,342,0,1,no,yes,no
-265,Tianjin University,China,257,0,1,no,yes,no
-227,Tongji University,China,177,0,1,no,yes,no
-20,Tsinghua University,China,17,1,27,no,no,no
-186,University of Science and Technology of China (USTC),China,132,1,9,no,no,no
-230,Wuhan University,China,186,0,1,no,yes,no
-291,Xi’an Jiaotong University,China,305,0,1,no,yes,no
-36,Zhejiang University,China,49,1,15,no,no,no
-190,Universidad Nacional de Colombia,Colombia,259,1,10,no,no,no
-159,Universidad de los Andes (Uniandes),Colombia,212,1,8,no,no,no
-212,Charles University,Czechia,265,0,1,no,yes,no
-213,Czech Technical University in Prague (CTU),Czechia,416,0,0,no,yes,yes
-195,Aarhus University,Denmark,131,1,10,no,no,no
-143,Technical University of Denmark (DTU International),Denmark,107,1,6,no,no,no
-114,Technical University of Denmark (DTU),Denmark,107,1,16,no,no,no
-193,University of Copenhagen,Denmark,101,1,10,no,no,no
-199,University of Tartu,Estonia,362,1,10,no,no,no
-103,Aalto University,Finland,114,1,15,no,no,no
-194,University of Helsinki,Finland,116,1,10,no,no,no
-197,University of Oulu,Finland,341,1,10,no,no,no
-196,University of Turku,Finland,366,1,10,no,no,no
-302,Institut Polytechnique de Paris,France,41,0,1,no,yes,no
-57,Sorbonne University,France,72,1,16,no,no,no
-44,Université PSL (Paris Sciences & Lettres),France,28,1,15,no,no,no
-324,Université Paris 1 Panthéon-Sorbonne,France,257,0,1,no,yes,no
-71,Université Paris-Saclay,France,70,1,16,no,no,no
-297,École Normale Supérieure de Lyon,France,205,0,1,no,yes,no
-298,École des Ponts ParisTech,France,NULL,0,1,yes,yes,no
-93,Freie Universität Berlin,Germany,88,1,17,no,no,no
-183,Humboldt-Universität zu Berlin,Germany,130,1,10,no,no,no
-220,Karlsruhe Institute of Technology,Germany,98,0,1,no,yes,no
-54,LMU Munich (Ludwig-Maximilians-Universität München),Germany,58,1,16,no,no,no
-129,RWTH Aachen University,Germany,105,1,18,no,no,no
-80,Ruprecht-Karls-Universität Heidelberg,Germany,80,1,20,no,no,no
-180,TU Dresden (Technische Universität Dresden),Germany,218,1,9,no,no,no
-320,Technical University of Darmstadt,Germany,253,0,1,no,yes,no
-25,Technical University of Munich (TUM),Germany,22,1,16,no,no,no
-218,Technische Universität Berlin,Germany,145,0,1,no,yes,no
-244,University of Bonn,Germany,207,0,1,no,yes,no
-126,University of Cologne,Germany,272,1,15,no,no,no
-243,University of Erlangen-Nürnberg,Germany,232,0,1,no,yes,no
-239,University of Freiburg,Germany,201,0,1,no,yes,no
-121,University of Göttingen,Germany,243,1,17,no,no,no
-130,University of Münster,Germany,350,1,16,no,no,no
-275,University of Tübingen,Germany,215,0,1,no,yes,no
-124,Universität Hamburg,Germany,193,1,16,no,no,no
-63,City University of Hong Kong (CityU),Hong Kong SAR,63,1,15,no,no,no
-321,Hong Kong Baptist University,Hong Kong SAR,244,0,1,no,yes,no
-33,The Chinese University of Hong Kong (CUHK),Hong Kong SAR,32,1,17,no,no,no
-72,The Hong Kong Polytechnic University (PolyU),Hong Kong SAR,54,1,16,no,no,no
-217,The Hong Kong University of Science and Technology,Hong Kong SAR,44,0,1,no,yes,no
-21,The University of Hong Kong (HKU),Hong Kong SAR,11,1,17,no,no,no
-206,Budapest University of Technology and Economics (BME),Hungary,NULL,0,1,yes,yes,no
-341,Corvinus University of Budapest,Hungary,NULL,0,1,yes,yes,no
-205,Eötvös Loránd University (ELTE),Hungary,584,0,1,no,yes,no
-343,Hungarian University of Agriculture and Life Sciences (MATE),Hungary,NULL,0,1,yes,yes,no
-342,Semmelweis University,Hungary,NULL,0,1,yes,yes,no
-345,Széchenyi István University,Hungary,NULL,0,1,yes,yes,no
-207,University of Debrecen,Hungary,563,0,1,no,yes,no
-340,University of Pécs,Hungary,NULL,0,1,yes,yes,no
-339,University of Szeged (SZTE),Hungary,597,0,1,no,yes,no
-344,Óbuda University,Hungary,NULL,0,1,yes,yes,no
-198,University of Iceland,Iceland,NULL,1,10,yes,no,no
-315,Indian Institute of Science,India,219,0,1,no,yes,no
-179,Indian Institute of Technology Bombay (IIT Bombay),India,129,1,9,no,no,no
-108,Indian Institute of Technology Delhi (IIT Delhi),India,123,1,17,no,no,no
-322,Indian Institute of Technology Kanpur,India,222,0,1,no,yes,no
-316,Indian Institute of Technology Kharagpur,India,215,0,1,no,yes,no
-317,Indian Institute of Technology Madras,India,180,0,1,no,yes,no
-257,Bandung Institute of Technology,Indonesia,255,0,1,no,yes,no
-250,Gadjah Mada University,Indonesia,224,0,1,no,yes,no
-236,Universitas Indonesia,Indonesia,189,0,1,no,yes,no
-81,Trinity College Dublin (TCD),Ireland,75,1,17,no,no,no
-282,University College Cork,Ireland,246,0,1,no,yes,no
-106,University College Dublin (UCD),Ireland,118,1,16,no,no,no
-283,University of Galway,Ireland,284,0,1,no,yes,no
-237,Tel Aviv University,Israel,223,0,1,no,yes,no
-287,The Hebrew University of Jerusalem,Israel,240,0,1,no,yes,no
-92,Politecnico di Milano,Italy,98,1,17,no,no,no
-319,Politecnico di Torino,Italy,242,0,1,no,yes,no
-118,Sapienza University of Rome,Italy,128,1,17,no,no,no
-117,University of Bologna (Alma Mater Studiorum),Italy,138,1,17,no,no,no
-337,University of Florence (UNIFI),Italy,404,0,1,no,yes,no
-269,University of Milan,Italy,276,0,1,no,yes,no
-335,University of Naples Federico II,Italy,379,0,1,no,yes,no
-248,University of Padua,Italy,233,0,1,no,yes,no
-336,University of Pisa (UNIPI),Italy,343,0,1,no,yes,no
-338,University of Turin (UniTo),Italy,408,0,1,no,yes,no
-128,Hokkaido University,Japan,170,1,17,no,no,no
-150,Keio University,Japan,215,1,6,no,no,no
-99,Kyoto University,Japan,57,1,18,no,no,no
-127,Kyushu University,Japan,170,1,16,no,no,no
-122,Nagoya University,Japan,164,1,16,no,no,no
-96,Osaka University,Japan,91,1,18,no,no,no
-39,The University of Tokyo,Japan,36,1,17,no,no,no
-123,Tohoku University,Japan,109,1,16,no,no,no
-38,Tokyo Institute of Technology (Institute of Science Tokyo),Japan,85,1,15,no,no,no
-156,Waseda University,Japan,196,1,8,no,no,no
-209,Al-Farabi Kazakh National University (KazNU),Kazakhstan,166,0,1,no,yes,no
-208,Nazarbayev University,Kazakhstan,NULL,0,1,yes,yes,no
-200,University of Latvia,Latvia,NULL,1,10,yes,no,no
-278,American University of Beirut,Lebanon,237,0,1,no,yes,no
-254,University of Macau,Macau SAR,285,0,1,no,yes,no
-355,International Islamic University Malaysia (IIUM),Malaysia,NULL,0,1,yes,yes,no
-354,Sunway University,Malaysia,410,0,1,no,yes,no
-279,Taylor’s University,Malaysia,253,0,1,no,yes,no
-263,UCSI University,Malaysia,269,0,1,no,yes,no
-97,Universiti Kebangsaan Malaysia (UKM),Malaysia,126,1,16,no,no,no
-187,Universiti Malaya (UM International),Malaysia,58,1,9,no,no,no
-77,Universiti Malaya (UM),Malaysia,58,1,16,no,no,no
-95,Universiti Putra Malaysia (UPM),Malaysia,134,1,16,no,no,no
-105,Universiti Sains Malaysia (USM),Malaysia,134,1,15,no,no,no
-98,Universiti Teknologi Malaysia (UTM),Malaysia,153,1,18,no,no,no
-323,Universiti Teknologi PETRONAS,Malaysia,251,0,1,no,yes,no
-226,Tecnológico de Monterrey,Mexico,187,0,1,no,yes,no
-176,UNAM (Universidad Nacional Autónoma de México - CU),Mexico,136,1,8,no,no,no
-91,Universidad Nacional Autónoma de México (UNAM),Mexico,136,1,19,no,no,no
-43,Delft University of Technology (TU Delft),Netherlands,47,1,16,no,no,no
-120,Eindhoven University of Technology (TU/e),Netherlands,140,1,18,no,no,no
-132,Erasmus University Rotterdam,Netherlands,140,1,10,no,no,no
-107,Leiden University,Netherlands,119,1,16,no,no,no
-245,Maastricht University,Netherlands,239,0,1,no,yes,no
-281,Radboud University,Netherlands,279,0,1,no,yes,no
-53,University of Amsterdam (UvA),Netherlands,53,1,16,no,no,no
-172,University of Groningen,Netherlands,147,1,9,no,no,no
-148,University of Twente,Netherlands,203,1,6,no,no,no
-101,Utrecht University,Netherlands,103,1,15,no,no,no
-181,Vrije Universiteit Amsterdam (VU Amsterdam),Netherlands,194,1,9,no,no,no
-224,Wageningen University & Research,Netherlands,153,0,1,no,yes,no
-251,Massey University,New Zealand,230,0,1,no,yes,no
-173,The University of Auckland,New Zealand,65,1,8,no,no,no
-261,University of Canterbury,New Zealand,261,0,1,no,yes,no
-149,University of Otago,New Zealand,197,1,6,no,no,no
-247,University of Waikato,New Zealand,281,0,1,no,yes,no
-253,Victoria University of Wellington,New Zealand,240,0,1,no,yes,no
-262,Norwegian University of Science and Technology,Norway,267,0,1,no,yes,no
-272,University of Bergen,Norway,287,0,1,no,yes,no
-158,University of Oslo,Norway,119,1,8,no,no,no
-357,AGH University of Krakow,Poland,NULL,0,1,yes,yes,no
-358,"Adam Mickiewicz University, Poznań",Poland,NULL,0,1,yes,yes,no
-359,Gdańsk University of Technology (Gdańsk Tech),Poland,NULL,0,1,yes,yes,no
-211,Jagiellonian University,Poland,303,0,1,no,yes,no
-363,Lodz University of Technology (TUL),Poland,NULL,0,1,yes,yes,no
-362,Poznań University of Technology (PUT),Poland,NULL,0,1,yes,yes,no
-210,University of Warsaw,Poland,271,0,1,no,yes,no
-361,University of Wrocław,Poland,NULL,0,1,yes,yes,no
-356,Warsaw University of Technology (WUT),Poland,487,0,1,no,yes,no
-360,Wrocław University of Science and Technology,Poland,NULL,0,1,yes,yes,no
-259,University of Lisbon,Portugal,230,0,1,no,yes,no
-285,University of Porto,Portugal,237,0,1,no,yes,no
-296,Hamad Bin Khalifa University,Qatar,244,0,1,no,yes,no
-102,Qatar University,Qatar,112,1,15,no,no,no
-325,Bauman Moscow State Technical University,Russia,320,0,1,no,yes,no
-348,HSE University (Higher School of Economics),Russia,440,0,1,no,yes,no
-353,Kazan Federal University (KFU),Russia,450,0,1,no,yes,no
-84,Lomonosov Moscow State University (MSU),Russia,105,1,17,no,no,no
-349,Moscow Institute of Physics and Technology (MIPT / Phystech),Russia,477,0,1,no,yes,no
-352,National Research Nuclear University MEPhI,Russia,NULL,0,1,yes,yes,no
-350,Novosibirsk State University (NSU),Russia,461,0,1,no,yes,no
-346,RUDN University (Peoples' Friendship University),Russia,367,0,1,no,yes,no
-347,Saint Petersburg State University (SPbU),Russia,375,0,1,no,yes,no
-351,Tomsk State University (TSU),Russia,499,0,1,no,yes,no
-304,King Abdulaziz University,Saudi Arabia,163,0,1,no,yes,no
-69,King Fahd University of Petroleum & Minerals (KFUPM),Saudi Arabia,67,1,16,no,no,no
-312,King Saud University,Saudi Arabia,143,0,1,no,yes,no
-16,Nanyang Technological University (NTU Singapore),Singapore,12,1,21,no,no,no
-8,National University of Singapore (NUS),Singapore,8,1,11,no,no,no
-292,Stellenbosch University,South Africa,302,0,1,no,yes,no
-192,University of Cape Town (UCT),South Africa,150,1,10,no,no,no
-264,University of the Witwatersrand,South Africa,291,0,1,no,yes,no
-328,Gwangju Institute of Science and Technology (GIST),South Korea,385,0,1,no,yes,no
-134,Hanyang University,South Korea,158,1,10,no,no,no
-37,KAIST (Korea Advanced Institute of Science & Technology),South Korea,NULL,1,16,yes,no,no
-100,Korea University,South Korea,61,1,20,no,no,no
-327,Kyung Hee University,South Korea,331,0,1,no,yes,no
-170,POSTECH (Pohang University of Science & Tech - Graduate/BSc),South Korea,102,1,10,no,no,no
-87,POSTECH (Pohang University of Science and Technology),South Korea,102,1,15,no,no,no
-29,Seoul National University (SNU),South Korea,38,1,18,no,no,no
-221,Sungkyunkwan University (SKKU),South Korea,126,0,1,no,yes,no
-286,Ulsan National Institute of Science and Technology,South Korea,310,0,1,no,yes,no
-88,Yonsei University,South Korea,50,1,19,no,no,no
-233,Autonomous University of Madrid,Spain,206,0,1,no,yes,no
-225,Complutense University of Madrid,Spain,187,0,1,no,yes,no
-267,Universidad Carlos III de Madrid,Spain,301,0,1,no,yes,no
-155,Universitat Autònoma de Barcelona (UAB),Spain,172,1,8,no,no,no
-46,Universitat Politècnica de Catalunya (UPC BarcelonaTech),Spain,392,1,14,no,no,no
-47,Universitat Pompeu Fabra (UPF Barcelona),Spain,265,1,16,no,no,no
-307,University of Barcelona,Spain,159,0,1,no,yes,no
-277,University of Navarra,Spain,262,0,1,no,yes,no
-110,Chalmers University of Technology,Sweden,165,1,16,no,no,no
-86,KTH Royal Institute of Technology,Sweden,78,1,16,no,no,no
-161,Lund University,Sweden,72,1,8,no,no,no
-140,Stockholm University,Sweden,147,1,10,no,no,no
-136,University of Gothenburg,Sweden,202,1,10,no,no,no
-90,Uppsala University,Sweden,93,1,18,no,no,no
-24,EPFL (École Polytechnique Fédérale de Lausanne),Switzerland,22,1,16,no,no,no
-7,ETH Zurich (Swiss Federal Institute of Technology),Switzerland,7,1,11,no,no,no
-141,University of Basel,Switzerland,157,1,7,no,no,no
-131,University of Bern,Switzerland,184,1,10,no,no,no
-177,University of Geneva,Switzerland,155,1,8,no,no,no
-135,University of Lausanne (UNIL - HEC & Sciences),Switzerland,212,1,10,no,no,no
-116,University of Lausanne (UNIL),Switzerland,212,1,15,no,no,no
-68,University of Zurich (UZH),Switzerland,100,1,15,no,no,no
-240,National Cheng Kung University,Taiwan,203,0,1,no,yes,no
-64,National Taiwan University (NTU),Taiwan,63,1,15,no,no,no
-238,National Tsing Hua University,Taiwan,176,0,1,no,yes,no
-274,National Yang Ming Chiao Tung University,Taiwan,199,0,1,no,yes,no
-189,Chulalongkorn University,Thailand,221,1,9,no,no,no
-334,Ankara University,Turkey,NULL,0,1,yes,yes,no
-330,Bilkent University,Turkey,415,0,1,no,yes,no
-203,Boğaziçi University,Turkey,371,0,1,no,yes,no
-331,Hacettepe University,Turkey,571,0,1,no,yes,no
-329,Istanbul Technical University (İTÜ),Turkey,298,0,1,no,yes,no
-332,Istanbul University,Turkey,NULL,0,1,yes,yes,no
-202,Koç University,Turkey,323,0,1,no,yes,no
-201,Middle East Technical University (METU),Turkey,269,0,1,no,yes,no
-204,Sabancı University,Turkey,404,0,1,no,yes,no
-333,Yıldız Technical University (YTÜ),Turkey,NULL,0,1,yes,yes,no
-234,American University of Sharjah,United Arab Emirates,272,0,1,no,yes,no
-260,Canadian University Dubai,United Arab Emirates,NULL,0,1,yes,yes,no
-188,Khalifa University,United Arab Emirates,177,1,9,no,no,no
-364,United Arab Emirates University (UAEU),United Arab Emirates,229,0,1,no,yes,no
-144,Cardiff University,United Kingdom,181,1,6,no,no,no
-160,Durham University,United Kingdom,94,1,10,no,no,no
-258,Heriot-Watt University,United Kingdom,287,0,1,no,yes,no
-2,Imperial College London,United Kingdom,2,1,14,no,no,no
-28,King's College London (KCL),United Kingdom,31,1,19,no,no,no
-222,Lancaster University,United Kingdom,157,0,1,no,yes,no
-76,London School of Economics and Political Science (LSE),United Kingdom,56,1,14,no,no,no
-163,Loughborough University,United Kingdom,225,1,8,no,no,no
-137,Newcastle University,United Kingdom,137,1,10,no,no,no
-182,Queen Mary University of London (QMUL),United Kingdom,110,1,9,no,no,no
-313,Queen’s University Belfast,United Kingdom,199,0,1,no,yes,no
-294,Swansea University,United Kingdom,292,0,1,no,yes,no
-19,The University of Edinburgh,United Kingdom,34,1,27,no,no,no
-55,The University of Manchester,United Kingdom,35,1,18,no,no,no
-166,The University of Sheffield,United Kingdom,92,1,9,no,no,no
-60,The University of Warwick,United Kingdom,74,1,20,no,no,no
-9,University College London (UCL),United Kingdom,9,1,12,no,no,no
-138,University of Aberdeen,United Kingdom,262,1,10,no,no,no
-147,University of Bath,United Kingdom,132,1,6,no,no,no
-162,University of Birmingham,United Kingdom,76,1,9,no,no,no
-58,University of Bristol,United Kingdom,51,1,17,no,no,no
-6,University of Cambridge,United Kingdom,6,1,12,no,no,no
-146,University of Exeter,United Kingdom,155,1,6,no,no,no
-61,University of Glasgow,United Kingdom,79,1,17,no,no,no
-171,University of Leeds,United Kingdom,86,1,9,no,no,no
-268,University of Leicester,United Kingdom,326,0,1,no,yes,no
-152,University of Liverpool,United Kingdom,147,1,8,no,no,no
-164,University of Nottingham,United Kingdom,97,1,9,no,no,no
-4,University of Oxford,United Kingdom,4,1,15,no,no,no
-154,University of Reading,United Kingdom,194,1,8,no,no,no
-165,University of Southampton,United Kingdom,87,1,8,no,no,no
-184,University of St Andrews,United Kingdom,113,1,9,no,no,no
-288,University of Strathclyde,United Kingdom,251,0,1,no,yes,no
-270,University of Surrey,United Kingdom,262,0,1,no,yes,no
-255,University of Sussex,United Kingdom,278,0,1,no,yes,no
-151,University of York,United Kingdom,169,1,8,no,no,no
-311,Arizona State University,United States,173,0,1,no,yes,no
-83,Boston University (BU),United States,88,1,19,no,no,no
-70,Brown University,United States,69,1,16,no,no,no
-10,California Institute of Technology (Caltech),United States,10,1,10,no,no,no
-45,Carnegie Mellon University,United States,52,1,23,no,no,no
-299,Case Western Reserve University,United States,294,0,1,no,yes,no
-18,Columbia University,United States,38,1,31,no,no,no
-14,Cornell University,United States,16,1,22,no,no,no
-252,Dartmouth College,United States,247,0,1,no,yes,no
-62,Duke University,United States,62,1,15,no,no,no
-231,Emory University,United States,182,0,1,no,yes,no
-75,Georgia Institute of Technology (Georgia Tech),United States,123,1,19,no,no,no
-5,Harvard University,United States,5,1,12,no,no,no
-31,Johns Hopkins University,United States,24,1,20,no,no,no
-1,Massachusetts Institute of Technology (MIT),United States,1,1,13,no,no,no
-305,Michigan State University,United States,160,0,1,no,yes,no
-50,New York University (NYU),United States,55,1,24,no,no,no
-219,Northwestern University,United States,42,0,1,no,yes,no
-82,Penn State University,United States,82,1,20,no,no,no
-13,Princeton University,United States,25,1,26,no,no,no
-85,Purdue University,United States,88,1,16,no,no,no
-73,Rice University,United States,119,1,18,no,no,no
-3,Stanford University,United States,3,1,15,no,no,no
-306,Texas A&M University,United States,144,0,1,no,yes,no
-314,The Ohio State University,United States,190,0,1,no,yes,no
-289,The University of Arizona,United States,287,0,1,no,yes,no
-79,The University of Texas at Austin (UT Austin),United States,68,1,21,no,no,no
-32,"University of California, Berkeley (UC Berkeley)",United States,17,1,21,no,no,no
-104,"University of California, Davis (UC Davis)",United States,114,1,16,no,no,no
-51,"University of California, Los Angeles (UCLA)",United States,46,1,22,no,no,no
-67,"University of California, San Diego (UCSD)",United States,66,1,14,no,no,no
-309,"University of California, Santa Barbara",United States,179,0,1,no,yes,no
-12,University of Chicago,United States,13,1,21,no,no,no
-241,University of Florida,United States,212,0,1,no,yes,no
-74,University of Illinois Urbana-Champaign (UIUC),United States,70,1,19,no,no,no
-273,"University of Maryland, College Park",United States,207,0,1,no,yes,no
-115,University of Massachusetts Amherst (UMass Amherst),United States,247,1,17,no,no,no
-30,University of Michigan-Ann Arbor,United States,45,1,22,no,no,no
-235,University of Minnesota Twin Cities,United States,210,0,1,no,yes,no
-223,University of North Carolina at Chapel Hill,United States,140,0,1,no,yes,no
-11,University of Pennsylvania (UPenn),United States,15,1,18,no,no,no
-175,University of Pittsburgh,United States,281,1,8,no,no,no
-249,University of Rochester,United States,236,0,1,no,yes,no
-59,University of Southern California (USC),United States,146,1,20,no,no,no
-293,University of Virginia,United States,275,0,1,no,yes,no
-78,University of Washington (UW),United States,81,1,18,no,no,no
-52,University of Wisconsin-Madison,United States,110,1,19,no,no,no
-276,Vanderbilt University,United States,250,0,1,no,yes,no
-308,Washington University in St. Louis,United States,167,0,1,no,yes,no
-17,Yale University,United States,21,1,24,no,no,no
-215,Inha University in Tashkent (IUT),Uzbekistan,NULL,0,0,yes,yes,yes
-216,New Uzbekistan University,Uzbekistan,NULL,0,0,yes,yes,yes
-214,Westminster International University in Tashkent (WIUT),Uzbekistan,NULL,0,0,yes,yes,yes
+id,name,country,rank_missing,image_missing,programs_missing
+1,Massachusetts Institute of Technology (MIT),United States,no,no,no
+2,Imperial College London,United Kingdom,no,no,no
+3,Stanford University,United States,no,no,no
+4,University of Oxford,United Kingdom,no,no,no
+5,Harvard University,United States,no,no,no
+6,University of Cambridge,United Kingdom,no,no,no
+7,ETH Zurich (Swiss Federal Institute of Technology),Switzerland,no,no,no
+8,National University of Singapore (NUS),Singapore,no,no,no
+9,University College London (UCL),United Kingdom,no,no,no
+10,California Institute of Technology (Caltech),United States,no,no,no
+11,University of Pennsylvania (UPenn),United States,no,no,no
+12,University of Chicago,United States,no,no,no
+13,Princeton University,United States,no,no,no
+14,Cornell University,United States,no,no,no
+15,The University of Melbourne,Australia,no,no,no
+16,Nanyang Technological University (NTU Singapore),Singapore,no,no,no
+17,Yale University,United States,no,no,no
+18,Columbia University,United States,no,no,no
+19,The University of Edinburgh,United Kingdom,no,no,no
+20,Tsinghua University,China,no,no,no
+21,The University of Hong Kong (HKU),Hong Kong SAR,no,no,no
+22,Peking University,China,no,no,no
+23,University of Toronto,Canada,no,no,no
+24,EPFL (École Polytechnique Fédérale de Lausanne),Switzerland,no,no,no
+25,Technical University of Munich (TUM),Germany,no,no,no
+26,McGill University,Canada,no,no,no
+27,Australian National University (ANU),Australia,no,no,no
+28,King's College London (KCL),United Kingdom,no,no,no
+29,Seoul National University (SNU),South Korea,no,no,no
+30,University of Michigan-Ann Arbor,United States,no,no,no
+31,Johns Hopkins University,United States,no,no,no
+32,"University of California, Berkeley (UC Berkeley)",United States,no,no,no
+33,The Chinese University of Hong Kong (CUHK),Hong Kong SAR,no,no,no
+34,UNSW Sydney (University of New South Wales),Australia,no,no,no
+35,The University of Sydney,Australia,no,no,no
+36,Zhejiang University,China,no,no,no
+37,KAIST (Korea Advanced Institute of Science & Technology),South Korea,yes,no,no
+38,Tokyo Institute of Technology (Institute of Science Tokyo),Japan,no,no,no
+39,The University of Tokyo,Japan,no,no,no
+40,Fudan University,China,no,no,no
+41,Shanghai Jiao Tong University (SJTU),China,no,no,no
+42,Monash University,Australia,no,no,no
+43,Delft University of Technology (TU Delft),Netherlands,no,no,no
+44,Université PSL (Paris Sciences & Lettres),France,no,no,no
+45,Carnegie Mellon University,United States,no,no,no
+46,Universitat Politècnica de Catalunya (UPC BarcelonaTech),Spain,no,no,no
+47,Universitat Pompeu Fabra (UPF Barcelona),Spain,no,no,no
+48,KU Leuven,Belgium,no,no,no
+49,University of British Columbia (UBC),Canada,no,no,no
+50,New York University (NYU),United States,no,no,no
+51,"University of California, Los Angeles (UCLA)",United States,no,no,no
+52,University of Wisconsin-Madison,United States,no,no,no
+53,University of Amsterdam (UvA),Netherlands,no,no,no
+54,LMU Munich (Ludwig-Maximilians-Universität München),Germany,no,no,no
+55,The University of Manchester,United Kingdom,no,no,no
+56,The University of Queensland (UQ),Australia,no,no,no
+57,Sorbonne University,France,no,no,no
+58,University of Bristol,United Kingdom,no,no,no
+59,University of Southern California (USC),United States,no,no,no
+60,The University of Warwick,United Kingdom,no,no,no
+61,University of Glasgow,United Kingdom,no,no,no
+62,Duke University,United States,no,no,no
+63,City University of Hong Kong (CityU),Hong Kong SAR,no,no,no
+64,National Taiwan University (NTU),Taiwan,no,no,no
+65,University of Alberta,Canada,no,no,no
+66,University of Waterloo,Canada,no,no,no
+67,"University of California, San Diego (UCSD)",United States,no,no,no
+68,University of Zurich (UZH),Switzerland,no,no,no
+69,King Fahd University of Petroleum & Minerals (KFUPM),Saudi Arabia,no,no,no
+70,Brown University,United States,no,no,no
+71,Université Paris-Saclay,France,no,no,no
+72,The Hong Kong Polytechnic University (PolyU),Hong Kong SAR,no,no,no
+73,Rice University,United States,no,no,no
+74,University of Illinois Urbana-Champaign (UIUC),United States,no,no,no
+75,Georgia Institute of Technology (Georgia Tech),United States,no,no,no
+76,London School of Economics and Political Science (LSE),United Kingdom,no,no,no
+77,Universiti Malaya (UM),Malaysia,no,no,no
+78,University of Washington (UW),United States,no,no,no
+79,The University of Texas at Austin (UT Austin),United States,no,no,no
+80,Ruprecht-Karls-Universität Heidelberg,Germany,no,no,no
+81,Trinity College Dublin (TCD),Ireland,no,no,no
+82,Penn State University,United States,no,no,no
+83,Boston University (BU),United States,no,no,no
+84,Lomonosov Moscow State University (MSU),Russia,no,no,no
+85,Purdue University,United States,no,no,no
+86,KTH Royal Institute of Technology,Sweden,no,no,no
+87,POSTECH (Pohang University of Science and Technology),South Korea,no,no,no
+88,Yonsei University,South Korea,no,no,no
+89,Pontificia Universidad Católica de Chile (UC Chile),Chile,no,no,no
+90,Uppsala University,Sweden,no,no,no
+91,Universidad Nacional Autónoma de México (UNAM),Mexico,no,no,no
+92,Politecnico di Milano,Italy,no,no,no
+93,Freie Universität Berlin,Germany,no,no,no
+94,Université de Montréal,Canada,no,no,no
+95,Universiti Putra Malaysia (UPM),Malaysia,no,no,no
+96,Osaka University,Japan,no,no,no
+97,Universiti Kebangsaan Malaysia (UKM),Malaysia,no,no,no
+98,Universiti Teknologi Malaysia (UTM),Malaysia,no,no,no
+99,Kyoto University,Japan,no,no,no
+100,Korea University,South Korea,no,no,no
+101,Utrecht University,Netherlands,no,no,no
+102,Qatar University,Qatar,no,no,no
+103,Aalto University,Finland,no,no,no
+104,"University of California, Davis (UC Davis)",United States,no,no,no
+105,Universiti Sains Malaysia (USM),Malaysia,no,no,no
+106,University College Dublin (UCD),Ireland,no,no,no
+107,Leiden University,Netherlands,no,no,no
+108,Indian Institute of Technology Delhi (IIT Delhi),India,no,no,no
+109,RMIT University,Australia,no,no,no
+110,Chalmers University of Technology,Sweden,no,no,no
+111,Nanjing University,China,no,no,no
+112,UCLouvain (Université catholique de Louvain),Belgium,no,no,no
+113,University of Calgary,Canada,no,no,no
+114,Technical University of Denmark (DTU),Denmark,no,no,no
+115,University of Massachusetts Amherst (UMass Amherst),United States,no,no,no
+116,University of Lausanne (UNIL),Switzerland,no,no,no
+117,University of Bologna (Alma Mater Studiorum),Italy,no,no,no
+118,Sapienza University of Rome,Italy,no,no,no
+119,Macquarie University,Australia,no,no,no
+120,Eindhoven University of Technology (TU/e),Netherlands,no,no,no
+121,University of Göttingen,Germany,no,no,no
+122,Nagoya University,Japan,no,no,no
+123,Tohoku University,Japan,no,no,no
+124,Universität Hamburg,Germany,no,no,no
+125,University of Vienna,Austria,no,no,no
+126,University of Cologne,Germany,no,no,no
+127,Kyushu University,Japan,no,no,no
+128,Hokkaido University,Japan,no,no,no
+129,RWTH Aachen University,Germany,no,no,no
+130,University of Münster,Germany,no,no,no
+131,University of Bern,Switzerland,no,no,no
+132,Erasmus University Rotterdam,Netherlands,no,no,no
+133,TU Wien (Vienna University of Technology),Austria,no,no,no
+134,Hanyang University,South Korea,no,no,no
+135,University of Lausanne (UNIL - HEC & Sciences),Switzerland,no,no,no
+136,University of Gothenburg,Sweden,no,no,no
+137,Newcastle University,United Kingdom,no,no,no
+138,University of Aberdeen,United Kingdom,no,no,no
+139,University of Wollongong (UOW),Australia,no,no,no
+140,Stockholm University,Sweden,no,no,no
+141,University of Basel,Switzerland,no,no,no
+142,Ghent University (UGent),Belgium,no,no,no
+143,Technical University of Denmark (DTU International),Denmark,no,no,no
+144,Cardiff University,United Kingdom,no,no,no
+145,McMaster University,Canada,no,no,no
+146,University of Exeter,United Kingdom,no,no,no
+147,University of Bath,United Kingdom,no,no,no
+148,University of Twente,Netherlands,no,no,no
+149,University of Otago,New Zealand,no,no,no
+150,Keio University,Japan,no,no,no
+151,University of York,United Kingdom,no,no,no
+152,University of Liverpool,United Kingdom,no,no,no
+153,Queen's University at Kingston,Canada,no,no,no
+154,University of Reading,United Kingdom,no,no,no
+155,Universitat Autònoma de Barcelona (UAB),Spain,no,no,no
+156,Waseda University,Japan,no,no,no
+157,University of Antwerp,Belgium,no,no,no
+158,University of Oslo,Norway,no,no,no
+159,Universidad de los Andes (Uniandes),Colombia,no,no,no
+160,Durham University,United Kingdom,no,no,no
+161,Lund University,Sweden,no,no,no
+162,University of Birmingham,United Kingdom,no,no,no
+163,Loughborough University,United Kingdom,no,no,no
+164,University of Nottingham,United Kingdom,no,no,no
+165,University of Southampton,United Kingdom,no,no,no
+166,The University of Sheffield,United Kingdom,no,no,no
+167,The University of Western Australia (UWA),Australia,no,no,no
+168,Universidad de Buenos Aires (UBA),Argentina,no,no,no
+169,University of Technology Sydney (UTS),Australia,no,no,no
+170,POSTECH (Pohang University of Science & Tech - Graduate/BSc),South Korea,no,no,no
+171,University of Leeds,United Kingdom,no,no,no
+172,University of Groningen,Netherlands,no,no,no
+173,The University of Auckland,New Zealand,no,no,no
+174,Pontificia Universidad Católica de Chile (UC Santiago),Chile,no,no,no
+175,University of Pittsburgh,United States,no,no,no
+176,UNAM (Universidad Nacional Autónoma de México - CU),Mexico,no,no,no
+177,University of Geneva,Switzerland,no,no,no
+178,University of Ottawa,Canada,no,no,no
+179,Indian Institute of Technology Bombay (IIT Bombay),India,no,no,no
+180,TU Dresden (Technische Universität Dresden),Germany,no,no,no
+181,Vrije Universiteit Amsterdam (VU Amsterdam),Netherlands,no,no,no
+182,Queen Mary University of London (QMUL),United Kingdom,no,no,no
+183,Humboldt-Universität zu Berlin,Germany,no,no,no
+184,University of St Andrews,United Kingdom,no,no,no
+185,Universidade de São Paulo (USP),Brazil,no,no,no
+186,University of Science and Technology of China (USTC),China,no,no,no
+187,Universiti Malaya (UM International),Malaysia,no,no,no
+188,Khalifa University,United Arab Emirates,no,no,no
+189,Chulalongkorn University,Thailand,no,no,no
+190,Universidad Nacional de Colombia,Colombia,no,no,no
+191,The University of Adelaide,Australia,no,no,no
+192,University of Cape Town (UCT),South Africa,no,no,no
+193,University of Copenhagen,Denmark,no,no,no
+194,University of Helsinki,Finland,no,no,no
+195,Aarhus University,Denmark,no,no,no
+196,University of Turku,Finland,no,no,no
+197,University of Oulu,Finland,no,no,no
+198,University of Iceland,Iceland,no,no,no
+199,University of Tartu,Estonia,no,no,no
+200,University of Latvia,Latvia,no,no,no
+201,Middle East Technical University (METU),Turkey,no,no,no
+202,Koç University,Turkey,no,no,no
+203,Boğaziçi University,Turkey,no,no,no
+204,Sabancı University,Turkey,no,no,no
+205,Eötvös Loránd University (ELTE),Hungary,no,no,no
+206,Budapest University of Technology and Economics (BME),Hungary,no,no,no
+207,University of Debrecen,Hungary,no,no,no
+208,Nazarbayev University,Kazakhstan,yes,yes,no
+209,Al-Farabi Kazakh National University (KazNU),Kazakhstan,no,no,no
+210,University of Warsaw,Poland,no,no,no
+211,Jagiellonian University,Poland,no,no,no
+212,Charles University,Czechia,no,no,no
+213,Czech Technical University in Prague (CTU),Czechia,no,no,yes
+214,Westminster International University in Tashkent (WIUT),Uzbekistan,yes,no,yes
+215,Inha University in Tashkent (IUT),Uzbekistan,yes,yes,yes
+216,New Uzbekistan University,Uzbekistan,yes,yes,yes
+217,The Hong Kong University of Science and Technology,Hong Kong SAR,no,no,no
+218,Technische Universität Berlin,Germany,no,no,no
+219,Northwestern University,United States,no,no,no
+220,Karlsruhe Institute of Technology,Germany,no,no,no
+221,Sungkyunkwan University (SKKU),South Korea,no,no,no
+222,Lancaster University,United Kingdom,no,no,no
+223,University of North Carolina at Chapel Hill,United States,no,no,no
+224,Wageningen University & Research,Netherlands,no,no,no
+225,Complutense University of Madrid,Spain,no,no,no
+226,Tecnológico de Monterrey,Mexico,no,yes,no
+227,Tongji University,China,no,no,no
+228,Curtin University,Australia,no,no,no
+229,Western University,Canada,no,yes,no
+230,Wuhan University,China,no,no,no
+231,Emory University,United States,no,no,no
+232,Deakin University,Australia,no,no,no
+233,Autonomous University of Madrid,Spain,no,no,no
+234,American University of Sharjah,United Arab Emirates,no,yes,no
+235,University of Minnesota Twin Cities,United States,no,no,no
+236,Universitas Indonesia,Indonesia,no,no,no
+237,Tel Aviv University,Israel,no,no,no
+238,National Tsing Hua University,Taiwan,no,no,no
+239,University of Freiburg,Germany,no,yes,no
+240,National Cheng Kung University,Taiwan,no,no,no
+241,University of Florida,United States,no,no,no
+242,La Trobe University,Australia,no,no,no
+243,University of Erlangen-Nürnberg,Germany,no,no,no
+244,University of Bonn,Germany,no,no,no
+245,Maastricht University,Netherlands,no,no,no
+246,University of Campinas,Brazil,no,no,no
+247,University of Waikato,New Zealand,no,no,no
+248,University of Padua,Italy,no,no,no
+249,University of Rochester,United States,no,no,no
+250,Gadjah Mada University,Indonesia,no,no,no
+251,Massey University,New Zealand,no,no,no
+252,Dartmouth College,United States,no,no,no
+253,Victoria University of Wellington,New Zealand,no,no,no
+254,University of Macau,Macau SAR,no,yes,no
+255,University of Sussex,United Kingdom,no,yes,no
+256,Griffith University,Australia,no,yes,no
+257,Bandung Institute of Technology,Indonesia,no,no,no
+258,Heriot-Watt University,United Kingdom,no,no,no
+259,University of Lisbon,Portugal,no,no,no
+260,Canadian University Dubai,United Arab Emirates,no,yes,no
+261,University of Canterbury,New Zealand,no,no,no
+262,Norwegian University of Science and Technology,Norway,no,no,no
+263,UCSI University,Malaysia,no,no,no
+264,University of the Witwatersrand,South Africa,no,no,no
+265,Tianjin University,China,no,no,no
+266,Beijing Normal University,China,no,no,no
+267,Universidad Carlos III de Madrid,Spain,no,no,no
+268,University of Leicester,United Kingdom,no,no,no
+269,University of Milan,Italy,no,no,no
+270,University of Surrey,United Kingdom,no,no,no
+271,Swinburne University of Technology,Australia,no,yes,no
+272,University of Bergen,Norway,no,yes,no
+273,"University of Maryland, College Park",United States,no,yes,no
+274,National Yang Ming Chiao Tung University,Taiwan,no,yes,no
+275,University of Tübingen,Germany,no,yes,no
+276,Vanderbilt University,United States,no,yes,no
+277,University of Navarra,Spain,no,yes,no
+278,American University of Beirut,Lebanon,no,yes,no
+279,Taylor’s University,Malaysia,no,yes,no
+280,Harbin Institute of Technology,China,no,yes,no
+281,Radboud University,Netherlands,no,yes,no
+282,University College Cork,Ireland,no,yes,no
+283,University of Galway,Ireland,no,yes,no
+284,Dalhousie University,Canada,no,yes,no
+285,University of Porto,Portugal,no,yes,no
+286,Ulsan National Institute of Science and Technology,South Korea,no,yes,no
+287,The Hebrew University of Jerusalem,Israel,no,yes,no
+288,University of Strathclyde,United Kingdom,no,yes,no
+289,The University of Arizona,United States,no,yes,no
+290,University of Tasmania,Australia,no,yes,no
+291,Xi’an Jiaotong University,China,no,yes,no
+292,Stellenbosch University,South Africa,no,yes,no
+293,University of Virginia,United States,no,yes,no
+294,Swansea University,United Kingdom,no,yes,no
+295,Huazhong University of Science and Technology,China,no,yes,no
+296,Hamad Bin Khalifa University,Qatar,no,yes,no
+297,École Normale Supérieure de Lyon,France,no,yes,no
+298,École des Ponts ParisTech,France,yes,yes,no
+299,Case Western Reserve University,United States,no,yes,no
+300,Vrije Universiteit Brussel,Belgium,no,yes,no
+301,Southern University of Science and Technology,China,no,yes,no
+302,Institut Polytechnique de Paris,France,no,yes,no
+303,Universidad de Chile,Chile,no,yes,no
+304,King Abdulaziz University,Saudi Arabia,no,yes,no
+305,Michigan State University,United States,no,yes,no
+306,Texas A&M University,United States,no,yes,no
+307,University of Barcelona,Spain,no,yes,no
+308,Washington University in St. Louis,United States,no,yes,no
+309,"University of California, Santa Barbara",United States,no,yes,no
+310,University of Newcastle (Australia),Australia,no,yes,no
+311,Arizona State University,United States,no,yes,no
+312,King Saud University,Saudi Arabia,no,yes,no
+313,Queen’s University Belfast,United Kingdom,no,yes,no
+314,The Ohio State University,United States,no,yes,no
+315,Indian Institute of Science,India,no,yes,no
+316,Indian Institute of Technology Kharagpur,India,no,yes,no
+317,Indian Institute of Technology Madras,India,no,yes,no
+318,Université libre de Bruxelles,Belgium,no,yes,no
+319,Politecnico di Torino,Italy,no,yes,no
+320,Technical University of Darmstadt,Germany,no,yes,no
+321,Hong Kong Baptist University,Hong Kong SAR,no,yes,no
+322,Indian Institute of Technology Kanpur,India,no,yes,no
+323,Universiti Teknologi PETRONAS,Malaysia,no,yes,no
+324,Université Paris 1 Panthéon-Sorbonne,France,no,yes,no
+325,Bauman Moscow State Technical University,Russia,no,yes,no
+326,Queensland University of Technology,Australia,no,yes,no
+327,Kyung Hee University,South Korea,no,no,no
+328,Gwangju Institute of Science and Technology (GIST),South Korea,no,yes,no
+329,Istanbul Technical University (İTÜ),Turkey,no,no,no
+330,Bilkent University,Turkey,no,no,no
+331,Hacettepe University,Turkey,no,no,no
+332,Istanbul University,Turkey,no,no,no
+333,Yıldız Technical University (YTÜ),Turkey,no,no,no
+334,Ankara University,Turkey,no,no,no
+335,University of Naples Federico II,Italy,no,no,no
+336,University of Pisa (UNIPI),Italy,no,no,no
+337,University of Florence (UNIFI),Italy,no,no,no
+338,University of Turin (UniTo),Italy,no,no,no
+339,University of Szeged (SZTE),Hungary,no,no,no
+340,University of Pécs,Hungary,no,no,no
+341,Corvinus University of Budapest,Hungary,yes,no,no
+342,Semmelweis University,Hungary,yes,no,no
+343,Hungarian University of Agriculture and Life Sciences (MATE),Hungary,no,no,no
+344,Óbuda University,Hungary,no,no,no
+345,Széchenyi István University,Hungary,no,no,no
+346,RUDN University (Peoples' Friendship University),Russia,no,no,no
+347,Saint Petersburg State University (SPbU),Russia,no,no,no
+348,HSE University (Higher School of Economics),Russia,no,yes,no
+349,Moscow Institute of Physics and Technology (MIPT / Phystech),Russia,no,no,no
+350,Novosibirsk State University (NSU),Russia,no,no,no
+351,Tomsk State University (TSU),Russia,no,no,no
+352,National Research Nuclear University MEPhI,Russia,no,no,no
+353,Kazan Federal University (KFU),Russia,no,no,no
+354,Sunway University,Malaysia,no,no,no
+355,International Islamic University Malaysia (IIUM),Malaysia,no,no,no
+356,Warsaw University of Technology (WUT),Poland,no,no,no
+357,AGH University of Krakow,Poland,no,no,no
+358,"Adam Mickiewicz University, Poznań",Poland,no,yes,no
+359,Gdańsk University of Technology (Gdańsk Tech),Poland,no,no,no
+360,Wrocław University of Science and Technology,Poland,no,no,no
+361,University of Wrocław,Poland,no,no,no
+362,Poznań University of Technology (PUT),Poland,no,no,no
+363,Lodz University of Technology (TUL),Poland,no,no,no
+364,United Arab Emirates University (UAEU),United Arab Emirates,no,yes,no
