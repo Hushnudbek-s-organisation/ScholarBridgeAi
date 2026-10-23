@@ -9,8 +9,6 @@ import re
 import sys
 from pathlib import Path
 
-IN = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/top300/raw_cells.json")
-OUT = Path(sys.argv[2] if len(sys.argv) > 2 else "/tmp/top300/parsed.json")
 
 # Country -> ISO2 (used for flag emoji + country_code). Names as they appear in the PDF.
 COUNTRY_ISO = {
@@ -227,24 +225,31 @@ def parse_col5(txt):
     return {"sch_name": name, "sch_avail": avail, "sch_type": clean(stype), "sch_max": clean(mx)}
 
 
-rows = json.load(open(IN))
-parsed = []
-errors = []
-for r in rows:
-    c = r["cells"]
-    try:
-        rec = {"page": r["page"]}
-        rec.update(parse_col0(c[0]))
-        rec.update(parse_col1(c[1]))
-        rec.update(parse_col2(c[2]))
-        rec.update(parse_col3(c[3]))
-        rec.update(parse_col4(c[4]))
-        rec.update(parse_col5(c[5]))
-        parsed.append(rec)
-    except Exception as e:  # noqa: BLE001
-        errors.append((c[0].split("\n")[0], str(e)))
+def main():
+    src = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/top300/raw_cells.json")
+    out = Path(sys.argv[2] if len(sys.argv) > 2 else "/tmp/top300/parsed.json")
+    rows = json.load(open(src))
+    parsed = []
+    errors = []
+    for r in rows:
+        c = r["cells"]
+        try:
+            rec = {"page": r["page"]}
+            rec.update(parse_col0(c[0]))
+            rec.update(parse_col1(c[1]))
+            rec.update(parse_col2(c[2]))
+            rec.update(parse_col3(c[3]))
+            rec.update(parse_col4(c[4]))
+            rec.update(parse_col5(c[5]))
+            parsed.append(rec)
+        except Exception as e:  # noqa: BLE001
+            errors.append((c[0].split("\n")[0], str(e)))
 
-OUT.write_text(json.dumps(parsed, ensure_ascii=False, indent=1))
-print(f"parsed {len(parsed)} rows, {len(errors)} errors -> {OUT}")
-for e in errors:
-    print("ERR", e)
+    out.write_text(json.dumps(parsed, ensure_ascii=False, indent=1))
+    print(f"parsed {len(parsed)} rows, {len(errors)} errors -> {out}")
+    for e in errors:
+        print("ERR", e)
+
+
+if __name__ == "__main__":
+    main()

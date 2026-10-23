@@ -1,0 +1,64 @@
+-- ════════════════════════════════════════════════════════════════════════
+-- "EdTech Audit + 13 Davlat Top-10 (130 Uni) + Global Top 300 — Supabase
+-- Master Guide" (PDF, 2026-10-23) — Supabase import / enrichment
+--
+-- Context: the second PDF was imported into the live project
+-- (zkdguzbdopfedkffsatk) on 2026-10-23, right after the Top 300 import
+-- (see supabase/top300_pdf_import.sql).  Sections 5–6 of this PDF are the
+-- same Top 300 registry (byte-identical, 0 field diffs) → nothing to do.
+-- Section 4 — 13 countries × Top-10 = 130 universities — is the new data:
+--   * public.universities  — 92 existing rows matched (domain, then name within
+--                            country; 2 manual overrides) and ENRICHED with the
+--                            Section-4 admission data; 38 inserted (ids 327–364);
+--                            8 old placeholder rows (ids 202–208, 211) fully filled
+--   * public.scholarships  — 68 Top-300 headline rows UPDATED with Section-4 data,
+--                            62 university rows INSERTED, 10 standalone national
+--                            programmes INSERTED (ids 859–868, university_id NULL)
+--   * public.university_scholarships — 130 upserted (61 new, 67 renamed) → 358 rows
+--   * programs / program_requirements / program_sources / application_cycles /
+--     sources / university_sources — one undergraduate record set per university
+--     that had none (38 new + 8 placeholders = 46), 56 application cycles
+--
+-- This file is the idempotent, re-runnable part. The data statements depend on
+-- staging tables built from the PDF by scripts/import/top300/*_13c.py (see
+-- scripts/import/top300/README.md) and are kept there, not here.
+--
+-- Decisions (same as the Top 300 import, approved in chat):
+--   * world_ranking of the 200 QS-ranked universities was KEPT; new rows = NULL.
+--   * acceptance_rate stays in PERCENT (app convention: 15 = 15%), not 0.15.
+--   * No deep links fabricated: admissions_url of new rows = official website.
+--   * highlights[0] = 'Scholarship: <name> — <max> [<availability>]' and a trailing
+--     'Uzbek applicants guide: <Country> Top-10 #<n>' element marks the 130 rows.
+-- ════════════════════════════════════════════════════════════════════════
+
+-- Table was created by supabase/top300_pdf_import.sql; only the comment changes.
+COMMENT ON TABLE public.university_scholarships IS
+  'Per-university headline scholarship from the Top 300 Universities dataset and the 13-country Top-10 guide for Uzbek applicants (PDFs, 2026). Detailed scholarship records live in public.scholarships (linked via scholarship_id).';
+
+-- ── Verification (expected values right after the import, 2026-10-23) ─────
+-- SELECT count(*) AS total, count(world_ranking) AS ranked FROM public.universities;          -- 364 / 200
+-- SELECT count(*) FROM public.universities WHERE highlights LIKE '%Uzbek applicants guide:%';  -- 130
+-- SELECT count(*) FROM public.universities WHERE data_source LIKE 'Uzbek-focused 13-country%'; -- 46 (38 new + 8 placeholders)
+-- SELECT count(*) FROM public.scholarships;                                                     -- 639
+-- SELECT count(*) FROM public.scholarships WHERE notes LIKE '%13-country Top-10 guide%';        -- 140 (68 enriched + 62 new + 10 national)
+-- SELECT count(*) FROM public.scholarships
+--  WHERE notes LIKE 'National scholarship programme from the 13-country%' AND university_id IS NULL; -- 10
+-- SELECT count(*), count(DISTINCT university_id), count(*) FILTER (WHERE scholarship_id IS NULL)
+--   FROM public.university_scholarships;                                                        -- 358 / 345 / 0
+-- Every one of the 130 Section-4 universities has programs, cycles, sources and a scholarship:
+-- SELECT count(*) FROM public.universities u
+--  WHERE u.highlights LIKE '%Uzbek applicants guide:%'
+--    AND EXISTS (SELECT 1 FROM public.programs p WHERE p.university_id = u.id)
+--    AND EXISTS (SELECT 1 FROM public.application_cycles c WHERE c.university_id = u.id)
+--    AND EXISTS (SELECT 1 FROM public.university_sources s WHERE s.university_id = u.id)
+--    AND EXISTS (SELECT 1 FROM public.university_scholarships us WHERE us.university_id = u.id); -- 130
+
+-- ── Optional cleanup (run manually in the Supabase SQL editor) ─────────────
+-- Staging tables left in the project. anon/authenticated grants were already
+-- revoked on all four, so they are not reachable through PostgREST; they only
+-- take space.  _pdf_13c / _pdf_13c_cycles are from this import, _import_top300 /
+-- _import_codes from the parallel Top-300 import process.
+-- DROP TABLE IF EXISTS public._pdf_13c_cycles;
+-- DROP TABLE IF EXISTS public._pdf_13c;
+-- DROP TABLE IF EXISTS public._import_top300;
+-- DROP TABLE IF EXISTS public._import_codes;

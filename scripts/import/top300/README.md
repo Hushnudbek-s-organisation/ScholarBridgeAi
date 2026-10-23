@@ -32,3 +32,29 @@ Python deps: `pip install pypdf pdfplumber` (Python 3.11).
   `is_estimated = true`, `deadline = NULL`, and the original text in `notes`).
 
 Staging tables `_pdf_top300` / `_pdf_cycles` were dropped afterwards.
+
+## Second PDF — 13-country Top-10 guide (130 universities)
+
+`uzbek_global_universities_supabase_master_guide.pdf` (79 pages) repeats the Top 300 registry in
+sections 5–6 (byte-identical, verified with 0 field diffs) and adds **section 4: 13 countries × Top-10**
+on pages 5–42. Same 6-column layout, but rows start with `[Country #N]`, there is no Books / A-Level /
+IB column and the deadline cell carries scholarship labels (TB, SH, EYUF, MEXT, RF Quota …).
+
+| Step | Script | Output |
+| --- | --- | --- |
+| 1 | `extract_pdf.py <pdf> raw_cells.json 5 79` (optional first/last page) → keep rows whose first cell starts with `[` | raw cells of the 130 section-4 rows |
+| 2 | `parse_rows_13c.py raw_cells_13c.json parsed_13c.json` | 130 records (`group`, `group_rank`, `action`, admission numbers, scholarship name/type/max, deadlines, ISO2 + flag) |
+| 3 | `gen_staging_13c.py parsed_13c.json db_unis.json out/` | `CREATE TABLE public._pdf_13c` + INSERT batches; `uni_id` = matched `universities.id` (domain match, then name similarity within the country; `MANUAL` overrides) or `NULL` for new rows. `db_unis.json` = `[[id, name, country, city, domain], …]` exported from the DB |
+| 4 | `gen_fill_13c.py parsed_13c.json out/` | `_pdf_13c_cycles` staging (one row per parsed deadline, reuses `gen_fill_sql.parse_deadlines`) |
+
+The parsed registry is committed as `data/uzbek_13_countries_top10_pdf_2026.json`; the Uzbek report
+with the matching table and every count is `docs/UZBEK_13_COUNTRIES_PDF_IMPORT_2026-10-23.md`.
+
+Written to the database (2026-10-23): 38 new `universities` (ids 327–364), 92 existing rows enriched
+(8 of them former placeholders), 68 `scholarships` updated + 62 university scholarships + 10 national
+programmes inserted, 130 `university_scholarships` upserted (358 total), and the generic undergraduate
+record set (programs / requirements / cycles / sources) for the 46 universities that had none.
+
+The `_pdf_13c` / `_pdf_13c_cycles` staging tables could **not** be dropped through the connector
+(the provider's security filter blocked the statement); `supabase/uzbek_13c_pdf_import.sql` has the
+cleanup lines to run manually.

@@ -21,12 +21,16 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 PDF = sys.argv[1] if len(sys.argv) > 1 else "/tmp/arena-coding-uploads/top_300_universities_supabase_prompt.pdf"
 OUT = Path(sys.argv[2] if len(sys.argv) > 2 else "/tmp/top300/raw_cells.json")
+# optional: first/last page (1-based). Defaults cover the original Top-300 PDF (pages 8-59);
+# the "13 countries + Top 300" master guide uses 5-79.
+FIRST_PAGE = int(sys.argv[3]) if len(sys.argv) > 3 else 8
+LAST_PAGE = int(sys.argv[4]) if len(sys.argv) > 4 else 59
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 COL_BOUNDS = [31.5, 164.2, 273.0, 390.0, 585.0, 687.0, 811.5]
 NAVY = (0.0588, 0.1608, 0.2588)
-ROW_START = re.compile(r"^#\d+\b")
-FIRST_PAGE, LAST_PAGE = 8, 59  # 1-based
+# rows start with "#12 Name" (Top 300 registry) or "[South Korea #3] Name" (13-country registry)
+ROW_START = re.compile(r"^(#\d+\b|\[[^\]]*#\d+\])")
 
 
 def col_index(x_center: float):
@@ -54,7 +58,7 @@ def words_to_lines(words, y_tol=2.0):
 
 rows = []
 with pdfplumber.open(PDF) as pdf:
-    for pno in range(FIRST_PAGE, LAST_PAGE + 1):
+    for pno in range(FIRST_PAGE, min(LAST_PAGE, len(pdf.pages)) + 1):
         page = pdf.pages[pno - 1]
         # black horizontal separators (one per column cell, same top) -> row boundaries
         # black rects = row separators; navy rects = bottom edge of a table header

@@ -1,0 +1,13 @@
+[
+  { "id": "eyuf-uz", "name": "El-Yurt Umidi Foundation (Top 300 Full Ride)", "url": "https://eyuf.uz", "country": "Uzbekistan", "regexHint": "April|deadline|qabul" },
+  { "id": "stipendium-hungaricum", "name": "Stipendium Hungaricum (Hungary Full Ride)", "url": "https://stipendiumhungaricum.hu/apply/", "country": "Hungary", "regexHint": "15 January|deadline" },
+  { "id": "turkiye-burslari", "name": "Türkiye Bursları (Turkey Full Ride)", "url": "https://www.turkiyeburslari.gov.tr/en/page/prospective-students/application-calendar", "country": "Türkiye", "regexHint": "February|Application" },
+  { "id": "gks-korea", "name": "Global Korea Scholarship (GKS)", "url": "https://www.studyinkorea.go.kr/ko/plan/scholarship.do", "country": "South Korea", "regexHint": "GKS|deadline|March|September" },
+  { "id": "maeci-italy", "name": "MAECI & Invest Your Talent in Italy", "url": "https://investyourtalentapplication.esteri.it", "country": "Italy", "regexHint": "Deadline|May|February" },
+  { "id": "csc-china", "name": "Chinese Government Scholarship (CSC)", "url": "https://www.campuschina.org", "country": "China", "regexHint": "Category A|Category B|deadline" },
+  { "id": "rf-quota", "name": "Russian Government Quota", "url": "https://education-in-russia.com", "country": "Russia", "regexHint": "registration|deadline" },
+  { "id": "nawa-poland", "name": "NAWA Stefan Banach Scholarship", "url": "https://nawa.gov.pl/en/students/foreign-students/the-banach-scholarship-programme", "country": "Poland", "regexHint": "call for proposals|deadline" },
+  { "id": "kfupm-saudi", "name": "KFUPM SAT Scholarship Track", "url": "https://admissions.kfupm.edu.sa", "country": "Saudi Arabia", "regexHint": "SAT Track|deadline" },
+  { "id": "daad-germany", "name": "DAAD & Deutschlandstipendium (Germany)", "url": "https://www.daad.de/en/", "country": "Germany", "regexHint": "Deutschlandstipendium|deadline|application" },
+  { "id": "universitaly-italy", "name": "Universitaly (Italy pre-enrolment portal)", "url": "https://www.universitaly.it/", "country": "Italy", "regexHint": "pre-enrolment|preiscrizione|deadline" }
+]
