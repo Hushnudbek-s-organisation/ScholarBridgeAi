@@ -32,3 +32,55 @@ Python deps: `pip install pypdf pdfplumber` (Python 3.11).
   `is_estimated = true`, `deadline = NULL`, and the original text in `notes`).
 
 Staging tables `_pdf_top300` / `_pdf_cycles` were dropped afterwards.
+
+## Second PDF — 13-country Top-10 guide (130 universities)
+
+`uzbek_global_universities_supabase_master_guide.pdf` (79 pages) repeats the Top 300 registry in
+sections 5–6 (byte-identical, verified with 0 field diffs) and adds **section 4: 13 countries × Top-10**
+on pages 5–28 (the Top 300 registry follows on pages 29–79). Same 6-column layout, but rows start with `[Country #N]`, there is no Books / A-Level /
+IB column and the deadline cell carries scholarship labels (TB, SH, EYUF, MEXT, RF Quota …).
+
+| Step | Script | Output |
+| --- | --- | --- |
+| 1 | `extract_pdf.py <pdf> raw_cells.json 5 79` (optional first/last page) → keep rows whose first cell starts with `[` | raw cells of the 130 section-4 rows |
+| 2 | `parse_rows_13c.py raw_cells_13c.json parsed_13c.json` | 130 records (`group`, `group_rank`, `action`, admission numbers, scholarship name/type/max, deadlines, ISO2 + flag) |
+| 3 | `gen_staging_13c.py parsed_13c.json db_unis.json out/` | `CREATE TABLE public._pdf_13c` + INSERT batches; `uni_id` = matched `universities.id` (domain match, then name similarity within the country; `MANUAL` overrides) or `NULL` for new rows. `db_unis.json` = `[[id, name, country, city, domain], …]` exported from the DB |
+| 4 | `gen_fill_13c.py parsed_13c.json out/` | `_pdf_13c_cycles` staging (one row per parsed deadline, reuses `gen_fill_sql.parse_deadlines`) |
+
+The parsed registry is committed as `data/uzbek_13_countries_top10_pdf_2026.json`; the Uzbek report
+with the matching table and every count is `docs/UZBEK_13_COUNTRIES_PDF_IMPORT_2026-10-23.md`.
+
+Written to the database (2026-10-23): 38 new `universities` (ids 327–364), 92 existing rows enriched
+(8 of them former placeholders), 68 `scholarships` updated + 62 university scholarships + 10 national
+programmes inserted, 130 `university_scholarships` upserted (358 total), and the generic undergraduate
+record set (programs / requirements / cycles / sources) for the 46 universities that had none.
+
+The `_pdf_13c` / `_pdf_13c_cycles` staging tables could **not** be dropped through the connector
+(the provider's security filter blocked the statement); `supabase/uzbek_13c_pdf_import.sql` has the
+cleanup lines to run manually.
+
+## Third PDF — 11 programmes + QS ranking + campus images (430 rows)
+
+`top_universities_programs_qs_rankings_master.pdf` (113 pages) re-prints both registries and adds
+four layers (11 programmes per university, QS rank, image URL, research-agent catalogue scanner).
+The table dropped to **4 columns** (`31.5 / 203.2 / 366.7 / 632.2 / 811.5`):
+
+| Step | Script | Output |
+| --- | --- | --- |
+| 1 | `extract_pdf_11progs.py <pdf> raw.json 5 113` | 430 rows (sec 4: 130, Top 1–200: 200, Top 201–300: 100) |
+| 2 | `parse_rows_11progs.py raw.json parsed.json` | name, QS rank, country/city, type/founded, PSW, website, image file, tuition/living/housing/fee, acceptance/GPA/SAT/IELTS/TOEFL/DET, PS/Rec/Int/Port, the 11 programmes, deadline/intake/timezone, "Fokus", grant + max coverage |
+
+Committed output: `data/top_universities_11progs_qs_pdf_2026.json`.
+
+**What was verified before writing anything** (`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`):
+
+* the QS ranks in the PDF are the **2025** edition (Oxford #3, Cambridge #5, KAIST #53). The DB's own
+  ranks were also not real QS data — 181 of 200 were wrong (UPenn #11 vs 15, Columbia #18 vs 38 …).
+  Both were replaced with the official **QS 2026** table: `data/qs_2026_top499.tsv`,
+  `supabase/qs_2026_rank_correction.sql` (336 verified ranks, 28 left `NULL`, KAIST cleared — QS
+  excluded it from the 2026 edition);
+* the image URLs are **constructed** (`Special:FilePath/<Name>_Campus.jpg`) — 4/4 sampled files do not
+  exist on Commons, so **no image_url was written**;
+* the "11 programmes" are **archetype templates** (identical lists per profile) with fabricated
+  `/programs`, `/apply`, `/admissions` URLs, and the app lists every `programs` row without a
+  verification filter → **not inserted**.

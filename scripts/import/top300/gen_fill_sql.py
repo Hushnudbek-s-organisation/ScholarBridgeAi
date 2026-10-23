@@ -13,10 +13,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-parsed = json.load(open(sys.argv[1]))
-out = Path(sys.argv[2])
-out.mkdir(parents=True, exist_ok=True)
-
 TODAY = date(2026, 10, 23)
 MONTHS = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
 
@@ -95,41 +91,49 @@ def parse_deadlines(text, default_type):
     return [(default_type, None, None, "rolling" if rolling else "estimated", t)]
 
 
-alter_rows = []
-cycle_rows = []
-for r in parsed:
-    other = (r["other"] or "").lower()
-    english = not any(tok in other for tok in LOCAL_LANG_TOKENS)
-    duration = 3 if r["iso2"] in THREE_YEAR else 4
-    lang = "English" if english else "English / local language (see requirements)"
-    admin_fee = r["iso2"] in ADMIN_FEE_COUNTRIES
-    alter_rows.append((r["rank"], english, duration, lang, admin_fee))
-    for i, (app, intake, d, kind, note) in enumerate(parse_deadlines(r["deadline"], r["apptype"]), start=1):
-        cycle_rows.append((r["rank"], i, app, intake, d, kind, note))
+def main():
+    parsed = json.load(open(sys.argv[1]))
+    out = Path(sys.argv[2])
+    out.mkdir(parents=True, exist_ok=True)
+    alter_rows = []
+    cycle_rows = []
+    for r in parsed:
+        other = (r["other"] or "").lower()
+        english = not any(tok in other for tok in LOCAL_LANG_TOKENS)
+        duration = 3 if r["iso2"] in THREE_YEAR else 4
+        lang = "English" if english else "English / local language (see requirements)"
+        admin_fee = r["iso2"] in ADMIN_FEE_COUNTRIES
+        alter_rows.append((r["rank"], english, duration, lang, admin_fee))
+        for i, (app, intake, d, kind, note) in enumerate(parse_deadlines(r["deadline"], r["apptype"]), start=1):
+            cycle_rows.append((r["rank"], i, app, intake, d, kind, note))
 
-sql1 = """
-ALTER TABLE public._pdf_top300
-  ADD COLUMN IF NOT EXISTS english boolean,
-  ADD COLUMN IF NOT EXISTS duration int,
-  ADD COLUMN IF NOT EXISTS lang text,
-  ADD COLUMN IF NOT EXISTS admin_fee boolean;
-UPDATE public._pdf_top300 p SET english = v.english, duration = v.duration, lang = v.lang, admin_fee = v.admin_fee
-FROM (VALUES
-""" + ",\n".join(f"({q(a)}, {q(b)}, {q(c)}, {q(d)}, {q(e)})" for a, b, c, d, e in alter_rows) + """
-) AS v(pdf_rank, english, duration, lang, admin_fee)
-WHERE p.pdf_rank = v.pdf_rank;
-"""
-(out / "20_alter_staging.sql").write_text(sql1)
+    sql1 = """
+    ALTER TABLE public._pdf_top300
+      ADD COLUMN IF NOT EXISTS english boolean,
+      ADD COLUMN IF NOT EXISTS duration int,
+      ADD COLUMN IF NOT EXISTS lang text,
+      ADD COLUMN IF NOT EXISTS admin_fee boolean;
+    UPDATE public._pdf_top300 p SET english = v.english, duration = v.duration, lang = v.lang, admin_fee = v.admin_fee
+    FROM (VALUES
+    """ + ",\n".join(f"({q(a)}, {q(b)}, {q(c)}, {q(d)}, {q(e)})" for a, b, c, d, e in alter_rows) + """
+    ) AS v(pdf_rank, english, duration, lang, admin_fee)
+    WHERE p.pdf_rank = v.pdf_rank;
+    """
+    (out / "20_alter_staging.sql").write_text(sql1)
 
-sql2 = """
-DROP TABLE IF EXISTS public._pdf_cycles;
-CREATE TABLE public._pdf_cycles (pdf_rank int, seq int, app_type text, intake_note text, deadline date, kind text, note text, PRIMARY KEY (pdf_rank, seq));
-INSERT INTO public._pdf_cycles (pdf_rank, seq, app_type, intake_note, deadline, kind, note) VALUES
-""" + ",\n".join(f"({q(a)}, {q(b)}, {q(c)}, {q(g)}, {q(d)}, {q(e)}, {q(f)})" for a, b, c, g, d, e, f in cycle_rows) + ";\n"
-(out / "21_cycles_staging.sql").write_text(sql2)
-print(f"alter rows: {len(alter_rows)}, cycle rows: {len(cycle_rows)}")
-import collections
-print(collections.Counter(k for _, _, _, _, _, k, _ in cycle_rows))
-print(collections.Counter(a for _, _, a, _, _, _, _ in cycle_rows).most_common(25))
-print(collections.Counter(a for _, _, _, a, _, _, _ in cycle_rows).most_common(25))
-print("english true:", sum(1 for x in alter_rows if x[1]), "/", len(alter_rows))
+    sql2 = """
+    DROP TABLE IF EXISTS public._pdf_cycles;
+    CREATE TABLE public._pdf_cycles (pdf_rank int, seq int, app_type text, intake_note text, deadline date, kind text, note text, PRIMARY KEY (pdf_rank, seq));
+    INSERT INTO public._pdf_cycles (pdf_rank, seq, app_type, intake_note, deadline, kind, note) VALUES
+    """ + ",\n".join(f"({q(a)}, {q(b)}, {q(c)}, {q(g)}, {q(d)}, {q(e)}, {q(f)})" for a, b, c, g, d, e, f in cycle_rows) + ";\n"
+    (out / "21_cycles_staging.sql").write_text(sql2)
+    print(f"alter rows: {len(alter_rows)}, cycle rows: {len(cycle_rows)}")
+    import collections
+    print(collections.Counter(k for _, _, _, _, _, k, _ in cycle_rows))
+    print(collections.Counter(a for _, _, a, _, _, _, _ in cycle_rows).most_common(25))
+    print(collections.Counter(a for _, _, _, a, _, _, _ in cycle_rows).most_common(25))
+    print("english true:", sum(1 for x in alter_rows if x[1]), "/", len(alter_rows))
+
+
+if __name__ == "__main__":
+    main()
