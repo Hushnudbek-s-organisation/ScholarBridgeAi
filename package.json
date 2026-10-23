@@ -81,7 +81,8 @@
     "test:stage7-seed-safety": "node scripts/check-stage7-seed-safety.mjs",
     "test:seed-catalog": "DATABASE_URL=postgresql://seed-test:seed-test@127.0.0.1:5432/seed_test tsx scripts/check-seed-catalog.ts",
     "test:task-sync": "node scripts/check-task-sync.mjs",
-    "test:duplicates": "tsx scripts/check-catalog-duplicates.ts"
+    "test:duplicates": "tsx scripts/check-catalog-duplicates.ts",
+    "test:deadlines": "tsx scripts/check-deadline-integrity.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

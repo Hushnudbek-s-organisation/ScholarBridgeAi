@@ -837,6 +837,20 @@ export const applicationCycles = pgTable("application_cycles", {
   sourceId: integer("source_id").references((): AnyPgColumn => sources.id, { onDelete: "set null" }),
   lastVerifiedAt: timestamp("last_verified_at"),
   verificationStatus: text("verification_status").notNull().default("unverified"),
+  /**
+   * The entry year these dates belong to. The database has carried this column
+   * all along and the API used to *parse* it out of `academic_year` instead,
+   * which read "2026-2027" as 2026 for a Fall 2027 entry. Read the column.
+   */
+  cycleYear: integer("cycle_year").notNull().default(2027),
+  deadlineType: text("deadline_type").notNull().default("exact"),
+  /** Redundant with verificationStatus; kept in sync by the data sweeps. */
+  isEstimated: boolean("is_estimated").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  isVerified: boolean("is_verified").notNull().default(false),
+  notes: text("notes"),
+  officialSourceId: integer("official_source_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_application_cycles_university_year").on(table.universityId, table.academicYear),
   index("idx_application_cycles_program").on(table.programId),

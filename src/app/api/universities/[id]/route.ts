@@ -707,9 +707,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const seenCycleKeys = new Set<string>();
     const cycles = cycleRows
       .map((c) => {
-        let year: number | null = null;
-        const m = /^(\d{4})/.exec(c.academicYear || "");
-        if (m) year = parseInt(m[1], 10);
+        // The row carries its own cycle_year. Deriving the year by parsing
+        // academic_year was wrong for every row labelled with the *application*
+        // year ("2026-2027" for a Fall 2027 entry) — the card then said 2026
+        // while the deadline was in 2027. The column wins; parsing is only the
+        // fallback for a row that somehow has no cycle_year.
+        let year: number | null = Number.isInteger(c.cycleYear) ? c.cycleYear : null;
+        if (year === null) {
+          const m = /^(\d{4})/.exec(c.academicYear || "");
+          if (m) year = parseInt(m[1], 10);
+        }
         return {
           id: c.id,
           cycleYear: year,

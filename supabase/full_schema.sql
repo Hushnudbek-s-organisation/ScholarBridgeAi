@@ -341,7 +341,15 @@ CREATE TABLE IF NOT EXISTS "application_cycles" (
   "source_url" text,
   "source_id" integer CONSTRAINT "application_cycles_source_id_fkey" REFERENCES "sources" ("id") ON DELETE SET NULL,
   "last_verified_at" timestamp,
-  "verification_status" text NOT NULL DEFAULT 'unverified'
+  "verification_status" text NOT NULL DEFAULT 'unverified',
+  "cycle_year" integer NOT NULL DEFAULT 2027,
+  "deadline_type" text NOT NULL DEFAULT 'exact',
+  "is_estimated" boolean NOT NULL DEFAULT FALSE,
+  "is_active" boolean NOT NULL DEFAULT TRUE,
+  "is_verified" boolean NOT NULL DEFAULT FALSE,
+  "notes" text,
+  "official_source_id" integer,
+  "created_at" timestamp NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS "application_document_links" (
   "id" serial PRIMARY KEY,
@@ -1580,6 +1588,14 @@ ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_url" text;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_id" integer;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'unverified';
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "cycle_year" integer NOT NULL DEFAULT 2027;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "deadline_type" text NOT NULL DEFAULT 'exact';
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_estimated" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_verified" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "notes" text;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "official_source_id" integer;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 -- ---------- application_document_links ----------
 ALTER TABLE "application_document_links" ADD COLUMN IF NOT EXISTS "application_id" integer;
 ALTER TABLE "application_document_links" ADD COLUMN IF NOT EXISTS "document_id" integer;

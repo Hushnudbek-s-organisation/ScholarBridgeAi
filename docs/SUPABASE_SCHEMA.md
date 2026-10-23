@@ -242,7 +242,15 @@ Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes insid
 | `source_url` | text | yes | — |  |
 | `source_id` | integer | yes | — | FK → sources(id) on delete set null |
 | `last_verified_at` | timestamp | yes | — |  |
-| `verification_status` | text |  | yes |  |
+| `verification_status` | text |  | yes | `verified` / `estimated` / `unverified` — the source of truth the API reads |
+| `cycle_year` | integer |  | yes | entry year (2027 = Fall 2027). The API reads this, not a parse of `academic_year` |
+| `deadline_type` | text |  | yes | e.g. `exact`, `Regular Decision` |
+| `is_estimated` | boolean |  | yes | mirror of `verification_status <> 'verified'`; kept in sync by the sweeps |
+| `is_active` | boolean |  | yes |  |
+| `is_verified` | boolean |  | yes | mirror of `verification_status = 'verified'` |
+| `notes` | text | yes | — | what the source page actually published |
+| `official_source_id` | integer | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
 
 ### `application_document_links`
 
