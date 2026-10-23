@@ -2572,6 +2572,49 @@ async function main() {
     dupCycles.rows.map((r) => r.id),
   ]);
 
+  // A scholarship the university itself awards must surface on its page, with
+  // the published amount; one that was retired (is_active = false) must not.
+  // This is the contract behind "link the university's own awards so they show".
+  const linkedSch = await pool.query<{ id: number }>(
+    `INSERT INTO scholarships
+       (title, provider, country, coverage_type, amount_usd_value, deadline, degree_levels,
+        eligible_majors, description, requirements, website_url, deadline_type, recurrence,
+        application_status, verification_status, source_reliability, is_active, university_id)
+     VALUES
+       ('Integration Test University Award', 'ETH Zurich', 'Switzerland', 'Partial Tuition', 10000,
+        '2027-02-01', '["Bachelor''s"]', '["All Majors"]', 'A test award.', 'Test requirements.',
+        'https://example.org/award', 'fixed', 'annual', 'open', 'verified', 9, true, $1),
+       ('Integration Test Retired Award', 'ETH Zurich', 'Switzerland', 'Partial Tuition', 10000,
+        '2027-02-01', '["Bachelor''s"]', '["All Majors"]', 'A retired test award.', 'Test requirements.',
+        'https://example.org/retired', 'fixed', 'annual', 'closed', 'verified', 9, false, $1)
+     RETURNING id`,
+    [uniA.id],
+  );
+  // The catalogue bundle is cached; a scholarship written after the cache was
+  // filled only becomes visible after the TTL, so the test invalidates it the
+  // same way the admin mutation path does.
+  const { invalidateCatalogCache: invalidateScholarshipCache } = await import("../src/lib/catalogCache");
+  invalidateScholarshipCache("scholarships");
+  const uniDetailWithSch = await call(
+    ((request: Request) =>
+      uniDetailRoute.GET(request, { params: Promise.resolve({ id: String(uniA.id) }) })) as any,
+    `/api/universities/${uniA.id}`,
+  );  const detailScholarships: any[] = uniDetailWithSch.body?.scholarships ?? [];
+  const linkedAward = detailScholarships.find((s) => s.title === "Integration Test University Award");
+  check(
+    "universities: a scholarship awarded by the university itself appears on its page with the published amount",
+    linkedAward?.amountUsdValue === 10000 && linkedAward?.isVerified === true,
+    JSON.stringify({ found: Boolean(linkedAward), amount: linkedAward?.amountUsdValue, count: detailScholarships.length }),
+  );
+  check(
+    "universities: a retired scholarship (is_active = false) is never shown",
+    !detailScholarships.some((s) => s.title === "Integration Test Retired Award"),
+    JSON.stringify(detailScholarships.map((s) => s.title)),
+  );
+  await pool.query("DELETE FROM scholarships WHERE id = ANY($1::int[])", [
+    linkedSch.rows.map((r) => r.id),
+  ]);
+
   const botSrc = readFile2("src/lib/telegram/bot.ts", "utf8");
   const botDeadlinesFn = botSrc.slice(botSrc.indexOf("async function deadlines"), botSrc.indexOf("async function next"));
   check("deadlines: the Telegram /deadlines list is FREE (policy: same data, every channel)", botDeadlinesFn.length > 0 && !/hasFeature|premium/.test(botDeadlinesFn));
