@@ -235,7 +235,9 @@ export default async function ScholarshipsPage({
                       </span>
                     </p>
                   )}
-                  {typeof scholarship.amount_usd_value === "number" && (
+                  {/* A stored 0 means "the provider publishes no cash value" —
+                      rendering "$0" would read as a real, zero-dollar award. */}
+                  {typeof scholarship.amount_usd_value === "number" && scholarship.amount_usd_value > 0 && (
                     <p className="break-words font-semibold text-emerald-800">
                       {amount.format(scholarship.amount_usd_value)}
                       {awardPeriodLabel(scholarship.award_period, copy) && (

@@ -98,7 +98,9 @@ export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "e
     const period = s.awardPeriod === "year" ? t("perYear") : s.awardPeriod === "month" ? t("perMonth") : "";
     return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
   }
-  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+  // 0 is the catalogue's "no cash value published" sentinel, not an award of
+  // zero dollars: fall through to the coverage label instead of printing "$0".
+  if (s.amountUsdValue != null && s.amountUsdValue > 0) return formatMoney(s.amountUsdValue, "USD");
   return s.coverageType && s.coverageType !== "Unspecified"
     ? localizeCoverageType(s.coverageType, locale)
     : t("awardNotSpecified");
