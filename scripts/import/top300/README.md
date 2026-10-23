@@ -37,7 +37,7 @@ Staging tables `_pdf_top300` / `_pdf_cycles` were dropped afterwards.
 
 `uzbek_global_universities_supabase_master_guide.pdf` (79 pages) repeats the Top 300 registry in
 sections 5–6 (byte-identical, verified with 0 field diffs) and adds **section 4: 13 countries × Top-10**
-on pages 5–42. Same 6-column layout, but rows start with `[Country #N]`, there is no Books / A-Level /
+on pages 5–28 (the Top 300 registry follows on pages 29–79). Same 6-column layout, but rows start with `[Country #N]`, there is no Books / A-Level /
 IB column and the deadline cell carries scholarship labels (TB, SH, EYUF, MEXT, RF Quota …).
 
 | Step | Script | Output |

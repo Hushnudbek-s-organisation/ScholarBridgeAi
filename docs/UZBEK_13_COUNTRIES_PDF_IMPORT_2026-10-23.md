@@ -10,7 +10,7 @@ Loyiha: Supabase `zkdguzbdopfedkffsatk` (production DB). Oldingi import: `docs/T
 | --- | --- | --- |
 | 1–2 | EdTech audit, master-prompt, qat'iy sxema qoidalari | ko'rsatma, ma'lumot yo'q |
 | 3 | `university_scholarships` DDL + `scholarship-watchlist.json` namunasi | jadval allaqachon bor (Top 300 importida yaratilgan); watchlist fayli repo'ga qo'shildi |
-| **4** | **13 davlat × Top-10 = 130 universitet + davlat grantlari (5–42-sahifalar)** | **to'liq import qilindi** |
+| **4** | **13 davlat × Top-10 = 130 universitet + davlat grantlari (5–28-sahifalar)** | **to'liq import qilindi** |
 | 5–6 | Global Top 1–300 reestri | birinchi PDF bilan **bayt-ma-bayt bir xil** (300 qator, 0 farq) → hech narsa o'zgartirilmadi |
 
 4-bo'lim mustaqil parse qilindi (`scripts/import/top300/parse_rows_13c.py`): 130 qator, 0 xato.
