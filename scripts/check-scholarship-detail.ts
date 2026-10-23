@@ -70,6 +70,15 @@ const HARD: Check[] = [
             AND coalesce(award_basis, '') NOT IN ('fixed', 'range', 'full_tuition', 'need_based', 'variable')`,
   },
   {
+    name: "coverage_type stays inside the values the UI can translate",
+    // The uz/ru dictionaries key off these exact strings; anything else
+    // renders raw English inside an Uzbek or Russian page.
+    sql: `SELECT COUNT(*)::int AS n FROM scholarships WHERE ${SCOPE}
+            AND coverage_type NOT IN ('Full Tuition + Stipend', 'Full Tuition',
+              'Partial Tuition', 'Full Funding', 'Partial Funding',
+              'Tuition Waiver', 'Living Stipend', 'Unspecified')`,
+  },
+  {
     name: "award_period stays inside the values the admin API accepts",
     // NULL is legitimate ("the provider states no period"); only a value
     // outside the accepted set is a defect.
