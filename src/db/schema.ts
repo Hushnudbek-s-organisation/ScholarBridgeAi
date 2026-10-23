@@ -856,6 +856,44 @@ export const universitySources = pgTable("university_sources", {
   sourceType: text("source_type").notNull().default("university_evidence"),
 });
 
+/**
+ * University→scholarship links as the database actually stores them.
+ *
+ * The detail route renders its "scholarships" block from the `scholarships`
+ * bundle (linked rows first), so this table was never modelled in Drizzle and
+ * drifted: it has `covers_tuition` / `covers_living_expenses` flags,
+ * `verification_status` and a UNIQUE (university_id, scholarship_name) that a
+ * merge of two duplicate university rows has to respect. Modelling it here
+ * keeps future data work typed instead of raw SQL guesswork.
+ */
+export const universityScholarships = pgTable(
+  "university_scholarships",
+  {
+    id: serial("id").primaryKey(),
+    universityId: integer("university_id").references(() => universities.id, { onDelete: "cascade" }).notNull(),
+    scholarshipId: integer("scholarship_id").references((): AnyPgColumn => scholarships.id, { onDelete: "set null" }),
+    scholarshipName: text("scholarship_name").notNull(),
+    availabilityStatus: text("availability_status").notNull(),
+    fundingType: text("funding_type").notNull(),
+    maxScholarship: text("max_scholarship").notNull(),
+    coversTuition: boolean("covers_tuition").notNull().default(true),
+    coversLivingExpenses: boolean("covers_living_expenses").notNull().default(false),
+    valuedAspect: text("valued_aspect"),
+    eligibilityNotes: text("eligibility_notes"),
+    officialUrl: text("official_url"),
+    sourceUrl: text("source_url"),
+    verificationStatus: text("verification_status").notNull().default("verified"),
+    lastVerifiedAt: timestamp("last_verified_at").defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("university_scholarships_university_id_scholarship_name_key").on(
+      table.universityId,
+      table.scholarshipName,
+    ),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // 12. SOURCES & SOURCE LINKS (spec §6, §7, §9, §10)
 // ---------------------------------------------------------------------------

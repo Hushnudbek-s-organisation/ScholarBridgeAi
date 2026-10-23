@@ -102,8 +102,8 @@ const main = async () => {
   await c.query(PAYMENT_MIGRATION);
   await c.query(PAYMENT_MIGRATION);
   const fresh = await stats(c);
-  check("creates the full table set (95)", fresh.tables === 95, `got ${fresh.tables}`);
-  check("creates every FK (117)", fresh.fks === 117, `got ${fresh.fks}`);
+  check("creates the full table set (96)", fresh.tables === 96, `got ${fresh.tables}`);
+  check("creates every FK (119)", fresh.fks === 119, `got ${fresh.fks}`);
   check(
     "composite programs(id, university_id) UNIQUE constraint exists",
     await uniqueConstraintOn(c, "programs", ["id", "university_id"]),
@@ -128,7 +128,7 @@ const main = async () => {
        FROM pg_class WHERE relkind='r' AND relnamespace='public'::regnamespace`,
     )
   ).rows[0];
-  check("RLS enabled on all 95 public tables", rls.total === 95 && rls.enabled === 95, `${rls.enabled}/${rls.total}`);
+  check("RLS enabled on all 96 public tables", rls.total === 96 && rls.enabled === 96, `${rls.enabled}/${rls.total}`);
   check(
     "rate-limit storage table rate_limit_hits exists",
     (await c.query(`SELECT 1 FROM information_schema.tables WHERE table_name='rate_limit_hits'`)).rows.length === 1,
@@ -192,7 +192,7 @@ const main = async () => {
   // Repair with the canonical file.
   await c.query(SQL);
   const repaired = await stats(c);
-  check("repair restores every FK (117)", repaired.fks === 117, `got ${repaired.fks}`);
+  check("repair restores every FK (119)", repaired.fks === 119, `got ${repaired.fks}`);
   check(
     "repair backfills the composite FK on application_cycles",
     (

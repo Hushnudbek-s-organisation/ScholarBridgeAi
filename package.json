@@ -80,7 +80,8 @@
     "preflight:phase11": "node scripts/phase11-preflight.mjs",
     "test:stage7-seed-safety": "node scripts/check-stage7-seed-safety.mjs",
     "test:seed-catalog": "DATABASE_URL=postgresql://seed-test:seed-test@127.0.0.1:5432/seed_test tsx scripts/check-seed-catalog.ts",
-    "test:task-sync": "node scripts/check-task-sync.mjs"
+    "test:task-sync": "node scripts/check-task-sync.mjs",
+    "test:duplicates": "tsx scripts/check-catalog-duplicates.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
