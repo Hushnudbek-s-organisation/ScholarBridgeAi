@@ -1,0 +1,29 @@
+-- Scholarship rewrite pass 23 — 2026-10-23
+-- The Malaysia cluster, second batch. Closes the cluster: zero template descriptions
+-- remain among active Malaysian rows.
+--
+-- The finding that mattered most: the Jeffrey Cheah Entrance Scholarship really is
+-- open to international students - the "Only Malaysian citizens are eligible to
+-- apply" clause in Sunway's terms belongs to the Jeffrey Cheah Foundation Community
+-- and Foundation Scholarships, not to the Entrance Scholarship. Same pattern at UCSI,
+-- where the Malaysian-only award is the Tan Sri Ahmad Razali Merit Scholarship. And
+-- at Taylor's, the opposite: the headline World Class Scholarship IS restricted to
+-- Malaysians and Taylor's Education Group progression students, while the Excellence
+-- Award is the one open to everyone.
+--
+-- UTP is the one row that had to go: every fund on its scholarship page requires
+-- Malaysian citizenship.
+--
+-- Rows: 842 Sunway · 811 IIUM · 677 Taylor's · 703 UCSI  → rewritten
+--       779 UTP                                        → retired
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+-- The UPDATE statements are recorded in the session log and mirrored in
+-- docs/SCHOLARSHIP_REWRITE_PASS_23_2026-10-23.md; each row's `notes` column carries
+-- the full correction record for that row.
+
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            → 156 (was 161)
+--   website_url bare domain and is_active                            → 207 (was 212)
+--   active scholarships                                              → 617 (was 618)
+--   Malaysian active rows still in template phrasing                 →   0
