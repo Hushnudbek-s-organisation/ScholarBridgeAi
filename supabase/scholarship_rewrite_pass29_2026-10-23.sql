@@ -1,0 +1,60 @@
+-- Scholarship rewrite pass 29 — 2026-10-23
+-- The United Kingdom cluster. Closes the template queue for the UK: zero rows
+-- remain in importer phrasing.
+--
+-- THE PATTERN
+-- All thirteen UK template rows shared one shape: a bare university domain as the
+-- website, an invented USD figure, and a deadline of "Jan 25 (UCAS)". That date is
+-- the UCAS equal-consideration deadline for the application itself, not a scholarship
+-- deadline, and the confusion made every one of these rows wrong in the same way.
+--
+-- THE FOUR VERIFIED AWARDS
+--
+--   id 11  Gates Cambridge        ~70 full-cost scholarships a year for non-UK
+--                                  postgraduates; ~2/3 to PhD. University Composition
+--                                  Fee + GBP 23,152 maintenance (2026-27, 12 months,
+--                                  up to 4 years for PhD) + airfare both ways + visa
+--                                  + IHS. Discretionary: GBP 750-4,000 academic
+--                                  development, Dependent Children Allowance up to
+--                                  GBP 12,793 / 18,244, fieldwork, parental, hardship.
+--                                  NOT covered: bench fees, scientific equipment.
+--                                  US round October, International round December.
+--
+--   id 542  Bath                  Bath International Excellence: up to 300 awards,
+--                                  GBP 8,000/yr, cap GBP 24,000 over 3 years. Rounds
+--                                  close 14 February and 31 March 2027. Not available
+--                                  for March Architecture. No discount in a placement
+--                                  or study-abroad year.
+--
+--   id 671  St Andrews            International Undergraduate Scholarship: up to
+--                                  GBP 10,000/yr, awarded on FINANCIAL NEED not merit.
+--                                  Opens 17 August 2026, closes 27 January 2027,
+--                                  outcome week of 17 March 2027. The FULL-tuition
+--                                  award is a different one - International Excellence,
+--                                  ONE place per intake.
+--
+--   id 634  Newcastle             Vice-Chancellor International: GBP 7,000/yr for the
+--                                  duration, automatic. Newcastle states plainly that
+--                                  all its scholarships are partial, not full funding.
+--                                  Separate Excellence scheme: up to 50%, 30 awards,
+--                                  ABB required.
+--
+-- Rows rewritten (4): 11 Gates Cambridge · 542 Bath · 671 St Andrews · 634 Newcastle
+-- Row retired (1):    109 - merged Gates Cambridge with the separate Cambridge Trust
+-- Ten rows given honest unverified descriptions and zeroed amounts:
+--   550 Cardiff · 589 Heriot-Watt · 614 Lancaster · 616 Loughborough · 657 QMUL
+--   658 QUB · 720 Aberdeen · 734 Exeter · 759 Surrey · 769 York
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 96 (was 109)
+--   website_url bare domain and is_active                            -> 155 (was 160)
+--   active scholarships                                              -> 577 (was 578)
+--   UK active rows still in template phrasing                        ->  0
+--
+-- NOTE ON THE REMAINING 10: their website_url still points at the university's own
+-- domain, because no scholarship page was fetched for them in this pass and inventing
+-- a deep link is exactly the fault this work is removing. Their amounts are zero, their
+-- coverage is described as a partial tuition discount, and their descriptions say in
+-- so many words that the terms were not verified.
