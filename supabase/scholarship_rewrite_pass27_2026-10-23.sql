@@ -1,0 +1,42 @@
+-- Scholarship rewrite pass 27 — 2026-10-23
+-- The Poland cluster. Closes it: zero template descriptions remain, and the
+-- country now has exactly ONE correct record instead of eleven competing ones.
+--
+-- THE PATTERN, THE WORST IN THE CATALOGUE
+-- Ten rows were built as "<University> & NAWA Stefan Banach" - the same national
+-- programme welded onto ten different universities, each with its own invented
+-- dollar figure between USD 3 000 and USD 16 800, each pointing at a bare university
+-- domain, and none of them describing how the programme is actually entered.
+--
+-- THE REAL PROGRAMME (id 867, rewritten)
+--   Monthly scholarship      PLN 2 500, paid for up to 12 months per academic year
+--   Tuition                  fully waived at public universities
+--   Travel allowance         one-time PLN 2 500
+--   Preparatory course       NAWA-funded, with PLN 1 700 a month during it
+--   Language                 Polish track or English track, with a Polish language
+--                            and culture course on the English track
+--   Eligible countries       36 covered by Polish Aid - UZBEKISTAN IS ON THE LIST
+--   Level                    master's (second-cycle) only
+--   Exclusions               no Polish citizenship, no existing master's degree
+--   Competition              the last edition drew 3 587 applications for 443 places
+--   Deadline                 2026 call closed 8 May 2026, 15:00 CEST - and it can
+--                            close EARLY once a country-group quota fills
+--   Humanities exception     the country group containing Uzbekistan may also study
+--                            humanities and social sciences, except philology in the
+--                            applicant's own native language
+--
+-- Rows retired (10): 766 Warsaw · 800 Gdansk Tech · 802 AGH · 809 Jagiellonian ·
+--                    810 Wroclaw · 820 AMU Poznan · 825 PUT Poznan · 827 WUT ·
+--                    830 Lodz Tech · 850 Wroclaw Tech
+-- Row rewritten (1):  867 the national programme
+-- Ten university_scholarships cards re-pointed to the national record
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 119 (was 129)
+--   website_url bare domain and is_active                            -> 171 (was 181)
+--   active scholarships                                              -> 587 (was 597)
+--   Polish active rows still in template phrasing                     ->   0
+--   Polish active rows with a bare-domain URL                         ->   0
+--   The Polish entry now passes all 12 hard completeness checks       -> yes
