@@ -1,0 +1,51 @@
+-- Scholarship rewrite pass 28 — 2026-10-23
+-- The Italy cluster. Closes it: zero template descriptions, zero invented
+-- five-figure USD amounts, and zero merged multi-programme rows remain active.
+--
+-- THE PATTERN, AND WHY IT MATTERED MORE THAN ELSEWHERE
+-- Italy has THREE completely separate funding instruments, and ten rows had welded
+-- all three into a single "Full Ride":
+--
+--   1. MAECI - the Ministry of Foreign Affairs grant, applied for nationally through
+--      the Study in Italy portal. MERIT-based.
+--   2. DSU  - the regional right-to-study grant, administered by ER.GO, EDISU, DiSCo,
+--      DSU Toscana, ADISURC, ESU Padova and others. NEED-based, decided by the ISEE
+--      income indicator, with a hard income ceiling.
+--   3. University merit awards - PoliMi, Padua, Sapienza and the rest. Institution-
+--      specific and separate again.
+--
+-- Merging them was not a cosmetic error. DSU's income ceiling means a family above
+-- roughly EUR 25 000-28 000 ISEE cannot receive it at all, so a row that promised a
+-- "Full Ride" combining all three told a student nothing about whether they would
+-- qualify for any of it.
+--
+-- WHAT IS NOW RECORDED, EACH VERIFIED
+--   id 864  MAECI          EUR 10 800 for nine months (2026-27), up from EUR 9 000;
+--                          EUR 3 600 for a language course; ages 28/30/40;
+--                          B2 Italian or English; 26 March 2026 deadline.
+--                          Tuition exemption is NOT central - each university decides.
+--   id 907  DSU            National minimums EUR 7 171.11 fuori sede / 4 190.71
+--                          pendolare / 2 890.16 in sede; ceilings ISEE EUR 28 339.88
+--                          and ISPE EUR 61 608.48, tighter regionally (ER.GO EUR 25 000,
+--                          EDISU EUR 26 306.25, Lombardy EUR 26 887.93); regional
+--                          summer windows; ISEE Parificato required; a DSU application
+--                          alone does NOT satisfy the visa financial requirement.
+--   id 351  PoliMi tiers   Platinum EUR 10 000 + waiver (10 places), Gold EUR 8 000
+--                          (18) or EUR 5 000 (16), Silver and Bronze waiver only.
+--                          ONLY Early Bird applicants 1 Oct - 1 Dec 2026 are considered.
+--
+-- Rows retired (10): 649, 650, 665, 727, 748, 754, 801, 808, 835, 839
+-- Rows rewritten (2): 864 MAECI, 351 PoliMi
+-- New record (1):     907 DSU
+-- Amounts zeroed and coverage downgraded (3): 379, 481, 482
+-- Eleven university_scholarships cards re-pointed
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 109 (was 119)
+--   website_url bare domain and is_active                            -> 160 (was 171)
+--   active scholarships                                              -> 578 (was 587)
+--   Italian active rows still in template phrasing                   ->   0
+--   Italian active rows with amount_usd_value > 3000                 ->   0
+--   Italian active rows failing a hard completeness check            ->   0
