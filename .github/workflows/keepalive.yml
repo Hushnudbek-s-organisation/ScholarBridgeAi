@@ -1,0 +1,49 @@
+name: keepalive
+
+# Two jobs in one ping:
+#  1. Keep the hosting instance warm. A sleeping instance (Render free plan)
+#     answers Telegram's webhook POST with its "Application loading" page, so the
+#     update is lost — the bot looks dead while nothing is actually broken.
+#  2. Produce a readable availability trail: /api/health fails only when the
+#     database is unreachable (see docs/AVAILABILITY.md).
+#
+# Enable it by adding the repository variable SITE_URL
+# (Settings → Secrets and variables → Actions → Variables → New variable).
+# Without it this workflow is a no-op, so forks never hammer someone's site.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /api/health
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          set -u
+          if [ -z "${SITE_URL:-}" ]; then
+            echo "::notice::SITE_URL is not set — keepalive is disabled."
+            exit 0
+          fi
+          base="${SITE_URL%/}"
+          code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 90 "$base/api/health" || echo 000)
+          body=$(head -c 200 /tmp/health.json 2>/dev/null || true)
+          echo "status=$code body=$body"
+          case "$code" in
+            200) echo "::notice::Site is awake and the database answers." ;;
+            503) echo "::warning::Site is up but /api/health returned 503 — the database is unreachable (docs/AVAILABILITY.md)." ;;
+            000) echo "::warning::No response within 90 s — the instance is asleep or down; the next run wakes it." ;;
+            *)   echo "::warning::Unexpected /api/health status $code." ;;
+          esac

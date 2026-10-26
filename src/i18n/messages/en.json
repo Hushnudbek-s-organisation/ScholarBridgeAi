@@ -6972,5 +6972,25 @@
       "unapprove": "Unapprove",
       "hint": "Only what you type here can be posted. Nothing is generated, and a story stays hidden until it is approved."
     }
+  },
+  "adminDiagnostics": {
+    "title": "System diagnostics",
+    "retry": "Retry",
+    "loading": "checking…",
+    "dbOk": "Connected, read-write, schema visible",
+    "dbReadOnly": "Connected, but not writable",
+    "dbDown": "Not reachable",
+    "schemaIdle": "not checked yet",
+    "schemaReady": "tables ready",
+    "schemaFailed": "tables could not be created",
+    "database": "Database",
+    "telegramTables": "Bot tables",
+    "channelTables": "Channel tables",
+    "botToken": "Bot token",
+    "tokenAdmin": "saved in the admin panel",
+    "tokenEnv": "from TELEGRAM_BOT_TOKEN (env)",
+    "tokenMissing": "missing — paste it in the bot settings",
+    "allGood": "Everything is ready.",
+    "failed": "Could not read diagnostics."
   }
 }

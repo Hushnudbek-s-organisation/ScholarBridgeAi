@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api, ErrorNote, LoadingBlock, StatCard, Toast, useToast } from "../growth/ui";
+import { SystemDiagnostics } from "./SystemDiagnostics";
 
 interface Settings {
   loginEnabled: boolean;
@@ -229,7 +230,15 @@ export function TelegramManager() {
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(data?.settings), [draft, data]);
 
-  if (error && !data) return <ErrorNote message={error} onRetry={() => load({ live: true })} retryLabel={t("retry")} />;
+  // "Temporarily unavailable" is never actionable on its own — always show the
+  // diagnostics underneath, they name the layer that actually failed.
+  if (error && !data)
+    return (
+      <div className="space-y-3">
+        <ErrorNote message={error} onRetry={() => load({ live: true })} retryLabel={t("retry")} />
+        <SystemDiagnostics />
+      </div>
+    );
   if (!data || !draft) return <LoadingBlock label={t("loading")} />;
 
   const configured = data.token.set && !!data.settings.botUsername;

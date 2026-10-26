@@ -193,7 +193,9 @@ export async function POST(req: Request) {
       const res = await tgCall(token, "setWebhook", {
         url,
         secret_token: webhookSecret(token),
-        allowed_updates: ["message", "callback_query", "my_chat_member"],
+        // "poll" is the aggregate poll state — the channel publisher learns
+        // vote shares from it. Without it Telegram silently withholds them.
+        allowed_updates: ["message", "callback_query", "my_chat_member", "poll"],
         drop_pending_updates: true,
       });
       if (!res.ok) return tgJsonError(502, `Telegram: ${res.description ?? "setWebhook failed"}`, "webhook_failed");

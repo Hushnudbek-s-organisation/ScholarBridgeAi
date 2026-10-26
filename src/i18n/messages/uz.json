@@ -6972,5 +6972,25 @@
       "unapprove": "Bekor qilish",
       "hint": "Faqat shu yerga yozgan matningiz joylanishi mumkin. Hech narsa avtomatik yaratilmaydi, hikoya tasdiqlanguncha yashirin turadi."
     }
+  },
+  "adminDiagnostics": {
+    "title": "Tizim diagnostikasi",
+    "retry": "Qayta urinish",
+    "loading": "tekshirilmoqda…",
+    "dbOk": "Ulangan, yozish mumkin, sxema joyida",
+    "dbReadOnly": "Ulangan, lekin yozib bo'lmaydi",
+    "dbDown": "Ulanib bo'lmayapti",
+    "schemaIdle": "hali tekshirilmagan",
+    "schemaReady": "jadvallar tayyor",
+    "schemaFailed": "jadvallarni yarata olmadi",
+    "database": "Baza",
+    "telegramTables": "Bot jadvallari",
+    "channelTables": "Kanal jadvallari",
+    "botToken": "Bot tokeni",
+    "tokenAdmin": "admin panelda saqlangan",
+    "tokenEnv": "TELEGRAM_BOT_TOKEN (env) dan",
+    "tokenMissing": "yo'q — bot sozlamalarida kiriting",
+    "allGood": "Hammasi tayyor.",
+    "failed": "Diagnostikani o'qib bo'lmadi."
   }
 }
