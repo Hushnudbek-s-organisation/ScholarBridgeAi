@@ -530,10 +530,10 @@ export function ScholarshipHub({
           <span className="min-w-0 break-words">{t("title")}</span>
         </h2>
 
-        {/* Toolbar — search, ordering and grouping. The faceted panel below
-            owns the categorical filters (country, degree, funding, status,
-            basis); keeping this row short means the first card stays visible
-            on a phone. */}
+        {/* Toolbar — search, ordering and grouping on the first row; the
+            categorical dropdowns (country, degree, funding, status, basis)
+            sit right under it, in the same card. No side panel: the cards
+            keep their full width. */}
         <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
           <div className="relative sm:col-span-2">
@@ -593,13 +593,16 @@ export function ScholarshipHub({
           </div>
         </div>
 
-        {/* Phone-only: opens the faceted panel as a sheet. */}
+        {/* Phone-only: the dropdown row collapses behind this button so the
+            first card is not pushed off the screen. From `sm` up the row is
+            always visible — the controls stay MOUNTED, so a collapsed filter
+            keeps its value and its accessible name. */}
         <button
           type="button"
-          onClick={() => setMobileFiltersOpen(true)}
+          onClick={() => setMobileFiltersOpen((open) => !open)}
           aria-expanded={mobileFiltersOpen}
           aria-controls="scholarship-filters"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 lg:hidden"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:hidden"
         >
           <Filter className="h-4 w-4" aria-hidden />
           <span className="break-words text-center">{t("filtersTitle")}</span>
@@ -610,6 +613,18 @@ export function ScholarshipHub({
           )}
           <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} aria-hidden />
         </button>
+
+        <div
+          id="scholarship-filters"
+          className={`${mobileFiltersOpen ? "block" : "hidden"} sm:block`}
+        >
+          <ScholarshipFiltersPanel
+            filters={filters}
+            facets={facets}
+            onChange={setFilters}
+            onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+          />
+        </div>
       </div>
 
       {/* Pillar 3.2 — saved grants lead somewhere: find the universities they
@@ -638,28 +653,7 @@ export function ScholarshipHub({
         </div>
       )}
 
-      {/* Facets + results. The panel is the same component on every screen:
-          a sticky sidebar from `lg`, a dismissible sheet on a phone. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[248px_minmax(0,1fr)] lg:items-start">
-        <div
-          id="scholarship-filters"
-          className={`${
-            mobileFiltersOpen
-              ? "fixed inset-0 z-50 overflow-y-auto bg-slate-50 p-3"
-              : "hidden"
-          } lg:sticky lg:top-4 lg:z-auto lg:block lg:overflow-visible lg:bg-transparent lg:p-0`}
-        >
-          <ScholarshipFiltersPanel
-            filters={filters}
-            facets={facets}
-            onChange={setFilters}
-            onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
-            onClose={() => setMobileFiltersOpen(false)}
-            resultCount={totalCount}
-          />
-        </div>
-
-        <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4">
       {/* Results Count */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
@@ -719,7 +713,7 @@ export function ScholarshipHub({
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
+          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
@@ -749,7 +743,7 @@ export function ScholarshipHub({
               <div
                 data-scholarship-id={s.id}
                 data-focused-record={isFocused ? "true" : undefined}
-                className={`bg-white rounded-2xl border shadow-xs transition-all p-5 flex flex-col gap-4 ${
+                className={`flex h-full flex-col gap-4 rounded-2xl border bg-white p-5 shadow-xs transition-all ${
                   isFocused
                     ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
                     : "border-slate-200 hover:shadow-lg hover:border-indigo-300"
@@ -765,7 +759,10 @@ export function ScholarshipHub({
                     {/* inline-block: a long provider name wraps as ONE chip,
                         not a ragged box per line. Neutral, so amber stays
                         reserved for deadlines and match issues. */}
-                    <span className="inline-block min-w-0 max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                    <span
+                      className="line-clamp-2 h-9 min-w-0 max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      title={`${localizeCountry(s.country, locale)} • ${localizeScholarshipProvider(s.provider, locale)}`}
+                    >
                       <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
                       {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
                     </span>
@@ -799,7 +796,10 @@ export function ScholarshipHub({
 
                   {/* Full-width, balanced heading: award names stay readable
                       and wrapped lines line up instead of trailing off. */}
-                  <h3 className="break-words text-base font-bold leading-snug text-slate-900 [text-wrap:balance]">
+                  <h3
+                    className="line-clamp-3 min-h-[4.125rem] break-words text-base font-bold leading-snug text-slate-900 [text-wrap:balance]"
+                    title={localizeScholarshipTitle(s.title, locale)}
+                  >
                     {localizeScholarshipTitle(s.title, locale)}
                   </h3>
 
@@ -973,7 +973,7 @@ export function ScholarshipHub({
 
                 {/* Actions — one row, two controls: the official portal link
                     and Track/Save. Everything else moved to the drawer. */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
                   <span className="flex flex-wrap items-center gap-2">
                     <Link
                       // `?from=app` tells the detail page which catalogue the
@@ -1028,7 +1028,6 @@ export function ScholarshipHub({
           onPageChange={handlePageChange}
         />
       )}
-        </div>
       </div>
       {/* The funding-plan action reports its own outcome inline — no alert(). */}
       {fundingError && (

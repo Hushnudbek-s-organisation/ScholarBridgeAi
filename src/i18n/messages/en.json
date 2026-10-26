@@ -4478,9 +4478,6 @@
     "viewDetails": "View full details",
     "filtersTitle": "Filters",
     "filtersClear": "Clear all",
-    "filtersClose": "Close filters",
-    "filtersDone": "Done",
-    "filtersShowResults": "Show {count} awards",
     "filterCountry": "Host country",
     "filterDegree": "Degree level",
     "filterCoverage": "Funding type",
@@ -4511,7 +4508,10 @@
       "degree": "Degree level",
       "coverage": "Funding type",
       "status": "Status"
-    }
+    },
+    "allDegrees": "🎓 All degree levels",
+    "allStatuses": "🗓 All statuses",
+    "allBasis": "🎯 Any award basis"
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",

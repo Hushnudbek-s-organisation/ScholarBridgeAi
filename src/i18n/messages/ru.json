@@ -4478,9 +4478,6 @@
     "viewDetails": "Подробнее",
     "filtersTitle": "Фильтры",
     "filtersClear": "Сбросить",
-    "filtersClose": "Закрыть фильтры",
-    "filtersDone": "Готово",
-    "filtersShowResults": "Показать стипендий: {count}",
     "filterCountry": "Страна обучения",
     "filterDegree": "Уровень обучения",
     "filterCoverage": "Тип финансирования",
@@ -4511,7 +4508,10 @@
       "degree": "Уровень обучения",
       "coverage": "Тип финансирования",
       "status": "Статус"
-    }
+    },
+    "allDegrees": "🎓 Все уровни обучения",
+    "allStatuses": "🗓 Все статусы",
+    "allBasis": "🎯 Любое основание"
   },
   "chancing": {
     "signIn": "Войдите, чтобы увидеть оценки соответствия профиля.",

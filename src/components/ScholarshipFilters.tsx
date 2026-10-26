@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { countryTranslationKey } from "@/lib/countries";
 import { localizeCoverageType, localizeDegreeLevel } from "@/lib/catalogLocalizer";
@@ -12,22 +12,25 @@ import {
   SCHOLARSHIP_DEGREE_OPTIONS,
   SCHOLARSHIP_STATUS_OPTIONS,
   scholarshipActiveFilterCount,
+  scholarshipStatusMessageKey,
   type ScholarshipFacets,
   type ScholarshipFilters,
 } from "@/lib/scholarshipFilters";
 
 /**
- * Scholarship filters — a faceted side panel.
+ * Scholarship filters — the row of dropdowns that sits in the catalogue
+ * toolbar, next to the search box ("All host countries", "All coverage
+ * levels", …). No separate side panel: the catalogue is one column of cards,
+ * and every control stays where the student already looks.
  *
- * Every count comes from the server's facet payload, so a checkbox states what
- * it will return BEFORE it is ticked, and a value the catalogue does not
- * publish never appears. Only dimensions this catalogue really answers are
- * offered: host country, degree level, funding type, application status and
- * award basis (merit / need). Field-of-study was deliberately left out —
- * almost every row says "All Majors", so a field filter would be decoration.
+ * Only dimensions this catalogue really answers are offered (host country,
+ * degree level, funding type, application status, award basis). Each option
+ * carries its result count from the server's facet payload, so a dropdown
+ * states what it will return before it is used, and a value the data does not
+ * publish never appears. Field of study is deliberately absent — almost every
+ * row says "All Majors", so it would be decoration.
  *
- * The panel is presentational: the hub owns the state, so the desktop sidebar
- * and the phone sheet render exactly the same controls.
+ * The panel is presentational: the hub owns the state and passes it down.
  */
 
 export interface ScholarshipFiltersPanelProps {
@@ -35,75 +38,38 @@ export interface ScholarshipFiltersPanelProps {
   facets: ScholarshipFacets;
   onChange: (next: ScholarshipFilters) => void;
   onReset: () => void;
-  /** Phone sheet only — rendered as a dismiss control inside the panel. */
-  onClose?: () => void;
-  /** Live total for the phone sheet's confirm button. */
-  resultCount?: number;
 }
 
-function FilterSection({
-  title,
-  children,
-  count,
-}: {
-  title: string;
-  children: React.ReactNode;
-  count?: number;
-}) {
-  return (
-    <details open className="group border-t border-slate-200 py-2 first:border-t-0 first:pt-0">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0 break-words">
-          {title}
-          {typeof count === "number" && count > 0 && (
-            <span className="ml-1.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-extrabold text-indigo-700">
-              {count}
-            </span>
-          )}
-        </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
-      </summary>
-      <div className="mt-1 space-y-0.5 pb-1">{children}</div>
-    </details>
-  );
-}
-
-function OptionRow({
+function Field({
   label,
-  count,
-  checked,
-  onToggle,
+  htmlFor,
+  children,
 }: {
   label: string;
-  count: number;
-  checked: boolean;
-  onToggle: () => void;
+  htmlFor: string;
+  children: React.ReactNode;
 }) {
   return (
-    <label
-      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-xs transition-colors ${
-        checked ? "bg-indigo-50 font-bold text-indigo-900" : "font-medium text-slate-700 hover:bg-slate-50"
-      } ${count === 0 && !checked ? "opacity-60" : ""}`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onToggle}
-        className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-      />
-      <span className="min-w-0 flex-1 break-words">{label}</span>
-      <span className="shrink-0 tabular-nums text-[10px] font-bold text-slate-400">{count}</span>
-    </label>
+    <div className="min-w-0">
+      <label
+        htmlFor={htmlFor}
+        className="mb-1 block break-words text-[10px] font-bold uppercase tracking-wide text-slate-400"
+      >
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }
+
+const SELECT_CLASS =
+  "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm";
 
 export function ScholarshipFiltersPanel({
   filters,
   facets,
   onChange,
   onReset,
-  onClose,
-  resultCount,
 }: ScholarshipFiltersPanelProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
@@ -120,75 +86,27 @@ export function ScholarshipFiltersPanel({
     }
   };
 
-  const toggleMulti = (key: "degrees" | "coverages" | "statuses" | "basis", value: string) => {
-    const current = filters[key];
-    const next = current.includes(value)
-      ? current.filter((item) => item !== value)
-      : [...current, value];
-    onChange({ ...filters, [key]: next });
-  };
-
-  const statusLabels: Record<string, string> = {
-    open: t("filterStatusOpen"),
-    upcoming: t("filterStatusUpcoming"),
-    rolling: t("filterStatusRolling"),
-    closed: t("filterStatusClosed"),
-    not_announced: t("filterStatusNotAnnounced"),
-    unknown: t("filterStatusUnknown"),
-  };
-
-  const basisLabels: Record<string, string> = {
-    merit: t("filterBasisMerit"),
-    need: t("filterBasisNeed"),
+  // The selects are single-choice in the UI ("All" = no filter). The filter
+  // model stays multi-valued so the API and deep links keep working if a
+  // second value is ever needed.
+  const setSingle = (key: "degrees" | "coverages" | "statuses" | "basis", value: string) => {
+    onChange({ ...filters, [key]: value === "All" ? [] : [value] });
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
-      <div className="flex items-center justify-between gap-2 pb-2">
-        <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900">
-          <SlidersHorizontal className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
-          <span className="min-w-0 break-words">{t("filtersTitle")}</span>
-          {activeCount > 0 && (
-            <span className="shrink-0 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-              {activeCount}
-            </span>
-          )}
-        </h3>
-        <div className="flex shrink-0 items-center gap-1">
-          {activeCount > 0 && (
-            <button
-              type="button"
-              onClick={onReset}
-              className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-            >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-              <span className="min-w-0 break-words">{t("filtersClear")}</span>
-            </button>
-          )}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t("filtersClose")}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 lg:hidden"
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ---- Host country (one choice — a country is an identity, not a tag) */}
-      <FilterSection title={t("filterCountry")} count={filters.country !== "All" ? 1 : 0}>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      {/* ---- Host country */}
+      <Field label={t("filterCountry")} htmlFor="scholarship-filter-country">
         <select
+          id="scholarship-filter-country"
           value={filters.country}
           onChange={(event) => onChange({ ...filters, country: event.target.value })}
           aria-label={t("allCountries")}
-          className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+          className={SELECT_CLASS}
         >
           <option value="All">{t("allCountries")}</option>
-          {/* The focused country can be a name the facet list does not carry
-              (a deep link from a university page) — keep it selectable. */}
+          {/* A deep link can focus a country the facet list does not carry
+              (a university page): keep it selectable instead of blank. */}
           {filters.country !== "All" && !facets.countries.some((entry) => entry.value === filters.country) && (
             <option value={filters.country}>{countryLabel(filters.country)}</option>
           )}
@@ -198,76 +116,93 @@ export function ScholarshipFiltersPanel({
             </option>
           ))}
         </select>
-      </FilterSection>
+      </Field>
 
       {/* ---- Degree level */}
-      <FilterSection title={t("filterDegree")} count={filters.degrees.length}>
-        {SCHOLARSHIP_DEGREE_OPTIONS.map((degree) => (
-          <OptionRow
-            key={degree}
-            label={localizeDegreeLevel(degree, locale) || degree}
-            count={facets.degrees[degree] ?? 0}
-            checked={filters.degrees.includes(degree)}
-            onToggle={() => toggleMulti("degrees", degree)}
-          />
-        ))}
-      </FilterSection>
-
-      {/* ---- Funding type */}
-      <FilterSection title={t("filterCoverage")} count={filters.coverages.length}>
-        <div role="group" aria-label={t("allCoverage")} className="space-y-0.5">
-          {SCHOLARSHIP_COVERAGE_OPTIONS.map((coverage) => (
-            <OptionRow
-              key={coverage}
-              label={localizeCoverageType(coverage, locale) || coverage}
-              count={facets.coverages[coverage] ?? 0}
-              checked={filters.coverages.includes(coverage)}
-              onToggle={() => toggleMulti("coverages", coverage)}
-            />
+      <Field label={t("filterDegree")} htmlFor="scholarship-filter-degree">
+        <select
+          id="scholarship-filter-degree"
+          value={filters.degrees[0] ?? "All"}
+          onChange={(event) => setSingle("degrees", event.target.value)}
+          className={SELECT_CLASS}
+        >
+          <option value="All">{t("allDegrees")}</option>
+          {SCHOLARSHIP_DEGREE_OPTIONS.map((degree) => (
+            <option key={degree} value={degree}>
+              {localizeDegreeLevel(degree, locale) || degree} ({facets.degrees[degree] ?? 0})
+            </option>
           ))}
-        </div>
-      </FilterSection>
+        </select>
+      </Field>
+
+      {/* ---- Funding (coverage) type */}
+      <Field label={t("filterCoverage")} htmlFor="scholarship-filter-coverage">
+        <select
+          id="scholarship-filter-coverage"
+          value={filters.coverages[0] ?? "All"}
+          onChange={(event) => setSingle("coverages", event.target.value)}
+          aria-label={t("allCoverage")}
+          className={SELECT_CLASS}
+        >
+          <option value="All">{t("allCoverage")}</option>
+          {SCHOLARSHIP_COVERAGE_OPTIONS.map((coverage) => (
+            <option key={coverage} value={coverage}>
+              {localizeCoverageType(coverage, locale) || coverage} ({facets.coverages[coverage] ?? 0})
+            </option>
+          ))}
+        </select>
+      </Field>
 
       {/* ---- Application status */}
-      <FilterSection title={t("filterStatus")} count={filters.statuses.length}>
-        {SCHOLARSHIP_STATUS_OPTIONS.map((status) => (
-          <OptionRow
-            key={status}
-            label={statusLabels[status] ?? status}
-            count={facets.statuses[status] ?? 0}
-            checked={filters.statuses.includes(status)}
-            onToggle={() => toggleMulti("statuses", status)}
-          />
-        ))}
-      </FilterSection>
+      <Field label={t("filterStatus")} htmlFor="scholarship-filter-status">
+        <select
+          id="scholarship-filter-status"
+          value={filters.statuses[0] ?? "All"}
+          onChange={(event) => setSingle("statuses", event.target.value)}
+          className={SELECT_CLASS}
+        >
+          <option value="All">{t("allStatuses")}</option>
+          {SCHOLARSHIP_STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {t(scholarshipStatusMessageKey(status))} ({facets.statuses[status] ?? 0})
+            </option>
+          ))}
+        </select>
+      </Field>
 
       {/* ---- Award basis */}
-      {/* ---- Award basis (merit and need can be asked for together) */}
-      <FilterSection title={t("filterBasis")} count={filters.basis.length}>
-        <div role="group" aria-label={t("filterBasis")} className="space-y-0.5">
-          {SCHOLARSHIP_BASIS_OPTIONS.map((basis) => (
-            <OptionRow
-              key={basis}
-              label={basisLabels[basis] ?? basis}
-              count={facets.basis[basis] ?? 0}
-              checked={filters.basis.includes(basis)}
-              onToggle={() => toggleMulti("basis", basis)}
-            />
-          ))}
-        </div>
-      </FilterSection>
-
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 lg:hidden"
+      <Field label={t("filterBasis")} htmlFor="scholarship-filter-basis">
+        <select
+          id="scholarship-filter-basis"
+          value={filters.basis[0] ?? "All"}
+          onChange={(event) => setSingle("basis", event.target.value)}
+          className={SELECT_CLASS}
         >
-          <Check className="h-4 w-4" aria-hidden />
-          <span className="min-w-0 break-words">
-            {typeof resultCount === "number" ? t("filtersShowResults", { count: resultCount }) : t("filtersDone")}
-          </span>
-        </button>
+          <option value="All">{t("allBasis")}</option>
+          {SCHOLARSHIP_BASIS_OPTIONS.map((basis) => (
+            <option key={basis} value={basis}>
+              {basis === "merit" ? t("filterBasisMerit") : t("filterBasisNeed")} ({facets.basis[basis] ?? 0})
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {/* Reset lives at the end of the row and only appears when it does
+          something — a permanently disabled "Clear" is noise. */}
+      {activeCount > 0 && (
+        <div className="col-span-full flex justify-end">
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+            <span className="min-w-0 break-words">{t("filtersClear")}</span>
+            <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {activeCount}
+            </span>
+          </button>
+        </div>
       )}
     </div>
   );

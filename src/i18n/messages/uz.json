@@ -4478,9 +4478,6 @@
     "viewDetails": "Batafsil ma'lumot",
     "filtersTitle": "Filtrlar",
     "filtersClear": "Tozalash",
-    "filtersClose": "Filtrlarni yopish",
-    "filtersDone": "Tayyor",
-    "filtersShowResults": "{count} ta stipendiyani ko'rsatish",
     "filterCountry": "Mezbon davlat",
     "filterDegree": "Ta'lim darajasi",
     "filterCoverage": "Moliyalashtirish turi",
@@ -4511,7 +4508,10 @@
       "degree": "Ta'lim darajasi",
       "coverage": "Moliyalashtirish turi",
       "status": "Holat"
-    }
+    },
+    "allDegrees": "🎓 Barcha darajalar",
+    "allStatuses": "🗓 Barcha holatlar",
+    "allBasis": "🎯 Har qanday asos"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",
