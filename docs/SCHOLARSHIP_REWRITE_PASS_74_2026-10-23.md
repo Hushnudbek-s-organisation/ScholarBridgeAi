@@ -22,7 +22,7 @@ Ya'ni **bazada uydirma summa qolmadi**: qolgan har bir `>5000` qator **e'lon qil
 
 | Fakt | Endi |
 |---|---|
-| Uch daraja: **50 % / 70 % / 100 %** | `coverage = Tuition Waiver`, `bas is = range` |
+| Uch daraja: **50 % / 70 % / 100 %** | `coverage = Tuition Waiver`, `basis = range` |
 | 2026/27 to'lovlar (**UZS**): 25,2 mln (3 muhandislik), 34 mln, 42 mln, 48 mln, **MD 94 mln** | `award_currency = 'UZS'`, `amount = 0` |
 | 70 % da qoladigan to'lov: 14,4 / 12,6 / 10,2 mln UZS | description ichida |
 | 3 muhandislik dasturida **40 % mahalliy stipendiya allaqachon** to'lovga kiritilgan | description ichida |
