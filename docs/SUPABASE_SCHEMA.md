@@ -75,6 +75,7 @@ isbotlamaydi; UI/API yo'nalishi bo'yicha aniq xarita audit natijasida beriladi.
 | **Imtiyozlar (o'sish)** | `opportunities` | Tanlovlar, tadqiqotlar, amaliyot, yozgi maktablar (admin boshqaradi) |
 | **Biznes / admin va xavfsizlik** | `app_config`, `audit_logs`, `refresh_jobs`, `consulting_requests`, `visa_requirements`, `learning_providers`, `learning_provider_links`, `learning_provider_scores`, `platform_ownership`, `ownership_transfers`, `site_visits`, `rate_limit_hits`, `user_sessions` | Admin sozlamalari/audit, provider va visa katalog metama'lumoti, session revoke uchun token hash, hamda instance'lararo rate-limit hitlari; real-time production holati emas |
 | **Telegram bot** | `telegram_links`, `telegram_login_requests`, `telegram_messages`, `telegram_updates` | Talabaning Telegram'ga ulanishi, kirish kodlar (hash bilan), xabarlar tarixi, takror so'rovlarni filtrlash |
+| **Telegram channel publisher** | `channel_plan`, `channel_posts`, `channel_polls`, `channel_prefs`, `channel_clicks`, `channel_stories` | Kunlik reja, postlar jurnali, so'rovnomalar (faqat jamlanma natijalar), mavzu og'irliklari, `/r/<code>` bosishlar va tasdiqlangan hikoyalar |
 
 ## 3. Qoidalar (nima uchun aynan shunday)
 
@@ -1414,6 +1415,106 @@ and the migration is safely retried.
 | `update_id` | bigint |  | — | PK |
 | `received_at` | timestamp |  | yes |  |
 
+### `channel_plan`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `plan_date` | date |  | — | Tashkent day the post belongs to |
+| `slot` | integer |  | — | 0-based position in the day (max 3) |
+| `send_at` | text |  | — | earliest HH:MM (Asia/Tashkent) |
+| `kind` | text |  | — | scholarship_single | fully_funded | urgency | … | poll |
+| `rung` | integer | yes | — | urgency rung: 30 | 14 | 7 | 3 | 1 | 0 |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `template_key` | text |  | — | template/bank id, e.g. single_v2, tip_ielts_routine |
+| `topic` | text | yes | — | preference topic key the post feeds |
+| `poll_type` | text | yes | — | poll message type when this slot is a poll |
+| `payload` | text |  | yes | JSON: digests, spotlight lists, variant, poll key |
+| `dedupe_key` | text |  | — | unique, NOT NULL — the real idempotency key |
+| `status` | text |  | yes | planned | rendered | sent | skipped | failed |
+| `reason` | text | yes | — | why the planner chose it |
+| `created_at` | timestamp |  | yes |  |
+
+### `channel_posts`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `plan_id` | integer | yes | — | FK → channel_plan(id) on delete set null |
+| `kind` | text |  | — | post kind (or poll) |
+| `rung` | integer | yes | — | urgency rung |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `plan_date` | date | yes | — | Tashkent day |
+| `slot` | integer | yes | — | position in the day |
+| `dedupe_key` | text |  | — | unique, NOT NULL — claimed before the send |
+| `mode` | text |  | yes | dryrun | on |
+| `chat_id` | text | yes | — | channel or admin chat the message went to |
+| `html` | text | yes | — | the exact message body |
+| `message_id` | bigint | yes | — | Telegram message id |
+| `poll_id` | text | yes | — | Telegram poll id when this post carried one |
+| `status` | text |  | yes | pending | sent | failed | skipped |
+| `attempts` | integer |  | yes |  |
+| `error` | text | yes | — | last failure description (never secrets) |
+| `sent_at` | timestamp | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_polls`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `post_id` | integer | yes | — | unique, FK → channel_posts(id) on delete cascade |
+| `message_id` | bigint | yes | — |  |
+| `poll_id` | text | yes | — | Telegram poll id (stopPoll reads it back) |
+| `poll_type` | text |  | — | pref | multi | self_assess | this_or_that | struggle | stage | feedback | quiz_data |
+| `poll_key` | text |  | — | deck entry id, used for the 28-day cooldown |
+| `topic` | text | yes | — | preference topic the answers update |
+| `question` | text |  | — |  |
+| `options` | text |  | yes | JSON [{ key, text }] |
+| `correct_index` | integer | yes | — | quiz_data only |
+| `status` | text |  | yes | open | closed | failed |
+| `results` | text |  | yes | JSON [{ key, count }] — aggregates only, never per user |
+| `total_voters` | integer | yes | — |  |
+| `opened_at` | timestamp |  | yes |  |
+| `closed_at` | timestamp | yes | — |  |
+
+### `channel_prefs`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `topic` | text |  | — | unique preference topic key, e.g. country:canada |
+| `weight` | double precision |  | yes | clamped 0.5–2.0 |
+| `samples` | integer |  | yes | how many signals went into the weight |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_clicks`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `code` | text |  | — | unique opaque code behind /r/<code> |
+| `post_id` | integer | yes | — | FK → channel_posts(id) on delete set null |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `target_path` | text |  | — | internal path only — never a caller-supplied URL |
+| `hits` | integer |  | yes |  |
+| `created_at` | timestamp |  | yes |  |
+| `last_hit_at` | timestamp | yes | — |  |
+
+### `channel_stories`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `title` | text |  | — |  |
+| `body` | text |  | — | shown verbatim (escaped); never rewritten by a template |
+| `author_label` | text | yes | — | how the author agreed to be named |
+| `source_url` | text | yes | — | where the story came from |
+| `approved` | boolean |  | yes | only approved rows may ever be posted |
+| `approved_by` | integer | yes | — | admin profile id |
+| `approved_at` | timestamp | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
 ### `test_attempts`
 
 | column | type | null | default | notes |
