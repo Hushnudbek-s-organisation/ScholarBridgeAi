@@ -10,7 +10,7 @@
  */
 import { escapeHtml } from "@/lib/telegram/core";
 
-const MONTHS_UZ = [
+export const MONTHS_UZ = [
   "yanvar",
   "fevral",
   "mart",
@@ -25,14 +25,52 @@ const MONTHS_UZ = [
   "dekabr",
 ] as const;
 
-/** "2026-11-12" → "12-noyabr 2026". Unparseable input → null (line dropped). */
-export function formatDateUz(day: string | null | undefined): string | null {
+/** 0 = Monday … 6 = Sunday, matching the planner. */
+export const WEEKDAYS_UZ = [
+  "Dushanba",
+  "Seshanba",
+  "Chorshanba",
+  "Payshanba",
+  "Juma",
+  "Shanba",
+  "Yakshanba",
+] as const;
+
+function partsOf(day: string | null | undefined): { year: number; month: string; day: number } | null {
   if (!day) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.slice(0, 10));
   if (!m) return null;
   const month = MONTHS_UZ[Number(m[2]) - 1];
   if (!month) return null;
-  return `${Number(m[3])}-${month} ${m[1]}`;
+  const dayNumber = Number(m[3]);
+  if (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 31) return null;
+  return { year: Number(m[1]), month, day: dayNumber };
+}
+
+/**
+ * `{deadline_text_long}` — "15-dekabr, 2026". Unparseable input → null
+ * (the caller drops the line rather than printing a broken date).
+ */
+export function formatDateUz(day: string | null | undefined): string | null {
+  const parts = partsOf(day);
+  return parts ? `${parts.day}-${parts.month}, ${parts.year}` : null;
+}
+
+/**
+ * `{deadline_day_text}` — "25-oktabr Yakshanba". No year: this appears in the
+ * weekly list, where the 7-day window makes the year unambiguous.
+ */
+export function formatDayWithWeekdayUz(day: string | null | undefined): string | null {
+  const parts = partsOf(day);
+  if (!parts) return null;
+  const weekday = WEEKDAYS_UZ[weekdayOfDay(day as string)];
+  return weekday ? `${parts.day}-${parts.month} ${weekday}` : null;
+}
+
+/** 0 = Monday … 6 = Sunday, computed in UTC on a YYYY-MM-DD plan day. */
+function weekdayOfDay(day: string): number {
+  const d = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  return (d.getUTCDay() + 6) % 7;
 }
 
 /** Human countdown that never overstates the time left. */
@@ -57,6 +95,33 @@ export function escOrNull(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const v = String(value).trim();
   return v ? esc(v) : null;
+}
+
+/**
+ * `{bullets:field}` — one `➡️` line per array item, HTML-escaped. Empty parts
+ * are dropped; an empty list yields `null`, so the caller removes the heading
+ * and its blank line together with the field.
+ */
+export function bullets(items: readonly string[] | null | undefined): string | null {
+  const clean = (items ?? []).map((item) => String(item).trim()).filter(Boolean);
+  if (!clean.length) return null;
+  return clean.map((item) => `➡️ ${esc(item)}`).join("\n");
+}
+
+/** `#tag` list, de-duplicated, lower-case, at most `max` entries. */
+export function hashtags(tags: readonly (string | null | undefined)[], max = 5): string[] {
+  const out: string[] = [];
+  for (const raw of tags) {
+    const tag = String(raw ?? "")
+      .trim()
+      .replace(/^#+/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "");
+    if (!tag || out.includes(tag)) continue;
+    out.push(tag);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 /** Join non-empty lines with single newlines — the template blank-line rule. */

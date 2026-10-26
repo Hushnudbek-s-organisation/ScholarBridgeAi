@@ -10,6 +10,8 @@ import { localDay } from "@/lib/telegram/reminders";
 import { CHANNEL_TZ, isFullyFunded, publishable } from "./model";
 import { buildDailyPlan, planDedupeKey, type PlanHistoryRow, type PlanKind, type PlanStory, type PlannedItem } from "./plan";
 import { topicKeys, type Candidate } from "./select";
+import { loadChannelSettings } from "./repo";
+import type { ChannelSettings } from "./settings";
 import { buildFacts } from "./templates/facts";
 import type { PollType } from "./templates/polls.uz";
 import type { Kind } from "./templates/templates.uz";
@@ -157,9 +159,11 @@ export interface PlanRunResult {
  */
 export async function runDailyPlan(
   now: Date,
-  opts: { siteUrl: string; discussionEnabled?: boolean; planDate?: string }
+  opts: { siteUrl: string; discussionEnabled?: boolean; planDate?: string; settings?: ChannelSettings }
 ): Promise<PlanRunResult> {
   const planDate = opts.planDate ?? planDateFor(now);
+  // Settings are read now, not cached: an admin change applies to the next run.
+  const settings = opts.settings ?? (await loadChannelSettings());
   const loaded = await loadPlanInput(planDate, now, opts.siteUrl);
   const items = buildDailyPlan({
     planDate,
@@ -168,7 +172,7 @@ export async function runDailyPlan(
     prefs: loaded.prefs,
     stories: loaded.stories,
     discussionEnabled: opts.discussionEnabled ?? false,
-    weekly: { newThisWeek: loaded.newThisWeek, published: loaded.publishedThisWeek },
+    settings,
   });
 
   let inserted = 0;
@@ -189,6 +193,7 @@ export async function runDailyPlan(
         dedupeKey: planDedupeKey(item, planDate, item.slot),
         status: "planned",
         reason: item.reason,
+        lane: item.lane,
       })
       .onConflictDoNothing({ target: channelPlan.dedupeKey })
       .returning({ id: channelPlan.id });

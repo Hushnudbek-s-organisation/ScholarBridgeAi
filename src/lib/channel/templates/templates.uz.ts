@@ -13,38 +13,19 @@
  * Proofread list: docs/CHANNEL.md.
  */
 import { esc, formatDateUz, daysLeftUz } from "./format";
+import type { Kind, PostChrome, Rendered } from "./chrome";
+import { ctaLine, footerLine } from "./chrome";
 import type { Facts } from "./facts";
 import { TIP_BANK, type TipEntry } from "./tips.uz";
 import { CHECKLIST_BANK, type ChecklistEntry } from "./checklist.uz";
 import { QA_BANK, type QaEntry } from "./qa.uz";
 
-export type Kind =
-  | "scholarship_single"
-  | "fully_funded"
-  | "urgency"
-  | "deadline_digest"
-  | "country_spotlight"
-  | "tip"
-  | "checklist"
-  | "weekly_summary"
-  | "qa"
-  | "story";
-
-export const KINDS: readonly Kind[] = [
-  "scholarship_single",
-  "fully_funded",
-  "urgency",
-  "deadline_digest",
-  "country_spotlight",
-  "tip",
-  "checklist",
-  "weekly_summary",
-  "qa",
-  "story",
-] as const;
+export type { Kind, Rendered } from "./chrome";
+export { KINDS } from "./chrome";
 
 /** Variant counts (the test asserts every one of them renders). */
 export const TEMPLATE_VARIANTS: Record<Kind, number> = {
+  scholarship_rich: 3,
   scholarship_single: 3,
   fully_funded: 3,
   urgency: 4,
@@ -52,22 +33,45 @@ export const TEMPLATE_VARIANTS: Record<Kind, number> = {
   country_spotlight: 3,
   tip: TIP_BANK.length,
   checklist: CHECKLIST_BANK.length,
-  weekly_summary: 3,
+  weekly_deadlines: 3,
   qa: QA_BANK.length,
   story: 2,
 };
-
-export interface Rendered {
-  /** Stable id stored in `channel_plan.template_key` / `channel_posts`. */
-  key: string;
-  html: string;
-}
 
 export interface RenderOptions {
   /** Site origin; "" disables every link line instead of printing a dead one. */
   siteUrl: string;
   /** Set only when CHANNEL_DISCUSSION_ENABLED — no comment CTA otherwise. */
   discussionUrl?: string | null;
+  /** Tracked `/go/<code>` link; falls back to the plain scholarship page. */
+  shortLink?: { url: string; visible: string } | null;
+  /** Resolved footer links (admin settings). */
+  footer?: { label: string; url: string }[];
+  /** Headline/CTA style. */
+  variant?: number;
+}
+
+/** The chrome a compact template needs, derived from RenderOptions. */
+function chromeOf(options?: RenderOptions): PostChrome | null {
+  if (!options) return null;
+  return {
+    siteUrl: options.siteUrl,
+    shortLink: options.shortLink ?? null,
+    hashtags: [],
+    footer: options.footer ?? [],
+    variant: options.variant ?? 0,
+  };
+}
+
+/** CTA: the tracked link when we have one, otherwise the plain detail link. */
+function ctaBlock(f: Facts, chrome: PostChrome | null, label = "Batafsil ma'lumot"): string | null {
+  if (chrome?.shortLink) return ctaLine(chrome);
+  return siteLink(f, label);
+}
+
+/** Footer line for compact posts (omitted when nothing is configured). */
+function footerBlock(chrome: PostChrome | null): string | null {
+  return footerLine(chrome?.footer);
 }
 
 const pick = <T,>(arr: readonly T[], v: number): T => arr[((v % arr.length) + arr.length) % arr.length];
@@ -182,16 +186,17 @@ function siteButtonLine(opts: RenderOptions, path: string, label: string): strin
 // Scholarship posts
 // ---------------------------------------------------------------------------
 
-export function renderScholarshipSingle(f: Facts, variant = 0): Rendered | null {
+export function renderScholarshipSingle(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
   const v = ((variant % 3) + 3) % 3;
-  const link = siteLink(f, "Batafsil ma'lumot");
+  const link = ctaBlock(f, chrome);
   if (v === 0) {
     return {
       key: "single_v1",
       html: block(
         row(`🎓 <b>${clipHtml(f.title, 120)}</b>`, `🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null),
         row(fundingLine(f), deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(audienceLine(f), link, providerLink(f))
+        row(audienceLine(f), link, providerLink(f)),
+        footerBlock(chrome)
       ),
     };
   }
@@ -204,7 +209,8 @@ export function renderScholarshipSingle(f: Facts, variant = 0): Rendered | null 
         row(fundingLine(f), deadlineLine(f)),
         row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
         "ℹ️ Ariza yuborishdan oldin talablarni rasmiy sahifada tekshiring.",
-        row(link, providerLink(f))
+        row(link, providerLink(f)),
+        footerBlock(chrome)
       ),
     };
   }
@@ -221,15 +227,16 @@ export function renderScholarshipSingle(f: Facts, variant = 0): Rendered | null 
     html: block(
       `📌 <b>${clipHtml(f.title, 120)}</b>`,
       bullets,
-      row(eligibilityLine(f), link, providerLink(f))
+      row(eligibilityLine(f), link, providerLink(f)),
+      footerBlock(chrome)
     ),
   };
 }
 
-export function renderFullyFunded(f: Facts, variant = 0): Rendered | null {
+export function renderFullyFunded(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
   if (!f.fullyFunded) return null;
   const v = ((variant % 3) + 3) % 3;
-  const link = siteLink(f, "Batafsil ma'lumot");
+  const link = ctaBlock(f, chrome);
   if (v === 0) {
     return {
       key: "ff_v1",
@@ -238,7 +245,8 @@ export function renderFullyFunded(f: Facts, variant = 0): Rendered | null {
         `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
         row(deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
         row(audienceLine(f), link, providerLink(f)),
-        "Shartlar va qamrovni rasmiy e'londa tasdiqlang."
+        "Shartlar va qamrovni rasmiy e'londa tasdiqlang.",
+        footerBlock(chrome)
       ),
     };
   }
@@ -255,7 +263,8 @@ export function renderFullyFunded(f: Facts, variant = 0): Rendered | null {
         ),
         "Bu e'londa moliyalashtirish to'liq deb ko'rsatilgan — kontrakt to'liq qoplanadi.",
         row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        row(link, providerLink(f))
+        row(link, providerLink(f)),
+        footerBlock(chrome)
       ),
     };
   }
@@ -271,7 +280,8 @@ export function renderFullyFunded(f: Facts, variant = 0): Rendered | null {
         requirementsPlain(f) ? `• Talab: ${requirementsPlain(f)}` : null
       ),
       row(eligibilityLine(f), link, providerLink(f)),
-      "To'liq moliyalashtirish qamrovi har bir dasturda farq qiladi — rasmiy e'lonni o'qing."
+      "To'liq moliyalashtirish qamrovi har bir dasturda farq qiladi — rasmiy e'lonni o'qing.",
+      footerBlock(chrome)
     ),
   };
 }
@@ -280,14 +290,14 @@ export function renderFullyFunded(f: Facts, variant = 0): Rendered | null {
  * Urgency post. Never produced for estimated/evergreen deadlines, and the
  * word "shoshiling" appears only when a day or less is actually left.
  */
-export function renderUrgency(f: Facts, rung: number, variant = 0): Rendered | null {
+export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostChrome | null = null): Rendered | null {
   const d = f.deadline;
   if (d.quality !== "exact" || d.daysLeft === null || d.daysLeft < 0 || d.daysLeft > rung) return null;
   const left = daysLeftUz(d.daysLeft);
   if (!left) return null;
   const lastDay = d.daysLeft <= 1;
   const v = ((variant % 4) + 4) % 4;
-  const link = siteLink(f, "Batafsil ma'lumot");
+  const link = ctaBlock(f, chrome);
   const headline = lastDay ? `⏰ <b>${clipHtml(f.title, 110)}</b>` : `⏳ <b>${clipHtml(f.title, 110)}</b>`;
 
   if (v === 0) {
@@ -298,7 +308,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0): Rendered | n
         `${lastDay ? "Shoshiling: " : ""}${cap(left)}.`,
         row(`🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null, deadlineDateLine(f)),
         row(fundingLine(f), requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        row(link, providerLink(f))
+        row(link, providerLink(f)),
+        footerBlock(chrome)
       ),
     };
   }
@@ -314,7 +325,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0): Rendered | n
           `⏳ ${cap(left)}`
         ),
         row(fundingLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(link, providerLink(f))
+        row(link, providerLink(f)),
+        footerBlock(chrome)
       ),
     };
   }
@@ -330,7 +342,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0): Rendered | n
           fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null
         ),
         `📌 ${cap(left)}.${lastDay ? " Shoshiling — ariza qabuli bugun yopiladi." : " Hujjatlarni oldindan tayyorlab qo'ying."}`,
-        row(eligibilityLine(f), link)
+        row(eligibilityLine(f), link),
+        footerBlock(chrome)
       ),
     };
   }
@@ -341,7 +354,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0): Rendered | n
       `🎓 <b>${clipHtml(f.title, 110)}</b>`,
       `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
       row(fundingLine(f), requirementsLine(f)),
-      row(link, providerLink(f))
+      row(link, providerLink(f)),
+      footerBlock(chrome)
     ),
   };
 }
@@ -377,7 +391,7 @@ export function renderDeadlineDigest(items: Facts[], variant: number, opts: Rend
     .join("\n");
   return {
     key: `digest_v${(variant % 3) + 1}`,
-    html: block(header, body, siteButtonLine(opts, "/scholarships", "Barcha imkoniyatlar")),
+    html: block(header, body, siteButtonLine(opts, "/scholarships", "Barcha imkoniyatlar"), footerBlock(chromeOf(opts))),
   };
 }
 
@@ -408,35 +422,7 @@ export function renderCountrySpotlight(
     .join("\n");
   return {
     key: `spotlight_v${(variant % 3) + 1}`,
-    html: block(header, body, siteButtonLine(opts, "/scholarships", "Barchasini ko'rish")),
-  };
-}
-
-export interface WeeklyStats {
-  published: number | null;
-  closingSoon: number | null;
-  newThisWeek: number | null;
-  top: { title: string; daysLeft: number } | null;
-}
-
-/** Weekly recap — every number comes from our own tables, or is omitted. */
-export function renderWeeklySummary(stats: WeeklyStats, variant: number, opts: RenderOptions): Rendered | null {
-  const facts: string[] = [];
-  if (stats.published !== null) facts.push(`• E'lon qilingan postlar: ${stats.published}`);
-  if (stats.newThisWeek !== null) facts.push(`• Shu hafta tekshirilgan yangi e'lonlar: ${stats.newThisWeek}`);
-  if (stats.closingSoon !== null) facts.push(`• Shu hafta yopiladigan arizalar: ${stats.closingSoon}`);
-  if (stats.top && stats.top.daysLeft >= 0) {
-    const left = daysLeftUz(stats.top.daysLeft);
-    if (left) facts.push(`• Eng yaqin muddat: ${esc(stats.top.title)} — ${left}`);
-  }
-  if (facts.length === 0) return null;
-  const header = pick(
-    ["📊 <b>Hafta yakuni</b>", "🗂 <b>Shu hafta nima bo'ldi</b>", "📈 <b>Haftalik jamlanma</b>"],
-    variant
-  );
-  return {
-    key: `weekly_v${(variant % 3) + 1}`,
-    html: block(header, facts.join("\n"), siteButtonLine(opts, "/scholarships", "Barcha imkoniyatlar")),
+    html: block(header, body, siteButtonLine(opts, "/scholarships", "Barchasini ko'rish"), footerBlock(chromeOf(opts))),
   };
 }
 

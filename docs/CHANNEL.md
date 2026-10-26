@@ -5,11 +5,12 @@ Telegram channel, rotating post kinds and polls and learning from poll answers
 and clicks. Channel text is Uzbek (Latin); code, comments and documentation are
 English. No paid AI: everything is rule- and template-based.
 
-> **Status.** Phase 1 is in place: schema, template engine, banks, lint, and the
-> deterministic daily planner (planning only — nothing is sent). Sending,
-> the cron route, poll results, `/r/<code>` and the admin view follow in
-> phases 2–4. `CHANNEL_AUTOPOST` defaults to `off`, so the feature cannot post
-> anything yet by accident.
+> **Status (Patch 3, Phase 1 done).** Tables (14), the country/content tables,
+> the rich and weekly renderers, the sanitizer, short-link helpers, the
+> settings reader and the lane-based planner are in place. Nothing is sent:
+> there is no sender and no cron route yet, and `CHANNEL_AUTOPOST` defaults to
+> `off`. Short links (`/go/<code>`), the admin panel and the sender follow in
+> phases 2–4.
 
 ---
 
@@ -20,7 +21,7 @@ English. No paid AI: everything is rule- and template-based.
 | `CHANNEL_AUTOPOST` | `off` | `off` → nothing leaves the app; `dryrun` → posts go **only** to `TELEGRAM_ADMIN_CHAT_ID`; `on` → posts go to the channel |
 | `TELEGRAM_CHANNEL_ID` | — | `-100…` id or `@username`; the bot must be a channel admin |
 | `TELEGRAM_ADMIN_CHAT_ID` | — | private chat for dryrun output and failure alerts |
-| `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/scholarships/<id>`) |
+| `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/go/<code>`) |
 | `CHANNEL_DISCUSSION_ENABLED` | off | enables the `qa` kind and the "ask in the comments" line |
 | `TELEGRAM_BOT_TOKEN` | — | already used by the bot (env or Admin → Telegram bot) |
 | `CRON_SECRET` | — | Bearer secret for `/api/cron/*` (Phase 2) |
@@ -62,11 +63,73 @@ never printed inside an Uzbek post.
 
 ## 4. Post kinds
 
-`scholarship_single`, `fully_funded`, `urgency` (rungs 30/14/7/3 plus a
-last-day variant), `deadline_digest`, `country_spotlight`, `tip`, `checklist`,
-`weekly_summary`, `qa` (only with `CHANNEL_DISCUSSION_ENABLED`), `story` (only
-from `channel_stories` rows with `approved = true`). Polls are their own
-message (`channel_plan.kind = "poll"`).
+`scholarship_rich` (authored Uzbek copy — see §4b), `scholarship_single`,
+`fully_funded`, `urgency` (rungs 30/14/7/3 plus a last-day variant),
+`deadline_digest` (Thursday, optional), `country_spotlight`, `tip`, `checklist`,
+`weekly_deadlines` (Sunday — see §4c), `qa` (only with
+`CHANNEL_DISCUSSION_ENABLED`), `story` (only from `channel_stories` rows with
+`approved = true`). Polls are their own message (`channel_plan.kind = "poll"`)
+and default to a 14-day cadence.
+
+### 4b. Rich post
+
+Used when `scholarship_channel_content` holds a tagline, a funding label and at
+least one body section (`isRichContent`). The section order is fixed:
+
+```
+{flag} <b>{title}</b> — {tagline}
+Moliyalashtirish: {funding_type_uz}
+Til talabi: {language_req_uz}
+
+<b>Kimlar uchun</b>
+➡️ {eligibility_uz…}
+
+<b>Foydali tomonlari</b>
+➡️ {benefits_uz…}
+
+<b>Dastur haqida</b>
+{about_uz}
+
+🕓Oxirgi muddat: 15-dekabr, 2026      (exact)
+🕓Taxminiy muddat: …                  (estimated — never called a deadline)
+🕓Muddat: rasmiy sahifada ko'rsatilgan (rolling)
+➡️Batafsil: <a href="SITE/go/CODE">SITE/go/CODE</a>
+
+{hashtags — kind + country + level + editor extras, deduped, max 5}
+💼 {Kanal} | {Bot}
+```
+
+An empty section disappears **with its heading and its blank line**. Length
+policy: at 1800 visible characters the `about` block is trimmed at a word
+boundary (`…`); at 4096 it is dropped; then each bullet list is cut to four; if
+it still does not fit the post is skipped rather than truncated. Eligibility,
+benefits and about are **never** generated or translated by anything: they come
+from the admin form or not at all.
+
+### 4c. Weekly deadlines post
+
+`weekly_deadlines` is Sunday-only. Scope comes from the planner: open, verified
+and **exact** deadline from today through today+7 Tashkent days; previously
+announced programmes stay in, because this post is a reminder list. Sorted by
+deadline, then by country. Fewer than `plan.weeklyMinItems` items (default 2)
+means no post at all.
+
+```
+⏳ Kelayotgan hafta muddati tugaydigan dasturlar
+
+🇩🇪 {title} — {tagline} [25-oktabr Yakshanba]
+👉 <a href="SITE/go/CODE">SITE/go/CODE</a>
+
+…
+
+🤖 Barcha imkoniyatlar: @bot
+#haftalik_eslatmalar #reminders
+💼 {configured social links}
+```
+
+A long list is split at block boundaries into `1/2`, `2/2`; every part after the
+first opens with `⏳ Davomi (2/2)`, and only the last part carries the closing
+lines. Pinning is `plan.weeklyPin` (default off).
 
 **Fully funded** is derived only from an explicit provider statement we store:
 `award_basis = full_tuition`, or a coverage label of `Full Funding` /
@@ -87,11 +150,16 @@ preferences, and returns the day's messages. Same inputs → same plan.
   evergreen tip/checklist.
 - **Send windows** (Asia/Tashkent): one message 09:00–11:00; the rest share
   18:30–21:00 in equal, disjoint slices. Jitter is seeded by the plan date.
+- **Lanes**: `urgent` (rung ≤ 3), `weekly` (Sunday), `editorial`
+  (single/rich/fully funded/digest/spotlight/story), `evergreen`
+  (tip/checklist/QA) and `engagement` (polls). Each day's messages are drawn
+  from lanes in that order, and a rich post wins ties **inside its own lane
+  only** (×1.08).
 - **Cooldowns**: same scholarship 30 days (45 for fully-funded, 7 for digest
   membership, 14 for a spotlight on the same country), tips 21, checklists 30,
-  Q&A 14, stories 90, weekly recap 6.
-- **Polls**: at most one a day, at least two days apart, 28-day cooldown per
-  poll, preferring the poll type that has gone longest without an outing.
+  Q&A 14, stories 90, poll cadence `max(2, settings.pollCadenceDays)` (14).
+- **Windows from settings**: first item morning, the rest across the evening
+  window; `sendAt` never decreases and is rounded to five minutes.
 - Every item carries `dedupe_key = kind|scholarship|rung|date|slot`; the column
   is `NOT NULL UNIQUE`, so a second (or concurrent) planning run inserts nothing.
 
@@ -130,7 +198,9 @@ touching code:
 
 | File | Contains |
 | --- | --- |
-| `src/lib/channel/templates/templates.uz.ts` | every post kind's frames, deadline labels, "taxminan …" wording, disclaimers |
+| `src/lib/channel/templates/templates.uz.ts` | compact kind frames, deadline labels, "taxminan …" wording, disclaimers |
+| `src/lib/channel/templates/rich.uz.ts` | rich post: headlines, section headings, length-policy wording |
+| `src/lib/channel/templates/weekly.uz.ts` | Sunday list: headers, block layout, "Davomi (n/m)", closing lines |
 | `src/lib/channel/templates/format.ts` | month names, countdown phrases, coverage/degree/country label tables |
 | `src/lib/channel/templates/tips.uz.ts` | tip bank (7 entries) |
 | `src/lib/channel/templates/checklist.uz.ts` | checklist bank (6 entries) |

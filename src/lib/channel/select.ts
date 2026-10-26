@@ -147,6 +147,8 @@ export function topicKeys(source: TopicSource): string[] {
 export interface Candidate {
   facts: Facts;
   topics: string[];
+  /** True when authored Uzbek copy exists (rich template available). */
+  rich?: boolean;
 }
 
 /**
@@ -160,7 +162,10 @@ export function scoreCandidate(candidate: Candidate, prefs: Record<string, numbe
   const daysLeft = candidate.facts.deadline.daysLeft;
   const exact = candidate.facts.deadline.quality === "exact";
   const urgency = exact && daysLeft !== null ? (daysLeft <= 7 ? 1.3 : daysLeft <= 21 ? 1.1 : 1) : 1;
-  return weight * jitter * urgency;
+  // Rich copy is a tie-break inside a lane, never a reason to outrank another
+  // lane: 8% is small enough that a preferred topic still wins.
+  const rich = candidate.rich ? 1.08 : 1;
+  return weight * jitter * urgency * rich;
 }
 
 /** Sort by score desc, then id asc — a total order, so planning is stable. */

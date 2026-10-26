@@ -11,6 +11,8 @@ export interface Facts {
   title: string; // escaped
   provider: string; // escaped
   country: string | null; // escaped Uzbek label
+  /** The stored country string, for flags/locative forms via channel_countries. */
+  countryRaw: string | null;
   degrees: string | null;
   majors: string | null;
   minGpa: number | null;
@@ -47,6 +49,7 @@ export function buildFacts(row: FactsRow, opts: FactsOptions): Facts {
     title: esc(row.title),
     provider: esc(row.provider),
     country: countryUz(row.country),
+    countryRaw: row.country ?? null,
     degrees: degreesUz(row.degreeLevels),
     majors: majorsUz(row.eligibleMajors),
     minGpa: typeof row.minGpa === "number" && Number.isFinite(row.minGpa) ? row.minGpa : null,

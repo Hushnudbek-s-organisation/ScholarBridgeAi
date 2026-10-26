@@ -1469,6 +1469,13 @@ export const channelPlan = pgTable(
     dedupeKey: text("dedupe_key").notNull().unique(),
     status: text("status").notNull().default("planned"), // planned | rendered | sent | skipped | failed
     reason: text("reason"),
+    // Phase 3 queue: lane, origin, per-post text override and operator actions.
+    lane: text("lane").notNull().default("editorial"), // urgent | weekly | editorial | evergreen | engagement
+    origin: text("origin").notNull().default("rotation"), // rotation | urgency | weekly | manual
+    textOverride: text("text_override"),
+    pinned: boolean("pinned").notNull().default(false),
+    skipReason: text("skip_reason"),
+    postponedTo: date("postponed_to"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -1494,6 +1501,9 @@ export const channelPosts = pgTable(
     html: text("html"),
     messageId: bigint("message_id", { mode: "number" }),
     pollId: text("poll_id"),
+    part: integer("part").notNull().default(1),
+    textOverride: text("text_override"),
+    lane: text("lane"),
     status: text("status").notNull().default("pending"), // pending | sent | failed | skipped
     attempts: integer("attempts").notNull().default(0),
     error: text("error"),
@@ -1571,6 +1581,121 @@ export const channelStories = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("idx_channel_stories_approved").on(table.approved)]
+);
+
+/** Authored Uzbek copy for one scholarship (rich post sections). */
+export const scholarshipChannelContent = pgTable("scholarship_channel_content", {
+  scholarshipId: integer("scholarship_id")
+    .primaryKey()
+    .references(() => scholarships.id, { onDelete: "cascade" }),
+  taglineUz: text("tagline_uz"),
+  fundingTypeUz: text("funding_type_uz"),
+  languageReqUz: text("language_req_uz"),
+  eligibilityUz: text("eligibility_uz").notNull().default("[]"), // JSON array of bullet strings
+  benefitsUz: text("benefits_uz").notNull().default("[]"), // JSON array of bullet strings
+  aboutUz: text("about_uz"),
+  extraHashtags: text("extra_hashtags").notNull().default("[]"), // JSON array, without "#"
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/** Uzbek name, locative form, flag and hashtag per country. */
+export const channelCountries = pgTable("channel_countries", {
+  key: text("key").primaryKey(),
+  iso2: text("iso2"),
+  flag: text("flag").notNull().default(""),
+  nameUz: text("name_uz").notNull(),
+  nameUzLoc: text("name_uz_loc"),
+  hashtag: text("hashtag"),
+  aliases: text("aliases").notNull().default("[]"), // JSON array of stored spellings
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/** Runtime settings (JSON per key), re-read by every cron run. */
+export const channelSettings = pgTable("channel_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default("{}"),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/** Admin overrides for template bodies; defaults live in code. */
+export const channelTemplates = pgTable(
+  "channel_templates",
+  {
+    id: serial("id").primaryKey(),
+    kind: text("kind").notNull(),
+    key: text("key").notNull(),
+    body: text("body").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    updatedBy: integer("updated_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_channel_templates_kind_key").on(table.kind, table.key)]
+);
+
+/** Append-only history of template edits ("reset to default" is a new version). */
+export const channelTemplateVersions = pgTable(
+  "channel_template_versions",
+  {
+    id: serial("id").primaryKey(),
+    templateId: integer("template_id")
+      .notNull()
+      .references(() => channelTemplates.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_channel_template_versions").on(table.templateId)]
+);
+
+/** Short tracked link: the only source of a `/go/<code>` destination. */
+export const channelLinks = pgTable(
+  "channel_links",
+  {
+    code: text("code").primaryKey(),
+    kind: text("kind").notNull().default("custom"), // site | official | custom
+    scholarshipId: integer("scholarship_id").references(() => scholarships.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_channel_links_scholarship_kind").on(table.scholarshipId, table.kind)]
+);
+
+/** Aggregated daily clicks — deliberately no IP, no user agent, no visitor row. */
+export const channelLinkClicks = pgTable(
+  "channel_link_clicks",
+  {
+    code: text("code")
+      .notNull()
+      .references(() => channelLinks.code, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("uq_channel_link_clicks_code_day").on(table.code, table.day),
+    index("idx_channel_link_clicks_day").on(table.day),
+  ]
+);
+
+/** Append-only audit trail for the channel publisher. */
+export const channelAudit = pgTable(
+  "channel_audit",
+  {
+    id: serial("id").primaryKey(),
+    actorProfileId: integer("actor_profile_id"),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    entityId: text("entity_id"),
+    before: text("before"),
+    after: text("after"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_channel_audit_created").on(table.createdAt)]
 );
 
 /**

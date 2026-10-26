@@ -17,7 +17,22 @@
 export const MAX_MESSAGE_CHARS = 4000;
 export const TELEGRAM_MAX_CHARS = 4096;
 
-export const ALLOWED_TAGS = ["b", "strong", "i", "em", "u", "s", "a", "code", "pre"] as const;
+export const ALLOWED_TAGS = [
+  "b",
+  "strong",
+  "i",
+  "em",
+  "u",
+  "ins",
+  "s",
+  "strike",
+  "del",
+  "a",
+  "code",
+  "pre",
+  "blockquote",
+  "tg-spoiler",
+] as const;
 
 export interface LintIssue {
   code: string;
