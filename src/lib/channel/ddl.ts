@@ -219,8 +219,24 @@ CREATE INDEX IF NOT EXISTS idx_channel_audit_created ON channel_audit(created_at
 `;
 
 /** Individual statements (the pg driver runs one statement per query). */
+/** The DDL with full-line `--` comments removed (they may contain `;`). */
+export function channelDdlCode(): string {
+  return CHANNEL_DDL.split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+}
+
+/**
+ * Statements to execute one by one.
+ *
+ * Comments are stripped before splitting: a `;` inside a comment would
+ * otherwise cut a statement in half and leave a fragment that starts mid-
+ * sentence — which is exactly the kind of failure that only shows up at
+ * runtime, on the first request, in production.
+ */
 export function channelStatements(): string[] {
-  return CHANNEL_DDL.split(";")
+  return channelDdlCode()
+    .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
 }

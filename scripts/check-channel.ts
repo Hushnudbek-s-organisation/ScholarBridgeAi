@@ -29,8 +29,29 @@ import { join } from "node:path";
 
 import { CHANNEL_DDL, channelStatements } from "../src/lib/channel/ddl";
 import {
+  POLL_EXPLANATION_MAX,
+  POLL_OPEN_PERIOD_SEC,
+  POLL_OPTIONS_MAX,
+  POLL_OPTIONS_MIN,
+  POLL_OPTION_MAX,
+  POLL_QUESTION_MAX,
+  optionSummary,
+  parsePollResult,
+  parseStoredResults,
+  pollHasSignal,
+  pollPreviewText,
+  pollSendParams,
+  pollSendProblem,
+  pollSpecByKey,
+  pollTeachesPrefs,
+  prefTopicFor,
+  prefUpdatesFromPoll,
+} from "../src/lib/channel/polls";
+import {
   channelBlockReason,
   channelConfig,
+  resolveChannelRuntime,
+  tashkentDay,
   normalizeSiteUrl,
   parseAutopost,
   targetChatId,
@@ -103,6 +124,7 @@ import {
   majorsUz,
 } from "../src/lib/channel/templates/format";
 import { lintText, plainText, visibleLength } from "../src/lib/channel/lint";
+import { mergeChannelSettings, settingsFromRows, settingsRows } from "../src/lib/channel/settings";
 import {
   MAX_POSTS_PER_DAY,
   buildDailyPlan,
@@ -236,11 +258,24 @@ function assertClean(html: string, label: string, opts: { allowUrgency?: boolean
 
 section("Schema");
 
+check("every statement starts with a real SQL keyword", () => {
+  // A `;` inside a comment used to cut a statement in half and leave a fragment
+  // beginning mid-sentence — a failure that only appeared at runtime.
+  const keywords = /^(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|DO|COMMENT)\b/i;
+  for (const statement of channelStatements()) {
+    assert.match(statement, keywords, `not a statement: ${statement.slice(0, 60)}`);
+  }
+});
+
 check("CHANNEL_DDL and supabase/add_channel.sql are identical", () => {
-  const norm = (s: string) => s.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  // Strip comments before splitting, exactly like the runtime does.
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
   const sql = read("supabase/add_channel.sql");
   const want = channelStatements().map(norm).filter(Boolean);
   const have = sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n")
     .split(";")
     .map(norm)
     .filter(Boolean);
@@ -1604,6 +1639,283 @@ check("the preview is deterministic for the same day and differs across days", (
     prefs: {},
   });
   assert.notDeepEqual(build().map((i) => i.sendAt), other.map((i) => i.sendAt));
+});
+
+// ---------------------------------------------------------------------------
+// Connection settings and the runtime guard
+// ---------------------------------------------------------------------------
+
+section("Connection");
+
+check("the connection block is validated, and anything unusable falls back", () => {
+  const good = mergeChannelSettings({
+    connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on", pausedUntil: "2026-11-01" },
+  });
+  assert.equal(good.connection.channelId, "@scholarbridge_uz");
+  assert.equal(good.connection.adminChatId, "123456789");
+  assert.equal(good.connection.mode, "on");
+  assert.equal(good.connection.pausedUntil, "2026-11-01");
+
+  const bad = mergeChannelSettings({
+    connection: { channelId: "not a channel", adminChatId: "abc", mode: "yes please", pausedUntil: "tomorrow" },
+  });
+  assert.equal(bad.connection.channelId, "", "an invalid channel id must not be stored");
+  assert.equal(bad.connection.adminChatId, "", "a non-numeric admin chat must not be stored");
+  assert.equal(bad.connection.mode, "off", "an unknown mode is always off");
+  assert.equal(bad.connection.pausedUntil, null);
+
+  assert.equal(mergeChannelSettings({}).connection.mode, "off", "the default is off");
+});
+
+check("settings rows round-trip through the database shape", () => {
+  const settings = mergeChannelSettings({
+    connection: { channelId: "-1001234567890", adminChatId: "987654321", mode: "dryrun", pausedUntil: null },
+    siteUrl: "https://scholarbridge.uz",
+    footerSocial: [{ label: "Instagram", url: "https://instagram.com/scholarbridge" }],
+  });
+  const rows = settingsRows(settings);
+  assert.ok(rows.connection, "connection must be persisted");
+  const restored = settingsFromRows(
+    Object.entries(rows).map(([key, value]) => ({ key, value: JSON.stringify(value) }))
+  );
+  assert.deepEqual(restored.connection, settings.connection);
+  assert.deepEqual(restored.footerSocial, settings.footerSocial);
+  assert.equal(restored.siteUrl, "https://scholarbridge.uz");
+});
+
+check("the environment kill switch always wins over the admin switch", () => {
+  const settings = mergeChannelSettings({
+    connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on" },
+    siteUrl: "https://scholarbridge.uz",
+  });
+  const off = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "off" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(off.mode, "off");
+  assert.equal(off.envKillSwitch, true);
+  assert.ok(off.blockedReason);
+
+  const live = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "on" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(live.mode, "on");
+  assert.equal(live.envKillSwitch, false);
+  assert.equal(live.blockedReason, null);
+  assert.equal(live.channelId, "@scholarbridge_uz");
+});
+
+check("a missing piece blocks the publisher with a readable reason", () => {
+  const base = { connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on" as const }, siteUrl: "https://scholarbridge.uz" };
+  const noChannel = resolveChannelRuntime(mergeChannelSettings({ ...base, connection: { ...base.connection, channelId: "" } }), { CHANNEL_AUTOPOST: "on" });
+  assert.match(noChannel.blockedReason ?? "", /not connected/i);
+
+  const noSite = resolveChannelRuntime(mergeChannelSettings({ ...base, siteUrl: "" }), { CHANNEL_AUTOPOST: "on" });
+  assert.match(noSite.blockedReason ?? "", /site URL/i);
+
+  const envFallback = resolveChannelRuntime(mergeChannelSettings({ connection: { mode: "dryrun" } }), {
+    CHANNEL_AUTOPOST: "dryrun",
+    TELEGRAM_CHANNEL_ID: "@env_channel",
+    TELEGRAM_ADMIN_CHAT_ID: "123456789",
+    APP_URL: "https://scholarbridge.uz",
+  });
+  assert.equal(envFallback.channelId, "@env_channel", "an existing env-only deployment keeps working");
+  assert.equal(envFallback.blockedReason, null);
+});
+
+check("a pause lasts through the end of its day in Tashkent", () => {
+  const settings = mergeChannelSettings({
+    connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on", pausedUntil: "2026-10-26" },
+    siteUrl: "https://scholarbridge.uz",
+  });
+  const during = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "on" }, new Date("2026-10-26T18:00:00Z"));
+  assert.equal(during.paused, true);
+  assert.match(during.blockedReason ?? "", /Paused/);
+
+  const after = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "on" }, new Date("2026-10-27T02:00:00Z"));
+  assert.equal(after.paused, false, "the pause ends after its last day");
+  assert.equal(after.blockedReason, null);
+});
+
+check("the Tashkent day rolls over at 19:00 UTC", () => {
+  assert.equal(tashkentDay(new Date("2026-10-26T18:59:00Z")), "2026-10-26");
+  assert.equal(tashkentDay(new Date("2026-10-26T19:00:00Z")), "2026-10-27");
+});
+
+check("footer links accept our own origin, never an external http link", () => {
+  const withSite = mergeChannelSettings({
+    siteUrl: "http://127.0.0.1:3000",
+    footerMain: [
+      { label: "Sayt", url: "http://127.0.0.1:3000" },
+      { label: "Kanal", url: "https://t.me/scholarbridge_uz" },
+      { label: "Begona", url: "http://evil.example.com/x" },
+    ],
+  });
+  assert.deepEqual(withSite.footerMain.map((link) => link.label), ["Sayt", "Kanal"]);
+  // Without a configured site there is nothing to be same-origin with.
+  const noSite = mergeChannelSettings({ footerMain: [{ label: "Begona", url: "http://evil.example.com/x" }] });
+  assert.deepEqual(noSite.footerMain, []);
+  // Social links follow the same rule.
+  const social = mergeChannelSettings({
+    siteUrl: "http://127.0.0.1:3000",
+    footerSocial: [
+      { label: "Instagram", url: "https://instagram.com/scholarbridge" },
+      { label: "Sayt", url: "http://127.0.0.1:3000/blog" },
+    ],
+  });
+  assert.deepEqual(social.footerSocial.map((link) => link.label), ["Instagram", "Sayt"]);
+});
+
+check("the admin site URL wins over APP_URL", () => {
+  const runtime = resolveChannelRuntime(
+    mergeChannelSettings({ siteUrl: "http://127.0.0.1:3000" }),
+    { CHANNEL_AUTOPOST: "dryrun", APP_URL: "http://localhost:3000" }
+  );
+  assert.equal(runtime.siteUrl, "http://127.0.0.1:3000", "the panel value must not be shadowed by the environment");
+});
+
+// ---------------------------------------------------------------------------
+// Polls: delivery, aggregates and what may be learned from them
+// ---------------------------------------------------------------------------
+
+check("poll sendPoll parameters are anonymous and Telegram-legal", () => {
+  for (const spec of POLL_DECK) {
+    const params = pollSendParams(spec);
+    assert.equal(params.is_anonymous, true, `${spec.key}: channel polls must be anonymous`);
+    assert.ok(params.question.length > 0 && params.question.length <= POLL_QUESTION_MAX);
+    assert.ok(params.options.length >= POLL_OPTIONS_MIN && params.options.length <= POLL_OPTIONS_MAX);
+    for (const option of params.options) assert.ok(option.length <= POLL_OPTION_MAX, `${spec.key}: option too long`);
+    assert.equal(params.open_period, POLL_OPEN_PERIOD_SEC, "a poll must close by itself, so results always arrive");
+    if (spec.type === "quiz_data") {
+      assert.equal(params.type, "quiz");
+      assert.ok(typeof params.correct_option_id === "number");
+      assert.ok((params.explanation ?? "").length <= POLL_EXPLANATION_MAX);
+    } else {
+      assert.equal(params.type, "regular");
+      assert.equal(params.correct_option_id, undefined, "only quizzes carry a correct answer");
+    }
+    assert.equal(pollSendProblem(spec), null, `${spec.key} must be sendable`);
+  }
+});
+
+check("poll preview text has the question and every option", () => {
+  const spec = pollSpecByKey("pref_country_1");
+  assert.ok(spec);
+  const text = pollPreviewText(spec.question, spec.options.map((option) => option.text));
+  assert.ok(text.includes(spec.question));
+  for (const option of spec.options) assert.ok(text.includes(option.text));
+});
+
+check("an unknown or broken deck entry is not sendable", () => {
+  assert.equal(pollSpecByKey("nope"), null);
+  assert.equal(pollSpecByKey(null), null);
+  assert.equal(pollSpecByKey(undefined), null);
+  const broken = { ...POLL_DECK[0], options: [{ key: "only", text: "bitta" }] };
+  assert.match(pollSendProblem(broken) ?? "", /fewer than 2 options/);
+  const longQuestion = { ...POLL_DECK[0], question: "x".repeat(POLL_QUESTION_MAX + 1) };
+  assert.match(pollSendProblem(longQuestion) ?? "", /question too long/);
+});
+
+check("an aggregate is mapped to deck keys by position", () => {
+  const spec = pollSpecByKey("pref_country_1")!;
+  const result = parsePollResult(spec, {
+    id: "p1",
+    options: spec.options.map((option, index) => ({ text: option.text, voter_count: index === 0 ? 6 : 2 })),
+    total_voter_count: 12,
+    is_closed: true,
+  });
+  assert.equal(result.options.length, spec.options.length);
+  assert.deepEqual(
+    result.options.map((option) => option.key),
+    spec.options.map((option) => option.key)
+  );
+  assert.equal(result.totalVoters, 12);
+  assert.equal(result.closed, true);
+  // Options no longer carry a renamed text: the deck key is the stable identity.
+  const renamed = parsePollResult(spec, { options: [{ text: "Boshqa nom", voter_count: 3 }], total_voter_count: 3 });
+  assert.equal(renamed.options[0].key, spec.options[0].key);
+  assert.equal(renamed.options[0].text, "Boshqa nom");
+});
+
+check("a stored aggregate survives garbage", () => {
+  assert.deepEqual(parseStoredResults("[]"), []);
+  assert.deepEqual(parseStoredResults("not json"), []);
+  assert.deepEqual(parseStoredResults(null), []);
+  const parsed = parseStoredResults('[{"key":"a","text":"A","voters":2.7},{"nope":1}]');
+  assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].voters, 2.7);
+  assert.equal(parsed[1].key, "option_1", "a row without a key still gets a stable placeholder");
+});
+
+check("only preference polls teach the planner", () => {
+  const result = {
+    options: [
+      { key: "canada", text: "Kanada", voters: 3 },
+      { key: "germany", text: "Germaniya", voters: 1 },
+    ],
+    totalVoters: 4,
+    closed: true,
+  };
+  const pref = pollSpecByKey("pref_country_1")!;
+  assert.equal(pollTeachesPrefs(pref), true);
+  for (const type of ["multi", "self_assess", "this_or_that", "struggle", "stage", "feedback", "quiz_data"]) {
+    const spec = POLL_DECK.find((entry) => entry.type === type)!;
+    assert.equal(pollTeachesPrefs(spec), false, `${type} must not move a weight`);
+    assert.deepEqual(prefUpdatesFromPoll(spec, result, {}), []);
+  }
+});
+
+check("vote shares become 0.7/0.3-blended weights inside 0.5–2.0", () => {
+  const spec = pollSpecByKey("pref_country_1")!;
+  const result = {
+    options: [
+      { key: "canada", text: "Kanada", voters: 30 },
+      { key: "germany", text: "Germaniya", voters: 10 },
+      { key: "usa", text: "AQSh", voters: 0 },
+      { key: "south_korea", text: "Koreya", voters: 0 },
+    ],
+    totalVoters: 40,
+    closed: true,
+  };
+  const updates = prefUpdatesFromPoll(spec, result, { "country:canada": 1 });
+  const byTopic = Object.fromEntries(updates.map((update) => [update.topic, update.weight]));
+  assert.deepEqual(Object.keys(byTopic).sort(), ["country:canada", "country:germany", "country:south_korea", "country:usa"]);
+  // share 0.75 × 4 options = 3 → 0.7×1 + 0.3×3 = 1.6
+  assert.equal(byTopic["country:canada"], 1.6);
+  // share 0.25 × 4 = 1 → 0.7 + 0.3 = 1.0
+  assert.equal(byTopic["country:germany"], 1);
+  // nobody voted for them: 0.7 × base, floored at 0.5
+  assert.equal(byTopic["country:usa"], 0.7);
+  // the current weight is the base, not always 1
+  const again = prefUpdatesFromPoll(spec, result, { "country:canada": 1.5 });
+  // 0.7 × 1.5 + 0.3 × 3 = 1.95 — the stored weight is the base, not always 1.
+  assert.equal(again.find((update) => update.topic === "country:canada")!.weight, 1.95);
+  for (const update of updates) assert.ok(update.weight >= 0.5 && update.weight <= 2);
+});
+
+check("a poll with no votes never moves a weight", () => {
+  const spec = pollSpecByKey("pref_country_1")!;
+  const empty = { options: spec.options.map((option) => ({ key: option.key, text: option.text, voters: 0 })), totalVoters: 0, closed: true };
+  assert.equal(pollHasSignal(empty), false);
+  assert.deepEqual(prefUpdatesFromPoll(spec, empty, {}), []);
+  // An option key that cannot form a topic key is skipped, not guessed.
+  assert.equal(prefTopicFor("", "canada"), null);
+  assert.equal(prefTopicFor("Country:mixed", "canada"), null, "topic families are lowercase keys");
+  assert.equal(prefTopicFor("country:mixed", "Not A Key"), null);
+  assert.equal(prefTopicFor("country:mixed", "south_korea"), "country:south_korea");
+});
+
+check("poll option shares sum to 1 and clamp at the edges", () => {
+  const spec = pollSpecByKey("pref_country_1")!;
+  const result = {
+    options: spec.options.map((option, index) => ({ key: option.key, text: option.text, voters: index === 0 ? 100 : 0 })),
+    totalVoters: 100,
+    closed: true,
+  };
+  const summary = optionSummary(result);
+  const total = summary.reduce((sum, row) => sum + row.share, 0);
+  assert.equal(Number(total.toFixed(6)), 1);
+  // 100% of a 4-option poll is a strong (but clamped) signal.
+  const updates = prefUpdatesFromPoll(spec, result, {});
+  // 0.7 × 1 + 0.3 × (1.0 × 4 options) = 1.9 — strong, still inside the range.
+  assert.equal(updates.find((update) => update.topic === "country:canada")!.weight, 1.9);
+  const noVoters = optionSummary({ ...result, totalVoters: 0 });
+  assert.equal(noVoters[0].share, 0, "0 voters must not divide by zero");
 });
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,11 @@ jobs:
       - name: Telegram integration tests (embedded Postgres)
         run: bash ci/run-step.sh "Telegram integration tests (embedded Postgres)" npm run test:telegram-integration
 
+      # Offline and deterministic: schema drift, config, publishability, every
+      # template variant, banks, poll deck, preferences and the daily plan.
+      - name: Channel publisher tests (offline)
+        run: bash ci/run-step.sh "Channel publisher tests (offline)" npm run test:channel
+
       - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
         run: bash ci/run-step.sh "API integration tests — ownership, Premium, AI quota (embedded Postgres)" npm run test:integration
 

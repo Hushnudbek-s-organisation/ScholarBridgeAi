@@ -93,3 +93,76 @@ export function channelBlockReason(cfg: ChannelConfig): string | null {
 export function targetChatId(cfg: ChannelConfig): string {
   return cfg.mode === "on" ? cfg.channelId : cfg.adminChatId;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Effective runtime: admin settings first, environment as the safety net.    */
+/* ------------------------------------------------------------------------- */
+
+import type { ChannelSettings } from "./settings";
+
+/** Asia/Tashkent calendar day (the publisher's only timezone). */
+export function tashkentDay(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tashkent",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export interface ChannelRuntime {
+  /** Effective mode: the environment can only make it quieter, never louder. */
+  mode: AutopostMode;
+  channelId: string;
+  adminChatId: string;
+  siteUrl: string;
+  discussionEnabled: boolean;
+  paused: boolean;
+  pausedUntil: string | null;
+  /** True when `CHANNEL_AUTOPOST=off` overrides the admin switch. */
+  envKillSwitch: boolean;
+  /** Why nothing may be sent right now, or null when the publisher may run. */
+  blockedReason: string | null;
+}
+
+/**
+ * `off` in the environment always wins (deploy-level kill switch), so removing
+ * admin access or a compromised account cannot start posting. Otherwise the
+ * admin switch decides, and the ids come from settings with an env fallback so
+ * an existing deployment keeps working with only env configured.
+ */
+export function resolveChannelRuntime(
+  settings: ChannelSettings,
+  env: Env = process.env,
+  now: Date = new Date()
+): ChannelRuntime {
+  const envMode = parseAutopost(env.CHANNEL_AUTOPOST);
+  const envKillSwitch = envMode === "off";
+  const mode: AutopostMode = envKillSwitch ? "off" : settings.connection.mode;
+  const channelId = settings.connection.channelId || (env.TELEGRAM_CHANNEL_ID ?? "").trim();
+  const adminChatId = settings.connection.adminChatId || (env.TELEGRAM_ADMIN_CHAT_ID ?? "").trim();
+  const siteUrl =
+    settings.siteUrl || normalizeSiteUrl(env.CHANNEL_SITE_URL) || normalizeSiteUrl(env.APP_URL);
+  const pausedUntil = settings.connection.pausedUntil;
+  const paused = Boolean(pausedUntil && pausedUntil >= tashkentDay(now));
+
+  let blockedReason: string | null = null;
+  if (envKillSwitch) blockedReason = "CHANNEL_AUTOPOST is off";
+  else if (mode === "off") blockedReason = "The channel publisher is switched off";
+  else if (paused) blockedReason = `Paused until ${pausedUntil}`;
+  else if (!validChannelId(channelId)) blockedReason = "The channel is not connected yet";
+  else if (!validAdminChatId(adminChatId)) blockedReason = "The admin chat is not set";
+  else if (!siteUrl) blockedReason = "The site URL is not set";
+
+  return {
+    mode,
+    channelId,
+    adminChatId,
+    siteUrl,
+    discussionEnabled: truthy(env.CHANNEL_DISCUSSION_ENABLED),
+    paused,
+    pausedUntil: pausedUntil ?? null,
+    envKillSwitch,
+    blockedReason,
+  };
+}

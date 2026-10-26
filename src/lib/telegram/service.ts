@@ -59,6 +59,7 @@ import {
   type RetryPayload,
 } from "./messaging";
 import { ensureTelegramTables } from "./db";
+import { applyPollResult } from "@/lib/channel/engage";
 import { getBotToken, getTelegramSettings } from "./settings";
 import { calendarDaysUntil, reminderTimezone } from "./reminders";
 
@@ -76,6 +77,14 @@ interface TgChat {
 }
 export interface TgUpdate {
   update_id?: number;
+  /** Aggregate poll state (created by us) — never an individual vote. */
+  poll?: {
+    id: string;
+    question?: string;
+    options?: { text?: string; voter_count?: number }[];
+    total_voter_count?: number;
+    is_closed?: boolean;
+  };
   message?: { message_id?: number; chat: TgChat; from?: TgUser; text?: string };
   callback_query?: { id: string; from: TgUser; data?: string; message?: { message_id: number; chat: TgChat } };
   my_chat_member?: { chat: TgChat; from: TgUser; new_chat_member?: { status?: string } };
@@ -105,6 +114,13 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
   const { token } = await getBotToken();
   if (!token) return;
   const settings = await getTelegramSettings();
+
+  // A poll we created changed: store the aggregate and, once it closes, learn
+  // from the vote shares. No voter identity is ever part of this update.
+  if (update.poll?.id) {
+    await applyPollResult({ pollId: update.poll.id, poll: update.poll });
+    return;
+  }
 
   // The user blocked / unblocked the bot.
   if (update.my_chat_member) {

@@ -496,7 +496,10 @@ export function Home({
   const hashSynced = useRef(false);
   useEffect(() => {
     if (view !== "app") return;
-    const want = activePane ? `#${activeTab}/${activePane}` : `#${activeTab}`;
+    // Admin keeps its own deep link (#admin/channel), so a refresh reopens the
+    // section the operator was working in.
+    const adminDeepLink = activeTab === "admin" && window.location.hash.startsWith("#admin/");
+    const want = activePane ? `#${activeTab}/${activePane}` : adminDeepLink ? window.location.hash : `#${activeTab}`;
     if (window.location.hash === want) {
       hashSynced.current = true;
       return;

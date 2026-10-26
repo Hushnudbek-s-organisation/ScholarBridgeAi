@@ -83,6 +83,15 @@ export function isSafeDestination(raw: unknown): boolean {
   return unsafeDestinationReason(raw) === null;
 }
 
+/** Same scheme+host+port? Used for our own "site" links (they never leave the app). */
+export function isSameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
 /** The internal path a "site" link points at. */
 export function siteLinkPath(scholarshipId: number): string {
   return `/scholarships/${scholarshipId}`;
