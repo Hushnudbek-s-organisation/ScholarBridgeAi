@@ -5,8 +5,9 @@
 -- UK tail universities (Lancaster, Heriot-Watt, QUB, Exeter, Edinburgh, Leeds,
 -- St Andrews) + El-Yurt Umidi Foundation (Uzbekistan state scheme).
 --
--- Currency rule: awards paid in GBP/UZS keep amount_usd_value = 0. Never invent
--- USD equivalents. Every row cites source_url; notes state published vs inferred.
+-- Currency rule: GBP awards keep amount_usd_value = 0; where the award currency
+-- or total value is unpublished, do not invent either. Final corrections and
+-- university_scholarships synchronization are in the last (authoritative) block.
 -- ============================================================================
 
 -- ---------------------------------------------------------------
@@ -154,8 +155,8 @@ UPDATE scholarships SET
 WHERE id = 734;
 
 -- ---------------------------------------------------------------
--- 862 — El-Yurt Umidi Foundation (Uzbekistan state scheme).
--- Official site el-yurt.uz recovered (was HTTP 500); Nizom page fetched.
+-- 862 — El-Yurt Umidi (provisional first-pass values; authoritative final
+--      Nizom correction is in the finalization block at the bottom).
 -- ---------------------------------------------------------------
 UPDATE scholarships SET
   title = 'El-Yurt Umidi Foundation Scholarship (QS Top-300 universities)',
@@ -189,9 +190,8 @@ UPDATE scholarships SET
 WHERE id = 862;
 
 -- ---------------------------------------------------------------
--- 131 — University of Edinburgh: postgraduate research funding pointer
---       retitled to Edinburgh Doctoral College Scholarships.
--- Manba: registryservices.ed.ac.uk .../doctoral-college
+-- 131 — Edinburgh provisional university-wide draft; final pass rewrites this
+--      to the fetched, Business School-specific Doctoral College Scholarship.
 -- ---------------------------------------------------------------
 UPDATE scholarships SET
   title = 'University of Edinburgh Edinburgh Doctoral College Scholarships',
@@ -260,12 +260,12 @@ UPDATE scholarships SET
 WHERE id = 53;
 
 -- ---------------------------------------------------------------
--- 312 — University of Leeds: retitled to the verified Masters scheme.
--- Manba: leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships
+-- 312 — University of Leeds: keep this PhD record as an honest research-funding directory pointer.
+-- The separately verified taught-Master's scholarship is inserted later as a new record.
 -- ---------------------------------------------------------------
 UPDATE scholarships SET
-  title = 'University of Leeds Masters International Excellence Scholarships',
-  website_url = 'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
+  title = 'University of Leeds research funding (named award unconfirmed)',
+  website_url = 'https://www.leeds.ac.uk/research-funding',
   source_url = 'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
   award_amount = 3000,
   award_currency = 'GBP',
@@ -330,9 +330,284 @@ UPDATE scholarships SET
 WHERE id = 327;
 
 -- ============================================================================
--- End of pass 87 SQL. Hard-check query (run after execute):
+-- Provisional pass statements end here. The authoritative finalization block
+-- below MUST also run to replace the temporary draft values. Hard-check query:
 --   SELECT id, title, award_amount, award_currency, source_reliability,
 --          deadline_type, coverage_type, is_active
 --   FROM scholarships WHERE id IN (614,589,658,734,862,131,53,312,327)
 --   ORDER BY id;
 -- ============================================================================
+
+-- ============================================================================
+-- FINALIZATION BLOCK — authoritative final state for Pass 87.
+-- Run after the initial rewrite blocks above. This final block intentionally
+-- supersedes their provisional draft values for ids 862, 131, 53, 312 and 327.
+-- It also synchronizes university_scholarships and adds the separate Leeds
+-- taught-Master's award as both a scholarship row and a university association.
+-- ============================================================================
+
+-- 862 — El-Yurt Umidi, using the official Nizom (all six chunks fetched).
+UPDATE scholarships SET
+  title = 'El-Yurt Umidi Presidential Scholarship (Uzbekistan)',
+  website_url = 'https://el-yurt.uz/candidates',
+  source_url = 'https://el-yurt.uz/candidates',
+  application_url = NULL,
+  award_amount = NULL,
+  award_currency = NULL,
+  award_period = 'variable',
+  award_basis = 'variable',
+  amount_usd_value = 0,
+  deadline = 'No fixed annual closing date is published. The Foundation announces each open competition at least one week before applications begin; the online document window may last up to one month. No 2027 competition deadline was published on 2026-10-26.',
+  deadline_date = NULL,
+  deadline_type = 'not_published',
+  deadline_range_start = NULL,
+  deadline_range_end = NULL,
+  expected_deadline_period = NULL,
+  opening_date = NULL,
+  degree_levels = '["Bachelor''s","Master''s","PhD"]',
+  eligible_majors = '["Priority fields are set in each competition notice; the current rules prioritize STEM, energy, transport, urbanisation, architecture and construction, agriculture and water management, geodesy and land relations, public administration, medicine and education"]',
+  eligible_countries = '["Uzbekistan"]',
+  coverage_type = 'Unspecified',
+  funding_type = 'Uzbekistan government scholarship; funding package depends on competition quota and approved costs',
+  tuition_coverage = 'General open-competition awardees may receive tuition, visa, medical insurance, one return trip per academic year, living costs and study materials, subject to the Board-approved cap; the Top-300 exam-free quota is limited to international transport and accommodation',
+  accommodation = 'Top-300 exam-free quota: accommodation and international transport only; other open-competition awards follow the individual approved package',
+  min_gpa = NULL,
+  min_ielts = NULL,
+  english_requirements = 'IELTS Academic 6.0 for bachelor''s and 7.0 for master''s and doctoral programmes, or an equivalent international test; the language certificate is waived for applicants with an unconditional admission letter.',
+  description = 'The El-Yurt Umidi Foundation is a state scholarship programme of Uzbekistan for citizens studying bachelor''s, master''s or doctoral programmes abroad. The Foundation''s current Nizom (selection rules) separates three exam-free routes from the general open competition. First, a candidate already admitted on a full tuition grant to a globally ranked Top-100 institution may compete for an exam-free quota: QS ranking is used for bachelor''s, while THE ranking is used for master''s and doctoral study. Second, a Top-300 exam-free quota is limited to candidates who already have a full tuition grant and agree that El-Yurt Umidi support will cover only international transport and accommodation. Third, graduates of Uzbekistan''s Presidential, creative or specialised schools admitted to a QS Top-20 undergraduate programme with at least 50% tuition already covered may compete for a separate exam-free quota. Candidates not selected through these routes may enter the open test-and-interview competition for eligible fields and quotas; Top-300 admission alone does not guarantee an award. For general open-competition awardees, the Nizom lists tuition, visa, health insurance, one return trip per academic year, living costs and study materials, with maximum amounts set by the Foundation Board for each programme. Age rules: bachelor''s applicants over 30, master''s applicants under 22 or over 40, and doctoral applicants under 25 or over 45 are excluded. Prior overseas study in a similar degree/field can disqualify applicants. At least one year of relevant employment is required for master''s and two years for doctoral applicants. IELTS Academic minimums are 6.0 for bachelor''s and 7.0 for master''s/doctoral applicants, or an equivalent test; this certificate is waived with an unconditional admission letter. Online or part-time study abroad is not eligible. The current Nizom describes post-study return and employment obligations in the scholarship contract. Exact funding amount, currency, eligible fields and application dates depend on the competition notice and individual approved quota; no single value or fixed 2027 date is published.',
+  requirements = 'Uzbek citizenship. Age at application: bachelor''s not over 30; master''s 22–40; doctoral 25–45. Master''s applicants need at least one year of relevant work experience and doctoral applicants at least two years. Applicants with prior overseas study at the same or a related degree level may be excluded under the Nizom. Applicants must have an active offer or conditional offer from a foreign institution included in the ranking or approved field-specific list. Applicants fully funded by another scholarship are excluded; online and part-time overseas study is not eligible. Successful candidates must return to Uzbekistan and comply with the employment obligations set out in the four-party contract.',
+  required_documents = '["Application addressed to the Foundation executive director", "Passport or national ID copy", "Offer of admission or conditional admission from a foreign institution", "International language certificate (IELTS Academic or equivalent; not required with an unconditional admission letter)", "Personal, academic and professional achievements statement", "High-school certificate or diploma for bachelor''s applicants", "Bachelor''s diploma and employment record for master''s applicants", "Master''s diploma and employment record for doctoral applicants", "List of published research papers for master''s and doctoral applicants", "Research supervisor recommendation and research motivation for doctoral applicants", "Level-specific motivational essay"]',
+  application_status = 'unknown',
+  source_reliability = 9,
+  notes = 'VERIFIED 2026-10-26 (UK tail pass 87) against the Foundation''s official Nizom at https://el-yurt.uz/candidates (all six page chunks fetched) and its programme page https://el-yurt.uz/programs/1. Corrected two material overstatements in the imported description: Top-300 admission does not itself guarantee the scholarship, and the current Nizom does not say that every Top-300 candidate automatically gets airfare/housing. Its Top-300 exam-free quota requires an existing full-tuition external grant plus the candidate''s consent to a package limited to international transport and accommodation. The Top-100 exam-free route uses QS for bachelor''s and THE for graduate degrees and also requires a full-tuition external grant; the Top-20 route is limited to graduates of Presidential, creative or specialised schools with at least 50% tuition covered. General open-competition awards may include tuition, visa, insurance, one return trip/year, living costs and study materials, with caps set per programme by the Board. No single award amount or currency is published, so award_amount and award_currency are NULL and amount_usd_value stays 0; coverage_type is Unspecified because benefits differ by route. IELTS criteria differ by degree and are waived with an unconditional admission letter, so min_ielts is deliberately NULL and the exact rules are in english_requirements. Calls are announced ad hoc; no 2027 date was published on 2026-10-26, so the earlier inferred April deadline and 2027-04-30 deadline_date were removed. The Foundation site currently lists a 2026 competition-results notice, not a 2027 application call.',
+  verification_status = 'verified',
+  last_verified_at = now(),
+  last_updated_at = now(),
+  is_active = true
+WHERE id = 862;
+
+-- 131 — Edinburgh: verified Business School-specific Doctoral College award.
+UPDATE scholarships SET
+  title = 'University of Edinburgh Business School Doctoral College Scholarship',
+  provider = 'University of Edinburgh',
+  website_url = 'https://www.business-school.ed.ac.uk/scholarships/edc-and-business-school',
+  source_url = 'https://www.business-school.ed.ac.uk/scholarships/edc-and-business-school',
+  award_amount = NULL,
+  award_currency = 'GBP',
+  award_period = 'year',
+  award_basis = 'full_tuition',
+  amount_usd_value = 0,
+  deadline = 'Scholarship application deadline: 23:59 UK time, 2 February 2027. The complete PhD programme application is due by 12 January 2027, and an offer must be received by the scholarship deadline.',
+  deadline_date = '2027-02-02',
+  deadline_type = 'fixed',
+  deadline_range_start = NULL,
+  deadline_range_end = NULL,
+  expected_deadline_period = NULL,
+  degree_levels = '["PhD"]',
+  eligible_majors = '["PhD with Integrated Study in Management", "PhD with Integrated Study in Accounting", "PhD with Integrated Study in Finance", "PhD in Business Economics", "PhD in Management Science & Analytics", "PhD in Financial Technology"]',
+  eligible_countries = '["All countries"]',
+  coverage_type = 'Full Tuition + Stipend',
+  funding_type = 'Competitive doctoral scholarship; full tuition fees plus annual UKRI-rate stipend',
+  tuition_coverage = 'Full UK or overseas tuition fees plus a stipend equal to the UKRI minimum rate; the page cites GBP 21,805 as the 2026/27 reference rate, with the rate for the relevant award year subject to change',
+  min_gpa = NULL,
+  min_ielts = NULL,
+  english_requirements = NULL,
+  required_documents = '[]',
+  application_status = 'unknown',
+  source_reliability = 9,
+  financial_need_based = false,
+  merit_based = true,
+  description = 'The University of Edinburgh Business School offers one Edinburgh Doctoral College Scholarship for a new PhD student joining in September 2027. It covers full University tuition fees at either the UK or overseas rate and pays an annual stipend equal to the UKRI minimum rate. The university cites GBP 21,805 as the current 2026/27 reference rate; the stipend for the 2027/28 award year is not yet published and should not be assumed to be the same. Subject to satisfactory progress, the award lasts between three and four years as agreed by the School/Deanery, pro-rata for part-time study. Eligible applicants must hold a conditional or unconditional offer for one of the Business School PhD programmes and receive an offer by 2 February 2027 at 23:59 UK time. The complete PhD programme application is due by 12 January 2027; the scholarship application is submitted separately through the University online application system after applying for the PhD. Selection considers academic background and research experience, the research proposal, PhD potential and contribution to the research community. The page has an internal date inconsistency: its eligibility section says September 2027 entry, while a later programme list says September 2026; applicants should confirm this with the Business School before applying.',
+  requirements = 'A new PhD applicant expecting to join the Edinburgh Business School in September 2027; a conditional or unconditional offer must be received by 2 February 2027. Submit a complete programme application by 12 January 2027 and a separate scholarship application after applying for the programme. Selection is based on academic background and research experience, research proposal, potential to complete a PhD, ability to flourish with funding, and contribution to a diverse PhD community. Eligible programmes are the Business School programmes listed on the official page. The official page does not publish a scholarship-specific GPA or English-test threshold.',
+  notes = 'VERIFIED 2026-10-26 (UK tail pass 87) against the official University of Edinburgh Business School page https://www.business-school.ed.ac.uk/scholarships/edc-and-business-school (fetched) and its PhD funding overview. The broader Registry Services Doctoral College page redirects the fetcher to university sign-in, so this record is deliberately limited to the Business School component, which has a directly accessible official page. The page publishes one award, full UK/overseas tuition, annual UKRI-rate stipend, three-to-four-year tenure, 2 February 2027 scholarship deadline and 12 January 2027 PhD-programme application deadline. It quotes GBP 21,805 only as the 2026/27 UKRI reference rate; no fixed 2027/28 amount is published, so award_amount is NULL and amount_usd_value is 0 rather than presenting a stale reference as the upcoming award value. The award page contains an apparent contradiction: eligibility says September 2027 entry, while the later programme list says September 2026. This is noted for applicants and source_reliability is 9 rather than 10. The page gives no scholarship document checklist or English-test/GPA threshold, so required_documents is deliberately [], min_ielts and min_gpa are NULL. The previous generic Edinburgh row and fabricated USD amount have been replaced with this named, verified School-specific award.',
+  verification_status = 'verified',
+  last_verified_at = now(),
+  last_updated_at = now(),
+  is_active = true
+WHERE id = 131;
+
+-- 53 — Edinburgh general funding index pointer; no award value is claimed.
+UPDATE scholarships SET
+  website_url = 'https://registryservices.ed.ac.uk/student-funding/postgraduate/international',
+  source_url = 'https://registryservices.ed.ac.uk/student-funding/postgraduate/international',
+  award_amount = NULL, award_currency = NULL, award_period = NULL,
+  award_basis = 'variable', amount_usd_value = 0,
+  deadline = 'No single university-wide scholarship deadline is published: postgraduate funding is grouped by region, College, subject and funding source, and each scheme sets its own dates.',
+  deadline_date = NULL, deadline_type = 'not_published',
+  deadline_range_start = NULL, deadline_range_end = NULL,
+  expected_deadline_period = NULL,
+  degree_levels = '["Master''s","PhD"]', eligible_majors = '[]', eligible_countries = '[]',
+  coverage_type = 'Unspecified',
+  funding_type = 'Postgraduate funding directory pointer; no single named award',
+  tuition_coverage = NULL, min_gpa = NULL, min_ielts = NULL,
+  required_documents = '[]', application_status = 'unknown', source_reliability = 4,
+  description = 'This row is a directory pointer, not an individual scholarship. The University of Edinburgh Registry Services page groups prospective international postgraduate funding by region, College of Arts, Humanities and Social Sciences, College of Medicine and Veterinary Medicine, College of Science and Engineering, other funding and the Edinburgh Doctoral College Scholarships. Each award has its own eligibility rules, amount and closing date; this record makes no claim about a specific award or amount. Use the official directory and its linked scheme pages to identify the award relevant to your subject and entry year.',
+  requirements = 'Eligibility and application conditions depend on the individual award linked from the official Registry Services funding directory; no single requirement can be stated for this pointer record.',
+  english_requirements = NULL,
+  notes = 'NOT VERIFIED as a named scholarship (UK tail pass 87, 2026-10-26). The official Registry Services funding index at registryservices.ed.ac.uk/student-funding/postgraduate/international was fetched and confirms several distinct College-, region- and subject-specific funding routes, including Edinburgh Doctoral College Scholarships. It does not publish one award amount, eligibility profile or deadline for the index as a whole. The previous invented USD amount and generic January date were removed in earlier passes and remain NULL/not_published here. source_reliability stays 4 because this is a directory pointer, not a verified award; the exact scheme, amount, application requirements and deadline are deliberately left empty rather than inferred.',
+  verification_status = 'verified', last_verified_at = now(), last_updated_at = now(), is_active = true
+WHERE id = 53;
+
+-- 312 — Leeds research funding pointer, separate from the new taught-Master's row 910.
+UPDATE scholarships SET
+  title = 'University of Leeds research funding (named award unconfirmed)',
+  website_url = 'https://www.leeds.ac.uk/research-funding',
+  source_url = 'https://www.leeds.ac.uk/research-funding',
+  award_amount = NULL, award_currency = NULL, award_period = NULL,
+  award_basis = 'variable', amount_usd_value = 0,
+  deadline = 'No single postgraduate research scholarship deadline is published on the University research-funding index; dates are set by each school, faculty or funded project.',
+  deadline_date = NULL, deadline_type = 'not_published',
+  deadline_range_start = NULL, deadline_range_end = NULL, expected_deadline_period = NULL,
+  degree_levels = '["PhD"]', eligible_majors = '[]', eligible_countries = '[]',
+  coverage_type = 'Unspecified',
+  funding_type = 'Postgraduate research funding directory pointer; schemes vary by School and Faculty',
+  tuition_coverage = NULL, min_gpa = NULL, min_ielts = NULL, required_documents = '[]',
+  application_status = 'unknown', source_reliability = 4,
+  description = 'This is a directory pointer rather than a single named scholarship. The University of Leeds states that research-degree funding is available to UK and international research students across its schools and subject areas, and directs applicants to its postgraduate research funding search and the Funding tab in the research opportunities directory. Central, Faculty, school and project awards have separate amounts, eligibility and deadlines; this row deliberately does not combine them into one fictitious award. The university notes that there are only a very limited number of UK Research Council studentships for international fee-rated applicants.',
+  requirements = 'Applicants must check the specific scholarship or funded project in the University of Leeds research-funding directory; eligibility, fee status, documents and deadlines vary by award. This pointer row has no shared minimum GPA, IELTS score or required-document list.',
+  english_requirements = NULL,
+  notes = 'NOT VERIFIED as a named award (UK tail pass 87, 2026-10-26). The former imported path leeds.ac.uk/research-degrees/doc/scholarships returned 404. The official University research-funding index at leeds.ac.uk/research-funding was searched and fetched; it directs applicants to the PGR funding search and confirms that awards span schools/subjects, with only limited UKRI studentships for international-fee students. No one central award amount, eligibility rule or deadline is published there. The imported USD 42,000 and January date were already removed in prior passes; amount and deadline remain deliberately unset. source_reliability stays 4: this is an honest directory pointer, not a named scholarship.',
+  verification_status = 'verified', last_verified_at = now(), last_updated_at = now(), is_active = true
+WHERE id = 312;
+
+-- 327 — St Andrews postgraduate funding index pointer.
+UPDATE scholarships SET
+  website_url = 'https://www.st-andrews.ac.uk/study/postgraduate/fees/scholarships/',
+  source_url = 'https://www.st-andrews.ac.uk/study/postgraduate/fees/scholarships/',
+  award_amount = NULL, award_currency = NULL, award_period = NULL,
+  award_basis = 'variable', amount_usd_value = 0,
+  deadline = 'No single postgraduate scholarship deadline is published on the overview page. St Andrews directs applicants to its catalogue, where each award has its own entry year, fee-status eligibility and application period.',
+  deadline_date = NULL, deadline_type = 'not_published',
+  deadline_range_start = NULL, deadline_range_end = NULL, expected_deadline_period = NULL,
+  degree_levels = '["Master''s","PhD"]', eligible_majors = '[]', eligible_countries = '[]',
+  coverage_type = 'Unspecified',
+  funding_type = 'Postgraduate scholarship directory pointer; named award unconfirmed',
+  tuition_coverage = NULL, min_gpa = NULL, min_ielts = NULL, required_documents = '[]',
+  application_status = 'unknown', source_reliability = 4,
+  description = 'This row is a pointer to the University of St Andrews postgraduate scholarships overview, not an individual award. The university says scholarship availability may depend on study area and Home/Overseas fee status, and links applicants to its searchable scholarship catalogue. Individual catalogue records set their own award values, eligibility and deadlines; none is inferred for this generic row. A verified undergraduate award is listed separately in this catalogue as St Andrews International Undergraduate Scholarship (id 671).',
+  requirements = 'Eligibility, amounts, application requirements and deadlines depend on the specific postgraduate award in the St Andrews scholarship catalogue; no universal rule is published on the overview page.',
+  english_requirements = NULL,
+  notes = 'NOT VERIFIED as a named award (UK tail pass 87, 2026-10-26). The imported recent-scholarships path returned 404. The official St Andrews postgraduate scholarships overview was fetched at st-andrews.ac.uk/study/postgraduate/fees/scholarships/ and confirms a catalogue of taught and research awards whose availability varies by subject and fee status, but it does not state a generic award amount or deadline. The imported USD 38,000 and January deadline were removed in earlier UK passes and remain unset. source_reliability stays 4: this is a directory pointer, not a specific award.',
+  verification_status = 'verified', last_verified_at = now(), last_updated_at = now(), is_active = true
+WHERE id = 327;
+
+-- Synchronize the corresponding existing university_scholarships records.
+UPDATE university_scholarships us SET
+  scholarship_name = v.nm, availability_status = v.avail, funding_type = v.funding,
+  max_scholarship = v.max_amount, covers_tuition = v.covers_tuition,
+  covers_living_expenses = v.covers_living, valued_aspect = v.valued,
+  eligibility_notes = v.eligibility, official_url = v.url, source_url = v.url,
+  verification_status = 'verified', last_verified_at = now()
+FROM (VALUES
+ (646, 'University of Edinburgh Business School Doctoral College Scholarship', 'Yes', 'Competitive doctoral scholarship; full tuition and annual UKRI-rate stipend', 'Full UK or overseas tuition plus annual UKRI-rate stipend; 3–4 years', true, true, 'Tuition and annual living stipend', 'New Business School PhD applicant; complete programme application by 12 Jan 2027 and hold offer by 2 Feb 2027; programme list and entry-year discrepancy noted on the official page.', 'https://www.business-school.ed.ac.uk/scholarships/edc-and-business-school'),
+ (229, 'Heriot-Watt University International Merit Scholarship', 'Yes', 'Merit-based partial tuition fee abatement', 'Value varies by region; normally first year only', true, false, 'Partial tuition fee reduction', 'International fee-paying students residing overseas; UK campus; undergraduate or taught postgraduate only; regional criteria and value are confirmed by the relevant manager; postgraduate research and online courses excluded.', 'https://www.hw.ac.uk/study/fees-and-funding/scholarships-and-bursaries/international-merit-scholarship'),
+ (193, 'Lancaster University Undergraduate International Excellence Scholarship', 'Yes', 'Automatic merit-based tuition fee reduction', 'GBP 3,000 fee reduction per year of study', true, false, 'Undergraduate tuition fee reduction', 'International fee-paying undergraduate; firm UCAS choice; A*AA or equivalent; full-time on-campus; repeated years, placement/industry/study-abroad years excluded.', 'https://www.lancaster.ac.uk/study/fees-and-funding/scholarships-and-bursaries/undergraduate-international-excellence-scholarship/'),
+ (284, 'Queen''s University Belfast International Undergraduate Scholarship', 'Yes', 'International undergraduate tuition fee reduction', 'GBP 3,500 (fee rate 1) or GBP 4,000 (fee rate 2), first year only', true, false, 'First-year tuition fee reduction', 'New international fee-paying full-time undergraduate at Queen''s Belfast for 2026/27; award is automatic on enrolment; fee-status and course exclusions apply.', 'https://www.qub.ac.uk/Study/funding-scholarships/Non-facultydepartments/international-office/international-office-undergraduate-scholarship.html'),
+ (139, 'Exeter Excellence Scholarships (University of Exeter)', 'Yes', 'International merit-based tuition fee reduction', 'GBP 15,000: undergraduates each eligible year; taught masters first year', true, false, 'International tuition fee reduction', 'International fee status and offer for an eligible undergraduate or taught masters programme; 2027/28 applications open, but no closing date is published on the scheme page.', 'https://www.exeter.ac.uk/study/funding/exeterexcellence/')
+) AS v(id, nm, avail, funding, max_amount, covers_tuition, covers_living, valued, eligibility, url)
+WHERE us.id = v.id;
+
+-- Add the Leeds taught-Master's scholarship in both catalogue tables. The
+-- upserts make this block safe to run again without creating duplicate rows.
+WITH new_scholarship AS (
+  INSERT INTO scholarships (
+    title, provider, country, coverage_type, amount_usd_value, deadline,
+    degree_levels, eligible_majors, min_gpa, min_ielts, financial_need_based,
+    merit_based, description, requirements, website_url, eligible_countries,
+    funding_type, tuition_coverage, required_documents, deadline_date,
+    deadline_type, rounds, application_status, last_verified_at,
+    last_updated_at, verification_status, source_reliability, source_url,
+    notes, is_active, university_id, award_amount, award_currency,
+    award_period, award_basis
+  ) VALUES (
+    'University of Leeds Masters International Excellence Scholarships',
+    'University of Leeds', 'United Kingdom', 'Partial Tuition', 0,
+    'Two application rounds for September 2027 entry: round one closes Sunday 28 February 2027, with outcomes by 2 April 2027; round two closes Sunday 16 May 2027, with outcomes by 11 June 2027.',
+    '["Master''s"]',
+    '["Eligible full-time taught Master''s programmes; MBA and fully online courses are excluded"]',
+    NULL, NULL, false, true,
+    'The University of Leeds offers Masters International Excellence Scholarships of GBP 3,000, GBP 6,000 or GBP 16,000 as a tuition fee reduction to eligible international students starting an eligible full-time taught Master''s course in September 2027. The award is applied to first-year tuition only and cannot pay for maintenance or accommodation. Applicants must be international-fee rated, self-funded or partially funded, hold an offer for an eligible programme, demonstrate at least a UK 2:1 honours bachelor''s degree or equivalent and evidence excellent professional and personal skills through work experience or extracurricular activity. MBA and fully online courses are excluded. Applicants may apply after receiving a conditional or unconditional offer; a separate scholarship application is required for each course. Round-one applicants who are not selected may be reconsidered in round two. The award may be combined with the Masters International Regional Scholarship or external funding only if total support does not exceed 100 per cent of tuition fees.',
+    'International fee status; conditional or unconditional offer for an eligible full-time taught Master''s course beginning September 2027; self-funded or partially-funded status; at least a UK 2:1 honours bachelor''s degree or equivalent; excellent professional and personal skills evidenced by work experience and/or extracurricular activities. MBA and fully online courses are excluded. Submit a separate scholarship application for each course after receiving an offer. The award cannot be deferred and is a first-year tuition reduction only.',
+    'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
+    '["All international"]',
+    'Merit-based tuition fee discount',
+    'GBP 3,000, GBP 6,000 or GBP 16,000 tuition discount for the first year only; no living-cost or accommodation payment',
+    '["Conditional or unconditional offer for an eligible taught Master''s course", "Masters International Excellence Scholarship application form"]',
+    '2027-05-16', 'fixed',
+    '[{"round":1,"deadline":"2027-02-28","outcome":"2027-04-02"},{"round":2,"deadline":"2027-05-16","outcome":"2027-06-11"}]',
+    'open', now(), now(), 'verified', 10,
+    'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
+    'VERIFIED 2026-10-26 (UK tail pass 87) against the official University of Leeds scholarship page, fetched at leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships. This is a distinct taught-Master''s award, not the separate Leeds postgraduate-research funding directory retained at scholarship id 312. The official page publishes three tiers (GBP 3,000/6,000/16,000), international fee eligibility, first-year-only fee reduction, 2:1 and skills criteria, exclusions and two 2027 application rounds. award_amount stores the lowest published tier (GBP 3,000) and award_basis=range; the other tiers are stated in the description and tuition_coverage. award_currency is GBP and amount_usd_value remains 0 because no USD award is paid. The latest closing date (16 May 2027) is stored in deadline_date; both round-specific deadlines and results dates are preserved in rounds and deadline. No IELTS threshold, GPA number or document checklist beyond the offer and application form is stated by the scheme page; min_ielts and min_gpa are NULL. The page does not publish a direct application URL; offer holders receive details by email.',
+    true, 171, 3000, 'GBP', 'one_time', 'range'
+  )
+  ON CONFLICT (title) DO UPDATE SET
+    provider = EXCLUDED.provider,
+    country = EXCLUDED.country,
+    coverage_type = EXCLUDED.coverage_type,
+    amount_usd_value = EXCLUDED.amount_usd_value,
+    deadline = EXCLUDED.deadline,
+    degree_levels = EXCLUDED.degree_levels,
+    eligible_majors = EXCLUDED.eligible_majors,
+    min_gpa = EXCLUDED.min_gpa,
+    min_ielts = EXCLUDED.min_ielts,
+    financial_need_based = EXCLUDED.financial_need_based,
+    merit_based = EXCLUDED.merit_based,
+    description = EXCLUDED.description,
+    requirements = EXCLUDED.requirements,
+    website_url = EXCLUDED.website_url,
+    eligible_countries = EXCLUDED.eligible_countries,
+    funding_type = EXCLUDED.funding_type,
+    tuition_coverage = EXCLUDED.tuition_coverage,
+    required_documents = EXCLUDED.required_documents,
+    deadline_date = EXCLUDED.deadline_date,
+    deadline_type = EXCLUDED.deadline_type,
+    rounds = EXCLUDED.rounds,
+    application_status = EXCLUDED.application_status,
+    last_verified_at = EXCLUDED.last_verified_at,
+    last_updated_at = EXCLUDED.last_updated_at,
+    verification_status = EXCLUDED.verification_status,
+    source_reliability = EXCLUDED.source_reliability,
+    source_url = EXCLUDED.source_url,
+    notes = EXCLUDED.notes,
+    is_active = EXCLUDED.is_active,
+    university_id = EXCLUDED.university_id,
+    award_amount = EXCLUDED.award_amount,
+    award_currency = EXCLUDED.award_currency,
+    award_period = EXCLUDED.award_period,
+    award_basis = EXCLUDED.award_basis
+  RETURNING id, university_id, title, funding_type
+)
+INSERT INTO university_scholarships (
+  university_id, scholarship_id, scholarship_name, availability_status,
+  funding_type, max_scholarship, covers_tuition, covers_living_expenses,
+  valued_aspect, eligibility_notes, official_url, source_url,
+  verification_status, last_verified_at
+)
+SELECT
+  university_id, id, title, 'Yes', funding_type,
+  'GBP 16,000 maximum published tier; first-year tuition fee reduction only',
+  true, false, 'Merit-based first-year tuition fee reduction',
+  'International fee-rated, self-funded or partially-funded full-time taught Master''s applicants; 2:1 equivalent; MBA and fully online courses excluded; round deadlines 28 February and 16 May 2027.',
+  'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
+  'https://www.leeds.ac.uk/scholarship/12/masters-international-excellence-scholarships',
+  'verified', now()
+FROM new_scholarship
+ON CONFLICT (university_id, scholarship_name) DO UPDATE SET
+  scholarship_id = EXCLUDED.scholarship_id,
+  availability_status = EXCLUDED.availability_status,
+  funding_type = EXCLUDED.funding_type,
+  max_scholarship = EXCLUDED.max_scholarship,
+  covers_tuition = EXCLUDED.covers_tuition,
+  covers_living_expenses = EXCLUDED.covers_living_expenses,
+  valued_aspect = EXCLUDED.valued_aspect,
+  eligibility_notes = EXCLUDED.eligibility_notes,
+  official_url = EXCLUDED.official_url,
+  source_url = EXCLUDED.source_url,
+  verification_status = EXCLUDED.verification_status,
+  last_verified_at = EXCLUDED.last_verified_at;
+
+-- Final hard-check query:
+-- SELECT id, title, award_amount, award_currency, source_reliability,
+--        deadline_type, coverage_type, is_active
+-- FROM scholarships WHERE id IN (53,131,312,327,589,614,658,734,862,910)
+-- ORDER BY id;
