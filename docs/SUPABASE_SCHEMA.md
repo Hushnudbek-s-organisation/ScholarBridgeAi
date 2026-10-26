@@ -75,6 +75,7 @@ isbotlamaydi; UI/API yo'nalishi bo'yicha aniq xarita audit natijasida beriladi.
 | **Imtiyozlar (o'sish)** | `opportunities` | Tanlovlar, tadqiqotlar, amaliyot, yozgi maktablar (admin boshqaradi) |
 | **Biznes / admin va xavfsizlik** | `app_config`, `audit_logs`, `refresh_jobs`, `consulting_requests`, `visa_requirements`, `learning_providers`, `learning_provider_links`, `learning_provider_scores`, `platform_ownership`, `ownership_transfers`, `site_visits`, `rate_limit_hits`, `user_sessions` | Admin sozlamalari/audit, provider va visa katalog metama'lumoti, session revoke uchun token hash, hamda instance'lararo rate-limit hitlari; real-time production holati emas |
 | **Telegram bot** | `telegram_links`, `telegram_login_requests`, `telegram_messages`, `telegram_updates` | Talabaning Telegram'ga ulanishi, kirish kodlar (hash bilan), xabarlar tarixi, takror so'rovlarni filtrlash |
+| **Telegram channel publisher** | `channel_plan`, `channel_posts`, `channel_polls`, `channel_prefs`, `channel_clicks`, `channel_stories` | Kunlik reja, postlar jurnali, so'rovnomalar (faqat jamlanma natijalar), mavzu og'irliklari, `/r/<code>` bosishlar va tasdiqlangan hikoyalar |
 
 ## 3. Qoidalar (nima uchun aynan shunday)
 
@@ -1414,6 +1415,208 @@ and the migration is safely retried.
 | `update_id` | bigint |  | — | PK |
 | `received_at` | timestamp |  | yes |  |
 
+### `channel_plan`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `plan_date` | date |  | — | Tashkent day the post belongs to |
+| `slot` | integer |  | — | 0-based position in the day (max 3) |
+| `send_at` | text |  | — | earliest HH:MM (Asia/Tashkent) |
+| `kind` | text |  | — | scholarship_single | fully_funded | urgency | … | poll |
+| `rung` | integer | yes | — | urgency rung: 30 | 14 | 7 | 3 | 1 | 0 |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `template_key` | text |  | — | template/bank id, e.g. single_v2, tip_ielts_routine |
+| `topic` | text | yes | — | preference topic key the post feeds |
+| `poll_type` | text | yes | — | poll message type when this slot is a poll |
+| `payload` | text |  | yes | JSON: digests, spotlight lists, variant, poll key |
+| `dedupe_key` | text |  | — | unique, NOT NULL — the real idempotency key |
+| `status` | text |  | yes | planned | rendered | sent | skipped | failed |
+| `reason` | text | yes | — | why the planner chose it |
+| `lane` | text |  | yes | urgent \| weekly \| editorial \| evergreen \| engagement |
+| `origin` | text |  | yes | rotation \| urgency \| weekly \| manual |
+| `text_override` | text | yes | — | sanitized per-post override edited in the queue |
+| `pinned` | boolean |  | yes | pinned to the front of the queue |
+| `skip_reason` | text | yes | — | why an operator skipped it |
+| `postponed_to` | date | yes | — | operator postponement |
+| `created_at` | timestamp |  | yes |  |
+
+### `channel_posts`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `plan_id` | integer | yes | — | FK → channel_plan(id) on delete set null |
+| `kind` | text |  | — | post kind (or poll) |
+| `rung` | integer | yes | — | urgency rung |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `plan_date` | date | yes | — | Tashkent day |
+| `slot` | integer | yes | — | position in the day |
+| `dedupe_key` | text |  | — | unique, NOT NULL — claimed before the send |
+| `mode` | text |  | yes | dryrun | on |
+| `chat_id` | text | yes | — | channel or admin chat the message went to |
+| `html` | text | yes | — | the exact message body |
+| `message_id` | bigint | yes | — | Telegram message id |
+| `poll_id` | text | yes | — | Telegram poll id when this post carried one |
+| `part` | integer |  | yes | part number when one item splits into several messages |
+| `text_override` | text | yes | — | sanitized override that was actually sent |
+| `lane` | text | yes | — | lane the post came from |
+| `status` | text |  | yes | pending | sent | failed | skipped |
+| `attempts` | integer |  | yes |  |
+| `error` | text | yes | — | last failure description (never secrets) |
+| `sent_at` | timestamp | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_polls`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `post_id` | integer | yes | — | unique, FK → channel_posts(id) on delete cascade |
+| `message_id` | bigint | yes | — |  |
+| `poll_id` | text | yes | — | Telegram poll id (stopPoll reads it back) |
+| `poll_type` | text |  | — | pref | multi | self_assess | this_or_that | struggle | stage | feedback | quiz_data |
+| `poll_key` | text |  | — | deck entry id, used for the 28-day cooldown |
+| `topic` | text | yes | — | preference topic the answers update |
+| `question` | text |  | — |  |
+| `options` | text |  | yes | JSON [{ key, text }] |
+| `correct_index` | integer | yes | — | quiz_data only |
+| `status` | text |  | yes | open | closed | failed |
+| `results` | text |  | yes | JSON [{ key, count }] — aggregates only, never per user |
+| `total_voters` | integer | yes | — |  |
+| `opened_at` | timestamp |  | yes |  |
+| `closed_at` | timestamp | yes | — |  |
+
+### `channel_prefs`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `topic` | text |  | — | unique preference topic key, e.g. country:canada |
+| `weight` | double precision |  | yes | clamped 0.5–2.0 |
+| `samples` | integer |  | yes | how many signals went into the weight |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_clicks`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `code` | text |  | — | unique opaque code behind /r/<code> |
+| `post_id` | integer | yes | — | FK → channel_posts(id) on delete set null |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `target_path` | text |  | — | internal path only — never a caller-supplied URL |
+| `hits` | integer |  | yes |  |
+| `created_at` | timestamp |  | yes |  |
+| `last_hit_at` | timestamp | yes | — |  |
+
+### `channel_stories`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `title` | text |  | — |  |
+| `body` | text |  | — | shown verbatim (escaped); never rewritten by a template |
+| `author_label` | text | yes | — | how the author agreed to be named |
+| `source_url` | text | yes | — | where the story came from |
+| `approved` | boolean |  | yes | only approved rows may ever be posted |
+| `approved_by` | integer | yes | — | admin profile id |
+| `approved_at` | timestamp | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+### `scholarship_channel_content`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `scholarship_id` | integer |  | — | PK, FK → scholarships(id) on delete cascade |
+| `tagline_uz` | text | yes | — | one-line hook used in the rich headline and the weekly list |
+| `funding_type_uz` | text | yes | — | “Moliyalashtirish:” line |
+| `language_req_uz` | text | yes | — | “Til talabi:” line |
+| `eligibility_uz` | text |  | yes | JSON array of bullet strings (“Kimlar uchun”) |
+| `benefits_uz` | text |  | yes | JSON array of bullet strings (“Foydali tomonlari”) |
+| `about_uz` | text | yes | — | “Dastur haqida” paragraph |
+| `extra_hashtags` | text |  | yes | JSON array, without “#” |
+| `updated_by` | integer | yes | — | admin profile id |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_countries`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `key` | text |  | — | PK, stable key such as “germany” |
+| `iso2` | text | yes | — |  |
+| `flag` | text |  | yes | emoji |
+| `name_uz` | text |  | — | “Germaniya” |
+| `name_uz_loc` | text | yes | — | locative “Germaniyada”; null = use the plain name |
+| `hashtag` | text | yes | — | without “#” |
+| `aliases` | text |  | yes | JSON array of stored `scholarships.country` spellings |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_settings`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `key` | text |  | — | PK, e.g. “brand”, “footer_main”, “plan” |
+| `value` | text |  | yes | JSON value, re-validated on read |
+| `updated_by` | integer | yes | — |  |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_templates`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `kind` | text |  | — | post kind |
+| `key` | text |  | — | variant key, unique with kind |
+| `body` | text |  | — | sanitized Telegram HTML override |
+| `enabled` | boolean |  | yes |  |
+| `updated_by` | integer | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_template_versions`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `template_id` | integer |  | — | FK → channel_templates(id) on delete cascade |
+| `body` | text |  | — | the exact body saved at that time |
+| `created_by` | integer | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+
+### `channel_links`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `code` | text |  | — | PK, 5–7 chars, lower-case, no ambiguous characters |
+| `kind` | text |  | yes | site | official | custom |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete cascade; unique with kind |
+| `url` | text |  | — | HTTPS destination — the only source used by /go/<code> |
+| `enabled` | boolean |  | yes | disabled links redirect to the site home page |
+| `note` | text | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
+| `updated_at` | timestamp |  | yes |  |
+
+### `channel_link_clicks`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `code` | text |  | — | PK part 1, FK → channel_links(code) on delete cascade |
+| `day` | date |  | — | PK part 2, Asia/Tashkent day |
+| `count` | integer |  | yes | aggregated hits; no IP, no user agent |
+
+### `channel_audit`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `actor_profile_id` | integer | yes | — | admin who acted (null = system) |
+| `action` | text |  | — | e.g. mode_change, post_now, template_update |
+| `entity` | text |  | — | plan | post | template | link | content | country | settings | poll | story |
+| `entity_id` | text | yes | — |  |
+| `before` | text | yes | — | JSON snapshot before the change |
+| `after` | text | yes | — | JSON snapshot after the change |
+| `created_at` | timestamp |  | yes |  |
 ### `test_attempts`
 
 | column | type | null | default | notes |

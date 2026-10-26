@@ -512,6 +512,206 @@ CREATE TABLE IF NOT EXISTS "certificates" (
   "certificate_code" text CONSTRAINT "uq_certificates_certificate_code" UNIQUE NOT NULL,
   "issued_at" timestamp NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS "channel_audit" (
+  "id" serial PRIMARY KEY,
+  "actor_profile_id" integer,
+  "action" text NOT NULL,
+  "entity" text NOT NULL,
+  "entity_id" text,
+  "before" text,
+  "after" text,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "scholarships" (
+  "id" serial PRIMARY KEY,
+  "title" text NOT NULL,
+  "provider" text NOT NULL,
+  "country" text NOT NULL,
+  "coverage_type" text NOT NULL DEFAULT 'Unspecified',
+  "amount_usd_value" integer,
+  "award_amount" numeric,
+  "award_currency" text,
+  "award_period" text,
+  "award_basis" text,
+  "deadline" text,
+  "degree_levels" text NOT NULL DEFAULT '[]',
+  "eligible_majors" text NOT NULL DEFAULT '[]',
+  "min_gpa" double precision,
+  "min_ielts" double precision,
+  "financial_need_based" boolean DEFAULT FALSE,
+  "merit_based" boolean DEFAULT TRUE,
+  "description" text NOT NULL,
+  "requirements" text NOT NULL,
+  "website_url" text NOT NULL,
+  "university_id" integer CONSTRAINT "scholarships_university_id_fkey" REFERENCES "universities" ("id") ON DELETE SET NULL,
+  "eligible_countries" text DEFAULT '[]',
+  "funding_type" text DEFAULT '',
+  "tuition_coverage" text DEFAULT '',
+  "living_allowance" integer,
+  "travel_allowance" integer,
+  "accommodation" text DEFAULT '',
+  "application_fee" integer,
+  "english_requirements" text DEFAULT '',
+  "required_documents" text DEFAULT '[]',
+  "application_url" text,
+  "opening_date" date,
+  "deadline_date" date,
+  "deadline_type" text NOT NULL DEFAULT 'unknown',
+  "deadline_range_start" date,
+  "deadline_range_end" date,
+  "rounds" text DEFAULT '[]',
+  "recurrence" text NOT NULL DEFAULT 'none',
+  "expected_opening_period" text,
+  "expected_deadline_period" text,
+  "application_status" text NOT NULL DEFAULT 'unknown',
+  "last_verified_at" timestamp,
+  "last_updated_at" timestamp,
+  "verification_status" text NOT NULL DEFAULT 'unverified',
+  "source_reliability" integer NOT NULL DEFAULT 7,
+  "source_url" text,
+  "notes" text,
+  "is_active" boolean NOT NULL DEFAULT TRUE
+);
+CREATE TABLE IF NOT EXISTS "channel_plan" (
+  "id" serial PRIMARY KEY,
+  "plan_date" date NOT NULL,
+  "slot" integer NOT NULL,
+  "send_at" text NOT NULL,
+  "kind" text NOT NULL,
+  "rung" integer,
+  "scholarship_id" integer CONSTRAINT "channel_plan_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE SET NULL,
+  "template_key" text NOT NULL,
+  "topic" text,
+  "poll_type" text,
+  "payload" text NOT NULL DEFAULT '{}',
+  "dedupe_key" text CONSTRAINT "uq_channel_plan_dedupe_key" UNIQUE NOT NULL,
+  "status" text NOT NULL DEFAULT 'planned',
+  "reason" text,
+  "lane" text NOT NULL DEFAULT 'editorial',
+  "origin" text NOT NULL DEFAULT 'rotation',
+  "text_override" text,
+  "pinned" boolean NOT NULL DEFAULT FALSE,
+  "skip_reason" text,
+  "postponed_to" date,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_posts" (
+  "id" serial PRIMARY KEY,
+  "plan_id" integer CONSTRAINT "channel_posts_plan_id_fkey" REFERENCES "channel_plan" ("id") ON DELETE SET NULL,
+  "kind" text NOT NULL,
+  "rung" integer,
+  "scholarship_id" integer CONSTRAINT "channel_posts_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE SET NULL,
+  "plan_date" date,
+  "slot" integer,
+  "dedupe_key" text CONSTRAINT "uq_channel_posts_dedupe_key" UNIQUE NOT NULL,
+  "mode" text NOT NULL DEFAULT 'dryrun',
+  "chat_id" text,
+  "html" text,
+  "message_id" bigint,
+  "poll_id" text,
+  "part" integer NOT NULL DEFAULT 1,
+  "text_override" text,
+  "lane" text,
+  "status" text NOT NULL DEFAULT 'pending',
+  "attempts" integer NOT NULL DEFAULT 0,
+  "error" text,
+  "sent_at" timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_clicks" (
+  "id" serial PRIMARY KEY,
+  "code" text CONSTRAINT "uq_channel_clicks_code" UNIQUE NOT NULL,
+  "post_id" integer CONSTRAINT "channel_clicks_post_id_fkey" REFERENCES "channel_posts" ("id") ON DELETE SET NULL,
+  "scholarship_id" integer CONSTRAINT "channel_clicks_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE SET NULL,
+  "target_path" text NOT NULL,
+  "hits" integer NOT NULL DEFAULT 0,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "last_hit_at" timestamp
+);
+CREATE TABLE IF NOT EXISTS "channel_countries" (
+  "key" text PRIMARY KEY,
+  "iso2" text,
+  "flag" text NOT NULL DEFAULT '',
+  "name_uz" text NOT NULL,
+  "name_uz_loc" text,
+  "hashtag" text,
+  "aliases" text NOT NULL DEFAULT '[]',
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_links" (
+  "code" text PRIMARY KEY,
+  "kind" text NOT NULL DEFAULT 'custom',
+  "scholarship_id" integer CONSTRAINT "channel_links_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE CASCADE,
+  "url" text NOT NULL,
+  "enabled" boolean NOT NULL DEFAULT TRUE,
+  "note" text,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_link_clicks" (
+  "code" text NOT NULL CONSTRAINT "channel_link_clicks_code_fkey" REFERENCES "channel_links" ("code") ON DELETE CASCADE,
+  "day" date NOT NULL,
+  "count" integer NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS "channel_polls" (
+  "id" serial PRIMARY KEY,
+  "post_id" integer CONSTRAINT "uq_channel_polls_post_id" UNIQUE CONSTRAINT "channel_polls_post_id_fkey" REFERENCES "channel_posts" ("id") ON DELETE CASCADE,
+  "message_id" bigint,
+  "poll_id" text,
+  "poll_type" text NOT NULL,
+  "poll_key" text NOT NULL,
+  "topic" text,
+  "question" text NOT NULL,
+  "options" text NOT NULL DEFAULT '[]',
+  "correct_index" integer,
+  "status" text NOT NULL DEFAULT 'open',
+  "results" text NOT NULL DEFAULT '[]',
+  "total_voters" integer,
+  "opened_at" timestamp NOT NULL DEFAULT now(),
+  "closed_at" timestamp
+);
+CREATE TABLE IF NOT EXISTS "channel_prefs" (
+  "id" serial PRIMARY KEY,
+  "topic" text CONSTRAINT "uq_channel_prefs_topic" UNIQUE NOT NULL,
+  "weight" double precision NOT NULL DEFAULT 1,
+  "samples" integer NOT NULL DEFAULT 0,
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_settings" (
+  "key" text PRIMARY KEY,
+  "value" text NOT NULL DEFAULT '{}',
+  "updated_by" integer,
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_stories" (
+  "id" serial PRIMARY KEY,
+  "title" text NOT NULL,
+  "body" text NOT NULL,
+  "author_label" text,
+  "source_url" text,
+  "approved" boolean NOT NULL DEFAULT FALSE,
+  "approved_by" integer,
+  "approved_at" timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_templates" (
+  "id" serial PRIMARY KEY,
+  "kind" text NOT NULL,
+  "key" text NOT NULL,
+  "body" text NOT NULL,
+  "enabled" boolean NOT NULL DEFAULT TRUE,
+  "updated_by" integer,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "channel_template_versions" (
+  "id" serial PRIMARY KEY,
+  "template_id" integer NOT NULL CONSTRAINT "channel_template_versions_template_id_fkey" REFERENCES "channel_templates" ("id") ON DELETE CASCADE,
+  "body" text NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS "checklist_items" (
   "id" serial PRIMARY KEY,
   "phase" text NOT NULL DEFAULT 'offer',
@@ -957,56 +1157,6 @@ CREATE TABLE IF NOT EXISTS "saved_programs" (
   "program_id" integer NOT NULL CONSTRAINT "saved_programs_program_id_fkey" REFERENCES "programs" ("id") ON DELETE CASCADE,
   "created_at" timestamp NOT NULL DEFAULT now()
 );
-CREATE TABLE IF NOT EXISTS "scholarships" (
-  "id" serial PRIMARY KEY,
-  "title" text NOT NULL,
-  "provider" text NOT NULL,
-  "country" text NOT NULL,
-  "coverage_type" text NOT NULL DEFAULT 'Unspecified',
-  "amount_usd_value" integer,
-  "award_amount" numeric,
-  "award_currency" text,
-  "award_period" text,
-  "award_basis" text,
-  "deadline" text,
-  "degree_levels" text NOT NULL DEFAULT '[]',
-  "eligible_majors" text NOT NULL DEFAULT '[]',
-  "min_gpa" double precision,
-  "min_ielts" double precision,
-  "financial_need_based" boolean DEFAULT FALSE,
-  "merit_based" boolean DEFAULT TRUE,
-  "description" text NOT NULL,
-  "requirements" text NOT NULL,
-  "website_url" text NOT NULL,
-  "university_id" integer CONSTRAINT "scholarships_university_id_fkey" REFERENCES "universities" ("id") ON DELETE SET NULL,
-  "eligible_countries" text DEFAULT '[]',
-  "funding_type" text DEFAULT '',
-  "tuition_coverage" text DEFAULT '',
-  "living_allowance" integer,
-  "travel_allowance" integer,
-  "accommodation" text DEFAULT '',
-  "application_fee" integer,
-  "english_requirements" text DEFAULT '',
-  "required_documents" text DEFAULT '[]',
-  "application_url" text,
-  "opening_date" date,
-  "deadline_date" date,
-  "deadline_type" text NOT NULL DEFAULT 'unknown',
-  "deadline_range_start" date,
-  "deadline_range_end" date,
-  "rounds" text DEFAULT '[]',
-  "recurrence" text NOT NULL DEFAULT 'none',
-  "expected_opening_period" text,
-  "expected_deadline_period" text,
-  "application_status" text NOT NULL DEFAULT 'unknown',
-  "last_verified_at" timestamp,
-  "last_updated_at" timestamp,
-  "verification_status" text NOT NULL DEFAULT 'unverified',
-  "source_reliability" integer NOT NULL DEFAULT 7,
-  "source_url" text,
-  "notes" text,
-  "is_active" boolean NOT NULL DEFAULT TRUE
-);
 CREATE TABLE IF NOT EXISTS "saved_scholarships" (
   "id" serial PRIMARY KEY,
   "profile_id" integer NOT NULL CONSTRAINT "saved_scholarships_profile_id_fkey" REFERENCES "student_profiles" ("id") ON DELETE CASCADE,
@@ -1022,6 +1172,18 @@ CREATE TABLE IF NOT EXISTS "saved_universities" (
   "status" text NOT NULL DEFAULT 'Shortlisted',
   "notes" text DEFAULT '',
   "created_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "scholarship_channel_content" (
+  "scholarship_id" integer PRIMARY KEY CONSTRAINT "scholarship_channel_content_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE CASCADE,
+  "tagline_uz" text,
+  "funding_type_uz" text,
+  "language_req_uz" text,
+  "eligibility_uz" text NOT NULL DEFAULT '[]',
+  "benefits_uz" text NOT NULL DEFAULT '[]',
+  "about_uz" text,
+  "extra_hashtags" text NOT NULL DEFAULT '[]',
+  "updated_by" integer,
+  "updated_at" timestamp NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS "scholarship_decisions" (
   "id" serial PRIMARY KEY,
@@ -1731,6 +1893,179 @@ ALTER TABLE "certificates" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "certificates" ADD COLUMN IF NOT EXISTS "course_id" integer;
 ALTER TABLE "certificates" ADD COLUMN IF NOT EXISTS "certificate_code" text;
 ALTER TABLE "certificates" ADD COLUMN IF NOT EXISTS "issued_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_audit ----------
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "actor_profile_id" integer;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "action" text;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "entity" text;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "entity_id" text;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "before" text;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "after" text;
+ALTER TABLE "channel_audit" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- scholarships ----------
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "title" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "provider" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "country" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "coverage_type" text NOT NULL DEFAULT 'Unspecified';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "amount_usd_value" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_amount" numeric;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_currency" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_period" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_basis" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "degree_levels" text NOT NULL DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_majors" text NOT NULL DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_gpa" double precision;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_ielts" double precision;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "financial_need_based" boolean DEFAULT FALSE;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "merit_based" boolean DEFAULT TRUE;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "description" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "requirements" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "website_url" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "university_id" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_countries" text DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "funding_type" text DEFAULT '';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "tuition_coverage" text DEFAULT '';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "living_allowance" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "travel_allowance" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "accommodation" text DEFAULT '';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_fee" integer;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "english_requirements" text DEFAULT '';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "required_documents" text DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_url" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "opening_date" date;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_date" date;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_type" text NOT NULL DEFAULT 'unknown';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_range_start" date;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_range_end" date;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "rounds" text DEFAULT '[]';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "recurrence" text NOT NULL DEFAULT 'none';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "expected_opening_period" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "expected_deadline_period" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_status" text NOT NULL DEFAULT 'unknown';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "last_updated_at" timestamp;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'unverified';
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "source_reliability" integer NOT NULL DEFAULT 7;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "source_url" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "notes" text;
+ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT TRUE;
+-- ---------- channel_plan ----------
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "plan_date" date;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "slot" integer;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "send_at" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "kind" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "rung" integer;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "template_key" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "topic" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "poll_type" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "payload" text NOT NULL DEFAULT '{}';
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "dedupe_key" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'planned';
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "reason" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "lane" text NOT NULL DEFAULT 'editorial';
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "origin" text NOT NULL DEFAULT 'rotation';
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "text_override" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "pinned" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "skip_reason" text;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "postponed_to" date;
+ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_posts ----------
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "plan_id" integer;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "kind" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "rung" integer;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "plan_date" date;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "slot" integer;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "dedupe_key" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "mode" text NOT NULL DEFAULT 'dryrun';
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "chat_id" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "html" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "message_id" bigint;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "poll_id" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "part" integer NOT NULL DEFAULT 1;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "text_override" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "lane" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'pending';
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "attempts" integer NOT NULL DEFAULT 0;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "error" text;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "sent_at" timestamp;
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "channel_posts" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_clicks ----------
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "code" text;
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "post_id" integer;
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "target_path" text;
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "hits" integer NOT NULL DEFAULT 0;
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "channel_clicks" ADD COLUMN IF NOT EXISTS "last_hit_at" timestamp;
+-- ---------- channel_countries ----------
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "iso2" text;
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "flag" text NOT NULL DEFAULT '';
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "name_uz" text;
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "name_uz_loc" text;
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "hashtag" text;
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "aliases" text NOT NULL DEFAULT '[]';
+ALTER TABLE "channel_countries" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_links ----------
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "kind" text NOT NULL DEFAULT 'custom';
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "url" text;
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "enabled" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "note" text;
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "channel_links" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_link_clicks ----------
+ALTER TABLE "channel_link_clicks" ADD COLUMN IF NOT EXISTS "code" text;
+ALTER TABLE "channel_link_clicks" ADD COLUMN IF NOT EXISTS "day" date;
+ALTER TABLE "channel_link_clicks" ADD COLUMN IF NOT EXISTS "count" integer NOT NULL DEFAULT 0;
+-- ---------- channel_polls ----------
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "post_id" integer;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "message_id" bigint;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "poll_id" text;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "poll_type" text;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "poll_key" text;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "topic" text;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "question" text;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "options" text NOT NULL DEFAULT '[]';
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "correct_index" integer;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'open';
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "results" text NOT NULL DEFAULT '[]';
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "total_voters" integer;
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "opened_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "channel_polls" ADD COLUMN IF NOT EXISTS "closed_at" timestamp;
+-- ---------- channel_prefs ----------
+ALTER TABLE "channel_prefs" ADD COLUMN IF NOT EXISTS "topic" text;
+ALTER TABLE "channel_prefs" ADD COLUMN IF NOT EXISTS "weight" double precision NOT NULL DEFAULT 1;
+ALTER TABLE "channel_prefs" ADD COLUMN IF NOT EXISTS "samples" integer NOT NULL DEFAULT 0;
+ALTER TABLE "channel_prefs" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_settings ----------
+ALTER TABLE "channel_settings" ADD COLUMN IF NOT EXISTS "value" text NOT NULL DEFAULT '{}';
+ALTER TABLE "channel_settings" ADD COLUMN IF NOT EXISTS "updated_by" integer;
+ALTER TABLE "channel_settings" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_stories ----------
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "title" text;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "body" text;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "author_label" text;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "source_url" text;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "approved" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "approved_by" integer;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "approved_at" timestamp;
+ALTER TABLE "channel_stories" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_templates ----------
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "kind" text;
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "key" text;
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "body" text;
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "enabled" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "updated_by" integer;
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+ALTER TABLE "channel_templates" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- channel_template_versions ----------
+ALTER TABLE "channel_template_versions" ADD COLUMN IF NOT EXISTS "template_id" integer;
+ALTER TABLE "channel_template_versions" ADD COLUMN IF NOT EXISTS "body" text;
+ALTER TABLE "channel_template_versions" ADD COLUMN IF NOT EXISTS "created_by" integer;
+ALTER TABLE "channel_template_versions" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 -- ---------- checklist_items ----------
 ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "phase" text NOT NULL DEFAULT 'offer';
 ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "title" text;
@@ -2094,54 +2429,6 @@ ALTER TABLE "requirement_templates" ADD COLUMN IF NOT EXISTS "updated_at" timest
 ALTER TABLE "saved_programs" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "saved_programs" ADD COLUMN IF NOT EXISTS "program_id" integer;
 ALTER TABLE "saved_programs" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
--- ---------- scholarships ----------
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "title" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "provider" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "country" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "coverage_type" text NOT NULL DEFAULT 'Unspecified';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "amount_usd_value" integer;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_amount" numeric;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_currency" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_period" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "award_basis" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "degree_levels" text NOT NULL DEFAULT '[]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_majors" text NOT NULL DEFAULT '[]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_gpa" double precision;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "min_ielts" double precision;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "financial_need_based" boolean DEFAULT FALSE;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "merit_based" boolean DEFAULT TRUE;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "description" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "requirements" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "website_url" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "university_id" integer;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "eligible_countries" text DEFAULT '[]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "funding_type" text DEFAULT '';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "tuition_coverage" text DEFAULT '';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "living_allowance" integer;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "travel_allowance" integer;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "accommodation" text DEFAULT '';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_fee" integer;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "english_requirements" text DEFAULT '';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "required_documents" text DEFAULT '[]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_url" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "opening_date" date;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_date" date;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_type" text NOT NULL DEFAULT 'unknown';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_range_start" date;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "deadline_range_end" date;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "rounds" text DEFAULT '[]';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "recurrence" text NOT NULL DEFAULT 'none';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "expected_opening_period" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "expected_deadline_period" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "application_status" text NOT NULL DEFAULT 'unknown';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "last_updated_at" timestamp;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'unverified';
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "source_reliability" integer NOT NULL DEFAULT 7;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "source_url" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "notes" text;
-ALTER TABLE "scholarships" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT TRUE;
 -- ---------- saved_scholarships ----------
 ALTER TABLE "saved_scholarships" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "saved_scholarships" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
@@ -2154,6 +2441,16 @@ ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "university_id" intege
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'Shortlisted';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "notes" text DEFAULT '';
 ALTER TABLE "saved_universities" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- scholarship_channel_content ----------
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "tagline_uz" text;
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "funding_type_uz" text;
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "language_req_uz" text;
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "eligibility_uz" text NOT NULL DEFAULT '[]';
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "benefits_uz" text NOT NULL DEFAULT '[]';
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "about_uz" text;
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "extra_hashtags" text NOT NULL DEFAULT '[]';
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "updated_by" integer;
+ALTER TABLE "scholarship_channel_content" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 -- ---------- scholarship_decisions ----------
 ALTER TABLE "scholarship_decisions" ADD COLUMN IF NOT EXISTS "profile_id" integer;
 ALTER TABLE "scholarship_decisions" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
@@ -2432,6 +2729,21 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_arrival_items_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_arrival_items_profile" ON "arrival_checklist_items" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_arrival_items_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_arrival_items_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_arrival_items_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_arrival_items_key" ON "arrival_checklist_items" ("profile_id", "item_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_arrival_items_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_arrival_items_key skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_career_discoveries_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_career_discoveries_profile" ON "career_discoveries" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_career_discoveries_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_career_discoveries_profile skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_audit_created') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_audit_created" ON "channel_audit" ("created_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_audit_created skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_audit_created skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_scholarships_university') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_scholarships_university" ON "scholarships" ("university_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_scholarships_university skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_scholarships_university skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_channel_plan_identity') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_channel_plan_identity" ON "channel_plan" ("kind", "scholarship_id", "rung", "plan_date", "slot"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_channel_plan_identity skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_channel_plan_identity skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_plan_date') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_plan_date" ON "channel_plan" ("plan_date"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_plan_date skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_plan_date skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_channel_posts_identity') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_channel_posts_identity" ON "channel_posts" ("kind", "scholarship_id", "rung", "plan_date", "slot"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_channel_posts_identity skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_channel_posts_identity skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_posts_status') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_posts_status" ON "channel_posts" ("status"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_posts_status skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_posts_status skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_posts_sent') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_posts_sent" ON "channel_posts" ("sent_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_posts_sent skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_posts_sent skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_clicks_post') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_clicks_post" ON "channel_clicks" ("post_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_clicks_post skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_clicks_post skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_channel_links_scholarship_kind') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_channel_links_scholarship_kind" ON "channel_links" ("scholarship_id", "kind"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_channel_links_scholarship_kind skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_channel_links_scholarship_kind skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_channel_link_clicks_code_day') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_channel_link_clicks_code_day" ON "channel_link_clicks" ("code", "day"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_channel_link_clicks_code_day skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_channel_link_clicks_code_day skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_link_clicks_day') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_link_clicks_day" ON "channel_link_clicks" ("day"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_link_clicks_day skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_link_clicks_day skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_polls_opened') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_polls_opened" ON "channel_polls" ("opened_at"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_polls_opened skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_polls_opened skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_stories_approved') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_stories_approved" ON "channel_stories" ("approved"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_stories_approved skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_stories_approved skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_channel_templates_kind_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_channel_templates_kind_key" ON "channel_templates" ("kind", "key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_channel_templates_kind_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_channel_templates_kind_key skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_channel_template_versions') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_channel_template_versions" ON "channel_template_versions" ("template_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_channel_template_versions skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_channel_template_versions skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_versions_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile" ON "essay_versions" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_versions_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_versions_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_versions_profile_type') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_versions_profile_type" ON "essay_versions" ("profile_id", "essay_type", "version_number"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_versions_profile_type skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_versions_profile_type skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_essay_reviews_version') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_essay_reviews_version" ON "essay_reviews" ("essay_version_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_essay_reviews_version skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_essay_reviews_version skipped: column missing'; END; END IF; END $$;
@@ -2456,7 +2768,6 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_requirement_templates_uni') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_requirement_templates_uni" ON "requirement_templates" ("university_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_requirement_templates_uni skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_requirement_templates_uni skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_requirement_templates_program') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_requirement_templates_program" ON "requirement_templates" ("program_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_requirement_templates_program skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_requirement_templates_program skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_saved_programs_profile_program') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_saved_programs_profile_program" ON "saved_programs" ("profile_id", "program_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_saved_programs_profile_program skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_saved_programs_profile_program skipped: column missing'; END; END IF; END $$;
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_scholarships_university') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_scholarships_university" ON "scholarships" ("university_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_scholarships_university skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_scholarships_university skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_saved_scholarships_profile_scholarship') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_saved_scholarships_profile_scholarship" ON "saved_scholarships" ("profile_id", "scholarship_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_saved_scholarships_profile_scholarship skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_saved_scholarships_profile_scholarship skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_saved_universities_profile_university') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_saved_universities_profile_university" ON "saved_universities" ("profile_id", "university_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_saved_universities_profile_university skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_saved_universities_profile_university skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_scholarship_decisions_profile_sch') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_scholarship_decisions_profile_sch" ON "scholarship_decisions" ("profile_id", "scholarship_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_scholarship_decisions_profile_sch skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_scholarship_decisions_profile_sch skipped: column missing'; END; END IF; END $$;
@@ -2498,6 +2809,11 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'pub
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.app_config'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.app_config'::regclass AND attname = 'key')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.app_config'::regclass AND ix.relname = 'uq_app_config_key' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_app_config_key')) THEN DROP INDEX uq_app_config_key; END IF; ALTER TABLE "app_config" ADD CONSTRAINT "uq_app_config_key" UNIQUE ("key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_app_config_key skipped: duplicate app_config.key values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_app_config_key: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.course_categories'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.course_categories'::regclass AND attname = 'slug')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.course_categories'::regclass AND ix.relname = 'uq_course_categories_slug' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_course_categories_slug')) THEN DROP INDEX uq_course_categories_slug; END IF; ALTER TABLE "course_categories" ADD CONSTRAINT "uq_course_categories_slug" UNIQUE ("slug"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_course_categories_slug skipped: duplicate course_categories.slug values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_course_categories_slug: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.certificates'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.certificates'::regclass AND attname = 'certificate_code')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.certificates'::regclass AND ix.relname = 'uq_certificates_certificate_code' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_certificates_certificate_code')) THEN DROP INDEX uq_certificates_certificate_code; END IF; ALTER TABLE "certificates" ADD CONSTRAINT "uq_certificates_certificate_code" UNIQUE ("certificate_code"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_certificates_certificate_code skipped: duplicate certificates.certificate_code values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_certificates_certificate_code: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_plan'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_plan'::regclass AND attname = 'dedupe_key')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.channel_plan'::regclass AND ix.relname = 'uq_channel_plan_dedupe_key' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_channel_plan_dedupe_key')) THEN DROP INDEX uq_channel_plan_dedupe_key; END IF; ALTER TABLE "channel_plan" ADD CONSTRAINT "uq_channel_plan_dedupe_key" UNIQUE ("dedupe_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_channel_plan_dedupe_key skipped: duplicate channel_plan.dedupe_key values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_channel_plan_dedupe_key: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_posts'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_posts'::regclass AND attname = 'dedupe_key')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.channel_posts'::regclass AND ix.relname = 'uq_channel_posts_dedupe_key' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_channel_posts_dedupe_key')) THEN DROP INDEX uq_channel_posts_dedupe_key; END IF; ALTER TABLE "channel_posts" ADD CONSTRAINT "uq_channel_posts_dedupe_key" UNIQUE ("dedupe_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_channel_posts_dedupe_key skipped: duplicate channel_posts.dedupe_key values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_channel_posts_dedupe_key: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_clicks'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_clicks'::regclass AND attname = 'code')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.channel_clicks'::regclass AND ix.relname = 'uq_channel_clicks_code' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_channel_clicks_code')) THEN DROP INDEX uq_channel_clicks_code; END IF; ALTER TABLE "channel_clicks" ADD CONSTRAINT "uq_channel_clicks_code" UNIQUE ("code"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_channel_clicks_code skipped: duplicate channel_clicks.code values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_channel_clicks_code: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_polls'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_polls'::regclass AND attname = 'post_id')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.channel_polls'::regclass AND ix.relname = 'uq_channel_polls_post_id' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_channel_polls_post_id')) THEN DROP INDEX uq_channel_polls_post_id; END IF; ALTER TABLE "channel_polls" ADD CONSTRAINT "uq_channel_polls_post_id" UNIQUE ("post_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_channel_polls_post_id skipped: duplicate channel_polls.post_id values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_channel_polls_post_id: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_prefs'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_prefs'::regclass AND attname = 'topic')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.channel_prefs'::regclass AND ix.relname = 'uq_channel_prefs_topic' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_channel_prefs_topic')) THEN DROP INDEX uq_channel_prefs_topic; END IF; ALTER TABLE "channel_prefs" ADD CONSTRAINT "uq_channel_prefs_topic" UNIQUE ("topic"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_channel_prefs_topic skipped: duplicate channel_prefs.topic values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_channel_prefs_topic: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.forum_categories'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.forum_categories'::regclass AND attname = 'slug')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.forum_categories'::regclass AND ix.relname = 'uq_forum_categories_slug' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_forum_categories_slug')) THEN DROP INDEX uq_forum_categories_slug; END IF; ALTER TABLE "forum_categories" ADD CONSTRAINT "uq_forum_categories_slug" UNIQUE ("slug"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_forum_categories_slug skipped: duplicate forum_categories.slug values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_forum_categories_slug: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.learning_providers'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.learning_providers'::regclass AND attname = 'provider_key')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.learning_providers'::regclass AND ix.relname = 'uq_learning_providers_provider_key' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_learning_providers_provider_key')) THEN DROP INDEX uq_learning_providers_provider_key; END IF; ALTER TABLE "learning_providers" ADD CONSTRAINT "uq_learning_providers_provider_key" UNIQUE ("provider_key"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_learning_providers_provider_key skipped: duplicate learning_providers.provider_key values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_learning_providers_provider_key: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.notification_preferences'::regclass AND c.contype = 'u' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.notification_preferences'::regclass AND attname = 'profile_id')::smallint]) THEN BEGIN IF EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ix ON ix.oid = i.indexrelid WHERE i.indrelid = 'public.notification_preferences'::regclass AND ix.relname = 'uq_notification_preferences_profile_id' AND i.indisunique AND NOT EXISTS (SELECT 1 FROM pg_constraint pc WHERE pc.conname = 'uq_notification_preferences_profile_id')) THEN DROP INDEX uq_notification_preferences_profile_id; END IF; ALTER TABLE "notification_preferences" ADD CONSTRAINT "uq_notification_preferences_profile_id" UNIQUE ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'uq_notification_preferences_profile_id skipped: duplicate notification_preferences.profile_id values exist'; WHEN duplicate_object THEN RAISE NOTICE 'uq_notification_preferences_profile_id: name already taken by another object — rename it manually, then re-run'; END; END IF; END $$;
@@ -2534,6 +2850,15 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'pub
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.career_discoveries'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.career_discoveries'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "career_discoveries" ADD CONSTRAINT "career_discoveries_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK career_discoveries_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.certificates'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.certificates'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "certificates" ADD CONSTRAINT "certificates_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK certificates_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.certificates'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.certificates'::regclass AND attname = 'course_id')::smallint] AND c.confrelid = 'public.courses'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.courses'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "certificates" ADD CONSTRAINT "certificates_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK certificates_course_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_clicks'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_clicks'::regclass AND attname = 'post_id')::smallint] AND c.confrelid = 'public.channel_posts'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_posts'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_clicks" ADD CONSTRAINT "channel_clicks_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "channel_posts" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_clicks_post_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_clicks'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_clicks'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_clicks" ADD CONSTRAINT "channel_clicks_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_clicks_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_link_clicks'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_link_clicks'::regclass AND attname = 'code')::smallint] AND c.confrelid = 'public.channel_links'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_links'::regclass AND attname = 'code')::smallint]) THEN BEGIN ALTER TABLE "channel_link_clicks" ADD CONSTRAINT "channel_link_clicks_code_fkey" FOREIGN KEY ("code") REFERENCES "channel_links" ("code") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_link_clicks_code_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_links'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_links'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_links" ADD CONSTRAINT "channel_links_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_links_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_plan'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_plan'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_plan" ADD CONSTRAINT "channel_plan_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_plan_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_polls'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_polls'::regclass AND attname = 'post_id')::smallint] AND c.confrelid = 'public.channel_posts'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_posts'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_polls" ADD CONSTRAINT "channel_polls_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "channel_posts" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_polls_post_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_posts'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_posts'::regclass AND attname = 'plan_id')::smallint] AND c.confrelid = 'public.channel_plan'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_plan'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_posts" ADD CONSTRAINT "channel_posts_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "channel_plan" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_posts_plan_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_posts'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_posts'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_posts" ADD CONSTRAINT "channel_posts_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_posts_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.channel_template_versions'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_template_versions'::regclass AND attname = 'template_id')::smallint] AND c.confrelid = 'public.channel_templates'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.channel_templates'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "channel_template_versions" ADD CONSTRAINT "channel_template_versions_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "channel_templates" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK channel_template_versions_template_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.consulting_requests'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.consulting_requests'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "consulting_requests" ADD CONSTRAINT "consulting_requests_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK consulting_requests_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.course_enrollments'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.course_enrollments'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "course_enrollments" ADD CONSTRAINT "course_enrollments_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK course_enrollments_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.course_enrollments'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.course_enrollments'::regclass AND attname = 'course_id')::smallint] AND c.confrelid = 'public.courses'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.courses'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "course_enrollments" ADD CONSTRAINT "course_enrollments_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK course_enrollments_course_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
@@ -2590,6 +2915,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'pub
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.saved_scholarships'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.saved_scholarships'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "saved_scholarships" ADD CONSTRAINT "saved_scholarships_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK saved_scholarships_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.saved_universities'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.saved_universities'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "saved_universities" ADD CONSTRAINT "saved_universities_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK saved_universities_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.saved_universities'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.saved_universities'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "saved_universities" ADD CONSTRAINT "saved_universities_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK saved_universities_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.scholarship_channel_content'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarship_channel_content'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "scholarship_channel_content" ADD CONSTRAINT "scholarship_channel_content_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK scholarship_channel_content_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.scholarship_decisions'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarship_decisions'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "scholarship_decisions" ADD CONSTRAINT "scholarship_decisions_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK scholarship_decisions_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.scholarship_decisions'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarship_decisions'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "scholarship_decisions" ADD CONSTRAINT "scholarship_decisions_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK scholarship_decisions_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.scholarship_sources'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarship_sources'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "scholarship_sources" ADD CONSTRAINT "scholarship_sources_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK scholarship_sources_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
