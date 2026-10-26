@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send, Crown } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send, Crown, Megaphone } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
@@ -24,6 +24,7 @@ import { NavManager } from "./admin/NavManager";
 import { AdminOverview } from "./admin/AdminOverview";
 import { StoriesModeration } from "./admin/growth/StoriesModeration";
 import { GuideManager } from "./admin/growth/GuideManager";
+import { ChannelManager } from "./admin/ChannelManager";
 import { TelegramManager } from "./admin/TelegramManager";
 import { CatalogManager, type FieldDef } from "./admin/growth/CatalogManager";
 import { CHECKLIST_PHASES, GOAL_LEVELS, GOAL_PILLARS, PROMPT_CATEGORIES } from "@/lib/growth/defaults";
@@ -74,6 +75,7 @@ type AdminTab =
   | "vaultPrompts"
   | "checklist"
   | "telegram"
+  | "channel"
   | "ownership";
 
 type AdminGroup = "home" | "content" | "community" | "growth" | "money" | "system";
@@ -98,6 +100,7 @@ const SECTIONS: { id: AdminTab; group: AdminGroup; icon: React.ComponentType<{ c
   { id: "navigation", group: "growth", icon: Menu },
   { id: "premium", group: "money", icon: Gift },
   { id: "telegram", group: "system", icon: Send, isNew: true },
+  { id: "channel", group: "system", icon: Megaphone, isNew: true },
   { id: "config", group: "system", icon: Settings2 },
   { id: "ai", group: "system", icon: KeyRound },
   { id: "audit", group: "system", icon: History },
@@ -236,6 +239,8 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
         return <GuideManager />;
       case "telegram":
         return <TelegramManager />;
+      case "channel":
+        return <ChannelManager />;
       case "ownership":
         return <OwnershipManager />;
       case "goalLibrary":

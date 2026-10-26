@@ -7,9 +7,17 @@
  * `mergeChannelSettings`, which silently repairs anything out of range — the
  * admin UI shows the repaired value, so it is never a surprise.
  */
-import { inArray } from "drizzle-orm";
+import { desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { channelCountries, channelSettings, scholarshipChannelContent } from "@/db/schema";
+import {
+  channelAudit,
+  channelCountries,
+  channelLinkClicks,
+  channelLinks,
+  channelSettings,
+  scholarshipChannelContent,
+} from "@/db/schema";
+import { isSameOrigin, scholarshipLinkCode, siteLinkPath } from "./links";
 import { CHANNEL_COUNTRIES, countryFromRow, type ChannelCountry } from "./countries";
 import { contentFromRow, type ScholarshipContent } from "./content";
 import { ensureChannelTables } from "./db";
@@ -147,4 +155,204 @@ export async function upsertChannelContent(
     .insert(scholarshipChannelContent)
     .values(values)
     .onConflictDoUpdate({ target: scholarshipChannelContent.scholarshipId, set: values });
+}
+
+/* ----------------------------------------------------------------- */
+/* Audit trail (channel_audit — append only)                          */
+/* ----------------------------------------------------------------- */
+
+export interface ChannelAuditEntry {
+  actorProfileId: number | null;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  before?: unknown;
+  after?: unknown;
+}
+
+export async function writeChannelAudit(entry: ChannelAuditEntry): Promise<void> {
+  try {
+    await db.insert(channelAudit).values({
+      actorProfileId: entry.actorProfileId,
+      action: entry.action,
+      entity: entry.entity,
+      entityId: entry.entityId ?? null,
+      before: entry.before === undefined ? null : JSON.stringify(entry.before),
+      after: entry.after === undefined ? null : JSON.stringify(entry.after),
+    });
+  } catch (err) {
+    // Never fail a mutation because the log write failed.
+    console.error("[channel] audit write failed:", err);
+  }
+}
+
+export async function recentChannelAudit(limit = 100) {
+  try {
+    return await db.select().from(channelAudit).orderBy(desc(channelAudit.createdAt)).limit(Math.min(500, limit));
+  } catch (err) {
+    console.error("[channel] audit read failed:", err);
+    return [];
+  }
+}
+
+/* ----------------------------------------------------------------- */
+/* Countries                                                          */
+/* ----------------------------------------------------------------- */
+
+export async function upsertChannelCountry(row: {
+  key: string;
+  iso2: string | null;
+  flag: string;
+  nameUz: string;
+  nameUzLoc: string | null;
+  hashtag: string | null;
+  aliases: string[];
+}): Promise<void> {
+  const values = {
+    key: row.key,
+    iso2: row.iso2,
+    flag: row.flag,
+    nameUz: row.nameUz,
+    nameUzLoc: row.nameUzLoc,
+    hashtag: row.hashtag,
+    aliases: JSON.stringify(row.aliases),
+    updatedAt: new Date(),
+  };
+  await db.insert(channelCountries).values(values).onConflictDoUpdate({ target: channelCountries.key, set: values });
+}
+
+export async function deleteChannelCountry(key: string): Promise<boolean> {
+  const rows = await db.delete(channelCountries).where(eq(channelCountries.key, key)).returning({ key: channelCountries.key });
+  return rows.length > 0;
+}
+
+/* ----------------------------------------------------------------- */
+/* Short links                                                        */
+/* ----------------------------------------------------------------- */
+
+export interface ChannelLinkRow {
+  code: string;
+  kind: string;
+  scholarshipId: number | null;
+  url: string;
+  enabled: boolean;
+  note: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export async function loadChannelLinks(): Promise<ChannelLinkRow[]> {
+  if (!(await ensureChannelTables())) return [];
+  try {
+    return await db.select().from(channelLinks).orderBy(desc(channelLinks.createdAt)).limit(1000);
+  } catch (err) {
+    console.error("[channel] link read failed:", err);
+    return [];
+  }
+}
+
+/**
+ * Create (or refresh) the stable "site" link for a scholarship. The URL is
+ * never taken from a request: it is rebuilt from the configured origin and the
+ * scholarship id, so a poisoned row cannot become an open redirect.
+ */
+/**
+ * A "site" link always points at our own origin — it is built here, never taken
+ * from a request — so the rule is "same origin as the configured site", not the
+ * public-HTTPS test that external destinations must pass. That keeps local and
+ * staging deployments (http://localhost) working without weakening `/go`.
+ */
+export async function ensureSiteLink(scholarshipId: number, siteUrl: string): Promise<string | null> {
+  if (!siteUrl || !Number.isInteger(scholarshipId) || scholarshipId <= 0) return null;
+  const code = scholarshipLinkCode(scholarshipId, "site");
+  const url = `${siteUrl.replace(/\/+$/, "")}${siteLinkPath(scholarshipId)}`;
+  if (!isSameOrigin(url, siteUrl)) return null;
+  try {
+    await db
+      .insert(channelLinks)
+      .values({ code, kind: "site", scholarshipId, url })
+      .onConflictDoUpdate({ target: channelLinks.code, set: { url, updatedAt: new Date() } });
+    return code;
+  } catch (err) {
+    console.error("[channel] link upsert failed:", err);
+    return null;
+  }
+}
+
+/** Refresh every "site" link after the origin changed. */
+export async function syncSiteLinks(siteUrl: string): Promise<number> {
+  if (!siteUrl) return 0;
+  const rows = await db.select({ code: channelLinks.code, scholarshipId: channelLinks.scholarshipId }).from(channelLinks).where(eq(channelLinks.kind, "site"));
+  let updated = 0;
+  for (const row of rows) {
+    if (row.scholarshipId === null) continue;
+    const url = `${siteUrl.replace(/\/+$/, "")}${siteLinkPath(row.scholarshipId)}`;
+    if (!isSameOrigin(url, siteUrl)) continue;
+    await db.update(channelLinks).set({ url, updatedAt: new Date() }).where(eq(channelLinks.code, row.code));
+    updated++;
+  }
+  return updated;
+}
+
+export async function upsertChannelLink(row: {
+  code: string;
+  kind: "site" | "official" | "custom";
+  scholarshipId: number | null;
+  url: string;
+  enabled: boolean;
+  note: string | null;
+}): Promise<void> {
+  const values = {
+    code: row.code,
+    kind: row.kind,
+    scholarshipId: row.scholarshipId,
+    url: row.url,
+    enabled: row.enabled,
+    note: row.note,
+    updatedAt: new Date(),
+  };
+  await db.insert(channelLinks).values(values).onConflictDoUpdate({ target: channelLinks.code, set: values });
+}
+
+export async function setChannelLinkEnabled(code: string, enabled: boolean): Promise<boolean> {
+  const rows = await db
+    .update(channelLinks)
+    .set({ enabled, updatedAt: new Date() })
+    .where(eq(channelLinks.code, code))
+    .returning({ code: channelLinks.code });
+  return rows.length > 0;
+}
+
+export async function deleteChannelLink(code: string): Promise<boolean> {
+  const rows = await db.delete(channelLinks).where(eq(channelLinks.code, code)).returning({ code: channelLinks.code });
+  return rows.length > 0;
+}
+
+/** One visit: aggregate per (code, day). Telegram's crawler and HEAD are skipped. */
+export async function recordClick(code: string, day: string): Promise<void> {
+  await db
+    .insert(channelLinkClicks)
+    .values({ code, day, count: 1 })
+    .onConflictDoUpdate({
+      target: [channelLinkClicks.code, channelLinkClicks.day],
+      set: { count: sql`${channelLinkClicks.count} + 1` },
+    });
+}
+
+/** Clicks per code over the last `days` days. */
+export async function clickCounts(days = 30): Promise<Record<string, number>> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  try {
+    const rows = await db
+      .select({ code: channelLinkClicks.code, total: sql<number>`sum(${channelLinkClicks.count})` })
+      .from(channelLinkClicks)
+      .where(gte(channelLinkClicks.day, since))
+      .groupBy(channelLinkClicks.code);
+    const out: Record<string, number> = {};
+    for (const row of rows) out[row.code] = Number(row.total ?? 0);
+    return out;
+  } catch (err) {
+    console.error("[channel] click read failed:", err);
+    return {};
+  }
 }

@@ -1,0 +1,157 @@
+/**
+ * Admin-initiated actions on the publisher: build today's plan, send what is
+ * due, and the small summary the dashboard header shows.
+ *
+ * These are the same code paths the cron job uses — the admin buttons cannot
+ * bypass validation, only the daily cap (an explicit, logged override).
+ */
+import { and, eq, gte, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { channelPlan, channelPosts } from "@/db/schema";
+import { resolveChannelRuntime, tashkentDay } from "./config";
+import { ensureChannelTables } from "./db";
+import { ensurePlanLinks, todayQueue } from "./admin";
+import { loadChannelSettings, writeChannelAudit } from "./repo";
+import { runDuePosts, sendPlanRow } from "./send";
+import { runDailyPlan } from "./store";
+
+export interface PlanRunSummary {
+  planDate: string;
+  planned: number;
+  inserted: number;
+  duplicates: number;
+  candidates: number;
+  quiet: boolean;
+  blockedReason: string | null;
+}
+
+/** Build today's plan (idempotent — a second run inserts nothing). */
+export async function runPlanForToday(actorProfileId: number | null): Promise<PlanRunSummary> {
+  await ensureChannelTables();
+  const settings = await loadChannelSettings();
+  const runtime = resolveChannelRuntime(settings);
+  const result = await runDailyPlan(new Date(), {
+    siteUrl: runtime.siteUrl,
+    discussionEnabled: runtime.discussionEnabled,
+    settings,
+  });
+  const links = await ensurePlanLinks();
+  await writeChannelAudit({
+    actorProfileId,
+    action: "plan_run",
+    entity: "plan",
+    entityId: result.planDate,
+    after: { planned: result.planned, inserted: result.inserted, links },
+  });
+  return {
+    planDate: result.planDate,
+    planned: result.planned,
+    inserted: result.inserted,
+    duplicates: result.duplicates,
+    candidates: result.candidates,
+    quiet: result.quiet,
+    blockedReason: runtime.blockedReason,
+  };
+}
+
+export interface RunPostsSummary {
+  attempted: number;
+  sent: number;
+  dryrun: number;
+  failed: number;
+  skipped: number;
+  reasons: string[];
+  blockedReason: string | null;
+}
+
+/** Send everything that is due right now (at most the daily cap). */
+export async function runPostsNow(actorProfileId: number | null, opts: { force?: boolean } = {}): Promise<RunPostsSummary> {
+  await ensureChannelTables();
+  const settings = await loadChannelSettings();
+  const runtime = resolveChannelRuntime(settings);
+
+  if (!opts.force && runtime.blockedReason) {
+    return {
+      attempted: 0,
+      sent: 0,
+      dryrun: 0,
+      failed: 0,
+      skipped: 0,
+      reasons: [runtime.blockedReason],
+      blockedReason: runtime.blockedReason,
+    };
+  }
+
+  const day = tashkentDay();
+  const [existing] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(channelPlan)
+    .where(eq(channelPlan.planDate, day));
+  if (Number(existing?.count ?? 0) === 0) await runPlanForToday(actorProfileId);
+
+  const outcomes = await runDuePosts(new Date(), Math.min(3, settings.plan.dailyCap));
+  const summary: RunPostsSummary = {
+    attempted: outcomes.length,
+    sent: outcomes.filter((o) => o.status === "sent").length,
+    dryrun: outcomes.filter((o) => o.status === "dryrun").length,
+    failed: outcomes.filter((o) => o.status === "failed").length,
+    skipped: outcomes.filter((o) => o.status === "skipped").length,
+    reasons: outcomes.map((o) => o.reason).filter((r): r is string => Boolean(r)),
+    blockedReason: runtime.blockedReason,
+  };
+  await writeChannelAudit({ actorProfileId, action: "posts_run", entity: "post", after: summary });
+  return summary;
+}
+
+/** Explicit "send this one now", used by the queue row action. */
+export async function postNow(planId: number, actorProfileId: number, opts: { toAdminChat?: boolean } = {}) {
+  const [row] = await db.select().from(channelPlan).where(eq(channelPlan.id, planId)).limit(1);
+  if (!row) return { ok: false as const, error: "not_found" };
+  const outcome = await sendPlanRow(row, { force: true, toAdminChat: opts.toAdminChat, actorProfileId });
+  await writeChannelAudit({
+    actorProfileId,
+    action: opts.toAdminChat ? "post_test" : "post_now",
+    entity: "plan",
+    entityId: String(planId),
+    after: { status: outcome.status, reason: outcome.reason },
+  });
+  return { ok: outcome.ok, outcome } as const;
+}
+
+export interface ChannelStatusSummary {
+  planDate: string;
+  planned: number;
+  sentToday: number;
+  failedToday: number;
+  queue: Awaited<ReturnType<typeof todayQueue>>;
+  blockedReason: string | null;
+  mode: string;
+}
+
+export async function channelAdminSummary(): Promise<ChannelStatusSummary> {
+  const settings = await loadChannelSettings();
+  const runtime = resolveChannelRuntime(settings);
+  const day = tashkentDay();
+  const midnight = new Date(`${day}T00:00:00+05:00`);
+  const [planned] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(channelPlan)
+    .where(and(eq(channelPlan.planDate, day), eq(channelPlan.status, "planned")));
+  const [sent] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(channelPosts)
+    .where(and(eq(channelPosts.status, "sent"), gte(channelPosts.sentAt, midnight)));
+  const [failed] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(channelPosts)
+    .where(and(eq(channelPosts.status, "failed"), gte(channelPosts.createdAt, midnight)));
+  return {
+    planDate: day,
+    planned: Number(planned?.count ?? 0),
+    sentToday: Number(sent?.count ?? 0),
+    failedToday: Number(failed?.count ?? 0),
+    queue: await todayQueue(day),
+    blockedReason: runtime.blockedReason,
+    mode: runtime.mode,
+  };
+}

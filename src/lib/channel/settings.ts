@@ -15,7 +15,25 @@ export interface LinkItem {
   url: string;
 }
 
+/**
+ * Channel connection, editable in Admin → Kanal. The bot token is NOT here: it
+ * lives in Admin → Telegram (or the environment) and never appears in the
+ * channel UI.
+ */
+export interface ChannelConnection {
+  /** `-100…` id or `@username` of the channel the bot posts to. */
+  channelId: string;
+  /** Private admin chat: dry-run target and failure alerts. */
+  adminChatId: string;
+  /** Feature switch. `CHANNEL_AUTOPOST=off` still forces everything off. */
+  mode: ChannelMode;
+  /** Last day (inclusive, Asia/Tashkent) the publisher stays paused. */
+  pausedUntil: string | null;
+}
+
 export interface ChannelSettings {
+  /** Channel wiring; empty values mean "not connected yet". */
+  connection: ChannelConnection;
   /** Shown in placeholders and admin headers. */
   brand: string;
   /** Without the leading @. */
@@ -64,6 +82,7 @@ export interface ChannelSettings {
 export const DEFAULT_FOOTER_LABELS = { channel: "Kanal", bot: "Bot" } as const;
 
 export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
+  connection: { channelId: "", adminChatId: "", mode: "off", pausedUntil: null },
   brand: "ScholarBridge",
   channelUsername: "",
   botUsername: "",
@@ -184,6 +203,27 @@ function boolMap(value: unknown, fallback: Record<string, boolean>): Record<stri
 }
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MODES: readonly ChannelMode[] = ["off", "dryrun", "on"];
+
+/** `-100…` numeric id or `@username` — the same rule the sender applies. */
+export function looksLikeChannelId(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const value = raw.trim();
+  if (!value) return false;
+  if (/^-?\d{5,20}$/.test(value)) return true;
+  return /^@[A-Za-z][A-Za-z0-9_]{4,31}$/.test(value);
+}
+
+/** Private chats are always numeric. */
+export function looksLikeChatId(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  return /^-?\d{5,20}$/.test(raw.trim());
+}
+
+export function isChannelMode(raw: unknown): raw is ChannelMode {
+  return typeof raw === "string" && MODES.includes(raw as ChannelMode);
+}
 
 function time(value: unknown, fallback: string): string {
   return typeof value === "string" && TIME_RE.test(value) ? value : fallback;
@@ -205,11 +245,26 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
     }
   }
 
+  const connectionRaw = (b.connection && typeof b.connection === "object" && !Array.isArray(b.connection)
+    ? b.connection
+    : {}) as Record<string, unknown>;
+  const pausedRaw = str(connectionRaw.pausedUntil, "").trim();
+
   const dailyCap = intIn(plan.dailyCap, d.plan.dailyCap, 1, 3);
   const budgetMin = intIn(plan.budgetMin, d.plan.budgetMin, 0, dailyCap);
   const budgetMax = intIn(plan.budgetMax, d.plan.budgetMax, budgetMin, dailyCap);
 
   return {
+    connection: {
+      channelId: looksLikeChannelId(connectionRaw.channelId)
+        ? str(connectionRaw.channelId, "").trim()
+        : d.connection.channelId,
+      adminChatId: looksLikeChatId(connectionRaw.adminChatId)
+        ? str(connectionRaw.adminChatId, "").trim()
+        : d.connection.adminChatId,
+      mode: isChannelMode(connectionRaw.mode) ? connectionRaw.mode : d.connection.mode,
+      pausedUntil: ISO_DAY_RE.test(pausedRaw) ? pausedRaw : null,
+    },
     brand: str(b.brand, d.brand).slice(0, 40) || d.brand,
     channelUsername: str(b.channelUsername, d.channelUsername).replace(/^@/, "").slice(0, 32),
     botUsername: str(b.botUsername, d.botUsername).replace(/^@/, "").slice(0, 32),
@@ -286,6 +341,7 @@ export function footerEnabledFor(settings: ChannelSettings, kind: string): boole
 
 /** Keys written to `channel_settings`; each row holds one JSON object. */
 export const SETTINGS_KEYS = [
+  "connection",
   "brand",
   "footer_main",
   "footer_social",
@@ -300,6 +356,7 @@ export type SettingsKey = (typeof SETTINGS_KEYS)[number];
 /** Split a full settings object into the rows we persist. */
 export function settingsRows(settings: ChannelSettings): Record<SettingsKey, unknown> {
   return {
+    connection: settings.connection,
     brand: {
       brand: settings.brand,
       channelUsername: settings.channelUsername,
@@ -334,6 +391,7 @@ export function settingsFromRows(rows: { key: string; value: string | null }[]):
       raw.plan = parsed;
       continue;
     }
+    if (row.key === "connection") raw.connection = parsed;
     if (row.key === "hashtags") raw.hashtags = parsed;
     if (row.key === "footer_main") raw.footerMain = parsed;
     if (row.key === "footer_social") raw.footerSocial = parsed;
