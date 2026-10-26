@@ -97,3 +97,18 @@ VALUES ('https://www.kas.de/en/web/begabtenfoerderung-und-kultur/international-t
 
 INSERT INTO scholarship_sources (scholarship_id, source_id, source_type, created_at)
 VALUES (913, 3045, 'official', now()), (914, 3046, 'official', now());
+
+-- ERRATA (added 2026-10-26, enrichment batch 6): verification by URL showed
+-- the two sources above were created in the opposite id order to what the
+-- parallel INSERT results suggested: in the database, source 3045 is the
+-- kas.de page and source 3046 is the scholarships.sk page (the reverse of
+-- the "-- 3045 / -- 3046" comments above). The link INSERT therefore
+-- pointed each scholarship at the other's source. This was corrected in
+-- batch 6 with:
+--   UPDATE scholarship_sources
+--   SET source_id = CASE WHEN scholarship_id = 913 THEN 3046 ELSE 3045 END
+--   WHERE (scholarship_id, source_id) IN ((913, 3045), (914, 3046));
+-- Final correct state: 913 Slovak NSP -> 3046 (scholarships.sk);
+-- 914 KAS -> 3045 (kas.de). The statements above are kept as executed for
+-- audit; any replay must apply this correction afterwards. Lesson recorded:
+-- never map parallel INSERT results positionally - re-SELECT by URL/title.
