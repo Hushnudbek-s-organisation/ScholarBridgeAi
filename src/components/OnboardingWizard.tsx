@@ -336,7 +336,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               : data.code === "invalid_email"
                 ? tOnboarding("invalidEmail")
                 : data.code === "weak_password"
-                  ? tOnboarding("weakPassword")
+                  ? tOnboarding("weakPassword", { minimum: MIN_PASSWORD_LENGTH })
                   : data.code === "study_interests_invalid"
                     ? tOnboarding("selectStudyInterest")
                     : tOnboarding("createError");

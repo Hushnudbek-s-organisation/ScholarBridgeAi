@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
+import { ScholarshipFiltersPanel } from "@/components/ScholarshipFilters";
 import { StudentProfile } from "./Navbar";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
@@ -13,9 +13,23 @@ import { CountryFlag } from "@/components/CountryFlag";
 import {
   localizeCountry,
   localizeCoverageType,
+  localizeDegreeLevel,
   localizeScholarshipProvider,
   localizeScholarshipTitle,
 } from "@/lib/catalogLocalizer";
+import {
+  EMPTY_SCHOLARSHIP_FACETS,
+  EMPTY_SCHOLARSHIP_FILTERS,
+  SCHOLARSHIP_GROUP_OPTIONS,
+  SCHOLARSHIP_SORT_OPTIONS,
+  parseScholarshipDegreeLevels,
+  scholarshipActiveFilterCount,
+  scholarshipStatusMessageKey,
+  type ScholarshipFacets,
+  type ScholarshipFilters,
+  type ScholarshipGroupOption,
+  type ScholarshipSortOption,
+} from "@/lib/scholarshipFilters";
 import { 
   Award, 
   Search, 
@@ -33,6 +47,9 @@ import {
   Wallet,
   Loader2,
   ArrowRight,
+  ArrowUpDown,
+  Layers,
+  RotateCcw,
   X
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
@@ -106,14 +123,49 @@ export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "e
     : t("awardNotSpecified");
 }
 
-const SCHOLARSHIP_FILTER_COUNTRIES = withQsTop200Countries([
-  "United States",
-  "United Kingdom",
-  "Germany",
-  "European Union",
-  "Canada",
-  "Japan",
-]);
+/**
+ * Filter state survives a trip to a scholarship's own page: the hub remembers
+ * the last selection for this tab session, so "back to all scholarships"
+ * returns to the list the student was reading — not to a blank catalogue.
+ */
+const SCHOLARSHIP_FILTER_STORAGE_KEY = "scholarbridge_scholarship_filters";
+
+function readStoredFilters(): {
+  filters: ScholarshipFilters;
+  sortBy: ScholarshipSortOption;
+  groupBy: ScholarshipGroupOption;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(SCHOLARSHIP_FILTER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<{
+      filters: Partial<ScholarshipFilters>;
+      sortBy: ScholarshipSortOption;
+      groupBy: ScholarshipGroupOption;
+    }>;
+    const stored = parsed?.filters ?? {};
+    const stringsOnly = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return {
+      filters: {
+        country: typeof stored.country === "string" && stored.country ? stored.country : "All",
+        degrees: stringsOnly(stored.degrees),
+        coverages: stringsOnly(stored.coverages),
+        statuses: stringsOnly(stored.statuses),
+        basis: stringsOnly(stored.basis),
+      },
+      sortBy: SCHOLARSHIP_SORT_OPTIONS.includes(parsed?.sortBy as ScholarshipSortOption)
+        ? (parsed?.sortBy as ScholarshipSortOption)
+        : "relevance",
+      groupBy: SCHOLARSHIP_GROUP_OPTIONS.includes(parsed?.groupBy as ScholarshipGroupOption)
+        ? (parsed?.groupBy as ScholarshipGroupOption)
+        : "none",
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface ScholarshipHubProps {
   activeProfile: StudentProfile | null;
@@ -193,17 +245,20 @@ export function ScholarshipHub({
   const [search, setSearch] = useState("");
   // Only the text box is debounced; dropdowns and pagination fire at once.
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("All");
-  const [selectedCoverage, setSelectedCoverage] = useState("All");
+  // Catalogue filters, ordering and grouping. Values stay canonical; the panel
+  // localizes the labels, so switching language never drops a selection.
+  const [filters, setFilters] = useState<ScholarshipFilters>(EMPTY_SCHOLARSHIP_FILTERS);
+  const [sortBy, setSortBy] = useState<ScholarshipSortOption>("relevance");
+  const [groupBy, setGroupBy] = useState<ScholarshipGroupOption>("none");
+  const [facets, setFacets] = useState<ScholarshipFacets>(EMPTY_SCHOLARSHIP_FACETS);
   const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
   /**
-   * Phone (< 640px): the two dropdowns collapse behind one button so the
-   * first scholarship card is not pushed off the screen. The search box stays
-   * visible; the selects stay mounted either way.
+   * Phones: the faceted panel is a sheet behind one button, so the first
+   * scholarship card is not pushed off the screen. From `lg` up the same panel
+   * is a sticky sidebar next to the results.
    */
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const activeFilterCount =
-    (selectedCountry !== "All" ? 1 : 0) + (selectedCoverage !== "All" ? 1 : 0);
+  const activeFilterCount = scholarshipActiveFilterCount(filters);
   if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
     setLastFocusRequestId(autoFocusScholarship.requestId);
     setSearch(autoFocusScholarship.title);
@@ -211,17 +266,12 @@ export function ScholarshipHub({
     // to debounce, the student already chose the record.
     setDebouncedSearch(autoFocusScholarship.title);
     // A university detail page can deep-link here with just a country: the
-    // dropdown opens pre-filtered to that country's grants.
-    setSelectedCountry(autoFocusScholarship.country && !autoFocusScholarship.title ? autoFocusScholarship.country : "All");
-    setSelectedCoverage("All");
+    // catalogue opens pre-filtered to that country's awards.
+    setFilters({
+      ...EMPTY_SCHOLARSHIP_FILTERS,
+      country: autoFocusScholarship.country && !autoFocusScholarship.title ? autoFocusScholarship.country : "All",
+    });
   }
-  // A focused country outside the preset option list still needs a visible
-  // <option>, otherwise the select renders empty while filtering works.
-  const focusCountry =
-    autoFocusScholarship?.country &&
-    !SCHOLARSHIP_FILTER_COUNTRIES.includes(autoFocusScholarship.country)
-      ? autoFocusScholarship.country
-      : null;
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
   // `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, so 8 / 16 / 24 cards.
@@ -230,13 +280,46 @@ export function ScholarshipHub({
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const resultsTopRef = useRef<HTMLDivElement>(null);
+  const restoredFiltersRef = useRef(false);
+
+  // Restore the last selection once, on mount: coming back from a detail page
+  // lands on the list the student left, not on a reset catalogue. An explicit
+  // deep link (global search, university card) always wins over the stored one.
+  useEffect(() => {
+    if (restoredFiltersRef.current) return;
+    restoredFiltersRef.current = true;
+    if (autoFocusScholarship) return;
+    // Read in a microtask so the effect body never calls setState synchronously
+    // (the same pattern the fetch effect below uses).
+    void Promise.resolve().then(() => {
+      const stored = readStoredFilters();
+      if (!stored) return;
+      setFilters(stored.filters);
+      setSortBy(stored.sortBy);
+      setGroupBy(stored.groupBy);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        SCHOLARSHIP_FILTER_STORAGE_KEY,
+        JSON.stringify({ filters, sortBy, groupBy }),
+      );
+    } catch {
+      // Private mode / storage disabled — the hub simply starts fresh next time.
+    }
+  }, [filters, sortBy, groupBy]);
 
   // Restart numbering from page 1 whenever the result-set identity changes
   // (filters, search, profile, locale, or page size). Adjusted during render (the
   // React-endorsed alternative to a reset effect), so the debounced fetch
   // below always fires once - already with the correct page.
   const profileFingerprint = profileMatchFingerprint(activeProfile);
-  const resultKey = [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, perPage, locale, profileFingerprint].join("|");
+  const filtersKey = JSON.stringify(filters);
+  const resultKey = [activeProfile?.id, filtersKey, sortBy, groupBy, debouncedSearch, perPage, locale, profileFingerprint].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -258,8 +341,13 @@ export function ScholarshipHub({
   const fetchScholarships = async (signal?: AbortSignal) => {
     const params = new URLSearchParams();
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
-    if (selectedCountry !== "All") params.set("country", selectedCountry);
-    if (selectedCoverage !== "All") params.set("coverageType", selectedCoverage);
+    if (filters.country !== "All") params.set("country", filters.country);
+    if (filters.degrees.length > 0) params.set("degree", filters.degrees.join(","));
+    if (filters.coverages.length > 0) params.set("coverageTypes", filters.coverages.join(","));
+    if (filters.statuses.length > 0) params.set("status", filters.statuses.join(","));
+    if (filters.basis.length > 0) params.set("basis", filters.basis.join(","));
+    if (sortBy !== "relevance") params.set("sort", sortBy);
+    if (groupBy !== "none") params.set("groupBy", groupBy);
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     if (
       autoFocusScholarship &&
@@ -269,6 +357,8 @@ export function ScholarshipHub({
     }
     params.set("page", page.toString());
     params.set("perPage", perPage.toString());
+    // Facet counts: what each checkbox would return, computed server-side.
+    params.set("facets", "1");
     // Explicit locale: the API localizes the response and the SWR cache key
     // (params.toString()) splits per language, so cached rows never mix.
     params.set("locale", locale);
@@ -279,6 +369,7 @@ export function ScholarshipHub({
       total: number;
       totalPages: number;
       page?: number;
+      facets?: ScholarshipFacets;
     }>("scholarships", queryKey);
 
     if (cached) {
@@ -287,6 +378,7 @@ export function ScholarshipHub({
       setMercuryEligibilityReview(null);
       setTotalCount(cached.data.total);
       setTotalPages(cached.data.totalPages);
+      if (cached.data.facets) setFacets(cached.data.facets);
       setLoading(false);
       setRefreshing(false);
       // Fresh enough (< 15 s): render it and skip the request entirely.
@@ -320,11 +412,17 @@ export function ScholarshipHub({
         setScholarships(data.scholarships);
         setTotalCount(nextTotal);
         setTotalPages(nextTotalPages);
+        const nextFacets: ScholarshipFacets | undefined =
+          data.facets && typeof data.facets === "object"
+            ? (data.facets as ScholarshipFacets)
+            : undefined;
+        if (nextFacets) setFacets(nextFacets);
         setCatalogSwr("scholarships", queryKey, {
           scholarships: data.scholarships,
           total: nextTotal,
           totalPages: nextTotalPages,
           page: data.page,
+          facets: nextFacets,
         });
         // The server clamps out-of-range pages - sync so the UI numbering
         // always matches the returned slice.
@@ -375,7 +473,7 @@ export function ScholarshipHub({
     void Promise.resolve().then(() => fetchScholarships(controller.signal));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, selectedCountry, selectedCoverage, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint]);
+  }, [activeProfile?.id, filtersKey, sortBy, groupBy, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint]);
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -398,6 +496,29 @@ export function ScholarshipHub({
     resultsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  /**
+   * Section heading for the chosen grouping. Labels go through the same
+   * localizers as the cards, so "Davlat bo'yicha" reads in the student's
+   * language instead of echoing canonical English catalogue values.
+   */
+  const groupHeading = (scholarship: Scholarship, group: ScholarshipGroupOption): string => {
+    switch (group) {
+      case "country":
+        return localizeCountry(scholarship.country, locale) || t("groupUnknown");
+      case "degree": {
+        const degrees = parseScholarshipDegreeLevels(scholarship.degreeLevels);
+        if (degrees.length === 0) return t("groupAnyDegree");
+        return degrees.map((degree) => localizeDegreeLevel(degree, locale) || degree).join(" · ");
+      }
+      case "coverage":
+        return localizeCoverageType(scholarship.coverageType, locale) || t("groupUnspecified");
+      case "status":
+        return t(scholarshipStatusMessageKey(scholarship.computedStatus));
+      default:
+        return "";
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Search & Filter toolbar — ONE compact card. The hub header already
@@ -409,14 +530,13 @@ export function ScholarshipHub({
           <span className="min-w-0 break-words">{t("title")}</span>
         </h2>
 
-        {/* Filter Controls
-            Phone (< 640px): the search box stays visible and the two dropdowns
-            collapse behind one button, so the first scholarship card is not
-            pushed off the screen. From `sm` up the wrapper becomes
-            `display: contents` and all three controls sit in one row. */}
-        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3">
+        {/* Toolbar — search, ordering and grouping on the first row; the
+            categorical dropdowns (country, degree, funding, status, basis)
+            sit right under it, in the same card. No side panel: the cards
+            keep their full width. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
-          <div className="relative">
+          <div className="relative sm:col-span-2">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -428,76 +548,82 @@ export function ScholarshipHub({
             />
           </div>
 
-          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
-          <button
-            type="button"
-            onClick={() => setMobileFiltersOpen((open) => !open)}
-            aria-expanded={mobileFiltersOpen}
-            aria-controls="scholarship-filters"
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 sm:hidden"
-          >
-            <Filter className="h-4 w-4" />
-            <span className="break-words text-center">{t("filtersAndSort")}</span>
-            {activeFilterCount > 0 && (
-              <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
-          </button>
-
-          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
-              The elements stay MOUNTED, so the filters keep their values and
-              their accessible names. */}
-          <div
-            id="scholarship-filters"
-            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
-          >
-          {/* Country Filter */}
+          {/* Ordering */}
           <div>
-            <select
-              value={selectedCountry}
-              onChange={(e) => setSelectedCountry(e.target.value)}
-              aria-label={t("allCountries")}
-              className="sb-flag-emoji min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
-            >
-              <option value="All">{t("allCountries")}</option>
-              {focusCountry && (
-                <option value={focusCountry}>
-                  {(() => {
-                    const key = countryTranslationKey(focusCountry);
-                    return key ? tCountry(key) : focusCountry;
-                  })()}
-                </option>
-              )}
-              {SCHOLARSHIP_FILTER_COUNTRIES.map((country) => {
-                const countryKey = countryTranslationKey(country);
-                const countryOption = qsCountryOption(country);
-                const flag = countryOption?.flag ?? (country === "European Union" ? "🇪🇺" : "");
-                return (
-                  <option key={country} value={country}>
-                    {flag ? `${flag} ` : ""}{countryKey ? tCountry(countryKey) : country}
+            <label htmlFor="scholarship-sort" className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {t("sortLabel")}
+            </label>
+            <div className="relative">
+              <ArrowUpDown className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <select
+                id="scholarship-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as ScholarshipSortOption)}
+                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
+              >
+                {SCHOLARSHIP_SORT_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`sortOption.${option}`)}
                   </option>
-                );
-              })}
-            </select>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Coverage Filter */}
+          {/* Grouping */}
           <div>
-            <select
-              value={selectedCoverage}
-              onChange={(e) => setSelectedCoverage(e.target.value)}
-              aria-label={t("allCoverage")}
-              className="min-h-11 w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
-            >
-              <option value="All">{t("allCoverage")}</option>
-              <option value="Full Tuition + Stipend">{t("coverageFullStipend")}</option>
-              <option value="Full Tuition">{t("coverageFullTuition")}</option>
-              <option value="Partial Tuition">{t("coveragePartial")}</option>
-            </select>
+            <label htmlFor="scholarship-group" className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {t("groupLabel")}
+            </label>
+            <div className="relative">
+              <Layers className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <select
+                id="scholarship-group"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as ScholarshipGroupOption)}
+                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
+              >
+                {SCHOLARSHIP_GROUP_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`groupOption.${option}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          </div>
+        </div>
+
+        {/* Phone-only: the dropdown row collapses behind this button so the
+            first card is not pushed off the screen. From `sm` up the row is
+            always visible — the controls stay MOUNTED, so a collapsed filter
+            keeps its value and its accessible name. */}
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((open) => !open)}
+          aria-expanded={mobileFiltersOpen}
+          aria-controls="scholarship-filters"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:hidden"
+        >
+          <Filter className="h-4 w-4" aria-hidden />
+          <span className="break-words text-center">{t("filtersTitle")}</span>
+          {activeFilterCount > 0 && (
+            <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+          <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+
+        <div
+          id="scholarship-filters"
+          className={`${mobileFiltersOpen ? "block" : "hidden"} sm:block`}
+        >
+          <ScholarshipFiltersPanel
+            filters={filters}
+            facets={facets}
+            onChange={setFilters}
+            onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+          />
         </div>
       </div>
 
@@ -527,6 +653,7 @@ export function ScholarshipHub({
         </div>
       )}
 
+      <div className="min-w-0 space-y-4">
       {/* Results Count */}
       <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
         <span>
@@ -571,17 +698,33 @@ export function ScholarshipHub({
           <span className="sr-only">{t("loading")}</span>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
-          {t("empty")}
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center sm:p-12">
+          <p className="text-sm font-medium text-slate-600">{t("empty")}</p>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+              className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+              {t("filtersClear")}
+            </button>
+          )}
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
+          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
         >
-          {filtered.map((s) => {
+          {filtered.map((s, index) => {
+            // A heading is drawn only when the section changes, and it spans the
+            // whole grid so the sections stay visually contiguous.
+            const heading = groupBy === "none" ? "" : groupHeading(s, groupBy);
+            const previousHeading =
+              groupBy === "none" || index === 0 ? null : groupHeading(filtered[index - 1], groupBy);
+            const showHeading = groupBy !== "none" && heading !== previousHeading;
             const isSaved = savedScholarshipIds.has(s.id);
             const isFocused =
               autoFocusScholarship?.id === s.id &&
@@ -590,29 +733,39 @@ export function ScholarshipHub({
             const score = s.matchScore ?? null;
 
             return (
+              <React.Fragment key={s.id}>
+                {showHeading && (
+                  <h4 className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                    <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 break-words">{heading}</span>
+                  </h4>
+                )}
               <div
-                key={s.id}
                 data-scholarship-id={s.id}
                 data-focused-record={isFocused ? "true" : undefined}
-                className={`bg-white rounded-2xl border shadow-xs transition-all p-5 flex flex-col gap-4 ${
+                className={`flex h-full flex-col gap-4 rounded-2xl border bg-white p-5 shadow-xs transition-all ${
                   isFocused
                     ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
                     : "border-slate-200 hover:shadow-lg hover:border-indigo-300"
                 }`}
               >
-                {/* Header */}
+                {/* Header — the provider chip and the fit badge share the first
+                    row so the TITLE can use the card's full width. A badge
+                    column beside the heading used to squeeze award names such
+                    as "NUS Xalqaro Undergraduate Scholarship" into three
+                    one-word lines. */}
                 <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      {/* inline-block: a long provider name wraps as ONE chip,
-                          not a ragged box per line. Neutral, so amber stays
-                          reserved for deadlines and match issues. */}
-                      <span className="inline-block max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                        <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
-                        {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
-                      </span>
-                      <h3 className="font-bold text-base text-slate-900 mt-1">{localizeScholarshipTitle(s.title, locale)}</h3>
-                    </div>
+                  <div className="flex items-start justify-between gap-2">
+                    {/* inline-block: a long provider name wraps as ONE chip,
+                        not a ragged box per line. Neutral, so amber stays
+                        reserved for deadlines and match issues. */}
+                    <span
+                      className="line-clamp-2 h-9 min-w-0 max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      title={`${localizeCountry(s.country, locale)} • ${localizeScholarshipProvider(s.provider, locale)}`}
+                    >
+                      <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
+                      {localizeCountry(s.country, locale)} • {localizeScholarshipProvider(s.provider, locale)}
+                    </span>
 
                     {score != null ? (
                       // This number is a FIT/match score (requirements + field +
@@ -640,6 +793,15 @@ export function ScholarshipHub({
                       </span>
                     )}
                   </div>
+
+                  {/* Full-width, balanced heading: award names stay readable
+                      and wrapped lines line up instead of trailing off. */}
+                  <h3
+                    className="line-clamp-3 min-h-[4.125rem] break-words text-base font-bold leading-snug text-slate-900 [text-wrap:balance]"
+                    title={localizeScholarshipTitle(s.title, locale)}
+                  >
+                    {localizeScholarshipTitle(s.title, locale)}
+                  </h3>
 
                   {/* Computed application status (spec §6) — "is this open
                       right now" stays glanceable on the card face; only the
@@ -811,10 +973,13 @@ export function ScholarshipHub({
 
                 {/* Actions — one row, two controls: the official portal link
                     and Track/Save. Everything else moved to the drawer. */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
                   <span className="flex flex-wrap items-center gap-2">
                     <Link
-                      href={`/scholarships/${s.id}`}
+                      // `?from=app` tells the detail page which catalogue the
+                      // student came from, so "back" returns HERE (the hub) and
+                      // not to the public catalogue.
+                      href={`/scholarships/${s.id}?from=app`}
                       className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:bg-slate-800 dark:text-slate-100"
                     >
                       {t("viewDetails")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -848,6 +1013,7 @@ export function ScholarshipHub({
                   )}
                 </div>
               </div>
+              </React.Fragment>
             );
           })}
         </div>
@@ -862,6 +1028,7 @@ export function ScholarshipHub({
           onPageChange={handlePageChange}
         />
       )}
+      </div>
       {/* The funding-plan action reports its own outcome inline — no alert(). */}
       {fundingError && (
         <div

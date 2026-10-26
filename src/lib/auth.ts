@@ -287,7 +287,31 @@ export function isSecureContext(req?: Request): boolean {
   return proto === "https";
 }
 
+/**
+ * Cross-site cookie mode (opt-in, off by default).
+ *
+ * `SameSite=Lax` is the right default, but it makes the session cookie
+ * unreadable when the app itself runs inside a THIRD-PARTY iframe — an embedded
+ * preview, a Mini App shell. There the sign-in POST returns 200 and the very
+ * next `/api/auth/session` returns 401, because the browser never sends the
+ * cookie back: the person appears signed in to the server and signed out to
+ * every request.
+ *
+ * With `SESSION_COOKIE_CROSS_SITE=1` the session cookie is issued as
+ * `SameSite=None; Secure; Partitioned` (CHIPS) — usable in an iframe, still
+ * isolated per top-level site, and never sent cross-site unpartitioned.
+ * Deployments that serve the app directly keep the default Lax cookie.
+ */
+function crossSiteSessions(): boolean {
+  return process.env.SESSION_COOKIE_CROSS_SITE === "1";
+}
+
 function cookieAttrs(req?: Request): string {
+  if (crossSiteSessions()) {
+    // SameSite=None requires Secure; this mode is only for https deployments
+    // and https preview hosts.
+    return ["Path=/", "HttpOnly", "SameSite=None", "Secure", "Partitioned"].join("; ");
+  }
   const attrs = ["Path=/", "HttpOnly", "SameSite=Lax"];
   if (isSecureContext(req)) attrs.push("Secure");
   return attrs.join("; ");

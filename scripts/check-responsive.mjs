@@ -31,6 +31,7 @@ const source = {
   arrival: read("src/components/journey/ArrivalPlanPanel.tsx"),
   explorer: read("src/components/UniversityExplorer.tsx"),
   scholarship: read("src/components/ScholarshipHub.tsx"),
+  scholarshipFilters: read("src/components/ScholarshipFilters.tsx"),
   university: read("src/components/UniversityDetail.tsx"),
   tasks: read("src/components/TaskRoadmap.tsx"),
   growthUi: read("src/components/growth/ui.tsx"),
@@ -103,7 +104,12 @@ check("notification bell is a 44×44px target wherever it appears", /min-h-11 mi
 check("destination tabs retain 44px minimum touch targets", /min-h-11 min-w-11/.test(source.hubsUi));
 check("destination tabs control real, hidden-or-visible tab panels", /aria-controls=\{`hub-panel-\$\{pane\.id\}`\}/.test(source.hubsUi) && /role="tabpanel"/.test(source.hubsUi) && /hidden=\{!isActive\}/.test(source.hubsUi));
 check("university filters have accessible names, including the tuition range", /aria-label=\{t\("exCountryAll"\)\}/.test(source.explorer) && /aria-label=\{t\("exSortRank"\)\}/.test(source.explorer) && /htmlFor="university-max-tuition"/.test(source.explorer) && /id="university-max-tuition"/.test(source.explorer));
-check("scholarship search and filters have accessible names", /aria-label=\{t\("searchPlaceholder"\)\}/.test(source.scholarship) && /aria-label=\{t\("allCountries"\)\}/.test(source.scholarship) && /aria-label=\{t\("allCoverage"\)\}/.test(source.scholarship));
+const scholarshipUi = source.scholarship + source.scholarshipFilters;
+check("scholarship search and filters have accessible names", /aria-label=\{t\("searchPlaceholder"\)\}/.test(scholarshipUi) && /aria-label=\{t\("allCountries"\)\}/.test(scholarshipUi) && /aria-label=\{t\("allCoverage"\)\}/.test(scholarshipUi));
+check("scholarship filter dropdowns are labelled, 44px tall and sit in the toolbar (no side panel)", (source.scholarshipFilters.match(/htmlFor="scholarship-filter-/g) ?? []).length === 5 && (source.scholarshipFilters.match(/id="scholarship-filter-/g) ?? []).length === 5 && /min-h-11/.test(source.scholarshipFilters) && !/lg:sticky/.test(source.scholarship));
+check("scholarship filter options state how many awards they return", /\(\{entry\.count\}\)/.test(source.scholarshipFilters) && /facets\.degrees\[degree\]/.test(source.scholarshipFilters));
+check("scholarship cards reserve one heading box so a row lines up", /line-clamp-3 min-h-\[4\.125rem\]/.test(source.scholarship) && /line-clamp-2 h-9/.test(source.scholarship));
+check("scholarship sort and group selects have programmatic labels", /htmlFor="scholarship-sort"/.test(source.scholarship) && /id="scholarship-sort"/.test(source.scholarship) && /htmlFor="scholarship-group"/.test(source.scholarship) && /id="scholarship-group"/.test(source.scholarship));
 check("mobile help and dismiss actions retain 44px targets and visible focus",  /min-h-11 min-w-11/.test(source.sectionIntro) && /h-11 w-11/.test(source.sectionIntro));
 check("compact language selector and logout control meet 44px targets", /min-h-11/.test(source.languageSwitcher) && /h-11 w-11/.test(source.navbar));
 check("application footer links remain tappable and keyboard focused", (source.homeClient.match(/min-h-11 min-w-11/g) ?? []).length >= 5 && /focus-visible:ring-2/.test(source.homeClient));
