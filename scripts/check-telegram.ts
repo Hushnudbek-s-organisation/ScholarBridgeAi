@@ -50,6 +50,8 @@ import {
   hashStartToken,
 } from "../src/lib/telegram/core";
 import { CMD_TEXTS } from "../src/lib/telegram/botTexts";
+import { isStaticCommand } from "../src/lib/telegram/core";
+import { classifyDbError, createTableBootstrap } from "../src/lib/db/bootstrap";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
 
 let passed = 0;
@@ -57,6 +59,17 @@ const failures: string[] = [];
 function check(name: string, fn: () => void) {
   try {
     fn();
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } catch (err) {
+    failures.push(`${name} — ${(err as Error).message}`);
+    console.log(`  ✗ ${name} — ${(err as Error).message}`);
+  }
+}
+const asyncChecks: [string, () => Promise<void>][] = [];
+async function checkAsync(name: string, fn: () => Promise<void>) {
+  try {
+    await fn();
     passed++;
     console.log(`  ✓ ${name}`);
   } catch (err) {
@@ -350,6 +363,67 @@ check("reserved placeholder email cannot be claimed via the profile APIs", () =>
   assert.ok(read("src/app/api/profiles/[id]/route.ts").includes("isTelegramPlaceholderEmail("));
 });
 
+console.log("\nTelegram — degraded mode (database problems must be diagnosable)");
+
+check("/id is answered without the database, /start is not", () => {
+  assert.equal(isStaticCommand("/id"), true);
+  assert.equal(isStaticCommand("/id@MyBot"), true);
+  assert.equal(isStaticCommand("/chatid"), true);
+  assert.equal(isStaticCommand("/start"), false);
+  assert.equal(isStaticCommand("id"), false);
+  assert.equal(isStaticCommand(undefined), false);
+});
+
+check("the chat-id reply exists in every language and names the field", () => {
+  for (const lang of ["uz", "ru", "en"] as const) {
+    const text = CMD_TEXTS[lang].chatIdText("123456789");
+    assert.ok(text.includes("123456789"), `${lang}: number must be echoed`);
+    assert.ok(/Admin chat ID/.test(text), `${lang}: must name the field`);
+    assert.ok(CMD_TEXTS[lang].dbTrouble.length > 20, `${lang}: dbTrouble must explain the outage`);
+  }
+});
+
+check("database errors are classified into actionable reasons", () => {
+  const cases: [string, string][] = [
+    ["cannot execute CREATE TABLE in a read-only transaction", "read_only"],
+    ["42501 permission denied for schema public", "permission_denied"],
+    ["28P01 password authentication failed for user", "auth_failed"],
+    ["53300 too many clients already", "unreachable"],
+    ["connect ECONNREFUSED 10.0.0.1:5432", "unreachable"],
+    ["something nobody has seen before", "unknown"],
+  ];
+  for (const [message, expected] of cases) {
+    const { reason, hint } = classifyDbError(new Error(message));
+    assert.equal(reason, expected, message);
+    assert.ok(hint.length > 20, `${expected}: needs an operator hint`);
+  }
+  // A hint must never leak connection details.
+  for (const message of ["connect ECONNREFUSED postgres://u:p@host:5432/db", "password authentication failed for user \"admin\""]) {
+    const { hint } = classifyDbError(new Error(message));
+    assert.ok(!/postgres:\/\/|:5432|\badmin\b/.test(hint), "hint leaked connection details");
+  }
+});
+
+asyncChecks.push(["bootstrap reports ready / failed(+reason) / reset, and retries after a minute", async () => {
+  let fail = true;
+  const ok = createTableBootstrap("test", () => ["create table x(1)"], async () => {
+    if (fail) throw new Error("42501 permission denied for schema public");
+  });
+  assert.equal(ok.status().state, "idle");
+  assert.equal(await ok.ensure(), false);
+  assert.equal(ok.status().state, "failed");
+  assert.equal(ok.status().reason, "permission_denied");
+  assert.match(String(ok.status().hint), /CREATE/);
+  assert.ok(ok.status().at, "the failure is timestamped for the panel");
+  // The failure is memoised for a minute: no repeated DDL on every request.
+  fail = false;
+  assert.equal(await ok.ensure(), false, "memoised failure is returned without a new attempt");
+  ok.reset();
+  assert.equal(await ok.ensure(), true);
+  assert.equal(ok.status().state, "ready");
+  assert.equal(ok.status().reason, null);
+}]);
+
 console.log("\nTelegram — schema drift");
 
 const norm = (s: string) =>
@@ -448,8 +522,16 @@ check("new UI strings exist in en/uz/ru", () => {
   assert.ok(miniAppSource.includes("formatMessage(t.hello"), "Mini App interpolation uses the shared message formatter");
 });
 
-console.log(`\n${passed} passed, ${failures.length} failed`);
-if (failures.length) {
-  for (const f of failures) console.log(`  - ${f}`);
-  process.exit(1);
+function summary() {
+  console.log(`\n${passed} passed, ${failures.length} failed`);
+  if (failures.length) {
+    for (const f of failures) console.log(`  - ${f}`);
+    process.exit(1);
+  }
 }
+
+// The bootstrap state machine is async; everything else above is sync.
+(async () => {
+  for (const [name, fn] of asyncChecks) await checkAsync(name, fn);
+  summary();
+})();

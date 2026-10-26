@@ -22,6 +22,8 @@ type Dict = {
   /** Plain-text handling: one-tap choices for a typed search term. */
   /** `/id` — the number the admin panel asks for as "Admin chat ID". */
   chatIdText: (id: string) => string;
+  /** The database is unreachable; the account data cannot be shown. */
+  dbTrouble: string;
   plainPrompt: (q: string) => string;
   btnSearchUnis: string;
   btnSearchSchs: string;
@@ -102,6 +104,8 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Ilovani ochish",
     menu: { universities: "🎓 Universitetlar", scholarships: "💰 Grantlar", applications: "📋 Arizalarim", deadlines: "⏰ Muddatlar", next: "✅ Keyingi qadam", saved: "⭐ Saqlanganlar", advisor: "🤖 AI maslahatchi", profile: "👤 Profil", settings: "⚙️ Sozlamalar", account: "💳 Akkaunt" },
     btnWebsite: "🌐 Sayt",
+    dbTrouble:
+      "⚙️ Hozir bazaga ulanib bo'lmayapti, shuning uchun akkaunt ma'lumotlarini ko'rsata olmayman. Sayt panelida «Tekshirish»ni bosing. Bir daqiqadan keyin qayta urinib ko'ring. /id buyrug'i baribir ishlaydi.",
     chatIdText: (id) =>
       `🆔 <b>Sizning chat ID:</b> <code>${escapeHtml(id)}</code>\n\nBu — shaxsiy chat. Admin panelda <b>Kanal → Ulash → Admin chat ID</b> maydoniga shu raqamni kiriting: sinov postlari va xatolar shu chatga keladi. Kanalga post joylashda bu raqam emas, kanalning ID si ishlatiladi.`,
     plainPrompt: (q) => `🔎 «${escapeHtml(q)}» so'rovi bo'yicha nima qilamiz?`,
@@ -174,6 +178,8 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Открыть приложение",
     menu: { universities: "🎓 Университеты", scholarships: "💰 Стипендии", applications: "📋 Мои заявки", deadlines: "⏰ Дедлайны", next: "✅ Следующий шаг", saved: "⭐ Сохранённое", advisor: "🤖 AI-советник", profile: "👤 Профиль", settings: "⚙️ Настройки", account: "💳 Аккаунт" },
     btnWebsite: "🌐 Сайт",
+    dbTrouble:
+      "⚙️ База данных сейчас недоступна, поэтому данные аккаунта показать не могу. Проверьте диагностику в админке и повторите через минуту. Команда /id работает всегда.",
     chatIdText: (id) =>
       `🆔 <b>Ваш chat ID:</b> <code>${escapeHtml(id)}</code>\n\nЭто личный чат. Вставьте это число в поле <b>Admin chat ID</b> (Админка → Канал → Подключение): туда приходят тестовые посты и сообщения об ошибках. Для публикаций в канале используется не этот номер, а ID канала.`,
     plainPrompt: (q) => `🔎 Что делаем с запросом «${escapeHtml(q)}»?`,
@@ -246,6 +252,8 @@ export const CMD_TEXTS: Record<BotLang, Dict> = {
     btnOpenApp: "📱 Open app",
     menu: { universities: "🎓 Universities", scholarships: "💰 Scholarships", applications: "📋 My applications", deadlines: "⏰ Deadlines", next: "✅ Next step", saved: "⭐ Saved", advisor: "🤖 AI advisor", profile: "👤 Profile", settings: "⚙️ Settings", account: "💳 Account" },
     btnWebsite: "🌐 Website",
+    dbTrouble:
+      "⚙️ The database is unreachable right now, so I cannot show your account data. Check the diagnostics in the admin panel and try again in a minute. /id keeps working.",
     chatIdText: (id) =>
       `🆔 <b>Your chat ID:</b> <code>${escapeHtml(id)}</code>\n\nThis is your private chat. Paste this number into <b>Admin chat ID</b> (Admin → Channel → Connect): dry-run posts and failure alerts go there. The channel itself needs the channel ID, not this number.`,
     plainPrompt: (q) => `🔎 What should I do with «${escapeHtml(q)}»?`,

@@ -39,6 +39,7 @@ import {
   pickLang,
   safeEqualHex,
   shouldDeliver,
+  isStaticCommand,
   type BotLang,
 } from "./core";
 import { CMD_TEXTS } from "./botTexts";
@@ -109,8 +110,34 @@ function argsOf(text: string | undefined): string {
   return text.trim().replace(/^\/[a-z_]+(?:@\w+)?/i, "").trim();
 }
 
+/**
+ * `/id` — answer before anything else touches the database.
+ *
+ * The admin panel asks for "the chat id" while the operator is wiring the bot
+ * up, and very often asks *because* something is broken. Both the update-dedup
+ * row and the delivery log are database writes, so a degraded database used to
+ * make the bot completely silent. This path needs only the bot token.
+ */
+async function answerChatId(update: TgUpdate): Promise<boolean> {
+  const m = update.message;
+  if (!m?.from || m.from.is_bot || m.chat.type !== "private" || !isStaticCommand(m.text)) return false;
+  const { token } = await getBotToken();
+  if (!token) return false;
+  await tgSendMessage(token, String(m.chat.id), CMD_TEXTS[pickLang(m.from.language_code)].chatIdText(String(m.chat.id))).catch((err) => {
+    console.warn("[telegram] chat id reply failed:", err instanceof Error ? err.message : err);
+  });
+  return true;
+}
+
 export async function handleUpdate(update: TgUpdate): Promise<void> {
-  if (!(await claimUpdate(update.update_id))) return;
+  if (await answerChatId(update)) return;
+  // Dedup normally decides "already handled". If the database is unreachable we
+  // answer anyway (Telegram may retry the update, which is better than silence).
+  const claimed = await claimUpdate(update.update_id).catch((err) => {
+    console.warn("[telegram] update dedup unavailable:", err instanceof Error ? err.message : err);
+    return "unavailable" as const;
+  });
+  if (claimed === false) return;
   const { token } = await getBotToken();
   if (!token) return;
   const settings = await getTelegramSettings();
@@ -166,7 +193,16 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
   }
 
   const chatId = String(msg.chat.id);
-  const ctx = await buildCtx(token, chatId, msg.from, settings);
+  let ctx: BotCtx;
+  try {
+    ctx = await buildCtx(token, chatId, msg.from, settings);
+  } catch (err) {
+    // The account data lives in the database. Say so plainly instead of going
+    // silent — a user who sees nothing assumes the bot is dead.
+    console.error("[telegram] context load failed:", err instanceof Error ? err.message : err);
+    await tgSendMessage(token, chatId, CMD_TEXTS[pickLang(msg.from.language_code)].dbTrouble).catch(() => undefined);
+    return;
+  }
 
   const payload = parseStartPayload(msg.text);
   if (payload) {
@@ -175,17 +211,6 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
   }
 
   const cmd = parseCommand(msg.text);
-  // `/id` — the one number the channel panel asks an operator for. Answering it
-  // here means nobody has to install a third-party "what is my id" bot, and it
-  // works whether or not this Telegram account is linked to a profile.
-  if (cmd === "id" || cmd === "chatid") {
-    await sendToChat(token, chatId, CMD_TEXTS[ctx.lang].chatIdText(chatId), {
-      profileId: ctx.link?.profileId ?? null,
-      kind: "reply",
-      preview: "chat id",
-    });
-    return;
-  }
   if (!cmd) {
     const typed = (msg.text ?? "").trim();
     if (ctx.link && typed) {

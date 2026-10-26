@@ -72,3 +72,97 @@ transient-vs-permanent database error classification, the single retry, and
 asserts that `HomeClient` no longer contains a blocking restore screen.
 `npm run test:channel`, `npm run check:i18n` and the lint/typecheck gates stay
 green.
+
+---
+
+# "Telegram features are temporarily unavailable" (bot + channel at once)
+
+That sentence comes from one place: `tgTablesOr503()`
+(`src/lib/telegram/http.ts`), which returns **503** when
+`ensureTelegramTables()` could not run the idempotent DDL. The channel panel has
+the same guard with `ensureChannelTables()`.
+
+It is **not** a Telegram problem. Telegram was never called. The bot goes quiet
+at the same time for the same reason: every update needs a `telegram_updates`
+row, so a database that refuses writes swallows the message.
+
+## Why both die together
+
+| Layer | Needs | Breaks as |
+| --- | --- | --- |
+| Auth (sign-in, panel) | `SELECT` on profiles/sessions | works — reads still work |
+| Telegram/channel panels | `CREATE TABLE IF NOT EXISTS …` | 503 "temporarily unavailable" |
+| Bot webhook | `INSERT` into `telegram_updates` | silence (no reply at all) |
+| Test posts / publishing | `INSERT` into `channel_*` | same 503 |
+
+So "the panel loads but Telegram is unavailable, and the bot does not answer
+`/id`" is the signature of **a database that reads fine and writes not at all**.
+
+Most likely causes, in order:
+
+1. `DATABASE_URL` points at a **read-only** endpoint or role (a replica, a
+   read-only pooler, Supabase's read-only connection string).
+2. The role is missing `CREATE` on the schema (or `INSERT` on the tables).
+3. The project is **paused / over quota** and the provider put it in
+   read-only mode.
+4. The Render service is **asleep** (free plan): Telegram's webhook POST lands on
+   Render's "Application loading" page and the update is lost. `/api/health`
+   returns an HTML loading page instead of JSON.
+
+## What the admin panel now tells you
+
+Admin → System → **Telegram bot** (or **Kanal**) shows a **System diagnostics**
+card that survives the failure, because it reads
+`GET /api/admin/diagnostics` — an endpoint that needs a session and nothing
+else (no `telegram_*` table, no bootstrap).
+
+It reports:
+
+* **Database** — reachable? read-only? `CREATE` allowed? `INSERT` allowed?
+* **Bot tables / Channel tables** — `ready`, `failed` with a stable reason
+  (`read_only`, `permission_denied`, `auth_failed`, `unreachable`,
+  `schema_missing`, `unknown`) and one line of advice.
+* **Bot token** — `admin` / `env` / `missing` (never the value).
+* **Retry** button → `POST /api/admin/diagnostics {action:"retry"}` clears the
+  memoised failure and runs the DDL again immediately instead of waiting the
+  usual 60 s.
+
+The same reason/hint is now included in the 503 body of the Telegram endpoints,
+so the toast is no longer a dead end.
+
+## What still works during that outage
+
+`/id` and `/chatid` are answered **before** any database access
+(`answerChatId()` in `src/lib/telegram/service.ts`, `isStaticCommand()` in
+`core.ts`, and the matching short-circuit in the webhook route). As long as the
+bot token is readable — ideally also set `TELEGRAM_BOT_TOKEN` in the host's
+environment as a fallback — an operator can still get the admin chat id while
+everything else is broken.
+
+For any other command the bot answers
+"⚙️ The database is unreachable right now…" instead of silence.
+
+## Fix, step by step
+
+```bash
+curl -i https://<site>/api/health                  # 200 {"ok":true} | 503
+```
+
+* **503** → the database, not Telegram. Open the diagnostics card, read the
+  reason, and fix the connection string / role.
+* **An HTML page ("Application loading")** → the host is asleep. Ping
+  `/api/health` every ~10 minutes (`.github/workflows/keepalive.yml`, enabled by
+  setting the repository variable `SITE_URL`) or upgrade the instance type.
+* `{"ok":true}` **and** schema `failed: read_only` → replace `DATABASE_URL`
+  with the read-write string (Supabase: the *session pooler* on port `5432`, not
+  the read-replica string).
+* `permission_denied` → grant `CREATE` on the schema, or apply
+  `supabase/*.sql` once as the owner; afterwards press **Retry**.
+
+## Regression tests
+
+`npm run test:telegram` covers the error classification (`read_only`,
+`permission_denied`, `auth_failed`, `unreachable`, `unknown`), the bootstrap
+state machine (idle → failed(+reason) → retry → ready), the `/id` fast path, and
+asserts that no hint can leak a DSN or a role name. `npm run test:security`
+keeps `/api/admin/diagnostics` behind `requireAdmin`.

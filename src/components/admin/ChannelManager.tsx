@@ -41,6 +41,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "../growth/ui";
+import { SystemDiagnostics } from "./SystemDiagnostics";
 
 type Tab =
   | "connect"
@@ -283,7 +284,13 @@ export function ChannelManager() {
     [load, showToast, t]
   );
 
-  if (error && !data) return <ErrorNote message={error} onRetry={() => void load(false)} retryLabel={t("retry")} />;
+  if (error && !data)
+    return (
+      <div className="space-y-3">
+        <ErrorNote message={error} onRetry={() => void load(false)} retryLabel={t("retry")} />
+        <SystemDiagnostics />
+      </div>
+    );
   if (!data) return <LoadingBlock label={t("loading")} />;
 
   const { settings, runtime, counts } = data;

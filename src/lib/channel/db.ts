@@ -6,41 +6,23 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { createTableBootstrap } from "@/lib/db/bootstrap";
 import { channelStatements } from "./ddl";
 
-let ready: boolean | null = null;
-let lastAttempt = 0;
-let inflight: Promise<boolean> | null = null;
-const RETRY_MS = 60_000;
+const bootstrap = createTableBootstrap("channel", channelStatements, (stmt) => db.execute(sql.raw(stmt)));
 
-export async function ensureChannelTables(): Promise<boolean> {
-  if (ready === true) return true;
-  if (inflight) return inflight;
-  const now = Date.now();
-  if (ready === false && now - lastAttempt < RETRY_MS) return false;
-  lastAttempt = now;
-  inflight = (async () => {
-    try {
-      for (const stmt of channelStatements()) {
-        await db.execute(sql.raw(stmt));
-      }
-      ready = true;
-    } catch (err) {
-      console.error("[channel] schema bootstrap failed:", err);
-      ready = false;
-    } finally {
-      inflight = null;
-    }
-    return ready === true;
-  })();
-  return inflight;
+export function ensureChannelTables(): Promise<boolean> {
+  return bootstrap.ensure();
+}
+
+/** Admin diagnostics: why the tables are (not) ready — never the raw error. */
+export function channelBootstrapStatus() {
+  return bootstrap.status();
 }
 
 /** Test seam: forget the memoised result (used by the integration checks). */
 export function resetChannelTablesMemo() {
-  ready = null;
-  lastAttempt = 0;
-  inflight = null;
+  bootstrap.reset();
 }
 
 export const CHANNEL_UNAVAILABLE = {

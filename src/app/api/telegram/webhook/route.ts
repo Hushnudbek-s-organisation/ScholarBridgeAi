@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { readJsonBody } from "@/lib/request";
 import { handleUpdate, type TgUpdate } from "@/lib/telegram/service";
 import { ensureTelegramTables } from "@/lib/telegram/db";
+import { isStaticCommand } from "@/lib/telegram/core";
 import { getBotToken, webhookSecret } from "@/lib/telegram/settings";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,11 @@ export async function POST(req: Request) {
   const parsed = await readJsonBody<TgUpdate>(req, 64 * 1024);
   if (!parsed.ok) return NextResponse.json({ ok: true });
   try {
-    if (await ensureTelegramTables()) await handleUpdate(parsed.body);
+    // `/id` is answered from the token alone: during a database problem the
+    // operator still needs that number to finish the setup.
+    const m = parsed.body.message;
+    const staticOnly = Boolean(m && m.chat?.type === "private" && isStaticCommand(m.text));
+    if (staticOnly || (await ensureTelegramTables())) await handleUpdate(parsed.body);
   } catch (err) {
     console.error("[telegram] webhook update failed:", err);
   }

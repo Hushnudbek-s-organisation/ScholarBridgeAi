@@ -199,6 +199,19 @@ export function parseStartPayload(text: string | undefined | null): { purpose: "
 }
 
 /** First word of a message if it is a command: "/stop@MyBot x" → "stop". */
+/**
+ * Commands that are answered without reading anything from the database.
+ * They exist so the bot still helps during an outage — `/id` is exactly what an
+ * operator needs *while* the panel is unavailable, so it must never depend on
+ * the tables being ready.
+ */
+export const STATIC_COMMANDS = new Set(["id", "chatid"]);
+
+export function isStaticCommand(text: string | undefined | null): boolean {
+  const cmd = parseCommand(text);
+  return cmd !== null && STATIC_COMMANDS.has(cmd);
+}
+
 export function parseCommand(text: string | undefined | null): string | null {
   if (!text) return null;
   const m = /^\/([a-z_]+)(?:@\w+)?(?:\s|$)/i.exec(text.trim());
