@@ -6826,7 +6826,13 @@
       "how5": "«Ulanishni tekshirish», keyin «Sinov xabari yuborish» tugmasini bosing. Shundan keyingina rejimni Jonli qiling.",
       "buildPlan": "Bugungi rejani tuzish",
       "runNow": "Vaqti kelganini yuborish",
-      "makeLinks": "Qisqa havolalarni yangilash"
+      "makeLinks": "Qisqa havolalarni yangilash",
+      "chatIdHowTitle": "Admin chat ID qayerdan olinadi?",
+      "chatIdHow1": "Botni Telegramda shaxsiy chatda ochib /start yuboring — yoki shunchaki /id. Bot javobida raqam chiqadi (bu sizning shaxsiy Telegram ID ingiz).",
+      "chatIdHow2": "Boshqa bot ham aytadi: @userinfobot ni ochib /start bosing.",
+      "chatIdHow3": "Raqamni shu maydonga yozib «Ulanishni tekshirish»ni bosing — maydon faqat bot haqiqatan o'sha chatga yeta olganda yashil bo'ladi.",
+      "chatIdHowOpen": "Botni Telegramda ochish",
+      "chatIdHowNoBot": "Avval bot @username ini kiriting — shundan keyin bu tugma botni ochadi."
     },
     "plan": {
       "title": "Chiqish ritmi",

@@ -460,14 +460,36 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 placeholder="@scholarbridge_uz yoki -1001234567890"
               />
             </Field>
-            <Field label={t("connect.adminChatId")} hint={t("connect.adminChatIdHint")}>
-              <input
-                className={inputCls}
-                value={conn.adminChatId}
-                onChange={(e) => setConn({ ...conn, adminChatId: e.target.value })}
-                placeholder="123456789"
-              />
-            </Field>
+            <div className="sm:col-span-2">
+              <Field label={t("connect.adminChatId")} hint={t("connect.adminChatIdHint")}>
+                <input
+                  className={inputCls}
+                  value={conn.adminChatId}
+                  onChange={(e) => setConn({ ...conn, adminChatId: e.target.value })}
+                  placeholder="123456789"
+                />
+              </Field>
+              <div className="mt-1.5 rounded-xl border border-dashed border-slate-200 p-2.5 text-[11px] leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                <p className="font-bold text-slate-700 dark:text-slate-200">{t("connect.chatIdHowTitle")}</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                  <li>{t("connect.chatIdHow1")}</li>
+                  <li>{t("connect.chatIdHow2")}</li>
+                  <li>{t("connect.chatIdHow3")}</li>
+                </ol>
+                {brand.botUsername ? (
+                  <a
+                    className="mt-1.5 inline-flex items-center gap-1 font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                    href={`https://t.me/${brand.botUsername.replace(/^@/, "")}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    <Send className="h-3 w-3" /> {t("connect.chatIdHowOpen")}
+                  </a>
+                ) : (
+                  <p className="mt-1.5 text-slate-500">{t("connect.chatIdHowNoBot")}</p>
+                )}
+              </div>
+            </div>
             <Field label={t("connect.siteUrl")} hint={t("connect.siteUrlHint")}>
               <input className={inputCls} value={brand.siteUrl} onChange={(e) => setBrand({ ...brand, siteUrl: e.target.value })} placeholder="https://example.org" />
             </Field>

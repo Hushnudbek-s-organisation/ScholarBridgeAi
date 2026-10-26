@@ -226,8 +226,12 @@ Everything below happens in **Admin → Kanal → Ulash**; no redeploy is needed
 3. **Fill in the channel**: its `@username` for a public channel, or the
    `-100…` id for a private one.
 4. **Fill in the admin chat**: open the bot in your own Telegram chat, press
-   `/start`, and use that numeric chat id. Dry-run posts and failure alerts go
-   there.
+   `/start` (or `/id`), and use that numeric chat id — the bot replies with the
+   number. Dry-run posts and failure alerts go there. It must be a private chat
+   with the bot: the bot deliberately ignores commands from groups and channels.
+   The same id can always be read from `@userinfobot`, or from
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` after a fresh message — but
+   never paste the token anywhere public.
 5. **Set the site URL** — post links are built from it.
 6. Press **Check connection** (getMe + getChat + getChatMember). The four-step
    checklist turns green only when the bot can actually post.
