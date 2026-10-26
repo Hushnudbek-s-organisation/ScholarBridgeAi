@@ -6971,6 +6971,13 @@
       "approve": "Approve",
       "unapprove": "Unapprove",
       "hint": "Only what you type here can be posted. Nothing is generated, and a story stays hidden until it is approved."
+    },
+    "env": {
+      "envLabel": "Environment",
+      "envUnset": "CHANNEL_AUTOPOST is not set — the panel controls posting",
+      "envKill": "CHANNEL_AUTOPOST=off is set on the server and overrides the panel",
+      "envDryrun": "CHANNEL_AUTOPOST=dryrun is set on the server (the panel can only make it quieter)",
+      "envOn": "CHANNEL_AUTOPOST=on is set on the server (the panel decides)"
     }
   },
   "adminDiagnostics": {

@@ -18,7 +18,7 @@ English. No paid AI: everything is rule- and template-based.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CHANNEL_AUTOPOST` | `off` | `off` → nothing leaves the app; `dryrun` → posts go **only** to `TELEGRAM_ADMIN_CHAT_ID`; `on` → posts go to the channel |
+| `CHANNEL_AUTOPOST` | *unset* | **Ceiling, not a switch.** Unset → the admin panel decides. `off` → deployment-level kill switch (nothing leaves the app, panel ignored). `dryrun` → the panel cannot reach live, everything goes to `TELEGRAM_ADMIN_CHAT_ID`. `on` → the panel decides freely |
 | `TELEGRAM_CHANNEL_ID` | — | `-100…` id or `@username`; the bot must be a channel admin |
 | `TELEGRAM_ADMIN_CHAT_ID` | — | private chat for dryrun output and failure alerts |
 | `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/go/<code>`); the admin panel value wins |
@@ -241,7 +241,15 @@ Everything below happens in **Admin → Kanal → Ulash**; no redeploy is needed
 8. **Pause** any time by setting a date in “Pause until”, or turn the mode off.
 
 `CHANNEL_AUTOPOST=off` in the environment overrides all of this: a deployment
-can always be silenced from the environment, never the other way round.
+can always be silenced from the environment, never the other way round. Leaving
+the variable **unset** is the normal case — the panel then owns the mode, and the
+panel itself starts at `off`. `dryrun` in the environment caps a panel `on` at
+dry run, which is the safe way to run a staging deployment.
+
+> If the panel says *"CHANNEL_AUTOPOST is off in the environment: posting stays
+> disabled until it changes"*, the host has that variable set to `off`. Either
+> remove it or set it to `on` (or `dryrun`) in the host's environment, then
+> redeploy — the panel cannot override it, by design.
 
 ### Modes
 

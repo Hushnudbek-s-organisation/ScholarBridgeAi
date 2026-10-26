@@ -135,6 +135,11 @@ scripts/check-channel.ts, check-channel-integration.ts
 `CHANNEL_AUTOPOST=off|dryrun|on`, `CHANNEL_SITE_URL`,
 `CHANNEL_DISCUSSION_ENABLED`, `CRON_SECRET` (already).
 Default `CHANNEL_AUTOPOST=off`; `dryrun` sends only to `TELEGRAM_ADMIN_CHAT_ID` and prefixes
+
+> **Keyinroq (2026-10-26):** `CHANNEL_AUTOPOST` — deploy-darajali *shift*
+> (kill switch). O'zgaruvchi **yo'q** bo'lsa qaror panelda; `off` panelni bekor
+> qiladi; `dryrun` live'ga chiqishga yo'l qo'ymaydi. Batafsil: `docs/CHANNEL.md`
+> va `.env.example`.
 `[DRYRUN]`. Nothing is ever posted to the channel until an operator sets `on`.
 
 ---

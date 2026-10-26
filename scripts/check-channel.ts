@@ -1700,6 +1700,36 @@ check("the environment kill switch always wins over the admin switch", () => {
   assert.equal(live.channelId, "@scholarbridge_uz");
 });
 
+check("an unset CHANNEL_AUTOPOST lets the panel decide, an explicit off still kills", () => {
+  const settings = mergeChannelSettings({
+    connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on" },
+    siteUrl: "https://scholarbridge.uz",
+  });
+  // Absent variable: this is the normal deployment — the panel is in charge.
+  const unset = resolveChannelRuntime(settings, {}, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(unset.envKillSwitch, false, "an absent variable is not a kill switch");
+  assert.equal(unset.envAutopost, null);
+  assert.equal(unset.mode, "on", "the panel's mode must win when the env says nothing");
+  assert.equal(unset.blockedReason, null);
+
+  // Explicit off wins over the panel.
+  const killed = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "off" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(killed.envKillSwitch, true);
+  assert.equal(killed.envAutopost, "off");
+  assert.equal(killed.mode, "off");
+
+  // `dryrun` in the environment is a ceiling: the panel cannot reach live.
+  const capped = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "dryrun" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(capped.envKillSwitch, false);
+  assert.equal(capped.mode, "dryrun", "an env dryrun must cap a panel \"on\"");
+  assert.equal(capped.blockedReason, null);
+
+  // A typo is not "on": it parses as off and therefore kills posting too.
+  const typo = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "ture" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(typo.envKillSwitch, true);
+  assert.equal(typo.mode, "off");
+});
+
 check("a missing piece blocks the publisher with a readable reason", () => {
   const base = { connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on" as const }, siteUrl: "https://scholarbridge.uz" };
   const noChannel = resolveChannelRuntime(mergeChannelSettings({ ...base, connection: { ...base.connection, channelId: "" } }), { CHANNEL_AUTOPOST: "on" });

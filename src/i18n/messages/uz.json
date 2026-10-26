@@ -6971,6 +6971,13 @@
       "approve": "Tasdiqlash",
       "unapprove": "Bekor qilish",
       "hint": "Faqat shu yerga yozgan matningiz joylanishi mumkin. Hech narsa avtomatik yaratilmaydi, hikoya tasdiqlanguncha yashirin turadi."
+    },
+    "env": {
+      "envLabel": "Muhit",
+      "envUnset": "CHANNEL_AUTOPOST yo'q — postni panel boshqaradi",
+      "envKill": "Serverda CHANNEL_AUTOPOST=off turibdi va panelni bekor qiladi",
+      "envDryrun": "Serverda CHANNEL_AUTOPOST=dryrun (panel faqat jimlashtira oladi)",
+      "envOn": "Serverda CHANNEL_AUTOPOST=on (qaror panelda)"
     }
   },
   "adminDiagnostics": {

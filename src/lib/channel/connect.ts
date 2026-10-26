@@ -140,7 +140,10 @@ export async function checkChannelConnection(runtime: ChannelRuntime): Promise<C
   }
 
   if (!runtime.siteUrl) hints.push("Set the site URL — post links are built from it.");
-  if (runtime.envKillSwitch) hints.push("CHANNEL_AUTOPOST is off in the environment: posting stays disabled until it changes.");
+  if (runtime.envKillSwitch)
+    hints.push(
+      "CHANNEL_AUTOPOST=off is set in this deployment's environment and overrides the panel. Remove it (or set CHANNEL_AUTOPOST=on, or dryrun for tests) in the host's environment variables and redeploy."
+    );
 
   report.ready =
     Boolean(token) &&

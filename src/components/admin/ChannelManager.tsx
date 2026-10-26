@@ -94,6 +94,7 @@ interface Runtime {
   paused: boolean;
   pausedUntil: string | null;
   envKillSwitch: boolean;
+  envAutopost: "off" | "dryrun" | "on" | null;
   blockedReason: string | null;
 }
 
@@ -539,6 +540,18 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 />
               </Field>
             </div>
+            {/* The deploy-level kill switch is invisible in the panel otherwise:
+                an operator flips the mode to Live and nothing happens. */}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="font-bold">{t("env.envLabel")}:</span>{" "}
+              {runtime.envAutopost === null
+                ? t("env.envUnset")
+                : runtime.envAutopost === "off"
+                  ? <span className="font-semibold text-rose-600 dark:text-rose-400">{t("env.envKill")}</span>
+                  : runtime.envAutopost === "dryrun"
+                    ? t("env.envDryrun")
+                    : t("env.envOn")}
+            </p>
             {conn.mode === "on" && (
               <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
                 {t("connect.liveWarning")}
