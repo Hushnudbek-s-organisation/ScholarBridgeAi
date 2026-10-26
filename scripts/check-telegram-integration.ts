@@ -469,6 +469,14 @@ async function main() {
     await service.handleUpdate(msg(1001, "/menu"));
     check("/menu re-opens the menu", buttonsOf(since(m).find((c) => c.method === "sendMessage")).some((b) => b.callback_data === "mn:next"));
     m = mark();
+    await service.handleUpdate(msg(1001, "/id"));
+    const idReply = textOf(since(m).find((c) => c.method === "sendMessage"));
+    check("/id tells the operator their admin chat ID", idReply.includes("1001"), idReply.slice(0, 60));
+    m = mark();
+    await service.handleUpdate(msg(7777, "/chatid"));
+    const idReplyUnlinked = textOf(since(m).find((c) => c.method === "sendMessage"));
+    check("/id works before the Telegram is linked to a profile (setup happens first)", idReplyUnlinked.includes("7777"), idReplyUnlinked.slice(0, 60));
+    m = mark();
     await service.handleUpdate(cb(7777, "mn:applications"));
     check("menu buttons do nothing for an unlinked Telegram", !since(m).some((c) => c.method === "sendMessage"));
     m = mark();

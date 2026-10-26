@@ -175,6 +175,17 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
   }
 
   const cmd = parseCommand(msg.text);
+  // `/id` — the one number the channel panel asks an operator for. Answering it
+  // here means nobody has to install a third-party "what is my id" bot, and it
+  // works whether or not this Telegram account is linked to a profile.
+  if (cmd === "id" || cmd === "chatid") {
+    await sendToChat(token, chatId, CMD_TEXTS[ctx.lang].chatIdText(chatId), {
+      profileId: ctx.link?.profileId ?? null,
+      kind: "reply",
+      preview: "chat id",
+    });
+    return;
+  }
   if (!cmd) {
     const typed = (msg.text ?? "").trim();
     if (ctx.link && typed) {

@@ -65,7 +65,12 @@ async function main() {
   const request = await import("../src/lib/request");
   const payments = await import("../src/lib/payments");
   const { contentSecurityPolicy, proxy: middleware } = await import("../src/proxy");
-  const { shouldRetrySessionRestore } = await import("../src/lib/sessionRestore");
+  const {
+    isTransientRestoreFailure,
+    sessionRestoreDelayMs,
+    shouldRetrySessionRestore,
+  } = await import("../src/lib/sessionRestore");
+  const { isTransientDbError, withDbRetry } = await import("../src/db/retry");
   const { NextRequest } = await import("next/server");
   // The exact function the App Router uses to pull the nonce out of the request
   // CSP header — used below to prove our policy format is compatible.
@@ -81,12 +86,96 @@ async function main() {
   check("transient 5xx session failures retry before the bounded final attempt", () => {
     assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 0), true);
     assert.equal(shouldRetrySessionRestore(502, undefined, 1), true);
-    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 2), false);
+    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 2), true, "a waking database gets more than three quick tries");
+    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 3), true);
+    assert.equal(shouldRetrySessionRestore(503, "session_service_unavailable", 4), false, "the budget is still bounded");
+    assert.equal(shouldRetrySessionRestore(503, "unavailable", 2, 3), false, "an explicit budget is honoured");
+  });
+  check("restore backoff grows and stays bounded", () => {
+    const delays = [0, 1, 2, 3, 4, 9].map(sessionRestoreDelayMs);
+    assert.deepEqual(delays, [400, 800, 1600, 2500, 2500, 2500]);
+    for (let i = 1; i < delays.length; i++) assert.ok(delays[i] >= delays[i - 1], "never shortens");
+    assert.equal(sessionRestoreDelayMs(Number.NaN), 400);
+    assert.equal(sessionRestoreDelayMs(-5), 400);
+    const total = delays.slice(0, 4).reduce((sum, ms) => sum + ms, 0);
+    assert.ok(total <= 6000, "five tries stay inside a page-load scale budget");
+  });
+  check("a server outage is never mistaken for a signed-out visitor", () => {
+    assert.equal(isTransientRestoreFailure(503, "unavailable"), true);
+    assert.equal(isTransientRestoreFailure(500, undefined), true);
+    assert.equal(isTransientRestoreFailure(Number.NaN, undefined), true, "a dead network is transient too");
+    assert.equal(isTransientRestoreFailure(401, "unauthorized"), false);
+    assert.equal(isTransientRestoreFailure(429, "rate_limited"), false);
+    assert.equal(isTransientRestoreFailure(503, "session_secret_required"), false, "misconfiguration is not transient");
+  });
+  check("an outage keeps the public site usable instead of blocking it", () => {
+    const home = readFileSync(join(ROOT, "src/app/HomeClient.tsx"), "utf8");
+    assert.doesNotMatch(home, /restore-error/, "no blocking restore screen is left");
+    assert.doesNotMatch(home, /SessionRestoreError/);
+    assert.match(home, /function SessionNotice\(/, "the outage is explained in a banner");
+    assert.match(home, /SESSION_RESTORE_MAX_ATTEMPTS/, "the shared attempt budget is used");
+    assert.match(home, /sessionRestoreDelayMs\(attempt\)/, "the tested backoff is used");
   });
   check("client errors are not retried", () => {
     assert.equal(shouldRetrySessionRestore(401, "unauthorized", 0), false);
     assert.equal(shouldRetrySessionRestore(429, "rate_limited", 0), false);
   });
+  await checkAsync("only connection-class database failures are retried", async () => {
+    const transient = [
+      Object.assign(new Error("terminating connection due to administrator command"), { code: "57P01" }),
+      Object.assign(new Error("sorry, too many clients already"), { code: "53300" }),
+      Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
+      Object.assign(new Error("cannot connect now"), { code: "57P03" }),
+      new Error("Connection terminated unexpectedly"),
+      new Error("timeout expired"),
+    ];
+    for (const error of transient) assert.equal(isTransientDbError(error), true, error.message);
+    const permanent = [
+      Object.assign(new Error('column "is_admin" does not exist'), { code: "42703" }),
+      Object.assign(new Error('relation "profiles" does not exist'), { code: "42P01" }),
+      Object.assign(new Error("duplicate key value"), { code: "23505" }),
+      new Error("syntax error at or near SELECT"),
+      null,
+      undefined,
+      "boom",
+    ];
+    for (const error of permanent) assert.equal(isTransientDbError(error), false, String(error));
+  });
+
+  await checkAsync("a transient failure is retried once, a permanent one is not", async () => {
+    const waits: number[] = [];
+    let calls = 0;
+    const flaky = async () => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error("too many clients"), { code: "53300" });
+      return "ok";
+    };
+    const value = await withDbRetry(flaky, { sleep: async (ms) => void waits.push(ms) });
+    assert.equal(value, "ok");
+    assert.equal(calls, 2, "exactly one extra attempt");
+    assert.deepEqual(waits, [120], "a short delay, not a hang");
+
+    let permanentCalls = 0;
+    await assert.rejects(
+      withDbRetry(async () => {
+        permanentCalls++;
+        throw Object.assign(new Error("bad column"), { code: "42703" });
+      }, { sleep: async () => undefined }),
+      /bad column/
+    );
+    assert.equal(permanentCalls, 1, "a real bug is surfaced immediately");
+
+    let exhausted = 0;
+    await assert.rejects(
+      withDbRetry(async () => {
+        exhausted++;
+        throw Object.assign(new Error("still down"), { code: "08006" });
+      }, { sleep: async () => undefined }),
+      /still down/
+    );
+    assert.equal(exhausted, 2, "attempts are capped");
+  });
+
   check("session restoration applies the tested status/code/attempt policy", () => {
     const home = readFileSync(join(ROOT, "src/app/HomeClient.tsx"), "utf8");
     assert.match(home, /shouldRetrySessionRestore\(res\.status,\s*data\.code,\s*attempt\)/);

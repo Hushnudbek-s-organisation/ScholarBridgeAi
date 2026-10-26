@@ -16,10 +16,11 @@ export async function GET(req: Request) {
   try {
     const auth = await authenticate(req);
     if (!auth.ok) {
-      return NextResponse.json(
-        { error: auth.error, code: auth.code, session: null },
-        { status: auth.status, headers: { "Cache-Control": "no-store" } }
-      );
+      // A 503 is "the database is not answering yet", not "you are signed out":
+      // tell intermediaries and the client's own retry loop how long to wait.
+      const headers: Record<string, string> = { "Cache-Control": "no-store" };
+      if (auth.status === 503) headers["Retry-After"] = "3";
+      return NextResponse.json({ error: auth.error, code: auth.code, session: null }, { status: auth.status, headers });
     }
     return NextResponse.json(
       {
