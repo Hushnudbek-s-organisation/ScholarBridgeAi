@@ -110,7 +110,14 @@ const SECTIONS: { id: AdminTab; group: AdminGroup; icon: React.ComponentType<{ c
 const GROUPS: AdminGroup[] = ["home", "content", "community", "growth", "money", "system"];
 const TAB_KEY = "scholarbridge_admin_tab";
 
+/** `#admin/channel` wins, then the last section this browser opened. */
 function initialTab(): AdminTab {
+  try {
+    const fromHash = /^#admin\/([a-zA-Z]+)$/.exec(window.location.hash)?.[1];
+    if (fromHash && SECTIONS.some((s) => s.id === fromHash)) return fromHash as AdminTab;
+  } catch {
+    // ignore
+  }
   try {
     const v = localStorage.getItem(TAB_KEY);
     if (v && SECTIONS.some((s) => s.id === v)) return v as AdminTab;
@@ -132,6 +139,8 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
     setTabState(id);
     try {
       localStorage.setItem(TAB_KEY, id);
+      // Shareable: /#admin/channel opens this section directly.
+      window.history.replaceState(null, "", `#admin/${id}`);
     } catch {
       // ignore
     }

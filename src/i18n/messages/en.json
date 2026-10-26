@@ -6788,7 +6788,10 @@
       "countries": "Countries",
       "shortlinks": "Short links",
       "queue": "Queue",
-      "audit": "Log"
+      "audit": "Log",
+      "polls": "Polls",
+      "prefs": "Interests",
+      "stories": "Stories"
     },
     "steps": {
       "token": "Bot token (Admin → Telegram)",
@@ -6923,6 +6926,45 @@
       "action": "Action",
       "entity": "Object",
       "empty": "Nothing logged yet"
+    },
+    "polls": {
+      "title": "Channel polls",
+      "hint": "Anonymous polls. Only Telegram's per-option totals are stored — never a voter.",
+      "empty": "No polls yet",
+      "emptyHint": "A poll appears here after the first one is posted to the channel.",
+      "question": "Question",
+      "type": "Type",
+      "status": "Status",
+      "votes": "voters",
+      "close": "Close poll",
+      "noVotes": "No votes yet",
+      "deckUnknown": "Deck entry missing"
+    },
+    "prefs": {
+      "title": "Interest weights",
+      "hint": "What the planner should favour, learned from poll shares. 1.00 is neutral; the range is 0.5–2.0.",
+      "empty": "No learned weights yet",
+      "emptyHint": "Weights appear once a preference poll closes with votes.",
+      "topic": "Topic",
+      "weight": "Weight",
+      "samples": "Polls",
+      "reset": "Reset all"
+    },
+    "stories": {
+      "title": "Stories",
+      "empty": "No stories yet",
+      "emptyHint": "Write a story, then approve it — the planner only ever posts approved stories.",
+      "add": "New story",
+      "edit": "Edit story",
+      "storyTitle": "Title",
+      "body": "Text",
+      "author": "Author label (optional)",
+      "source": "Source URL (optional)",
+      "approved": "Approved",
+      "pending": "Pending",
+      "approve": "Approve",
+      "unapprove": "Unapprove",
+      "hint": "Only what you type here can be posted. Nothing is generated, and a story stays hidden until it is approved."
     }
   }
 }

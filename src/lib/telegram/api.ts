@@ -132,6 +132,44 @@ export async function tgAnswerCallback(token: string, callbackQueryId: string, t
   });
 }
 
+/** A poll Telegram sends with per-option counters and nothing about voters. */
+export interface TgPollState {
+  id: string;
+  question?: string;
+  options?: { text?: string; voter_count?: number }[];
+  total_voter_count?: number;
+  is_closed?: boolean;
+  is_anonymous?: boolean;
+  type?: string;
+}
+
+/** Send an anonymous poll. The result carries the poll id the webhook keys on. */
+export async function tgSendPoll(
+  token: string,
+  chatId: string,
+  params: {
+    question: string;
+    options: string[];
+    type?: "regular" | "quiz";
+    is_anonymous?: boolean;
+    correct_option_id?: number;
+    explanation?: string;
+    allows_multiple_answers?: boolean;
+    open_period?: number;
+  }
+): Promise<TgResult<{ message_id: number; poll: TgPollState }>> {
+  return tgCall(token, "sendPoll", { chat_id: chatId, ...params }, 12_000);
+}
+
+/** Close a poll we sent and read the final aggregate (no per-voter data). */
+export async function tgStopPoll(
+  token: string,
+  chatId: string,
+  messageId: number
+): Promise<TgResult<TgPollState>> {
+  return tgCall(token, "stopPoll", { chat_id: chatId, message_id: messageId }, 10_000);
+}
+
 export async function tgSendChatAction(token: string, chatId: string, action: "typing" = "typing"): Promise<TgResult> {
   return tgCall(token, "sendChatAction", { chat_id: chatId, action }, 4000);
 }

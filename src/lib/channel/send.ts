@@ -15,7 +15,7 @@ import { and, eq, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts } from "@/db/schema";
 import { getBotToken } from "@/lib/telegram/settings";
-import { tgCall } from "@/lib/telegram/api";
+import { tgCall, tgSendPoll } from "@/lib/telegram/api";
 import { resolveChannelRuntime, tashkentDay, type ChannelRuntime } from "./config";
 import { ensureSiteLink, loadChannelSettings } from "./repo";
 import { loadRenderData, loadChannelCountries } from "./runtime";
@@ -23,6 +23,8 @@ import { renderPlanItemWithReason, type RenderedPost } from "./render";
 import { linkPreviewFor, type ChannelSettings } from "./settings";
 import { sanitizeTelegramHtml } from "./sanitize";
 import type { PlannedItem } from "./plan";
+import { insertPoll } from "./engage";
+import { pollPreviewText, pollSendParams, pollSendProblem, pollSpecByKey } from "./polls";
 
 export interface SendOutcome {
   ok: boolean;
@@ -113,6 +115,16 @@ async function prepare(settings?: ChannelSettings): Promise<SendContext | { erro
  */
 export async function renderPlanRow(row: typeof channelPlan.$inferSelect): Promise<{ item: PlannedItem; parts: string[]; reason: string | null }> {
   const item = planRowToItem(row);
+  if (item.kind === "poll") {
+    const spec = pollSpecByKey(typeof item.payload.pollKey === "string" ? item.payload.pollKey : null);
+    if (!spec) return { item, parts: [], reason: "poll_not_found" };
+    const problem = pollSendProblem(spec);
+    return {
+      item,
+      parts: [pollPreviewText(spec.question, spec.options.map((option) => option.text))],
+      reason: problem ? `poll_not_sendable: ${problem}` : null,
+    };
+  }
   const settings = await loadChannelSettings();
   const runtime = resolveChannelRuntime(settings);
   const countries = await loadChannelCountries();
@@ -139,6 +151,133 @@ export interface SendOptions {
 }
 
 /**
+ * Insert the post row *before* the network call. The dedupe key is the plan
+ * identity, so a second concurrent tick finds the row and stops here instead of
+ * posting twice.
+ */
+async function reservePost(
+  row: typeof channelPlan.$inferSelect,
+  mode: string,
+  chatId: string,
+  html: string
+): Promise<{ postId: number | null; early?: SendOutcome }> {
+  const key = dedupeKey(row);
+  const inserted = await db
+    .insert(channelPosts)
+    .values({
+      planId: row.id,
+      kind: row.kind,
+      rung: row.rung,
+      scholarshipId: row.scholarshipId,
+      planDate: row.planDate,
+      slot: row.slot,
+      dedupeKey: key,
+      mode,
+      chatId,
+      html,
+      lane: row.lane,
+      textOverride: row.textOverride,
+      status: "pending",
+      attempts: 1,
+    })
+    .onConflictDoNothing({ target: channelPosts.dedupeKey })
+    .returning({ id: channelPosts.id });
+
+  let postId = inserted[0]?.id ?? null;
+  if (!postId) {
+    const existing = await db
+      .select({ id: channelPosts.id, status: channelPosts.status })
+      .from(channelPosts)
+      .where(eq(channelPosts.dedupeKey, key))
+      .limit(1);
+    const state = existing[0]?.status;
+    if (state === "sent") {
+      return { postId: null, early: { ok: true, status: "sent", chatId, messageId: null, reason: "Already sent earlier", parts: [html] } };
+    }
+    if (state === "sending") {
+      return { postId: null, early: { ok: false, status: "skipped", chatId, messageId: null, reason: "Another run is sending this post", parts: [html] } };
+    }
+    postId = existing[0]?.id ?? null;
+    if (postId) {
+      await db
+        .update(channelPosts)
+        .set({ status: "pending", mode, chatId, html, updatedAt: new Date() })
+        .where(eq(channelPosts.id, postId));
+    }
+  }
+  if (postId) {
+    await db.update(channelPosts).set({ status: "sending", updatedAt: new Date() }).where(eq(channelPosts.id, postId));
+  }
+  return { postId };
+}
+
+export { pollPreviewText } from "./polls";
+
+/**
+ * A poll row is not a message: it goes out with `sendPoll`, has no HTML body and
+ * cannot be multi-part. In dry-run mode it is shown in the admin chat so the
+ * operator sees exactly what the channel would get — and no `channel_polls` row
+ * is created, because a dry-run poll can never collect a vote.
+ */
+async function sendPollPlanRow(
+  row: typeof channelPlan.$inferSelect,
+  ctx: { mode: "dryrun" | "on"; chatId: string; token: string }
+): Promise<SendOutcome> {
+  const payload = planRowToItem(row).payload;
+  const spec = pollSpecByKey(typeof payload.pollKey === "string" ? payload.pollKey : null);
+  if (!spec) {
+    return { ok: false, status: "skipped", chatId: null, messageId: null, reason: "Poll deck entry not found", parts: [] };
+  }
+  const problem = pollSendProblem(spec);
+  if (problem) {
+    return { ok: false, status: "skipped", chatId: null, messageId: null, reason: `Poll is not sendable: ${problem}`, parts: [] };
+  }
+
+  const params = pollSendParams(spec);
+  const body = pollPreviewText(params.question, params.options);
+  const reserved = await reservePost(row, ctx.mode, ctx.chatId, body);
+  if (reserved.early) return reserved.early;
+  const postId = reserved.postId as number;
+
+  const sent = await tgSendPoll(ctx.token, ctx.chatId, params);
+  if (!sent.ok || !sent.result) {
+    const reason = sent.description ?? "sendPoll failed";
+    await db.update(channelPosts).set({ status: "failed", error: reason, updatedAt: new Date() }).where(eq(channelPosts.id, postId));
+    return { ok: false, status: "failed", chatId: ctx.chatId, messageId: null, reason, parts: [body] };
+  }
+
+  const now = new Date();
+  await db
+    .update(channelPosts)
+    .set({ status: "sent", messageId: sent.result.message_id, sentAt: now, updatedAt: now, error: null })
+    .where(eq(channelPosts.id, postId));
+  await db.update(channelPlan).set({ status: "sent" }).where(eq(channelPlan.id, row.id));
+
+  if (ctx.mode === "on") {
+    await insertPoll({
+      postId,
+      messageId: sent.result.message_id,
+      pollId: sent.result.poll?.id ?? null,
+      pollType: spec.type,
+      pollKey: spec.key,
+      topic: spec.topic,
+      question: params.question,
+      options: spec.options,
+      correctIndex: typeof params.correct_option_id === "number" ? params.correct_option_id : null,
+    });
+  }
+
+  return {
+    ok: true,
+    status: ctx.mode === "on" ? "sent" : "dryrun",
+    chatId: ctx.chatId,
+    messageId: sent.result.message_id,
+    reason: null,
+    parts: [body],
+  };
+}
+
+/**
  * Send one stored plan row. `opts.force` is only used by the admin "send now"
  * action; the cron path always goes through the mode, pause and cap checks.
  */
@@ -159,13 +298,13 @@ export async function sendPlanRow(
   if (!opts.force && runtime.blockedReason) {
     return { ok: false, status: "skipped", chatId: null, messageId: null, reason: runtime.blockedReason, parts: [] };
   }
-  if (row.kind === "poll") {
-    return { ok: false, status: "skipped", chatId: null, messageId: null, reason: "Polls are not sent yet (poll delivery arrives with the sender upgrade)", parts: [] };
-  }
-
   const chatId = mode === "on" ? runtime.channelId : runtime.adminChatId;
   if (!chatId) {
     return { ok: false, status: "failed", chatId: null, messageId: null, reason: "No target chat configured", parts: [] };
+  }
+
+  if (row.kind === "poll") {
+    return await sendPollPlanRow(row, { mode, chatId, token });
   }
 
   // Render first: a post that cannot be rendered must not create a post row.
@@ -179,52 +318,9 @@ export async function sendPlanRow(
   // A tracked link must exist before the message points at it.
   if (row.scholarshipId) await ensureSiteLink(row.scholarshipId, runtime.siteUrl);
 
-  const key = dedupeKey(row);
-  const inserted = await db
-    .insert(channelPosts)
-    .values({
-      planId: row.id,
-      kind: row.kind,
-      rung: row.rung,
-      scholarshipId: row.scholarshipId,
-      planDate: row.planDate,
-      slot: row.slot,
-      dedupeKey: key,
-      mode,
-      chatId,
-      html: parts.join("\n\n———\n\n"),
-      lane: row.lane,
-      textOverride: row.textOverride,
-      status: "pending",
-      attempts: 1,
-    })
-    .onConflictDoNothing({ target: channelPosts.dedupeKey })
-    .returning({ id: channelPosts.id, status: channelPosts.status });
-
-  let postId = inserted[0]?.id ?? null;
-  if (!postId) {
-    const existing = await db
-      .select({ id: channelPosts.id, status: channelPosts.status })
-      .from(channelPosts)
-      .where(eq(channelPosts.dedupeKey, key))
-      .limit(1);
-    const state = existing[0]?.status;
-    if (state === "sent") {
-      return { ok: true, status: "sent", chatId, messageId: null, reason: "Already sent earlier", parts };
-    }
-    if (state === "sending") {
-      return { ok: false, status: "skipped", chatId, messageId: null, reason: "Another run is sending this post", parts };
-    }
-    postId = existing[0]?.id ?? null;
-    if (postId) {
-      await db
-        .update(channelPosts)
-        .set({ status: "pending", mode, chatId, html: parts.join("\n\n———\n\n"), updatedAt: new Date() })
-        .where(eq(channelPosts.id, postId));
-    }
-  }
-
-  await db.update(channelPosts).set({ status: "sending", updatedAt: new Date() }).where(eq(channelPosts.id, postId as number));
+  const reserved = await reservePost(row, mode, chatId, parts.join("\n\n———\n\n"));
+  if (reserved.early) return reserved.early;
+  const postId = reserved.postId as number;
 
   const disablePreview = !linkPreviewFor(settings, row.kind);
   let firstMessageId: number | null = null;

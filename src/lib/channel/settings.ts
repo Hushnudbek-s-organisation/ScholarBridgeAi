@@ -8,6 +8,8 @@
  * settings and must never appear in the admin UI.
  */
 
+import { isSameOrigin } from "./links";
+
 export type ChannelMode = "off" | "dryrun" | "on";
 
 export interface LinkItem {
@@ -161,17 +163,34 @@ function intIn(value: unknown, fallback: number, min: number, max: number): numb
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-function links(value: unknown, fallback: LinkItem[]): LinkItem[] {
+/**
+ * Footer links. External links must be public HTTPS; a link to our own site is
+ * allowed on whatever origin the site actually runs on (localhost and staging
+ * included), exactly like `/go` site links.
+ */
+function links(value: unknown, fallback: LinkItem[], siteUrl = ""): LinkItem[] {
   if (!Array.isArray(value)) return fallback;
   const out: LinkItem[] = [];
   for (const entry of value.slice(0, 8)) {
     if (!entry || typeof entry !== "object") continue;
     const label = str((entry as LinkItem).label, "").slice(0, 40);
     const url = str((entry as LinkItem).url, "");
-    if (!label || !isAllowedLinkUrl(url)) continue;
+    if (!label) continue;
+    if (!isAllowedLinkUrl(url) && !(siteUrl && isSameOrigin(url, siteUrl))) continue;
     out.push({ label, url });
   }
   return out;
+}
+
+/** A site origin from settings: http(s) only, no path, no trailing slash. */
+function normalizeSite(value: string): string {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? `${url.protocol}//${url.host}` : "";
+  } catch {
+    return "";
+  }
 }
 
 function tagList(value: unknown, fallback: string[]): string[] {
@@ -234,6 +253,8 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
   const d = DEFAULT_CHANNEL_SETTINGS;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return d;
   const b = raw as Record<string, unknown>;
+  // Resolved first: footer links are validated against our own origin.
+  const siteUrl = normalizeSite(str(b.siteUrl, d.siteUrl));
   const plan = (b.plan && typeof b.plan === "object" ? b.plan : {}) as Record<string, unknown>;
   const morning = (plan.morningWindow && typeof plan.morningWindow === "object" ? plan.morningWindow : {}) as Record<string, unknown>;
   const evening = (plan.eveningWindow && typeof plan.eveningWindow === "object" ? plan.eveningWindow : {}) as Record<string, unknown>;
@@ -268,18 +289,9 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
     brand: str(b.brand, d.brand).slice(0, 40) || d.brand,
     channelUsername: str(b.channelUsername, d.channelUsername).replace(/^@/, "").slice(0, 32),
     botUsername: str(b.botUsername, d.botUsername).replace(/^@/, "").slice(0, 32),
-    siteUrl: (() => {
-      const value = str(b.siteUrl, d.siteUrl);
-      if (!value) return "";
-      try {
-        const url = new URL(value);
-        return url.protocol === "https:" || url.protocol === "http:" ? `${url.protocol}//${url.host}` : "";
-      } catch {
-        return "";
-      }
-    })(),
-    footerMain: links(b.footerMain, d.footerMain),
-    footerSocial: links(b.footerSocial, d.footerSocial),
+    siteUrl,
+    footerMain: links(b.footerMain, d.footerMain, siteUrl),
+    footerSocial: links(b.footerSocial, d.footerSocial, siteUrl),
     hashtags: {
       kinds,
       countries: tagMap(hashtagBlock.countries, d.hashtags.countries),

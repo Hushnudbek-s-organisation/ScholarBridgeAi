@@ -258,6 +258,9 @@ can always be silenced from the environment, never the other way round.
 | Davlatlar | Flag, Uzbek name, locative form, hashtag, aliases |
 | Havolalar | Short links, 7/30-day clicks, CSV export, create/disable/delete |
 | Navbat | Today's queue with the exact rendered text, send now, test, skip, postpone, pin, text override |
+| So'rovlar | Every poll sent, its aggregate results, a manual close |
+| Qiziqish | Learned topic weights (from poll shares), hand-correctable, reset-all |
+| Hikoyalar | Admin-written stories; only approved rows are postable |
 | Jurnal | Append-only `channel_audit` trail of every mutation |
 
 Every mutation passes `guardAdmin` (admin session + rate limit), the global CSRF
@@ -283,3 +286,74 @@ match the configured origin; external links must be public HTTPS URLs. Clicks
 are aggregated per `(code, day)` — no IP, no user agent, no per-visitor row —
 and Telegram's crawler plus `HEAD` probes are ignored. `/r/<code>` is an alias
 for links already shared.
+
+
+## 13. Polls
+
+A poll is a **post kind**, not a message: it goes out with `sendPoll`, has no
+HTML body and cannot be multi-part. The deck (`templates/polls.uz.ts`, eight
+types, 28-day cooldown) is code, so a plan row only stores the deck key and can
+always be replayed.
+
+*Anonymous by construction.* `is_anonymous` is hard-coded, the question is
+posted with `open_period` (3 days) so it closes itself, and the row stores
+**per-option counters only**. There is no row, column or log line anywhere that
+could name a voter — the publisher reads `stopPoll` / the `poll` update, both of
+which are aggregates.
+
+- **Live** send → a `channel_polls` row is created with the poll id.
+- **Dry run** send → the poll appears in the admin chat and **no**
+  `channel_polls` row is created (a dry-run poll could never collect a vote).
+- Telegram posts a `poll` update when the poll closes (`/api/telegram/webhook`);
+  **Close poll** in Admin → Kanal → So'rovlar calls `stopPoll` for an immediate
+  aggregate. Either path ends in the same place.
+- If Telegram refuses to stop the poll (bot removed, already closed), the row is
+  still closed locally and the reason is audited — the panel never lies about
+  state.
+
+## 14. Interest weights (`channel_prefs`)
+
+Only `pref` polls teach the planner. When a poll closes with votes:
+
+```
+weight = clamp(0.7 × current + 0.3 × (share × optionCount), 0.5 … 2.0)
+```
+
+`share × optionCount` normalises across poll sizes, so 1-of-2 and 1-of-5 are not
+treated as the same signal. A topic key is `family:option` (`country:mixed` +
+`canada` → `country:canada`), which is exactly what `topicKeys()` produces from a
+scholarship. Multi-answer, quiz and this-or-that polls are engagement, not
+preferences, and never move a weight; a poll with zero votes changes nothing.
+The blend happens **once per poll** (guarded by the row leaving `open`), so a
+duplicate Telegram update cannot double-count.
+
+Admin → Qiziqish shows every weight with its sample count, allows a manual
+correction (0.5–2.0 only) and a reset-all back to neutral 1.0.
+
+## 15. Stories (`channel_stories`)
+
+Stories are the only editorial content in the publisher, and they are strictly
+admin-authored: there is no generator, no import and no model call. A story is
+invisible to the planner until an admin presses **Approve**; unapproving hides it
+again, and deleting removes it. The planner respects a 90-day cooldown per story
+and only picks from approved rows.
+
+## 16. Local development against the Telegram mock
+
+```
+node scripts/telegram-mock.mjs           # http://127.0.0.1:8099
+TELEGRAM_API_BASE=http://127.0.0.1:8099  # in .env, then restart `next dev`
+TELEGRAM_BOT_TOKEN=8099000001:AAH…       # any token that matches 123:AA… (≥30 chars)
+```
+
+The mock now answers `getMe`, `getChat`, `getChatMember`, `getChatMemberCount`,
+`sendMessage`, `sendPoll` and `stopPoll`, so **Check connection**, a test
+message and a full poll round-trip work offline:
+
+```
+curl -X POST localhost:8099/_vote -d '{"pollId":"poll_2","votes":{"0":30,"1":10}}'
+```
+
+Verified end to end in this repository: connection check green → dry-run poll to
+the admin chat (no results row) → live poll to the channel → votes → **Close
+poll** → weights learned (`country:canada` 1.4 → 1.58).

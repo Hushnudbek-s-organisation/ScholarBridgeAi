@@ -11,6 +11,9 @@
  *   Davlatlar — flags, Uzbek names, locative forms, hashtags
  *   Havolalar — short links and their clicks
  *   Navbat    — today's queue: preview, send, skip, postpone, pin, edit
+ *   So'rovlar — polls, their aggregate results and a manual close
+ *   Qiziqish  — learned topic weights (from poll shares), correctable by hand
+ *   Hikoyalar — admin-written stories; only approved ones may be posted
  *   Jurnal    — the append-only audit trail
  *
  * Nothing here can show or accept the bot token: it lives in Admin → Telegram.
@@ -39,7 +42,18 @@ import {
 } from "lucide-react";
 import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "../growth/ui";
 
-type Tab = "connect" | "plan" | "links" | "content" | "countries" | "shortlinks" | "queue" | "audit";
+type Tab =
+  | "connect"
+  | "plan"
+  | "links"
+  | "content"
+  | "countries"
+  | "shortlinks"
+  | "queue"
+  | "polls"
+  | "prefs"
+  | "stories"
+  | "audit";
 
 interface LinkItem {
   label: string;
@@ -202,7 +216,19 @@ interface AuditRow {
   createdAt: string;
 }
 
-const TABS: Tab[] = ["connect", "plan", "links", "content", "countries", "shortlinks", "queue", "audit"];
+const TABS: Tab[] = [
+  "connect",
+  "plan",
+  "links",
+  "content",
+  "countries",
+  "shortlinks",
+  "queue",
+  "polls",
+  "prefs",
+  "stories",
+  "audit",
+];
 
 const btn =
   "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50";
@@ -323,6 +349,9 @@ export function ChannelManager() {
       {tab === "countries" && <CountriesTab showToast={showToast} />}
       {tab === "shortlinks" && <ShortLinksTab showToast={showToast} />}
       {tab === "queue" && <QueueTab rows={data.queue} showToast={showToast} reload={load} />}
+      {tab === "polls" && <PollsTab showToast={showToast} />}
+      {tab === "prefs" && <PrefsTab showToast={showToast} />}
+      {tab === "stories" && <StoriesTab showToast={showToast} />}
       {tab === "audit" && <AuditTab />}
 
       <Toast message={toast} />
@@ -1419,6 +1448,447 @@ function AuditTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* So'rovnomalar                                                       */
+/* ------------------------------------------------------------------ */
+
+interface PollOptionRow {
+  key: string;
+  text: string;
+  voters: number;
+  share: number;
+}
+
+interface PollRow {
+  id: number;
+  pollId: string | null;
+  pollType: string;
+  pollKey: string;
+  topic: string | null;
+  question: string;
+  status: string;
+  openedAt: string;
+  closedAt: string | null;
+  totalVoters: number;
+  options: PollOptionRow[];
+  deckKnown: boolean;
+}
+
+function PollsTab({ showToast }: { showToast: ShowToast }) {
+  const t = useTranslations("adminChannel");
+  const [rows, setRows] = useState<PollRow[] | null>(null);
+  const [closing, setClosing] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api<{ rows: PollRow[] }>("/api/admin/channel/polls");
+      setRows(res.rows);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("loadFailed"));
+    }
+  }, [showToast, t]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
+    void load();
+  }, [load]);
+
+  const close = async (id: number) => {
+    setClosing(id);
+    try {
+      const res = await api<{ rows: PollRow[]; reason: string | null }>("/api/admin/channel/polls", {
+        method: "POST",
+        body: JSON.stringify({ action: "close", id }),
+      });
+      setRows(res.rows);
+      showToast(res.reason ? `${t("done")} · ${res.reason}` : t("done"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    } finally {
+      setClosing(null);
+    }
+  };
+
+  if (!rows) return <LoadingBlock label={t("loading")} />;
+  if (!rows.length) {
+    return <EmptyState icon={BarChart3} title={t("polls.empty")} body={t("polls.emptyHint")} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className={card}>
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <BarChart3 className="h-4 w-4 text-indigo-500" /> {t("polls.title")}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">{t("polls.hint")}</p>
+      </div>
+      {rows.map((row) => (
+        <div key={row.id} className={card}>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{row.question}</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                <span className={`${chip} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>{row.pollType}</span>
+                <span>{row.topic ?? "—"}</span>
+                <span>·</span>
+                <span>{new Date(row.openedAt).toLocaleDateString()}</span>
+                {!row.deckKnown && (
+                  <span className={`${chip} bg-amber-100 text-amber-700`}>
+                    <AlertTriangle className="h-3 w-3" /> {t("polls.deckUnknown")}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`${chip} ${
+                  row.status === "open" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600 dark:bg-slate-800"
+                }`}
+              >
+                {row.status}
+              </span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                {row.totalVoters} {t("polls.votes")}
+              </span>
+              {row.status === "open" && (
+                <button className={btnGhost} disabled={closing === row.id} onClick={() => void close(row.id)}>
+                  {closing === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                  {t("polls.close")}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 space-y-1.5">
+            {row.options.length === 0 && <p className="text-xs text-slate-500">{t("polls.noVotes")}</p>}
+            {row.options.map((option) => (
+              <div key={option.key} className="flex items-center gap-2 text-xs">
+                <span className="w-40 shrink-0 truncate text-slate-600 dark:text-slate-300">{option.text}</span>
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.round(option.share * 100)}%` }} />
+                </div>
+                <span className="w-16 shrink-0 text-right font-mono text-[11px] text-slate-500">
+                  {option.voters} · {Math.round(option.share * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Qiziqish og'irliklari                                               */
+/* ------------------------------------------------------------------ */
+
+interface PrefRow {
+  topic: string;
+  family: string;
+  weight: number;
+  samples: number;
+  updatedAt: string;
+}
+
+function PrefsTab({ showToast }: { showToast: ShowToast }) {
+  const t = useTranslations("adminChannel");
+  const [rows, setRows] = useState<PrefRow[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api<{ rows: PrefRow[] }>("/api/admin/channel/prefs");
+      setRows(res.rows);
+      setDraft(Object.fromEntries(res.rows.map((row) => [row.topic, String(row.weight)])));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("loadFailed"));
+    }
+  }, [showToast, t]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
+    void load();
+  }, [load]);
+
+  const save = async (topic: string) => {
+    setBusy(true);
+    try {
+      const res = await api<{ rows: PrefRow[] }>("/api/admin/channel/prefs", {
+        method: "POST",
+        body: JSON.stringify({ topic, weight: Number(draft[topic]) }),
+      });
+      setRows(res.rows);
+      setDraft(Object.fromEntries(res.rows.map((row) => [row.topic, String(row.weight)])));
+      showToast(t("saved"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ rows: PrefRow[]; count: number }>("/api/admin/channel/prefs", {
+        method: "POST",
+        body: JSON.stringify({ action: "reset" }),
+      });
+      setRows(res.rows);
+      setDraft(Object.fromEntries(res.rows.map((row) => [row.topic, String(row.weight)])));
+      showToast(`${t("done")} · ${res.count}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!rows) return <LoadingBlock label={t("loading")} />;
+
+  return (
+    <div className="space-y-3">
+      <div className={card}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <Settings2 className="h-4 w-4 text-indigo-500" /> {t("prefs.title")}
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">{t("prefs.hint")}</p>
+          </div>
+          <button className={btnGhost} onClick={() => void reset()} disabled={busy || !rows.length}>
+            <RefreshCw className="h-3.5 w-3.5" /> {t("prefs.reset")}
+          </button>
+        </div>
+      </div>
+
+      {!rows.length ? (
+        <EmptyState icon={Settings2} title={t("prefs.empty")} body={t("prefs.emptyHint")} />
+      ) : (
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-left text-xs">
+            <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-2 py-2">{t("prefs.topic")}</th>
+                <th className="px-2 py-2">{t("prefs.weight")}</th>
+                <th className="px-2 py-2">{t("prefs.samples")}</th>
+                <th className="px-2 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.topic} className="border-t border-slate-100 dark:border-slate-800">
+                  <td className="px-2 py-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">{row.topic}</td>
+                  <td className="px-2 py-1">
+                    <input
+                      className={`${inputCls} max-w-[6rem]`}
+                      inputMode="decimal"
+                      value={draft[row.topic] ?? String(row.weight)}
+                      onChange={(e) => setDraft({ ...draft, [row.topic]: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-2 py-1 text-slate-500">{row.samples}</td>
+                  <td className="px-2 py-1">
+                    <button className={btnGhost} disabled={busy} onClick={() => void save(row.topic)}>
+                      <Save className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Hikoyalar                                                           */
+/* ------------------------------------------------------------------ */
+
+interface StoryRow {
+  id: number;
+  title: string;
+  body: string;
+  authorLabel: string | null;
+  sourceUrl: string | null;
+  approved: boolean;
+  createdAt: string;
+}
+
+const emptyStory = { id: 0, title: "", body: "", authorLabel: "", sourceUrl: "", approved: false };
+
+function StoriesTab({ showToast }: { showToast: ShowToast }) {
+  const t = useTranslations("adminChannel");
+  const [rows, setRows] = useState<StoryRow[] | null>(null);
+  const [draft, setDraft] = useState({ ...emptyStory });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api<{ rows: StoryRow[] }>("/api/admin/channel/stories");
+      setRows(res.rows);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("loadFailed"));
+    }
+  }, [showToast, t]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
+    void load();
+  }, [load]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ rows: StoryRow[] }>("/api/admin/channel/stories", {
+        method: "POST",
+        body: JSON.stringify({ action: "save", ...draft, id: draft.id || undefined }),
+      });
+      setRows(res.rows);
+      setDraft({ ...emptyStory });
+      showToast(t("saved"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = async (row: StoryRow) => {
+    try {
+      const res = await api<{ rows: StoryRow[] }>("/api/admin/channel/stories", {
+        method: "POST",
+        body: JSON.stringify({ action: row.approved ? "unapprove" : "approve", id: row.id }),
+      });
+      setRows(res.rows);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    }
+  };
+
+  const remove = async (id: number) => {
+    try {
+      const res = await api<{ rows: StoryRow[] }>(`/api/admin/channel/stories?id=${id}`, { method: "DELETE" });
+      setRows(res.rows);
+      showToast(t("deleted"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("deleteFailed"));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <ClipboardList className="h-4 w-4 text-indigo-500" /> {draft.id ? t("stories.edit") : t("stories.add")}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">{t("stories.hint")}</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Field label={t("stories.storyTitle")}>
+            <input className={inputCls} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          </Field>
+          <Field label={t("stories.author")}>
+            <input
+              className={inputCls}
+              value={draft.authorLabel}
+              onChange={(e) => setDraft({ ...draft, authorLabel: e.target.value })}
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label={t("stories.body")}>
+              <textarea
+                className={`${inputCls} min-h-[7rem]`}
+                value={draft.body}
+                onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Field label={t("stories.source")}>
+            <input
+              className={inputCls}
+              value={draft.sourceUrl}
+              onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })}
+            />
+          </Field>
+          <label className="flex items-end gap-2 pb-2 text-xs text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={draft.approved}
+              onChange={(e) => setDraft({ ...draft, approved: e.target.checked })}
+            />
+            {t("stories.approved")}
+          </label>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.title.trim() || !draft.body.trim()}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
+          </button>
+          {draft.id > 0 && (
+            <button className={btnGhost} onClick={() => setDraft({ ...emptyStory })}>
+              {t("cancel")}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!rows ? (
+        <LoadingBlock label={t("loading")} />
+      ) : !rows.length ? (
+        <EmptyState icon={ClipboardList} title={t("stories.empty")} body={t("stories.emptyHint")} />
+      ) : (
+        <div className={`${card} space-y-2`}>
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2 last:border-0 last:pb-0 dark:border-slate-800"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.title}</p>
+                <p className="line-clamp-2 text-xs text-slate-500">{row.body}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {row.authorLabel ?? "—"} · {new Date(row.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <span
+                  className={`${chip} ${row.approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                >
+                  {row.approved ? t("stories.approved") : t("stories.pending")}
+                </span>
+                <button className={btnGhost} onClick={() => void toggle(row)}>
+                  {row.approved ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  {row.approved ? t("stories.unapprove") : t("stories.approve")}
+                </button>
+                <button
+                  className={btnGhost}
+                  onClick={() =>
+                    setDraft({
+                      id: row.id,
+                      title: row.title,
+                      body: row.body,
+                      authorLabel: row.authorLabel ?? "",
+                      sourceUrl: row.sourceUrl ?? "",
+                      approved: row.approved,
+                    })
+                  }
+                >
+                  <Play className="h-3.5 w-3.5" />
+                </button>
+                <button className={btnGhost} onClick={() => void remove(row.id)} aria-label={t("delete")}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -6788,7 +6788,10 @@
       "countries": "Davlatlar",
       "shortlinks": "Qisqa havolalar",
       "queue": "Navbat",
-      "audit": "Jurnal"
+      "audit": "Jurnal",
+      "polls": "So'rovnomalar",
+      "prefs": "Qiziqish",
+      "stories": "Hikoyalar"
     },
     "steps": {
       "token": "Bot tokeni (Admin → Telegram)",
@@ -6923,6 +6926,45 @@
       "action": "Amal",
       "entity": "Obyekt",
       "empty": "Jurnal hali bo'sh"
+    },
+    "polls": {
+      "title": "Kanal so'rovnomalari",
+      "hint": "Anonim so'rovnomalar. Faqat Telegram bergan variant bo'yicha jami saqlanadi — hech qanday saylovchi emas.",
+      "empty": "Hozircha so'rovnoma yo'q",
+      "emptyHint": "Birinchi so'rovnoma kanalga chiqqandan keyin shu yerda ko'rinadi.",
+      "question": "Savol",
+      "type": "Turi",
+      "status": "Holati",
+      "votes": "ovoz",
+      "close": "So'rovnomani yopish",
+      "noVotes": "Hozircha ovoz yo'q",
+      "deckUnknown": "To'plamda topilmadi"
+    },
+    "prefs": {
+      "title": "Qiziqish og'irliklari",
+      "hint": "Reja nimani ko'proq ko'rsatishi, so'rovnoma ulushlaridan o'rganiladi. 1.00 — betaraf, oraliq 0.5–2.0.",
+      "empty": "Hozircha o'rganilgan og'irlik yo'q",
+      "emptyHint": "Og'irliklar qiziqish so'rovnomasi ovoz bilan yopilgach paydo bo'ladi.",
+      "topic": "Mavzu",
+      "weight": "Og'irlik",
+      "samples": "So'rovlar",
+      "reset": "Hammasini tiklash"
+    },
+    "stories": {
+      "title": "Hikoyalar",
+      "empty": "Hozircha hikoya yo'q",
+      "emptyHint": "Hikoya yozing va tasdiqlang — reja faqat tasdiqlangan hikoyalarni joylaydi.",
+      "add": "Yangi hikoya",
+      "edit": "Hikoyani tahrirlash",
+      "storyTitle": "Sarlavha",
+      "body": "Matn",
+      "author": "Muallif yorlig'i (ixtiyoriy)",
+      "source": "Manba havolasi (ixtiyoriy)",
+      "approved": "Tasdiqlangan",
+      "pending": "Kutilmoqda",
+      "approve": "Tasdiqlash",
+      "unapprove": "Bekor qilish",
+      "hint": "Faqat shu yerga yozgan matningiz joylanishi mumkin. Hech narsa avtomatik yaratilmaydi, hikoya tasdiqlanguncha yashirin turadi."
     }
   }
 }

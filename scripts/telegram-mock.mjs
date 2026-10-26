@@ -7,9 +7,14 @@
  *   TELEGRAM_API_BASE=http://127.0.0.1:8099   # in .env.local, then restart `next dev`
  *
  * Implements getMe, getWebhookInfo, setWebhook, deleteWebhook, setMyCommands,
- * setChatMenuButton, sendMessage, editMessageText, answerCallbackQuery and
- * sendChatAction. Any token whose secret part starts with "bad" is rejected
- * with 401 (to test error handling).
+ * setChatMenuButton, sendMessage, editMessageText, answerCallbackQuery,
+ * sendChatAction, getChat, getChatMember, getChatMemberCount, sendPoll and
+ * stopPoll. Any token whose secret part starts with "bad" is rejected with 401
+ * (to test error handling).
+ *
+ * Polls are answered by the mock itself: `POST /_vote { pollId }` records votes
+ * and `stopPoll` returns the aggregate — enough to exercise the whole
+ * poll → results → preference-weight path offline.
  *
  * Test helpers (not part of the real API):
  *   GET  /_messages?chat_id=…      → messages the bot "sent"
@@ -28,7 +33,7 @@ const PORT = Number(process.env.TG_MOCK_PORT || 8099);
 // update_id keeps growing across /_reset, like real Telegram: the server
 // de-duplicates update ids, so reusing one would be (correctly) ignored.
 let lastUpdateId = Math.floor(Date.now() / 1000) * 100;
-const fresh = () => ({ webhook: null, secret: null, messages: [], answers: [], commands: {}, menuButton: null, updateId: lastUpdateId, messageId: 1 });
+const fresh = () => ({ webhook: null, secret: null, messages: [], answers: [], commands: {}, menuButton: null, polls: {}, updateId: lastUpdateId, messageId: 1 });
 let state = fresh();
 
 const json = (res, status, body) => {
@@ -120,6 +125,16 @@ const server = http.createServer(async (req, res) => {
     };
     return json(res, 200, await deliver(update));
   }
+  if (url.pathname === "/_vote") {
+    // votes: { "optionIndex": count } — enough to produce an aggregate.
+    const poll = state.polls[String(body.pollId)];
+    if (!poll) return json(res, 404, { ok: false, error: "no such poll" });
+    for (const [index, count] of Object.entries(body.votes || {})) {
+      const option = poll.options[Number(index)];
+      if (option) option.voter_count += Number(count) || 0;
+    }
+    return json(res, 200, { ok: true, poll });
+  }
   if (url.pathname === "/_reset") {
     lastUpdateId = state.updateId;
     state = fresh();
@@ -163,6 +178,52 @@ const server = http.createServer(async (req, res) => {
       if (!target) return json(res, 400, { ok: false, error_code: 400, description: "Bad Request: message to edit not found" });
       Object.assign(target, { text: body.text, reply_markup: body.reply_markup, editedAt: new Date().toISOString() });
       return json(res, 200, { ok: true, result: { message_id: target.message_id } });
+    }
+    case "getChat": {
+      const id = String(body.chat_id);
+      const isChannel = id.startsWith("-100") || id.startsWith("@");
+      return json(res, 200, {
+        ok: true,
+        result: isChannel
+          ? { id: id.startsWith("@") ? id : Number(id), type: "channel", title: "ScholarBridge Test Channel", username: "scholarbridge_test" }
+          : { id: Number(id) || id, type: "private", first_name: "Test", username: "test_user" },
+      });
+    }
+    case "getChatMember":
+      return json(res, 200, {
+        ok: true,
+        result: { status: "administrator", can_post_messages: true, user: { id: botId, is_bot: true, first_name: "ScholarBridge Test" } },
+      });
+    case "getChatMemberCount":
+      return json(res, 200, { ok: true, result: 128 });
+    case "sendPoll": {
+      const pollId = `poll_${state.messageId}`;
+      const poll = {
+        id: pollId,
+        question: body.question,
+        options: (body.options || []).map((text) => ({ text, voter_count: 0 })),
+        total_voter_count: 0,
+        is_closed: false,
+        is_anonymous: body.is_anonymous !== false,
+        type: body.type || "regular",
+      };
+      const msg = {
+        message_id: ++state.messageId,
+        chat_id: body.chat_id,
+        poll,
+        at: new Date().toISOString(),
+      };
+      state.polls[pollId] = poll;
+      state.messages.push(msg);
+      if (state.messages.length > 500) state.messages.shift();
+      return json(res, 200, { ok: true, result: { message_id: msg.message_id, poll } });
+    }
+    case "stopPoll": {
+      const msg = state.messages.find((x) => x.message_id === Number(body.message_id));
+      if (!msg || !msg.poll) return json(res, 400, { ok: false, error_code: 400, description: "Bad Request: poll not found" });
+      msg.poll.is_closed = true;
+      msg.poll.total_voter_count = msg.poll.options.reduce((total, option) => total + option.voter_count, 0);
+      return json(res, 200, { ok: true, result: msg.poll });
     }
     case "sendMessage": {
       if (String(body.chat_id) === "403403") {

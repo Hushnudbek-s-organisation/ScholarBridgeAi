@@ -27,7 +27,26 @@ import { loadContentMap, simulatePreview } from "./runtime";
 import { renderPlanRow } from "./send";
 import { buildFacts } from "./templates/facts";
 import { renderScholarshipRich } from "./templates/rich.uz";
-import { isValidCustomCode, scholarshipLinkCode, shortLinkView, unsafeDestinationReason } from "./links";
+import { isSameOrigin, isValidCustomCode, scholarshipLinkCode, shortLinkView, unsafeDestinationReason } from "./links";
+import {
+  closePollLocally,
+  deleteStory,
+  listPolls,
+  listPrefs,
+  listStories,
+  pollTarget,
+  resetPrefs,
+  setPref,
+  setStoryApproved,
+  upsertStory,
+  applyPollResult,
+  type PollRow,
+  type PrefRow,
+  type StoryRow,
+} from "./engage";
+import { optionSummary, parseStoredResults, pollSpecByKey, type PollResult } from "./polls";
+import { getBotToken } from "@/lib/telegram/settings";
+import { tgStopPoll } from "@/lib/telegram/api";
 import {
   DEFAULT_CHANNEL_SETTINGS,
   isAllowedLinkUrl,
@@ -46,7 +65,12 @@ import { normalizeContentForPost } from "./content";
 
 export type BlockResult = { ok: true; settings: ChannelSettings } | { ok: false; error: string };
 
-function cleanLinks(raw: unknown): LinkItem[] | null {
+/**
+ * Footer rows. External links must be public HTTPS; a link to our own site is
+ * accepted on the origin the site runs on, so localhost and staging work the
+ * same way `/go` site links do.
+ */
+function cleanLinks(raw: unknown, siteUrl = ""): LinkItem[] | null {
   if (!Array.isArray(raw)) return null;
   const out: LinkItem[] = [];
   for (const item of raw.slice(0, 10)) {
@@ -54,7 +78,8 @@ function cleanLinks(raw: unknown): LinkItem[] | null {
     const label = String((item as Record<string, unknown>).label ?? "").trim().slice(0, 40);
     const url = String((item as Record<string, unknown>).url ?? "").trim();
     if (!label && !url) continue; // empty row = "removed"
-    if (!label || !isAllowedLinkUrl(url)) return null;
+    if (!label) return null;
+    if (!isAllowedLinkUrl(url) && !(siteUrl && isSameOrigin(url, siteUrl))) return null;
     out.push({ label, url });
   }
   return out;
@@ -76,7 +101,7 @@ function cleanTags(raw: unknown, max = 8): string[] | null {
 }
 
 /** Validate one settings block coming from the UI. `null` = unusable. */
-function cleanBlock(key: SettingsKey, value: unknown): unknown | null {
+function cleanBlock(key: SettingsKey, value: unknown, siteUrl = ""): unknown | null {
   const obj = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
   if (key === "connection") {
@@ -104,7 +129,7 @@ function cleanBlock(key: SettingsKey, value: unknown): unknown | null {
     return { brand, siteUrl, channelUsername, botUsername };
   }
 
-  if (key === "footer_main" || key === "footer_social") return cleanLinks(value);
+  if (key === "footer_main" || key === "footer_social") return cleanLinks(value, siteUrl);
 
   if (key === "hashtags") {
     if (!obj) return null;
@@ -178,9 +203,9 @@ function cleanBlock(key: SettingsKey, value: unknown): unknown | null {
 }
 
 export async function updateSettingsBlock(key: SettingsKey, raw: unknown, actorProfileId: number): Promise<BlockResult> {
-  const value = cleanBlock(key, raw);
-  if (value === null) return { ok: false, error: "invalid_value" };
   const before = await loadChannelSettings();
+  const value = cleanBlock(key, raw, before.siteUrl);
+  if (value === null) return { ok: false, error: "invalid_value" };
   const settings = await saveChannelSettingsBlock(key, value, actorProfileId);
   await writeChannelAudit({
     actorProfileId,
@@ -594,4 +619,212 @@ export async function ensurePlanLinks(): Promise<number> {
 
 export async function previewDays(days = 14) {
   return simulatePreview(new Date(), Math.min(30, Math.max(1, days)));
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Polls                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface PollAdminRow {
+  id: number;
+  pollId: string | null;
+  pollType: string;
+  pollKey: string;
+  topic: string | null;
+  question: string;
+  status: string;
+  openedAt: string;
+  closedAt: string | null;
+  totalVoters: number;
+  /** Deck text, so the table reads correctly even if the deck entry changed. */
+  options: { key: string; text: string; voters: number; share: number }[];
+  /** True when the deck entry still exists and is sendable. */
+  deckKnown: boolean;
+}
+
+function pollAdminRow(row: PollRow): PollAdminRow {
+  const stored = parseStoredResults(row.results);
+  const spec = pollSpecByKey(row.pollKey);
+  const result: PollResult = {
+    options: stored.length
+      ? stored
+      : (spec?.options ?? []).map((option) => ({ key: option.key, text: option.text, voters: 0 })),
+    totalVoters: row.totalVoters ?? 0,
+    closed: row.status === "closed",
+  };
+  return {
+    id: row.id,
+    pollId: row.pollId,
+    pollType: row.pollType,
+    pollKey: row.pollKey,
+    topic: row.topic,
+    question: row.question,
+    status: row.status,
+    openedAt: row.openedAt.toISOString(),
+    closedAt: row.closedAt ? row.closedAt.toISOString() : null,
+    totalVoters: result.totalVoters,
+    options: optionSummary(result),
+    deckKnown: Boolean(spec),
+  };
+}
+
+export async function pollList(): Promise<PollAdminRow[]> {
+  return (await listPolls(100)).map(pollAdminRow);
+}
+
+/**
+ * Close a poll and store its final numbers.
+ *
+ * `stopPoll` is the only way to read a channel poll's aggregate; it returns
+ * counters, never voters. If Telegram refuses (bot no longer in the channel,
+ * poll already closed, no token) the row is still closed locally so the admin
+ * is not stuck with a poll the panel calls "open" forever.
+ */
+export async function closePoll(id: number, actorProfileId: number): Promise<{ ok: boolean; error?: string; reason?: string }> {
+  const target = await pollTarget(id);
+  if (!target) return { ok: false, error: "not_found" };
+  if (target.poll.status === "closed") return { ok: false, error: "already_closed" };
+
+  const { token } = await getBotToken();
+  let reason: string | undefined;
+  if (!token) {
+    reason = "no_token";
+  } else if (!target.chatId || !target.messageId) {
+    reason = "no_message";
+  } else {
+    const res = await tgStopPoll(token, target.chatId, target.messageId);
+    if (res.ok && res.result && target.poll.pollId) {
+      await applyPollResult({
+        pollId: target.poll.pollId,
+        poll: { ...res.result, is_closed: true },
+      });
+    } else {
+      reason = res.description ?? "stop_failed";
+    }
+  }
+  await closePollLocally(id);
+  await writeChannelAudit({
+    actorProfileId,
+    action: "poll_close",
+    entity: "poll",
+    entityId: String(id),
+    after: { reason: reason ?? "stopped" },
+  });
+  return { ok: true, reason };
+}
+
+/* ------------------------------------------------------------------ */
+/* Preference weights                                                 */
+/* ------------------------------------------------------------------ */
+
+export async function prefList() {
+  const rows: PrefRow[] = await listPrefs();
+  return rows.map((row) => ({
+    topic: row.topic,
+    family: row.topic.split(":")[0] ?? "",
+    weight: Number(row.weight.toFixed(4)),
+    samples: row.samples,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}
+
+export async function savePref(topic: string, weight: number, actorProfileId: number) {
+  if (!/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/.test(topic.trim())) return { ok: false as const, error: "invalid_topic" };
+  if (!Number.isFinite(weight) || weight < 0.5 || weight > 2) return { ok: false as const, error: "invalid_weight" };
+  const saved = await setPref(topic.trim(), weight);
+  if (!saved) return { ok: false as const, error: "invalid_topic" };
+  await writeChannelAudit({
+    actorProfileId,
+    action: "pref_update",
+    entity: "pref",
+    entityId: topic.trim(),
+    after: { weight },
+  });
+  return { ok: true as const };
+}
+
+export async function resetAllPrefs(actorProfileId: number) {
+  const count = await resetPrefs();
+  await writeChannelAudit({ actorProfileId, action: "pref_reset", entity: "pref", after: { count } });
+  return count;
+}
+
+/* ------------------------------------------------------------------ */
+/* Stories                                                            */
+/* ------------------------------------------------------------------ */
+
+const STORY_LIMITS = { title: 120, body: 1200, author: 60 };
+
+function storyRowView(row: StoryRow) {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    authorLabel: row.authorLabel,
+    sourceUrl: row.sourceUrl,
+    approved: row.approved,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function storyList() {
+  return (await listStories(200)).map(storyRowView);
+}
+
+/**
+ * Create or update a story. Nothing here is generated: a story is whatever the
+ * admin typed, and it stays unpublishable until `approved` is set — the planner
+ * only ever sees approved rows.
+ */
+export async function saveStory(raw: Record<string, unknown>, actorProfileId: number) {
+  const title = String(raw.title ?? "").trim();
+  const body = String(raw.body ?? "").trim();
+  const authorLabel = String(raw.authorLabel ?? "").trim().slice(0, STORY_LIMITS.author) || null;
+  const sourceUrl = String(raw.sourceUrl ?? "").trim() || null;
+  const approved = raw.approved === true;
+  const id = Number(raw.id ?? 0);
+
+  if (!title) return { ok: false as const, error: "invalid_title" };
+  if (title.length > STORY_LIMITS.title) return { ok: false as const, error: "title_too_long" };
+  if (!body) return { ok: false as const, error: "invalid_body" };
+  if (body.length > STORY_LIMITS.body) return { ok: false as const, error: "body_too_long" };
+  if (sourceUrl && !isAllowedLinkUrl(sourceUrl)) return { ok: false as const, error: "invalid_url" };
+
+  const savedId = await upsertStory({
+    id: Number.isInteger(id) && id > 0 ? id : null,
+    title,
+    body,
+    authorLabel,
+    sourceUrl,
+    approved,
+    actorProfileId,
+  });
+  if (!savedId) return { ok: false as const, error: "save_failed" };
+  await writeChannelAudit({
+    actorProfileId,
+    action: id > 0 ? "story_update" : "story_create",
+    entity: "story",
+    entityId: String(savedId),
+    after: { title, approved },
+  });
+  return { ok: true as const, id: savedId };
+}
+
+export async function approveStory(id: number, approved: boolean, actorProfileId: number) {
+  const ok = await setStoryApproved(id, approved, actorProfileId);
+  if (!ok) return false;
+  await writeChannelAudit({
+    actorProfileId,
+    action: approved ? "story_approve" : "story_unapprove",
+    entity: "story",
+    entityId: String(id),
+  });
+  return true;
+}
+
+export async function removeStory(id: number, actorProfileId: number) {
+  const ok = await deleteStory(id);
+  if (ok) await writeChannelAudit({ actorProfileId, action: "story_delete", entity: "story", entityId: String(id) });
+  return ok;
 }
