@@ -19,6 +19,66 @@ import {
 import { expandMultilingualSearchTerms, localizeScholarshipRow } from "@/lib/catalogLocalizer";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 import { runMercuryDecision } from "@/lib/ai/decide";
+import {
+  EMPTY_SCHOLARSHIP_FILTERS,
+  SCHOLARSHIP_BASIS_OPTIONS,
+  SCHOLARSHIP_COVERAGE_OPTIONS,
+  SCHOLARSHIP_DEGREE_OPTIONS,
+  SCHOLARSHIP_GROUP_OPTIONS,
+  SCHOLARSHIP_SORT_OPTIONS,
+  SCHOLARSHIP_STATUS_OPTIONS,
+  parseFilterTokens,
+  parseScholarshipDegreeLevels,
+  scholarshipGroupKey,
+  scholarshipMatchesFilters,
+  type ScholarshipFacets,
+  type ScholarshipFilterDimension,
+  type ScholarshipFilters,
+  type ScholarshipFilterRow,
+  type ScholarshipGroupOption,
+  type ScholarshipSortOption,
+} from "@/lib/scholarshipFilters";
+
+/** Multi-value query params, both `?degree=A&degree=B` and `?degree=A,B`. */
+function listParam(searchParams: URLSearchParams, ...names: string[]): string[] {
+  const values: string[] = [];
+  for (const name of names) {
+    for (const raw of searchParams.getAll(name)) {
+      for (const part of raw.split(",")) {
+        const value = part.trim().slice(0, 80);
+        if (value) values.push(value);
+      }
+    }
+  }
+  return [...new Set(values)].slice(0, 24);
+}
+
+/** `deadlineDate` arrives as a Date (json-serialized to a string) or is absent. */
+function deadlineSortValue(row: { deadlineDate?: Date | string | null; deadline?: string | null }): string {
+  const raw = row.deadlineDate;
+  if (raw) {
+    const asDate = raw instanceof Date ? raw : new Date(raw);
+    if (!Number.isNaN(asDate.getTime())) return asDate.toISOString().slice(0, 10);
+  }
+  return (row.deadline ?? "").trim();
+}
+
+/** Counts per value, skipping empty buckets — the client renders what exists. */
+function countValues(
+  rows: ScholarshipFilterRow[],
+  valuesOf: (row: ScholarshipFilterRow) => string[],
+  allowed?: readonly string[],
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    for (const value of valuesOf(row)) {
+      if (!value) continue;
+      if (allowed && !allowed.includes(value)) continue;
+      counts[value] = (counts[value] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
 
 export async function GET(req: Request) {
   try {
@@ -29,9 +89,30 @@ export async function GET(req: Request) {
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.trim().slice(0, 200).toLowerCase();
     const country = searchParams.get("country")?.trim().slice(0, 100);
-    const coverageType = searchParams.get("coverageType")?.trim().slice(0, 80);
     const rawFocusId = searchParams.get("focusId");
     const focusId = rawFocusId && rawFocusId.length <= 12 ? Number(rawFocusId) : Number.NaN;
+
+    /**
+     * Catalogue filters (host country, degree level, funding type, application
+     * status, award basis) plus the grid's sort/group choice. Every value is
+     * canonical — the same tokens the catalogue stores — so a Russian or Uzbek
+     * UI never sends a translated label into a database-shaped filter.
+     */
+    const sortParam = (searchParams.get("sort") ?? "relevance").trim() as ScholarshipSortOption;
+    const groupParam = (searchParams.get("groupBy") ?? "none").trim() as ScholarshipGroupOption;
+    const filters: ScholarshipFilters = {
+      country: country && country !== "All" ? country : EMPTY_SCHOLARSHIP_FILTERS.country,
+      degrees: parseFilterTokens(listParam(searchParams, "degree", "degrees"), SCHOLARSHIP_DEGREE_OPTIONS),
+      coverages: parseFilterTokens(
+        listParam(searchParams, "coverageTypes", "coverageType"),
+        SCHOLARSHIP_COVERAGE_OPTIONS,
+      ),
+      statuses: parseFilterTokens(listParam(searchParams, "status", "statuses"), SCHOLARSHIP_STATUS_OPTIONS),
+      basis: parseFilterTokens(listParam(searchParams, "basis"), SCHOLARSHIP_BASIS_OPTIONS),
+    };
+    const sortBy: ScholarshipSortOption = SCHOLARSHIP_SORT_OPTIONS.includes(sortParam) ? sortParam : "relevance";
+    const groupBy: ScholarshipGroupOption = SCHOLARSHIP_GROUP_OPTIONS.includes(groupParam) ? groupParam : "none";
+    const wantFacets = searchParams.get("facets") === "1";
 
     // Cached base catalogue — the same active-only visibility boundary, the
     // same resolved USD mirrors, without re-reading every scholarship (and its
@@ -114,12 +195,16 @@ export async function GET(req: Request) {
       );
     }
 
+    // Country facet — snapshotted BEFORE the country selection is applied, so
+    // the dropdown keeps listing every destination the SEARCH matches with the
+    // number of awards each one holds (a country filter must not zero its own
+    // options).
+    const countryFacetSource: string[] = wantFacets
+      ? allScholarships.map((scholarship) => scholarship.country ?? "")
+      : [];
+
     if (country && country !== "All") {
       allScholarships = allScholarships.filter((s) => countriesMatch(s.country, country));
-    }
-
-    if (coverageType && coverageType !== "All") {
-      allScholarships = allScholarships.filter(s => s.coverageType.includes(coverageType));
     }
 
     // ---------- Source signals (scholarship_sources -> sources) ----------
@@ -127,7 +212,7 @@ export async function GET(req: Request) {
     // with the scholarship's own lastVerifiedAt only as a date fallback).
     const sourceMap = bundle.sourceMap;
 
-    const results = allScholarships.map((s) => {
+    const mapped = allScholarships.map((s) => {
       const isVerified = s.verificationStatus === "verified";
       // Historical seed rows contain unsupported amounts, eligibility and
       // cycles. Preserve them in storage (an admin may have edited them), but
@@ -211,6 +296,37 @@ export async function GET(req: Request) {
       };
     });
 
+    /**
+     * Faceted filtering. Runs on the PUBLIC projection (an unverified row has
+     * its coverage/degree/eligibility stripped above), so a filter can never
+     * surface a claim the catalogue is not allowed to publish.
+     */
+    const results = mapped.filter((row) => scholarshipMatchesFilters(row, filters));
+
+    let facets: ScholarshipFacets | null = null;
+    if (wantFacets) {
+      const without = (dimension: ScholarshipFilterDimension) =>
+        mapped.filter((row) => scholarshipMatchesFilters(row, filters, [dimension]));
+      const countryCounts = new Map<string, number>();
+      for (const name of countryFacetSource) {
+        const key = name.trim();
+        if (key) countryCounts.set(key, (countryCounts.get(key) ?? 0) + 1);
+      }
+      facets = {
+        countries: [...countryCounts.entries()]
+          .map(([value, count]) => ({ value, count }))
+          .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
+        degrees: countValues(without("degrees"), (row) => parseScholarshipDegreeLevels(row.degreeLevels), SCHOLARSHIP_DEGREE_OPTIONS),
+        coverages: countValues(without("coverages"), (row) => [row.coverageType ?? ""], SCHOLARSHIP_COVERAGE_OPTIONS),
+        statuses: countValues(without("statuses"), (row) => [row.computedStatus ?? "unknown"], SCHOLARSHIP_STATUS_OPTIONS),
+        basis: countValues(
+          without("basis"),
+          (row) => [...(row.meritBased === true ? ["merit"] : []), ...(row.financialNeedBased === true ? ["need"] : [])],
+          SCHOLARSHIP_BASIS_OPTIONS,
+        ),
+      };
+    }
+
     const semanticScores = new Map<number, number>();
     if (search && search.trim().length >= 4 && results.length > 1) {
       try {
@@ -269,6 +385,47 @@ export async function GET(req: Request) {
         if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
         return a.id - b.id;
       });
+    }
+
+    /**
+     * The student's own ordering choice. Without it the list keeps the
+     * relevance order above (match score / coverage tier), which stays the
+     * default: "best fit for me" is the question this catalogue answers.
+     */
+    if (sortBy === "deadline") {
+      // Soonest published deadline first; awards with no published date last —
+      // never at the top pretending to be urgent.
+      results.sort((a, b) => {
+        const ad = deadlineSortValue(a);
+        const bd = deadlineSortValue(b);
+        if (ad !== bd) {
+          if (!ad) return 1;
+          if (!bd) return -1;
+          return ad.localeCompare(bd);
+        }
+        return a.id - b.id;
+      });
+    } else if (sortBy === "amount") {
+      results.sort((a, b) => {
+        if (a.amountUsdValue == null && b.amountUsdValue == null) return a.id - b.id;
+        if (a.amountUsdValue == null) return 1;
+        if (b.amountUsdValue == null) return -1;
+        if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
+        return a.id - b.id;
+      });
+    } else if (sortBy === "title") {
+      results.sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
+    }
+
+    /**
+     * Grouping is a stable re-sort on the group key, so the order chosen above
+     * survives INSIDE each section. The client draws a heading whenever the
+     * key changes, which keeps sections contiguous across pages.
+     */
+    if (groupBy !== "none") {
+      results.sort(
+        (a, b) => scholarshipGroupKey(a, groupBy).localeCompare(scholarshipGroupKey(b, groupBy)),
+      );
     }
 
     // A command-search result may pass its record id with an exact-title
@@ -347,6 +504,10 @@ export async function GET(req: Request) {
         searchParams
       ),
       ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),
+      // Facet counts describe the CANONICAL catalogue, so they are sent as-is
+      // (country names are localized in the browser, like every other option).
+      ...(facets ? { facets } : {}),
+      ...(groupBy !== "none" ? { groupBy } : {}),
     });
   } catch (error) {
     console.error("GET /api/scholarships error:", error);

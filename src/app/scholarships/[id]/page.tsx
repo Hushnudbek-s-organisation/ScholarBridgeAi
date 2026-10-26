@@ -42,6 +42,8 @@ async function getPageLocale(): Promise<Locale> {
 interface DetailPageProps {
   // Next.js 15+: route params are async.
   params: Promise<{ id: string }>;
+  /** `?from=app` — the student opened this award from the dashboard catalogue. */
+  searchParams: Promise<{ from?: string | string[] }>;
 }
 
 /** JSON-array columns and comma-separated legacy text both feed the same list. */
@@ -82,8 +84,21 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
   };
 }
 
-export default async function ScholarshipDetailPage({ params }: DetailPageProps) {
+export default async function ScholarshipDetailPage({ params, searchParams }: DetailPageProps) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const rawFrom = Array.isArray(from) ? from[0] : from;
+  /**
+   * Where "back" goes.
+   *
+   * The dashboard catalogue (`#scholarships`) and this public page are two
+   * different screens: sending a signed-in student to `/scholarships` dropped
+   * them into a catalogue without their sidebar, filters or profile. When the
+   * link says it came from the app, "back" returns to the app's scholarship
+   * hub — which restores the filters the student had chosen.
+   */
+  const fromApp = rawFrom === "app";
+  const backHref = fromApp ? "/#scholarships" : "/scholarships";
   const numericId = Number.parseInt(id, 10);
   const locale = await getPageLocale();
   const copy = dictionaries[locale];
@@ -102,11 +117,11 @@ export default async function ScholarshipDetailPage({ params }: DetailPageProps)
           <h1 className="text-2xl font-bold">{t.notFoundTitle}</h1>
           <p className="mt-2 text-sm text-slate-600">{t.notFoundBody}</p>
           <Link
-            href="/scholarships"
+            href={backHref}
             className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t.back}
+            {fromApp ? t.backToApp : t.back}
           </Link>
         </main>
       </LocaleProvider>
@@ -205,11 +220,11 @@ export default async function ScholarshipDetailPage({ params }: DetailPageProps)
       <PublicCatalogHeader />
       <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link
-          href="/scholarships"
+          href={backHref}
           className="inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          {t.back}
+          {fromApp ? t.backToApp : t.back}
         </Link>
 
         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
