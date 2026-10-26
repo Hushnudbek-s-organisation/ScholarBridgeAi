@@ -25,11 +25,11 @@ Pass 88’da 829 Phystech.International, 859 Study in Saudi va 868 Rossotrudnich
 
 ## 3. 868 — Rossiya hukumat kvotasi / Rossotrudnichestvo
 
-- **O‘zbekiston uchun rasmiy portal:** `https://rusedu.uz/` (fetch qilindi). Unda 2027/28 kvota arizalari **2026-yil noyabrda boshlanishi** aytilgan va federal ariza portaliga havola berilgan.
+- **O‘zbekiston uchun rasmiy portal:** `https://rusedu.uz/` (fetch qilindi). Unda 2027/28 kvota arizalari **2026-yil noyabrda boshlanishi** aytilgan.
 - **Rasmiy mezon va qamrov sahifalari:** `https://en.misis.ru/applicants/scholarships/quota/` va `https://en.misis.ru/applicants/algorithm/` (ikkalasi ham fetch qilindi).
 - NUST MISIS sahifasi kvota orqali bakalavr, magistratura va PhD-ekvivalent bosqichlarida full tuition, zarur bo‘lsa tayyorlov rus tili kursi hamda oylik stipendiya ko‘rsatilishini bildiradi. Stipendiyaning miqdori e’lon qilinmagan: `award_amount=NULL`, `award_currency=NULL`, `amount_usd_value=0`.
 - MISIS yotoqxona joyini taklif qiladi, lekin narxi **oyiga RUB 2 500–3 769**; turar joy bepul emas va bu narx boshqa universitetlarga avtomatik tatbiq qilinmaydi. MISIS qo‘llanmasida yo‘l, hujjat tarjimasi/rasmiylashtirish, viza, sug‘urta va ovqat xarajatlari talabgor zimmasida ekani aytiladi.
-- **Muddat:** MISIS’ning CIS mamlakatlariga xos jadvali 15-dekabr-2026, boshqa mamlakatlar uchun 15-yanvar-2027 deydi; ariza algoritmi ham shu farqni tasdiqlaydi. Biroq MISIS sahifasining umumiy 5-qadami 15-yanvar sanasini umumiy qilib yozadi. Shu zidlik `notes`’da qayd etildi; O‘zbekistonliklar mahalliy portalni tekshirishi kerak. Hozircha 15-dekabr-2026 CIS muddati sifatida saqlandi, `application_status=upcoming`.
+- **Muddat bo‘yicha rasmiy manbalar o‘zaro farq qiladi:** O‘zbekiston portali sikl noyabrda boshlanishini aytadi; MISIS algoritmi esa CIS uchun 15-sentabr-2026 dan 15-dekabr-2026 gacha ko‘rsatadi. MISIS kvota sahifasi/FAQ CIS uchun 15-dekabr, boshqalar uchun 15-yanvar-2027 deydi, lekin umumiy 5-qadami yana 15-yanvarni yozadi. DB’da CIS uchun aniq ko‘rsatilgan 15-dekabr-2026 saqlandi, ammo `application_status=unknown` qilindi; topshirishdan oldin O‘zbekiston portalidagi joriy ko‘rsatmani tekshirish kerak.
 - `source_reliability=9`; award amount va stipend soni to‘qib kiritilmadi. Bu milliy kvota bo‘lgani sabab `university_id=NULL` va `university_scholarships` bog‘lanmasi qo‘shilmadi.
 
 ## 4. Schema enum tozaligi
