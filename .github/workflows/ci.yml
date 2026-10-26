@@ -149,6 +149,9 @@ jobs:
       - name: Dark-mode contrast audit
         run: bash ci/run-step.sh "Dark-mode contrast audit" npm run test:dark
 
+      - name: Deployment shape (build memory, live commit probe)
+        run: bash ci/run-step.sh "Deployment shape" npm run test:deploy
+
       - name: Build
         run: bash ci/run-step.sh "Build" npm run build
         env:

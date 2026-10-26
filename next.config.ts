@@ -39,6 +39,14 @@ const nextConfig: NextConfig = {
     ],
   },
   allowedDevOrigins: ["*.e2b.app", "*.e2b.dev"],
+  // Type-checking runs in CI on every pull request (`npm run typecheck`) and in
+  // the `verify` job that must be green before a merge. Running it a second
+  // time inside `next build` is what pushed the production build past the
+  // 512 MB of a small hosting instance: every deploy died with an
+  // out-of-memory kill, the previous release kept serving, and new code looked
+  // "not deployed". Next 16 no longer lints during a build at all, so only the
+  // TypeScript pass has to be switched off here.
+  typescript: { ignoreBuildErrors: true },
   // Do not advertise the framework/fingerprint in response headers.
   poweredByHeader: false,
   async headers() {
