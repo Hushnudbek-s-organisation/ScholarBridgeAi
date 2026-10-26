@@ -30,6 +30,7 @@ import { studentProfiles, telegramLinks, userSessions } from "@/db/schema";
 import { clientIp } from "@/lib/rate-limit";
 import { sanitizeProfile } from "@/lib/password";
 import { ensureCoreSchema } from "@/lib/core/db";
+import { withDbRetry } from "@/db/retry";
 
 export const SESSION_COOKIE = "sb_session";
 
@@ -228,11 +229,13 @@ export async function checkSessionRecord(
 ): Promise<"ok" | "revoked" | "error"> {
   const hash = sessionTokenHash(token);
   try {
-    const [row] = await db
-      .select({ revokedAt: userSessions.revokedAt, lastSeenAt: userSessions.lastSeenAt })
-      .from(userSessions)
-      .where(eq(userSessions.tokenHash, hash))
-      .limit(1);
+    const [row] = await withDbRetry(() =>
+      db
+        .select({ revokedAt: userSessions.revokedAt, lastSeenAt: userSessions.lastSeenAt })
+        .from(userSessions)
+        .where(eq(userSessions.tokenHash, hash))
+        .limit(1)
+    );
     if (row) {
       if (row.revokedAt) return "revoked";
       const seen = row.lastSeenAt ? new Date(row.lastSeenAt).getTime() : 0;
@@ -455,12 +458,14 @@ async function authenticateTelegramChannel(token: string): Promise<AuthResult> {
   }
   let row: typeof studentProfiles.$inferSelect | undefined;
   try {
-    const rows = await db
-      .select({ profile: studentProfiles, linkId: telegramLinks.id })
-      .from(telegramLinks)
-      .innerJoin(studentProfiles, eq(studentProfiles.id, telegramLinks.profileId))
-      .where(and(eq(telegramLinks.profileId, payload.pid), eq(telegramLinks.telegramUserId, payload.tgu)))
-      .limit(1);
+    const rows = await withDbRetry(() =>
+      db
+        .select({ profile: studentProfiles, linkId: telegramLinks.id })
+        .from(telegramLinks)
+        .innerJoin(studentProfiles, eq(studentProfiles.id, telegramLinks.profileId))
+        .where(and(eq(telegramLinks.profileId, payload.pid), eq(telegramLinks.telegramUserId, payload.tgu)))
+        .limit(1)
+    );
     row = rows[0]?.profile;
   } catch (err) {
     console.error("[auth] telegram session lookup failed:", err instanceof Error ? err.message : err);
@@ -549,11 +554,11 @@ export async function authenticate(req: Request): Promise<AuthResult> {
 
   let row: typeof studentProfiles.$inferSelect | undefined;
   try {
-    const rows = await db
-      .select()
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, payload.pid))
-      .limit(1);
+    // One retry for a dropped pooled connection: a pooler restart must not turn
+    // every signed-in request into "Authentication is temporarily unavailable".
+    const rows = await withDbRetry(() =>
+      db.select().from(studentProfiles).where(eq(studentProfiles.id, payload.pid)).limit(1)
+    );
     row = rows[0];
   } catch (err) {
     console.error("[auth] session lookup failed:", err);

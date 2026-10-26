@@ -24,7 +24,11 @@ import { AppNote } from "@/components/AppNote";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
 import { PanelSkeleton } from "@/components/hubs/ui";
-import { shouldRetrySessionRestore } from "@/lib/sessionRestore";
+import {
+  SESSION_RESTORE_MAX_ATTEMPTS,
+  sessionRestoreDelayMs,
+  shouldRetrySessionRestore,
+} from "@/lib/sessionRestore";
 
 /**
  * Every heavy screen is a separate chunk: the admin panel, the payments and
@@ -78,10 +82,34 @@ function targetFromHash(): { section: string; pane: string | null; openProfileEd
   return { section: target.section, pane: target.utility ? null : target.pane };
 }
 
-const sessionCopy: Record<Locale, { opening: string; checking: string; unavailable: string; retry: string; signIn: string; details: string }> = {
-  en: { opening: "Opening ScholarBridge…", checking: "Checking your secure session.", unavailable: "Dashboard temporarily unavailable", retry: "Try again", signIn: "Go to sign in", details: "More information" },
-  uz: { opening: "ScholarBridge ochilmoqda…", checking: "Xavfsiz seansingiz tekshirilmoqda.", unavailable: "Boshqaruv paneli vaqtincha ishlamayapti", retry: "Qayta urinish", signIn: "Kirish sahifasiga o‘tish", details: "Qo‘shimcha ma’lumot" },
-  ru: { opening: "Открываем ScholarBridge…", checking: "Проверяем защищённую сессию.", unavailable: "Панель временно недоступна", retry: "Повторить", signIn: "Перейти ко входу", details: "Подробнее" },
+const sessionCopy: Record<
+  Locale,
+  { opening: string; checking: string; noticeTitle: string; noticeBody: string; retry: string; dismiss: string }
+> = {
+  en: {
+    opening: "Opening ScholarBridge…",
+    checking: "Checking your secure session.",
+    noticeTitle: "Your session could not be checked",
+    noticeBody: "The server is briefly unreachable, so you are browsing as a visitor. The site keeps working and your sign-in is kept.",
+    retry: "Try again",
+    dismiss: "Dismiss",
+  },
+  uz: {
+    opening: "ScholarBridge ochilmoqda…",
+    checking: "Xavfsiz seansingiz tekshirilmoqda.",
+    noticeTitle: "Seansingizni tekshirib bo‘lmadi",
+    noticeBody: "Server bilan aloqa vaqtincha uzildi, shu sababli saytni mehmon sifatida ko‘ryapsiz. Sayt ishlashda davom etadi, kirishingiz saqlanadi.",
+    retry: "Qayta urinish",
+    dismiss: "Yopish",
+  },
+  ru: {
+    opening: "Открываем ScholarBridge…",
+    checking: "Проверяем защищённую сессию.",
+    noticeTitle: "Не удалось проверить сессию",
+    noticeBody: "Сервер временно недоступен, поэтому вы просматриваете сайт как гость. Сайт продолжает работать, вход сохраняется.",
+    retry: "Повторить",
+    dismiss: "Закрыть",
+  },
 };
 
 function SessionRestoreLoader() {
@@ -100,20 +128,54 @@ function SessionRestoreLoader() {
   );
 }
 
-function SessionRestoreError({ error, onRetry, onSignIn }: { error: string | null; onRetry: () => void; onSignIn: () => void }) {
+/**
+ * A session that cannot be checked right now is NOT a dead end.
+ *
+ * The old behaviour replaced the whole app with "Dashboard temporarily
+ * unavailable", so a database that was waking up (Supabase unpausing, a pooler
+ * restart, a cold Render instance) made the public site unusable for every
+ * signed-in visitor. Now the landing page renders as usual and this banner
+ * explains the situation, keeps the cookie untouched, and offers a retry.
+ */
+function SessionNotice({
+  message,
+  onRetry,
+  onDismiss,
+}: {
+  message: string | null;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
   const { locale } = useLocaleContext();
   const text = sessionCopy[locale];
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-50 px-4 text-center dark:bg-slate-950">
-      <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white">{text.unavailable}</h1>
-        {error && <details className="mt-3 text-left text-sm text-slate-600 dark:text-slate-300"><summary className="cursor-pointer font-medium">{text.details}</summary><p className="mt-2 break-words">{error}</p></details>}
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button type="button" onClick={onRetry} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700">{text.retry}</button>
-          <button type="button" onClick={onSignIn} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">{text.signIn}</button>
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-3">
+      <div
+        role="status"
+        className="pointer-events-auto flex w-full max-w-2xl flex-wrap items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left shadow-lg dark:border-amber-700 dark:bg-amber-950"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-amber-900 dark:text-amber-100">{text.noticeTitle}</p>
+          <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-200">{message || text.noticeBody}</p>
         </div>
-      </section>
-    </main>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
+          >
+            {text.retry}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+          >
+            {text.dismiss}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -163,7 +225,7 @@ export function Home({
   // lets it be server-rendered — visible to crawlers and painted instantly.
   // Returning students still start in "restoring" so they never flash the
   // public welcome page while their valid session is being checked.
-  const [view, setView] = useState<"restoring" | "restore-error" | "landing" | "wizard" | "app">(
+  const [view, setView] = useState<"restoring" | "landing" | "wizard" | "app">(
     hasSessionCookie ? "restoring" : "landing"
   );
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -404,15 +466,16 @@ export function Home({
       // the recovery UI; a 401 is definitive and should return to sign-in now.
       let res: Response | null = null;
       let data: { profile?: StudentProfile; error?: string; code?: string } = {};
-      for (let attempt = 0; attempt < 3; attempt++) {
+      const lastAttempt = SESSION_RESTORE_MAX_ATTEMPTS - 1;
+      for (let attempt = 0; attempt < SESSION_RESTORE_MAX_ATTEMPTS; attempt++) {
         try {
           res = await fetch("/api/auth/session", { cache: "no-store" });
           data = await res.json().catch(() => ({}));
           if (!shouldRetrySessionRestore(res.status, data.code, attempt)) break;
         } catch (err) {
-          if (attempt === 2) throw err;
+          if (attempt === lastAttempt) throw err;
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+        await new Promise((resolve) => window.setTimeout(resolve, sessionRestoreDelayMs(attempt)));
       }
       if (!res) throw new Error("Session check did not return a response.");
       if (res.ok && data.profile) {
@@ -465,12 +528,13 @@ export function Home({
         return;
       }
 
-      // A 401 means there is no valid session. Other failures (for example a
-      // temporary database outage) must not silently send a returning student
-      // back to the public landing page as if they had been signed out.
+      // A 401 means there is no valid session. Any other failure (a database
+      // that is waking up, a proxy hiccup) is about the server, not the user:
+      // keep the cookie, let the public site render, and explain via the banner
+      // instead of replacing the whole app with an error screen.
       if (!res.ok && res.status !== 401) {
         setRestoreError(data.error || "Your session could not be checked. Please try again.");
-        setView("restore-error");
+        setView("landing");
         return;
       }
 
@@ -484,8 +548,10 @@ export function Home({
       setRestoreError(null);
     } catch (err) {
       console.error("Error restoring session:", err);
+      // Offline or a hard network failure: the landing page is still useful and
+      // the retry button is one tap away.
       setRestoreError("We could not reach ScholarBridgeAI. Check your connection and try again.");
-      setView("restore-error");
+      setView("landing");
       return;
     }
     setView("landing");
@@ -891,27 +957,22 @@ export function Home({
     return <LocaleProvider initialLocale={initialLocale}><SessionRestoreLoader /></LocaleProvider>;
   }
 
-  if (view === "restore-error") {
-    return (
-      <LocaleProvider initialLocale={initialLocale}>
-        <SessionRestoreError
-          error={restoreError}
-          onRetry={() => {
-            setRestoreError(null);
-            setView("restoring");
-            void loadStoredProfile();
-          }}
-          onSignIn={() => setView("landing")}
-        />
-      </LocaleProvider>
-    );
-  }
-
   // ---- First visit: English landing page ----
   if (view === "landing") {
     return (
       <LocaleProvider initialLocale={initialLocale}>
         <>
+          {restoreError && (
+            <SessionNotice
+              message={restoreError}
+              onRetry={() => {
+                setRestoreError(null);
+                setView("restoring");
+                void loadStoredProfile();
+              }}
+              onDismiss={() => setRestoreError(null)}
+            />
+          )}
           <LandingPage onStart={startOnboarding} onEnterApp={enterApp} onSignIn={openProfilePicker} />
           {profilePicker}
         </>
