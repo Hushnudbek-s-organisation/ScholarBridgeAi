@@ -469,7 +469,7 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
               />
             </Field>
             <Field label={t("connect.siteUrl")} hint={t("connect.siteUrlHint")}>
-              <input className={inputCls} value={brand.siteUrl} onChange={(e) => setBrand({ ...brand, siteUrl: e.target.value })} placeholder="https://scholarbridge.uz" />
+              <input className={inputCls} value={brand.siteUrl} onChange={(e) => setBrand({ ...brand, siteUrl: e.target.value })} placeholder="https://example.org" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("connect.channelUsername")}>
