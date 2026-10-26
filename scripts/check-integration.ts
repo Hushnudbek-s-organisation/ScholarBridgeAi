@@ -2510,6 +2510,111 @@ async function main() {
   const { readFileSync: readFile2 } = await import("node:fs");
   const deadlinesSrc = readFile2("src/app/api/deadlines/route.ts", "utf8");
   check("deadlines: the web API has no premium gate (policy: visibility is free)", !/premiumGate|requireFeatureSession/.test(deadlinesSrc));
+
+  // An UNVERIFIED cycle must never become a countdown. The catalogue import once
+  // wrote one identical "Fall 2027, 15 January" row for every programme of 217
+  // universities and marked it verified; the date is a constant, not a deadline.
+  const unverifiedDeadline = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+  const insertedCycle = await pool.query<{ id: number }>(
+    `INSERT INTO application_cycles (university_id, academic_year, intake, application_type, deadline, verification_status)
+     VALUES ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'unverified') RETURNING id`,
+    [uniA.id, unverifiedDeadline],
+  );
+  const cycleId = insertedCycle.rows[0]?.id;
+  const afterUnverified = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
+  const unverifiedItem = (afterUnverified.body?.items ?? []).find(
+    (item: any) => item.type === "university" && item.universityId === uniA.id,
+  );
+  check(
+    "deadlines: an UNVERIFIED application cycle never becomes a countdown",
+    unverifiedItem?.date === null && unverifiedItem?.status === "NO DEADLINE ON FILE",
+    JSON.stringify({ date: unverifiedItem?.date, status: unverifiedItem?.status, seeded: unverifiedDeadline }),
+  );
+
+  await pool.query("UPDATE application_cycles SET verification_status = 'verified' WHERE id = $1", [cycleId]);
+  const afterVerified = await call(deadlinesRoute.GET as any, `/api/deadlines?profileId=${profile.id}`);
+  const verifiedItem = (afterVerified.body?.items ?? []).find(
+    (item: any) => item.type === "university" && item.universityId === uniA.id,
+  );
+  check(
+    "deadlines: a VERIFIED application cycle does produce the date",
+    verifiedItem?.date === unverifiedDeadline,
+    JSON.stringify({ date: verifiedItem?.date, expected: unverifiedDeadline }),
+  );
+  await pool.query("DELETE FROM application_cycles WHERE id = $1", [cycleId]);
+
+  // application_cycles is written per programme, so one undergraduate deadline
+  // arrives as a dozen identical rows. The detail page only renders the first
+  // two cycles, so duplicates used to fill the card list with the same date.
+  const dupDeadline = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+  const dupCycles = await pool.query<{ id: number }>(
+    `INSERT INTO application_cycles (university_id, academic_year, intake, application_type, deadline, verification_status)
+     VALUES ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Fall', 'Regular Decision', $2, 'verified'),
+            ($1, '2027-2028', 'Spring', 'Regular Decision', $3, 'verified')
+     RETURNING id`,
+    [uniA.id, dupDeadline, new Date(Date.now() + 200 * 86400000).toISOString().slice(0, 10)],
+  );
+  const uniDetailRoute = await import("../src/app/api/universities/[id]/route");
+  const uniDetail = await call(
+    ((request: Request) =>
+      uniDetailRoute.GET(request, { params: Promise.resolve({ id: String(uniA.id) }) })) as any,
+    `/api/universities/${uniA.id}`,
+  );
+  const detailCycles: any[] = uniDetail.body?.applicationCycles ?? [];
+  check(
+    "universities: identical cycles collapse to one card, a different intake stays",
+    detailCycles.length === 2 && detailCycles[0]?.deadline === dupDeadline,
+    JSON.stringify(detailCycles.map((c) => `${c.intake}:${c.deadline}`)),
+  );
+  await pool.query("DELETE FROM application_cycles WHERE id = ANY($1::int[])", [
+    dupCycles.rows.map((r) => r.id),
+  ]);
+
+  // A scholarship the university itself awards must surface on its page, with
+  // the published amount; one that was retired (is_active = false) must not.
+  // This is the contract behind "link the university's own awards so they show".
+  const linkedSch = await pool.query<{ id: number }>(
+    `INSERT INTO scholarships
+       (title, provider, country, coverage_type, amount_usd_value, deadline, degree_levels,
+        eligible_majors, description, requirements, website_url, deadline_type, recurrence,
+        application_status, verification_status, source_reliability, is_active, university_id)
+     VALUES
+       ('Integration Test University Award', 'ETH Zurich', 'Switzerland', 'Partial Tuition', 10000,
+        '2027-02-01', '["Bachelor''s"]', '["All Majors"]', 'A test award.', 'Test requirements.',
+        'https://example.org/award', 'fixed', 'annual', 'open', 'verified', 9, true, $1),
+       ('Integration Test Retired Award', 'ETH Zurich', 'Switzerland', 'Partial Tuition', 10000,
+        '2027-02-01', '["Bachelor''s"]', '["All Majors"]', 'A retired test award.', 'Test requirements.',
+        'https://example.org/retired', 'fixed', 'annual', 'closed', 'verified', 9, false, $1)
+     RETURNING id`,
+    [uniA.id],
+  );
+  // The catalogue bundle is cached; a scholarship written after the cache was
+  // filled only becomes visible after the TTL, so the test invalidates it the
+  // same way the admin mutation path does.
+  const { invalidateCatalogCache: invalidateScholarshipCache } = await import("../src/lib/catalogCache");
+  invalidateScholarshipCache("scholarships");
+  const uniDetailWithSch = await call(
+    ((request: Request) =>
+      uniDetailRoute.GET(request, { params: Promise.resolve({ id: String(uniA.id) }) })) as any,
+    `/api/universities/${uniA.id}`,
+  );  const detailScholarships: any[] = uniDetailWithSch.body?.scholarships ?? [];
+  const linkedAward = detailScholarships.find((s) => s.title === "Integration Test University Award");
+  check(
+    "universities: a scholarship awarded by the university itself appears on its page with the published amount",
+    linkedAward?.amountUsdValue === 10000 && linkedAward?.isVerified === true,
+    JSON.stringify({ found: Boolean(linkedAward), amount: linkedAward?.amountUsdValue, count: detailScholarships.length }),
+  );
+  check(
+    "universities: a retired scholarship (is_active = false) is never shown",
+    !detailScholarships.some((s) => s.title === "Integration Test Retired Award"),
+    JSON.stringify(detailScholarships.map((s) => s.title)),
+  );
+  await pool.query("DELETE FROM scholarships WHERE id = ANY($1::int[])", [
+    linkedSch.rows.map((r) => r.id),
+  ]);
+
   const botSrc = readFile2("src/lib/telegram/bot.ts", "utf8");
   const botDeadlinesFn = botSrc.slice(botSrc.indexOf("async function deadlines"), botSrc.indexOf("async function next"));
   check("deadlines: the Telegram /deadlines list is FREE (policy: same data, every channel)", botDeadlinesFn.length > 0 && !/hasFeature|premium/.test(botDeadlinesFn));

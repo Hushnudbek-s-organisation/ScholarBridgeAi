@@ -1,0 +1,42 @@
+-- Scholarship rewrite pass 26 — 2026-10-23
+-- The Netherlands cluster. Closes it: zero template descriptions, zero invented
+-- five-figure USD amounts, and zero rows claiming "Full Tuition + Stipend" remain
+-- among active Dutch rows.
+--
+-- THE PATTERN
+-- For almost every Dutch university the catalogue held TWO rows: one with a specific
+-- award name and a large invented USD figure, and one with a generic name pointing at
+-- the bare university domain. The generic ones were duplicates; the specific ones
+-- mostly had the right name and the wrong money.
+--
+-- THE FOUR CORRECTIONS THAT MATTER
+-- 1. The Holland Scholarship was renamed the NL Scholarship in June 2023. It pays a
+--    one-time EUR 5 000 towards living costs - not full tuition. Groningen and Erasmus
+--    each had a copy claiming full tuition at USD 18 000 and 11 500.
+-- 2. TU Delft did NOT take part in the NL Scholarship in 2026/27, yet the national
+--    record id 593 named TU Delft as its provider. Provider corrected.
+-- 3. The Radboud Scholarship Programme is a tuition REDUCTION to about EUR 2 694
+--    against a normal EUR 18 000, plus visa and insurance. It pays NO living
+--    allowance. The old row claimed USD 24 000 with a living grant.
+-- 4. Wageningen: two awards had been merged. The Africa Scholarship Programme is the
+--    fully funded one but is Sub-Saharan Africa only, so an Uzbek applicant cannot
+--    use it. The Excellence Programme is open to all and pays tuition only. The old
+--    row promised the first while looking as though it were the second.
+--
+-- Rows retired (8): 374 Groningen Holland · 577 Erasmus Holland · 661 Radboud ·
+--                   691 TU/e Excellence · 741 Groningen Talent · 786 VU ·
+--                   787 Wageningen Excellence · 461 UvA Excellence
+-- Rows rewritten (6): 152 TU Delft · 416 Twente · 417 Radboud · 418 VU ·
+--                     419 Wageningen · 618 Maastricht
+-- Coverage withdrawn pending verification (2): 415 TU/e TSP · 420 Erasmus Trustfonds
+-- Provider corrected (1): 593 NL Scholarship
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 129 (was 136)
+--   website_url bare domain and is_active                            -> 181 (was 188)
+--   active scholarships                                              -> 597 (was 605)
+--   Dutch active rows still in template phrasing                     ->   0
+--   Dutch active rows with amount_usd_value > 5000                   ->   0
+--   Dutch active rows failing a hard completeness check              ->   0

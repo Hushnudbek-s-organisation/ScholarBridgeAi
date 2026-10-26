@@ -1,4 +1,9 @@
-import { computeDailyStreak, STREAK_MILESTONES } from "../src/lib/streak";
+import {
+  computeDailyStreak,
+  isStreakActivity,
+  DAILY_ACTIVITY_REASON,
+  STREAK_MILESTONES,
+} from "../src/lib/streak";
 
 let passed = 0;
 function check(label: string, condition: boolean) {
@@ -47,5 +52,33 @@ check("date-only activity keeps its calendar date across timezones", dateOnlyInL
 const invalidTimezone = computeDailyStreak(["2026-10-12T10:00:00Z"], now, "Not/A_Timezone");
 check("invalid timezone safely falls back to UTC", invalidTimezone.current === 1);
 check("milestones are ordered and meaningful", STREAK_MILESTONES.join(",") === "3,7,14,30,60,100,365");
+
+console.log("\nStreak activity definition");
+
+// A day may only be counted for something the student DID. Points received for
+// someone else's action must never extend the streak: a like on an old post, or
+// a referred friend's progress, used to count as a study day for the author.
+for (const selfPerformed of ["lesson_complete", "quiz_passed", "thread_created", "reply_created", DAILY_ACTIVITY_REASON]) {
+  check(`"${selfPerformed}" counts as the student's own activity`, isStreakActivity(selfPerformed));
+}
+for (const received of ["content_liked", "referral_referrer", "referral_referred", "admin_award", "profile_created"]) {
+  check(`"${received}" does NOT count as activity`, !isStreakActivity(received));
+}
+check("unknown reasons never count", !isStreakActivity("some_future_reason") && !isStreakActivity(null) && !isStreakActivity(""));
+check("the daily marker reason is the one the writer uses", DAILY_ACTIVITY_REASON === "daily_active");
+
+// The card's call to action: a lapsed streak (nothing yesterday or today) must
+// present as a fresh start, not as "continue" — current is 0 in that state.
+const lapsed = computeDailyStreak(["2026-10-01", "2026-10-02"], now);
+check("a lapsed streak reports 0 current days and is not active today", lapsed.current === 0 && !lapsed.activeToday);
+check("a lapsed streak still reports the honest record", lapsed.longest === 2 && lapsed.lastActiveDate === "2026-10-02");
+
+// Repeating the same activity on the same day (two videos, one afternoon) must
+// never inflate the count.
+const repeated = computeDailyStreak(
+  Array.from({ length: 12 }, (_, i) => `2026-10-12T0${(i % 9) + 1}:00:00Z`),
+  now,
+);
+check("twelve actions in one day are one streak day", repeated.current === 1 && repeated.longest === 1);
 
 console.log(`\nstreak test passed (${passed} assertions)`);

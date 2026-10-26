@@ -341,7 +341,15 @@ CREATE TABLE IF NOT EXISTS "application_cycles" (
   "source_url" text,
   "source_id" integer CONSTRAINT "application_cycles_source_id_fkey" REFERENCES "sources" ("id") ON DELETE SET NULL,
   "last_verified_at" timestamp,
-  "verification_status" text NOT NULL DEFAULT 'unverified'
+  "verification_status" text NOT NULL DEFAULT 'unverified',
+  "cycle_year" integer NOT NULL DEFAULT 2027,
+  "deadline_type" text NOT NULL DEFAULT 'exact',
+  "is_estimated" boolean NOT NULL DEFAULT FALSE,
+  "is_active" boolean NOT NULL DEFAULT TRUE,
+  "is_verified" boolean NOT NULL DEFAULT FALSE,
+  "notes" text,
+  "official_source_id" integer,
+  "created_at" timestamp NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS "application_document_links" (
   "id" serial PRIMARY KEY,
@@ -549,6 +557,9 @@ CREATE TABLE IF NOT EXISTS "essay_versions" (
   "essay_type" text NOT NULL DEFAULT 'sop',
   "title" text NOT NULL DEFAULT '',
   "content" text NOT NULL DEFAULT '',
+  "prompt" text,
+  "target_name" text,
+  "word_limit" integer,
   "word_count" integer NOT NULL DEFAULT 0,
   "char_count" integer NOT NULL DEFAULT 0,
   "version_number" integer NOT NULL DEFAULT 1,
@@ -1238,6 +1249,24 @@ CREATE TABLE IF NOT EXISTS "university_rankings" (
   "verification_status" text NOT NULL DEFAULT 'unverified',
   "created_at" timestamp NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS "university_scholarships" (
+  "id" serial PRIMARY KEY,
+  "university_id" integer NOT NULL CONSTRAINT "university_scholarships_university_id_fkey" REFERENCES "universities" ("id") ON DELETE CASCADE,
+  "scholarship_id" integer CONSTRAINT "university_scholarships_scholarship_id_fkey" REFERENCES "scholarships" ("id") ON DELETE SET NULL,
+  "scholarship_name" text NOT NULL,
+  "availability_status" text NOT NULL,
+  "funding_type" text NOT NULL,
+  "max_scholarship" text NOT NULL,
+  "covers_tuition" boolean NOT NULL DEFAULT TRUE,
+  "covers_living_expenses" boolean NOT NULL DEFAULT FALSE,
+  "valued_aspect" text,
+  "eligibility_notes" text,
+  "official_url" text,
+  "source_url" text,
+  "verification_status" text NOT NULL DEFAULT 'verified',
+  "last_verified_at" timestamp DEFAULT now(),
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS "university_sources" (
   "id" serial PRIMARY KEY,
   "university_id" integer NOT NULL CONSTRAINT "university_sources_university_id_fkey" REFERENCES "universities" ("id") ON DELETE CASCADE,
@@ -1559,6 +1588,14 @@ ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_url" text;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "source_id" integer;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp;
 ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'unverified';
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "cycle_year" integer NOT NULL DEFAULT 2027;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "deadline_type" text NOT NULL DEFAULT 'exact';
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_estimated" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "is_verified" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "notes" text;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "official_source_id" integer;
+ALTER TABLE "application_cycles" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 -- ---------- application_document_links ----------
 ALTER TABLE "application_document_links" ADD COLUMN IF NOT EXISTS "application_id" integer;
 ALTER TABLE "application_document_links" ADD COLUMN IF NOT EXISTS "document_id" integer;
@@ -1730,6 +1767,9 @@ ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "essay_type" text NOT NULL DEFAULT 'sop';
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "title" text NOT NULL DEFAULT '';
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "content" text NOT NULL DEFAULT '';
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "prompt" text;
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "target_name" text;
+ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "word_limit" integer;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "word_count" integer NOT NULL DEFAULT 0;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "char_count" integer NOT NULL DEFAULT 0;
 ALTER TABLE "essay_versions" ADD COLUMN IF NOT EXISTS "version_number" integer NOT NULL DEFAULT 1;
@@ -2304,6 +2344,22 @@ ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "source_id" integer;
 ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "verified_at" timestamp;
 ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'unverified';
 ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- university_scholarships ----------
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "university_id" integer;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "scholarship_id" integer;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "scholarship_name" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "availability_status" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "funding_type" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "max_scholarship" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "covers_tuition" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "covers_living_expenses" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "valued_aspect" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "eligibility_notes" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "official_url" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "source_url" text;
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "verification_status" text NOT NULL DEFAULT 'verified';
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "last_verified_at" timestamp DEFAULT now();
+ALTER TABLE "university_scholarships" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 -- ---------- university_sources ----------
 ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "university_sources" ADD COLUMN IF NOT EXISTS "source_id" integer;
@@ -2424,6 +2480,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_test_tasks_plan') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_test_tasks_plan" ON "test_tasks" ("test_plan_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_test_tasks_plan skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_test_tasks_plan skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_university_ranking_edition') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_university_ranking_edition" ON "university_rankings" ("university_id", "ranking_provider", "ranking_name", "ranking_year"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_university_ranking_edition skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_university_ranking_edition skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_university_rankings_year_rank') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_university_rankings_year_rank" ON "university_rankings" ("ranking_year", "rank"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_university_rankings_year_rank skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_university_rankings_year_rank skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'university_scholarships_university_id_scholarship_name_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "university_scholarships_university_id_scholarship_name_key" ON "university_scholarships" ("university_id", "scholarship_name"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index university_scholarships_university_id_scholarship_name_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index university_scholarships_university_id_scholarship_name_key skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_user_sessions_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_user_sessions_profile" ON "user_sessions" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_user_sessions_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_user_sessions_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_visa_requirements_country') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_visa_requirements_country" ON "visa_requirements" ("country", "visa_type"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_visa_requirements_country skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_visa_requirements_country skipped: column missing'; END; END IF; END $$;
 
@@ -2560,6 +2617,8 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'pub
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.programs'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.programs'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "programs" ADD CONSTRAINT "programs_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK programs_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_rankings'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_rankings'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_rankings" ADD CONSTRAINT "university_rankings_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_rankings_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_rankings'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_rankings'::regclass AND attname = 'source_id')::smallint] AND c.confrelid = 'public.sources'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.sources'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_rankings" ADD CONSTRAINT "university_rankings_source_id_fkey" FOREIGN KEY ("source_id") REFERENCES "sources" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_rankings_source_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_scholarships'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_scholarships'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_scholarships" ADD CONSTRAINT "university_scholarships_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_scholarships_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_scholarships'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_scholarships'::regclass AND attname = 'scholarship_id')::smallint] AND c.confrelid = 'public.scholarships'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.scholarships'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_scholarships" ADD CONSTRAINT "university_scholarships_scholarship_id_fkey" FOREIGN KEY ("scholarship_id") REFERENCES "scholarships" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_scholarships_scholarship_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_sources'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_sources'::regclass AND attname = 'university_id')::smallint] AND c.confrelid = 'public.universities'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.universities'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_sources" ADD CONSTRAINT "university_sources_university_id_fkey" FOREIGN KEY ("university_id") REFERENCES "universities" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_sources_university_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.university_sources'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.university_sources'::regclass AND attname = 'source_id')::smallint] AND c.confrelid = 'public.sources'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.sources'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "university_sources" ADD CONSTRAINT "university_sources_source_id_fkey" FOREIGN KEY ("source_id") REFERENCES "sources" ("id") ON DELETE SET NULL; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK university_sources_source_id_fkey skipped: existing rows violate it'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.user_badges'::regclass AND c.contype = 'f' AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.user_badges'::regclass AND attname = 'profile_id')::smallint] AND c.confrelid = 'public.student_profiles'::regclass AND c.confkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.student_profiles'::regclass AND attname = 'id')::smallint]) THEN BEGIN ALTER TABLE "user_badges" ADD CONSTRAINT "user_badges_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "student_profiles" ("id") ON DELETE CASCADE; EXCEPTION WHEN foreign_key_violation THEN RAISE NOTICE 'FK user_badges_profile_id_fkey skipped: existing rows violate it'; END; END IF; END $$;

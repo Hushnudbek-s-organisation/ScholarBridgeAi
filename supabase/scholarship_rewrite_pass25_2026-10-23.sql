@@ -1,0 +1,41 @@
+-- Scholarship rewrite pass 25 — 2026-10-23
+-- The Japan cluster. Closes it: zero template descriptions and zero rows titled
+-- "& MEXT" remain among active Japanese rows.
+--
+-- THE FINDING THAT DRIVES THIS PASS
+-- Every Japanese row in this catalogue was built as "<University> & MEXT", which
+-- treated the Japanese Government Scholarship as though a university awards it.
+-- MEXT is a Ministry of Education programme applied for through the Japanese embassy
+-- or through a university that nominates the candidate; nobody applies for it on a
+-- university's scholarships page. It had no record of its own, so id 906 now exists
+-- with rates verified against three official sources (Study in Japan portal, MEXT's
+-- own 2026 Research Students guidelines PDF, Kyoto University's MEXT page):
+--   Undergraduate / Japanese Studies / KOSEN / STC   JPY 117 000 per month
+--   Research students, preparatory or non-degree     JPY 143 000
+--   Master's / professional degree                   JPY 144 000
+--   Doctoral                                         JPY 145 000
+--   Young Leaders Program                            JPY 242 000
+--   Plus a regional supplement of JPY 2 000-3 000
+--   Plus all tuition, entrance-examination and matriculation fees, and round-trip airfare.
+--
+-- SECOND FINDING
+-- Hokkaido University's Office of International Affairs lists the President's
+-- Fellowship with the note "New recruitment suspended from 2024". Two rows described
+-- it as a live award. Both are retired, and the note names what IS open at Hokkaido.
+--
+-- Rows retired (9): 607 Keio · 612 Kyushu · 630 Nagoya · 646 Osaka · 685 Tohoku ·
+--                   686 Science Tokyo · 821 Hokkaido · 834 Waseda · 448 Hokkaido
+-- Rows rewritten (2): 449 Nagoya G30 · 491 Waseda
+-- New record (1):    906 MEXT
+-- Amounts zeroed in place (8): 137, 146, 393, 447, 450, 457, 470, 488
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 136 (was 144)
+--   website_url bare domain and is_active                            -> 188 (was 195)
+--   active scholarships                                              -> 605 (was 613)
+--   Japanese active rows still in template phrasing                   ->   0
+--   Japanese active rows still titled "& MEXT"                        ->   0
+--   Japanese active rows with amount_usd_value > 5000                 ->   0
+--   Japanese active rows failing a hard completeness check            ->   0

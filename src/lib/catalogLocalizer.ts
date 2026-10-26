@@ -87,6 +87,14 @@ function mapJsonStringArray<T extends string | null | undefined>(
 /** Country names present in catalog data but outside the 38-key `countryNames`
  *  set. `countryTranslationKey` handles the rest through its alias table. */
 const EXTRA_COUNTRY_NAMES: Record<string, Record<TargetLocale, string>> = {
+  // Uzbekistan is a home market, not a QS destination, so it has no entry in
+  // QS_TOP_200_COUNTRIES and therefore no `countryNames` key; without this it
+  // renders in English on every Uzbek-owned award.
+  Uzbekistan: { uz: "Oʻzbekiston", ru: "Узбекистан" },
+  Hungary: { uz: "Vengriya", ru: "Венгрия" },
+  Poland: { uz: "Polsha", ru: "Польша" },
+  Turkey: { uz: "Turkiya", ru: "Турция" },
+  "Türkiye": { uz: "Turkiya", ru: "Турция" },
   Estonia: { uz: "Estoniya", ru: "Эстония" },
   Latvia: { uz: "Latviya", ru: "Латвия" },
   Lithuania: { uz: "Litva", ru: "Литва" },

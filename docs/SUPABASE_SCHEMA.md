@@ -242,7 +242,15 @@ Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes insid
 | `source_url` | text | yes | — |  |
 | `source_id` | integer | yes | — | FK → sources(id) on delete set null |
 | `last_verified_at` | timestamp | yes | — |  |
-| `verification_status` | text |  | yes |  |
+| `verification_status` | text |  | yes | `verified` / `estimated` / `unverified` — the source of truth the API reads |
+| `cycle_year` | integer |  | yes | entry year (2027 = Fall 2027). The API reads this, not a parse of `academic_year` |
+| `deadline_type` | text |  | yes | e.g. `exact`, `Regular Decision` |
+| `is_estimated` | boolean |  | yes | mirror of `verification_status <> 'verified'`; kept in sync by the sweeps |
+| `is_active` | boolean |  | yes |  |
+| `is_verified` | boolean |  | yes | mirror of `verification_status = 'verified'` |
+| `notes` | text | yes | — | what the source page actually published |
+| `official_source_id` | integer | yes | — |  |
+| `created_at` | timestamp |  | yes |  |
 
 ### `application_document_links`
 
@@ -1557,6 +1565,34 @@ and the migration is safely retried.
 | `source_id` | integer | yes | — | FK → sources(id) on delete set null |
 | `verified_at` | timestamp | yes | — |  |
 | `verification_status` | text |  | yes |  |
+| `created_at` | timestamp |  | yes |  |
+
+### `university_scholarships`
+
+University→scholarship links. The university page renders its "scholarships"
+block from the `scholarships` bundle (rows linked through `scholarships.university_id`
+come first), so this table is the editorial mapping: which awards a university
+was verified to offer, with its own coverage flags and source. Unique on
+(`university_id`, `scholarship_name`) — a merge of two duplicate university rows
+must collapse colliding names before re-pointing the rest.
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `university_id` | integer |  | — | FK → universities(id) on delete cascade |
+| `scholarship_id` | integer | yes | — | FK → scholarships(id) on delete set null |
+| `scholarship_name` | text |  | — | unique per university |
+| `availability_status` | text |  | — | e.g. `available` |
+| `funding_type` | text |  | — | `Merit-based`, `Need-based`, `Mixed` |
+| `max_scholarship` | text |  | — | free text (currency-specific: "up to GBP 5,000") |
+| `covers_tuition` | boolean |  | yes |  |
+| `covers_living_expenses` | boolean |  | yes |  |
+| `valued_aspect` | text | yes | — | what the award recognises |
+| `eligibility_notes` | text | yes | — |  |
+| `official_url` | text | yes | — | university's own page for the award |
+| `source_url` | text | yes | — | the page the row was verified against |
+| `verification_status` | text |  | yes |  |
+| `last_verified_at` | timestamp | yes | yes |  |
 | `created_at` | timestamp |  | yes |  |
 
 ### `university_sources`

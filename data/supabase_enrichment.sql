@@ -825,7 +825,10 @@ SELECT
   u.official_website_url, u.official_website_url, u.admissions_url, u.official_website_url,
   u.min_ielts,
   CASE WHEN m.degree_level = 'Bachelor''s' THEN u.min_sat ELSE NULL END,
-  DATE '2027-01-15',
+  -- 2026-10-23: this used to write DATE '2027-01-15' into every generated
+  -- programme (2,764 rows) as if it were a published deadline. No date is known
+  -- for these rows, so NULL is written and the UI says "not announced".
+  NULL::date,
   true, true, 'verified', TIMESTAMP '2026-10-17 00:00:00'
 FROM missing_progs m
 JOIN public.universities u ON u.id = m.university_id

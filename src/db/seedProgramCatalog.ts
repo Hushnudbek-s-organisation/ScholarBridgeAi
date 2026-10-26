@@ -153,19 +153,39 @@ export async function seedProgramCatalog(): Promise<SeedProgramCatalogSummary> {
           eq(applicationCycles.academicYear, cycle.academicYear), eq(applicationCycles.intake, cycle.intake),
         )).limit(1);
         if (existingCycle) return false;
+        // A seeded cycle is a real, sourced fact, so it must carry everything a
+        // verified row needs — the deadline-integrity gate (`npm run
+        // test:deadlines`) rejects a verified row that leaves any of these out,
+        // and that is exactly what a fresh install used to produce:
+        //   * is_verified stayed false while verification_status was 'verified'
+        //   * is_estimated stayed false (correct, but by accident)
+        //   * notes was empty, so nothing said what the source published
+        //   * cycle_year kept its column default even when academicYear started
+        //     in a different year ("2026-2027" next to cycle_year 2027)
+        const cycleYearMatch = /^(\d{4})/.exec(cycle.academicYear ?? "");
+        const cycleYear = cycleYearMatch ? parseInt(cycleYearMatch[1], 10) : VERIFIED_AT.getUTCFullYear();
         await tx.insert(applicationCycles).values({
           universityId: university.id,
           programId: program.id,
           academicYear: cycle.academicYear,
+          cycleYear,
           intake: cycle.intake,
           applicationType: "Direct Application",
           openingDate: "openingDate" in cycle ? cycle.openingDate : null,
           deadline: cycle.deadline,
+          deadlineType: "exact",
           applicationUrl: spec.applicationUrl,
           sourceUrl: spec.programUrl,
           sourceId,
           lastVerifiedAt: VERIFIED_AT,
           verificationStatus: "verified",
+          isVerified: true,
+          isEstimated: false,
+          isActive: true,
+          notes:
+            `Deadline published on the official programme page ${spec.programUrl} ` +
+            `(read ${VERIFIED_AT.toISOString().slice(0, 10)}). The date is the one that page states for ` +
+            `${cycle.intake} ${cycleYear}.`,
         });
         return true;
       });

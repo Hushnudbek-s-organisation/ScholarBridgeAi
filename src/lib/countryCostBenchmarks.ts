@@ -632,9 +632,12 @@ export function resolveMultiCurrencyScholarshipAmount(row: {
       return { amountUsd: converted, convertedFromCurrency: code };
     }
   }
-  if (row.amountUsdValue != null) {
-    const fallback = convertCurrencyToUsd(row.amountUsdValue, "USD");
-    if (fallback != null) {
+  const legacyUsd = row.amountUsdValue;
+  if (legacyUsd != null && Number(legacyUsd) > 0) {
+    // 0 is the column's "no published amount" sentinel (the column is NOT NULL);
+    // a zero-dollar award does not exist and must not reach a cost calculation.
+    const fallback = convertCurrencyToUsd(legacyUsd, "USD");
+    if (fallback != null && fallback > 0) {
       return { amountUsd: fallback, convertedFromCurrency: null };
     }
   }

@@ -241,8 +241,23 @@ async function main() {
     check("p2.isVerified === false", p2?.isVerified === false);
     check("p2.sources is empty", Array.isArray(p2?.sources) && p2.sources.length === 0, p2?.sources);
     const p2Reqs: any[] = p2?.requirements ?? [];
-    check("p2 requirements unverified with null sourceUrl",
-      p2Reqs.length > 0 && p2Reqs.every((r) => r.verificationStatus === "unverified" && r.sourceUrl === null), p2Reqs);
+    // The API is stricter than "label it unverified": a requirement row that has
+    // no source URL is dropped from the response entirely, because the detail
+    // page renders every requirement it receives as a plain fact — there is no
+    // "unconfirmed" badge to fall back on. Showing "IELTS 7.0" from an
+    // unsourced row would present an unverified number as truth, which is the
+    // one thing this catalogue must never do. The row still exists in the
+    // database and stays out of the matching/chancing minima for the same
+    // reason. An earlier assertion here expected the value to be returned with
+    // `verificationStatus: "unverified"`; that contract was never implemented
+    // in the route and the stricter one is the correct behaviour.
+    check(
+      "p2 requirements are withheld entirely (no source ⇒ not shown as fact)",
+      p2Reqs.length === 0,
+      p2Reqs,
+    );
+    // …and the program itself is still listed, so "unknown" never means "gone".
+    check("p2 is still listed even with its requirements withheld", !!p2 && p2.name?.includes("Biology"));
 
     console.log("\ncycle provenance (estimated vs confirmed):");
     check("2 cycles returned", cycles.length === 2, cycles.length);

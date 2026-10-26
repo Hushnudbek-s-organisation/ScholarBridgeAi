@@ -263,6 +263,13 @@ export async function GET(req: Request) {
 
     // Nearest UPCOMING verified cycle per candidate (one batched query,
     // never a per-university loop).
+    //
+    // The `verification_status = 'verified'` filter is the contract the comment
+    // above describes and the detail page already follows: an unverified or
+    // estimated cycle is a catalogue guess (the import once wrote one identical
+    // "Fall 2027, 15 January" row for every programme of 217 universities) and
+    // must never become a countdown here. A university with no verified cycle
+    // falls through to "NO DEADLINE ON FILE".
     const cycleRows =
       candidateIds.length > 0
         ? await db
@@ -274,7 +281,8 @@ export async function GET(req: Request) {
             .where(
               and(
                 inArray(applicationCycles.universityId, candidateIds),
-                gte(applicationCycles.deadline, new Date().toISOString().slice(0, 10))
+                gte(applicationCycles.deadline, new Date().toISOString().slice(0, 10)),
+                eq(applicationCycles.verificationStatus, "verified")
               )
             )
             .orderBy(asc(applicationCycles.deadline))

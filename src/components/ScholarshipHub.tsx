@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { countryTranslationKey, qsCountryOption, withQsTop200Countries } from "@/lib/countries";
 import { StudentProfile } from "./Navbar";
 import { Pagination } from "./Pagination";
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   Wallet,
   Loader2,
+  ArrowRight,
   X
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
@@ -96,7 +98,9 @@ export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "e
     const period = s.awardPeriod === "year" ? t("perYear") : s.awardPeriod === "month" ? t("perMonth") : "";
     return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
   }
-  if (s.amountUsdValue != null) return formatMoney(s.amountUsdValue, "USD");
+  // 0 is the catalogue's "no cash value published" sentinel, not an award of
+  // zero dollars: fall through to the coverage label instead of printing "$0".
+  if (s.amountUsdValue != null && s.amountUsdValue > 0) return formatMoney(s.amountUsdValue, "USD");
   return s.coverageType && s.coverageType !== "Unspecified"
     ? localizeCoverageType(s.coverageType, locale)
     : t("awardNotSpecified");
@@ -808,14 +812,22 @@ export function ScholarshipHub({
                 {/* Actions — one row, two controls: the official portal link
                     and Track/Save. Everything else moved to the drawer. */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                  <a
-                    href={s.websiteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
-                  >
-                    {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/scholarships/${s.id}`}
+                      className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:bg-slate-800 dark:text-slate-100"
+                    >
+                      {t("viewDetails")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                    <a
+                      href={s.websiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                    >
+                      {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </span>
 
                   {isSaved ? (
                     <button

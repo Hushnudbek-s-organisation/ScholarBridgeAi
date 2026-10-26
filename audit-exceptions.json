@@ -1,13 +1,4 @@
 {
   "_comment": "Reviewed exceptions for high/critical advisories that currently have NO released fix. Production dependencies are never excepted — they are gated separately and hard by `npm audit --omit=dev --audit-level=high`. Every entry must carry an advisory id, the affected package, a reason and a review date; the gate fails on an entry that is no longer needed, so this list can only shrink. See docs/RELEASE_GATE.md.",
-  "exceptions": [
-    {
-      "advisory": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "severity": "high",
-      "reason": "Stack-exhaustion denial of service in brace expansion. Reached only through the ESLint toolchain (eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces) and never by the running application, which does not import any of it. The advisory lists no patched release: every published braces version (<= 3.0.3) is affected, so no dependency bump can clear it.",
-      "reviewedOn": "2026-10-16",
-      "upstream": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
-    }
-  ]
+  "exceptions": []
 }

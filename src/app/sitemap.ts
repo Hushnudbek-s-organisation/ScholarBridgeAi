@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { siteUrlForRequest } from "@/lib/requestAppUrl";
+import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
 
 /**
  * Public, crawlable pages. The catalogue pages serve real server-rendered
@@ -12,6 +13,23 @@ import { siteUrlForRequest } from "@/lib/requestAppUrl";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const SITE_URL = await siteUrlForRequest();
   const now = new Date();
+
+  // Every public scholarship detail page is real, server-rendered content, so
+  // it is crawlable. A catalogue outage must not take the sitemap down with it:
+  // the static entries still ship, the detail URLs are simply omitted.
+  let scholarshipUrls: MetadataRoute.Sitemap = [];
+  try {
+    const bundle = await getCachedScholarshipsBundle();
+    scholarshipUrls = bundle.entries.map((scholarship) => ({
+      url: `${SITE_URL}/scholarships/${scholarship.id}`,
+      lastModified: scholarship.lastVerifiedAt instanceof Date ? scholarship.lastVerifiedAt : now,
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    }));
+  } catch {
+    scholarshipUrls = [];
+  }
+
   return [
     {
       url: `${SITE_URL}/`,
@@ -31,6 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    ...scholarshipUrls,
     {
       url: `${SITE_URL}/terms`,
       lastModified: now,

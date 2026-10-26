@@ -138,6 +138,46 @@ function parseOtherRequirements(texts: string[]) {
  * No verification flags are invented: they come from the DB columns only.
  */
 
+/**
+ * Does this database have the optional `programs.application_deadline` column?
+ *
+ * The canonical schema does not define it; enriched deployments (see
+ * data/supabase_enrichment.sql) add it. The old code just ran the SELECT and
+ * relied on the catch, which meant *every* university page load fired a query
+ * that was guaranteed to fail on a stock database — visible as a steady stream
+ * of `column "application_deadline" does not exist` in the Postgres log, plus one
+ * wasted round-trip per request.
+ *
+ * The answer cannot change while the process lives, so it is probed once and
+ * memoised. `null` means "not yet known"; the promise is cached so concurrent
+ * first requests share the single probe instead of racing.
+ */
+let programDeadlineColumnProbe: Promise<boolean> | null = null;
+
+function hasProgramDeadlineColumn(): Promise<boolean> {
+  if (!programDeadlineColumnProbe) {
+    programDeadlineColumnProbe = db
+      .execute(sql`
+        SELECT 1 AS present
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'programs'
+          AND column_name = 'application_deadline'
+        LIMIT 1
+      `)
+      .then((res) => (res.rows as unknown[]).length > 0)
+      .catch(() => {
+        // The probe could not run (database not ready, transient error). Answer
+        // "no column" for THIS request so the page still renders, but clear the
+        // memo so the next request asks again — a momentary outage must not
+        // disable program deadlines until the process restarts.
+        programDeadlineColumnProbe = null;
+        return false;
+      });
+  }
+  return programDeadlineColumnProbe;
+}
+
 /** Words that never identify an institution on their own. */
 const INSTITUTION_STOPWORDS = new Set([
   "university",
@@ -449,11 +489,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       })(),
       // ---------- Program deadlines ----------
       // The canonical schema has no `programs.application_deadline` column, but
-      // enriched deployments add one (see data/supabase_enrichment.sql). The
-      // read is defensive: when the column is missing the query fails, the
-      // deadlines stay null and the page still renders. A published date is
-      // never invented here — it is either in the column or nowhere.
+      // enriched deployments add one (see data/supabase_enrichment.sql). Probe
+      // the column once (memoised) instead of running a query that is known to
+      // fail on a stock database — see hasProgramDeadlineColumn(). A published
+      // date is never invented here: it is either in the column or nowhere.
       (async () => {
+        if (!(await hasProgramDeadlineColumn())) {
+          return [] as { id: number; application_deadline: string | null }[];
+        }
         try {
           const res = await db.execute(sql`
             SELECT id, application_deadline
@@ -693,31 +736,57 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    const cycles = cycleRows.map((c) => {
-      let year: number | null = null;
-      const m = /^(\d{4})/.exec(c.academicYear || "");
-      if (m) year = parseInt(m[1], 10);
-      return {
-        id: c.id,
-        cycleYear: year,
-        academicYear: c.academicYear,
-        intake: c.intake,
-        applicationType: c.applicationType,
-        openingDate: c.openingDate,
-        deadline: c.deadline,
-        deadlineTimezone: c.deadlineTimezone,
-        applicationFee: c.applicationFee != null ? Number(c.applicationFee) : null,
-        applicationFeeCurrency: c.applicationFeeCurrency,
-        applicationUrl: c.applicationUrl,
-        isVerified: c.verificationStatus === "verified",
-        // A deadline only counts as "confirmed" when the DB row is verified.
-        // Anything else is surfaced as "estimated / not confirmed" so a
-        // student never mistakes an unverified date for an official one.
-        isEstimated: c.verificationStatus !== "verified",
-        sourceUrl: c.sourceUrl ?? null,
-        lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
-      };
-    });
+    /*
+     * One card per distinct deadline.
+     *
+     * application_cycles is written per programme, so a university whose
+     * undergraduate deadline is the same for every major carries a dozen
+     * identical rows. The page renders only the first two cycles, so without
+     * this collapse the student saw the same "Fall 2027 · 1 January" card
+     * twice and never reached the second (e.g. graduate) cycle. Rows that
+     * differ in any displayed field — deadline, intake, plan, verification —
+     * stay separate; only exact duplicates collapse.
+     */
+    const seenCycleKeys = new Set<string>();
+    const cycles = cycleRows
+      .map((c) => {
+        // The row carries its own cycle_year. Deriving the year by parsing
+        // academic_year was wrong for every row labelled with the *application*
+        // year ("2026-2027" for a Fall 2027 entry) — the card then said 2026
+        // while the deadline was in 2027. The column wins; parsing is only the
+        // fallback for a row that somehow has no cycle_year.
+        let year: number | null = Number.isInteger(c.cycleYear) ? c.cycleYear : null;
+        if (year === null) {
+          const m = /^(\d{4})/.exec(c.academicYear || "");
+          if (m) year = parseInt(m[1], 10);
+        }
+        return {
+          id: c.id,
+          cycleYear: year,
+          academicYear: c.academicYear,
+          intake: c.intake,
+          applicationType: c.applicationType,
+          openingDate: c.openingDate,
+          deadline: c.deadline,
+          deadlineTimezone: c.deadlineTimezone,
+          applicationFee: c.applicationFee != null ? Number(c.applicationFee) : null,
+          applicationFeeCurrency: c.applicationFeeCurrency,
+          applicationUrl: c.applicationUrl,
+          isVerified: c.verificationStatus === "verified",
+          // A deadline only counts as "confirmed" when the DB row is verified.
+          // Anything else is surfaced as "estimated / not confirmed" so a
+          // student never mistakes an unverified date for an official one.
+          isEstimated: c.verificationStatus !== "verified",
+          sourceUrl: c.sourceUrl ?? null,
+          lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
+        };
+      })
+      .filter((c) => {
+        const key = [c.deadline, c.intake, c.applicationType, c.isVerified].join("|");
+        if (seenCycleKeys.has(key)) return false;
+        seenCycleKeys.add(key);
+        return true;
+      });
 
     // ---------- Sources (resilient: unknown table shape must not crash the page) ----------
     let uniSources: {
@@ -832,12 +901,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           const sameCountry = countriesMatch(s.country, uniCountry);
           if (!linked && !providerMatch && !sameCountry) return null;
           const source = schBundle.sourceMap.get(s.id);
-          const amountUsdValue =
-            s.amountUsdValue != null
-              ? Number(s.amountUsdValue)
-              : s.awardAmount != null
-                ? Number(s.awardAmount)
-                : null;
+          // A stored 0 means "no fixed amount is published" (the column is NOT
+          // NULL, so programme-wide and merit scholarships use 0 as the
+          // sentinel). It must never reach the UI as "$0" — an award of zero
+          // dollars does not exist and it made national scholarships look empty.
+          const positive = (value: number | string | null | undefined) => {
+            if (value == null) return null;
+            const n = Number(value);
+            return Number.isFinite(n) && n > 0 ? n : null;
+          };
+          const amountUsdValue = positive(s.amountUsdValue) ?? positive(s.awardAmount);
           return {
             linked,
             providerMatch,
@@ -851,12 +924,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               degreeLevels: s.degreeLevels ?? null,
               coverageType: s.coverageType ?? null,
               amountUsdValue,
-              awardAmount:
-                s.awardAmount != null
-                  ? Number(s.awardAmount)
-                  : s.amountUsdValue != null
-                    ? Number(s.amountUsdValue)
-                    : null,
+              awardAmount: positive(s.awardAmount) ?? positive(s.amountUsdValue),
               awardCurrency: s.awardCurrency ?? "USD",
               awardPeriod: s.awardPeriod ?? "year",
               deadline: s.deadline ?? s.deadlineDate ?? null,

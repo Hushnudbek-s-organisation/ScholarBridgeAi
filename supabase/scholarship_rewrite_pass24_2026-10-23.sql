@@ -1,0 +1,42 @@
+-- Scholarship rewrite pass 24 — 2026-10-23
+-- The Germany cluster. Closes it: zero template descriptions, zero rows claiming
+-- "Full Tuition + Stipend", and zero invented five-figure USD amounts remain among
+-- active German rows.
+--
+-- THE FINDING THAT DRIVES THIS PASS
+-- German public universities charge no tuition. Berlin state law prohibits it; 14 of
+-- 16 federal states charge non-EU students nothing. The two exceptions are
+-- Baden-Wurttemberg (EUR 1 500 a semester for non-EU, waived for doctoral students)
+-- and the Technical University of Munich (EUR 2 000-6 000 a semester).
+--
+-- So every German row that claimed "Full Tuition" was valuing something that costs
+-- EUR 0, and the USD figures attached to those rows were the semester contribution
+-- the student PAYS, not money they receive. Twelve template rows carried that error,
+-- and eleven further rows carried the same "Full Tuition + Stipend" label with
+-- invented amounts of USD 15 000-22 000.
+--
+-- WHAT IS ACTUALLY WINNABLE IN GERMANY
+-- The Deutschlandstipendium: EUR 300 a month, EUR 3 600 a year, half from private
+-- sponsors and half from the federal government, all nationalities, bachelor and
+-- master only (not doctoral), and not combinable with other talent funding averaging
+-- EUR 30 or more a month. Verified against the federal programme's own description in
+-- the DAAD scholarship database.
+--
+-- Rows retired as duplicates of existing Deutschlandstipendium records:
+--   567 HU Berlin (dup of 499) · 571 RWTH Aachen (dup of 350)
+--   714 Hamburg  (dup of 483) · 732 Cologne   (dup of 484)
+-- Rows rewritten to state the real position:
+--   568 TU Berlin · 606 KIT · 736 Freiburg · 763 Tubingen
+--   689 TU Dresden · 578 FAU · 678 TU Darmstadt · 740 Gottingen
+-- Rows whose coverage label and invented amount were corrected in place:
+--   43, 132, 147, 349, 352, 376, 426, 427, 428, 429, 430
+--
+-- Applied to the live project (zkdguzbdopfedkffsatk) on 2026-10-23.
+--
+-- Index check after this pass:
+--   description ~ 'offers .*Maximum award:' and is_active            -> 144 (was 156)
+--   website_url bare domain and is_active                            -> 195 (was 207)
+--   active scholarships                                              -> 613 (was 617)
+--   German active rows still in template phrasing                     ->   0
+--   German active rows still claiming Full Tuition + Stipend          ->   0
+--   German active rows with amount_usd_value > 5000                   ->   0

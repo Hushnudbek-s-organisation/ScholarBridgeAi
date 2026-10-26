@@ -11,6 +11,38 @@ export interface DailyStreak {
 
 export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365] as const;
 
+/**
+ * Ledger reasons that represent something the STUDENT DID.
+ *
+ * The streak must never count points the student merely RECEIVED:
+ *   • `content_liked`     — someone else liked their old post (the author is credited)
+ *   • `referral_referred` — someone else applied their code
+ *   • `referral_referrer` — a referred friend completed a step
+ *   • `admin_award`       — an operator granted points
+ *   • `profile_created`   — signing up is not learning
+ *
+ * `daily_active` is the marker written by `recordDailyActivity()`; it exists so a
+ * day still counts when the action earned no new points (a re-watched lesson, a
+ * retaken quiz).
+ */
+export const STREAK_ACTIVITY_REASONS = [
+  "lesson_complete",
+  "quiz_passed",
+  "thread_created",
+  "reply_created",
+  "daily_active",
+] as const;
+
+const STREAK_ACTIVITY_REASON_SET: ReadonlySet<string> = new Set(STREAK_ACTIVITY_REASONS);
+
+/** True when this ledger reason is an action the student performed themselves. */
+export function isStreakActivity(reason: string | null | undefined): boolean {
+  return !!reason && STREAK_ACTIVITY_REASON_SET.has(reason);
+}
+
+/** Reason written by `recordDailyActivity()` — the per-day "showed up" marker. */
+export const DAILY_ACTIVITY_REASON = "daily_active";
+
 function dayKey(value: Date | string, formatter: Intl.DateTimeFormat): string | null {
   // A date-only value is already a calendar day, not a UTC timestamp. Keep
   // it stable in every timezone; timestamps are projected into the student's

@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { quizzes, quizQuestions, quizAttempts, lessons, courseModules, courses } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { maybeIssueCertificate } from "@/lib/certificates";
-import { awardPoints } from "@/lib/gamification";
+import { awardPoints, recordDailyActivity } from "@/lib/gamification";
 import { percentage } from "@/lib/calculations";
 
 export async function POST(req: Request) {
@@ -58,6 +58,10 @@ export async function POST(req: Request) {
         passed,
       })
       .returning();
+
+    // A retake is still practice: count the day even though the quiz already
+    // paid out its one-off points. recordDailyActivity never throws.
+    await recordDailyActivity(Number(profileId));
 
     let award = null;
     let certificate = null;
