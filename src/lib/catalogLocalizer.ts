@@ -37,7 +37,7 @@
  */
 
 import type { Locale } from "@/i18n/config";
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries } from "@/i18n/messages.server";
 import { countryTranslationKey } from "@/lib/countries";
 
 /* ============================================================================

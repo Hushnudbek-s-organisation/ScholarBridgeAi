@@ -9,6 +9,7 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { LandingPage } from "@/components/LandingPage";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
+import type { Messages } from "@/i18n/messages";
 import { trackScreen } from "@/lib/tracker";
 import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
@@ -203,10 +204,13 @@ function ParentDashboardGate({
 export function Home({
   hasSessionCookie = false,
   initialLocale = defaultLocale,
+  initialMessages = null,
 }: {
   hasSessionCookie?: boolean;
   /** Locale the server resolved from the cookie — keeps SSR and hydration in one language. */
   initialLocale?: Locale;
+  /** That locale's dictionary when it is not English (English is bundled). */
+  initialMessages?: Messages | null;
 }) {
   // The open destination (one of the fourteen) and, inside a multi-tab
   // destination, the open tab. Both live in the URL hash so Back/Forward,
@@ -954,13 +958,13 @@ export function Home({
 
   // ---- Restore a returning student's session before showing the landing page ----
   if (view === "restoring") {
-    return <LocaleProvider initialLocale={initialLocale}><SessionRestoreLoader /></LocaleProvider>;
+    return <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}><SessionRestoreLoader /></LocaleProvider>;
   }
 
   // ---- First visit: English landing page ----
   if (view === "landing") {
     return (
-      <LocaleProvider initialLocale={initialLocale}>
+      <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
         <>
           {restoreError && (
             <SessionNotice
@@ -985,7 +989,7 @@ export function Home({
   // resumes where they left off) ----
   if (view === "wizard") {
     return (
-      <LocaleProvider initialLocale={initialLocale}>
+      <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
         <div className="min-h-screen bg-slate-50 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
           <OnboardingWizard
             profile={null}
@@ -998,7 +1002,7 @@ export function Home({
   }
 
   return (
-    <LocaleProvider initialLocale={initialLocale}>
+    <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
       {/* 3-tier shell: the column stacks on a phone, the tablet rail and the
           laptop sidebar sit next to the content from `md` (768px) up. */}
       <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">

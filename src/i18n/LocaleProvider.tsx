@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { defaultLocale, isLocale, type Locale } from "./config";
-import { dictionaries } from "./messages";
+import { dictionaries, englishMessages, loadMessages, registerMessages, type Messages } from "./messages";
 import { getLocaleCookie, setLocaleCookie } from "./locale";
 
 interface LocaleContextValue {
@@ -27,9 +27,20 @@ export function useLocaleContext() {
   return useContext(LocaleContext);
 }
 
+/**
+ * The active locale's messages, read synchronously. `dictionaries[locale]` is
+ * populated by this provider, so helpers outside React (date labels, the
+ * Telegram mini app) can use it right after render.
+ */
+export function useMessages(): Messages {
+  const { locale } = useLocaleContext();
+  return dictionaries[locale] ?? englishMessages;
+}
+
 export function LocaleProvider({
   children,
   initialLocale = defaultLocale,
+  initialMessages = null,
 }: {
   children: React.ReactNode;
   /**
@@ -41,17 +52,32 @@ export function LocaleProvider({
    * client-side swap below.
    */
   initialLocale?: Locale;
+  /**
+   * That locale's dictionary, resolved on the server so hydration matches the
+   * server HTML. English is bundled with the app, so it is only sent for
+   * Uzbek/Russian — a visitor downloads one language, never three.
+   */
+  initialMessages?: Messages | null;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [messages, setMessages] = useState<Messages>(() => {
+    registerMessages(initialLocale, initialMessages);
+    return initialMessages ?? dictionaries[initialLocale] ?? englishMessages;
+  });
 
-  // Read the persisted choice on mount (no-op when the server already did).
+  // Read the persisted choice on mount (no-op when the server already did) and
+  // fetch that language's dictionary if it is not the one we shipped.
   useEffect(() => {
     let live = true;
-    void Promise.resolve().then(() => {
+    void Promise.resolve().then(async () => {
       const stored = getLocaleCookie();
-      if (live && isLocale(stored) && stored !== initialLocale) {
-        setLocaleState(stored);
-      }
+      const next = isLocale(stored) ? stored : initialLocale;
+      if (!live || next === initialLocale) return;
+      const loaded = await loadMessages(next);
+      if (!live) return;
+      registerMessages(next, loaded);
+      setLocaleState(next);
+      setMessages(loaded);
     });
     return () => {
       live = false;
@@ -59,8 +85,21 @@ export function LocaleProvider({
   }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
     setLocaleCookie(next);
+    // English is already in the bundle; the other two arrive as one chunk, and
+    // the switch happens only once that chunk is here — otherwise the UI would
+    // show the new language's KEYS for a frame while the messages catch up.
+    const ready = dictionaries[next];
+    if (ready) {
+      setLocaleState(next);
+      setMessages(ready);
+      return;
+    }
+    void loadMessages(next).then((loaded) => {
+      registerMessages(next, loaded);
+      setLocaleState(next);
+      setMessages(loaded);
+    });
   }, []);
 
   // Keep <html lang> truthful when the language changes without a reload:
@@ -68,11 +107,6 @@ export function LocaleProvider({
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
-
-  const messages = useMemo(
-    () => dictionaries[locale] ?? dictionaries[defaultLocale],
-    [locale]
-  );
 
   const contextValue = useMemo(
     () => ({ locale, setLocale }),
@@ -95,7 +129,7 @@ export function LocaleProvider({
         }}
         getMessageFallback={({ namespace, key }) => {
           const path = namespace ? [namespace, ...key.split(".")] : key.split(".");
-          let node: unknown = dictionaries.en;
+          let node: unknown = englishMessages as unknown;
           for (const part of path) {
             if (node && typeof node === "object") node = (node as Record<string, unknown>)[part];
             else return path[path.length - 1] ?? key;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { clientMessagesFor } from "@/i18n/messages.server";
 import { ParentShareView } from "@/components/ParentShareView";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,11 @@ export default async function ParentSharePage({ params }: { params: Promise<{ to
   const storedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const initialLocale = storedLocale && isLocale(storedLocale) ? storedLocale : defaultLocale;
 
+  // English ships with the app; the other languages are fetched once, here.
+  const initialMessages = clientMessagesFor(initialLocale);
+
   return (
-    <LocaleProvider initialLocale={initialLocale}>
+    <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
       <ParentShareView key={token} token={token} />
     </LocaleProvider>
   );

@@ -1,4 +1,4 @@
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries } from "@/i18n/messages.server";
 import type { Locale } from "@/i18n/config";
 import type { CvIssue, CvMissingKey, CvResult, CvWarningKey } from "@/lib/cv";
 

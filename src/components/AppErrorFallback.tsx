@@ -45,7 +45,9 @@ export function AppErrorFallback({
   // first client render must agree, and the value is read from the DOM rather
   // than mirrored into state.
   const locale = useSyncExternalStore(neverChanges, currentLocale, serverLocale);
-  const t = dictionaries[locale].appError;
+  // The dictionary for a non-English locale is loaded on demand, and an error
+  // screen can render outside the provider — so it must never index blindly.
+  const t = (dictionaries[locale] ?? dictionaries.en).appError;
 
   // Log with the digest Next.js attaches so a production report can be matched
   // against the server log without putting the stack in front of the student.

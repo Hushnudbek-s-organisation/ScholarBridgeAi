@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries, clientMessagesFor, messagesFor } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
@@ -111,7 +111,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
 
   if (!scholarship) {
     return (
-      <LocaleProvider initialLocale={locale}>
+      <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-3xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <h1 className="text-2xl font-bold">{t.notFoundTitle}</h1>
@@ -216,7 +216,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   ].filter((section) => section.show);
 
   return (
-    <LocaleProvider initialLocale={locale}>
+    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
       <PublicCatalogHeader />
       <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link

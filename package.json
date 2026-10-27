@@ -60,6 +60,7 @@
     "test:ownership": "tsx scripts/check-ownership.ts",
     "test:portability": "tsx scripts/check-portability.ts",
     "test:deploy": "tsx scripts/check-deploy.ts",
+    "test:perf": "tsx scripts/check-perf.ts",
     "test:journey": "tsx scripts/check-journey.ts",
     "test:differentiators": "tsx scripts/check-differentiators.ts",
     "test:dark": "node scripts/dark-audit.mjs",
