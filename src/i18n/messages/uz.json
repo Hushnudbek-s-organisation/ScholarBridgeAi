@@ -6971,6 +6971,28 @@
       "approve": "Tasdiqlash",
       "unapprove": "Bekor qilish",
       "hint": "Faqat shu yerga yozgan matningiz joylanishi mumkin. Hech narsa avtomatik yaratilmaydi, hikoya tasdiqlanguncha yashirin turadi."
+    },
+    "env": {
+      "panelTitle": "Server muhiti",
+      "panelHint": "Bu qiymatlar hosting muhitida turadi, panelda emas. Panel nima qo'yilganini va ishlatish mumkinmi-yo'qmi ko'rsatadi; o'zgartirish uchun Render → Environment, keyin qayta deploy.",
+      "set": "qo'yilgan",
+      "missing": "yo'q",
+      "bad": "xato",
+      "required": "live uchun kerak",
+      "where": {
+        "CHANNEL_AUTOPOST": "Ixtiyoriy shift. Yo'q = qaror shu panelda. off = qattiq kill switch. dryrun = live postga yo'l yo'q (hammasi admin chatga).",
+        "TELEGRAM_CHANNEL_ID": "Kanalingiz: @username yoki −100… id (Telegram → kanal → post → Copy link → t.me/c/…).",
+        "TELEGRAM_ADMIN_CHAT_ID": "O'zingizning Telegram id: botga shaxsiy chatda /id yuboring (yoki @userinfobot).",
+        "CHANNEL_SITE_URL": "Saytning ommaviy manzili, masalan https://example.org — post havolalari shundan yasaladi. Bo'sh bo'lsa APP_URL ishlatiladi.",
+        "APP_URL": "Xuddi shu sayt manzili; ko'p deploylarda allaqachon bor. CHANNEL_SITE_URL bo'sh bo'lganda ishlatiladi.",
+        "CHANNEL_DISCUSSION_ENABLED": "1 → «izohlarda muhokama» tugmasi chiqadi. Ixtiyoriy.",
+        "TELEGRAM_BOT_TOKEN": "BotFather → /mybots → bot → API Token. Bu yerda ixtiyoriy: bot sozlamalari tabi uni shifrlab saqlaydi."
+      },
+      "envLabel": "Muhit",
+      "envUnset": "CHANNEL_AUTOPOST yo'q — postni panel boshqaradi",
+      "envKill": "Serverda CHANNEL_AUTOPOST=off turibdi va panelni bekor qiladi",
+      "envDryrun": "Serverda CHANNEL_AUTOPOST=dryrun (panel faqat jimlashtira oladi)",
+      "envOn": "Serverda CHANNEL_AUTOPOST=on (qaror panelda)"
     }
   },
   "adminDiagnostics": {

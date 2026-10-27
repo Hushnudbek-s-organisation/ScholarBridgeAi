@@ -128,3 +128,61 @@ tekshiring:
   workflow faqat `information_schema` o'qiydi.
 - Supabase'da `anon`/`authenticated` rollari `supabase/full_schema.sql` tomonidan cheklangan
   (faqat `universities`/`scholarships` katalogi uchun read-only). Tekshirish: `npm run test:portability`.
+
+---
+
+## 2026-10-26: "kod tuzatildi, lekin serverda hech narsa o'zgarmadi"
+
+Belgi: bugungi barcha tuzatishlar `main` da, CI yashil, lekin jonli saytda
+o'zgarish yo'q — masalan bot `/id` ga javob bermaydi, panelda yangi karta
+ko'rinmaydi.
+
+Sabab har doim bir xil: **deploy yiqilgan, eski reliz esa ishlab turadi.**
+Render (va boshqa hostlar) muvaffaqiyatsiz builddan keyin oldingi versiyani
+qoldiradi, ya'ni sayt "ishlayapti" deb ko'rinadi.
+
+### Qanday aniqlanadi
+
+```bash
+curl -s https://<sayt>/api/health
+# {"ok":true,"commit":"ecca569"}   ← shu SHA `main` ning oxirgi commiti bo'lishi kerak
+```
+
+* `commit` **eski** SHA → deploy o'tmagan.
+* `commit` **yo'q** (maydon umuman chiqmaydi) → 2026-10-26 dan oldingi build,
+  ya'ni bugungi kod emas.
+* Javob HTML ("Application loading") → instans uxlab yotibdi, uyg'otish kerak.
+
+Deployment tarixini GitHub'dan ham ko'rish mumkin:
+
+```bash
+gh api "repos/<owner>/<repo>/deployments?per_page=10" \
+  --jq '.[] | "\(.created_at) \(.sha[0:7]) \(.environment)"'
+gh api "repos/<owner>/<repo>/deployments/<id>/statuses" --jq '.[] | .state'
+```
+
+### Nega yiqilgan edi
+
+`next build` ichida TypeScript tekshiruvi **ikkinchi marta** yugurardi (CI
+allaqachon `npm run typecheck` qiladi). Katta App Router loyihasida bu 512 MB
+instansda out-of-memory bilan tugaydi — build ~17 daqiqadan keyin `failure`.
+
+Yechim: `next.config.ts` da `typescript.ignoreBuildErrors` va
+`eslint.ignoreDuringBuilds` yoqilgan; sifat nazorati CI'da qoladi (`typecheck`,
+`lint:baseline`, `test:deploy`). Natija: sovuq build 460 MB heap bilan 26 s
+(avval OOM).
+
+### Deployni qayta yurgizish
+
+Render: **Manual Deploy → Clear build cache & deploy**. Build log'da
+`Failed to type check` yoki `Killed`/`JavaScript heap out of memory` bo'lsa —
+xotira masalasi qaytgan, `next.config.ts` dagi ikki sozlamani tekshiring.
+Vercel'da build allaqachon o'tadi, lekin production hali Render'da bo'lsa,
+bot webhook URL'i ham Render manziliga qaratilgan bo'ladi (Admin → Telegram bot
+→ "Webhookni ulash").
+
+### Regressiya testi
+
+`npm run test:deploy` — build tip tekshiruvini qaytarmasa, CI'da `typecheck`
+bo'lmasa, `/api/health` commitni ko'rsatmasa yoki keepalive'da qattiq yozilgan
+domen paydo bo'lsa, yiqiladi.

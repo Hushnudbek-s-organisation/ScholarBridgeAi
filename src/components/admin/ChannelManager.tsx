@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Save,
   Send,
+  Server,
   Settings2,
   ShieldCheck,
   Trash2,
@@ -94,6 +95,7 @@ interface Runtime {
   paused: boolean;
   pausedUntil: string | null;
   envKillSwitch: boolean;
+  envAutopost: "off" | "dryrun" | "on" | null;
   blockedReason: string | null;
 }
 
@@ -137,6 +139,14 @@ interface PostRow {
   error: string | null;
 }
 
+interface EnvRow {
+  key: string;
+  level: "required" | "optional";
+  set: boolean;
+  valid: boolean | null;
+  preview: string | null;
+}
+
 interface Overview {
   settings: Settings;
   runtime: Runtime;
@@ -144,7 +154,13 @@ interface Overview {
   queue: QueueRow[];
   posts: PostRow[];
   hasToken: boolean;
-  env: { killSwitch: boolean; channelIdConfigured: boolean; discussionEnabled: boolean };
+  env: {
+    killSwitch: boolean;
+    autopost: "off" | "dryrun" | "on" | null;
+    channelIdConfigured: boolean;
+    discussionEnabled: boolean;
+    checklist: EnvRow[];
+  };
   connection: ConnectionCheck | null;
 }
 
@@ -539,6 +555,18 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 />
               </Field>
             </div>
+            {/* The deploy-level kill switch is invisible in the panel otherwise:
+                an operator flips the mode to Live and nothing happens. */}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="font-bold">{t("env.envLabel")}:</span>{" "}
+              {runtime.envAutopost === null
+                ? t("env.envUnset")
+                : runtime.envAutopost === "off"
+                  ? <span className="font-semibold text-rose-600 dark:text-rose-400">{t("env.envKill")}</span>
+                  : runtime.envAutopost === "dryrun"
+                    ? t("env.envDryrun")
+                    : t("env.envOn")}
+            </p>
             {conn.mode === "on" && (
               <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
                 {t("connect.liveWarning")}
@@ -571,6 +599,33 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
             <Link2 className="h-3.5 w-3.5" /> {t("connect.makeLinks")}
           </button>
         </div>
+      </div>
+
+      {/* Everything the server's environment controls. The app cannot write it,
+          so the panel shows what is set, whether it is usable and where the
+          value comes from — the alternative is guessing inside a host's UI. */}
+      <div className={card}>
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <Server className="h-4 w-4 text-indigo-500" /> {t("env.panelTitle")}
+        </h3>
+        <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("env.panelHint")}</p>
+        <ul className="space-y-1.5">
+          {data.env.checklist.map((row) => {
+            const bad = row.set && row.valid === false;
+            const tone = bad ? "text-rose-600 dark:text-rose-400" : row.set ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400";
+            return (
+              <li key={row.key} className="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] dark:border-slate-700">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <code className="font-bold text-slate-800 dark:text-slate-100">{row.key}</code>
+                  <span className={`font-semibold ${tone}`}>{bad ? t("env.bad") : row.set ? t("env.set") : t("env.missing")}</span>
+                  {row.level === "required" && <span className="rounded bg-slate-100 px-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t("env.required")}</span>}
+                  {row.preview && <span className="text-slate-500 dark:text-slate-400">= {row.preview}</span>}
+                </div>
+                <p className="mt-0.5 text-slate-500 dark:text-slate-400">{t(`env.where.${row.key}`)}</p>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );

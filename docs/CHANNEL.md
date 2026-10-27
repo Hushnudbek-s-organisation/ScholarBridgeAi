@@ -18,7 +18,7 @@ English. No paid AI: everything is rule- and template-based.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CHANNEL_AUTOPOST` | `off` | `off` → nothing leaves the app; `dryrun` → posts go **only** to `TELEGRAM_ADMIN_CHAT_ID`; `on` → posts go to the channel |
+| `CHANNEL_AUTOPOST` | *unset* | **Ceiling, not a switch.** Unset → the admin panel decides. `off` → deployment-level kill switch (nothing leaves the app, panel ignored). `dryrun` → the panel cannot reach live, everything goes to `TELEGRAM_ADMIN_CHAT_ID`. `on` → the panel decides freely |
 | `TELEGRAM_CHANNEL_ID` | — | `-100…` id or `@username`; the bot must be a channel admin |
 | `TELEGRAM_ADMIN_CHAT_ID` | — | private chat for dryrun output and failure alerts |
 | `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/go/<code>`); the admin panel value wins |
@@ -29,6 +29,35 @@ English. No paid AI: everything is rule- and template-based.
 `channelBlockReason()` refuses to run when a value is missing or malformed: a
 half-configured deployment stays silent rather than posting to a stranger's
 chat. `dryrun` never resolves to the channel id, even when one is configured.
+
+### 1a. What goes into Render → Environment (and where each value comes from)
+
+Only **one** variable is really needed for the channel; everything else is
+already editable in the panel. Render: *service → Environment → Add Environment
+Variable → Save* (a redeploy starts automatically).
+
+| Variable | Needed? | Where to get it |
+| --- | --- | --- |
+| `CHANNEL_AUTOPOST` | **optional now.** Leave it out and the panel decides. Set `off` only to silence a deployment, `dryrun` to keep staging harmless | Typed by hand. A typo (`ture`) behaves like `off` |
+| `TELEGRAM_CHANNEL_ID` | optional (panel value wins) | Your channel: the `@username`, or the numeric `-100…` id. To see the id: open the channel in Telegram Web, open any post → *Copy link* → `t.me/c/1234567890/45` ⇒ the id is `-1001234567890` |
+| `TELEGRAM_ADMIN_CHAT_ID` | optional (panel value wins) | Your own Telegram id: write `/id` to the bot in a private chat, or use `@userinfobot` |
+| `CHANNEL_SITE_URL` | optional, falls back to `APP_URL` | The public site origin, e.g. `https://example.org` (protocol + host, no path) |
+| `APP_URL` | usually already set | The same origin; used for links and the bot's Mini App |
+| `CHANNEL_DISCUSSION_ENABLED` | optional | `1` to show the "ask in the comments" line |
+| `TELEGRAM_BOT_TOKEN` | optional but recommended in production | BotFather → `/mybots` → your bot → **API Token**. The panel stores it encrypted anyway; the env copy keeps the bot answering during a database outage |
+| `CRON_SECRET` | needed for timed publishing | Any long random string: `openssl rand -hex 32`. The same value must be in the cron caller's `Authorization: Bearer …` |
+| `DATABASE_URL`, `SESSION_SECRET` | required | Already set for the app itself (see `docs/AVAILABILITY.md`) |
+
+`Admin → Kanal → Ulash` now lists exactly these keys with a **set / not set /
+invalid** badge and one line of "where from" text, read live from the server's
+environment (`GET /api/admin/channel` → `env.checklist`). The panel cannot write
+the environment — no host exposes that — so it shows the verdict and the fix.
+
+**Order of operations:** connect the channel + admin chat in the panel, press
+*Check connection*, send a test, then set the panel mode to *Dry run*, build
+today's plan, and only then switch to *Live*. Publication itself is started by
+the cron tick (`/api/cron/channel`), so `CRON_SECRET` must be set before live
+posting can run unattended.
 
 ## 2. What may be published
 
@@ -241,7 +270,15 @@ Everything below happens in **Admin → Kanal → Ulash**; no redeploy is needed
 8. **Pause** any time by setting a date in “Pause until”, or turn the mode off.
 
 `CHANNEL_AUTOPOST=off` in the environment overrides all of this: a deployment
-can always be silenced from the environment, never the other way round.
+can always be silenced from the environment, never the other way round. Leaving
+the variable **unset** is the normal case — the panel then owns the mode, and the
+panel itself starts at `off`. `dryrun` in the environment caps a panel `on` at
+dry run, which is the safe way to run a staging deployment.
+
+> If the panel says *"CHANNEL_AUTOPOST is off in the environment: posting stays
+> disabled until it changes"*, the host has that variable set to `off`. Either
+> remove it or set it to `on` (or `dryrun`) in the host's environment, then
+> redeploy — the panel cannot override it, by design.
 
 ### Modes
 

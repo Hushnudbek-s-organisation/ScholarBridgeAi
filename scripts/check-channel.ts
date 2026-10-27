@@ -50,6 +50,7 @@ import {
 import {
   channelBlockReason,
   channelConfig,
+  channelEnvChecklist,
   resolveChannelRuntime,
   tashkentDay,
   normalizeSiteUrl,
@@ -1698,6 +1699,69 @@ check("the environment kill switch always wins over the admin switch", () => {
   assert.equal(live.envKillSwitch, false);
   assert.equal(live.blockedReason, null);
   assert.equal(live.channelId, "@scholarbridge_uz");
+});
+
+check("an unset CHANNEL_AUTOPOST lets the panel decide, an explicit off still kills", () => {
+  const settings = mergeChannelSettings({
+    connection: { channelId: "@scholarbridge_uz", adminChatId: "123456789", mode: "on" },
+    siteUrl: "https://scholarbridge.uz",
+  });
+  // Absent variable: this is the normal deployment — the panel is in charge.
+  const unset = resolveChannelRuntime(settings, {}, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(unset.envKillSwitch, false, "an absent variable is not a kill switch");
+  assert.equal(unset.envAutopost, null);
+  assert.equal(unset.mode, "on", "the panel's mode must win when the env says nothing");
+  assert.equal(unset.blockedReason, null);
+
+  // Explicit off wins over the panel.
+  const killed = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "off" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(killed.envKillSwitch, true);
+  assert.equal(killed.envAutopost, "off");
+  assert.equal(killed.mode, "off");
+
+  // `dryrun` in the environment is a ceiling: the panel cannot reach live.
+  const capped = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "dryrun" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(capped.envKillSwitch, false);
+  assert.equal(capped.mode, "dryrun", "an env dryrun must cap a panel \"on\"");
+  assert.equal(capped.blockedReason, null);
+
+  // A typo is not "on": it parses as off and therefore kills posting too.
+  const typo = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "ture" }, new Date("2026-10-26T04:00:00Z"));
+  assert.equal(typo.envKillSwitch, true);
+  assert.equal(typo.mode, "off");
+});
+
+check("the panel's environment checklist never leaks the bot token", () => {
+  const secret = "987654321:AAFakeTokenValueThatMustNeverBeShown123456";
+  const rows = channelEnvChecklist({
+    CHANNEL_AUTOPOST: "on",
+    TELEGRAM_CHANNEL_ID: "@my_channel",
+    TELEGRAM_ADMIN_CHAT_ID: "123456789",
+    CHANNEL_SITE_URL: "https://example.org/",
+    TELEGRAM_BOT_TOKEN: secret,
+  });
+  const token = rows.find((r) => r.key === "TELEGRAM_BOT_TOKEN");
+  assert.ok(token, "the token must be listed");
+  assert.equal(token!.set, true);
+  assert.equal(token!.valid, true);
+  assert.equal(token!.preview, null, "the token value is never returned");
+  assert.ok(!JSON.stringify(rows).includes(secret), "no row may contain the secret");
+
+  const site = rows.find((r) => r.key === "CHANNEL_SITE_URL");
+  assert.equal(site!.preview, "https://example.org", "origins are normalised for display");
+  const autopost = rows.find((r) => r.key === "CHANNEL_AUTOPOST");
+  assert.equal(autopost!.set, true);
+  assert.equal(autopost!.preview, "on");
+
+  // Nothing set at all: every row is safe to render, none is "invalid".
+  const empty = channelEnvChecklist({});
+  assert.equal(empty.find((r) => r.key === "CHANNEL_AUTOPOST")!.set, false);
+  assert.equal(empty.find((r) => r.key === "TELEGRAM_CHANNEL_ID")!.valid, false);
+  assert.equal(empty.find((r) => r.key === "TELEGRAM_CHANNEL_ID")!.level, "required");
+  // A malformed channel id is flagged, a typo'd autopost is not silently "on".
+  const bad = channelEnvChecklist({ TELEGRAM_CHANNEL_ID: "my channel!!", CHANNEL_AUTOPOST: "ture" });
+  assert.equal(bad.find((r) => r.key === "TELEGRAM_CHANNEL_ID")!.valid, false);
+  assert.equal(bad.find((r) => r.key === "CHANNEL_AUTOPOST")!.preview, "off");
 });
 
 check("a missing piece blocks the publisher with a readable reason", () => {
