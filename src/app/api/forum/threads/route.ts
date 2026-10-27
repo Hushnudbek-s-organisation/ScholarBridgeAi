@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategories } from "@/db/schema";
 import { seedForum } from "@/db/seed";
+import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import { awardPoints } from "@/lib/gamification";
 import { notifyAdminsLocalized } from "@/lib/notifications";
@@ -22,8 +23,8 @@ export async function GET(req: Request) {
     const member = await requireFeatureSession(req, "forum");
     if (!member.ok) return member.response;
     if (!forumSeededOnce) {
-      await seedForum().catch(() => {});
       forumSeededOnce = true;
+      if (requestPathSeedingEnabled()) await seedForum().catch(() => {});
     }
     const { searchParams } = new URL(req.url);
     const categoryIdStr = searchParams.get("categoryId");

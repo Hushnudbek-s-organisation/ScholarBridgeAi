@@ -14,7 +14,7 @@
  * milliseconds.
  *
  * Invalidation:
- *   • TTL (60 s) is the safety net;
+ *   • TTL (5 min by default, `CATALOG_CACHE_TTL_MS`) is the safety net;
  *   • `invalidateCatalogCache()` is called by admin writes to universities,
  *     programs, scholarships and opportunities, so an operator sees their own
  *     catalogue edit on the very next request;
@@ -48,10 +48,23 @@ import {
 } from "@/lib/usdCosts";
 import type { StudentProfileData, UniversityData } from "@/lib/matching";
 
-/** How long a base catalogue snapshot may be served (ms). */
-export const CATALOG_TTL_MS = 60_000;
+/**
+ * How long a base catalogue snapshot may be served (ms).
+ *
+ * Five minutes, not one: the snapshot is language-neutral (localisation happens
+ * later, per response) and only changes through an admin write, which calls
+ * `invalidateCatalogCache()` and therefore still appears immediately on the
+ * instance that served the edit. `CATALOG_CACHE_TTL_MS` tunes it.
+ */
+function envTtl(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(raw)));
+}
+
+export const CATALOG_TTL_MS = envTtl("CATALOG_CACHE_TTL_MS", 300_000, 5_000, 900_000);
 /** How long a profile's derived match inputs may be reused (ms). */
-export const PROFILE_MATCH_TTL_MS = 15_000;
+export const PROFILE_MATCH_TTL_MS = envTtl("PROFILE_MATCH_CACHE_TTL_MS", 15_000, 0, 120_000);
 
 export type SourceSignal = {
   sourceUrl: string | null;

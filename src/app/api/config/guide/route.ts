@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { publicCacheJson } from "@/lib/apiResponse";
 import { parseSectionHelp } from "@/lib/growth/defaults";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const { getConfig } = await import("@/lib/config");
-    return NextResponse.json(
-      { help: parseSectionHelp(await getConfig("section_help")) },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    return publicCacheJson({ help: parseSectionHelp(await getConfig("section_help")) });
   } catch {
-    return NextResponse.json({ help: {} }, { headers: { "Cache-Control": "no-store" } });
+    // A failure is an empty guide, not an uncacheable one.
+    return publicCacheJson({ help: {} }, { sMaxAge: 30, swr: 60 });
   }
 }

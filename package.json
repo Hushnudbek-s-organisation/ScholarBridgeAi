@@ -24,6 +24,7 @@
     "db:verify": "tsx scripts/check-supabase-schema.ts --live",
     "db:gen:full-schema": "tsx scripts/gen-full-schema-sql.ts",
     "db:apply-full-schema": "tsx scripts/apply-full-schema.ts",
+    "db:schema": "tsx scripts/ensure-schema.ts",
     "db:core-repair-sql": "tsx scripts/gen-core-repair-sql.ts",
     "test:security": "tsx scripts/check-security.ts",
     "test:match": "tsx scripts/check-match.ts",

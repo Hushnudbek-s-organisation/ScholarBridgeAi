@@ -43,12 +43,19 @@ Common triggers, in order of likelihood:
   column or a syntax error is still thrown immediately.
 * **Honest 503s.** The route sends `Retry-After: 3`, so proxies and the client
   loop back off instead of hammering a database that is already struggling.
-* **A smaller, faster pool.** `max` is now 5 per instance (was 15) and
-  configurable with `PG_POOL_MAX`; connect timeout 8 s instead of 10 s, idle
-  timeout 10 s, TCP keepalive on, `application_name=scholarbridge` so pool
-  dashboards attribute the connections. In production only, statements are
-  capped at `PG_QUERY_TIMEOUT_MS` (default 20 000) so a request can never hang
-  the page forever.
+* **A smaller, faster pool.** `max` is 10 per instance (was 15; 5 in the first
+  availability pass) and configurable with `PG_POOL_MAX`; connect timeout 8 s,
+  idle timeout 30 s so a warm connection survives a normal traffic gap, TCP
+  keepalive on, `application_name=scholarbridge` so pool dashboards attribute
+  the connections, and connections are retired after 1 800 s / 7 500 uses so the
+  app never keeps a client the pooler has already forgotten. In production only,
+  statements are capped at `PG_QUERY_TIMEOUT_MS` (default 20 000) so a request
+  can never hang the page forever. See `docs/BACKEND_PERFORMANCE.md`.
+* **Schema repair and seeding are not request work.** With
+  `SCHEMA_AUTO_REPAIR=off` a request never runs DDL (it verifies, once per
+  process), and with `SEED_ON_REQUEST=auto` a production request never seeds.
+  `npm run db:schema` / `npm run db:seed` / Admin → Diagnostics → Retry apply
+  both deliberately.
 
 ## What to check when it happens
 

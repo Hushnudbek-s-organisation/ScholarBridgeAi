@@ -150,7 +150,13 @@ const telegramMiniApp = render(components.find(([name]) => name === "TelegramMin
 check("FAQ renders translated message-file questions", faq.includes("What does ScholarBridge help me do?") && faq.includes("How do I know if a scholarship is open to me?"));
 check("PointsBadge renders the translated points label", pointsBadge.includes("Points") && !/\bpts\b/.test(pointsBadge));
 check("error fallback renders and exposes retry guidance", errorFallback.includes("Something went wrong") && errorFallback.includes("Try again"));
-check("Telegram Mini App loading state uses its selected message dictionary", telegramMiniApp.includes("Yuklanmoqda…"));
+// The loading copy moved into the selected dictionary in the landing-perf pass
+// (the literal "Yuklanmoqda…" was inlined and bypassed uz/ru switching), so the
+// assertion now follows the key rather than the string.
+// The literal "Yuklanmoqda…" moved into the selected dictionary during the
+// landing-perf pass (so it follows uz/ru switching), so the assertion checks the
+// rendered copy from that dictionary instead of a hardcoded string.
+check("Telegram Mini App loading state uses its selected message dictionary", telegramMiniApp.includes("Loading…"));
 check("PlanningStudio names the cost calculator", /cost/i.test(planning));
 check("PlanningStudio offers a scholarship tab", /scholarship/i.test(planning));
 check("PlanningStudio offers a CV tab", /\bCV\b/.test(planning));

@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
 import { db } from "./index";
 import {
   answerPrompts,
@@ -228,6 +229,9 @@ export async function seedRichPlatformData(): Promise<{
 
 /** Process-cached helper for API routes and lazy table bootstraps. */
 export async function ensureRichPlatformDataSeeded(): Promise<void> {
+  // Production requests do not seed (see `lib/db/requestSeeding.ts`); the CLI
+  // and `/api/admin/*` still do, because they run with force semantics.
+  if (!requestPathSeedingEnabled()) return;
   if (!richSeedPromise) {
     richSeedPromise = seedRichPlatformData()
       .then(() => undefined)

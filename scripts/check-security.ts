@@ -64,7 +64,8 @@ async function main() {
   const ssrf = await import("../src/lib/ssrf");
   const request = await import("../src/lib/request");
   const payments = await import("../src/lib/payments");
-  const { contentSecurityPolicy, proxy: middleware } = await import("../src/proxy");
+  const proxyModule = await import("../src/proxy");
+  const { contentSecurityPolicy, proxy: middleware } = proxyModule;
   const {
     isTransientRestoreFailure,
     sessionRestoreDelayMs,
@@ -1242,6 +1243,37 @@ async function main() {
     assert.match(String(res.headers.get("cache-control")), /no-store/);
     const health = middleware(new NextRequest("https://app.example.org/api/health"));
     assert.match(String(health.headers.get("cache-control")), /no-store/);
+  });
+
+  check("only the reviewed public config reads may set their own cache policy", () => {
+    const sec = proxyModule as unknown as { PUBLIC_CACHEABLE_API: ReadonlySet<string> };
+    assert.deepEqual(
+      [...sec.PUBLIC_CACHEABLE_API].sort(),
+      ["/api/config/branding", "/api/config/guide", "/api/config/nav"],
+      "the public-cacheable allowlist is exactly the three session-independent config reads"
+    );
+    // The middleware must not stamp no-store on those paths: a header set in the
+    // middleware wins over the one the route handler sets.
+    for (const path of sec.PUBLIC_CACHEABLE_API) {
+      const res = middleware(new NextRequest(`https://app.example.org${path}`));
+      assert.equal(res.headers.get("cache-control"), null, `${path} is left to its route handler`);
+    }
+    const guarded = middleware(new NextRequest("https://app.example.org/api/config/telegram"));
+    assert.match(String(guarded.headers.get("cache-control")), /no-store/, "everything else stays no-store");
+  });
+
+  check("an HTML response for a visitor with cookies is never shared", () => {
+    const anonymous = middleware(new NextRequest("https://app.example.org/scholarships"));
+    assert.equal(anonymous.headers.get("cache-control"), null, "an anonymous page is left cacheable");
+    const signedIn = middleware(
+      new NextRequest("https://app.example.org/scholarships", { headers: { cookie: "sb_session=abc" } })
+    );
+    assert.match(String(signedIn.headers.get("cache-control")), /no-store/);
+    // The public config endpoints keep their shared policy even with a cookie.
+    const branding = middleware(
+      new NextRequest("https://app.example.org/api/config/branding", { headers: { cookie: "sb_session=abc" } })
+    );
+    assert.equal(branding.headers.get("cache-control"), null);
   });
 }
 

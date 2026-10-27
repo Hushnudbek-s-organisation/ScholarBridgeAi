@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { readJsonBody } from "@/lib/request";
 import { dbDiagnostics } from "@/lib/db/health";
-import { channelBootstrapStatus, ensureChannelTables, resetChannelTablesMemo } from "@/lib/channel/db";
-import { ensureTelegramTables, resetTelegramTablesMemo, telegramBootstrapStatus } from "@/lib/telegram/db";
+import {
+  channelBootstrapStatus,
+  forceChannelRepair,
+} from "@/lib/channel/db";
+import { forceTelegramRepair, telegramBootstrapStatus } from "@/lib/telegram/db";
+import { forceCoreSchemaRepair } from "@/lib/core/db";
+import { forceJourneyRepair } from "@/lib/journey/db";
+import { forceGrowthRepair } from "@/lib/growth/db";
+import { forceOwnershipRepair } from "@/lib/ownership/db";
+import { schemaGateSnapshot } from "@/lib/schemaGate";
+import { requestSeedingPolicy } from "@/lib/db/requestSeeding";
 import { getBotToken } from "@/lib/telegram/settings";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +39,16 @@ async function snapshot() {
   }
   return {
     database,
-    schema: { telegram: telegramBootstrapStatus(), channel: channelBootstrapStatus() },
+    schema: {
+      telegram: telegramBootstrapStatus(),
+      channel: channelBootstrapStatus(),
+      // Which schema areas this process has resolved, how (real DDL or a
+      // read-only verification because SCHEMA_AUTO_REPAIR=off), and what a
+      // verification found missing. No DSNs, no role names.
+      gate: schemaGateSnapshot(),
+    },
+    // `auto` (seeds outside production only) / `on` / `off`.
+    seeding: requestSeedingPolicy(),
     token,
     checkedAt: new Date().toISOString(),
   };
@@ -55,8 +73,15 @@ export async function POST(req: Request) {
   if (parsed.body.action !== "retry") {
     return NextResponse.json({ error: "Unknown action.", code: "bad_action" }, { status: 400 });
   }
-  resetTelegramTablesMemo();
-  resetChannelTablesMemo();
-  await Promise.all([ensureTelegramTables(), ensureChannelTables()]);
+  // Explicit operator action: run the real DDL for every area, whatever
+  // `SCHEMA_AUTO_REPAIR` says about the request path.
+  await Promise.all([
+    forceCoreSchemaRepair(),
+    forceJourneyRepair(),
+    forceGrowthRepair(),
+    forceOwnershipRepair(),
+    forceTelegramRepair(),
+    forceChannelRepair(),
+  ]);
   return NextResponse.json(await snapshot(), { headers: { "Cache-Control": "no-store" } });
 }

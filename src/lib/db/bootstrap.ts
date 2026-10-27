@@ -9,7 +9,20 @@
  *
  * Now every attempt records *why* it failed (a stable, non-secret code), and
  * the admin diagnostics read that state back.
+ *
+ * The memo lives in `lib/schemaGate.ts` — `globalThis`, so once per Node process
+ * instead of once per route bundle — and honours `SCHEMA_AUTO_REPAIR=off`: with
+ * DDL disabled on the request path the bootstrap only *verifies* that its tables
+ * exist (one cheap `to_regclass` query) and the admin diagnostics action can
+ * still force the real repair.
  */
+import {
+  ensureSchemaOnce,
+  forceSchemaRepair,
+  resetSchemaEntry,
+  tableExistenceVerify,
+  tablesInStatements,
+} from "@/lib/schemaGate";
 
 export type BootstrapState = "idle" | "ready" | "failed";
 
@@ -24,6 +37,17 @@ export interface BootstrapStatus {
 }
 
 const RETRY_MS = 60_000;
+
+const STATUS_KEY = "__sbBootstrapStatus";
+
+/** Status must survive a bundle boundary too, so it lives on globalThis. */
+function statusStore(): Map<string, BootstrapStatus> {
+  const g = globalThis as typeof globalThis & { [STATUS_KEY]?: Map<string, BootstrapStatus> };
+  if (!g[STATUS_KEY]) g[STATUS_KEY] = new Map();
+  return g[STATUS_KEY]!;
+}
+
+const IDLE: BootstrapStatus = { state: "idle", reason: null, hint: null, at: null };
 
 /**
  * Classify a database error into a stable code plus an operator-facing hint.
@@ -72,47 +96,62 @@ export function classifyDbError(err: unknown): { reason: string; hint: string } 
 }
 
 export function createTableBootstrap(label: string, statements: () => string[], run: (stmt: string) => Promise<unknown>) {
-  let ready: boolean | null = null;
-  let inflight: Promise<boolean> | null = null;
-  let lastAttempt = 0;
-  let status: BootstrapStatus = { state: "idle", reason: null, hint: null, at: null };
+  const gateName = `bootstrap:${label}`;
+  const statuses = statusStore();
 
-  async function attempt(): Promise<boolean> {
+  function setStatus(next: BootstrapStatus) {
+    statuses.set(label, next);
+  }
+
+  async function attempt(): Promise<void> {
     try {
       for (const stmt of statements()) await run(stmt);
-      ready = true;
-      status = { state: "ready", reason: null, hint: null, at: new Date().toISOString() };
+      setStatus({ state: "ready", reason: null, hint: null, at: new Date().toISOString() });
     } catch (err) {
       const { reason, hint } = classifyDbError(err);
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[${label}] schema bootstrap failed (${reason}):`, message);
-      ready = false;
-      status = { state: "failed", reason, hint, at: new Date().toISOString() };
-    } finally {
-      inflight = null;
+      setStatus({ state: "failed", reason, hint, at: new Date().toISOString() });
+      throw err; // the gate records the failure and throttles the retry
     }
-    return ready === true;
+  }
+
+  async function verify(): Promise<{ ok: boolean; problems: string[] }> {
+    const check = tableExistenceVerify(tablesInStatements(statements()));
+    const result = await check();
+    setStatus(
+      result.ok
+        ? { state: "ready", reason: null, hint: null, at: new Date().toISOString() }
+        : {
+            state: "failed",
+            reason: "schema_missing",
+            hint:
+              `Missing table(s): ${result.problems.join(", ")}. SCHEMA_AUTO_REPAIR=off keeps DDL out of the ` +
+              `request path — run scripts/apply-full-schema.ts once, or press "Retry" in Admin → Diagnostics.`,
+            at: new Date().toISOString(),
+          }
+    );
+    return result;
   }
 
   return {
-    async ensure(): Promise<boolean> {
-      if (ready === true) return true;
-      if (inflight) return inflight;
-      const now = Date.now();
-      if (ready === false && now - lastAttempt < RETRY_MS) return false;
-      lastAttempt = now;
-      inflight = attempt();
-      return inflight;
+    ensure(): Promise<boolean> {
+      return ensureSchemaOnce(gateName, attempt, verify);
     },
-    /** Test seam + "try again now" button in the admin panel. */
+    /**
+     * "Try again now": run the DDL regardless of `SCHEMA_AUTO_REPAIR`, because
+     * this is an explicit operator action, not a student request.
+     */
+    forceRepair(): Promise<boolean> {
+      return forceSchemaRepair(gateName, attempt);
+    },
+    /** Test seam. */
     reset() {
-      ready = null;
-      lastAttempt = 0;
-      inflight = null;
-      status = { state: "idle", reason: null, hint: null, at: null };
+      resetSchemaEntry(gateName);
+      statuses.delete(label);
     },
     status(): BootstrapStatus {
-      return status;
+      return statuses.get(label) ?? IDLE;
     },
   };
 }
