@@ -40,13 +40,15 @@ import {
 import { inArray, eq } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
 import { pickBestSource } from "@/lib/sourcePick";
-import { chancingProfileWithActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, invalidateSavedActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   resolvedUsdUniversityCosts,
   resolvedUsdScholarshipAmount,
   type ResolvedUsdUniversityCosts,
 } from "@/lib/usdCosts";
 import type { StudentProfileData, UniversityData } from "@/lib/matching";
+import { invalidateLocalizeMemo, localizeMemoStats } from "@/lib/localizeMemo";
+import { invalidateMatchMemo, matchMemoStats } from "@/lib/matchMemo";
 
 /**
  * How long a base catalogue snapshot may be served (ms).
@@ -491,6 +493,10 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
     opportunitiesEntry = null;
     opportunitiesInFlight = null;
   }
+  // The localized strings and the scores are derived from these rows: an admin
+  // edit must never be served from a memo after the row changed.
+  invalidateLocalizeMemo();
+  invalidateMatchMemo();
 }
 
 /**
@@ -498,6 +504,9 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
  * change (e.g. an administrator editing the catalogue) can affect all.
  */
 export function invalidateProfileMatchCache(profileId?: number) {
+  // The activity rows feed every score too — dropping one without the other
+  // would serve a fresh profile with a stale portfolio.
+  invalidateSavedActivities(profileId);
   if (profileId == null) {
     profileMatchCache.clear();
     return;
@@ -520,6 +529,8 @@ export function resetCatalogCacheForTests() {
 /** Diagnostics for the operations dashboard / tests. */
 export function catalogCacheStats() {
   return {
+    localization: localizeMemoStats(),
+    matches: matchMemoStats(),
     universitiesCached: fresh(universitiesEntry) !== null,
     scholarshipsCached: fresh(scholarshipsEntry) !== null,
     opportunitiesCached: fresh(opportunitiesEntry) !== null,

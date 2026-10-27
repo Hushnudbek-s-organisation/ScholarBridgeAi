@@ -15,6 +15,8 @@ import { requireProfileAccess } from "@/lib/auth";
 import { applyMatchScenario, calculateUniversityMatch, majorOverlap, type MatchScenario } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
+import { memoizeMatch } from "@/lib/matchMemo";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { ADMISSION_PROBABILITY, type ChancingProfile } from "@/lib/chancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import {
@@ -117,6 +119,11 @@ export async function GET(req: Request) {
       matchProfile = applyMatchScenario(matchProfile, scenario);
     }
 
+    // Memo key for every fit score below. Taken from the FINAL match profile, so
+    // a scenario override ("what if my IELTS were 7.5?") gets its own cache
+    // entry instead of reusing the real profile's scores.
+    const fingerprint = profileMatchFingerprint(matchProfile);
+
     const singleId = Number(searchParams.get("universityId"));
     const requestedProgramId = Number(searchParams.get("programId"));
     const filterCountry = (searchParams.get("country") ?? "").trim();
@@ -176,7 +183,9 @@ export async function GET(req: Request) {
       const scoredPool = pool
         .map((u) => ({
           uni: u,
-          fit: calculateUniversityMatch(matchProfile, toUniversityData(u)),
+          fit: memoizeMatch("fit", fingerprint, u.id, toUniversityData(u) as unknown as Record<string, unknown>, () =>
+            calculateUniversityMatch(matchProfile, toUniversityData(u))
+          ),
         }))
         .sort((a, b) => b.fit.matchScore - a.fit.matchScore)
         .slice(0, 12)
@@ -334,7 +343,9 @@ export async function GET(req: Request) {
     };
 
     const results = unis.map((uni) => {
-      const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni));
+      const fit = memoizeMatch("fit", fingerprint, uni.id, toUniversityData(uni) as unknown as Record<string, unknown>, () =>
+        calculateUniversityMatch(matchProfile, toUniversityData(uni))
+      );
       const qsBenchmark = matchQsUniversityBenchmark(uni);
       const uniPrograms = programsByUniId.get(uni.id) ?? [];
       const uniOutcomes = outcomesByUniId.get(uni.id) ?? [];

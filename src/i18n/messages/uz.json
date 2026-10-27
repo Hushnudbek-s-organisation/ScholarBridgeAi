@@ -1646,7 +1646,7 @@
     "tpHonesty": "Universitet darajasidagi katalog raqamlari faqat ma’lumot uchun; ular dasturga xos tasdiqlangan talablar emas. Amaldagi qoidalarni har bir dasturning rasmiy sahifasida tekshiring. Ball taqqoslanishi qabul ehtimolini bildirmaydi.",
     "tpUnplannedTitle": "Tekshirilishi kerak bo‘lgan katalog test raqamlari",
     "tpUnplannedSubtitle": "Bu raqamlar universitet darajasidagi katalogdan olingan, dasturga xos qoidalar emas. Raqam yo‘qligi test kerak emasligini anglatmaydi. Test topshirishdan oldin aynan tanlagan dasturingizning rasmiy sahifasida talablar, muqobil variantlar va imtiyozlarni tekshiring.",
-    "tpMinimumPill": "minimum {n}",
+    "tpMinimumPill": "kamida {n}",
     "tpTrackIt": "Bu testni kuzatish",
     "tpScorePlaceholder": "Ball",
     "tpRecordAttempt": "Urinishni yozish",

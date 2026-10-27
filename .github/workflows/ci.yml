@@ -51,6 +51,12 @@ jobs:
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
+      # Phase 3: uz/ru coverage for every study field, degree level, study mode
+      # and programme language in the imported catalogue, plus the localization
+      # and score memos (correctness and speed).
+      - name: Catalogue localization coverage and memo tests
+        run: bash ci/run-step.sh "Catalogue localization coverage and memo tests" npm run test:localization
+
       - name: Discovery matcher tests — university/scholarship Match %
         run: bash ci/run-step.sh "Discovery matcher tests — university/scholarship Match %" npm run test:match
 

@@ -1,6 +1,8 @@
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import { calculateScholarshipMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
+import { memoizeMatch } from "@/lib/matchMemo";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { seedDatabase } from "@/db/seed";
@@ -140,6 +142,10 @@ export async function GET(req: Request) {
       }
     }
 
+    // One fingerprint for the whole response: any score-relevant profile edit
+    // changes it, which is exactly when the memoized scores must be recomputed.
+    const profileFingerprint = profileData ? profileMatchFingerprint(profileData) : "anonymous";
+
     // The dashboard needs one number, not the full catalogue payload. Avoid
     // generating localized reasons, coverage metadata, and serializing every
     // scholarship just to count scores >= 60. The matching calculation itself
@@ -148,7 +154,17 @@ export async function GET(req: Request) {
       const matchCount = matchProfile
         ? bundle.entries.reduce(
             (count, scholarship) =>
-              count + Number(scholarship.verificationStatus === "verified" && (calculateScholarshipMatch(matchProfile, scholarship).matchScore ?? 0) >= 60),
+              count +
+              Number(
+                scholarship.verificationStatus === "verified" &&
+                  (memoizeMatch(
+                    "scholarship-fit",
+                    profileFingerprint,
+                    scholarship.id,
+                    scholarship as unknown as Record<string, unknown>,
+                    () => calculateScholarshipMatch(matchProfile!, scholarship)
+                  ).matchScore ?? 0) >= 60
+              ),
             0,
           )
         : 0;
@@ -267,7 +283,11 @@ export async function GET(req: Request) {
         breakdown?: MatchBreakdown;
       } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
       if (matchProfile && isVerified) {
-        matchInfo = calculateScholarshipMatch(matchProfile, s);
+        // Memoized per (profile fingerprint, scholarship): the catalogue is
+        // re-scored for every filter change and neither side moved.
+        matchInfo = memoizeMatch("scholarship-fit", profileFingerprint, s.id, s as unknown as Record<string, unknown>, () =>
+          calculateScholarshipMatch(matchProfile!, s)
+        );
       }
       // Computed application status from dates (spec §6) — never stale.
       const statusInfo = withStatus(publicRow, locale);
@@ -495,14 +515,16 @@ export async function GET(req: Request) {
     // Without those params the full list is returned (admin tools, ...).
     // Rows are localized LAST — every filter above ran on canonical English
     // data, so canonical dropdown values like "Full Tuition" never break.
+    // `covTier` is an internal ordering key — the payload carries the honest
+    // booleans (`coversSavedUni`, `isFullForSavedUni`) instead. It is stripped
+    // for every row; the translation then runs on the PAGE only (translating
+    // the whole catalogue to return 24 rows was wasted work).
+    const visible = results.map(({ covTier: _covTier, ...row }) => row);
+    const paginated = paginatedPayload("scholarships", visible, searchParams);
+    const pageRows = paginated.scholarships as typeof visible;
+    paginated.scholarships = pageRows.map((row) => localizeScholarshipRow(row, locale));
     return privateNoStoreJson({
-      ...paginatedPayload(
-        "scholarships",
-        // `covTier` is an internal ordering key — the payload carries the
-        // honest booleans (`coversSavedUni`, `isFullForSavedUni`) instead.
-        results.map(({ covTier: _covTier, ...row }) => localizeScholarshipRow(row, locale)),
-        searchParams
-      ),
+      ...paginated,
       ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),
       // Facet counts describe the CANONICAL catalogue, so they are sent as-is
       // (country names are localized in the browser, like every other option).

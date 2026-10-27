@@ -13,6 +13,7 @@ import { forceGrowthRepair } from "@/lib/growth/db";
 import { forceOwnershipRepair } from "@/lib/ownership/db";
 import { schemaGateSnapshot } from "@/lib/schemaGate";
 import { requestSeedingPolicy } from "@/lib/db/requestSeeding";
+import { catalogCacheStats } from "@/lib/catalogCache";
 import { getBotToken } from "@/lib/telegram/settings";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,8 @@ async function snapshot() {
     },
     // `auto` (seeds outside production only) / `on` / `off`.
     seeding: requestSeedingPolicy(),
+    // Per-process caches: catalogue snapshots, localization memo, match memo.
+    caches: catalogCacheStats(),
     token,
     checkedAt: new Date().toISOString(),
   };

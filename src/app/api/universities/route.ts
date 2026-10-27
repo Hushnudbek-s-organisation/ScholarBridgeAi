@@ -8,6 +8,8 @@ import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
 import { expandMultilingualSearchTerms, localizeUniversityRow } from "@/lib/catalogLocalizer";
+import { memoizeMatch } from "@/lib/matchMemo";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { matchesUniversityType } from "@/lib/universityType";
@@ -94,6 +96,11 @@ export async function GET(req: Request) {
         }
       }
     }
+
+    // One fingerprint for the whole response: it changes the moment the student
+    // edits a score-relevant field, which is exactly when every memoized fit and
+    // chance score must be recomputed.
+    const profileFingerprint = profileData ? profileMatchFingerprint(profileData) : "anonymous";
 
     // ---------- Program fields per university (from the cached bundle) ----------
     // Needed for career/major filtering and for enriching the response so the
@@ -221,7 +228,12 @@ export async function GET(req: Request) {
         breakdown?: MatchBreakdown;
       } = { matchScore: null, reasons: [], potentialIssues: [] };
       if (matchProfile) {
-        matchInfo = calculateUniversityMatch(matchProfile, toUniversityData(uni));
+        // Memoized per (profile fingerprint, university): the explorer scores the
+        // whole filtered catalogue on every keystroke, and neither side changed.
+        const uniData = toUniversityData(uni);
+        matchInfo = memoizeMatch("fit", profileFingerprint, uni.id, uniData as unknown as Record<string, unknown>, () =>
+          calculateUniversityMatch(matchProfile!, uniData)
+        );
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
@@ -233,19 +245,32 @@ export async function GET(req: Request) {
       // disagree — and both stay NULL for signed-out visitors.
       let chance: ReturnType<typeof evaluateUniversityAndProgramChance> | null = null;
       if (chancingProfile) {
-        chance = evaluateUniversityAndProgramChance(
-          chancingProfile,
-          uni,
-          {
-            id: uni.id,
-            universityId: uni.id,
-            name: profileData?.targetMajor || uni.programMajor || "General Studies",
-            degreeLevel: profileData?.degreeLevel || uni.degreeLevel || "Bachelor",
-            field: profileData?.targetMajor || uni.programMajor || null,
-          },
-          { minGpa: uni.minGpa, minIelts: uni.minIelts, minSat: uni.minSat },
-          [],
-          matchQsUniversityBenchmark(uni)
+        const syntheticProgram = {
+          id: uni.id,
+          universityId: uni.id,
+          name: profileData?.targetMajor || uni.programMajor || "General Studies",
+          degreeLevel: profileData?.degreeLevel || uni.degreeLevel || "Bachelor",
+          field: profileData?.targetMajor || uni.programMajor || null,
+        };
+        // The chance result depends on the same (profile, university) pair as the
+        // fit score, so it lives in the same memo — keyed by the university row,
+        // with the synthesized programme (derived from that same profile) folded
+        // into the key by way of the profile fingerprint.
+        const chanceProfile = chancingProfile;
+        chance = memoizeMatch(
+          "chance",
+          profileFingerprint,
+          uni.id,
+          uni as unknown as Record<string, unknown>,
+          () =>
+            evaluateUniversityAndProgramChance(
+              chanceProfile,
+              uni,
+              syntheticProgram,
+              { minGpa: uni.minGpa, minIelts: uni.minIelts, minSat: uni.minSat },
+              [],
+              matchQsUniversityBenchmark(uni)
+            )
         );
       }
       return {
@@ -346,9 +371,13 @@ export async function GET(req: Request) {
     // Without those params the full list is returned (admin tools, ...).
     // Rows are localized LAST — every filter/match above ran on canonical
     // English data, so canonical dropdown values never break (spec §3 STEP 3.1).
-    return privateNoStoreJson(
-      paginatedPayload("universities", results.map((u) => localizeUniversityRow(u, locale)), searchParams),
-    );
+    //
+    // Localize the PAGE, not the catalogue: this used to translate every row
+    // and then throw all but 24 away.
+    const payload = paginatedPayload("universities", results, searchParams);
+    const rows = payload.universities as typeof results;
+    payload.universities = rows.map((u) => localizeUniversityRow(u, locale));
+    return privateNoStoreJson(payload);
   } catch (error) {
     console.error("GET /api/universities error:", error);
     // Never substitute sample universities: during a database outage students

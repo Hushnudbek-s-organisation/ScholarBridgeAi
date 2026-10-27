@@ -156,3 +156,74 @@ guards it.
 npm run build && npm run test:perf     # budgets, lazy panes, one boot request, 3 s beacon
 npm run check:i18n && npm run test:render && npm run test:responsive
 ```
+
+---
+
+# Phase 3 — catalogue localization and match scores
+
+Every catalogue response is translated on the way out (`uz`, `ru`), and every
+list item gets a fit score and (on the dashboard/chancing screens) a chance
+score. Both steps are pure functions of data that rarely changes, so both are now
+memoized. Nothing about *what* the API returns changed — only how often the same
+work is redone.
+
+## 1. Localization memo (`src/lib/localizeMemo.ts`)
+
+* key: `locale | kind | id | updatedAt | digest(localizable fields)` — the digest
+  is over the translatable fields only, so two responses that carry different
+  per-request numbers (match score, saved flag) still share **one** translation
+  entry, and a cache hit can never leak another request's numbers;
+* only the translated **strings** are cached; the caller always receives a fresh
+  `{ ...row, ...translated }`;
+* bounds: `LOCALIZE_MEMO_MAX` (4 000 entries, LRU) and `LOCALIZE_MEMO_TTL_MS`
+  (10 min); `invalidateLocalizeMemo()` runs from `invalidateCatalogCache()`, so
+  an admin edit is never served stale;
+* rows whose localizable text is under 96 characters skip the memo — hashing them
+  costs as much as translating them. Real prose is far above that line;
+* long free text (descriptions, requirement bodies) goes through
+  `memoizedText()`, keyed by translator name + locale + the input itself.
+
+Measured with the catalogue loaded from the seeded database (per row, warm):
+
+| description length | translate every time | memo hit |
+| --- | --- | --- |
+| 101 chars (unverified disclaimer) | 14.0 µs | 4.8 µs |
+| 300 chars | 10.3 µs | 4.1 µs |
+| 1 200 chars | 20.2 µs | 7.3 µs |
+| 3 600 chars | 33.4 µs | 16.3 µs |
+
+`GET /api/universities` and `GET /api/scholarships` also localize **only the
+page they return**: with `?page=1` that is 24 rows out of 3 220 instead of the
+whole catalogue. On a 3 220-row synthetic catalogue the paginated response was
+4.4 ms against 13.0 ms for the full list.
+
+## 2. Score memo (`src/lib/matchMemo.ts`)
+
+* key: `kind | profileFingerprint | entityId | digest(entity scoring fields)`;
+  kinds in use are `fit`, `chance` and `scholarship-fit`;
+* the profile fingerprint is derived from the profile fields that actually feed
+  the scorer, so editing a profile re-scores and viewing the same profile twice
+  does not;
+* bounds: `MATCH_MEMO_MAX` (20 000) and `MATCH_MEMO_TTL_MS` (5 min);
+  `invalidateProfileMatchCache()` (profile edits) and admin catalogue writes call
+  `invalidateMatchMemo()`;
+* `loadSavedActivities()` is memoized for 15 s (`ACTIVITIES_MEMO_TTL_MS`), so the
+  four scoring routes no longer each query the activity table.
+
+## 3. Coverage gaps closed
+
+The imported catalogue carried study fields, degree levels, study modes and
+programme languages that the uz/ru dictionaries did not know, so those rows fell
+back to English mid-sentence. All of them are translated now (Information
+Systems, Interdisciplinary, Arts, Humanities, Veterinary, the degree ladder from
+Foundation to Doctorate, Arabic/Portuguese/Nordic/Central-European languages, the
+"not source-verified" disclaimers), and `npm run test:localization` reads the real
+`data/*.csv` files so a future import cannot silently reintroduce the gaps.
+
+## 4. Verify
+
+```bash
+npm run test:localization    # uz/ru coverage + memo correctness + memo speed
+npm run test:perf            # client bundle budgets, lazy panes, boot request
+npm run check:i18n           # every message key used by every locale
+```
