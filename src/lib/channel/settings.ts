@@ -10,7 +10,21 @@
 
 import { isSameOrigin } from "./links";
 
-export type ChannelMode = "off" | "dryrun" | "on";
+/**
+ * How the publisher behaves.
+ *
+ *   off       nothing is planned and nothing is sent
+ *   dryrun    the plan is built, posts go only to the admin chat
+ *   approval  the plan is built, every post is sent to the admin chat with
+ *             [Approve] [Reject] [Edit] buttons and reaches the channel only
+ *             after an admin presses Approve
+ *   on        posts go straight to the channel
+ *
+ * `approval` exists because "dry run" and "live" were two ends of one switch:
+ * an operator who wanted to read a post before it went public had to keep the
+ * publisher off and post by hand. The confirmation step is the middle.
+ */
+export type ChannelMode = "off" | "dryrun" | "approval" | "on";
 
 export interface LinkItem {
   label: string;
@@ -223,7 +237,7 @@ function boolMap(value: unknown, fallback: Record<string, boolean>): Record<stri
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const MODES: readonly ChannelMode[] = ["off", "dryrun", "on"];
+const MODES: readonly ChannelMode[] = ["off", "dryrun", "approval", "on"];
 
 /** `-100…` numeric id or `@username` — the same rule the sender applies. */
 export function looksLikeChannelId(raw: unknown): boolean {

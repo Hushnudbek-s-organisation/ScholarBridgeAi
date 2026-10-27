@@ -14,6 +14,7 @@ import { ensurePlanLinks, todayQueue } from "./admin";
 import { loadChannelSettings, writeChannelAudit } from "./repo";
 import { runDuePosts, sendPlanRow } from "./send";
 import { runDailyPlan } from "./store";
+import { expireStaleApprovals } from "./approvalStore";
 
 export interface PlanRunSummary {
   planDate: string;
@@ -58,8 +59,12 @@ export interface RunPostsSummary {
   attempted: number;
   sent: number;
   dryrun: number;
+  /** Sent to the admin chat and now waiting for a human (approval mode). */
+  approval: number;
   failed: number;
   skipped: number;
+  /** Posts retired because nobody answered within the approval window. */
+  expired: number;
   reasons: string[];
   blockedReason: string | null;
 }
@@ -75,12 +80,18 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
       attempted: 0,
       sent: 0,
       dryrun: 0,
+      approval: 0,
       failed: 0,
       skipped: 0,
+      expired: 0,
       reasons: [runtime.blockedReason],
       blockedReason: runtime.blockedReason,
     };
   }
+
+  // Retire previews nobody answered before planning anything new: approving a
+  // stale post later would publish yesterday's news under today's date.
+  const expired = await expireStaleApprovals().catch(() => 0);
 
   const day = tashkentDay();
   const [existing] = await db
@@ -94,8 +105,10 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
     attempted: outcomes.length,
     sent: outcomes.filter((o) => o.status === "sent").length,
     dryrun: outcomes.filter((o) => o.status === "dryrun").length,
+    approval: outcomes.filter((o) => o.status === "approval").length,
     failed: outcomes.filter((o) => o.status === "failed").length,
     skipped: outcomes.filter((o) => o.status === "skipped").length,
+    expired,
     reasons: outcomes.map((o) => o.reason).filter((r): r is string => Boolean(r)),
     blockedReason: runtime.blockedReason,
   };

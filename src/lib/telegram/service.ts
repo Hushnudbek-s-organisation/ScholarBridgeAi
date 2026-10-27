@@ -45,6 +45,7 @@ import {
 import { CMD_TEXTS } from "./botTexts";
 import { promptPlainSearch, runCallback, runCommand, type BotCtx } from "./bot";
 import { handleLinkStart, loadOwnedRequest, type TgUser } from "./linking";
+import { handleChannelApprovalCallback, handlePendingChannelEdit, isApprovalCallback } from "./approval";
 import {
   getLinkByProfile,
   getLinkByTelegramUser,
@@ -165,11 +166,27 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
     let toast = "";
     try {
       const chat = cq.message?.chat;
+      const data = String(cq.data ?? "");
       if (!chat || chat.type !== "private" || cq.from?.is_bot) {
         toast = CMD_TEXTS[pickLang(cq.from?.language_code)].privateOnly;
+      } else if (isApprovalCallback(data)) {
+        /**
+         * Channel approval buttons (`ch:ok|no|ed:<postId>`).
+         *
+         * They run BEFORE `buildCtx`/`runCallback` because those scope every
+         * button to a linked student's session, while approving a post is an
+         * operator action gated on `is_admin` — see lib/telegram/approval.ts.
+         */
+        toast = await handleChannelApprovalCallback({
+          data,
+          chatId: String(chat.id),
+          chatType: chat.type,
+          telegramUserId: cq.from.id,
+          isBot: cq.from.is_bot,
+        });
       } else {
         const ctx = await buildCtx(token, String(chat.id), cq.from, settings);
-        toast = await runCallback(ctx, String(cq.data ?? ""), cq.message?.message_id ?? null);
+        toast = await runCallback(ctx, data, cq.message?.message_id ?? null);
       }
     } catch (err) {
       console.error("[telegram] callback failed:", err instanceof Error ? err.message : err);
@@ -193,6 +210,21 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
   }
 
   const chatId = String(msg.chat.id);
+
+  // An admin in the middle of editing a channel post: the next message is the
+  // new body, not a bot command. Returns `handled: false` for everyone else,
+  // so the normal routing below is untouched.
+  const edited = await handlePendingChannelEdit({
+    chatId,
+    telegramUserId: msg.from.id,
+    text: msg.text ?? "",
+  }).catch(() => ({ handled: false, toast: null }));
+  if (edited.handled) {
+    // There is no callback query to answer here, so the outcome is a message.
+    if (edited.toast) await tgSendMessage(token, chatId, escapeHtml(edited.toast)).catch(() => undefined);
+    return;
+  }
+
   let ctx: BotCtx;
   try {
     ctx = await buildCtx(token, chatId, msg.from, settings);

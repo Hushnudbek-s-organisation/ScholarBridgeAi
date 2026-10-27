@@ -11,24 +11,35 @@
  * The token is read from the Telegram settings (admin panel or environment) and
  * never appears in any response.
  */
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts } from "@/db/schema";
 import { getBotToken } from "@/lib/telegram/settings";
-import { tgCall, tgSendPoll } from "@/lib/telegram/api";
+import { tgCall, tgEditMessage, tgSendPoll } from "@/lib/telegram/api";
 import { resolveChannelRuntime, tashkentDay, type ChannelRuntime } from "./config";
-import { ensureSiteLink, loadChannelSettings } from "./repo";
+import { ensureSiteLink, loadChannelSettings, writeChannelAudit } from "./repo";
 import { loadRenderData, loadChannelCountries } from "./runtime";
 import { renderPlanItemWithReason, type RenderedPost } from "./render";
 import { linkPreviewFor, type ChannelSettings } from "./settings";
 import { sanitizeTelegramHtml } from "./sanitize";
 import type { PlannedItem } from "./plan";
 import { insertPoll } from "./engage";
+import {
+  APPROVAL_TEXTS,
+  approvalHeader,
+  approvalKeyboard,
+  approvalTtlHours,
+  PARTS_SEPARATOR,
+  splitApprovalParts,
+  APPROVAL_STATUS,
+  OPEN_APPROVAL_STATUSES,
+} from "./approval";
 import { pollPreviewText, pollSendParams, pollSendProblem, pollSpecByKey } from "./polls";
 
 export interface SendOutcome {
   ok: boolean;
-  status: "sent" | "dryrun" | "skipped" | "failed";
+  /** `approval` = it is sitting in the admin chat waiting for a human. */
+  status: "sent" | "dryrun" | "approval" | "skipped" | "failed";
   chatId: string | null;
   messageId: number | null;
   reason: string | null;
@@ -197,6 +208,15 @@ async function reservePost(
     if (state === "sending") {
       return { postId: null, early: { ok: false, status: "skipped", chatId, messageId: null, reason: "Another run is sending this post", parts: [html] } };
     }
+    // A post that is already with a human must not be re-offered on every cron
+    // tick, and one that was rejected or timed out must stay closed for this
+    // plan identity (tomorrow's post has its own dedupe key).
+    if ((OPEN_APPROVAL_STATUSES as readonly string[]).includes(state ?? "")) {
+      return { postId: null, early: { ok: false, status: "skipped", chatId, messageId: null, reason: "Waiting for approval in the admin chat", parts: [html] } };
+    }
+    if (state === APPROVAL_STATUS.rejected || state === APPROVAL_STATUS.expired) {
+      return { postId: null, early: { ok: false, status: "skipped", chatId, messageId: null, reason: `This post was already ${state}`, parts: [html] } };
+    }
     postId = existing[0]?.id ?? null;
     if (postId) {
       await db
@@ -291,7 +311,7 @@ export async function sendPlanRow(
   }
   const { settings, runtime, token } = prepared;
 
-  const mode = opts.toAdminChat ? "dryrun" : runtime.mode;
+  const mode = opts.toAdminChat ? ("dryrun" as const) : runtime.mode;
   if (mode === "off") {
     return { ok: false, status: "skipped", chatId: null, messageId: null, reason: runtime.blockedReason ?? "Publisher is off", parts: [] };
   }
@@ -301,6 +321,11 @@ export async function sendPlanRow(
   const chatId = mode === "on" ? runtime.channelId : runtime.adminChatId;
   if (!chatId) {
     return { ok: false, status: "failed", chatId: null, messageId: null, reason: "No target chat configured", parts: [] };
+  }
+
+  // Approval mode: nothing is posted until a human presses a button.
+  if (mode === "approval") {
+    return await sendPlanRowForApproval(row, { settings, runtime, token }, chatId);
   }
 
   if (row.kind === "poll") {
@@ -358,6 +383,344 @@ export async function sendPlanRow(
     reason: null,
     parts,
   };
+}
+
+/* ==========================================================================
+ * Approval mode — nothing is posted until a human presses a button
+ * ==========================================================================
+ *
+ * Flow
+ *   1. the cron tick renders the post exactly as it would be published;
+ *   2. the body is stored on the post row (byte-for-byte) and sent to the
+ *      admin chat, with [Approve] [Reject] [Edit] on the last part;
+ *   3. Approve publishes *that stored body* to the channel — it is never
+ *      re-rendered, so what the operator read is what the channel gets;
+ *   4. Reject closes the post, Edit replaces the body and re-offers it.
+ *
+ * The row is claimed with a conditional UPDATE before anything is sent, so a
+ * double press (or two admins at once) publishes once.
+ */
+
+/** One part, optionally carrying the decision buttons. */
+async function sendPartWithKeyboard(
+  token: string,
+  chatId: string,
+  html: string,
+  disablePreview: boolean,
+  keyboard: { text: string; callback_data: string }[][]
+): Promise<{ ok: boolean; messageId: number | null; error: string | null }> {
+  const result = await tgCall<{ message_id: number }>(
+    token,
+    "sendMessage",
+    {
+      chat_id: chatId,
+      text: html,
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: disablePreview },
+      reply_markup: { inline_keyboard: keyboard },
+    },
+    12_000
+  );
+  return result.ok
+    ? { ok: true, messageId: result.result?.message_id ?? null, error: null }
+    : { ok: false, messageId: null, error: result.description ?? "sendMessage failed" };
+}
+
+/**
+ * Render a plan row and send it to the admin chat for confirmation.
+ *
+ * The header is a separate message so the stored body stays identical to what
+ * the channel will receive. `channel_posts.messageId` keeps the id of the LAST
+ * part — the one that carries the buttons and the one an edit rewrites.
+ */
+async function sendPlanRowForApproval(
+  row: typeof channelPlan.$inferSelect,
+  ctx: SendContext,
+  adminChatId: string
+): Promise<SendOutcome> {
+  const { settings, runtime, token } = ctx;
+  const rendered = await renderPlanRow(row);
+  const parts = rendered.parts.map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) {
+    return { ok: false, status: "skipped", chatId: null, messageId: null, reason: rendered.reason ?? "Nothing to send", parts: [] };
+  }
+
+  if (row.scholarshipId) await ensureSiteLink(row.scholarshipId, runtime.siteUrl);
+
+  const reserved = await reservePost(row, "approval", adminChatId, parts.join(PARTS_SEPARATOR));
+  if (reserved.early) return reserved.early;
+  const postId = reserved.postId as number;
+
+  const header = approvalHeader({
+    kind: row.kind,
+    slot: row.slot ?? null,
+    partCount: parts.length,
+    ttlHours: approvalTtlHours(),
+  });
+  const head = await sendPart(token, adminChatId, header, true);
+  if (!head.ok) {
+    await db
+      .update(channelPosts)
+      .set({ status: "failed", error: head.error, updatedAt: new Date() })
+      .where(eq(channelPosts.id, postId));
+    return { ok: false, status: "failed", chatId: adminChatId, messageId: null, reason: head.error, parts };
+  }
+
+  const keyboard = approvalKeyboard(postId);
+  const disablePreview = !linkPreviewFor(settings, row.kind);
+  let lastMessageId: number | null = null;
+  for (const [index, part] of parts.entries()) {
+    const isLast = index === parts.length - 1;
+    const result = isLast
+      ? await sendPartWithKeyboard(token, adminChatId, part, disablePreview, keyboard)
+      : await sendPart(token, adminChatId, part, disablePreview);
+    if (!result.ok) {
+      await db
+        .update(channelPosts)
+        .set({ status: "failed", error: result.error, updatedAt: new Date() })
+        .where(eq(channelPosts.id, postId));
+      return { ok: false, status: "failed", chatId: adminChatId, messageId: null, reason: result.error, parts };
+    }
+    if (index === 0) lastMessageId = lastMessageId ?? result.messageId;
+    lastMessageId = result.messageId;
+    if (!isLast) await sleep(1200);
+  }
+
+  const now = new Date();
+  await db
+    .update(channelPosts)
+    .set({ status: APPROVAL_STATUS.awaiting, messageId: lastMessageId, updatedAt: now, error: null })
+    .where(eq(channelPosts.id, postId));
+
+  return { ok: true, status: "approval", chatId: adminChatId, messageId: lastMessageId, reason: null, parts };
+}
+
+/** Claim a post for one actor: only `awaiting_approval`/`editing` can move. */
+async function claimApproval(postId: number, now: Date): Promise<typeof channelPosts.$inferSelect | null> {
+  const claimed = await db
+    .update(channelPosts)
+    .set({ status: "sending", updatedAt: now })
+    .where(and(eq(channelPosts.id, postId), inArray(channelPosts.status, [...OPEN_APPROVAL_STATUSES])))
+    .returning();
+  return claimed[0] ?? null;
+}
+
+/**
+ * Publish an approved post to the channel.
+ *
+ * The body comes from the stored row, never from a fresh render: the operator
+ * approved specific words, and a re-render could change "5 days left" into
+ * "4 days left" between the preview and the button press.
+ */
+export async function approveApproval(
+  postId: number,
+  actorProfileId: number | null,
+  now: Date = new Date()
+): Promise<SendOutcome> {
+  const prepared = await prepare();
+  if ("error" in prepared) {
+    return { ok: false, status: "failed", chatId: null, messageId: null, reason: prepared.error, parts: [] };
+  }
+  const { settings, runtime, token } = prepared;
+  const blocked = (reason: string): SendOutcome => ({ ok: false, status: "skipped", chatId: null, messageId: null, reason, parts: [] });
+
+  if (runtime.envKillSwitch) return blocked(APPROVAL_TEXTS.killSwitch);
+  if (runtime.mode === "off") return blocked(runtime.blockedReason ?? "Publisher is off");
+  if (!runtime.channelId) return blocked("The channel is not connected yet");
+
+  const [existing] = await db.select().from(channelPosts).where(eq(channelPosts.id, postId)).limit(1);
+  if (!existing) return blocked(APPROVAL_TEXTS.unknownPost);
+  if (existing.status === "sent") return blocked(APPROVAL_TEXTS.alreadySent);
+  const post = await claimApproval(postId, now);
+  if (!post) return blocked(APPROVAL_TEXTS.rejectedAlready);
+
+  const restore = async (status: string, error: string) => {
+    await db.update(channelPosts).set({ status, error, updatedAt: new Date() }).where(eq(channelPosts.id, postId));
+  };
+
+  const planRows = post.planId
+    ? await db.select().from(channelPlan).where(eq(channelPlan.id, post.planId)).limit(1)
+    : [];
+  const plan = planRows[0] ?? null;
+
+  // ---- polls: the channel needs a real vote, not the preview text ---------
+  if (post.kind === "poll") {
+    const spec = plan
+      ? pollSpecByKey(typeof planRowToItem(plan).payload.pollKey === "string" ? (planRowToItem(plan).payload.pollKey as string) : null)
+      : null;
+    if (!spec || !plan) {
+      await restore(APPROVAL_STATUS.awaiting, "Poll deck entry not found");
+      return blocked("Poll deck entry not found");
+    }
+    const params = pollSendParams(spec);
+    const sent = await tgSendPoll(token, runtime.channelId, params);
+    if (!sent.ok || !sent.result) {
+      const reason = sent.description ?? "sendPoll failed";
+      await restore(APPROVAL_STATUS.awaiting, reason);
+      return { ok: false, status: "failed", chatId: runtime.channelId, messageId: null, reason, parts: [] };
+    }
+    const stamp = new Date();
+    await db
+      .update(channelPosts)
+      .set({ status: "sent", chatId: runtime.channelId, messageId: sent.result.message_id, sentAt: stamp, updatedAt: stamp, error: null })
+      .where(eq(channelPosts.id, postId));
+    await db.update(channelPlan).set({ status: "sent" }).where(eq(channelPlan.id, plan.id));
+    await insertPoll({
+      postId,
+      messageId: sent.result.message_id,
+      pollId: sent.result.poll?.id ?? null,
+      pollType: spec.type,
+      pollKey: spec.key,
+      topic: spec.topic,
+      question: params.question,
+      options: spec.options,
+      correctIndex: typeof params.correct_option_id === "number" ? params.correct_option_id : null,
+    });
+    await writeChannelAudit({
+      actorProfileId,
+      action: "approval_approve",
+      entity: "post",
+      entityId: String(postId),
+      after: { channel: runtime.channelId, messageId: sent.result.message_id, kind: post.kind },
+    });
+    return { ok: true, status: "sent", chatId: runtime.channelId, messageId: sent.result.message_id, reason: null, parts: [] };
+  }
+
+  // ---- text posts: exactly the stored body --------------------------------
+  const parts = splitApprovalParts(post.html);
+  if (!parts.length) {
+    await restore(APPROVAL_STATUS.awaiting, "The stored body is empty");
+    return blocked("The stored body is empty");
+  }
+  const disablePreview = !linkPreviewFor(settings, post.kind);
+  let firstMessageId: number | null = null;
+  for (const [index, part] of parts.entries()) {
+    const result = await sendPart(token, runtime.channelId, part, disablePreview);
+    if (!result.ok) {
+      // Back to the queue: a transient Telegram error must not lose the post.
+      await restore(APPROVAL_STATUS.awaiting, result.error ?? "sendMessage failed");
+      return { ok: false, status: "failed", chatId: runtime.channelId, messageId: null, reason: result.error, parts };
+    }
+    if (index === 0) firstMessageId = result.messageId;
+    if (index < parts.length - 1) await sleep(1200);
+  }
+
+  const stamp = new Date();
+  await db
+    .update(channelPosts)
+    .set({
+      status: "sent",
+      chatId: runtime.channelId,
+      messageId: firstMessageId,
+      sentAt: stamp,
+      updatedAt: stamp,
+      error: null,
+    })
+    .where(eq(channelPosts.id, postId));
+  if (plan) await db.update(channelPlan).set({ status: "sent" }).where(eq(channelPlan.id, plan.id));
+
+  await writeChannelAudit({
+    actorProfileId,
+    action: "approval_approve",
+    entity: "post",
+    entityId: String(postId),
+    after: { channel: runtime.channelId, messageId: firstMessageId, parts: parts.length, edited: Boolean(plan?.textOverride) },
+  });
+
+  return { ok: true, status: "sent", chatId: runtime.channelId, messageId: firstMessageId, reason: null, parts };
+}
+
+/** Close a post that should never be published. */
+export async function rejectApproval(
+  postId: number,
+  actorProfileId: number | null,
+  reason: string | null = null
+): Promise<{ ok: boolean; reason: string | null }> {
+  const claimed = await claimApproval(postId, new Date());
+  if (!claimed) return { ok: false, reason: APPROVAL_TEXTS.rejectedAlready };
+  await db
+    .update(channelPosts)
+    .set({ status: APPROVAL_STATUS.rejected, error: reason, updatedAt: new Date() })
+    .where(eq(channelPosts.id, postId));
+  if (claimed.planId) {
+    await db
+      .update(channelPlan)
+      .set({ status: "skipped", skipReason: (reason ?? "Rejected by an admin").slice(0, 200) })
+      .where(eq(channelPlan.id, claimed.planId));
+  }
+  await writeChannelAudit({
+    actorProfileId,
+    action: "approval_reject",
+    entity: "post",
+    entityId: String(postId),
+    after: { reason },
+  });
+  return { ok: true, reason: null };
+}
+
+/**
+ * Replace the body of a post that is waiting for confirmation.
+ *
+ * The new text goes through the same sanitizer as a template post (Telegram
+ * HTML only, https links only) and is written to `channelPlan.textOverride`
+ * as well, so a later re-render for the same plan identity keeps the human
+ * wording instead of quietly reverting to the template.
+ */
+export async function applyApprovalEdit(
+  postId: number,
+  text: string,
+  actorProfileId: number | null
+): Promise<{ ok: true; html: string } | { ok: false; error: "empty" | "too_long" | "closed"; max: number }> {
+  const MAX = 4000;
+  const clean = sanitizeTelegramHtml(text ?? "").html.trim();
+  if (!clean) return { ok: false, error: "empty", max: MAX };
+  if (clean.length > MAX) return { ok: false, error: "too_long", max: MAX };
+
+  const [post] = await db.select().from(channelPosts).where(eq(channelPosts.id, postId)).limit(1);
+  if (!post || !(OPEN_APPROVAL_STATUSES as readonly string[]).includes(post.status)) {
+    return { ok: false, error: "closed", max: MAX };
+  }
+
+  await db
+    .update(channelPosts)
+    .set({ html: clean, status: APPROVAL_STATUS.awaiting, error: null, updatedAt: new Date() })
+    .where(eq(channelPosts.id, postId));
+  if (post.planId) {
+    await db.update(channelPlan).set({ textOverride: clean }).where(eq(channelPlan.id, post.planId));
+  }
+  await writeChannelAudit({
+    actorProfileId,
+    action: "approval_edit",
+    entity: "post",
+    entityId: String(postId),
+    before: { length: (post.html ?? "").length },
+    after: { length: clean.length },
+  });
+  return { ok: true, html: clean };
+}
+
+/**
+ * Rewrite the confirmation message after an edit, so the operator's chat shows
+ * the text that will actually be published (instead of the old one).
+ */
+export async function refreshApprovalMessage(
+  postId: number,
+  opts: { chatId: string; messageId: number | null; disablePreview: boolean }
+): Promise<boolean> {
+  const [post] = await db.select().from(channelPosts).where(eq(channelPosts.id, postId)).limit(1);
+  if (!post?.html || !opts.messageId) return false;
+  const parts = splitApprovalParts(post.html);
+  const body = parts.length ? parts[parts.length - 1] : post.html;
+  const { token } = await getBotToken();
+  if (!token) return false;
+  const result = await tgEditMessage(
+    token,
+    opts.chatId,
+    opts.messageId,
+    `${APPROVAL_TEXTS.edited}\n\n${body}`,
+    approvalKeyboard(postId)
+  );
+  return result.ok;
 }
 
 /** Plan rows due now (or a whole day, for the admin queue). */

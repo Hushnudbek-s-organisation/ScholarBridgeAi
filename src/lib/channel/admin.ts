@@ -25,6 +25,8 @@ import {
 } from "./repo";
 import { loadContentMap, simulatePreview } from "./runtime";
 import { renderPlanRow } from "./send";
+import { approvalTtlHours } from "./approval";
+import { expireStaleApprovals, pendingApprovals } from "./approvalStore";
 import { buildFacts } from "./templates/facts";
 import { renderScholarshipRich } from "./templates/rich.uz";
 import { isSameOrigin, isValidCustomCode, scholarshipLinkCode, shortLinkView, unsafeDestinationReason } from "./links";
@@ -304,6 +306,12 @@ export interface OverviewPayload {
   counts: Awaited<ReturnType<typeof dashboardCounts>>;
   queue: PlanPreviewRow[];
   posts: Awaited<ReturnType<typeof recentPosts>>;
+  /** Posts sitting in the admin chat waiting for Approve / Reject / Edit. */
+  approvals: Awaited<ReturnType<typeof pendingApprovals>>;
+  /** Approval window in hours, so the panel can say when a preview expires. */
+  approvalTtlHours: number;
+  /** How many stale previews this load retired. */
+  expiredOnLoad: number;
   hasToken: boolean;
   env: {
     killSwitch: boolean;
@@ -320,6 +328,10 @@ export async function channelOverview(): Promise<OverviewPayload> {
   const counts = await dashboardCounts();
   const queue = await todayQueue();
   const posts = await recentPosts(20);
+  // Reading the approvals list is also the natural moment to retire the ones
+  // nobody answered — the panel never shows a preview that can no longer post.
+  const expired = await expireStaleApprovals().catch(() => 0);
+  const approvals = await pendingApprovals(20).catch(() => []);
   const { getBotToken } = await import("@/lib/telegram/settings");
   const { token } = await getBotToken();
   return {
@@ -328,6 +340,9 @@ export async function channelOverview(): Promise<OverviewPayload> {
     counts,
     queue,
     posts,
+    approvals,
+    approvalTtlHours: approvalTtlHours(),
+    expiredOnLoad: expired,
     hasToken: Boolean(token),
     env: {
       killSwitch: runtime.envKillSwitch,

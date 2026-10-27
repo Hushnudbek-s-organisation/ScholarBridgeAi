@@ -24,7 +24,10 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  Check,
   CheckCircle2,
+  Clock,
+  Pencil,
   ClipboardList,
   Globe2,
   Link2,
@@ -57,13 +60,15 @@ type Tab =
   | "stories"
   | "audit";
 
+type ChannelMode = "off" | "dryrun" | "approval" | "on";
+
 interface LinkItem {
   label: string;
   url: string;
 }
 
 interface Settings {
-  connection: { channelId: string; adminChatId: string; mode: "off" | "dryrun" | "on"; pausedUntil: string | null };
+  connection: { channelId: string; adminChatId: string; mode: ChannelMode; pausedUntil: string | null };
   brand: string;
   channelUsername: string;
   botUsername: string;
@@ -88,7 +93,7 @@ interface Settings {
 }
 
 interface Runtime {
-  mode: "off" | "dryrun" | "on";
+  mode: ChannelMode;
   channelId: string;
   adminChatId: string;
   siteUrl: string;
@@ -139,6 +144,17 @@ interface PostRow {
   error: string | null;
 }
 
+interface ApprovalRow {
+  postId: number;
+  planId: number | null;
+  kind: string;
+  slot: number | null;
+  status: string;
+  html: string | null;
+  messageId: number | null;
+  createdAt: string;
+}
+
 interface EnvRow {
   key: string;
   level: "required" | "optional";
@@ -153,6 +169,9 @@ interface Overview {
   counts: { plannedToday: number; sentWeek: number; failedWeek: number; contentRows: number; links: number; countries: number };
   queue: QueueRow[];
   posts: PostRow[];
+  /** Posts waiting in the admin chat for Approve / Reject / Edit. */
+  approvals: ApprovalRow[];
+  approvalTtlHours: number;
   hasToken: boolean;
   env: {
     killSwitch: boolean;
@@ -325,7 +344,7 @@ export function ChannelManager() {
             className={`${chip} ${
               runtime.envKillSwitch || runtime.mode === "off"
                 ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                : runtime.mode === "dryrun"
+                : runtime.mode === "dryrun" || runtime.mode === "approval"
                   ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
                   : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
             }`}
@@ -349,6 +368,17 @@ export function ChannelManager() {
           <span>{runtime.blockedReason}</span>
         </div>
       )}
+
+      {/* The approval inbox sits above the tabs on purpose: while the mode is
+          "approval" these are the only posts that can reach the channel, and a
+          preview expires, so they must not be hidden behind a tab. */}
+      <ApprovalInbox
+        rows={data.approvals ?? []}
+        ttlHours={data.approvalTtlHours ?? 6}
+        busy={busy}
+        act={act}
+        showToast={showToast}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard label={t("stats.today")} value={counts.plannedToday} icon={CalendarClock} tone="indigo" />
@@ -389,6 +419,123 @@ type Reload = (live?: boolean) => Promise<void>;
 /* ------------------------------------------------------------------ */
 /* Ulash                                                              */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Approval inbox — the posts sitting in the admin chat.
+ *
+ * The Telegram buttons are the primary path; this panel exists so an operator
+ * on a laptop can approve, reject or rewrite a post without switching to
+ * Telegram, and so a preview that is about to expire is visible at all. Both
+ * paths call the same server functions, so they cannot disagree.
+ */
+function ApprovalInbox({
+  rows,
+  ttlHours,
+  busy,
+  act,
+  showToast,
+}: {
+  rows: ApprovalRow[];
+  ttlHours: number;
+  busy: boolean;
+  act: ActFn;
+  showToast: ShowToast;
+}) {
+  const t = useTranslations("adminChannel");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+
+  if (rows.length === 0) return null;
+
+  const run = async (action: string, postId: number, extra: Record<string, unknown> = {}) => {
+    const res = await act(action, { postId, ...extra });
+    if (res) {
+      showToast(t(`approval.${action}Done`));
+      setEditingId(null);
+    }
+  };
+
+  return (
+    <div className={`${card} border-amber-200 dark:border-amber-500/30`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <Clock className="h-4 w-4 text-amber-500" />
+          {t("approval.title", { count: rows.length })}
+        </h3>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400">{t("approval.ttl", { hours: ttlHours })}</span>
+      </div>
+      <ul className="space-y-3">
+        {rows.map((row) => {
+          const parts = (row.html ?? "").split("\n\n———\n\n").filter(Boolean);
+          const editing = editingId === row.postId;
+          return (
+            <li key={row.postId} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className={`${chip} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>{row.kind}</span>
+                {row.slot != null && <span>slot {row.slot}</span>}
+                {row.status === "editing" && (
+                  <span className={`${chip} bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300`}>
+                    {t("approval.editing")}
+                  </span>
+                )}
+              </div>
+              {editing ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    className={`${inputCls} min-h-40 font-mono text-[11px]`}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    maxLength={4000}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className={btnPrimary}
+                      disabled={busy || !draft.trim()}
+                      onClick={() => void run("edit", row.postId, { text: draft })}
+                    >
+                      <Save className="h-3.5 w-3.5" /> {t("approval.saveEdit")}
+                    </button>
+                    <button className={btnGhost} onClick={() => setEditingId(null)}>
+                      {t("cancel")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                    {parts.join("\n\n———\n\n") || t("approval.empty")}
+                  </pre>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className={btnPrimary} disabled={busy} onClick={() => void run("approve", row.postId)}>
+                      <Check className="h-3.5 w-3.5" /> {t("approval.approve")}
+                    </button>
+                    <button
+                      className={btnGhost}
+                      disabled={busy}
+                      onClick={() => void run("reject", row.postId)}
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> {t("approval.reject")}
+                    </button>
+                    <button
+                      className={btnGhost}
+                      disabled={busy}
+                      onClick={() => {
+                        setEditingId(row.postId);
+                        setDraft(parts[0] ?? "");
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> {t("approval.edit")}
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; act: ActFn; busy: boolean; showToast: ShowToast; reload: Reload }) {
   const t = useTranslations("adminChannel");
@@ -543,6 +690,7 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 >
                   <option value="off">{t("mode.off")}</option>
                   <option value="dryrun">{t("mode.dryrun")}</option>
+                  <option value="approval">{t("mode.approval")}</option>
                   <option value="on">{t("mode.on")}</option>
                 </select>
               </Field>
@@ -567,6 +715,11 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                     ? t("env.envDryrun")
                     : t("env.envOn")}
             </p>
+            {conn.mode === "approval" && (
+              <p className="rounded-xl bg-sky-50 px-3 py-2 text-[11px] font-semibold text-sky-800 dark:bg-sky-500/10 dark:text-sky-300">
+                {t("connect.approvalHint")}
+              </p>
+            )}
             {conn.mode === "on" && (
               <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
                 {t("connect.liveWarning")}

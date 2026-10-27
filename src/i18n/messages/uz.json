@@ -6840,7 +6840,8 @@
     "mode": {
       "off": "O'chirilgan",
       "dryrun": "Sinov rejimi",
-      "on": "Jonli"
+      "on": "Jonli",
+      "approval": "Tasdiqlash bilan"
     },
     "stats": {
       "today": "Bugun rejalashtirilgan",
@@ -6902,7 +6903,8 @@
       "chatIdHow2": "Boshqa bot ham aytadi: @userinfobot ni ochib /start bosing.",
       "chatIdHow3": "Raqamni shu maydonga yozib «Ulanishni tekshirish»ni bosing — maydon faqat bot haqiqatan o'sha chatga yeta olganda yashil bo'ladi.",
       "chatIdHowOpen": "Botni Telegramda ochish",
-      "chatIdHowNoBot": "Avval bot @username ini kiriting — shundan keyin bu tugma botni ochadi."
+      "chatIdHowNoBot": "Avval bot @username ini kiriting — shundan keyin bu tugma botni ochadi.",
+      "approvalHint": "Har bir post avval admin chatiga keladi va Tasdiqlash / Rad etish / Tahrirlash tugmalari bilan ko'rsatiladi. Admin tasdiqlamaguncha kanalga hech narsa chiqmaydi."
     },
     "plan": {
       "title": "Chiqish ritmi",
@@ -7063,6 +7065,19 @@
       "envKill": "Serverda CHANNEL_AUTOPOST=off turibdi va panelni bekor qiladi",
       "envDryrun": "Serverda CHANNEL_AUTOPOST=dryrun (panel faqat jimlashtira oladi)",
       "envOn": "Serverda CHANNEL_AUTOPOST=on (qaror panelda)"
+    },
+    "approval": {
+      "title": "Tasdiqlash kutilmoqda ({count})",
+      "ttl": "Javobsiz qolgan postlar {hours} soatdan keyin bekor bo'ladi",
+      "editing": "tahrirlanmoqda",
+      "empty": "Bu post uchun matn saqlanmagan",
+      "approve": "Tasdiqlash va yuborish",
+      "reject": "Rad etish",
+      "edit": "Tahrirlash",
+      "saveEdit": "Saqlash va qayta ko'rsatish",
+      "approveDone": "Kanalga yuborildi",
+      "rejectDone": "Rad etildi",
+      "editDone": "Matn saqlandi, tasdiqlash kutilmoqda"
     }
   },
   "adminDiagnostics": {

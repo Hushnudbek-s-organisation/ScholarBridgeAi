@@ -13,7 +13,8 @@ export const maxDuration = 120;
  *   GET  ?live=1&days=14  → settings, runtime status, counts, today's queue,
  *                           recent posts, live connection check, plan preview
  *   PUT  { key, value }   → save one settings block (validated, audited)
- *   POST { action }       → verify | test | plan | run | links | preview
+ *   POST { action }       → verify | test | plan | run | links | preview |
+ *                           approve | reject | edit   (see "approval" below)
  */
 export async function GET(req: Request) {
   const guard = await guardAdmin(req);
@@ -78,6 +79,32 @@ export async function POST(req: Request) {
     if (action === "preview") {
       const days = Number(body.value.days ?? 14);
       return NextResponse.json({ ok: true, preview: await previewDays(days) });
+    }
+    /**
+     * Approval actions from the panel. The same three decisions the Telegram
+     * buttons offer, minus the edit-text round trip: "edit" here takes the new
+     * body in the request, so an operator on a laptop does not have to type it
+     * into a chat. Both paths go through the same guarded functions.
+     */
+    if (action === "approve" || action === "reject" || action === "edit") {
+      const postId = Number(body.value.postId);
+      if (!Number.isInteger(postId) || postId <= 0) return jsonError(400, "postId is required", "bad_request");
+      const { approveApproval, rejectApproval, applyApprovalEdit } = await import("@/lib/channel/send");
+      if (action === "approve") {
+        const outcome = await approveApproval(postId, actor);
+        if (!outcome.ok) return jsonError(409, outcome.reason ?? "approval_failed", "approval_failed");
+        return NextResponse.json({ ok: true, outcome });
+      }
+      if (action === "reject") {
+        const reason = String(body.value.reason ?? "").trim().slice(0, 200) || null;
+        const result = await rejectApproval(postId, actor, reason);
+        if (!result.ok) return jsonError(409, result.reason ?? "already_closed", "already_closed");
+        return NextResponse.json({ ok: true });
+      }
+      const text = String(body.value.text ?? "");
+      const edited = await applyApprovalEdit(postId, text, actor);
+      if (!edited.ok) return jsonError(400, edited.error, edited.error);
+      return NextResponse.json({ ok: true, html: edited.html });
     }
     if (action === "summary") {
       return NextResponse.json({ ok: true, summary: await channelAdminSummary() });

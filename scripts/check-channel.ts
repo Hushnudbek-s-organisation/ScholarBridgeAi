@@ -127,6 +127,18 @@ import {
 import { lintText, plainText, visibleLength } from "../src/lib/channel/lint";
 import { mergeChannelSettings, settingsFromRows, settingsRows } from "../src/lib/channel/settings";
 import {
+  APPROVAL_STATUS,
+  APPROVAL_TEXTS,
+  approvalCallbackData,
+  approvalHeader,
+  approvalKeyboard,
+  approvalTtlHours,
+  isApprovalCallback,
+  parseApprovalCallback,
+  splitApprovalParts,
+  PARTS_SEPARATOR,
+} from "../src/lib/channel/approval";
+import {
   MAX_POSTS_PER_DAY,
   buildDailyPlan,
   isQuietDay,
@@ -1980,6 +1992,142 @@ check("poll option shares sum to 1 and clamp at the edges", () => {
   assert.equal(updates.find((update) => update.topic === "country:canada")!.weight, 1.9);
   const noVoters = optionSummary({ ...result, totalVoters: 0 });
   assert.equal(noVoters[0].share, 0, "0 voters must not divide by zero");
+});
+
+// ---------------------------------------------------------------------------
+// Approval mode — read it before it goes public
+// ---------------------------------------------------------------------------
+
+section("Approval mode");
+
+check("the panel can select approval, and it survives a settings round trip", () => {
+  const merged = mergeChannelSettings({ connection: { mode: "approval" } });
+  assert.equal(merged.connection.mode, "approval");
+  assert.equal(mergeChannelSettings({ connection: { mode: "nonsense" } }).connection.mode, "off");
+});
+
+check("approval mode runs the publisher but never targets the channel", () => {
+  const settings = mergeChannelSettings({
+    connection: { mode: "approval", channelId: "-1001234567890", adminChatId: "123456789" },
+    siteUrl: SITE,
+  });
+  const runtime = resolveChannelRuntime(settings, {});
+  assert.equal(runtime.mode, "approval");
+  assert.equal(runtime.blockedReason, null, "an approval deployment must be allowed to build and preview");
+});
+
+check("CHANNEL_AUTOPOST=off still kills approval mode", () => {
+  const settings = mergeChannelSettings({
+    connection: { mode: "approval", channelId: "-1001234567890", adminChatId: "123456789" },
+    siteUrl: SITE,
+  });
+  const runtime = resolveChannelRuntime(settings, { CHANNEL_AUTOPOST: "off" });
+  assert.equal(runtime.mode, "off");
+  assert.equal(runtime.envKillSwitch, true);
+  assert.match(runtime.blockedReason ?? "", /kill switch/i);
+});
+
+check("only the three documented buttons parse, and nothing else does", () => {
+  assert.deepEqual(parseApprovalCallback("ch:ok:12"), { action: "approve", postId: 12 });
+  assert.deepEqual(parseApprovalCallback("ch:no:12"), { action: "reject", postId: 12 });
+  assert.deepEqual(parseApprovalCallback("ch:ed:12"), { action: "edit", postId: 12 });
+  assert.equal(isApprovalCallback("ch:ok:12"), true);
+
+  for (const bad of ["", "ch:ok:0", "ch:ok:-1", "ch:xx:12", "ch:ok:12 ", "ch:ok:12\n2", "ch:ok", "su:1:2", "ch:ok:9999999999"]) {
+    assert.equal(parseApprovalCallback(bad), null, `must reject ${JSON.stringify(bad)}`);
+  }
+  // The student router's own callbacks must not be mistaken for approvals.
+  assert.equal(isApprovalCallback("su:1:2"), false);
+  assert.equal(isApprovalCallback(undefined), false);
+});
+
+check("callback data round-trips and fits Telegram's 64-byte budget", () => {
+  for (const action of ["approve", "reject", "edit"] as const) {
+    const data = approvalCallbackData(action, 123456789);
+    assert.deepEqual(parseApprovalCallback(data), { action, postId: 123456789 });
+    assert.ok(Buffer.byteLength(data, "utf8") <= 64);
+  }
+});
+
+check("every approval carries approve, reject and edit", () => {
+  const rows = approvalKeyboard(7);
+  const flat = rows.flat();
+  assert.deepEqual(flat.map((b) => b.callback_data), ["ch:ok:7", "ch:no:7", "ch:ed:7"]);
+  assert.deepEqual(flat.map((b) => b.text), [
+    APPROVAL_TEXTS.buttons.approve,
+    APPROVAL_TEXTS.buttons.reject,
+    APPROVAL_TEXTS.buttons.edit,
+  ]);
+  // Two rows: the decision is separated from the "do more work" action.
+  assert.equal(rows.length, 2);
+});
+
+check("the stored body splits back into exactly the parts that were sent", () => {
+  const parts = ["Birinchi qism", "Ikkinchi qism", "Uchinchi qism"];
+  const stored = parts.join(PARTS_SEPARATOR);
+  assert.deepEqual(splitApprovalParts(stored), parts);
+  assert.deepEqual(splitApprovalParts(null), []);
+  assert.deepEqual(splitApprovalParts(""), []);
+  // A single-part post must not gain a phantom part.
+  assert.deepEqual(splitApprovalParts("bitta qism"), ["bitta qism"]);
+});
+
+check("the approval window is bounded and configurable", () => {
+  assert.equal(approvalTtlHours({}), 6);
+  assert.equal(approvalTtlHours({ CHANNEL_APPROVAL_TTL_HOURS: "12" }), 12);
+  assert.equal(approvalTtlHours({ CHANNEL_APPROVAL_TTL_HOURS: "0" }), 1, "never instant");
+  assert.equal(approvalTtlHours({ CHANNEL_APPROVAL_TTL_HOURS: "999" }), 48, "never longer than two days");
+  assert.equal(approvalTtlHours({ CHANNEL_APPROVAL_TTL_HOURS: "abc" }), 6);
+});
+
+check("the header states what happens and never repeats the body", () => {
+  const multi = approvalHeader({ kind: "scholarship_rich", slot: 2, partCount: 3, ttlHours: 6 });
+  assert.match(multi, /Tasdiqlash kerak/);
+  assert.match(multi, /3 qismda/);
+  assert.match(multi, /6 soat/);
+  const poll = approvalHeader({ kind: "poll", slot: null, partCount: 1, ttlHours: 6 });
+  assert.match(poll, /so'rovnoma/);
+});
+
+check("the approval code paths exist where they are claimed to", () => {
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  // The approval branch must run BEFORE the generic send path.
+  const approvalBranch = sendSrc.indexOf('if (mode === "approval")');
+  const pollBranch = sendSrc.indexOf('if (row.kind === "poll") {');
+  assert.ok(approvalBranch > 0 && pollBranch > approvalBranch, "approval must be decided before anything is sent");
+  assert.match(sendSrc, /export async function approveApproval/);
+  assert.match(sendSrc, /export async function rejectApproval/);
+  assert.match(sendSrc, /export async function applyApprovalEdit/);
+  // Approval must publish the STORED body, not a fresh render.
+  assert.match(sendSrc, /splitApprovalParts\(post\.html\)/);
+  // A double press must not publish twice.
+  assert.match(sendSrc, /async function claimApproval/);
+  assert.match(
+    sendSrc,
+    /inArray\(channelPosts\.status, \[\.\.\.OPEN_APPROVAL_STATUSES\]\)/,
+    "the conditional UPDATE must only claim an open post"
+  );
+
+  const serviceSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/service.ts"), "utf8");
+  assert.match(serviceSrc, /isApprovalCallback\(data\)/, "the webhook must route approval buttons");
+  assert.match(serviceSrc, /handlePendingChannelEdit/, "a typed message must be able to become the new body");
+
+  const telegramApproval = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/approval.ts"), "utf8");
+  assert.match(telegramApproval, /approver\.isAdmin/, "only an admin may approve");
+  assert.match(telegramApproval, /ensureChannelTables/, "the tables are ensured before any write");
+  // The student router stays untouched: an approval button is never a student command.
+  const botSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/bot.ts"), "utf8");
+  assert.doesNotMatch(botSrc, /ch:\(ok\|no\|ed\)/, "approval buttons must not enter the link-scoped router");
+});
+
+check("approval statuses are named once and reused", () => {
+  assert.equal(APPROVAL_STATUS.awaiting, "awaiting_approval");
+  assert.equal(APPROVAL_STATUS.editing, "editing");
+  assert.equal(APPROVAL_STATUS.rejected, "rejected");
+  assert.equal(APPROVAL_STATUS.expired, "expired");
+  // No copy of the literal strings anywhere else.
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  assert.doesNotMatch(sendSrc, /"awaiting_approval"/, "use APPROVAL_STATUS, not a literal");
 });
 
 // ---------------------------------------------------------------------------

@@ -89,7 +89,7 @@ export function channelBlockReason(cfg: ChannelConfig): string | null {
   return null;
 }
 
-/** Where a post goes: dryrun always talks to the admin chat, never the channel. */
+/** Where a post goes: only `on` talks to the channel; every other mode goes to the admin chat. */
 export function targetChatId(cfg: ChannelConfig): string {
   return cfg.mode === "on" ? cfg.channelId : cfg.adminChatId;
 }
@@ -98,7 +98,7 @@ export function targetChatId(cfg: ChannelConfig): string {
 /* Effective runtime: admin settings first, environment as the safety net.    */
 /* ------------------------------------------------------------------------- */
 
-import type { ChannelSettings } from "./settings";
+import type { ChannelMode, ChannelSettings } from "./settings";
 
 /** Asia/Tashkent calendar day (the publisher's only timezone). */
 export function tashkentDay(now: Date = new Date()): string {
@@ -112,7 +112,7 @@ export function tashkentDay(now: Date = new Date()): string {
 
 export interface ChannelRuntime {
   /** Effective mode: the environment can only make it quieter, never louder. */
-  mode: AutopostMode;
+  mode: ChannelMode;
   channelId: string;
   adminChatId: string;
   siteUrl: string;
@@ -152,7 +152,7 @@ export function resolveChannelRuntime(
   // The environment is a CEILING, the panel is the switch underneath it:
   // `off` silences everything, `dryrun` keeps live posting impossible, and an
   // absent variable leaves the decision entirely to the panel.
-  let mode: AutopostMode = settings.connection.mode;
+  let mode: ChannelMode = settings.connection.mode;
   if (envKillSwitch) mode = "off";
   else if (envMode === "dryrun" && mode === "on") mode = "dryrun";
   const channelId = settings.connection.channelId || (env.TELEGRAM_CHANNEL_ID ?? "").trim();
