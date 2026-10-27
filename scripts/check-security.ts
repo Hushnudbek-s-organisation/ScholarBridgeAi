@@ -322,6 +322,34 @@ async function main() {
     assert.equal(rateLimit.checkRateLimit("w", { limit: 3, windowMs: 1000, now }).ok, true);
   });
 
+  check("a flood on one key keeps a bounded number of timestamps", () => {
+    rateLimit.resetRateLimits();
+    const now = () => 5_000;
+    for (let i = 0; i < 5_000; i++) {
+      rateLimit.checkRateLimit("flood", { limit: 5, windowMs: 60_000, now });
+    }
+    const stats = rateLimit.rateLimitBucketStats();
+    assert.equal(stats.buckets, 1);
+    assert.ok(stats.hits <= 6, `retained ${stats.hits} timestamps for a single key`);
+  });
+
+  check("the sweep releases idle buckets instead of letting them pile up", () => {
+    rateLimit.resetRateLimits();
+    let t = 0;
+    const now = () => t;
+    for (let i = 0; i < 50; i++) {
+      rateLimit.checkRateLimit(`idle-${i}`, { limit: 5, windowMs: 1_000, now });
+    }
+    assert.equal(rateLimit.rateLimitBucketStats().buckets, 50);
+    t = 30 * 60_000;
+    rateLimit.checkRateLimit("fresh", { limit: 5, windowMs: 1_000, now });
+    assert.equal(
+      rateLimit.rateLimitBucketStats().buckets,
+      1,
+      "buckets that can no longer block anyone must be freed by the sweep"
+    );
+  });
+
   check("rateLimitedResponse returns 429 + Retry-After", () => {
     const res = rateLimit.rateLimitedResponse(7);
     assert.equal(res.status, 429);

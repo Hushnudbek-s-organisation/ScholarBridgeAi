@@ -454,6 +454,25 @@ async function main() {
     );
   });
 
+  await checkAsync("a budget-store outage is probed once per window, not once per AI call", async () => {
+    let reads = 0;
+    gate.setBudgetStateReaderForTests(async () => { reads += 1; throw new Error("simulated budget store outage"); });
+    gate.resetBudgetGateLogThrottleForTests();
+    const t0 = new Date("2026-10-22T12:00:00.000Z");
+    for (let i = 0; i < 5; i++) {
+      const verdict = await gate.evaluateAiBudget("openai", "gpt-4o-mini", new Date(t0.getTime() + i * 1_000));
+      assert.equal(verdict.allowed, false, "paid calls must stay refused while the budget is unverifiable");
+    }
+    assert.equal(reads, 1, `the budget store must be read once while the breaker is open (read ${reads} times)`);
+    assert.equal(gate.budgetGateOutageState(t0).open, true);
+    // The breaker must re-probe (and recover on its own) once the window ends.
+    const later = new Date(t0.getTime() + 20_000);
+    assert.equal((await gate.evaluateAiBudget("openai", "gpt-4o-mini", later)).allowed, false);
+    assert.equal(reads, 2, "the breaker must re-probe after the backoff window");
+    gate.setBudgetStateReaderForTests();
+    gate.resetBudgetGateLogThrottleForTests();
+  });
+
   check("only explicitly marked OpenRouter :free models or an explicitly Free Groq plan are zero-cost", () => {
     assert.equal(gate.isZeroCostModel("openrouter", "qwen/qwen3-32b:free"), true);
     assert.equal(gate.isZeroCostModel("openrouter", "qwen/qwen3-32b"), false);
