@@ -6,7 +6,7 @@
 import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts, scholarshipChannelContent, scholarships } from "@/db/schema";
-import { channelConfig, resolveChannelRuntime, tashkentDay, type ChannelRuntime } from "./config";
+import { channelConfig, channelEnvChecklist, resolveChannelRuntime, tashkentDay, type ChannelRuntime, type EnvCheckRow } from "./config";
 import { countryDisplay, type ChannelCountry } from "./countries";
 import { contentCompleteness, EMPTY_CONTENT, isRichContent, MAX_ABOUT_CHARS, MAX_BULLETS, MAX_TAGLINE_CHARS, type ScholarshipContent } from "./content";
 import { ensureChannelTables } from "./db";
@@ -305,7 +305,13 @@ export interface OverviewPayload {
   queue: PlanPreviewRow[];
   posts: Awaited<ReturnType<typeof recentPosts>>;
   hasToken: boolean;
-  env: { killSwitch: boolean; channelIdConfigured: boolean; discussionEnabled: boolean };
+  env: {
+    killSwitch: boolean;
+    autopost: "off" | "dryrun" | "on" | null;
+    channelIdConfigured: boolean;
+    discussionEnabled: boolean;
+    checklist: EnvCheckRow[];
+  };
 }
 
 export async function channelOverview(): Promise<OverviewPayload> {
@@ -325,8 +331,12 @@ export async function channelOverview(): Promise<OverviewPayload> {
     hasToken: Boolean(token),
     env: {
       killSwitch: runtime.envKillSwitch,
+      autopost: runtime.envAutopost,
       channelIdConfigured: Boolean(channelConfig().channelId),
       discussionEnabled: runtime.discussionEnabled,
+      // Read-only checklist for the panel: what the deployment's environment
+      // actually has, so nobody has to guess which Render variable is wrong.
+      checklist: channelEnvChecklist(),
     },
   };
 }

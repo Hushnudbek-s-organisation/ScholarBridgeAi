@@ -183,3 +183,54 @@ export function resolveChannelRuntime(
     blockedReason,
   };
 }
+
+/* ------------------------------------------------------------------------- */
+/* Deployment environment checklist (read-only, shown in the admin panel)     */
+/* ------------------------------------------------------------------------- */
+
+export interface EnvCheckRow {
+  key: string;
+  /** `required` for live posting, `optional` for extras. */
+  level: "required" | "optional";
+  set: boolean;
+  /** Usable value? `null` for secrets, which are never echoed or inspected beyond a shape check. */
+  valid: boolean | null;
+  /** Non-secret preview (channel handle, site origin, mode). Never a token. */
+  preview: string | null;
+}
+
+/**
+ * Every channel-related environment variable with a verdict, so the panel can
+ * say "this is what the server has" instead of the operator guessing which
+ * value in Render's dashboard is wrong. Nothing secret ever leaves this
+ * function: the bot token is reported as present/absent only.
+ *
+ * The environment cannot be *written* from the app (hosts do not expose that),
+ * which is exactly why the panel shows the list with where each value comes
+ * from — everything else is editable in the panel itself.
+ */
+export function channelEnvChecklist(env: Env = process.env): EnvCheckRow[] {
+  const autopostRaw = (env.CHANNEL_AUTOPOST ?? "").trim();
+  const botToken = (env.TELEGRAM_BOT_TOKEN ?? "").trim();
+  const channelId = (env.TELEGRAM_CHANNEL_ID ?? "").trim();
+  const adminChat = (env.TELEGRAM_ADMIN_CHAT_ID ?? "").trim();
+  const site = normalizeSiteUrl(env.CHANNEL_SITE_URL) || normalizeSiteUrl(env.APP_URL);
+
+  return [
+    {
+      key: "CHANNEL_AUTOPOST",
+      level: "optional",
+      set: autopostRaw !== "",
+      // Empty is a valid state: the panel decides. A typo silently means "off".
+      valid: null,
+      preview: autopostRaw === "" ? null : parseAutopost(autopostRaw),
+    },
+    { key: "TELEGRAM_CHANNEL_ID", level: "required", set: channelId !== "", valid: validChannelId(channelId), preview: channelId ? channelId.slice(0, 40) : null },
+    { key: "TELEGRAM_ADMIN_CHAT_ID", level: "required", set: adminChat !== "", valid: validAdminChatId(adminChat), preview: adminChat || null },
+    { key: "CHANNEL_SITE_URL", level: "optional", set: Boolean(normalizeSiteUrl(env.CHANNEL_SITE_URL)), valid: Boolean(normalizeSiteUrl(env.CHANNEL_SITE_URL)), preview: normalizeSiteUrl(env.CHANNEL_SITE_URL) || null },
+    { key: "APP_URL", level: "optional", set: Boolean(normalizeSiteUrl(env.APP_URL)), valid: Boolean(normalizeSiteUrl(env.APP_URL)), preview: normalizeSiteUrl(env.APP_URL) || site || null },
+    { key: "CHANNEL_DISCUSSION_ENABLED", level: "optional", set: (env.CHANNEL_DISCUSSION_ENABLED ?? "").trim() !== "", valid: null, preview: truthy(env.CHANNEL_DISCUSSION_ENABLED) ? "on" : "off" },
+    // Secret: presence + shape only, never the value.
+    { key: "TELEGRAM_BOT_TOKEN", level: "optional", set: botToken !== "", valid: botToken === "" ? null : /^\d{5,}:[A-Za-z0-9_-]{20,}$/.test(botToken), preview: null },
+  ];
+}

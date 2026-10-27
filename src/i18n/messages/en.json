@@ -6973,6 +6973,21 @@
       "hint": "Only what you type here can be posted. Nothing is generated, and a story stays hidden until it is approved."
     },
     "env": {
+      "panelTitle": "Server environment",
+      "panelHint": "These values live in the hosting environment, not in this panel. The panel shows what is set and whether it is usable; change them in Render → Environment, then redeploy.",
+      "set": "set",
+      "missing": "not set",
+      "bad": "invalid",
+      "required": "needed for live",
+      "where": {
+        "CHANNEL_AUTOPOST": "Optional ceiling. Unset = this panel decides. off = hard kill switch. dryrun = live posting impossible (everything goes to the admin chat).",
+        "TELEGRAM_CHANNEL_ID": "Your channel: @username or the −100… id (Telegram → channel → a post → Copy link → t.me/c/…).",
+        "TELEGRAM_ADMIN_CHAT_ID": "Your own Telegram id: send /id to the bot in a private chat (or @userinfobot).",
+        "CHANNEL_SITE_URL": "Your public site origin, e.g. https://example.org — used to build post links. Falls back to APP_URL.",
+        "APP_URL": "The same site origin; already set on most deployments. Used when CHANNEL_SITE_URL is empty.",
+        "CHANNEL_DISCUSSION_ENABLED": "1 enables the “discuss in comments” call-to-action. Optional.",
+        "TELEGRAM_BOT_TOKEN": "BotFather → /mybots → your bot → API Token. Optional here: the bot settings tab stores it encrypted."
+      },
       "envLabel": "Environment",
       "envUnset": "CHANNEL_AUTOPOST is not set — the panel controls posting",
       "envKill": "CHANNEL_AUTOPOST=off is set on the server and overrides the panel",
