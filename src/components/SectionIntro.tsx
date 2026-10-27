@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, HelpCircle, Lightbulb, X } from "lucide-react";
 import { HELP_SECTIONS, type HelpSection, type SectionHelpOverride } from "@/lib/growth/defaults";
+import { invalidateBootConfig, loadBootConfig } from "@/lib/bootConfig";
 
 // ---------------------------------------------------------------------------
 // Admin overrides (GET /api/config/guide) — fetched once per page load and
@@ -16,9 +17,10 @@ let helpPromise: Promise<Record<string, SectionHelpOverride>> | null = null;
 function loadHelp(): Promise<Record<string, SectionHelpOverride>> {
   if (helpCache) return Promise.resolve(helpCache);
   if (!helpPromise) {
-    helpPromise = fetch("/api/config/guide", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { help: {} }))
-      .then((d) => (helpCache = d?.help && typeof d.help === "object" ? d.help : {}))
+    // Comes from the shared boot payload — the navbar and the logo ask for the
+    // same document, so this is not a fourth request.
+    helpPromise = loadBootConfig()
+      .then((config) => (helpCache = config.guide))
       .catch(() => (helpCache = {}));
   }
   return helpPromise;
@@ -28,6 +30,7 @@ function loadHelp(): Promise<Record<string, SectionHelpOverride>> {
 export function invalidateSectionHelp() {
   helpCache = null;
   helpPromise = null;
+  invalidateBootConfig();
   if (typeof window !== "undefined") window.dispatchEvent(new Event("scholarbridge:help-updated"));
 }
 

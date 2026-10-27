@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { publicCacheJson } from "@/lib/apiResponse";
 import { DEFAULT_HIDDEN_NAV_ITEMS, parseHiddenNav } from "@/lib/navSections";
 
 // The configuration changes only through explicit admin actions; cache briefly
@@ -18,14 +18,8 @@ export async function GET() {
     // (same pattern as /api/config/branding).
     const { getConfig } = await import("@/lib/config");
     const raw = await getConfig("nav_hidden_items");
-    return NextResponse.json(
-      { hidden: parseHiddenNav(raw) },
-      { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" } }
-    );
+    return publicCacheJson({ hidden: parseHiddenNav(raw) });
   } catch {
-    return NextResponse.json(
-      { hidden: DEFAULT_HIDDEN_NAV_ITEMS },
-      { headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" } }
-    );
+    return publicCacheJson({ hidden: DEFAULT_HIDDEN_NAV_ITEMS }, { sMaxAge: 30, swr: 60 });
   }
 }

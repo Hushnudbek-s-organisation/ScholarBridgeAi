@@ -11,13 +11,15 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { answerPrompts, checklistItems, goalTemplates } from "@/db/schema";
 import { ensureRichPlatformDataSeeded } from "@/db/seedRichPlatformData";
+import {
+  ensureSchemaOnce,
+  forceSchemaRepair,
+  schemaGateSnapshot,
+  tableExistenceVerify,
+  tablesInStatements,
+} from "@/lib/schemaGate";
 import { growthStatements } from "./ddl";
 import { SEED_ANSWER_PROMPTS, SEED_CHECKLIST_ITEMS, SEED_GOAL_TEMPLATES } from "./defaults";
-
-let ready: boolean | null = null;
-let lastAttempt = 0;
-let inflight: Promise<boolean> | null = null;
-const RETRY_MS = 60_000;
 
 async function seedIfEmpty() {
   const existingGoals = await db.select({ title: goalTemplates.title }).from(goalTemplates);
@@ -54,28 +56,26 @@ async function seedIfEmpty() {
   await ensureRichPlatformDataSeeded();
 }
 
-export async function ensureGrowthTables(): Promise<boolean> {
-  if (ready === true) return true;
-  if (inflight) return inflight;
-  const now = Date.now();
-  if (ready === false && now - lastAttempt < RETRY_MS) return false;
-  lastAttempt = now;
-  inflight = (async () => {
-    try {
-      for (const stmt of growthStatements()) {
-        await db.execute(sql.raw(stmt));
-      }
-      await seedIfEmpty();
-      ready = true;
-    } catch (err) {
-      console.error("[growth] schema bootstrap failed:", err);
-      ready = false;
-    } finally {
-      inflight = null;
-    }
-    return ready === true;
-  })();
-  return inflight;
+const GATE = "growth";
+
+async function repair(): Promise<void> {
+  for (const stmt of growthStatements()) {
+    await db.execute(sql.raw(stmt));
+  }
+  await seedIfEmpty();
+}
+
+/** Once per process, shared by every route bundle — `lib/schemaGate.ts`. */
+export function ensureGrowthTables(): Promise<boolean> {
+  return ensureSchemaOnce(GATE, repair, tableExistenceVerify(tablesInStatements(growthStatements())));
+}
+
+export function forceGrowthRepair(): Promise<boolean> {
+  return forceSchemaRepair(GATE, repair);
+}
+
+export function growthSchemaStatus() {
+  return schemaGateSnapshot().entries[GATE] ?? { ready: null, at: null, how: null, problems: [] };
 }
 
 /** Standard 503 body when the tables could not be prepared. */

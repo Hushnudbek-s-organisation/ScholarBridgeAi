@@ -112,6 +112,18 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
   return response;
 }
 
+/**
+ * Public, session-independent API reads whose route handler sets its own
+ * `Cache-Control` (see `src/lib/apiResponse.ts` → `publicCacheJson`). Every
+ * entry is a reviewed public read with no student data.
+ */
+export const PUBLIC_CACHEABLE_API: ReadonlySet<string> = new Set([
+  "/api/config/boot",
+  "/api/config/branding",
+  "/api/config/nav",
+  "/api/config/guide",
+]);
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -152,7 +164,15 @@ export function proxy(request: NextRequest) {
     // Privacy: an API response can contain one student's data (journey plans,
     // documents, essays) and is frequently authorized by a cookie or a Telegram
     // bearer token. Never let a shared cache or an intermediary store it.
-    apiResponse.headers.set("Cache-Control", "no-store, private");
+    //
+    // The one exception is the reviewed, session-independent configuration
+    // endpoints below: they carry UI settings and nothing else, they are asked
+    // for on every app boot, and they are worth caching. Their route handlers set
+    // the policy (`publicCacheJson`), so the middleware must not overwrite it —
+    // a header set here wins over the one the route sets.
+    if (!PUBLIC_CACHEABLE_API.has(pathname)) {
+      apiResponse.headers.set("Cache-Control", "no-store, private");
+    }
     return apiResponse;
   }
 
@@ -192,7 +212,7 @@ export function proxy(request: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });
-    return applySecurityHeaders(response, csp, miniApp);
+    return withPrivateNoStore(request, applySecurityHeaders(response, csp, miniApp));
   }
 
   // For unprefixed requests, seed the default locale cookie if it is missing.
@@ -206,7 +226,22 @@ export function proxy(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
     });
   }
-  return applySecurityHeaders(response, csp, miniApp);
+  return withPrivateNoStore(request, applySecurityHeaders(response, csp, miniApp));
+}
+
+/**
+ * An HTML response for a visitor who already carries cookies (a session, a
+ * locale, a referral) must not be stored by a shared proxy. This used to be a
+ * `headers()` rule in next.config.ts keyed on `has: cookie`, but Next applied it
+ * to every response regardless of the condition — including the public config
+ * endpoints, whose own `Cache-Control` it then overwrote. Keeping the rule here
+ * makes it exact and testable (`npm run test:security`).
+ */
+export function withPrivateNoStore(request: NextRequest, response: NextResponse): NextResponse {
+  if (request.headers.get("cookie")) {
+    response.headers.set("Cache-Control", "no-store, private");
+  }
+  return response;
 }
 
 export const config = {

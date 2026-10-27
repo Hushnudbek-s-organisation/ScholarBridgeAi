@@ -13,6 +13,7 @@ import type { Messages } from "@/i18n/messages";
 import { trackScreen } from "@/lib/tracker";
 import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
+import { loadBootConfig } from "@/lib/bootConfig";
 import { PageTransition } from "@/components/motion";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
@@ -315,9 +316,9 @@ export function Home({
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/config/nav");
-        const data = await res.json();
-        if (alive) setHiddenNav(parseHiddenNav(JSON.stringify(data.hidden ?? [])));
+        // One shared boot payload for branding + nav + guide (see lib/bootConfig).
+        const config = await loadBootConfig();
+        if (alive) setHiddenNav(parseHiddenNav(JSON.stringify(config.nav)));
       } catch {
         // keep the defaults — the shell still works offline
       }

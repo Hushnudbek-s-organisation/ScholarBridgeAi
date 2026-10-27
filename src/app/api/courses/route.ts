@@ -24,15 +24,17 @@ import { completionSummary } from "@/lib/calculations";
  */
 
 import { seedCourses } from "@/db/seed";
+import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
+import { ensureSchemaOnce } from "@/lib/schemaGate";
 
-let seedCheckedThisProcess = false;
-
-/** Seed the demo course once per process (fresh databases self-bootstrap;
- *  subsequent GETs never touch the seed path again). */
+/** Seed the demo course once per PROCESS (not once per route bundle) — and not
+ *  at all on a production request path, where seeding belongs to the CLI or the
+ *  admin seed endpoint (`POST /api/admin/courses/seed`). */
 async function ensureCatalogueSeeded() {
-  if (seedCheckedThisProcess) return;
-  seedCheckedThisProcess = true;
-  await seedCourses();
+  await ensureSchemaOnce("seed:courses", async () => {
+    if (!requestPathSeedingEnabled()) return;
+    await seedCourses();
+  });
 }
 
 export async function GET(req: Request) {

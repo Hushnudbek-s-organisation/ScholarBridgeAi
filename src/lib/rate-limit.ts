@@ -12,24 +12,47 @@ import { NextResponse } from "next/server";
 
 interface Bucket {
   hits: number[];
+  /** The window this key was last counted with (sweep uses it to expire). */
+  windowMs: number;
+  /** Timestamp of the newest hit (sweep uses it to expire). */
+  lastHitAt: number;
 }
 
 const buckets = new Map<string, Bucket>();
 let lastSweep = Date.now();
 const SWEEP_INTERVAL_MS = 60_000;
+/** Never hold more timestamps than this for one key (see `MAX_HITS_SLACK`). */
+const MAX_HITS_SLACK = 1;
 
-/** Drop buckets that have been idle longer than their window. */
+/**
+ * Drop buckets that can no longer block anyone.
+ *
+ * The previous sweep deleted only buckets whose `hits` array was already empty
+ * — and `hits` is pruned on *access*, not by the sweep, so a bucket that had
+ * ever been hit never became empty. Idle keys therefore accumulated until the
+ * 50 000-entry hard cap kicked in and deleted arbitrary buckets, which could
+ * evict budgets that were still live. Expiring by `lastHitAt + windowMs`
+ * frees exactly the buckets that cannot affect a verdict any more.
+ */
 function sweep(now: number): void {
   if (now - lastSweep < SWEEP_INTERVAL_MS) return;
   lastSweep = now;
+  const minIdleMs = 10 * 60_000;
   for (const [key, bucket] of buckets) {
-    if (bucket.hits.length === 0) buckets.delete(key);
+    if (now - bucket.lastHitAt > Math.max(bucket.windowMs, minIdleMs)) buckets.delete(key);
   }
   // Hard cap: never let a flood of unique keys grow the map without bound.
   if (buckets.size > 50_000) {
     const keys = [...buckets.keys()].slice(0, buckets.size - 25_000);
     for (const key of keys) buckets.delete(key);
   }
+}
+
+/** Diagnostics/tests: how much memory the limiter is holding. */
+export function rateLimitBucketStats(): { buckets: number; hits: number } {
+  let hits = 0;
+  for (const bucket of buckets.values()) hits += bucket.hits.length;
+  return { buckets: buckets.size, hits };
 }
 
 export interface RateLimitOptions {
@@ -57,10 +80,20 @@ export function checkRateLimit(key: string, options: RateLimitOptions): RateLimi
   const now = options.now ? options.now() : Date.now();
   sweep(now);
 
-  const bucket = buckets.get(key) ?? { hits: [] };
+  const bucket = buckets.get(key) ?? { hits: [], windowMs: options.windowMs, lastHitAt: now };
   const windowStart = now - options.windowMs;
+  bucket.windowMs = options.windowMs;
+  bucket.lastHitAt = now;
   bucket.hits = bucket.hits.filter((t) => t > windowStart);
   bucket.hits.push(now);
+  // Bound the memory ONE key can cost. A caller that floods a single key (a
+  // broken client retry loop, an attacker) used to grow its timestamp array
+  // for the whole window — limit × 10⁶ requests meant 10⁶ numbers retained.
+  // The OLDEST hits are the ones that decide when the block lifts, so those
+  // are what we keep; the verdict, `remaining` and `Retry-After` stay exactly
+  // the same as before, only the redundant tail is dropped.
+  const maxHits = Math.max(1, options.limit) + MAX_HITS_SLACK;
+  if (bucket.hits.length > maxHits) bucket.hits = bucket.hits.slice(0, maxHits);
   buckets.set(key, bucket);
 
   const over = bucket.hits.length > options.limit;
@@ -79,6 +112,9 @@ export function checkRateLimit(key: string, options: RateLimitOptions): RateLimi
 /** Remove all counters (used by tests and by admin sign-out). */
 export function resetRateLimits(): void {
   buckets.clear();
+  // Also re-arm the sweep, so an injected clock in a test is honoured instead
+  // of being compared against the process's real start time.
+  lastSweep = 0;
 }
 
 /**

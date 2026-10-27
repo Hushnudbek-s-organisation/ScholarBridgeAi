@@ -5,34 +5,38 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import {
+  ensureSchemaOnce,
+  forceSchemaRepair,
+  schemaGateSnapshot,
+  tableExistenceVerify,
+  tablesInStatements,
+} from "@/lib/schemaGate";
 import { ownershipStatements } from "./ddl";
 
-let ready: boolean | null = null;
-let lastAttempt = 0;
-let inflight: Promise<boolean> | null = null;
-const RETRY_MS = 60_000;
+const GATE = "ownership";
 
-export async function ensureOwnershipTables(): Promise<boolean> {
-  if (ready === true) return true;
-  if (inflight) return inflight;
-  const now = Date.now();
-  if (ready === false && now - lastAttempt < RETRY_MS) return false;
-  lastAttempt = now;
-  inflight = (async () => {
-    try {
-      for (const stmt of ownershipStatements()) {
-        await db.execute(sql.raw(stmt));
-      }
-      ready = true;
-    } catch (err) {
-      console.error("[ownership] schema bootstrap failed:", (err as Error)?.message);
-      ready = false;
-    } finally {
-      inflight = null;
-    }
-    return ready === true;
-  })();
-  return inflight;
+async function repair(): Promise<void> {
+  for (const stmt of ownershipStatements()) {
+    await db.execute(sql.raw(stmt));
+  }
+}
+
+/**
+ * Once per process (shared with every route bundle — see `lib/schemaGate.ts`),
+ * and never at all when `SCHEMA_AUTO_REPAIR=off`.
+ */
+export function ensureOwnershipTables(): Promise<boolean> {
+  return ensureSchemaOnce(GATE, repair, tableExistenceVerify(tablesInStatements(ownershipStatements())));
+}
+
+/** Admin "retry" action: run the DDL now, even with request-path repair off. */
+export function forceOwnershipRepair(): Promise<boolean> {
+  return forceSchemaRepair(GATE, repair);
+}
+
+export function ownershipSchemaStatus() {
+  return schemaGateSnapshot().entries[GATE] ?? { ready: null, at: null, how: null, problems: [] };
 }
 
 export const OWNERSHIP_UNAVAILABLE = {

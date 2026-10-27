@@ -20,7 +20,7 @@
  *   npm run test:schema          # offline
  *   DATABASE_URL=… npm run db:verify   # live (Supabase: Project → Settings → Database)
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import "./lib/env";
 import {
@@ -136,6 +136,30 @@ async function main() {
       if (docColumnIssues.length) console.log(`  ✗ Column documentation mismatch: ${docColumnIssues.join(", ")}`);
     }
 
+    // Finished work belongs in archive/ (see archive/README.md). The 90
+    // rewrite reports and their 80 SQL files were filed back into docs/ and
+    // supabase/ over several weeks until `docs/` had more history in it than
+    // documentation. This keeps the two folders from refilling: `supabase/*.sql`
+    // is the DDL the app is checked against, not a migration log.
+    heading("ARCHIVE HYGIENE — finished pass reports belong in archive/");
+    const straySupabase = sqlFiles
+      .map((file) => file.file)
+      .filter((file) => /scholarship_rewrite_pass/i.test(file));
+    let strayDocs: string[] = [];
+    try {
+      strayDocs = readdirSync(join(__dirname, "..", "docs"))
+        .filter((file) => /^SCHOLARSHIP_REWRITE_PASS_/i.test(file))
+        .map((file) => `docs/${file}`);
+    } catch {
+      /* docs/ missing — not this check's problem */
+    }
+    const strayPassFiles = [...straySupabase, ...strayDocs];
+    if (strayPassFiles.length === 0) {
+      console.log("  ✓ no finished pass reports at the top of docs/ or supabase/");
+    } else {
+      console.log(`  ✗ ${strayPassFiles.length} finished pass file(s) outside archive/: ${strayPassFiles.slice(0, 5).join(", ")}${strayPassFiles.length > 5 ? ", …" : ""}`);
+    }
+
     // Offline drift is a warning, not a failure: the lazy-DDL app repairs
     // most of it at runtime. Hard-fail only when a NON-self-healing gap
     // exists (that is exactly "bazi joylar Supabaseda to'g'ri kelmayapti").
@@ -148,9 +172,13 @@ async function main() {
       ...extraDocTables,
       ...duplicateDocTables,
       ...docColumnIssues,
+      ...strayPassFiles,
     ];
     if (critical.length) {
       console.error("\nFAILED: there is non-self-healing schema drift or schema-documentation coverage mismatch.");
+      if (strayPassFiles.length) {
+        console.error(`  → ${strayPassFiles.length} finished pass file(s) outside archive/: move them to archive/docs or archive/supabase (see archive/README.md).`);
+      }
       process.exit(1);
     }
     console.log("\nPASSED (offline).");

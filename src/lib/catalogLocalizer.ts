@@ -39,6 +39,7 @@
 import type { Locale } from "@/i18n/config";
 import { dictionaries } from "@/i18n/messages.server";
 import { countryTranslationKey } from "@/lib/countries";
+import { memoizedLocalize, memoizedText, type LocalizedFields } from "@/lib/localizeMemo";
 
 /* ============================================================================
  * 0. UTILITIES
@@ -325,7 +326,7 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
   Anthropology: { uz: "Antropologiya", ru: "Антропология" },
   History: { uz: "Tarix", ru: "История" },
   Philosophy: { uz: "Falsafa", ru: "Философия" },
-  "Theology / Religious Studies": { uz: "Ilоhiyat / Diniy ta'limotlar", ru: "Богословие / Религиоведение" },
+  "Theology / Religious Studies": { uz: "Ilohiyot / Diniy ta'limotlar", ru: "Богословие / Религиоведение" },
   "Fine Arts": { uz: "Tasviriy san'at", ru: "Изобразительное искусство" },
   "Performing Arts / Music": { uz: "Sahnalik san'ati / Musiqa", ru: "Сценическое искусство / Музыка" },
   Design: { uz: "Dizayn", ru: "Дизайн" },
@@ -362,6 +363,14 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
   "Business Analytics": { uz: "Biznes analitikasi", ru: "Бизнес-аналитика" },
   "Systems Engineering": { uz: "Tizimlar muhandisligi", ru: "Системная инженерия" },
   "Chemistry / Materials": { uz: "Kimyo / Materiallar", ru: "Химия / Материалы" },
+  // Gaps found by comparing the dictionary with data/programs_enriched_full.csv
+  // (2026-10-27): these field labels were reaching students in English.
+  "Information Systems": { uz: "Axborot tizimlari", ru: "Информационные системы" },
+  Interdisciplinary: { uz: "Fanlararo yo'nalish", ru: "Междисциплинарное направление" },
+  Arts: { uz: "San'at", ru: "Искусство" },
+  Humanities: { uz: "Gumanitar fanlar", ru: "Гуманитарные науки" },
+  Veterinary: { uz: "Veterinariya", ru: "Ветеринария" },
+  "Veterinary Medicine": { uz: "Veterinariya meditsinasi", ru: "Ветеринарная медицина" },
 };
 
 /** Word/alias layer — small tokens that appear inside compound field names. */
@@ -490,6 +499,16 @@ const DEGREE_LEVEL_NAMES: Record<string, Record<TargetLocale, string>> = {
   Any: { uz: "Barcha bosqichlar", ru: "Любой уровень" },
   "Bachelor's": { uz: "Bakalavriat", ru: "Бакалавриат" },
   "Master's": { uz: "Magistratura", ru: "Магистратура" },
+  // Gaps found in data/programs_enriched_full.csv (`degree_level`, `degree`).
+  Undergraduate: { uz: "Bakalavriat", ru: "Бакалавриат" },
+  Postgraduate: { uz: "Magistratura", ru: "Магистратура" },
+  Graduate: { uz: "Magistratura", ru: "Магистратура" },
+  Doctoral: { uz: "Doktorantura (PhD)", ru: "Докторантура (PhD)" },
+  Doctorate: { uz: "Doktorantura (PhD)", ru: "Докторантура (PhD)" },
+  Diploma: { uz: "Diplom dasturi", ru: "Программа диплома" },
+  Certificate: { uz: "Sertifikat dasturi", ru: "Программа сертификата" },
+  Foundation: { uz: "Tayyorlov dasturi", ru: "Подготовительная программа" },
+  "Language course": { uz: "Til kursi", ru: "Языковые курсы" },
 };
 
 export function localizeDegreeLevel(level: string | null | undefined, locale: Locale): string {
@@ -518,6 +537,33 @@ export function localizeCoverageType(coverage: string | null | undefined, locale
   if (!tl) return coverage;
   const hit = COVERAGE_TYPE_NAMES[coverage] ?? COVERAGE_TYPE_NAMES[keyOf(coverage)];
   return hit ? hit[tl] : coverage;
+}
+
+/**
+ * Funding type ("Merit-based", "Need-based", …) — the `scholarships.funding_type`
+ * column the admin panel can fill. The column is optional and usually empty, so
+ * an unknown value is returned verbatim rather than guessed.
+ */
+const FUNDING_TYPE_NAMES: Record<string, Record<TargetLocale, string>> = {
+  "Merit-based": { uz: "Natijaga asoslangan (merit)", ru: "По заслугам (merit)" },
+  "Merit based": { uz: "Natijaga asoslangan (merit)", ru: "По заслугам (merit)" },
+  Merit: { uz: "Natijaga asoslangan (merit)", ru: "По заслугам (merit)" },
+  "Need-based": { uz: "Ehtiyojga asoslangan", ru: "По потребности (need-based)" },
+  "Need based": { uz: "Ehtiyojga asoslangan", ru: "По потребности (need-based)" },
+  "Merit & Need": { uz: "Merit va ehtiyoj", ru: "Заслуги и потребность" },
+  "Merit- and need-based": { uz: "Merit va ehtiyoj asosida", ru: "По заслугам и потребности" },
+  "Need-based; varies": { uz: "Ehtiyojga asoslangan; farq qiladi", ru: "По потребности; варьируется" },
+  "Full funding": { uz: "To'liq moliyalashtirish", ru: "Полное финансирование" },
+  "Partial funding": { uz: "Qisman moliyalashtirish", ru: "Частичное финансирование" },
+  "Tuition only": { uz: "Faqat kontrakt", ru: "Только обучение" },
+};
+
+export function localizeFundingType(type: string | null | undefined, locale: Locale): string {
+  if (locale === "en" || type == null || type === "") return type ?? "";
+  const tl = targetLocale(locale);
+  if (!tl) return type;
+  const hit = FUNDING_TYPE_NAMES[type] ?? FUNDING_TYPE_NAMES[keyOf(type)];
+  return hit ? hit[tl] : type;
 }
 
 /** University type display (canonical filter values "Public"/"Private" kept). */
@@ -615,6 +661,15 @@ const REQUIREMENT_PHRASES: Record<string, Record<TargetLocale, string>> = {
 
 /** Whole-row requirement string dictionary (seeded rows, exact match). */
 const REQUIREMENT_FULL: Record<string, Record<TargetLocale, string>> = {
+  // Unverified-award requirement placeholders.
+  "Check the official programme page for current eligibility, coverage, required documents, and application dates.": {
+    uz: "Joriy talablar, qamrov, kerakli hujjatlar va ariza muddatlari uchun rasmiy dastur sahifasini tekshiring.",
+    ru: "Проверьте официальную страницу программы: актуальные требования, покрытие, документы и сроки подачи.",
+  },
+  "Confirm current eligibility, award details, country availability, and application dates with the official provider.": {
+    uz: "Joriy talablar, grant shartlari, mamlakatlar ro'yxati va ariza muddatlarini rasmiy taqdim etuvchi bilan tasdiqlang.",
+    ru: "Уточните актуальные требования, условия стипендии, доступные страны и сроки подачи у официального провайдера.",
+  },
   "Bachelor's degree, strong leadership record, 3 recommendation letters, essay of intent, and commitment to return to home country.":
     {
       uz: "Bakalavr darajasi, kuchli liderlik tajribasi, 3 ta tavsiyanoma xati, niyat xati (essay) va vatanga qaytish majburiyati.",
@@ -665,6 +720,13 @@ export function localizeRequirementText(text: string | null | undefined, locale:
   if (locale === "en" || text == null || text === "") return text ?? "";
   const tl = targetLocale(locale);
   if (!tl) return text;
+  return memoizedText("requirement-text", locale, text, () => translateRequirementText(text, locale));
+}
+
+/** The uncached translation — `memoizedText` remembers the result per input. */
+function translateRequirementText(text: string, locale: Locale): string {
+  // `text` is non-empty and `locale` is uz/ru here — the caller guarantees it.
+  const tl = targetLocale(locale) ?? "uz";
   const full = REQUIREMENT_FULL[text.trim()];
   if (full) return full[tl];
   const trimmed = text.trim();
@@ -683,7 +745,9 @@ export function localizeRequirementText(text: string | null | undefined, locale:
       .join(", ");
   }
   return text;
+
 }
+
 
 /* ============================================================================
  * 5. PATTERN LAYER — UNIVERSITY DESCRIPTIONS
@@ -695,6 +759,17 @@ const UNI_TEMPLATE_1 =
 
 /** Seeded university descriptions — exact-match dictionary. */
 const UNIVERSITY_DESCRIPTIONS: Record<string, Record<TargetLocale, string>> = {
+  // Seeded "not verified yet" disclaimers. They are shown on every institution
+  // record that has no source-verified description, so they are translated like
+  // any other user-facing sentence — and they stay honest about the state.
+  "Institution identity seed. Current programmes, tuition, admissions, and rankings are not source-verified.": {
+    uz: "Muassasa identifikatori (boshlang'ich yozuv). Joriy dasturlar, kontrakt, qabul va reytinglar manba bilan tasdiqlanmagan.",
+    ru: "Запись идентификации учреждения. Текущие программы, стоимость обучения, приём и рейтинги не подтверждены источником.",
+  },
+  "Institution record; current programme, cost, ranking, and admissions details are not source-verified.": {
+    uz: "Muassasa yozuvi; joriy dasturlar, xarajatlar, reyting va qabul ma'lumotlari manba bilan tasdiqlanmagan.",
+    ru: "Запись учреждения; текущие программы, стоимость, рейтинг и условия приёма не подтверждены источником.",
+  },
   "World leader in technology, AI research, and engineering. MIT provides cutting-edge labs, startup incubators, and unmatched industry connections.":
     {
       uz: "Texnologiya, sun'iy intellekt tadqiqotlari va muhandislik bo'yicha jahon yetakchisi. MIT zamonaviy laboratoriyalar, startap inkubatorlari va tengsiz sanoat aloqalarini taqdim etadi.",
@@ -761,6 +836,13 @@ export function localizeUniversityDescription(text: string | null | undefined, l
   if (locale === "en" || text == null || text === "") return text ?? "";
   const tl = targetLocale(locale);
   if (!tl) return text;
+  return memoizedText("university-description", locale, text, () => translateUniversityDescription(text, locale));
+}
+
+/** The uncached translation — `memoizedText` remembers the result per input. */
+function translateUniversityDescription(text: string, locale: Locale): string {
+  // `text` is non-empty and `locale` is uz/ru here — the caller guarantees it.
+  const tl = targetLocale(locale) ?? "uz";
   const exact = UNIVERSITY_DESCRIPTIONS[text.trim()];
   if (exact) return exact[tl];
   // Template 1 — "premier global research university in {city}, {country}, ...".
@@ -775,7 +857,9 @@ export function localizeUniversityDescription(text: string | null | undefined, l
     return `Престижный глобальный исследовательский университет в городе ${city}, ${country} — в топ-${rank}; центр всеобъемлющего глобального партнёрства и академического превосходства.`;
   }
   return text;
+
 }
+
 
 /* ============================================================================
  * 6. DICTIONARY + PATTERN LAYER — HIGHLIGHTS
@@ -1133,6 +1217,13 @@ export function localizeProgramDescription(text: string | null | undefined, loca
   if (locale === "en" || text == null || text === "") return text ?? "";
   const tl = targetLocale(locale);
   if (!tl) return text;
+  return memoizedText("program-description", locale, text, () => translateProgramDescription(text, locale));
+}
+
+/** The uncached translation — `memoizedText` remembers the result per input. */
+function translateProgramDescription(text: string, locale: Locale): string {
+  // `text` is non-empty and `locale` is uz/ru here — the caller guarantees it.
+  const tl = targetLocale(locale) ?? "uz";
   const exact = PROGRAM_DESCRIPTIONS[text.trim()];
   if (exact) return exact[tl];
   // Template pattern 2 — positional groups:
@@ -1151,7 +1242,9 @@ export function localizeProgramDescription(text: string | null | undefined, loca
     return `${program} — ${m[5]}-летняя очная программа ${level} в ${city}, ${country} (${m[2]}). Совмещает строгую базовую теорию, практические исследовательские лаборатории и глобальную подготовку к карьере.`;
   }
   return text;
+
 }
+
 
 /* ============================================================================
  * 9. PATTERN LAYER — SCHOLARSHIPS (title / description / requirement)
@@ -1287,6 +1380,15 @@ function localizeScholarshipTitleGeneric(text: string, tl: TargetLocale): string
 
 /** Exact seeded scholarship descriptions. */
 const SCHOLARSHIP_DESCRIPTIONS: Record<string, Record<TargetLocale, string>> = {
+  // Unverified-award disclaimers (used by the public catalogue boundary).
+  "Current award details have not been reviewed against an official source.": {
+    uz: "Joriy grant ma'lumotlari rasmiy manba bilan ko'rib chiqilmagan.",
+    ru: "Текущие условия стипендии не сверены с официальным источником.",
+  },
+  "Current award terms and dates are not yet verified; consult the linked official programme page.": {
+    uz: "Joriy shartlar va muddatlar hali tasdiqlanmagan; havola qilingan rasmiy dastur sahifasini tekshiring.",
+    ru: "Текущие условия и даты ещё не подтверждены; проверьте официальную страницу программы по ссылке.",
+  },
   "Covers full tuition, living stipend, roundtrip airfare, health insurance, and visa support for international graduate students studying in the USA.":
     {
       uz: "AQShda tahsil olayotgan xalqaro magistratura talabalari uchun to'liq kontrakt, yashash stipendiyasi, qatnov aviachiptasi, tibbiy sug'urta va viza yordamini qamrab oladi.",
@@ -1337,6 +1439,13 @@ export function localizeScholarshipDescription(text: string | null | undefined, 
   if (locale === "en" || text == null || text === "") return text ?? "";
   const tl = targetLocale(locale);
   if (!tl) return text;
+  return memoizedText("scholarship-description", locale, text, () => translateScholarshipDescription(text, locale));
+}
+
+/** The uncached translation — `memoizedText` remembers the result per input. */
+function translateScholarshipDescription(text: string, locale: Locale): string {
+  // `text` is non-empty and `locale` is uz/ru here — the caller guarantees it.
+  const tl = targetLocale(locale) ?? "uz";
   const exact = SCHOLARSHIP_DESCRIPTIONS[text.trim()];
   if (exact) return exact[tl];
   const m = text.match(SCHOLARSHIP_TEMPLATE_3);
@@ -1348,7 +1457,9 @@ export function localizeScholarshipDescription(text: string | null | undefined, 
     return `Заслуженная международная стипендия для высокодостижимых абитуриентов, зачисленных на образовательные программы ${uni}.`;
   }
   return text;
+
 }
+
 
 export function localizeScholarshipRequirements(text: string | null | undefined, locale: Locale): string {
   return localizeRequirementText(text, locale);
@@ -1503,19 +1614,53 @@ interface UniversityRowLike {
   [key: string]: unknown;
 }
 
-/** Localize the display fields of a university row. `en` returns `uni` itself. */
+/** The fields `localizeUniversityRow` translates (memo signature). */
+const UNIVERSITY_LOCALIZED_FIELDS = [
+  "city",
+  "country",
+  "universityType",
+  "programMajor",
+  "description",
+  "highlights",
+] as const;
+
+function translateUniversityFields<T extends UniversityRowLike>(uni: T, locale: Locale): LocalizedFields {
+  const out: LocalizedFields = {};
+  if (typeof uni.city === "string") out.city = localizeCity(uni.city, locale);
+  if (typeof uni.country === "string") out.country = localizeCountry(uni.country, locale);
+  if (typeof uni.universityType === "string") out.universityType = localizeUniversityType(uni.universityType, locale);
+  if (typeof uni.programMajor === "string") out.programMajor = localizeMajorOrField(uni.programMajor, locale);
+  if (typeof uni.description === "string") out.description = localizeUniversityDescription(uni.description, locale);
+  if (typeof uni.highlights === "string") out.highlights = localizeHighlights(uni.highlights, locale);
+  return out;
+}
+
+/**
+ * Localize the display fields of a university row. `en` returns `uni` itself.
+ *
+ * The translation is memoized on `locale + id + updatedAt + the localizable
+ * fields` (`src/lib/localizeMemo.ts`) — the same catalogue row is localized on
+ * every catalogue request, and the description/pattern work is the expensive
+ * part. Per-request extras (match score, saved flag) are never cached: the
+ * memo stores translated strings only and the caller always gets a new object.
+ */
 export function localizeUniversityRow<T extends UniversityRowLike>(uni: T, locale: Locale): T {
   if (locale === "en") return passthrough(uni);
   const tl = targetLocale(locale);
   if (!tl) return uni;
+  // An array of highlights cannot be expressed as a translated string — take
+  // the plain path rather than teaching the memo about shapes.
+  const arrayHighlights = uni.highlights != null && typeof uni.highlights !== "string";
+  const fields = arrayHighlights
+    ? translateUniversityFields(uni, locale)
+    : memoizedLocalize("university", locale, uni, UNIVERSITY_LOCALIZED_FIELDS, (row) =>
+        translateUniversityFields(row as T, locale)
+      );
   return {
     ...uni,
-    city: typeof uni.city === "string" ? localizeCity(uni.city, locale) : uni.city,
-    country: typeof uni.country === "string" ? localizeCountry(uni.country, locale) : uni.country,
-    universityType: typeof uni.universityType === "string" ? localizeUniversityType(uni.universityType, locale) : uni.universityType,
-    programMajor: typeof uni.programMajor === "string" ? localizeMajorOrField(uni.programMajor, locale) : uni.programMajor,
-    description: typeof uni.description === "string" ? localizeUniversityDescription(uni.description, locale) : uni.description,
-    highlights: localizeHighlights(uni.highlights as Str, locale),
+    ...fields,
+    // Arrays/objects pass through the (uncached) translator untouched.
+    ...(arrayHighlights ? { highlights: localizeHighlights(uni.highlights as Str, locale) } : {}),
   };
 }
 
@@ -1529,6 +1674,7 @@ interface ScholarshipRowLike {
   description?: Str;
   requirements?: Str;
   statusLabel?: Str;
+  fundingType?: Str;
   expectedOpeningPeriod?: Str;
   [key: string]: unknown;
 }
@@ -1566,27 +1712,57 @@ export function localizeScholarshipProvider(provider: string | null | undefined,
   return hit ? hit[tl] : provider;
 }
 
-/** Localize a scholarship row (title/provider/country/coverage/levels/majors
- *  /description/requirements/status labels). `en` returns `s` itself. */
+/** The fields `localizeScholarshipRow` translates (memo signature). */
+const SCHOLARSHIP_LOCALIZED_FIELDS = [
+  "title",
+  "provider",
+  "country",
+  "coverageType",
+  "degreeLevels",
+  "eligibleMajors",
+  "description",
+  "requirements",
+  "statusLabel",
+  "fundingType",
+] as const;
+
+function translateScholarshipFields<T extends ScholarshipRowLike>(s: T, locale: Locale): LocalizedFields {
+  const out: LocalizedFields = {};
+  if (typeof s.title === "string") out.title = localizeScholarshipTitle(s.title, locale);
+  if (typeof s.provider === "string") out.provider = localizeScholarshipProvider(s.provider, locale);
+  if (typeof s.country === "string") out.country = localizeCountry(s.country, locale);
+  if (typeof s.coverageType === "string") out.coverageType = localizeCoverageType(s.coverageType, locale);
+  if (typeof s.degreeLevels === "string") out.degreeLevels = mapJsonStringArray(s.degreeLevels, (item) => localizeDegreeLevel(item, locale));
+  if (typeof s.eligibleMajors === "string") out.eligibleMajors = mapJsonStringArray(s.eligibleMajors, (item) => localizeMajorOrField(item, locale));
+  if (typeof s.description === "string") out.description = localizeScholarshipDescription(s.description, locale);
+  if (typeof s.requirements === "string") out.requirements = localizeScholarshipRequirements(s.requirements, locale);
+  if (typeof s.statusLabel === "string") out.statusLabel = localizeStatusValue(s.statusLabel, locale);
+  if (typeof s.fundingType === "string") out.fundingType = localizeFundingType(s.fundingType, locale);
+  return out;
+}
+
+/**
+ * Localize a scholarship row (title/provider/country/coverage/levels/majors
+ * /description/requirements/status labels). `en` returns `s` itself.
+ *
+ * Memoized like the university row: a 300-record catalogue is localized on
+ * every filter change, and the requirement/title patterns are the expensive
+ * half. Only translated strings are cached.
+ */
 export function localizeScholarshipRow<T extends ScholarshipRowLike>(s: T, locale: Locale): T {
   if (locale === "en") return passthrough(s);
   const tl = targetLocale(locale);
   if (!tl) return s;
+  const fields = memoizedLocalize("scholarship", locale, s, SCHOLARSHIP_LOCALIZED_FIELDS, (row) =>
+    translateScholarshipFields(row as T, locale)
+  );
   return {
     ...s,
     // Preserve canonical institution/award nomenclature alongside the
     // translated display field, so a student can still recognize official
     // names and source-page wording.
     officialTitle: s.title ?? null,
-    title: typeof s.title === "string" ? localizeScholarshipTitle(s.title, locale) : s.title,
-    provider: typeof s.provider === "string" ? localizeScholarshipProvider(s.provider, locale) : s.provider,
-    country: typeof s.country === "string" ? localizeCountry(s.country, locale) : s.country,
-    coverageType: typeof s.coverageType === "string" ? localizeCoverageType(s.coverageType, locale) : s.coverageType,
-    degreeLevels: mapJsonStringArray(s.degreeLevels as Str, (item) => localizeDegreeLevel(item, locale)),
-    eligibleMajors: mapJsonStringArray(s.eligibleMajors as Str, (item) => localizeMajorOrField(item, locale)),
-    description: typeof s.description === "string" ? localizeScholarshipDescription(s.description, locale) : s.description,
-    requirements: typeof s.requirements === "string" ? localizeScholarshipRequirements(s.requirements, locale) : s.requirements,
-    statusLabel: typeof s.statusLabel === "string" ? localizeStatusValue(s.statusLabel, locale) : s.statusLabel,
+    ...fields,
   };
 }
 
@@ -1596,6 +1772,10 @@ const STATUS_VALUES: Record<string, Record<TargetLocale, string>> = {
   CLOSED: { uz: "YOPILGAN", ru: "ЗАКРЫТА" },
   "deadline-overdue": { uz: "muddat o'tib ketgan", ru: "срок просрочен" },
   "deadline-soon": { uz: "muddat yaqinlashmoqda", ru: "срок скоро истекает" },
+  rolling: { uz: "Doimiy qabul", ru: "Приём круглый год" },
+  upcoming: { uz: "Yaqinlashmoqda", ru: "Скоро откроется" },
+  open: { uz: "Ochiq", ru: "Открыта" },
+  closed: { uz: "Yopilgan", ru: "Закрыта" },
 };
 
 export function localizeStatusValue(value: string | null | undefined, locale: Locale): string {
@@ -1617,26 +1797,39 @@ interface ProgramRowLike {
   [key: string]: unknown;
 }
 
-/** Localize a program row (with nested requirement entries). */
+/** The fields `localizeProgramRow` translates (memo signature). */
+const PROGRAM_LOCALIZED_FIELDS = ["name", "field", "degree", "studyMode", "language", "description"] as const;
+
+function translateProgramFields<T extends ProgramRowLike>(p: T, locale: Locale): LocalizedFields {
+  const out: LocalizedFields = {};
+  if (typeof p.name === "string") out.name = localizeProgramName(p.name, locale);
+  if (typeof p.field === "string") out.field = localizeMajorOrField(p.field, locale);
+  if (typeof p.degree === "string") out.degree = localizeDegreeLevel(p.degree, locale);
+  if (typeof p.studyMode === "string") out.studyMode = localizeStudyMode(p.studyMode, locale);
+  if (typeof p.language === "string") out.language = localizeProgramLanguage(p.language, locale);
+  if (typeof p.description === "string") out.description = localizeProgramDescription(p.description, locale);
+  return out;
+}
+
+/** Localize a program row (with nested requirement entries). Memoized on the
+ *  program's identity, like the university and scholarship rows. */
 export function localizeProgramRow<T extends ProgramRowLike>(p: T, locale: Locale): T {
   if (locale === "en") return passthrough(p);
   const tl = targetLocale(locale);
   if (!tl) return p;
-  const requirements = Array.isArray(p.requirements)
-    ? p.requirements.map((req) => localizeRequirementRow(req, locale))
-    : p.requirements;
+  const fields = memoizedLocalize("program", locale, p, PROGRAM_LOCALIZED_FIELDS, (row) =>
+    translateProgramFields(row as T, locale)
+  );
   return {
     ...p,
     // Keep the original catalogue/programme name available as well as the
     // localized display form; official application links may use it verbatim.
     officialName: p.name ?? null,
-    name: typeof p.name === "string" ? localizeProgramName(p.name, locale) : p.name,
-    field: typeof p.field === "string" ? localizeMajorOrField(p.field, locale) : p.field,
-    degree: typeof p.degree === "string" ? localizeDegreeLevel(p.degree, locale) : p.degree,
-    studyMode: typeof p.studyMode === "string" ? localizeStudyMode(p.studyMode, locale) : p.studyMode,
-    language: typeof p.language === "string" ? localizeProgramLanguage(p.language, locale) : p.language,
-    description: typeof p.description === "string" ? localizeProgramDescription(p.description, locale) : p.description,
-    requirements,
+    ...fields,
+    // Nested requirement rows are translated (and memoized) one level down.
+    requirements: Array.isArray(p.requirements)
+      ? p.requirements.map((req) => localizeRequirementRow(req, locale))
+      : p.requirements,
   };
 }
 
@@ -1668,6 +1861,26 @@ const PROGRAM_LANGUAGE_NAMES: Record<string, Record<TargetLocale, string>> = {
   Chinese: { uz: "Xitoy tili", ru: "Китайский" },
   Russian: { uz: "Rus tili", ru: "Русский" },
   Uzbek: { uz: "O'zbek tili", ru: "Узбекский" },
+  Arabic: { uz: "Arab tili", ru: "Арабский" },
+  Portuguese: { uz: "Portugal tili", ru: "Португальский" },
+  Swedish: { uz: "Shved tili", ru: "Шведский" },
+  Danish: { uz: "Daniya tili", ru: "Датский" },
+  Norwegian: { uz: "Norveg tili", ru: "Норвежский" },
+  Finnish: { uz: "Fin tili", ru: "Финский" },
+  Icelandic: { uz: "Island tili", ru: "Исландский" },
+  Latvian: { uz: "Latviya tili", ru: "Латышский" },
+  Polish: { uz: "Polyak tili", ru: "Польский" },
+  Czech: { uz: "Chex tili", ru: "Чешский" },
+  Hungarian: { uz: "Vengr tili", ru: "Венгерский" },
+  // Compound values used by the programme catalogue ("German/English").
+  "German/English": { uz: "Nemis / Ingliz tili", ru: "Немецкий / Английский" },
+  "English/German": { uz: "Ingliz / Nemis tili", ru: "Английский / Немецкий" },
+  "French/English": { uz: "Fransuz / Ingliz tili", ru: "Французский / Английский" },
+  "English/French": { uz: "Ingliz / Fransuz tili", ru: "Английский / Французский" },
+  "Spanish/English": { uz: "Ispan / Ingliz tili", ru: "Испанский / Английский" },
+  "English/Spanish": { uz: "Ingliz / Ispan tili", ru: "Английский / Испанский" },
+  "Italian/English": { uz: "Italyan / Ingliz tili", ru: "Итальянский / Английский" },
+  "Dutch/English": { uz: "Golland / Ingliz tili", ru: "Голландский / Английский" },
 };
 
 export function localizeProgramLanguage(language: string | null | undefined, locale: Locale): string {
@@ -1842,19 +2055,39 @@ interface OpportunityRowLike {
 /** Localize opportunity title/description/fields/country (provider stays
  *  verbatim). `en` returns the row itself. `fields` may be a JSON-list string
  *  (DB `text` column) or a parsed array. */
+/** The fields `localizeOpportunityRow` translates (memo signature). */
+const OPPORTUNITY_LOCALIZED_FIELDS = ["title", "country", "fields", "description"] as const;
+
+function translateOpportunityFields<T extends OpportunityRowLike>(o: T, locale: Locale): LocalizedFields {
+  const out: LocalizedFields = {};
+  if (typeof o.title === "string") out.title = localizeOpportunityTitle(o.title, locale);
+  if (typeof o.country === "string") out.country = localizeCountry(o.country, locale);
+  if (typeof o.fields === "string") out.fields = mapJsonStringArray(o.fields, (item) => localizeMajorOrField(item, locale));
+  if (typeof o.description === "string") out.description = localizeOpportunityDescription(o.description, locale);
+  return out;
+}
+
+/** Localize an opportunity row. Memoized like the rest of the catalogue. */
 export function localizeOpportunityRow<T extends OpportunityRowLike>(o: T, locale: Locale): T {
   if (locale === "en") return passthrough(o);
   const tl = targetLocale(locale);
   if (!tl) return o;
-  const fields = Array.isArray(o.fields)
-    ? o.fields.map((f) => (typeof f === "string" ? localizeMajorOrField(f, locale) : f))
-    : mapJsonStringArray(o.fields as Str, (item) => localizeMajorOrField(item, locale));
+  // `fields` can arrive as a real array (already parsed by the route) — that
+  // shape is translated directly instead of going through the string memo.
+  if (Array.isArray(o.fields)) {
+    return {
+      ...o,
+      title: typeof o.title === "string" ? localizeOpportunityTitle(o.title, locale) : o.title,
+      country: typeof o.country === "string" ? localizeCountry(o.country, locale) : o.country,
+      fields: o.fields.map((f) => (typeof f === "string" ? localizeMajorOrField(f, locale) : f)),
+      description: typeof o.description === "string" ? localizeOpportunityDescription(o.description, locale) : o.description,
+    };
+  }
   return {
     ...o,
-    title: typeof o.title === "string" ? localizeOpportunityTitle(o.title, locale) : o.title,
-    country: typeof o.country === "string" ? localizeCountry(o.country, locale) : o.country,
-    fields,
-    description: typeof o.description === "string" ? localizeOpportunityDescription(o.description, locale) : o.description,
+    ...memoizedLocalize("opportunity", locale, o, OPPORTUNITY_LOCALIZED_FIELDS, (row) =>
+      translateOpportunityFields(row as T, locale)
+    ),
   };
 }
 

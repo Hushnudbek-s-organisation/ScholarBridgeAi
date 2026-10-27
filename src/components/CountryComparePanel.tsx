@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Globe2, Loader2, RefreshCw } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { countriesMatch, countryTranslationKey, resolveCountryCode, withQsTop200Countries } from "@/lib/countries";
 import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -25,8 +25,32 @@ interface Comparison {
   workRights: { avgYears: number; published: number } | null;
 }
 
+/**
+ * Student-visa facts for one destination, already collapsed to the visitor's
+ * language by the API. `null` fields are genuinely unpublished — the UI says so
+ * rather than showing a zero or a guess.
+ */
+interface CountryFactRow {
+  country: string;
+  iso2: string;
+  proofOfFunds: { usd: number | null; localText: string; period: string; note: string | null };
+  partTimeWorkHours: number | null;
+  partTimeWorkNote: string | null;
+  postStudyWorkMonths: number | null;
+  postStudyWorkNote: string | null;
+  elevenYearDiploma: "direct" | "foundation" | "varies" | null;
+  elevenYearNote: string | null;
+  recognitionUrl: string | null;
+  embassy: { kind: "embassy" | "consulate" | "honorary-consulate" | null; name: string | null; address: string | null; website: string | null };
+  sourceName: string;
+  sourceUrl: string;
+  lastVerifiedAt: string;
+  asOf: string | null;
+}
+
 interface CompareData {
   countries: Comparison[];
+  facts?: Record<string, CountryFactRow>;
   available: { country: string; universities: number }[];
 }
 
@@ -41,6 +65,7 @@ function money(v: number | null): string {
  */
 export function CountryComparePanel() {
   const t = useTranslations("countryCompare");
+  const locale = useLocale();
   const tCountry = useTranslations("countryNames");
   const tc = useTranslations("common");
   const [data, setData] = useState<CompareData | null>(null);
@@ -57,7 +82,9 @@ export function CountryComparePanel() {
     setLoading(true);
     setError(null);
     try {
-      const qs = countries.length ? `?countries=${encodeURIComponent(countries.join(","))}` : "";
+      const params = new URLSearchParams({ locale });
+      if (countries.length) params.set("countries", countries.join(","));
+      const qs = `?${params.toString()}`;
       const res = await fetch(`/api/countries/compare${qs}`, { cache: "no-store" });
       const b = await res.json();
       if (!res.ok) throw new Error(b?.error ?? `HTTP ${res.status}`);
@@ -67,13 +94,13 @@ export function CountryComparePanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [locale]);
 
   // First load — setState only inside promise callbacks, never synchronously
   // in the effect body.
   useEffect(() => {
     let live = true;
-    fetch("/api/countries/compare", { cache: "no-store" })
+    fetch(`/api/countries/compare?locale=${encodeURIComponent(locale)}`, { cache: "no-store" })
       .then((res) => res.json().then((b) => (res.ok ? b : Promise.reject(new Error(b?.error ?? `HTTP ${res.status}`)))))
       .then((b) => {
         if (live) setData(b);
@@ -87,7 +114,7 @@ export function CountryComparePanel() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [locale]);
 
   const toggle = (c: string) =>
     setSelected((prev) =>
@@ -251,6 +278,105 @@ export function CountryComparePanel() {
           <p className="mt-2 text-[10px] text-slate-400">{t("publishedNote")}</p>
         </ScrollRegion>
       )}
+      {/* Student-visa facts — sourced and dated, never estimated. A country
+          without verified facts simply shows "not published" cells. */}
+      {data && data.countries.length > 0 && (
+        <div className="mt-5">
+          <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{t("factsTitle")}</h4>
+          <p className="mt-1 max-w-3xl text-[11px] text-slate-500">{t("factsSubtitle")}</p>
+          <div className="mt-3 space-y-2">
+            {data.countries.map((c) => {
+              const facts = data.facts?.[c.country] ?? null;
+              const countryKey = countryTranslationKey(c.country);
+              return (
+                <div key={`facts-${c.country}`} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                    <CountryFlag country={c.country} size="xs" />
+                    {countryKey ? tCountry(countryKey) : c.country}
+                  </div>
+                  {!facts && <p className="mt-1 text-[11px] text-slate-400">{t("factsMissing")}</p>}
+                  {facts && (
+                    <>
+                      <dl className="mt-2 grid gap-2 text-[11px] sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          <dt className="font-bold text-slate-500">{t("proofOfFunds")}</dt>
+                          <dd className="text-slate-700 dark:text-slate-200">
+                            {facts.proofOfFunds.usd != null && (
+                              <span className="font-semibold">${facts.proofOfFunds.usd.toLocaleString("en-US")} </span>
+                            )}
+                            <span className="text-slate-500">{facts.proofOfFunds.localText}</span>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-bold text-slate-500">{t("partTimeWork")}</dt>
+                          <dd className="text-slate-700 dark:text-slate-200">
+                            {facts.partTimeWorkHours != null
+                              ? t("hoursPerWeek", { hours: facts.partTimeWorkHours })
+                              : t("notPublishedCountry")}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-bold text-slate-500">{t("postStudyWork")}</dt>
+                          <dd className="text-slate-700 dark:text-slate-200">
+                            {facts.postStudyWorkMonths != null
+                              ? t("months", { months: facts.postStudyWorkMonths })
+                              : t("notPublishedCountry")}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-bold text-slate-500">{t("elevenYearLabel")}</dt>
+                          <dd className="text-slate-700 dark:text-slate-200">
+                            {facts.elevenYearDiploma ? t(`elevenYear.${facts.elevenYearDiploma}`) : t("notPublishedCountry")}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                        <span>
+                          <span className="font-bold">{t("embassy")}:</span>{" "}
+                          {facts.embassy.kind ? t(`embassyKinds.${facts.embassy.kind}`) : t("embassyKinds.none")}
+                          {facts.embassy.name ? ` — ${facts.embassy.name}` : ""}
+                        </span>
+                        <a
+                          href={facts.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                        >
+                          {facts.sourceName}
+                        </a>
+                        <span>{t("verifiedOn", { date: facts.lastVerifiedAt })}</span>
+                      </div>
+                      {(facts.proofOfFunds.note || facts.partTimeWorkNote || facts.postStudyWorkNote || facts.elevenYearNote) && (
+                        <details className="mt-2 text-[11px] text-slate-600 dark:text-slate-300">
+                          <summary className="cursor-pointer font-semibold text-slate-500">{t("factsDetail")}</summary>
+                          <ul className="mt-1 space-y-1 pl-4">
+                            {facts.proofOfFunds.note && <li className="list-disc">{facts.proofOfFunds.note}</li>}
+                            {facts.partTimeWorkNote && <li className="list-disc">{facts.partTimeWorkNote}</li>}
+                            {facts.postStudyWorkNote && <li className="list-disc">{facts.postStudyWorkNote}</li>}
+                            {facts.elevenYearNote && <li className="list-disc">{facts.elevenYearNote}</li>}
+                          </ul>
+                          {facts.recognitionUrl && (
+                            <a
+                              href={facts.recognitionUrl}
+                              target="_blank"
+                              rel="noopener noreferrer nofollow"
+                              className="mt-1 inline-block font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                            >
+                              {t("recognitionDatabase")}
+                            </a>
+                          )}
+                        </details>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-400">{t("factsNote")}</p>
+        </div>
+      )}
+
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="catalogue" className="mt-2" />
     </div>

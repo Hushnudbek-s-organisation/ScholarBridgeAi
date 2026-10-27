@@ -64,7 +64,8 @@ async function main() {
   const ssrf = await import("../src/lib/ssrf");
   const request = await import("../src/lib/request");
   const payments = await import("../src/lib/payments");
-  const { contentSecurityPolicy, proxy: middleware } = await import("../src/proxy");
+  const proxyModule = await import("../src/proxy");
+  const { contentSecurityPolicy, proxy: middleware } = proxyModule;
   const {
     isTransientRestoreFailure,
     sessionRestoreDelayMs,
@@ -319,6 +320,34 @@ async function main() {
     assert.equal(rateLimit.checkRateLimit("w", { limit: 3, windowMs: 1000, now }).ok, false);
     t = 1001; // window elapsed
     assert.equal(rateLimit.checkRateLimit("w", { limit: 3, windowMs: 1000, now }).ok, true);
+  });
+
+  check("a flood on one key keeps a bounded number of timestamps", () => {
+    rateLimit.resetRateLimits();
+    const now = () => 5_000;
+    for (let i = 0; i < 5_000; i++) {
+      rateLimit.checkRateLimit("flood", { limit: 5, windowMs: 60_000, now });
+    }
+    const stats = rateLimit.rateLimitBucketStats();
+    assert.equal(stats.buckets, 1);
+    assert.ok(stats.hits <= 6, `retained ${stats.hits} timestamps for a single key`);
+  });
+
+  check("the sweep releases idle buckets instead of letting them pile up", () => {
+    rateLimit.resetRateLimits();
+    let t = 0;
+    const now = () => t;
+    for (let i = 0; i < 50; i++) {
+      rateLimit.checkRateLimit(`idle-${i}`, { limit: 5, windowMs: 1_000, now });
+    }
+    assert.equal(rateLimit.rateLimitBucketStats().buckets, 50);
+    t = 30 * 60_000;
+    rateLimit.checkRateLimit("fresh", { limit: 5, windowMs: 1_000, now });
+    assert.equal(
+      rateLimit.rateLimitBucketStats().buckets,
+      1,
+      "buckets that can no longer block anyone must be freed by the sweep"
+    );
   });
 
   check("rateLimitedResponse returns 429 + Retry-After", () => {
@@ -1137,6 +1166,7 @@ async function main() {
     // Public reads: shared catalogues and configuration only. None of these may
     // ever return another student's data — each is reviewed in SECURITY.md.
     const PUBLIC_READS = new Set([
+      "config/boot GET",
       "config/branding GET",
       "config/guide GET",
       "config/nav GET",
@@ -1242,6 +1272,37 @@ async function main() {
     assert.match(String(res.headers.get("cache-control")), /no-store/);
     const health = middleware(new NextRequest("https://app.example.org/api/health"));
     assert.match(String(health.headers.get("cache-control")), /no-store/);
+  });
+
+  check("only the reviewed public config reads may set their own cache policy", () => {
+    const sec = proxyModule as unknown as { PUBLIC_CACHEABLE_API: ReadonlySet<string> };
+    assert.deepEqual(
+      [...sec.PUBLIC_CACHEABLE_API].sort(),
+      ["/api/config/boot", "/api/config/branding", "/api/config/guide", "/api/config/nav"],
+      "the public-cacheable allowlist is exactly the three session-independent config reads"
+    );
+    // The middleware must not stamp no-store on those paths: a header set in the
+    // middleware wins over the one the route handler sets.
+    for (const path of sec.PUBLIC_CACHEABLE_API) {
+      const res = middleware(new NextRequest(`https://app.example.org${path}`));
+      assert.equal(res.headers.get("cache-control"), null, `${path} is left to its route handler`);
+    }
+    const guarded = middleware(new NextRequest("https://app.example.org/api/config/telegram"));
+    assert.match(String(guarded.headers.get("cache-control")), /no-store/, "everything else stays no-store");
+  });
+
+  check("an HTML response for a visitor with cookies is never shared", () => {
+    const anonymous = middleware(new NextRequest("https://app.example.org/scholarships"));
+    assert.equal(anonymous.headers.get("cache-control"), null, "an anonymous page is left cacheable");
+    const signedIn = middleware(
+      new NextRequest("https://app.example.org/scholarships", { headers: { cookie: "sb_session=abc" } })
+    );
+    assert.match(String(signedIn.headers.get("cache-control")), /no-store/);
+    // The public config endpoints keep their shared policy even with a cookie.
+    const branding = middleware(
+      new NextRequest("https://app.example.org/api/config/branding", { headers: { cookie: "sb_session=abc" } })
+    );
+    assert.equal(branding.headers.get("cache-control"), null);
   });
 }
 

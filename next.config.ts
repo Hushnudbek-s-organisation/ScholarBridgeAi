@@ -26,8 +26,11 @@ async function securityHeaders() {
       // genuinely unused, so they stay off for every origin.
       value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
     },
-    // Never let an authenticated JSON response be cached by a shared proxy.
-    { key: "Cache-Control", value: "no-store", has: [{ type: "header", key: "cookie" }] },
+    // NOTE: the "cache nothing for a visitor with cookies" rule lives in
+    // `src/proxy.ts` (`withPrivateNoStore`), not here. A `headers()` entry with
+    // `has: [{ header: "cookie" }]` was applied by every response regardless of
+    // the condition, which silently overrode `Cache-Control` on the public
+    // config endpoints and made the whole site uncacheable.
   ];
 }
 

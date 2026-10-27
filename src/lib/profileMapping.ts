@@ -96,15 +96,60 @@ export function toChancingProfile(row: ProfileRow): ChancingProfile {
  * engine counts. Kept separate from `toChancingProfile` so that function stays
  * pure; callers that can await use `chancingProfileWithActivities`.
  */
+/**
+ * How long one student's activity rows may be reused (ms).
+ *
+ * Every scoring route needs them (`/api/dashboard`, `/api/chancing`,
+ * `/api/universities`, the detail page…), and each call was a database round
+ * trip for a table of at most a few dozen rows that changes only when the
+ * student edits the Activities pane — which invalidates this memo explicitly
+ * (see `invalidateSavedActivities`, called from `/api/activities` and from
+ * `invalidateProfileMatchCache`).
+ */
+const ACTIVITIES_MEMO_TTL_MS = (() => {
+  const raw = Number(process.env.ACTIVITIES_MEMO_TTL_MS ?? 15_000);
+  return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 15_000;
+})();
+
+type ActivitiesRow = {
+  category: string | null;
+  role: string | null;
+  achievements: string | null;
+};
+
+const ACTIVITIES_MEMO_KEY = "__sbSavedActivitiesMemo";
+
+function activitiesMemo(): Map<number, { expiresAt: number; rows: ActivitiesRow[] }> {
+  const g = globalThis as typeof globalThis & {
+    [ACTIVITIES_MEMO_KEY]?: Map<number, { expiresAt: number; rows: ActivitiesRow[] }>;
+  };
+  if (!g[ACTIVITIES_MEMO_KEY]) g[ACTIVITIES_MEMO_KEY] = new Map();
+  return g[ACTIVITIES_MEMO_KEY]!;
+}
+
+/** Drop the memoized activity rows — one student, or everybody. */
+export function invalidateSavedActivities(profileId?: number): void {
+  const memo = activitiesMemo();
+  if (profileId == null) memo.clear();
+  else memo.delete(profileId);
+}
+
 export async function loadSavedActivities(profileId: number) {
-  const rows = await db
+  const memo = activitiesMemo();
+  const now = Date.now();
+  const hit = memo.get(profileId);
+  if (hit && hit.expiresAt > now) return hit.rows;
+
+  const rows = (await db
     .select({
       category: studentActivities.category,
       role: studentActivities.role,
       achievements: studentActivities.achievements,
     })
     .from(studentActivities)
-    .where(eq(studentActivities.profileId, profileId));
+    .where(eq(studentActivities.profileId, profileId))) as ActivitiesRow[];
+
+  if (ACTIVITIES_MEMO_TTL_MS > 0) memo.set(profileId, { expiresAt: now + ACTIVITIES_MEMO_TTL_MS, rows });
   return rows;
 }
 

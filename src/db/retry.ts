@@ -75,9 +75,23 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
  * Never wrap a transaction in this: a retried statement would restart it
  * halfway through.
  */
+function envInt(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(raw)));
+}
+
+/**
+ * Defaults are deliberately gentle (two attempts, 120 ms) — a request that hits
+ * a pooler hiccup should transparently retry, not queue for seconds. A busy
+ * self-hosted install can raise `PG_RETRY_ATTEMPTS` / `PG_RETRY_BASE_MS`.
+ */
 export async function withDbRetry<T>(run: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
-  const attempts = Math.max(1, Math.min(3, Math.floor(options.attempts ?? 2)));
-  const base = Math.max(0, Math.min(2_000, Math.floor(options.baseDelayMs ?? 120)));
+  const attempts = Math.max(1, Math.min(4, Math.floor(options.attempts ?? envInt("PG_RETRY_ATTEMPTS", 2, 1, 4))));
+  const base = Math.max(
+    0,
+    Math.min(2_000, Math.floor(options.baseDelayMs ?? envInt("PG_RETRY_BASE_MS", 120, 0, 2_000)))
+  );
   const sleep = options.sleep ?? defaultSleep;
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {

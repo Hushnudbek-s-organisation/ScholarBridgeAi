@@ -70,6 +70,26 @@ services:
       # unset, Render's RENDER_EXTERNAL_URL is used automatically.
       - key: APP_URL
         sync: false
+      # --- Performance / schema policy (added with the Phase-1 speed pass) ---
+      # With this set to "off", a web request never runs CREATE TABLE / ALTER
+      # TABLE: it verifies the tables exist and the DDL is applied by
+      #   npm run db:schema        (all additive repairs)
+      #   npm run db:seed          (schema + catalogue)
+      #   Admin → Diagnostics → Retry   (POST /api/admin/diagnostics {action:"retry"})
+      # Unset means "auto": repair once per process on first use (fine for a
+      # small self-hosted install, slower for a managed one).
+      - key: SCHEMA_AUTO_REPAIR
+        value: "off"
+      # Production requests do not seed. "auto" = seed from a request only
+      # outside production; "on"/"off" force the behaviour. The CLI seeder and
+      # the admin seed buttons bypass this.
+      - key: SEED_ON_REQUEST
+        value: "auto"
+      # Process-local catalogue snapshot TTL (ms). Admin edits still appear
+      # immediately on the instance that served them; other instances follow
+      # within this window.
+      - key: CATALOG_CACHE_TTL_MS
+        value: "300000"
       # Legacy name, still honoured after APP_URL.
       - key: NEXT_PUBLIC_APP_URL
         sync: false

@@ -68,6 +68,7 @@ import {
   type NavGroupId,
 } from "@/lib/navSections";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { loadBootConfig } from "@/lib/bootConfig";
 
 export interface StudentProfile {
   id: number;
@@ -384,13 +385,13 @@ export function Navbar({
     let alive = true;
     const loadHidden = async () => {
       try {
-        const res = await fetch("/api/config/nav", { cache: "no-store" });
-        const data = await res.json();
-        if (alive && Array.isArray(data.hidden)) {
+        // Shared boot payload: one request for branding + nav + guide.
+        const config = await loadBootConfig();
+        if (alive) {
           // Re-normalize on the client too: legacy configs can otherwise hide
           // a locked destination and the Edit Profile link would bounce back to
           // the dashboard when its target pane is opened.
-          setHiddenItems(parseHiddenNav(JSON.stringify(data.hidden)));
+          setHiddenItems(parseHiddenNav(JSON.stringify(config.nav)));
         }
       } catch {
         // offline / API down — keep the defaults, the sidebar still works.

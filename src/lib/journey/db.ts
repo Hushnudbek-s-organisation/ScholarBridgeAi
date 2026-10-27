@@ -11,35 +11,41 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ensureRichPlatformDataSeeded } from "@/db/seedRichPlatformData";
+import {
+  ensureSchemaOnce,
+  forceSchemaRepair,
+  schemaGateSnapshot,
+  tableExistenceVerify,
+  tablesInStatements,
+} from "@/lib/schemaGate";
 import { journeyStatements } from "./ddl";
 
-let ready: boolean | null = null;
-let lastAttempt = 0;
-let inflight: Promise<boolean> | null = null;
-const RETRY_MS = 60_000;
+const GATE = "journey";
 
-export async function ensureJourneyTables(): Promise<boolean> {
-  if (ready === true) return true;
-  if (inflight) return inflight;
-  const now = Date.now();
-  if (ready === false && now - lastAttempt < RETRY_MS) return false;
-  lastAttempt = now;
-  inflight = (async () => {
-    try {
-      for (const stmt of journeyStatements()) {
-        await db.execute(sql.raw(stmt));
-      }
-      await ensureRichPlatformDataSeeded();
-      ready = true;
-    } catch (err) {
-      console.error("[journey] schema bootstrap failed:", err);
-      ready = false;
-    } finally {
-      inflight = null;
-    }
-    return ready === true;
-  })();
-  return inflight;
+async function repair(): Promise<void> {
+  for (const stmt of journeyStatements()) {
+    await db.execute(sql.raw(stmt));
+  }
+  await ensureRichPlatformDataSeeded();
+}
+
+/**
+ * Once per PROCESS (not per route bundle — see `lib/schemaGate.ts`), and never
+ * on a request path when `SCHEMA_AUTO_REPAIR=off`: a managed database gets its
+ * schema from `supabase/*.sql` or the seed CLI, so a user request must not wait
+ * for `CREATE TABLE`.
+ */
+export function ensureJourneyTables(): Promise<boolean> {
+  return ensureSchemaOnce(GATE, repair, tableExistenceVerify(tablesInStatements(journeyStatements())));
+}
+
+/** Admin "retry" action / CLI: run the DDL now regardless of the mode. */
+export function forceJourneyRepair(): Promise<boolean> {
+  return forceSchemaRepair(GATE, repair);
+}
+
+export function journeySchemaStatus() {
+  return schemaGateSnapshot().entries[GATE] ?? { ready: null, at: null, how: null, problems: [] };
 }
 
 /** Standard 503 body when the tables could not be prepared. */

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
+import type { ReactElement } from "react";
+import { Building2, ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
@@ -220,48 +221,109 @@ export default async function UniversitiesPage({
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6">
-            {universities.map((university) => (
-              <article
-                key={university.id}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-2xl" aria-hidden>{university.flag_emoji}</span>
-                  {university.world_ranking != null && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 ring-inset">
-                      <Trophy className="h-3 w-3" aria-hidden />#{university.world_ranking}
+            {universities.map((university) => {
+              const majors = (university.program_major ?? "")
+                .split(",")
+                .map((field) => field.trim())
+                .filter(Boolean)
+                .map((field) => localizeMajorOrField(field, locale));
+              // Card discipline: at most three badges, then "+N". A card that
+              // tries to say everything says nothing — the profile page is one
+              // click away and holds the rest.
+              const badges: CatalogBadge[] = ([
+                university.world_ranking != null
+                  ? { key: "rank", icon: <Trophy className="h-3 w-3" aria-hidden />, label: `#${number.format(university.world_ranking)}`, strong: true }
+                  : null,
+                university.university_type
+                  ? { key: "type", icon: <Building2 className="h-3 w-3" aria-hidden />, label: localizeUniversityType(university.university_type, locale), strong: false }
+                  : null,
+                ...majors.map((major, index) => ({
+                  key: `major-${index}`,
+                  icon: <GraduationCap className="h-3 w-3" aria-hidden />,
+                  label: major,
+                  strong: false,
+                })),
+              ] as (CatalogBadge | null)[]).filter((badge): badge is CatalogBadge => badge != null);
+              const visibleBadges = badges.slice(0, 3);
+              const hiddenBadges = badges.length - visibleBadges.length;
+
+              return (
+                <article
+                  key={university.id}
+                  className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-2xl" aria-hidden>{university.flag_emoji}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                      <MapPin className="h-3 w-3 shrink-0 text-slate-400" aria-hidden />
+                      <span className="break-words">{localizeCountry(university.country, locale)}</span>
                     </span>
+                  </div>
+
+                  {/* Equal-height cards start with a fixed-length title: the
+                      clamp keeps a long institution name from pushing its own
+                      numbers below its neighbours'. */}
+                  <h2 className="mt-2 line-clamp-2 break-words text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                    <Link href={`/universities/${university.id}`} className="hover:text-blue-800">
+                      {university.name}
+                    </Link>
+                  </h2>
+                  <p className="mt-1 break-words text-xs text-slate-600">
+                    {localizeCity(university.city, locale) || localizeCountry(university.country, locale)}
+                  </p>
+
+                  {visibleBadges.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {visibleBadges.map((badge) => (
+                        <li
+                          key={badge.key}
+                          className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            badge.strong
+                              ? "bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {badge.icon}
+                          <span className="line-clamp-1 break-words">{badge.label}</span>
+                        </li>
+                      ))}
+                      {hiddenBadges > 0 && (
+                        <li className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                          +{number.format(hiddenBadges)}
+                        </li>
+                      )}
+                    </ul>
                   )}
-                </div>
-                <h2 className="mt-2 break-words text-sm font-bold text-slate-900 sm:text-base">
-                  {university.name}
-                </h2>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                  <span className="break-words">{[localizeCity(university.city, locale), localizeCountry(university.country, locale)].filter(Boolean).join(", ")}</span>
-                </p>
-                {university.program_major && (
-                  <p className="mt-1 break-words text-xs text-slate-500">{localizeMajorOrField(university.program_major, locale)}</p>
-                )}
-                <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs dark:border-slate-700">
-                  <CatalogFact label={copy.institutionType} value={university.university_type ? localizeUniversityType(university.university_type, locale) : copy.notPublished} />
-                  <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
-                  <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
-                  <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />
-                  <CatalogFact label={copy.postStudyWork} value={university.post_study_work_visa_years == null ? copy.notPublished : `${number.format(university.post_study_work_visa_years)} ${university.post_study_work_visa_years === 1 ? copy.year : copy.years}`} numeric />
-                </dl>
-                {university.official_website_url && (
-                  <Link
-                    href={university.official_website_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-auto inline-flex min-h-11 items-center gap-1 pt-4 text-xs font-semibold text-blue-700 hover:text-blue-900 sm:text-sm"
-                  >
-                    {copy.website} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                  </Link>
-                )}
-              </article>
-            ))}
+
+                  <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs">
+                    <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
+                    <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
+                    <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />
+                  </dl>
+
+                  <div className="mt-auto flex items-center gap-1.5 pt-4">
+                    <Link
+                      href={`/universities/${university.id}`}
+                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
+                    >
+                      {copy.viewDetails}
+                    </Link>
+                    {university.official_website_url && (
+                      <a
+                        href={university.official_website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={copy.website}
+                        aria-label={copy.website}
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:text-blue-700"
+                      >
+                        <ExternalLink className="h-4 w-4" aria-hidden />
+                      </a>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
 
@@ -274,6 +336,9 @@ export default async function UniversitiesPage({
     </LocaleProvider>
   );
 }
+
+/** One badge on a catalogue card — at most three render, the rest fold into "+N". */
+type CatalogBadge = { key: string; icon: ReactElement; label: string; strong: boolean };
 
 function CatalogFact({ label, value, numeric = false }: { label: string; value: string; numeric?: boolean }) {
   return (

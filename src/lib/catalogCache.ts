@@ -14,7 +14,7 @@
  * milliseconds.
  *
  * Invalidation:
- *   • TTL (60 s) is the safety net;
+ *   • TTL (5 min by default, `CATALOG_CACHE_TTL_MS`) is the safety net;
  *   • `invalidateCatalogCache()` is called by admin writes to universities,
  *     programs, scholarships and opportunities, so an operator sees their own
  *     catalogue edit on the very next request;
@@ -40,18 +40,33 @@ import {
 import { inArray, eq } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
 import { pickBestSource } from "@/lib/sourcePick";
-import { chancingProfileWithActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { chancingProfileWithActivities, invalidateSavedActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   resolvedUsdUniversityCosts,
   resolvedUsdScholarshipAmount,
   type ResolvedUsdUniversityCosts,
 } from "@/lib/usdCosts";
 import type { StudentProfileData, UniversityData } from "@/lib/matching";
+import { invalidateLocalizeMemo, localizeMemoStats } from "@/lib/localizeMemo";
+import { invalidateMatchMemo, matchMemoStats } from "@/lib/matchMemo";
 
-/** How long a base catalogue snapshot may be served (ms). */
-export const CATALOG_TTL_MS = 60_000;
+/**
+ * How long a base catalogue snapshot may be served (ms).
+ *
+ * Five minutes, not one: the snapshot is language-neutral (localisation happens
+ * later, per response) and only changes through an admin write, which calls
+ * `invalidateCatalogCache()` and therefore still appears immediately on the
+ * instance that served the edit. `CATALOG_CACHE_TTL_MS` tunes it.
+ */
+function envTtl(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(raw)));
+}
+
+export const CATALOG_TTL_MS = envTtl("CATALOG_CACHE_TTL_MS", 300_000, 5_000, 900_000);
 /** How long a profile's derived match inputs may be reused (ms). */
-export const PROFILE_MATCH_TTL_MS = 15_000;
+export const PROFILE_MATCH_TTL_MS = envTtl("PROFILE_MATCH_CACHE_TTL_MS", 15_000, 0, 120_000);
 
 export type SourceSignal = {
   sourceUrl: string | null;
@@ -478,6 +493,10 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
     opportunitiesEntry = null;
     opportunitiesInFlight = null;
   }
+  // The localized strings and the scores are derived from these rows: an admin
+  // edit must never be served from a memo after the row changed.
+  invalidateLocalizeMemo();
+  invalidateMatchMemo();
 }
 
 /**
@@ -485,6 +504,9 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
  * change (e.g. an administrator editing the catalogue) can affect all.
  */
 export function invalidateProfileMatchCache(profileId?: number) {
+  // The activity rows feed every score too — dropping one without the other
+  // would serve a fresh profile with a stale portfolio.
+  invalidateSavedActivities(profileId);
   if (profileId == null) {
     profileMatchCache.clear();
     return;
@@ -507,6 +529,8 @@ export function resetCatalogCacheForTests() {
 /** Diagnostics for the operations dashboard / tests. */
 export function catalogCacheStats() {
   return {
+    localization: localizeMemoStats(),
+    matches: matchMemoStats(),
     universitiesCached: fresh(universitiesEntry) !== null,
     scholarshipsCached: fresh(scholarshipsEntry) !== null,
     opportunitiesCached: fresh(opportunitiesEntry) !== null,

@@ -175,6 +175,22 @@ check("QS Top 200 dataset contains all 200 ranked universities plus KAIST", () =
   assert.equal(ox.qsRank, 4);
   assert.equal(kaist.officialDomain, "kaist.ac.kr");
 });
+check("every QS benchmark carries its estimate provenance", () => {
+  // These bands are compiled from Common Data Sets and admissions statistics —
+  // not figures the universities publish as official. No consumer may present
+  // them as verified, so the flag must be on EVERY row and on every derived
+  // fallback (a row without it could be rendered as a fact).
+  const unflagged = QS_TOP_200_BENCHMARKS.filter((b) => b.isEstimated !== true || !b.estimateBasis);
+  assert.equal(unflagged.length, 0, `${unflagged.length} benchmark rows lost their provenance flag`);
+  const derived = matchQsUniversityBenchmark({
+    name: "Some University Nobody Ranked",
+    country: "Germany",
+    worldRanking: 900,
+  });
+  assert.equal(derived.isEstimated, true, "a rank-derived band is an estimate");
+  assert.match(derived.estimateBasis, /rank/i);
+});
+
 check("14 granular department selectivity profiles differentiate CS/AI from Humanities", () => {
   assert.equal(Object.keys(PROGRAM_DEPARTMENT_PROFILES).length, 14);
   const csDept = resolveProgramDepartmentProfile("BSc in Computer Science and AI");

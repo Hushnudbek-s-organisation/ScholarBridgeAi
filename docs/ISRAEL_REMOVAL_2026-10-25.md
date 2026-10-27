@@ -71,7 +71,7 @@ Kodda Isroilga oid hech qanday havola yo'q: `src/`, `scripts/` va `src/i18n/mess
 | notes | "Imported from the Top 300 Universities dataset (PDF 2026). Availability: Limited." |
 | source_reliability | 8 |
 
-**Muhim izoh:** ikkala qator ham import qilingan shablon qatorlar edi — uydirma USD summalar, tekshirilmagan IELTS/GPA, yalang'och domen manbalar va "Varies; typically Jan–Mar" kabi noaniq muddat. Ular baribir keyingi passlarda qayta yozilishi yoki nafaqaga chiqarilishi kerak edi, shuning uchun o'chirish tadqiqot qiymatini yo'qotmaydi. Tiklash kerak bo'lsa, yuqoridagi jadval yetarli emas — to'liq qatorni tiklash uchun `docs/SCHOLARSHIP_REWRITE_PASS_*.md` konvensiyasiga ko'ra qaytadan tekshirish tavsiya etiladi.
+**Muhim izoh:** ikkala qator ham import qilingan shablon qatorlar edi — uydirma USD summalar, tekshirilmagan IELTS/GPA, yalang'och domen manbalar va "Varies; typically Jan–Mar" kabi noaniq muddat. Ular baribir keyingi passlarda qayta yozilishi yoki nafaqaga chiqarilishi kerak edi, shuning uchun o'chirish tadqiqot qiymatini yo'qotmaydi. Tiklash kerak bo'lsa, yuqoridagi jadval yetarli emas — to'liq qatorni tiklash uchun `archive/docs/SCHOLARSHIP_REWRITE_PASS_*.md` konvensiyasiga ko'ra qaytadan tekshirish tavsiya etiladi.
 
 ---
 

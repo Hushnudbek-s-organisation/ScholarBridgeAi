@@ -7,6 +7,7 @@ import { refreshSeededScholarshipCycles } from "./seedScholarshipCycles";
 import { seedOpportunities } from "./seedOpportunities";
 import { seedRichPlatformData, ensureRichPlatformDataSeeded } from "./seedRichPlatformData";
 import { seedOutcomesAndStories, ensureOutcomesAndStoriesSeeded } from "./seedOutcomesAndStories";
+import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
 import { ensureGrowthTables } from "@/lib/growth/db";
 import { ensureJourneyTables } from "@/lib/journey/db";
 import {
@@ -78,6 +79,10 @@ export function resetSeedDatabaseCache() {
 
 export async function seedDatabase(options?: { force?: boolean }): Promise<void> {
   if (!options?.force) {
+    // Production requests never seed: the catalogue is a deployment concern
+    // (scripts/seed-db.ts, POST /api/admin/refresh, or the admin seed button).
+    // See `src/lib/db/requestSeeding.ts` for the policy and the override.
+    if (!requestPathSeedingEnabled()) return;
     if (seedDatabaseCompleted) return;
     if (seedDatabasePromise) return seedDatabasePromise;
   }
@@ -327,14 +332,10 @@ async function runSeedDatabase(force = false) {
       } catch (err) {
         console.error("Verified university-type top-up failed:", err);
       }
-      if (force) {
-        await runExistingCatalogTopUps();
-      } else {
-        // Do not block student-facing GET /api/universities or GET /api/scholarships
-        // on the heavier catalogue/schema top-ups.
-        seedDatabaseCompleted = true;
-        void runExistingCatalogTopUps();
-      }
+      // The heavier catalogue/schema top-ups never block a student-facing GET
+      // and never run on a production request path — `seedDatabase()` already
+      // returned early there unless an operator forced it.
+      await runExistingCatalogTopUps();
       return;
     }
 

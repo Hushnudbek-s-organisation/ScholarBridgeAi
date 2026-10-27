@@ -18,14 +18,28 @@
  * Usage:  npm run db:seed        (needs DATABASE_URL)
  */
 import "./lib/env";
+
+// A CLI run IS the seeding step: allow it even on a production NODE_ENV, where
+// a normal web request is not allowed to seed (see `lib/db/requestSeeding.ts`).
+process.env.SEED_ON_REQUEST = "on";
+// …and apply the additive schema repairs now, instead of leaving them to a
+// request that (in production) is not allowed to run DDL.
+process.env.SCHEMA_AUTO_REPAIR = "auto";
 import { seedDatabase, seedForum, seedCourses, seedGamification } from "@/db/seed";
 import { seedProgramCatalog } from "@/db/seedProgramCatalog";
 import { refreshSeededScholarshipCycles } from "@/db/seedScholarshipCycles";
 import { countOpportunities, seedOpportunities } from "@/db/seedOpportunities";
+import { ensureCoreSchema } from "@/lib/core/db";
+import { ensureJourneyTables } from "@/lib/journey/db";
+import { ensureGrowthTables } from "@/lib/growth/db";
+import { ensureOwnershipTables } from "@/lib/ownership/db";
 
 async function main() {
-  console.log("[seed] base catalogue (universities, programmes, scholarships, admin)…");
-  await seedDatabase();
+  console.log("[seed] schema (core, journey, growth, ownership, telegram, channel)…");
+  await Promise.all([ensureCoreSchema(), ensureJourneyTables(), ensureGrowthTables(), ensureOwnershipTables()]);
+  // Forced: repairs and top-ups run in the foreground, so the command's exit
+  // code reflects the real state instead of "started in the background".
+  await seedDatabase({ force: true });
 
   console.log("[seed] programme catalogue…");
   const programs = await seedProgramCatalog();

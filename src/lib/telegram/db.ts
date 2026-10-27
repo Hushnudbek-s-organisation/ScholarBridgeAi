@@ -16,6 +16,14 @@ export function ensureTelegramTables(): Promise<boolean> {
   return bootstrap.ensure();
 }
 
+/**
+ * Admin "retry" action: run the DDL even when the request path is configured
+ * not to (`SCHEMA_AUTO_REPAIR=off`), because this is an explicit operator step.
+ */
+export function forceTelegramRepair(): Promise<boolean> {
+  return bootstrap.forceRepair();
+}
+
 /** Admin diagnostics: why the tables are (not) ready — never the raw error. */
 export function telegramBootstrapStatus() {
   return bootstrap.status();

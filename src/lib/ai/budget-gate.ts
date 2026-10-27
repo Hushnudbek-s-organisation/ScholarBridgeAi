@@ -46,12 +46,32 @@ let lastBlockAt = 0;
 const LOG_EVERY_MS = 60_000;
 const DEGRADED_FREE_CALLS_PER_MINUTE = 20;
 let degradedFreeCallTimes: number[] = [];
+/**
+ * Circuit breaker for the budget store itself.
+ *
+ * Every AI request evaluates the budget, so a database outage used to mean
+ * every request paid for two failing reads (limits + spend) before it could
+ * be refused — turning a database problem into a slow, self-inflicted flood on
+ * the same database. After one failed read, further reads are skipped for this
+ * long and requests go straight to the degraded path (which still refuses
+ * every paid call and still caps free ones). AI_BUDGET_OUTAGE_BACKOFF_MS tunes
+ * it; 0 disables the breaker.
+ */
+let outageUntilMs = 0;
+
+function outageBackoffMs(): number {
+  const raw = Number(process.env.AI_BUDGET_OUTAGE_BACKOFF_MS ?? 15_000);
+  if (!Number.isFinite(raw) || raw < 0) return 15_000;
+  return Math.min(5 * 60_000, Math.floor(raw));
+}
 type BudgetStateReader = (now: Date) => Promise<[BudgetLimits, SpendSnapshot]>;
 let budgetStateReader: BudgetStateReader = (now) => Promise.all([loadBudgetLimits(), aiSpendSnapshot(now)]);
 
 /** Test-only injection: production always reads persisted limits and spend. */
 export function setBudgetStateReaderForTests(reader?: BudgetStateReader): void {
   budgetStateReader = reader ?? ((now) => Promise.all([loadBudgetLimits(), aiSpendSnapshot(now)]));
+  // A new reader must be consulted immediately, even if the old one failed.
+  outageUntilMs = 0;
 }
 
 /** Only explicitly free OpenRouter IDs, or a Groq key the operator identifies as Free, are zero-cost. */
@@ -73,6 +93,40 @@ export function resetBudgetGateLogThrottleForTests(): void {
   lastWarnAt = 0;
   lastBlockAt = 0;
   degradedFreeCallTimes = [];
+  outageUntilMs = 0;
+}
+
+/** Tests/diagnostics: is the budget-store breaker currently open? */
+export function budgetGateOutageState(now: Date = new Date()): { open: boolean; untilMs: number } {
+  return { open: now.getTime() < outageUntilMs, untilMs: outageUntilMs };
+}
+
+/**
+ * The verdict while the budget cannot be verified.
+ *
+ * Only a model we can prove is free may run, and even then under a hard local
+ * cap — the paid path is refused, never guessed.
+ */
+function degradedVerdict(provider: string, model: string | null | undefined, now: Date, cause: "read_failed" | "breaker_open"): BudgetVerdict {
+  const zeroCost = isZeroCostModel(provider, model);
+  const allowed = zeroCost && allowDegradedFreeCall(now);
+  if (now.getTime() - lastWarnAt > LOG_EVERY_MS) {
+    lastWarnAt = now.getTime();
+    console.warn(JSON.stringify({
+      evt: "ai_budget_unavailable",
+      cause,
+      action: allowed ? "allowed" : "blocked",
+      degradedMode: true,
+      reason: zeroCost ? (allowed ? "verified_zero_cost_model" : "degraded_free_rate_limit") : "budget_verification_unavailable",
+      ...(zeroCost ? {} : { provider }),
+    }));
+  }
+  if (allowed) return { allowed: true, warning: null };
+  return {
+    allowed: false,
+    reason: zeroCost ? "degraded_free_rate_limit" : "budget_verification_unavailable",
+    degradedMode: true,
+  };
 }
 
 /** Verdict before one provider attempt. A Date as the second argument remains supported for old callers/tests. */
@@ -85,27 +139,17 @@ export async function evaluateAiBudget(
   const now = modelOrNow instanceof Date ? modelOrNow : suppliedNow;
   let limits: BudgetLimits;
   let spend: SpendSnapshot;
+  if (now.getTime() < outageUntilMs) {
+    // The breaker is open: do not touch the store again yet, but keep the
+    // exact same refusal the failed read produced.
+    return degradedVerdict(provider, model, now, "breaker_open");
+  }
   try {
     [limits, spend] = await budgetStateReader(now);
-  } catch (err) {
-    const zeroCost = isZeroCostModel(provider, model);
-    const allowed = zeroCost && allowDegradedFreeCall(now);
-    if (now.getTime() - lastWarnAt > LOG_EVERY_MS) {
-      lastWarnAt = now.getTime();
-      console.warn(JSON.stringify({
-        evt: "ai_budget_unavailable",
-        action: allowed ? "allowed" : "blocked",
-        degradedMode: true,
-        reason: zeroCost ? (allowed ? "verified_zero_cost_model" : "degraded_free_rate_limit") : "budget_verification_unavailable",
-        ...(zeroCost ? {} : { provider }),
-      }));
-    }
-    if (allowed) return { allowed: true, warning: null };
-    return {
-      allowed: false,
-      reason: zeroCost ? "degraded_free_rate_limit" : "budget_verification_unavailable",
-      degradedMode: true,
-    };
+  } catch {
+    const backoff = outageBackoffMs();
+    if (backoff > 0) outageUntilMs = now.getTime() + backoff;
+    return degradedVerdict(provider, model, now, "read_failed");
   }
   const verdict = budgetVerdict(provider, spend, limits);
   if (!verdict.allowed) {

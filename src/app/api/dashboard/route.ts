@@ -1,4 +1,6 @@
 import { privateNoStoreJson } from "@/lib/apiResponse";
+import { memoizeMatch } from "@/lib/matchMemo";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -571,6 +573,9 @@ async function recommendedFor(
   // readiness calculation; avoid two duplicate profile-activity queries.
   const matchProfile = derivedProfiles?.matchProfile ?? await toMatchProfileWithActivities(profile);
   const chancingProfile = derivedProfiles?.chancingProfile ?? await chancingProfileWithActivities(profile);
+  // Memo key for the fit/positioning scores below: changes with any
+  // score-relevant profile edit, so a dashboard refresh re-scores.
+  const fingerprint = profileMatchFingerprint(profile);
 
   // Which profile facts exist, and which would unlock a better list.
   const basis: string[] = [];
@@ -649,24 +654,29 @@ async function recommendedFor(
         return true;
       })
       .map((u) => {
-        const match = calculateUniversityMatch(matchProfile, toUniversityData(u));
+        const uniData = toUniversityData(u);
+        const match = memoizeMatch("fit", fingerprint, u.id, uniData as unknown as Record<string, unknown>, () =>
+          calculateUniversityMatch(matchProfile, uniData)
+        );
         const qsBenchmark = matchQsUniversityBenchmark(u);
         // A synthetic programme row: the dashboard never loads the program
         // catalogue, so it evaluates the stated major against this university's
         // own benchmark band instead of inventing a specific programme id.
-        const chance = evaluateUniversityAndProgramChance(
-          chancingProfile,
-          u,
-          {
-            id: u.id,
-            universityId: u.id,
-            name: major || u.programMajor || "General Studies",
-            degreeLevel: degreeLevel || u.degreeLevel || "Bachelor",
-            field: major || u.programMajor || null,
-          },
-          null,
-          [],
-          qsBenchmark
+        const chance = memoizeMatch("chance", fingerprint, u.id, u as unknown as Record<string, unknown>, () =>
+          evaluateUniversityAndProgramChance(
+            chancingProfile,
+            u,
+            {
+              id: u.id,
+              universityId: u.id,
+              name: major || u.programMajor || "General Studies",
+              degreeLevel: degreeLevel || u.degreeLevel || "Bachelor",
+              field: major || u.programMajor || null,
+            },
+            null,
+            [],
+            qsBenchmark
+          )
         );
         return {
           uni: u,

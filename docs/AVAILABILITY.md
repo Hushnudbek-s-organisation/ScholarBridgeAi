@@ -43,12 +43,19 @@ Common triggers, in order of likelihood:
   column or a syntax error is still thrown immediately.
 * **Honest 503s.** The route sends `Retry-After: 3`, so proxies and the client
   loop back off instead of hammering a database that is already struggling.
-* **A smaller, faster pool.** `max` is now 5 per instance (was 15) and
-  configurable with `PG_POOL_MAX`; connect timeout 8 s instead of 10 s, idle
-  timeout 10 s, TCP keepalive on, `application_name=scholarbridge` so pool
-  dashboards attribute the connections. In production only, statements are
-  capped at `PG_QUERY_TIMEOUT_MS` (default 20 000) so a request can never hang
-  the page forever.
+* **A smaller, faster pool.** `max` is 10 per instance (was 15; 5 in the first
+  availability pass) and configurable with `PG_POOL_MAX`; connect timeout 8 s,
+  idle timeout 30 s so a warm connection survives a normal traffic gap, TCP
+  keepalive on, `application_name=scholarbridge` so pool dashboards attribute
+  the connections, and connections are retired after 1 800 s / 7 500 uses so the
+  app never keeps a client the pooler has already forgotten. In production only,
+  statements are capped at `PG_QUERY_TIMEOUT_MS` (default 20 000) so a request
+  can never hang the page forever. See `docs/BACKEND_PERFORMANCE.md`.
+* **Schema repair and seeding are not request work.** With
+  `SCHEMA_AUTO_REPAIR=off` a request never runs DDL (it verifies, once per
+  process), and with `SEED_ON_REQUEST=auto` a production request never seeds.
+  `npm run db:schema` / `npm run db:seed` / Admin → Diagnostics → Retry apply
+  both deliberately.
 
 ## What to check when it happens
 
@@ -166,3 +173,40 @@ curl -i https://<site>/api/health                  # 200 {"ok":true} | 503
 state machine (idle → failed(+reason) → retry → ready), the `/id` fast path, and
 asserts that no hint can leak a DSN or a role name. `npm run test:security`
 keeps `/api/admin/diagnostics` behind `requireAdmin`.
+
+## Guards during a database outage
+
+Two guards sit in front of every expensive request, and both had a failure
+mode of their own during an outage. Both are now bounded:
+
+**AI budget gate (`src/lib/ai/budget-gate.ts`).** Before any paid provider
+call the router reads the budget limits and the spend snapshot. During an
+outage every AI request used to pay for two *failing* reads before it could be
+refused — the outage multiplied its own load. A breaker now remembers the
+failed read: for `AI_BUDGET_OUTAGE_BACKOFF_MS` (default `15 000`, `0` disables)
+further requests skip the store and take the degraded path directly, which
+still refuses every paid call and still caps free models at 20/minute per
+process. The breaker re-probes on its own after the window, so recovery needs
+no restart. `budgetGateOutageState()` reports whether it is open.
+
+**The in-process rate limiter (`src/lib/rate-limit.ts`)** keeps counters per
+key in memory. It had two unbounded behaviours:
+
+* a caller flooding ONE key grew that key's timestamp array for the whole
+  window (limit × 10⁶ requests = 10⁶ retained numbers). Each key now keeps at
+  most `limit + 1` timestamps — the oldest ones, which are the ones that decide
+  when the block lifts, so the verdict, `remaining` and `Retry-After` are
+  unchanged;
+* the sweep only deleted buckets whose array was already empty, and arrays were
+  pruned on access, so a bucket that had ever been hit never became empty. Idle
+  keys piled up until the 50 000-entry hard cap deleted arbitrary buckets —
+  possibly ones that were still blocking an attacker. Buckets now expire by
+  `lastHitAt + max(window, 10 min)`.
+
+`rateLimitBucketStats()` returns `{ buckets, hits }` for diagnostics, and
+`npm run test:security` asserts both bounds.
+
+The shared limiter (`src/lib/rate-limit-shared.ts`, Postgres-backed) already
+degrades to the in-process limiter if its insert/select fails, so sign-in and
+AI budgets keep working with a weaker per-process budget instead of locking
+everyone out.

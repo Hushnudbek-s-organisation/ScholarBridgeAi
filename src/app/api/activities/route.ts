@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { activityEvidence, studentActivities, userDocuments } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { invalidateProfileMatchCache } from "@/lib/catalogCache";
+import { invalidateSavedActivities } from "@/lib/profileMapping";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
 
 export const dynamic = "force-dynamic";
@@ -102,6 +103,7 @@ export async function POST(req: Request) {
     const withEvidence = await attachEvidence(profileId, row.id, b.value.evidence);
     // A new activity changes the match inputs — never serve a stale score.
     invalidateProfileMatchCache(profileId);
+    invalidateSavedActivities(profileId);
     invalidateDashboardRecommendationsForProfile(profileId);
     return NextResponse.json({ ok: true, activity: { ...row, evidence: withEvidence } });
   } catch (err) {
@@ -143,6 +145,7 @@ export async function PATCH(req: Request) {
       evidence = await attachEvidence(profileId, id, b.value.evidence);
     }
     invalidateProfileMatchCache(profileId);
+    invalidateSavedActivities(profileId);
     invalidateDashboardRecommendationsForProfile(profileId);
     return NextResponse.json({ ok: true, id, evidence });
   } catch (err) {
@@ -163,6 +166,7 @@ export async function DELETE(req: Request) {
       .returning({ id: studentActivities.id });
     if (!deleted.length) return jsonError(404, "Activity not found", "not_found");
     invalidateProfileMatchCache(g.value.profileId);
+    invalidateSavedActivities(g.value.profileId);
     invalidateDashboardRecommendationsForProfile(g.value.profileId);
     return NextResponse.json({ ok: true, id });
   } catch (err) {

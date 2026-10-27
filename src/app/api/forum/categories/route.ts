@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { requireFeatureSession } from "@/lib/premium";
 import { clampString, readJsonBody } from "@/lib/request";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -15,7 +16,9 @@ export async function GET(req: Request) {
     // Reading the forum is part of the Premium `forum` feature (not only the UI).
     const member = await requireFeatureSession(req, "forum");
     if (!member.ok) return member.response;
-    await seedForum();
+    // Demo forum content is a seed step, not a request step (see
+    // `lib/db/requestSeeding.ts`); it still runs on first use outside production.
+    if (requestPathSeedingEnabled()) await seedForum();
     const rows = await db
       .select({
         id: forumCategories.id,

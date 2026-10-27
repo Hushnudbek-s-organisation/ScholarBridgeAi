@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { scholarships, universities } from "@/db/schema";
 import { compareCountries, listCountries, type CountryComparison } from "@/lib/countryCompare";
+import { countryFactsFor, localizeCountryFacts, type LocalizedCountryFacts } from "@/lib/countryFacts";
 import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 
 export const dynamic = "force-dynamic";
@@ -65,9 +66,20 @@ export async function GET(req: Request) {
     }
 
     const comparisons: CountryComparison[] = wanted.map((c) => compareCountries(c, unis, schs));
+    // Student-visa facts are reference data (sourced, dated), not database rows:
+    // they ride along with the comparison so the panel needs one request. A
+    // country with no verified facts stays absent — the UI shows the "not
+    // published" state instead of an empty card.
+    const locale = (url.searchParams.get("locale") ?? "en").toLowerCase();
+    const facts: Record<string, LocalizedCountryFacts> = {};
+    for (const comparison of comparisons) {
+      const verified = countryFactsFor(comparison.country);
+      if (verified) facts[comparison.country] = localizeCountryFacts(verified, locale);
+    }
     return NextResponse.json({
       source: "database",
       countries: comparisons,
+      facts,
       available: listCountries(unis).slice(0, 40),
     });
   } catch {
