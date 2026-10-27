@@ -14,42 +14,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Empty } from "@/components/journey/ui";
-import { UniversityExplorer } from "@/components/UniversityExplorer";
-import { ScholarshipHub } from "@/components/ScholarshipHub";
-import { OpportunitiesPanel } from "@/components/OpportunitiesPanel";
-import { TaskRoadmap } from "@/components/TaskRoadmap";
-import { DeadlineCenter } from "@/components/DeadlineCenter";
-import { ProfileStrengthPanel } from "@/components/ProfileStrengthPanel";
-import { SimilarProfiles } from "@/components/SimilarProfiles";
-import { ApplicationCenter } from "@/components/ApplicationCenter";
 import { PremiumGate } from "@/components/PremiumGate";
-import { FaqSection } from "@/components/FaqSection";
-import { AnswerVault } from "@/components/growth/AnswerVault";
-import { DepartureChecklist } from "@/components/growth/DepartureChecklist";
-import { GoalPlanner } from "@/components/growth/GoalPlanner";
-import { ScholarshipAutopilot } from "@/components/growth/ScholarshipAutopilot";
-import { SuccessStories } from "@/components/growth/SuccessStories";
-import { InterviewCenterPanel, VisaCenterPanel } from "@/components/journey/ExplorePanels";
-import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
-import { ArrivalPlanPanel } from "@/components/journey/ArrivalPlanPanel";
-import { ApplicationWorkspacePanel } from "@/components/journey/ApplicationWorkspacePanel";
-import {
-  FinancialPlanPanel,
-  LearningProvidersPanel,
-  OffersPanel,
-  PostAdmissionOfferMatrix,
-  RecommendationManagerPanel,
-} from "@/components/journey/AfterAdmissionPanels";
-import {
-  ActivityPortfolioPanel,
-  DocumentVaultPanel,
-  StudyPlanPanel,
-  TestPlannerPanel,
-} from "@/components/journey/PreparePanels";
-import { RequirementsBrowser } from "@/components/journey/RequirementsBrowser";
 import { HubPage, HubEmpty, PanelSkeleton, usePaneSelection, type HubPaneDef } from "./ui";
-import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
-import { FeeWaiverStudio } from "@/components/FeeWaiverStudio";
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 
@@ -60,6 +26,49 @@ import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSec
  * explorer — not every studio in the product.
  */
 const panelLoading = () => <PanelSkeleton rows={3} />;
+
+/**
+ * Every pane's feature component is its own chunk.
+ *
+ * The hub file used to import all of them statically, so opening ONE
+ * destination downloaded the explorer, the scholarship finder, the deadline
+ * centre, the goal planner, the document vault, the arrival plan and the fee
+ * waiver studio — in a single chunk — even though the student can only look at
+ * one tab. `next/dynamic` splits them: a tab's bundle arrives when the tab is
+ * opened, and `PanelSkeleton` covers the gap (the panes already had their own
+ * loading states, so nothing new is shown).
+ */
+const UniversityExplorer = dynamic(() => import("@/components/UniversityExplorer").then((m) => m.UniversityExplorer), { loading: panelLoading });
+const ScholarshipHub = dynamic(() => import("@/components/ScholarshipHub").then((m) => m.ScholarshipHub), { loading: panelLoading });
+const OpportunitiesPanel = dynamic(() => import("@/components/OpportunitiesPanel").then((m) => m.OpportunitiesPanel), { loading: panelLoading });
+const TaskRoadmap = dynamic(() => import("@/components/TaskRoadmap").then((m) => m.TaskRoadmap), { loading: panelLoading });
+const DeadlineCenter = dynamic(() => import("@/components/DeadlineCenter").then((m) => m.DeadlineCenter), { loading: panelLoading });
+const ProfileStrengthPanel = dynamic(() => import("@/components/ProfileStrengthPanel").then((m) => m.ProfileStrengthPanel), { loading: panelLoading });
+const SimilarProfiles = dynamic(() => import("@/components/SimilarProfiles").then((m) => m.SimilarProfiles), { loading: panelLoading });
+const ApplicationCenter = dynamic(() => import("@/components/ApplicationCenter").then((m) => m.ApplicationCenter), { loading: panelLoading });
+const FaqSection = dynamic(() => import("@/components/FaqSection").then((m) => m.FaqSection), { loading: panelLoading });
+const AnswerVault = dynamic(() => import("@/components/growth/AnswerVault").then((m) => m.AnswerVault), { loading: panelLoading });
+const DepartureChecklist = dynamic(() => import("@/components/growth/DepartureChecklist").then((m) => m.DepartureChecklist), { loading: panelLoading });
+const GoalPlanner = dynamic(() => import("@/components/growth/GoalPlanner").then((m) => m.GoalPlanner), { loading: panelLoading });
+const ScholarshipAutopilot = dynamic(() => import("@/components/growth/ScholarshipAutopilot").then((m) => m.ScholarshipAutopilot), { loading: panelLoading });
+const SuccessStories = dynamic(() => import("@/components/growth/SuccessStories").then((m) => m.SuccessStories), { loading: panelLoading });
+const InterviewCenterPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.InterviewCenterPanel), { loading: panelLoading });
+const VisaCenterPanel = dynamic(() => import("@/components/journey/ExplorePanels").then((m) => m.VisaCenterPanel), { loading: panelLoading });
+const ApostilleReadinessCard = dynamic(() => import("@/components/ApostilleReadinessCard").then((m) => m.ApostilleReadinessCard), { loading: panelLoading });
+const ArrivalPlanPanel = dynamic(() => import("@/components/journey/ArrivalPlanPanel").then((m) => m.ArrivalPlanPanel), { loading: panelLoading });
+const ApplicationWorkspacePanel = dynamic(() => import("@/components/journey/ApplicationWorkspacePanel").then((m) => m.ApplicationWorkspacePanel), { loading: panelLoading });
+const FinancialPlanPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.FinancialPlanPanel), { loading: panelLoading });
+const LearningProvidersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.LearningProvidersPanel), { loading: panelLoading });
+const OffersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.OffersPanel), { loading: panelLoading });
+const PostAdmissionOfferMatrix = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.PostAdmissionOfferMatrix), { loading: panelLoading });
+const RecommendationManagerPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.RecommendationManagerPanel), { loading: panelLoading });
+const ActivityPortfolioPanel = dynamic(() => import("@/components/journey/PreparePanels").then((m) => m.ActivityPortfolioPanel), { loading: panelLoading });
+const DocumentVaultPanel = dynamic(() => import("@/components/journey/PreparePanels").then((m) => m.DocumentVaultPanel), { loading: panelLoading });
+const StudyPlanPanel = dynamic(() => import("@/components/journey/PreparePanels").then((m) => m.StudyPlanPanel), { loading: panelLoading });
+const TestPlannerPanel = dynamic(() => import("@/components/journey/PreparePanels").then((m) => m.TestPlannerPanel), { loading: panelLoading });
+const RequirementsBrowser = dynamic(() => import("@/components/journey/RequirementsBrowser").then((m) => m.RequirementsBrowser), { loading: panelLoading });
+const DocumentTemplatesCard = dynamic(() => import("@/components/samples/DocumentTemplatesCard").then((m) => m.DocumentTemplatesCard), { loading: panelLoading });
+const FeeWaiverStudio = dynamic(() => import("@/components/FeeWaiverStudio").then((m) => m.FeeWaiverStudio), { loading: panelLoading });
 const ChancingPanel = dynamic(() => import("@/components/ChancingPanel").then((m) => m.ChancingPanel), { loading: panelLoading });
 const RecommendationStudio = dynamic(() => import("@/components/RecommendationStudio").then((m) => m.RecommendationStudio), { loading: panelLoading });
 const CountryComparePanel = dynamic(() => import("@/components/CountryComparePanel").then((m) => m.CountryComparePanel), { loading: panelLoading });

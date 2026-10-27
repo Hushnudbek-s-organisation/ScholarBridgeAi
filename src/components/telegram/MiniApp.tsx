@@ -1664,6 +1664,10 @@ function DetailSheet({
             <img
               src={viaImageProxy(toWikimediaThumb(item.imageUrl, 640))}
               alt=""
+              // Off-screen until the sheet settles: never let it compete with
+              // the name and the badges that the student opened the sheet for.
+              loading="lazy"
+              decoding="async"
               onError={(e) => {
                 const img = e.currentTarget;
                 if (item.imageUrl && img.src !== item.imageUrl) img.src = item.imageUrl;

@@ -79,6 +79,41 @@ check("the locale provider stays hydration-safe", () => {
   assert.ok(provider.includes("englishMessages"), "a missing language must fall back to English, never to undefined");
 });
 
+check("the hub panes are code-split, not one chunk", () => {
+  const hubs = read("src/components/hubs/index.tsx");
+  // The one exception is PremiumGate: a tiny wrapper rendered in three places,
+  // splitting it would cost more in requests than it saves.
+  const staticImports = [...hubs.matchAll(/^import \{([^}]+)\} from "(@\/components\/[^"]+)";$/gm)]
+    .map((m) => m[2])
+    // Shared, tiny primitives that every hub needs are allowed to stay static:
+    // a gate wrapper rendered three times, and the shell's own UI kit.
+    .filter((from) => !["@/components/PremiumGate", "@/components/journey/ui"].includes(from));
+  assert.deepEqual(staticImports, [], `hub panes must be lazy: ${staticImports.join(", ")}`);
+  const lazy = [...hubs.matchAll(/dynamic\(\(\) => import\("@\/components\/([^"]+)"\)/g)].map((m) => m[1]);
+  assert.ok(lazy.length >= 30, `only ${lazy.length} lazy panes — the split was lost`);
+});
+
+check("the app shell asks for its configuration once", () => {
+  const clients = [
+    "src/components/Navbar.tsx",
+    "src/components/SectionIntro.tsx",
+    "src/components/BrandingImage.tsx",
+    "src/app/HomeClient.tsx",
+  ];
+  for (const file of clients) {
+    const source = read(file);
+    assert.ok(!source.includes('fetch("/api/config/nav"'), `${file} must use loadBootConfig(), not its own /api/config/nav call`);
+    assert.ok(!source.includes('fetch("/api/config/guide"'), `${file} must use loadBootConfig(), not its own /api/config/guide call`);
+    assert.ok(!source.includes('fetch("/api/config/branding"'), `${file} must use loadBootConfig(), not its own /api/config/branding call`);
+  }
+  assert.ok(read("src/lib/bootConfig.ts").includes('fetch("/api/config/boot")'), "one boot request");
+});
+
+check("the analytics beacon stays out of the first three seconds", () => {
+  const tracker = read("src/components/SiteTracker.tsx");
+  assert.ok(/scheduleWhenIdle\([\s\S]*?\}, 3000\)/.test(tracker), "SiteTracker must be deferred by 3 s");
+});
+
 /*
  * Bundle budget. `.next/diagnostics/route-bundle-stats.json` is written by
  * `next build`, so this half only runs after a build (CI runs it there).

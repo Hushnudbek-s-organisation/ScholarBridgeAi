@@ -84,3 +84,75 @@ If the landing is slow again, check in this order: bundle stats first (the
 budget test above), then `curl -i https://<site>/api/health` for a sleeping
 instance (`docs/AVAILABILITY.md` — a cold Render instance answers in ~30 s
 regardless of JavaScript).
+
+---
+
+# Phase 2 — the shell after the landing page
+
+The landing page was fixed first (above). This pass is about everything the app
+loads **after** a student clicks into the product.
+
+## 1. Hub panes are chunks, not one bundle
+
+`src/components/hubs/index.tsx` statically imported **31** feature components —
+the explorer, the scholarship finder, the deadline centre, the goal planner, the
+document vault, the arrival plan, the fee-waiver studio… — so opening *one* tab
+downloaded all of them. Every pane is now a `next/dynamic` chunk that arrives when
+its tab is opened, with the existing `PanelSkeleton` as the placeholder.
+
+Measured on a clean production build (client chunks):
+
+| | Before | After |
+| --- | --- | --- |
+| Client chunks | 71 | 107 |
+| Largest pane chunk (gz) | **357 KB / 80 KB gz** | **229 KB / 72 KB gz** |
+| Landing first-load JS | 1 221 KB | 1 221 KB (unchanged) |
+
+The total JS *on disk* grows (~+200 KB gzip across **all** chunks) because each
+split chunk repeats a little module boilerplate; a visitor never downloads all of
+them. What a visitor pays for opening a hub went down.
+
+Allowed to stay static: `PremiumGate` (tiny, rendered three times) and
+`@/components/journey/ui` (the shell's own UI kit). `npm run test:perf` enforces
+the rule.
+
+## 2. One boot request instead of three
+
+The shell asked for `/api/config/branding`, `/api/config/nav` and
+`/api/config/guide` from three different components — three round trips and three
+`app_config` reads before the sidebar knew what to hide.
+
+* new `GET /api/config/boot` returns `{ branding, nav, guide }`, publicly
+  cacheable (`s-maxage=300`, see `docs/BACKEND_PERFORMANCE.md`);
+* new `src/lib/bootConfig.ts` holds **one** shared promise, so `Navbar`,
+  `SectionIntro` and `BrandingImage` share the same document; the admin save
+  events clear it;
+* the three original routes stay (public reads; the admin screens refresh one
+  thing at a time).
+
+## 3. Smaller items
+
+* `SiteTracker` beacon deferred from 1.8 s to **3 s** of idle time — analytics
+  must not compete with the session/catalogue requests that follow the first
+  paint.
+* `/api/image` (the Wikimedia photo proxy) now answers
+  `public, max-age=31536000, immutable`: the bytes behind a Commons URL never
+  change, so a year is safe and the photo is not re-fetched on every visit.
+* The remaining `<img>` tags without a loading hint got `loading="lazy"
+  decoding="async"` (the mini-app detail sheet, the logo); the university-detail
+  hero intentionally stays eager.
+
+## 4. i18n — already done in Phase 1 of this programme
+
+The brief asked for "one locale per request, −65 % translation payload". That
+shipped with the landing-page work: English only in the bundle, uz/ru as separate
+chunks fetched on switch, the server sending just the visitor's dictionary
+(1 407 KB → 397 KB, **−72 %**). Nothing was left to do here; `npm run test:perf`
+guards it.
+
+## 5. Verify
+
+```bash
+npm run build && npm run test:perf     # budgets, lazy panes, one boot request, 3 s beacon
+npm run check:i18n && npm run test:render && npm run test:responsive
+```

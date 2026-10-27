@@ -12,7 +12,7 @@
  *     through `fetchGuarded`, so a Wikimedia 302 aimed at a private address
  *     (or the metadata endpoint) is refused per hop, never followed blindly;
  *   • a bounded 64-entry / 512 KiB-per-image LRU shares validated bytes in
- *     process RAM for 24 hours; client responses remain `public, max-age=604800,
+ *     process RAM for 24 hours; client responses remain `public, max-age=31536000,
  *     immutable` (the <img> tags also carry crossOrigin="anonymous" so no
  *     cookies ride along and no auth-only `no-store` header applies);
  *   • upstream failures answer a plain 404/502 — no upstream error bodies,
@@ -63,7 +63,9 @@ function imageResponse(bytes: Uint8Array, contentType: string): NextResponse {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=604800, immutable",
+      // A Campus photo URL is content-addressed on Wikimedia: the bytes behind
+      // it never change, so the browser (and any CDN) may keep it for a year.
+      "Cache-Control": "public, max-age=31536000, immutable",
       "Access-Control-Allow-Origin": "*",
       "Cross-Origin-Resource-Policy": "cross-origin",
       "X-Content-Type-Options": "nosniff",

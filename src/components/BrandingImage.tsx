@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { loadBootConfig } from "@/lib/bootConfig";
 const FALLBACK_LOGO_URL = "/icon-192.png";
 // Bundled icon first; the configured logo (/api/config/branding) replaces it.
 const DEFAULT_LOGO_URL = "/icon-512.png";
@@ -26,10 +27,10 @@ export function BrandingImage({ className, alt }: { className?: string; alt: str
     return () => window.clearTimeout(timer);
   }, [src]);
   useEffect(() => {
-    fetch("/api/config/branding")
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => data?.logo && setSrc(data.logo))
-      .catch(() => undefined);
+    // Part of the shared boot payload (one request for branding + nav + guide).
+    void loadBootConfig().then((config) => {
+      if (config.branding.logo) setSrc(config.branding.logo);
+    });
   }, []);
   // If the remote logo can't be reached (offline, blocked CDN, bad URL) fall
   // back to the bundled app icon instead of showing a broken image + alt text.
@@ -39,6 +40,9 @@ export function BrandingImage({ className, alt }: { className?: string; alt: str
       ref={imgRef}
       src={src}
       alt={alt}
+      decoding="async"
+      // The logo is in the header, so it is never lazy — but it must not block
+      // text rendering either, hence `async` and an explicit size above.
       className={className}
       onError={() => setSrc((cur) => (cur === FALLBACK_LOGO_URL ? cur : FALLBACK_LOGO_URL))}
     />

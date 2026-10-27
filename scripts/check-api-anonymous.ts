@@ -45,6 +45,7 @@ const API_DIR = join(ROOT, "src/app/api");
 /** Routes an anonymous caller may legitimately reach, with the reason. */
 const PUBLIC = new Map<string, string>([
   // --- shared catalogues / configuration (no personal data) ----------------
+  ["config/boot GET", "branding, hidden nav ids and intro copy (the shell's one config request)"],
   ["config/branding GET", "branding assets"],
   ["config/guide GET", "help copy"],
   ["config/nav GET", "which sidebar sections are hidden"],

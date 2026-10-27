@@ -1138,6 +1138,7 @@ async function main() {
     // Public reads: shared catalogues and configuration only. None of these may
     // ever return another student's data — each is reviewed in SECURITY.md.
     const PUBLIC_READS = new Set([
+      "config/boot GET",
       "config/branding GET",
       "config/guide GET",
       "config/nav GET",
@@ -1249,7 +1250,7 @@ async function main() {
     const sec = proxyModule as unknown as { PUBLIC_CACHEABLE_API: ReadonlySet<string> };
     assert.deepEqual(
       [...sec.PUBLIC_CACHEABLE_API].sort(),
-      ["/api/config/branding", "/api/config/guide", "/api/config/nav"],
+      ["/api/config/boot", "/api/config/branding", "/api/config/guide", "/api/config/nav"],
       "the public-cacheable allowlist is exactly the three session-independent config reads"
     );
     // The middleware must not stamp no-store on those paths: a header set in the

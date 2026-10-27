@@ -118,6 +118,7 @@ function applySecurityHeaders(response: NextResponse, csp: string, miniApp = fal
  * entry is a reviewed public read with no student data.
  */
 export const PUBLIC_CACHEABLE_API: ReadonlySet<string> = new Set([
+  "/api/config/boot",
   "/api/config/branding",
   "/api/config/nav",
   "/api/config/guide",
