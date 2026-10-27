@@ -21,6 +21,7 @@ const UniversityDetail = dynamic(
   },
 );
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
+import { formatDegreeLevel } from "@/lib/degreeLevels";
 import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
 import { DecisionPillStrip } from "./DecisionPillStrip";
 import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
@@ -161,6 +162,7 @@ export function UniversityExplorer({
   onOpenProfileModal,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
+  const tDegrees = useTranslations("degrees");
   const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
 
@@ -1046,7 +1048,7 @@ export function UniversityExplorer({
                         API actually computed one. */}
                     {typeof uni.chanceScore === "number" && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-lg bg-violet-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md"
+                        className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm"
                         title={uni.selectivityCategory ?? undefined}
                       >
                         🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
@@ -1055,7 +1057,7 @@ export function UniversityExplorer({
                   </div>
 
                   {/* World Rank Badge */}
-                  <div className="absolute top-3 right-3 bg-slate-900/80 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10 flex items-center gap-1">
+                  <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
                     <Star className="h-3 w-3 fill-amber-300" />
                     {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
                   </div>
@@ -1066,38 +1068,93 @@ export function UniversityExplorer({
                       <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="xs" />
                       <span>{localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)}</span>
                     </div>
-                    <h3 className="break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
+                    <h3 className="line-clamp-2 break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
                   </div>
                 </div>
 
                 {/* Card Content Body */}
                 <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                   <div>
-                    {/* Major & Program */}
-                    <div className="mb-2 inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
-                      {visibleMajorFields}
-                      {remainingMajorFields > 0 && <span> +{remainingMajorFields}</span>}
-                    </div>
-
-                    {uni.universityType && (
-                      <span className="mb-2 inline-flex rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 dark:border-[#46536b] dark:bg-[#202b42] dark:text-[#e2e8f0]">
-                        {uni.universityType}
-                      </span>
-                    )}
-                    <p className="text-[11px] text-slate-500 mb-2">
-                      <DegreeLevelLabel value={uni.degreeLevel} showPrefix />
-                    </p>
-
-                    {/* Pillar 5.1 — a rank-verified state-scholarship signal.
-                        El-Yurt Umidi funds applicants admitted to top-ranked
-                        universities; ≤300 on the catalogue's QS-based ranking
-                        is a CRITERION MATCH, never a promise of an award. */}
-                    {uni.worldRanking != null && uni.worldRanking <= 300 && (
-                      <p className="mb-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200">
-                        <CountryFlag country="Uzbekistan" size="xs" />
-                        <span className="min-w-0 break-words">{t("exTop300Badge").replace(/^🇺🇿\s*/, "")}</span>
-                      </p>
-                    )}
+                    {/* Card discipline — three chips at most, then "+N".
+                        The card used to stack a major chip, an institution
+                        type, a degree line and a Top-300 signal on top of the
+                        three overlay badges. The hidden ones are named in the
+                        "+N" tooltip and spelled out in the details drawer. */}
+                    {(() => {
+                      const metaChips: { key: string; label: string; node: React.ReactNode }[] = [];
+                      if (visibleMajorFields) {
+                        metaChips.push({
+                          key: "major",
+                          label: `${visibleMajorFields}${remainingMajorFields > 0 ? ` +${remainingMajorFields}` : ""}`,
+                          node: (
+                            <span className="inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+                              {visibleMajorFields}
+                              {remainingMajorFields > 0 && <span> +{remainingMajorFields}</span>}
+                            </span>
+                          ),
+                        });
+                      }
+                      if (uni.universityType) {
+                        metaChips.push({
+                          key: "type",
+                          label: uni.universityType,
+                          node: (
+                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 dark:border-[#46536b] dark:bg-[#202b42] dark:text-[#e2e8f0]">
+                              {uni.universityType}
+                            </span>
+                          ),
+                        });
+                      }
+                      if (uni.degreeLevel) {
+                        const degreeLabel = formatDegreeLevel(uni.degreeLevel, tDegrees);
+                        metaChips.push({
+                          key: "degree",
+                          label: degreeLabel,
+                          node: (
+                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              {degreeLabel}
+                            </span>
+                          ),
+                        });
+                      }
+                      // Pillar 5.1 — a rank-verified state-scholarship signal.
+                      // El-Yurt Umidi funds applicants admitted to top-ranked
+                      // universities; ≤300 on the catalogue's QS-based ranking
+                      // is a CRITERION MATCH, never a promise of an award.
+                      if (uni.worldRanking != null && uni.worldRanking <= 300) {
+                        const top300Label = t("exTop300Badge").replace(/^🇺🇿\s*/, "");
+                        metaChips.push({
+                          key: "top300",
+                          label: top300Label,
+                          node: (
+                            <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200">
+                              <CountryFlag country="Uzbekistan" size="xs" />
+                              <span className="min-w-0 break-words">{top300Label}</span>
+                            </span>
+                          ),
+                        });
+                      }
+                      const visibleChips = metaChips.slice(0, 3);
+                      const hiddenChips = metaChips.slice(visibleChips.length);
+                      if (metaChips.length === 0) return null;
+                      return (
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                          {visibleChips.map((chip) => (
+                            <span key={chip.key} className="inline-flex min-w-0 max-w-full">
+                              {chip.node}
+                            </span>
+                          ))}
+                          {hiddenChips.length > 0 && (
+                            <span
+                              className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                              title={hiddenChips.map((chip) => chip.label).join(" · ")}
+                            >
+                              +{hiddenChips.length}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Pillar 5.1 — the % is only as sharp as the profile.
                         A logged-in student missing score data gets a one-click

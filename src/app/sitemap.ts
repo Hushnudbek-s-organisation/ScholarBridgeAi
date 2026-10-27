@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { siteUrlForRequest } from "@/lib/requestAppUrl";
-import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
+import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 
 /**
  * Public, crawlable pages. The catalogue pages serve real server-rendered
@@ -30,6 +30,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     scholarshipUrls = [];
   }
 
+  // Every active institution has its own server-rendered profile page — the
+  // largest body of real content the site owns, so it belongs here too.
+  let universityUrls: MetadataRoute.Sitemap = [];
+  try {
+    const bundle = await getCachedUniversitiesBundle();
+    universityUrls = bundle.unis
+      .filter((university) => university.isActive !== false)
+      .map((university) => ({
+        url: `${SITE_URL}/universities/${university.id}`,
+        lastModified:
+          university.lastVerifiedAt instanceof Date
+            ? university.lastVerifiedAt
+            : typeof university.lastVerifiedAt === "string"
+              ? new Date(university.lastVerifiedAt)
+              : now,
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
+      }));
+  } catch {
+    universityUrls = [];
+  }
+
   return [
     {
       url: `${SITE_URL}/`,
@@ -49,6 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    ...universityUrls,
     ...scholarshipUrls,
     {
       url: `${SITE_URL}/terms`,

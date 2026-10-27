@@ -7,7 +7,8 @@
  *   1. Where am I?        → the journey bar with the current stage
  *   2. What do I do today? → 3–5 prioritized steps, each with [Continue]
  *   3. What's due?         → the nearest deadlines
- *   4. How far along?     → application progress
+ *   4. How far along?     → application progress, then the four at-a-glance
+ *                           tiles (they describe; they do not direct)
  *   5. Where am I weak?    → profile readiness, weakest first
  *   6. What should I look at? → recommendations based on the real profile
  */
@@ -785,96 +786,6 @@ export function JourneyControlCenter({
 
       </JourneyCard>
 
-      {/* ---- 1b. At a glance ---------------------------------------------
-          Four numbers the student should not have to hunt for. Each tile is
-          tinted by state, not decorated: amber means "still moving", green
-          means "done". */}
-      <RevealGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4" stagger={0.06}>
-        <RevealItem>
-          <StatTile
-            label={t("ccApplications")}
-            value={applications.total}
-            hint={
-              applications.total === 0
-                ? t("ccAddFirstUni")
-                : t("ccSubmittedHint", { n: applications.submitted })
-            }
-            icon={<Compass className="h-3.5 w-3.5" aria-hidden />}
-            state={applications.total === 0 ? "warn" : "brand"}
-          />
-        </RevealItem>
-        <RevealItem>
-          <StatTile
-            label={t("ccReadinessTile")}
-            // The unrounded average (one decimal) — the same value the
-            // Readiness pane prints. A bare integer here would silently
-            // disagree with the pane by up to half a point.
-            value={readiness.profile ? readiness.profile.overallPrecise : "—"}
-            decimals={1}
-            suffix="%"
-            hint={
-              readiness.profile
-                ? t("ccReadinessMeasured", {
-                    measured: readiness.profile.measured,
-                    total: readiness.profile.total,
-                  })
-                : t("ccReadinessTileHint")
-            }
-            icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
-            state={readiness.profile ? "brand" : "neutral"}
-          />
-        </RevealItem>
-        <RevealItem>
-          <StatTile
-            label={t("ccFinancialGap")}
-            value={data.funding.calculated && data.funding.fundingGap != null ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
-            prefix={data.funding.calculated && data.funding.fundingGap != null ? "$" : ""}
-            hint={
-              data.funding.calculated
-                ? `${data.funding.isCovered ? t("ccCovered") : t("ccStillToFind")}${
-                    data.funding.estimated ? ` ${t("ccIncludesEstimates")}` : ""
-                  }`
-                : t("ccNotCalculated")
-            }
-            icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
-            state={!data.funding.calculated ? "neutral" : data.funding.isCovered ? "good" : "warn"}
-            onClick={!data.funding.calculated ? () => onNavigateTab("funding") : undefined}
-          />
-        </RevealItem>
-        <RevealItem>
-          <StatTile
-            label={t("ccNextDeadline")}
-            value={
-              deadlines.length && deadlines[0].daysRemaining != null
-                ? deadlines[0].daysRemaining < 0
-                  ? t("ccOverdue")
-                  : deadlines[0].daysRemaining
-                : "—"
-            }
-            suffix={
-              deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0
-                ? t("ccDaysSuffix")
-                : ""
-            }
-            hint={
-              deadlines[0]
-                ? t("ccDueHint", { title: deadlines[0].title, date: deadlines[0].dueDate })
-                : t("ccUnscheduled")
-            }
-            icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
-            state={
-              !deadlines.length || deadlines[0].daysRemaining == null
-                ? "neutral"
-                : deadlines[0].daysRemaining < 0
-                  ? "bad"
-                  : (deadlines[0].daysRemaining ?? 99) <= 14
-                    ? "warn"
-                    : "good"
-            }
-          />
-        </RevealItem>
-      </RevealGroup>
-
       {/* ---- 2. Next steps ----------------------------------------------- */}
       <JourneyCard title={t("ccNextStepsTitle")} subtitle={t("ccNextStepsSubtitle")}>
         {nextSteps.length === 0 ? (
@@ -1012,6 +923,100 @@ export function JourneyControlCenter({
           )}
         </JourneyCard>
       </div>
+
+      {/* ---- 4b. At a glance ---------------------------------------------
+          Four numbers the student should not have to hunt for. Each tile is
+          tinted by state, not decorated: amber means "still moving", green
+          means "done".
+
+          These sit BELOW what to do today and what is due: a tile answers
+          "how am I doing", and a student who has just opened the dashboard
+          needs "what do I do next" first. */}
+      <RevealGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4" stagger={0.06}>
+        <RevealItem>
+          <StatTile
+            label={t("ccApplications")}
+            value={applications.total}
+            hint={
+              applications.total === 0
+                ? t("ccAddFirstUni")
+                : t("ccSubmittedHint", { n: applications.submitted })
+            }
+            icon={<Compass className="h-3.5 w-3.5" aria-hidden />}
+            state={applications.total === 0 ? "warn" : "brand"}
+          />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label={t("ccReadinessTile")}
+            // The unrounded average (one decimal) — the same value the
+            // Readiness pane prints. A bare integer here would silently
+            // disagree with the pane by up to half a point.
+            value={readiness.profile ? readiness.profile.overallPrecise : "—"}
+            decimals={1}
+            suffix="%"
+            hint={
+              readiness.profile
+                ? t("ccReadinessMeasured", {
+                    measured: readiness.profile.measured,
+                    total: readiness.profile.total,
+                  })
+                : t("ccReadinessTileHint")
+            }
+            icon={<Sparkles className="h-3.5 w-3.5" aria-hidden />}
+            state={readiness.profile ? "brand" : "neutral"}
+          />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label={t("ccFinancialGap")}
+            value={data.funding.calculated && data.funding.fundingGap != null ? Math.max(0, Math.round(data.funding.fundingGap)) : "—"}
+            prefix={data.funding.calculated && data.funding.fundingGap != null ? "$" : ""}
+            hint={
+              data.funding.calculated
+                ? `${data.funding.isCovered ? t("ccCovered") : t("ccStillToFind")}${
+                    data.funding.estimated ? ` ${t("ccIncludesEstimates")}` : ""
+                  }`
+                : t("ccNotCalculated")
+            }
+            icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
+            state={!data.funding.calculated ? "neutral" : data.funding.isCovered ? "good" : "warn"}
+            onClick={!data.funding.calculated ? () => onNavigateTab("funding") : undefined}
+          />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label={t("ccNextDeadline")}
+            value={
+              deadlines.length && deadlines[0].daysRemaining != null
+                ? deadlines[0].daysRemaining < 0
+                  ? t("ccOverdue")
+                  : deadlines[0].daysRemaining
+                : "—"
+            }
+            suffix={
+              deadlines.length && deadlines[0].daysRemaining != null && deadlines[0].daysRemaining >= 0
+                ? t("ccDaysSuffix")
+                : ""
+            }
+            hint={
+              deadlines[0]
+                ? t("ccDueHint", { title: deadlines[0].title, date: deadlines[0].dueDate })
+                : t("ccUnscheduled")
+            }
+            icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden />}
+            state={
+              !deadlines.length || deadlines[0].daysRemaining == null
+                ? "neutral"
+                : deadlines[0].daysRemaining < 0
+                  ? "bad"
+                  : (deadlines[0].daysRemaining ?? 99) <= 14
+                    ? "warn"
+                    : "good"
+            }
+          />
+        </RevealItem>
+      </RevealGroup>
 
       {/* ---- 5. Recorded profile and application details ------------------ */}
       <JourneyCard
