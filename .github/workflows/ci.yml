@@ -57,6 +57,12 @@ jobs:
       - name: Catalogue localization coverage and memo tests
         run: bash ci/run-step.sh "Catalogue localization coverage and memo tests" npm run test:localization
 
+      # Phase 4: the student-visa fact sheet (sourced, dated, trilingual) and the
+      # catalogue gap report (what is fillable from repository data and what is
+      # administrator work).
+      - name: Student-visa facts and catalogue gap gates
+        run: bash ci/run-step.sh "Student-visa facts and catalogue gap gates" npm run test:country-facts && npm run check:catalog-gaps
+
       - name: Discovery matcher tests — university/scholarship Match %
         run: bash ci/run-step.sh "Discovery matcher tests — university/scholarship Match %" npm run test:match
 

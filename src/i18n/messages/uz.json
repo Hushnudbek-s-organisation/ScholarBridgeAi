@@ -1311,7 +1311,33 @@
     },
     "compare": "Taqqoslash",
     "noResults": "Tanlangan mamlakatlar uchun ma'lumot yo'q — yuqoridagi ro'yxatdan tanlang.",
-    "workRightsAverage": "O‘rtacha {years} yil ({count} ta universitetda e’lon qilingan)"
+    "workRightsAverage": "O‘rtacha {years} yil ({count} ta universitetda e’lon qilingan)",
+    "factsTitle": "Talaba vizasi va ish qoidalari",
+    "factsSubtitle": "Mablag' talabi, yarim kunlik ish soatlari, bitiruvdan keyingi ish huquqi va Toshkentdagi elchixona — rasmiy manbalardan. E'lon qilinmagan qiymatlar bo'sh qoladi, bu yerda hech narsa taxmin qilinmaydi.",
+    "factsMissing": "Bu mamlakat uchun tasdiqlangan ma'lumot varag'i hali yo'q.",
+    "proofOfFunds": "Mablag' talabi",
+    "partTimeWork": "Yarim kunlik ish",
+    "postStudyWork": "Bitirgandan keyin",
+    "elevenYearLabel": "11 yillik attestat",
+    "hoursPerWeek": "haftasiga {hours} soat",
+    "months": "{months} oy",
+    "notPublishedCountry": "rasmiy raqam e'lon qilinmagan",
+    "embassy": "Toshkentda",
+    "verifiedOn": "Tekshirilgan sana: {date}",
+    "factsDetail": "Tafsilotlar va istisnolar",
+    "recognitionDatabase": "Rasmiy tan olish bazasi",
+    "factsNote": "Summalar har yili o'zgaradi — manba havolasi va tekshirilgan sana shu sababli ko'rsatilgan. Pul o'tkazishdan yoki navbat olishdan oldin rasmiy sahifada albatta tasdiqlang.",
+    "elevenYear": {
+      "direct": "To'g'ridan-to'g'ri qabul",
+      "foundation": "Tayyorlov yili kerak",
+      "varies": "Har bir holatda alohida"
+    },
+    "embassyKinds": {
+      "embassy": "Elchixona",
+      "consulate": "Konsullik",
+      "honorary-consulate": "Faxriy konsullik",
+      "none": "Toshkentda vakolatxonasi yo'q — onlayn yoki boshqa davlatdagi vakolatxona orqali"
+    }
   },
   "opportunities": {
     "title": "Siz uchun imkoniyatlar",

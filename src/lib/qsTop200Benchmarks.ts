@@ -29,6 +29,17 @@ export interface QsUniversityBenchmark {
   minToefl: number;      // Published minimum TOEFL iBT score
   officialDomain: string;
   officialUrl: string;
+  /**
+   * PROVENANCE — every figure in this table is a *compiled* percentile band
+   * (Common Data Sets, UCAS/OfS admissions statistics, institutional profiles),
+   * not a figure the university publishes as an official acceptance rate or a
+   * guaranteed admitted median. `isEstimated` is therefore always `true` and
+   * always travels with the object, so no consumer — API payload, dashboard or
+   * chancing screen — can present it as a verified statistic.
+   */
+  isEstimated: true;
+  /** One line a UI can show next to the number, in English. */
+  estimateBasis: string;
 }
 
 export const QS_TOP_200_RAW_TUPLE_DATA: [
@@ -281,6 +292,9 @@ export const QS_TOP_200_BENCHMARKS: QsUniversityBenchmark[] = QS_TOP_200_RAW_TUP
     minToefl,
     officialDomain,
     officialUrl: `https://${officialDomain}`,
+    // Compiled bands, never an official published statistic — see the field doc.
+    isEstimated: true,
+    estimateBasis: "Compiled percentile band (Common Data Set / admissions statistics), not an official figure",
   })
 );
 
@@ -411,6 +425,10 @@ export function matchQsUniversityBenchmark(
         minToefl: 85,
         officialDomain: extractDomain(uni.officialWebsiteUrl || uni.websiteUrl) || "topuniversities.com",
         officialUrl: uni.officialWebsiteUrl || uni.websiteUrl || "https://www.topuniversities.com",
+        // Not in the table at all: the band is derived from the world rank, so
+        // it is an estimate twice over. Say so.
+        isEstimated: true,
+        estimateBasis: "Derived from the university's world rank — no published benchmark for this institution",
       };
 
   // Honest Override Priority: merge DB row's explicit minima/acceptance rate
