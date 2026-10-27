@@ -6,7 +6,7 @@ import { ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { asc, eq, sql } from "drizzle-orm";

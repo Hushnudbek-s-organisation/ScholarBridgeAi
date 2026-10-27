@@ -538,7 +538,9 @@ export const inputClass = "sb-field w-full rounded-lg border px-3 py-2 text-sm t
 
 /** "in 4 days" / "today" / "3 days ago" — the format the spec asks for. */
 export function daysLabel(days: number | null, locale: string = "en"): string {
-  const m = isLocale(locale) ? dictionaries[locale].journey : dictionaries.en.journey;
+  // `dictionaries` only carries English plus whatever locale the provider has
+  // registered; an unloaded language falls back to English, never to a crash.
+  const m = (isLocale(locale) ? dictionaries[locale] : undefined)?.journey ?? dictionaries.en.journey;
   if (days == null) return m.daysNoDate;
   if (days === 0) return m.daysToday;
   if (days === 1) return m.daysTomorrow;

@@ -1,4 +1,4 @@
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries } from "@/i18n/messages.server";
 
 /**
  * Shared, additive country/territory options requested for the QS top-200

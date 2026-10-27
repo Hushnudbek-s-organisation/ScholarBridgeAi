@@ -154,5 +154,10 @@ jobs:
 
       - name: Build
         run: bash ci/run-step.sh "Build" npm run build
+
+      # Runs against the freshly built bundle: fails if the landing page starts
+      # shipping every language again (it was 2.2 MB of JS, now ~1.2 MB).
+      - name: Landing page weight budget
+        run: bash ci/run-step.sh "Landing page weight budget" npm run test:perf
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci

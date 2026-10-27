@@ -22,7 +22,7 @@
  * response is byte-identical to what the engine produced before this module
  * existed (and every existing English assertion keeps passing).
  */
-import { dictionaries } from "@/i18n/messages";
+import { dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import type { ReasonDetail } from "@/lib/matching";
 

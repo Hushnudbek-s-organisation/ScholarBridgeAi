@@ -14,7 +14,7 @@
  *    server applies the same ownership checks, entitlements and quotas.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { dictionaries, type Messages } from "@/i18n/messages";
+import { dictionaries, loadMessages, registerMessages, type Messages } from "@/i18n/messages";
 import { formatMessage } from "@/i18n/formatMessage";
 import { toWikimediaThumb, viaImageProxy } from "@/lib/wikimediaThumb";
 import {
@@ -103,11 +103,40 @@ interface MiniProfile {
 // selects the language reported by Telegram/profile rather than assuming the
 // website's current cookie locale.
 type MiniAppMessages = Messages["telegram"]["miniApp"];
-const TXT: Record<Lang, MiniAppMessages> = {
-  en: dictionaries.en.telegram.miniApp,
-  uz: dictionaries.uz.telegram.miniApp,
-  ru: dictionaries.ru.telegram.miniApp,
-};
+/**
+ * Resolved on first use, not at import time: only English is bundled, and the
+ * Uzbek/Russian dictionaries arrive with the active locale (see
+ * `src/i18n/messages.ts`). A missing language falls back to English rather
+ * than to `undefined`.
+ */
+function miniAppText(lang: Lang): MiniAppMessages {
+  return dictionaries[lang]?.telegram.miniApp ?? dictionaries.en.telegram.miniApp;
+}
+/**
+ * The mini app picks its language from Telegram, not from the website cookie,
+ * and it is rendered without a `LocaleProvider` — so the Uzbek/Russian
+ * dictionaries have to be fetched here. Until one arrives the English copy is
+ * shown, which is what `miniAppText` falls back to.
+ */
+function useMiniAppText(lang: Lang): MiniAppMessages {
+  const [ready, setReady] = useState<Lang | null>(() => (dictionaries[lang] ? lang : null));
+  useEffect(() => {
+    if (dictionaries[lang]) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: the dictionary is already registered
+      setReady(lang);
+      return;
+    }
+    let live = true;
+    void loadMessages(lang).then((messages) => {
+      registerMessages(lang, messages);
+      if (live) setReady(lang);
+    });
+    return () => {
+      live = false;
+    };
+  }, [lang]);
+  return ready === lang ? miniAppText(lang) : dictionaries.en.telegram.miniApp;
+}
 
 const PRESETS: { id: string; days: number[] }[] = [
   { id: "standard", days: [30, 14, 7, 3, 1, 0] },
@@ -268,7 +297,7 @@ export function MiniApp() {
   const tokenRef = useRef<string | null>(null);
   const tgRef = useRef<TgWebApp | null>(null);
   const [tg, setTg] = useState<TgWebApp | null>(null);
-  const t = TXT[lang];
+  const t = useMiniAppText(lang);
 
   // Command-center state
   const [plan, setPlan] = useState<string | null>(null);
@@ -699,7 +728,7 @@ export function MiniApp() {
 // Pieces
 // ---------------------------------------------------------------------------
 
-type T = (typeof TXT)["uz"];
+type T = MiniAppMessages;
 type Api = <R>(path: string, init?: RequestInit) => Promise<{ data: R; fallback: boolean }>;
 
 function PrimaryButton({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {

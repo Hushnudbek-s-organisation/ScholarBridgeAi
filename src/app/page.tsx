@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { clientMessagesFor } from "@/i18n/messages.server";
 import { Home } from "./HomeClient";
 
 /**
@@ -19,5 +20,8 @@ export default async function Page() {
   const hasSessionCookie = Boolean(jar.get(SESSION_COOKIE)?.value);
   const stored = jar.get(LOCALE_COOKIE)?.value;
   const initialLocale = stored && isLocale(stored) ? stored : defaultLocale;
-  return <Home hasSessionCookie={hasSessionCookie} initialLocale={initialLocale} />;
+  // English ships inside the client bundle; Uzbek and Russian travel with the
+  // page (one language, not all three). This is what keeps the landing page's
+  // first load small enough to stay responsive on a phone.
+  return <Home hasSessionCookie={hasSessionCookie} initialLocale={initialLocale} initialMessages={clientMessagesFor(initialLocale)} />;
 }
