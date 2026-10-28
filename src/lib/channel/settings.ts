@@ -88,6 +88,14 @@ export interface ChannelSettings {
     kinds: Record<string, string[]>;
     /** Country key → tag, without "#". */
     countries: Record<string, string>;
+    /**
+     * Funding tag, picked by stored data: `full` for a fully funded award,
+     * `partial` otherwise. An empty string switches it off.
+     *
+     * The reference post ends with `#to'liq_moliyalashtiriladi`, and that is a
+     * fact we hold (`isFullyFunded`), not an editorial claim.
+     */
+    funding: { full: string; partial: string };
     /** Degree level → tag, without "#". */
     levels: Record<string, string>;
     /** Weekly-post tags ("#haftalik_eslatmalar #reminders" by default). */
@@ -199,6 +207,9 @@ export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
       story: ["tajriba"],
     },
     countries: {},
+    // No apostrophe: `hashtags()` keeps only [a-z0-9_], so a tag written with one
+    // would silently lose letters. The default is already the published form.
+    funding: { full: "toliq_moliyalashtiriladi", partial: "" },
     levels: { bachelor: "bakalavr", master: "magistratura", phd: "phd" },
     weekly: ["haftalik_eslatmalar", "reminders"],
   },
@@ -307,6 +318,22 @@ function tagMap(value: unknown, fallback: Record<string, string>): Record<string
   return out;
 }
 
+/**
+ * Funding tags. An explicit empty string switches the tag off, so this cannot
+ * fall back the way `str()` does for a missing key.
+ */
+function fundingTags(value: unknown, fallback: { full: string; partial: string }): { full: string; partial: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  const raw = value as Record<string, unknown>;
+  const clean = (input: unknown, alt: string): string => {
+    if (typeof input !== "string") return alt;
+    const tag = input.trim().replace(/^#+/, "").toLowerCase();
+    if (tag === "") return "";
+    return /^[a-z0-9_]{1,30}$/.test(tag) ? tag : alt;
+  };
+  return { full: clean(raw.full, fallback.full), partial: clean(raw.partial, fallback.partial) };
+}
+
 function boolMap(value: unknown, fallback: Record<string, boolean>): Record<string, boolean> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
   const out: Record<string, boolean> = { ...fallback };
@@ -406,6 +433,7 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
     hashtags: {
       kinds,
       countries: tagMap(hashtagBlock.countries, d.hashtags.countries),
+      funding: fundingTags(hashtagBlock.funding, d.hashtags.funding),
       levels: tagMap(hashtagBlock.levels, d.hashtags.levels),
       weekly: tagList(hashtagBlock.weekly, d.hashtags.weekly),
     },

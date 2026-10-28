@@ -110,8 +110,8 @@ least one body section (`isRichContent`). The section order is fixed:
 
 ```
 {flag} <b>{title}</b> — {tagline}
-Moliyalashtirish: {funding_type_uz}
-Til talabi: {language_req_uz}
+<b>Moliyalashtirish:</b> {funding_type_uz}
+<b>Til talabi:</b> {language_req_uz}
 
 <b>Kimlar uchun</b>
 ➡️ {eligibility_uz…}
@@ -120,16 +120,64 @@ Til talabi: {language_req_uz}
 ➡️ {benefits_uz…}
 
 <b>Dastur haqida</b>
-{about_uz}
+➡️ {about_uz}
 
-🕓Oxirgi muddat: 15-dekabr, 2026      (exact)
-🕓Taxminiy muddat: …                  (estimated — never called a deadline)
-🕓Muddat: rasmiy sahifada ko'rsatilgan (rolling)
+⏰️<b>Oxirgi muddat:</b> 15-dekabr, 2026      (exact)
+⏰️<b>Taxminiy muddat:</b> …                  (estimated — never called a deadline)
+⏰️<b>Muddat:</b> rasmiy sahifada ko'rsatilgan (rolling)
 ➡️Batafsil: <a href="SITE/go/CODE">SITE/go/CODE</a>
 
-{hashtags — kind + country + level + editor extras, deduped, max 5}
+{hashtags — kind + country + funding + level + editor extras, deduped, max 5}
 💼 {Kanal} | {Bot}
 ```
+
+### 4b-2. Standard card (`scholarship_single`, `fully_funded`)
+
+Same shape, built from **structured facts** instead of authored copy, so the
+500+ awards without Uzbek copy still post in the published format:
+
+```
+{flag} <b>{title}</b>[ — {tagline, only if authored}]
+🏛 {provider}
+
+<b>Moliyalashtirish:</b> To'liq          (fully funded)
+<b>Moliyalashtirish:</b> Kontraktning bir qismi   (partial: the Uzbek coverage label)
+<b>Til talabi:</b> IELTS 6.5+           (only when min_ielts is stored, or authored)
+
+<b>Kimlar uchun</b>
+➡️ Magistratura                          (degree_levels → Uzbek)
+➡️ Iqtisod, statistika                   (eligible_majors)
+➡️ GPA 3.0+                              (min_gpa)
+➡️ 🇺🇿 O'zbekistonliklar uchun ochiq      (only when eligible_countries names Uzbekistan)
+
+<b>Foydali tomonlari</b>
+➡️ To'liq moliyalashtirish               (fully funded rows only — never repeats a partial header)
+➡️ Yashash uchun to'lov: $1,400          (living_allowance, when > 0)
+➡️ Yo'l xarajatlari: $500                (travel_allowance, when > 0)
+
+⏰️<b>Oxirgi muddat:</b> 27-yanvar, 2027 · 90 kun qoldi
+🏛 Rasmiy manba: <a href="{application_url|website_url}">havola</a>
+➡️Batafsil: <a href="SITE/go/CODE">SITE/go/CODE</a>
+
+#grant #toliq_moliyalashtiriladi #magistratura
+💼 {Kanal} | {Bot}
+```
+
+Rules, enforced by `scripts/check-channel.ts`:
+
+* **Uzbek only.** `description`, `requirements`, `english_requirements`,
+  `tuition_coverage` and `expected_deadline_period` are English prose in
+  production data and are never printed; the card is built from the
+  already-translated structured fields.
+* **No invented period.** A stored allowance is printed as a bare amount. The
+  row does not record whether it is monthly or yearly, so the card never says.
+* **No repetition.** The header already states the coverage, so a partial award
+  gets no coverage bullet — only amounts, or no section at all.
+* **Authored copy wins.** When `scholarship_channel_content` has the Uzbek
+  fields for that award, its bullets replace the structured ones (that is the
+  rich post's content, in the same card layout).
+* **Funding hashtag** is data-driven: `#toliq_moliyalashtiriladi` only on an
+  award `isFullyFunded` accepts. Editable in settings (`hashtags.funding`).
 
 An empty section disappears **with its heading and its blank line**. Length
 policy: at 1800 visible characters the `about` block is trimmed at a word

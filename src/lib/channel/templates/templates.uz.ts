@@ -14,7 +14,10 @@
  */
 import { esc, formatDateUz, daysLeftUz } from "./format";
 import type { Kind, PostChrome, Rendered } from "./chrome";
-import { ctaLine, footerLine } from "./chrome";
+import { ctaLine, EMPTY_CHROME, footerLine } from "./chrome";
+import { renderScholarshipCard } from "./card.uz";
+import type { ScholarshipContent } from "../content";
+import type { CountryDisplay } from "../countries";
 import type { Facts } from "./facts";
 import { TIP_BANK, type TipEntry } from "./tips.uz";
 import { CHECKLIST_BANK, type ChecklistEntry } from "./checklist.uz";
@@ -186,110 +189,53 @@ function siteButtonLine(opts: RenderOptions, path: string, label: string): strin
 // Scholarship posts
 // ---------------------------------------------------------------------------
 
-export function renderScholarshipSingle(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
+/**
+ * `scholarship_single` — the standard card (see `card.uz.ts`).
+ *
+ * It used to be three dense compact variants; the operator asked for the shape
+ * every Uzbek grant channel uses: bold title, `Moliyalashtirish` / `Til talabi`,
+ * then ➡️ bullet sections. The three variants now only vary the headline style
+ * (and the three CTA wordings in `chrome.ts`), so the layout is recognisable
+ * across the channel while the wording still rotates.
+ */
+export function renderScholarshipSingle(
+  f: Facts,
+  variant = 0,
+  chrome: PostChrome | null = null,
+  extra: { content?: ScholarshipContent | null; country?: CountryDisplay | null } = {}
+): Rendered | null {
   const v = ((variant % 3) + 3) % 3;
-  const link = ctaBlock(f, chrome);
-  if (v === 0) {
-    return {
-      key: "single_v1",
-      html: block(
-        row(`🎓 <b>${clipHtml(f.title, 120)}</b>`, `🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null),
-        row(fundingLine(f), deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(audienceLine(f), link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 1) {
-    return {
-      key: "single_v2",
-      html: block(
-        `🎓 <b>${clipHtml(f.title, 120)}</b>`,
-        `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-        row(fundingLine(f), deadlineLine(f)),
-        row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        "ℹ️ Ariza yuborishdan oldin talablarni rasmiy sahifada tekshiring.",
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  const bullets = row(
-    `• Tashkilot: ${f.provider}`,
-    f.country ? `• Davlat: ${f.country}` : null,
-    fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null,
-    deadlinePlain(f) ? `• Muddat: ${cap(deadlinePlain(f) as string)}` : null,
-    requirementsPlain(f) ? `• Talab: ${requirementsPlain(f)}` : null,
-    audiencePlain(f) ? `• Kim uchun: ${audiencePlain(f)}` : null
-  );
-  return {
-    key: "single_v3",
-    html: block(
-      `📌 <b>${clipHtml(f.title, 120)}</b>`,
-      bullets,
-      row(eligibilityLine(f), link, providerLink(f)),
-      footerBlock(chrome)
-    ),
-  };
-}
-
-export function renderFullyFunded(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
-  if (!f.fullyFunded) return null;
-  const v = ((variant % 3) + 3) % 3;
-  const link = ctaBlock(f, chrome);
-  if (v === 0) {
-    return {
-      key: "ff_v1",
-      html: block(
-        `💰 <b>${clipHtml(f.title, 120)}</b> — to'liq moliyalashtirish`,
-        `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-        row(deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(audienceLine(f), link, providerLink(f)),
-        "Shartlar va qamrovni rasmiy e'londa tasdiqlang.",
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 1) {
-    return {
-      key: "ff_v2",
-      html: block(
-        `💰 <b>${clipHtml(f.title, 120)}</b>`,
-        row(
-          `🏛 ${f.provider}`,
-          f.country ? `📍 ${f.country}` : null,
-          f.coverage ? `💳 E'londagi qamrov: ${cap(f.coverage)}` : null,
-          deadlineLine(f)
-        ),
-        "Bu e'londa moliyalashtirish to'liq deb ko'rsatilgan — kontrakt to'liq qoplanadi.",
-        row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  return {
-    key: "ff_v3",
-    html: block(
-      `💸 To'liq moliyalashtirish`,
-      `🎓 <b>${clipHtml(f.title, 120)}</b>`,
-      row(
-        `• Tashkilot: ${f.provider}`,
-        f.country ? `• Davlat: ${f.country}` : null,
-        deadlinePlain(f) ? `• Muddat: ${cap(deadlinePlain(f) as string)}` : null,
-        requirementsPlain(f) ? `• Talab: ${requirementsPlain(f)}` : null
-      ),
-      row(eligibilityLine(f), link, providerLink(f)),
-      "To'liq moliyalashtirish qamrovi har bir dasturda farq qiladi — rasmiy e'lonni o'qing.",
-      footerBlock(chrome)
-    ),
-  };
+  const post = renderScholarshipCard({
+    facts: f,
+    content: extra.content ?? null,
+    country: extra.country ?? null,
+    chrome: chrome ?? { ...EMPTY_CHROME, variant: v },
+  });
+  return post ? { key: `single_v${v + 1}`, html: post.html } : null;
 }
 
 /**
- * Urgency post. Never produced for estimated/evergreen deadlines, and the
- * word "shoshiling" appears only when a day or less is actually left.
+ * `fully_funded` — the same card, only ever for an award the data calls full.
+ * A partial award stays silent here; the planner then falls back to the
+ * standard card instead of mislabelling it.
  */
+export function renderFullyFunded(
+  f: Facts,
+  variant = 0,
+  chrome: PostChrome | null = null,
+  extra: { content?: ScholarshipContent | null; country?: CountryDisplay | null } = {}
+): Rendered | null {
+  if (!f.fullyFunded) return null;
+  const v = ((variant % 3) + 3) % 3;
+  const post = renderScholarshipCard({
+    facts: f,
+    content: extra.content ?? null,
+    country: extra.country ?? null,
+    chrome: chrome ?? { ...EMPTY_CHROME, variant: v },
+  });
+  return post ? { key: `ff_v${v + 1}`, html: post.html } : null;
+}
+
 export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostChrome | null = null): Rendered | null {
   const d = f.deadline;
   if (d.quality !== "exact" || d.daysLeft === null || d.daysLeft < 0 || d.daysLeft > rung) return null;

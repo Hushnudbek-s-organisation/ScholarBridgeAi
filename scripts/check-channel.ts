@@ -264,6 +264,8 @@ function row(overrides: Partial<FactsRow> = {}): FactsRow {
     eligibleMajors: '["All Majors"]',
     minGpa: 3.5,
     minIelts: 6.5,
+    livingAllowance: null,
+    travelAllowance: null,
     websiteUrl: "https://example.edu/scholarship",
     applicationUrl: null,
     ...overrides,
@@ -294,6 +296,17 @@ const minutesOf = (time: string) => {
   assert.ok(m, `bad send_at ${time}`);
   return Number(m[1]) * 60 + Number(m[2]);
 };
+
+/** Chrome for the card checks: tracked link, funding tag, footer. */
+function cardChrome() {
+  return {
+    siteUrl: SITE,
+    shortLink: { url: `${SITE}/go/card1`, visible: "scholarbridge.example/go/card1" },
+    hashtags: ["grant", "toliq_moliyalashtiriladi"],
+    footer: [{ label: "Kanal", url: "https://t.me/scholarbridge" }],
+    variant: 0,
+  };
+}
 
 function assertClean(html: string, label: string, opts: { allowUrgency?: boolean } = {}) {
   const issues = lintText(html, opts);
@@ -1190,11 +1203,11 @@ check("the rich post renders the exact agreed layout", () => {
   const code = scholarshipLinkCode(1, "site");
   const expected = [
     "🇨🇦 <b>Global Excellence Scholarship</b> — Kanadada bepul o'qish imkoniyati",
-    "Moliyalashtirish: To'liq kontrakt + stipendiya\nTil talabi: IELTS 6.5",
+    "<b>Moliyalashtirish:</b> To'liq kontrakt + stipendiya\n<b>Til talabi:</b> IELTS 6.5",
     "<b>Kimlar uchun</b>\n➡️ Bakalavr yo'nalishi\n➡️ GPA 3.5 dan yuqori",
     "<b>Foydali tomonlari</b>\n➡️ Kontrakt to'liq qoplanadi\n➡️ Oylik stipendiya",
     "<b>Dastur haqida</b>\nDastur har yili 20 talabani qabul qiladi.",
-    `🕓Oxirgi muddat: 12-noyabr, 2026\n➡️Batafsil: <a href="${SITE}/go/${code}">scholarbridge.example/go/${code}</a>`,
+    `⏰️<b>Oxirgi muddat:</b> 12-noyabr, 2026\n➡️Batafsil: <a href="${SITE}/go/${code}">scholarbridge.example/go/${code}</a>`,
     "#grant #kanada #bakalavr",
     '💼 <a href="https://t.me/scholarbridge">Kanal</a> | <a href="https://t.me/scholarbridgebot">Bot</a>',
   ].join("\n\n");
@@ -1290,7 +1303,7 @@ check("estimated and rolling deadlines never look exact", () => {
     chrome: richChrome(),
   });
   assert.ok(estimated);
-  assert.ok(estimated.html.includes("🕓Muddat: rasmiy sahifada ko'rsatilgan"));
+  assert.ok(estimated.html.includes("⏰️<b>Muddat:</b> rasmiy sahifada ko'rsatilgan"));
   assert.ok(!estimated.html.includes("Oxirgi muddat"));
 
   const estimated2 = renderScholarshipRich({
@@ -1315,7 +1328,7 @@ check("estimated and rolling deadlines never look exact", () => {
     chrome: richChrome(),
   });
   assert.ok(ranged);
-  assert.ok(ranged.html.includes("🕓Taxminiy muddat:"), "a range end is an estimate, not a deadline");
+  assert.ok(ranged.html.includes("⏰️<b>Taxminiy muddat:</b>"), "a range end is an estimate, not a deadline");
 });
 
 check("rolling and estimated awards never enter an urgency post", () => {
@@ -3111,6 +3124,67 @@ check("Tables this app creates at runtime are not left open to the anon key", ()
   const bootstrap = read("src/lib/db/bootstrap.ts");
   assert.match(bootstrap, /after\?\s*:\s*\(\)\s*=>\s*Promise<unknown>/, "the bootstrap has the hook");
   assert.match(bootstrap, /await after\(\)\.catch/, "and it can never fail the bootstrap");
+});
+
+check("the standard card follows the published shape, in order", () => {
+  const f = facts({ livingAllowance: 1400, travelAllowance: 500, eligibleCountries: '["Uzbekistan"]' });
+  const out = renderScholarshipSingle(f, 0, cardChrome());
+  assert.ok(out, "card did not render");
+  assertClean(out.html, "card");
+  const lines = out.html.split("\n");
+  const idx = (needle: string) => lines.findIndex((line) => line.includes(needle));
+  assert.ok(idx("🏛 Example University") > idx("<b>Global Excellence Scholarship</b>"), "provider follows the title");
+  assert.ok(idx("<b>Moliyalashtirish:</b>") > idx("🏛 Example University"), "funding before the sections");
+  assert.ok(idx("<b>Til talabi:</b>") > idx("<b>Moliyalashtirish:</b>"), "language under funding");
+  assert.ok(idx("<b>Kimlar uchun</b>") > idx("<b>Til talabi:</b>"));
+  assert.ok(idx("<b>Foydali tomonlari</b>") > idx("<b>Kimlar uchun</b>"));
+  assert.ok(idx("⏰️<b>Oxirgi muddat:</b>") > idx("<b>Foydali tomonlari</b>"), "deadline after the sections");
+  assert.ok(idx("Rasmiy manba") > idx("⏰️<b>"), "the official source sits under the deadline");
+  assert.ok(idx("➡️Batafsil:") > idx("Rasmiy manba"), "the tracked link is the last content line");
+  assert.match(out.html, /^➡️ /m, "bullets use the published arrow");
+  assert.match(out.html, /\n\n#/, "hashtags are their own block");
+});
+
+check("the card prints stored facts and never English database prose", () => {
+  const f = facts({ livingAllowance: 1400, travelAllowance: 500, eligibleCountries: '["Uzbekistan"]' });
+  const text = plainText(renderScholarshipSingle(f, 0, cardChrome())?.html ?? "");
+  for (const expected of ["Moliyalashtirish: To'liq", "Til talabi: IELTS 6.5+", "Bakalavr", "GPA 3.5+", "Yashash uchun to'lov: $1,400", "Yo'l xarajatlari: $500", "🇺🇿 O'zbekistonliklar uchun ochiq", "17 kun qoldi"]) {
+    assert.ok(text.includes(expected), `missing: ${expected}`);
+  }
+  // The row's `description`/`requirements` are English in production and must
+  // never reach an Uzbek post — the card is built from structured facts only.
+  // Only the code, not the doc comment that names those fields to explain why
+  // they are excluded.
+  const source = read("src/lib/channel/templates/card.uz.ts").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const field of ["description", "requirements", "englishRequirements", "tuitionCoverage", "expectedDeadlinePeriod"]) {
+    assert.ok(!source.includes(field), `${field} must not be printed`);
+  }
+  // A number without a stored period may not be given one.
+  assert.ok(!/oylik|yillik|yiliga/i.test(text), "never invents a payment period");
+});
+
+check("a thin record produces a short honest card", () => {
+  const out = renderScholarshipSingle(MINIMAL, 0, cardChrome());
+  assert.ok(out, "the minimal record still renders");
+  const text = plainText(out.html);
+  assert.ok(!text.includes("Kimlar uchun"), "no empty audience section");
+  assert.ok(!text.includes("Foydali tomonlari"), "no empty benefits section");
+  assert.ok(!text.includes("Dastur haqida"), "no empty about section");
+  assert.ok(!text.includes("📍"), "no country flag line without a country");
+  assert.ok(!out.html.includes("\n\n\n"), "no gap where a section was dropped");
+  // No tagline, no dangling separator.
+  assert.ok(!/<b>[^<]*<\/b>\s*[—-]\s*$/.test(out.html.split("\n")[0]), "no orphaned dash");
+});
+
+check("authored Uzbek copy replaces the structured sections", () => {
+  const out = renderScholarshipSingle(facts(), 0, cardChrome(), { content: RICH_CONTENT, country: countryDisplay("Canada") });
+  assert.ok(out);
+  const text = plainText(out.html);
+  assert.ok(text.includes("Kanadada bepul o'qish imkoniyati"), "the authored tagline leads the headline");
+  assert.ok(text.includes("Bakalavr yo'nalishi"), "authored eligibility wins");
+  assert.ok(text.includes("Kontrakt to'liq qoplanadi"), "authored benefits win");
+  assert.ok(text.includes("Dastur haqida"), "authored about appears");
+  assert.ok(out.html.startsWith("🇨🇦"), "the flag comes from the country table");
 });
 
 // ---------------------------------------------------------------------------
