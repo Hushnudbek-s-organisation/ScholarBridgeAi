@@ -7,6 +7,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { createTableBootstrap } from "@/lib/db/bootstrap";
+import { lockDownTables } from "@/lib/db/lockdown";
 import { columnExistenceVerify, tableExistenceVerify, tablesInStatements } from "@/lib/schemaGate";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { channelColumns, channelStatements } from "./ddl";
@@ -34,7 +35,12 @@ const bootstrap = createTableBootstrap(
   verifyChannelSchema,
   // `channel_plan` / `channel_posts` reference `scholarships`, so the base
   // schema has to exist before this DDL can succeed.
-  ensureCoreSchema
+  ensureCoreSchema,
+  // On Supabase a table created this way is public by default: RLS off and a
+  // full grant to `anon`/`authenticated`. `supabase/enable_rls.sql` fixes the
+  // tables that existed when it was run, not the ones this bootstrap creates
+  // afterwards — so lock them down here too.
+  () => lockDownTables(tablesInStatements(channelStatements()), (stmt) => db.execute(sql.raw(stmt)))
 );
 
 export function ensureChannelTables(): Promise<boolean> {

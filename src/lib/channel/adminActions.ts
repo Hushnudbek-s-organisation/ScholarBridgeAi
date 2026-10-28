@@ -13,7 +13,7 @@ import { ensureChannelTables } from "./db";
 import { ensurePlanLinks, todayQueue } from "./admin";
 import { loadChannelSettings, writeChannelAudit } from "./repo";
 import { runDuePosts, sendPlanRow } from "./send";
-import { runDailyPlan } from "./store";
+import { retireStalePlans, runDailyPlan } from "./store";
 import { expireStaleApprovals } from "./approvalStore";
 
 export interface PlanRunSummary {
@@ -65,6 +65,8 @@ export interface RunPostsSummary {
   skipped: number;
   /** Posts retired because nobody answered within the approval window. */
   expired: number;
+  /** Queue rows from earlier days that can never be sent any more. */
+  retired: number;
   reasons: string[];
   blockedReason: string | null;
 }
@@ -90,6 +92,7 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
       failed: 0,
       skipped: 0,
       expired: 0,
+      retired: 0,
       reasons: [runtime.blockedReason],
       blockedReason: runtime.blockedReason,
     };
@@ -98,6 +101,9 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
   // Retire previews nobody answered before planning anything new: approving a
   // stale post later would publish yesterday's news under today's date.
   const expired = await expireStaleApprovals().catch(() => 0);
+  // Yesterday's queue cannot be sent (the sender is date-scoped), so retire it
+  // explicitly instead of leaving rows that look pending forever.
+  const retired = await retireStalePlans(tashkentDay()).catch(() => 0);
 
   const day = tashkentDay();
   const [existing] = await db
@@ -115,6 +121,7 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
     failed: outcomes.filter((o) => o.status === "failed").length,
     skipped: outcomes.filter((o) => o.status === "skipped").length,
     expired,
+    retired,
     reasons: outcomes.map((o) => o.reason).filter((r): r is string => Boolean(r)),
     blockedReason: runtime.blockedReason,
   };

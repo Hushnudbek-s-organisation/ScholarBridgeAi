@@ -93,7 +93,17 @@ export function createTableBootstrap(
    * and the panel reports "the bot tables failed" for something the app could
    * have created itself a moment earlier.
    */
-  prerequisite?: () => Promise<boolean>
+  prerequisite?: () => Promise<boolean>,
+  /**
+   * Runs once the tables exist. Used for the Supabase lockdown: tables this app
+   * creates at runtime are born readable/writable by the public `anon` role,
+   * because Supabase grants `public` tables to `anon`/`authenticated` by default
+   * and only `supabase/enable_rls.sql` (a manual step) turns RLS on.
+   *
+   * Best-effort on purpose: a database role that may not alter the tables gets
+   * a warning in the log, never a broken bot or publisher.
+   */
+  after?: () => Promise<unknown>
 ) {
   const gateName = `bootstrap:${label}`;
   const statuses = statusStore();
@@ -123,6 +133,7 @@ export function createTableBootstrap(
         subject = statementSubject(stmt);
         await run(stmt);
       }
+      if (after) await after().catch((err) => console.warn(`[${label}] post-bootstrap step skipped:`, err instanceof Error ? err.message : err));
       setStatus({ state: "ready", reason: null, hint: null, detail: null, statement: null, at: new Date().toISOString() });
     } catch (err) {
       const { reason, hint, detail } = classifyDbError(err);

@@ -7,6 +7,8 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { lockDownTables } from "@/lib/db/lockdown";
+import { tablesInStatements } from "@/lib/schemaGate";
 import { createTableBootstrap } from "@/lib/db/bootstrap";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { telegramStatements } from "./ddl";
@@ -21,7 +23,11 @@ const bootstrap = createTableBootstrap(
   telegramStatements,
   (stmt) => db.execute(sql.raw(stmt)),
   undefined,
-  ensureCoreSchema
+  ensureCoreSchema,
+  // Supabase exposes `public` through PostgREST and grants new tables to
+  // `anon`/`authenticated` with RLS off — `telegram_links` holds chat ids, so
+  // the tables this bootstrap creates are locked down immediately.
+  () => lockDownTables(tablesInStatements(telegramStatements()), (stmt) => db.execute(sql.raw(stmt)))
 );
 
 export function ensureTelegramTables(): Promise<boolean> {
