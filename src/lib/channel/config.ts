@@ -40,12 +40,91 @@ function truthy(raw: string | undefined | null): boolean {
   return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
+/* ------------------------------------------------------------------------- */
+/* Channel identifier normalisation                                           */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Why a channel identifier is normalised instead of only validated.
+ *
+ * Operators paste whatever Telegram gave them: `https://t.me/scholarbridge`,
+ * `t.me/scholarbridge`, `scholarbridge`, `@scholarbridge`, `-1001234567890`,
+ * and — the one that used to fail silently — `https://t.me/+AbCdEf` (an invite
+ * link) or `https://t.me/c/1234567890/42` (a message link). The old check
+ * (`validChannelId`) rejected every URL form, and the panel only said
+ * "invalid value for this block": no hint about what to type instead.
+ *
+ * This function turns what a human pastes into the two forms the Bot API
+ * accepts, and names the one case it cannot fix (an invite link contains no id
+ * Telegram will accept as `chat_id`).
+ */
+export type ChannelIdentifier =
+  | { ok: true; value: string; kind: "id" | "username" }
+  | { ok: false; reason: "empty" | "invite_link" | "not_a_channel"; hint: string };
+
+/** The hint shown in the panel and returned by the API for an invite link. */
+export const INVITE_LINK_HINT =
+  "Maxfiy kanal uchun taklif havolasini emas, kanalning `-100…` bilan boshlanuvchi ID raqamini kiriting " +
+  "yoki kanaldan botga bitta post forward qiling.";
+export const NOT_A_CHANNEL_HINT =
+  "Kanal manzili noto'g'ri. `@kanal_nomi`, `https://t.me/kanal_nomi` yoki `-100…` ID kiriting.";
+
+const USERNAME = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;
+
+/**
+ * Turn an operator-typed channel reference into `-100…` or `@username`.
+ *
+ * Accepted: `-1001234567890`, `1234567890`, `@name`, `name`,
+ * `https://t.me/name`, `http://t.me/name`, `t.me/name`, `telegram.me/name`,
+ * `https://t.me/s/name` (the web-preview link), `https://t.me/c/<id>/<msg>`.
+ * Everything is trimmed, lower-cased only where Telegram is case-insensitive
+ * (the URL host), and returned without a trailing slash or query string.
+ */
+export function normalizeChannelIdentifier(raw: string | null | undefined): ChannelIdentifier {
+  const original = String(raw ?? "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // pasted zero-width junk
+    .trim();
+  if (!original) return { ok: false, reason: "empty", hint: NOT_A_CHANNEL_HINT };
+
+  // Strip a scheme and the known Telegram hosts, so every form reduces to a path.
+  let rest = original
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(?:www\.)?(?:t\.me|telegram\.me|telegram\.dog)\//i, "")
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+    .trim();
+
+  // A private invite link carries no chat id Telegram accepts.
+  if (/^(\+|joinchat\/)/i.test(rest)) {
+    return { ok: false, reason: "invite_link", hint: INVITE_LINK_HINT };
+  }
+
+  // A message link `t.me/c/<internal id>/<message>` → the channel's real id.
+  const privateMessage = /^c\/(\d{5,14})(?:\/\d+)?$/i.exec(rest);
+  if (privateMessage) return { ok: true, value: `-100${privateMessage[1]}`, kind: "id" };
+
+  // Web preview links: `t.me/s/<username>`.
+  rest = rest.replace(/^s\//i, "");
+
+  // Bare username, with or without the @.
+  const username = rest.replace(/^@/, "");
+  if (USERNAME.test(username)) return { ok: true, value: `@${username}`, kind: "username" };
+
+  // Numeric ids, as-is (the minus sign matters for supergroups).
+  if (/^-?\d{5,20}$/.test(rest)) return { ok: true, value: rest, kind: "id" };
+
+  return { ok: false, reason: "not_a_channel", hint: NOT_A_CHANNEL_HINT };
+}
+
 /** Numeric chat ids (channels/supergroups start with -100) or an @username. */
 export function validChannelId(raw: string): boolean {
-  const v = raw.trim();
-  if (!v) return false;
-  if (/^-?\d{5,20}$/.test(v)) return true;
-  return /^@[A-Za-z][A-Za-z0-9_]{4,31}$/.test(v);
+  return normalizeChannelIdentifier(raw).ok;
+}
+
+/** The canonical form of an identifier, or the input unchanged when it is unusable. */
+export function canonicalChannelId(raw: string): string {
+  const normalized = normalizeChannelIdentifier(raw);
+  return normalized.ok ? normalized.value : String(raw ?? "").trim();
 }
 
 /** Private/admin chat ids are always numeric (possibly negative). */
@@ -68,9 +147,13 @@ export function normalizeSiteUrl(raw: string | undefined | null): string {
 }
 
 export function channelConfig(env: Env = process.env): ChannelConfig {
+  const rawChannel = (env.TELEGRAM_CHANNEL_ID ?? "").trim();
+  const normalized = normalizeChannelIdentifier(rawChannel);
   return {
     mode: parseAutopost(env.CHANNEL_AUTOPOST),
-    channelId: (env.TELEGRAM_CHANNEL_ID ?? "").trim(),
+    // The environment is typed by a human in a host dashboard too: accept the
+    // same forms as the panel (a `t.me/…` link included), store the canonical id.
+    channelId: normalized.ok ? normalized.value : rawChannel,
     adminChatId: (env.TELEGRAM_ADMIN_CHAT_ID ?? "").trim(),
     siteUrl: normalizeSiteUrl(env.CHANNEL_SITE_URL) || normalizeSiteUrl(env.APP_URL),
     discussionEnabled: truthy(env.CHANNEL_DISCUSSION_ENABLED),
@@ -130,7 +213,18 @@ export interface ChannelRuntime {
   envAutopost: AutopostMode | null;
   /** Why nothing may be sent right now, or null when the publisher may run. */
   blockedReason: string | null;
+  /**
+   * The same answer as a stable code.
+   *
+   * Callers need to distinguish "the admin chat is not set" from every other
+   * reason: in approval mode that is not a dead end — the post can still be
+   * approved from the panel — while a missing channel really is one. Matching
+   * on the English message would be a bug waiting for a translation.
+   */
+  blockedCode: BlockedCode | null;
 }
+
+export type BlockedCode = "env_off" | "off" | "paused" | "no_channel" | "no_admin_chat" | "no_site";
 
 /**
  * `off` in the environment always wins (deploy-level kill switch), so removing
@@ -155,7 +249,12 @@ export function resolveChannelRuntime(
   let mode: ChannelMode = settings.connection.mode;
   if (envKillSwitch) mode = "off";
   else if (envMode === "dryrun" && mode === "on") mode = "dryrun";
-  const channelId = settings.connection.channelId || (env.TELEGRAM_CHANNEL_ID ?? "").trim();
+  // Both sides are normalised: a legacy settings row (or a host dashboard entry)
+  // may hold `https://t.me/name`, which the Bot API answers with
+  // "Bad Request: chat not found".
+  const settingChannel = normalizeChannelIdentifier(settings.connection.channelId);
+  const envChannel = normalizeChannelIdentifier(env.TELEGRAM_CHANNEL_ID ?? "");
+  const channelId = (settingChannel.ok ? settingChannel.value : "") || (envChannel.ok ? envChannel.value : "");
   const adminChatId = settings.connection.adminChatId || (env.TELEGRAM_ADMIN_CHAT_ID ?? "").trim();
   const siteUrl =
     settings.siteUrl || normalizeSiteUrl(env.CHANNEL_SITE_URL) || normalizeSiteUrl(env.APP_URL);
@@ -163,12 +262,18 @@ export function resolveChannelRuntime(
   const paused = Boolean(pausedUntil && pausedUntil >= tashkentDay(now));
 
   let blockedReason: string | null = null;
-  if (envKillSwitch) blockedReason = "CHANNEL_AUTOPOST=off is set in this deployment's environment (kill switch) — it overrides the panel";
-  else if (mode === "off") blockedReason = "Posting is off in the panel — choose Dry run or Live above";
-  else if (paused) blockedReason = `Paused until ${pausedUntil}`;
-  else if (!validChannelId(channelId)) blockedReason = "The channel is not connected yet";
-  else if (!validAdminChatId(adminChatId)) blockedReason = "The admin chat is not set";
-  else if (!siteUrl) blockedReason = "The site URL is not set";
+  let blockedCode: BlockedCode | null = null;
+  const block = (code: BlockedCode, reason: string) => {
+    blockedCode = code;
+    blockedReason = reason;
+  };
+  if (envKillSwitch)
+    block("env_off", "CHANNEL_AUTOPOST=off is set in this deployment's environment (kill switch) — it overrides the panel");
+  else if (mode === "off") block("off", "Posting is off in the panel — choose Dry run or Live above");
+  else if (paused) block("paused", `Paused until ${pausedUntil}`);
+  else if (!validChannelId(channelId)) block("no_channel", "The channel is not connected yet");
+  else if (!validAdminChatId(adminChatId)) block("no_admin_chat", "The admin chat is not set");
+  else if (!siteUrl) block("no_site", "The site URL is not set");
 
   return {
     mode,
@@ -181,6 +286,7 @@ export function resolveChannelRuntime(
     pausedUntil: pausedUntil ?? null,
     envKillSwitch,
     blockedReason,
+    blockedCode,
   };
 }
 
@@ -225,7 +331,15 @@ export function channelEnvChecklist(env: Env = process.env): EnvCheckRow[] {
       valid: null,
       preview: autopostRaw === "" ? null : parseAutopost(autopostRaw),
     },
-    { key: "TELEGRAM_CHANNEL_ID", level: "required", set: channelId !== "", valid: validChannelId(channelId), preview: channelId ? channelId.slice(0, 40) : null },
+    {
+      key: "TELEGRAM_CHANNEL_ID",
+      level: "required",
+      set: channelId !== "",
+      valid: validChannelId(channelId),
+      // Show the canonical form: `https://t.me/x` is accepted, but the operator
+      // should see which `@x` it means.
+      preview: channelId ? canonicalChannelId(channelId).slice(0, 40) : null,
+    },
     { key: "TELEGRAM_ADMIN_CHAT_ID", level: "required", set: adminChat !== "", valid: validAdminChatId(adminChat), preview: adminChat || null },
     { key: "CHANNEL_SITE_URL", level: "optional", set: Boolean(normalizeSiteUrl(env.CHANNEL_SITE_URL)), valid: Boolean(normalizeSiteUrl(env.CHANNEL_SITE_URL)), preview: normalizeSiteUrl(env.CHANNEL_SITE_URL) || null },
     { key: "APP_URL", level: "optional", set: Boolean(normalizeSiteUrl(env.APP_URL)), valid: Boolean(normalizeSiteUrl(env.APP_URL)), preview: normalizeSiteUrl(env.APP_URL) || site || null },

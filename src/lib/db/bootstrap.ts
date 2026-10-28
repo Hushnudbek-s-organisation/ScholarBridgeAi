@@ -95,7 +95,18 @@ export function classifyDbError(err: unknown): { reason: string; hint: string } 
   };
 }
 
-export function createTableBootstrap(label: string, statements: () => string[], run: (stmt: string) => Promise<unknown>) {
+export function createTableBootstrap(
+  label: string,
+  statements: () => string[],
+  run: (stmt: string) => Promise<unknown>,
+  /**
+   * What "the schema is there" means when DDL is disabled
+   * (`SCHEMA_AUTO_REPAIR=off`). Defaults to "every table exists"; the channel
+   * bootstrap also checks its columns, because that module adds columns over
+   * time and a table-only check would call an old schema healthy.
+   */
+  verifyOverride?: () => Promise<{ ok: boolean; problems: string[] }>
+) {
   const gateName = `bootstrap:${label}`;
   const statuses = statusStore();
 
@@ -117,7 +128,7 @@ export function createTableBootstrap(label: string, statements: () => string[], 
   }
 
   async function verify(): Promise<{ ok: boolean; problems: string[] }> {
-    const check = tableExistenceVerify(tablesInStatements(statements()));
+    const check = verifyOverride ?? tableExistenceVerify(tablesInStatements(statements()));
     const result = await check();
     setStatus(
       result.ok

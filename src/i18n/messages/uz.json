@@ -6868,7 +6868,8 @@
       "token": "Bot tokeni (Admin → Telegram)",
       "channel": "Bot kanal administratori",
       "adminChat": "Admin chat ochiq",
-      "siteUrl": "Sayt manzili kiritilgan"
+      "siteUrl": "Sayt manzili kiritilgan",
+      "permission": "Bot huquqlari"
     },
     "connect": {
       "title": "Ulanish holati",
@@ -6908,7 +6909,47 @@
       "autostartHint": "Saqlashingiz bilan kanal ulanadi: bot shu zahoti admin chatga bitta xabar va birinchi postni yuboradi, keyin tizim o'zi davom etadi (belgilangan vaqtlarda o'zi tekshiradi).",
       "autostartDone": "Kanal ulandi — Telegram chatingizga xabar yuborildi. {count} ta post tasdiqlash uchun kutilmoqda.",
       "autostartQuiet": "Kanal ulandi — Telegram chatingizga xabar yuborildi. Bugun navbatda post yo'q.",
-      "autostartBlocked": "Sozlamalar saqlandi, lekin hozir post ketmaydi: {reason}"
+      "autostartBlocked": "Sozlamalar saqlandi, lekin hozir post ketmaydi: {reason}",
+      "diag": {
+        "ok": "Tayyor",
+        "token_missing": "Bot tokeni yo'q. Uni Admin → Telegram bo'limida kiriting (bu bo'limda token kiritilmaydi).",
+        "token_invalid": "Bot tokeni noto'g'ri yoki yaroqsiz (401). Admin → Telegram bo'limida tekshiring. {detail}",
+        "channel_missing": "Kanal ko'rsatilmagan. @username yoki -100… ID kiriting.",
+        "channel_invalid": "Kanal manzili noto'g'ri. @kanal_nomi, https://t.me/kanal_nomi yoki -100… ID kiriting.",
+        "channel_not_found": "Kanal topilmadi. Username to'g'riligini va botni kanalga admin qilganingizni tekshiring. {detail}",
+        "channel_wrong_type": "Bu ID kanal emas ({type}). Kanalning @username yoki -100… ID sini kiriting.",
+        "bot_not_admin": "{botUsername} kanalda administrator emas. Telegramda kanal → Administratorlar → botni qo'shib, «Post messages» ruxsatini bering.",
+        "no_post_permission": "{botUsername} uchun «Post messages» ruxsati o'chirilgan. Kanal → Administratorlar bo'limida yoqing.",
+        "admin_chat_missing": "Admin chat ID yo'q. Botni o'z chatingizda ochib /start bosing va raqamli ID ni kiriting.",
+        "admin_chat_unreachable": "Bu chatga yozib bo'lmadi: botni o'sha chatda bir marta ochib /start bosing. {detail}",
+        "site_missing": "Sayt manzili yo'q — postlardagi havolalar tushib qoladi.",
+        "site_not_public": "«{siteUrl}» lokal manzil. Telegram bunday havolani qabul qilmaydi — ochiq https manzil kiriting."
+      },
+      "discoveredTitle": "🎯 Aniqlangan kanal",
+      "discoveredNoTitle": "Nomsiz kanal",
+      "discoveredConnect": "Shu kanalni ulash",
+      "discoveredDone": "Kanal ulandi — rejim «Tasdiqlash bilan» bo'ldi, xohlasangiz o'zgartiring.",
+      "quick": {
+        "title": "Tez ulash — bitta maydon",
+        "hint": "Kanal manzilini qanday ko'chirsangiz ham bo'ladi: @username, t.me/username, -100… ID. Manzil darhol tekshiriladi, xato bo'lsa darhol aytiladi.",
+        "label": "Kanal manzili",
+        "placeholder": "@kanal_nomi · https://t.me/kanal_nomi · -1001234567890",
+        "previewOk": "Aniqlandi: {value}",
+        "previewUsername": "Bu @username. «Ulash» bosilganda Telegramdan raqamli ID olinadi va saqlanadi — username o'zgarsa ham kanal uzilmaydi.",
+        "previewId": "Bu raqamli ID — eng ishonchli shakl, u hech qachon o'zgarmaydi.",
+        "previewOpen": "Kanalni Telegramda ochish",
+        "errEmpty": "Kanal manzili bo'sh.",
+        "errInvite": "Bu maxfiy taklif havolasi (t.me/+…). Undan kanal ID olib bo'lmaydi — kanaldan botga bitta post forward qiling yoki -100… ID kiriting.",
+        "errNotChannel": "Bu kanal manziliga o'xshamaydi. @kanal_nomi, https://t.me/kanal_nomi yoki -100… ID kiriting.",
+        "connect": "Ulash va tekshirish",
+        "test": "Sinov xabari",
+        "connecting": "Ulanmoqda…",
+        "connectDone": "Kanal saqlandi. Tekshiruv natijasi quyida.",
+        "connectSaved": "Kanal saqlandi, lekin rejim «O'chirilgan» — post ketmaydi.",
+        "fixTitle": "Ulanish tugamadi. Buni tuzating:",
+        "ready": "Hammasi tayyor — kanal ulandi va bot post yozish huquqiga ega.",
+        "modeApprovalNote": "Rejim «Tasdiqlash bilan» qilib qo'yildi: birinchi post admin chatga keladi, tasdiqlaganingizdan keyin kanalga chiqadi."
+      }
     },
     "plan": {
       "title": "Chiqish ritmi",

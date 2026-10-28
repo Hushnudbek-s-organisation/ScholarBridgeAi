@@ -14,8 +14,8 @@
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts } from "@/db/schema";
-import { getBotToken } from "@/lib/telegram/settings";
-import { tgCall, tgEditMessage, tgSendPoll } from "@/lib/telegram/api";
+import { getChannelBotToken } from "./token";
+import { tgCall, tgEditMessage, tgSendPoll, type TgResult } from "@/lib/telegram/api";
 import { resolveChannelRuntime, tashkentDay, type ChannelRuntime } from "./config";
 import { ensureSiteLink, loadChannelSettings, writeChannelAudit } from "./repo";
 import { loadRenderData, loadChannelCountries } from "./runtime";
@@ -37,6 +37,7 @@ import {
   sendablePlanRows,
 } from "./approval";
 import { pollPreviewText, pollSendParams, pollSendProblem, pollSpecByKey } from "./polls";
+import { recoveryAttempt, usableButtons, type SendAttempt } from "./recover";
 
 export interface SendOutcome {
   ok: boolean;
@@ -82,6 +83,72 @@ function dedupeKey(row: typeof channelPlan.$inferSelect): string {
   return `post|${row.kind}|${row.scholarshipId ?? "-"}|${row.rung ?? "-"}|${row.planDate}|${row.slot}`;
 }
 
+/**
+ * One `sendMessage`, with the recovery ladder from `recover.ts`.
+ *
+ * Telegram rejects a whole message for reasons that are not about the content:
+ * an inline-button URL that is not absolute https (a deployment configured with
+ * `APP_URL=http://localhost:3000` produces exactly that) or markup it cannot
+ * parse. Both used to lose the post. Now the keyboard is dropped first (the
+ * text is what matters), then the markup, and only then is the send reported as
+ * failed — with the reason the operator can act on.
+ */
+async function sendMessageWithRecovery(
+  token: string,
+  chatId: string,
+  html: string,
+  params: { disablePreview: boolean; keyboard?: Array<Array<{ text: string; url?: string; callback_data?: string }>> },
+  timeoutMs = 12_000
+): Promise<{ ok: boolean; messageId: number | null; error: string | null; retryAfter: number; recovered: string | null }> {
+  const initialButtons = params.keyboard ?? [];
+  const { rows: buttons, dropped } = usableButtons(initialButtons);
+  let attempt: SendAttempt = {
+    kind: "html",
+    text: html,
+    withKeyboard: buttons.length > 0,
+  };
+
+  let last: TgResult<{ message_id: number }> = { ok: false, description: "not sent" };
+  let recovered: string | null = dropped.length ? `dropped_buttons:${dropped.length}` : null;
+
+  for (let step = 0; step < 3; step++) {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      text: attempt.text,
+      link_preview_options: { is_disabled: params.disablePreview },
+    };
+    if (attempt.kind === "html") body.parse_mode = "HTML";
+    if (attempt.withKeyboard) body.reply_markup = { inline_keyboard: buttons };
+
+    last = await tgCall<{ message_id: number }>(token, "sendMessage", body, timeoutMs);
+    if (last.ok) {
+      return { ok: true, messageId: last.result?.message_id ?? null, error: null, retryAfter: 0, recovered };
+    }
+
+    const retryAfter = last.parameters?.retry_after ?? 0;
+    if (last.error_code === 429 && retryAfter > 0 && retryAfter * 1000 <= MAX_FLOOD_WAIT_MS) {
+      await sleep(retryAfter * 1000);
+      last = await tgCall<{ message_id: number }>(token, "sendMessage", body, timeoutMs);
+      if (last.ok) {
+        return { ok: true, messageId: last.result?.message_id ?? null, error: null, retryAfter, recovered };
+      }
+    }
+
+    const next = recoveryAttempt(attempt, last.description);
+    if (!next) break;
+    recovered = next.kind === "plain" ? "plain_text" : "without_keyboard";
+    attempt = next;
+  }
+
+  return {
+    ok: false,
+    messageId: null,
+    error: last.description ?? "sendMessage failed",
+    retryAfter: last.parameters?.retry_after ?? 0,
+    recovered,
+  };
+}
+
 /** Send one message part, honouring a long flood wait once. */
 async function sendPart(
   token: string,
@@ -89,23 +156,8 @@ async function sendPart(
   html: string,
   disablePreview: boolean
 ): Promise<{ ok: boolean; messageId: number | null; error: string | null; retryAfter: number }> {
-  const params: Record<string, unknown> = {
-    chat_id: chatId,
-    text: html,
-    parse_mode: "HTML",
-    link_preview_options: { is_disabled: disablePreview },
-  };
-  const first = await tgCall<{ message_id: number }>(token, "sendMessage", params, 12_000);
-  if (first.ok) return { ok: true, messageId: first.result?.message_id ?? null, error: null, retryAfter: 0 };
-  const retryAfter = first.parameters?.retry_after ?? 0;
-  if (first.error_code === 429 && retryAfter > 0 && retryAfter * 1000 <= MAX_FLOOD_WAIT_MS) {
-    await sleep(retryAfter * 1000);
-    const second = await tgCall<{ message_id: number }>(token, "sendMessage", params, 12_000);
-    return second.ok
-      ? { ok: true, messageId: second.result?.message_id ?? null, error: null, retryAfter }
-      : { ok: false, messageId: null, error: second.description ?? "sendMessage failed", retryAfter };
-  }
-  return { ok: false, messageId: null, error: first.description ?? "sendMessage failed", retryAfter };
+  const result = await sendMessageWithRecovery(token, chatId, html, { disablePreview });
+  return { ok: result.ok, messageId: result.messageId, error: result.error, retryAfter: result.retryAfter };
 }
 
 interface SendContext {
@@ -117,7 +169,7 @@ interface SendContext {
 async function prepare(settings?: ChannelSettings): Promise<SendContext | { error: string }> {
   const resolved = settings ?? (await loadChannelSettings());
   const runtime = resolveChannelRuntime(resolved);
-  const { token } = await getBotToken();
+  const { token } = await getChannelBotToken();
   if (!token) return { error: "The Telegram bot token is not configured (Admin → Telegram)" };
   return { settings: resolved, runtime, token };
 }
@@ -160,6 +212,15 @@ export interface SendOptions {
   force?: boolean;
   /** Send to the admin chat even when the mode is `on`. */
   toAdminChat?: boolean;
+  /**
+   * "Send now" from the queue: publish to the channel even in approval mode.
+   *
+   * The approval step exists so nothing reaches the channel *unread*. An
+   * operator pressing "Hozir yuborish" has read it and decided — asking them to
+   * confirm their own confirmation is the kind of friction that makes people
+   * turn the approval step off.
+   */
+  direct?: boolean;
   actorProfileId?: number | null;
 }
 
@@ -313,21 +374,52 @@ export async function sendPlanRow(
   }
   const { settings, runtime, token } = prepared;
 
-  const mode = opts.toAdminChat ? ("dryrun" as const) : runtime.mode;
+  // `direct` publishes without the approval step; `toAdminChat` is a preview.
+  const mode = opts.direct && !opts.toAdminChat ? ("on" as const) : opts.toAdminChat ? ("dryrun" as const) : runtime.mode;
   if (mode === "off") {
     return { ok: false, status: "skipped", chatId: null, messageId: null, reason: runtime.blockedReason ?? "Publisher is off", parts: [] };
   }
-  if (!opts.force && runtime.blockedReason) {
+  /**
+   * Approval mode with no admin chat is not a dead end.
+   *
+   * The preview cannot be delivered, but the decision can still be taken in the
+   * panel (Admin → Kanal → "Tasdiqlash kutilmoqda"). Blocking here would leave
+   * the post nowhere: not in Telegram, not in the queue, invisible until TTL.
+   * Every other reason still blocks — posting to the channel by accident is
+   * worse than waiting.
+   */
+  const panelOnlyApproval = mode === "approval" && !runtime.adminChatId;
+  if (!opts.force && runtime.blockedReason && !panelOnlyApproval) {
     return { ok: false, status: "skipped", chatId: null, messageId: null, reason: runtime.blockedReason, parts: [] };
   }
   const chatId = mode === "on" ? runtime.channelId : runtime.adminChatId;
-  if (!chatId) {
+  if (!chatId && !panelOnlyApproval) {
     return { ok: false, status: "failed", chatId: null, messageId: null, reason: "No target chat configured", parts: [] };
   }
 
   // Approval mode: nothing is posted until a human presses a button.
   if (mode === "approval") {
     return await sendPlanRowForApproval(row, { settings, runtime, token }, chatId);
+  }
+
+  /**
+   * "Hozir yuborish" on a post that is already waiting for approval must not
+   * dead-end in the inbox. The operator is looking at that row and pressing
+   * Send; the stored text is the one they were shown, so publish exactly that
+   * (approveApproval reads the row, never a fresh render).
+   */
+  if (mode === "on" && opts.direct) {
+    const [waiting] = await db
+      .select({ id: channelPosts.id })
+      .from(channelPosts)
+      .where(
+        and(
+          eq(channelPosts.dedupeKey, dedupeKey(row)),
+          inArray(channelPosts.status, [...OPEN_APPROVAL_STATUSES])
+        )
+      )
+      .limit(1);
+    if (waiting) return await approveApproval(waiting.id, opts.actorProfileId ?? null);
   }
 
   if (row.kind === "poll") {
@@ -411,21 +503,8 @@ async function sendPartWithKeyboard(
   disablePreview: boolean,
   keyboard: { text: string; callback_data: string }[][]
 ): Promise<{ ok: boolean; messageId: number | null; error: string | null }> {
-  const result = await tgCall<{ message_id: number }>(
-    token,
-    "sendMessage",
-    {
-      chat_id: chatId,
-      text: html,
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: disablePreview },
-      reply_markup: { inline_keyboard: keyboard },
-    },
-    12_000
-  );
-  return result.ok
-    ? { ok: true, messageId: result.result?.message_id ?? null, error: null }
-    : { ok: false, messageId: null, error: result.description ?? "sendMessage failed" };
+  const result = await sendMessageWithRecovery(token, chatId, html, { disablePreview, keyboard });
+  return { ok: result.ok, messageId: result.messageId, error: result.error };
 }
 
 /**
@@ -453,6 +532,28 @@ async function sendPlanRowForApproval(
   if (reserved.early) return reserved.early;
   const postId = reserved.postId as number;
 
+  /**
+   * No admin chat: keep the post open for the panel.
+   *
+   * Without this the row was either never created or marked failed, so the
+   * operator saw nothing in Telegram *and* nothing to approve — the post simply
+   * disappeared until the next tick retried it into the same silence.
+   */
+  if (!adminChatId) {
+    await db
+      .update(channelPosts)
+      .set({ status: APPROVAL_STATUS.awaiting, error: APPROVAL_TEXTS.panelOnly, updatedAt: new Date() })
+      .where(eq(channelPosts.id, postId));
+    return {
+      ok: true,
+      status: "approval",
+      chatId: null,
+      messageId: null,
+      reason: APPROVAL_TEXTS.panelOnly,
+      parts,
+    };
+  }
+
   const header = approvalHeader({
     kind: row.kind,
     slot: row.slot ?? null,
@@ -461,11 +562,16 @@ async function sendPlanRowForApproval(
   });
   const head = await sendPart(token, adminChatId, header, true);
   if (!head.ok) {
+    /**
+     * The admin chat is unreachable (bot never started there, chat deleted).
+     * The post is still valid and still needs a decision, so it stays OPEN and
+     * the panel shows it with the reason instead of losing it.
+     */
     await db
       .update(channelPosts)
-      .set({ status: "failed", error: head.error, updatedAt: new Date() })
+      .set({ status: APPROVAL_STATUS.awaiting, error: `preview_not_delivered: ${head.error}`, updatedAt: new Date() })
       .where(eq(channelPosts.id, postId));
-    return { ok: false, status: "failed", chatId: adminChatId, messageId: null, reason: head.error, parts };
+    return { ok: true, status: "approval", chatId: null, messageId: null, reason: head.error, parts };
   }
 
   const keyboard = approvalKeyboard(postId);
@@ -477,11 +583,12 @@ async function sendPlanRowForApproval(
       ? await sendPartWithKeyboard(token, adminChatId, part, disablePreview, keyboard)
       : await sendPart(token, adminChatId, part, disablePreview);
     if (!result.ok) {
+      // Same rule as the header: a Telegram hiccup must not discard the draft.
       await db
         .update(channelPosts)
-        .set({ status: "failed", error: result.error, updatedAt: new Date() })
+        .set({ status: APPROVAL_STATUS.awaiting, error: `preview_not_delivered: ${result.error}`, updatedAt: new Date() })
         .where(eq(channelPosts.id, postId));
-      return { ok: false, status: "failed", chatId: adminChatId, messageId: null, reason: result.error, parts };
+      return { ok: true, status: "approval", chatId: null, messageId: null, reason: result.error, parts };
     }
     if (index === 0) lastMessageId = lastMessageId ?? result.messageId;
     lastMessageId = result.messageId;
@@ -713,7 +820,7 @@ export async function refreshApprovalMessage(
   if (!post?.html || !opts.messageId) return false;
   const parts = splitApprovalParts(post.html);
   const body = parts.length ? parts[parts.length - 1] : post.html;
-  const { token } = await getBotToken();
+  const { token } = await getChannelBotToken();
   if (!token) return false;
   const result = await tgEditMessage(
     token,

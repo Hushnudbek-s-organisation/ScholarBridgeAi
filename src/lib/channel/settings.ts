@@ -9,6 +9,7 @@
  */
 
 import { isSameOrigin } from "./links";
+import { canonicalChannelId, normalizeChannelIdentifier } from "./config";
 
 /**
  * How the publisher behaves.
@@ -45,6 +46,26 @@ export interface ChannelConnection {
   mode: ChannelMode;
   /** Last day (inclusive, Asia/Tashkent) the publisher stays paused. */
   pausedUntil: string | null;
+  /**
+   * A channel the bot was added to (or that an admin forwarded a post from) but
+   * which is not the one configured above.
+   *
+   * Discovery is automatic because the bot is *told*: Telegram sends
+   * `my_chat_member` when it is promoted, and a forwarded post carries
+   * `forward_from_chat`. Storing the candidate means the panel can offer a
+   * one-click "connect this one" instead of asking the operator to hunt for a
+   * `-100…` id in a Telegram client that will not show it.
+   */
+  discoveredChannel: DiscoveredChannel | null;
+}
+
+export interface DiscoveredChannel {
+  /** `-100…` — the only form that survives a username change. */
+  id: string;
+  title: string | null;
+  username: string | null;
+  /** ISO timestamp of the discovery. */
+  at: string;
 }
 
 export interface ChannelSettings {
@@ -98,7 +119,7 @@ export interface ChannelSettings {
 export const DEFAULT_FOOTER_LABELS = { channel: "Kanal", bot: "Bot" } as const;
 
 export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
-  connection: { channelId: "", adminChatId: "", mode: "off", pausedUntil: null },
+  connection: { channelId: "", adminChatId: "", mode: "off", pausedUntil: null, discoveredChannel: null },
   brand: "ScholarBridge",
   channelUsername: "",
   botUsername: "",
@@ -242,10 +263,11 @@ const MODES: readonly ChannelMode[] = ["off", "dryrun", "approval", "on"];
 /** `-100…` numeric id or `@username` — the same rule the sender applies. */
 export function looksLikeChannelId(raw: unknown): boolean {
   if (typeof raw !== "string") return false;
-  const value = raw.trim();
-  if (!value) return false;
-  if (/^-?\d{5,20}$/.test(value)) return true;
-  return /^@[A-Za-z][A-Za-z0-9_]{4,31}$/.test(value);
+  // One definition of "a channel identifier" for the whole module: the panel,
+  // the settings merge and the env checklist all go through
+  // `normalizeChannelIdentifier`, so `https://t.me/name` cannot be accepted in
+  // one place and rejected in another.
+  return normalizeChannelIdentifier(raw).ok;
 }
 
 /** Private chats are always numeric. */
@@ -263,6 +285,18 @@ function time(value: unknown, fallback: string): string {
 }
 
 /** Deep, validating merge of stored JSON over the defaults. */
+/** A discovered candidate, or null. Never trusted: it is written by a webhook. */
+export function parseDiscoveredChannel(raw: unknown): DiscoveredChannel | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  const id = String(obj.id ?? "").trim();
+  if (!/^-?\d{5,20}$/.test(id)) return null;
+  const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 120) : null;
+  const username = typeof obj.username === "string" ? obj.username.trim().replace(/^@/, "").slice(0, 32) : null;
+  const at = typeof obj.at === "string" && !Number.isNaN(Date.parse(obj.at)) ? obj.at : new Date(0).toISOString();
+  return { id, title: title || null, username: username || null, at };
+}
+
 export function mergeChannelSettings(raw: unknown): ChannelSettings {
   const d = DEFAULT_CHANNEL_SETTINGS;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return d;
@@ -291,14 +325,17 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
 
   return {
     connection: {
+      // Stored value *and* legacy rows are canonicalised on the way out, so a
+      // `t.me/…` link saved by an older build still resolves to `@name`.
       channelId: looksLikeChannelId(connectionRaw.channelId)
-        ? str(connectionRaw.channelId, "").trim()
+        ? canonicalChannelId(str(connectionRaw.channelId, ""))
         : d.connection.channelId,
       adminChatId: looksLikeChatId(connectionRaw.adminChatId)
         ? str(connectionRaw.adminChatId, "").trim()
         : d.connection.adminChatId,
       mode: isChannelMode(connectionRaw.mode) ? connectionRaw.mode : d.connection.mode,
       pausedUntil: ISO_DAY_RE.test(pausedRaw) ? pausedRaw : null,
+      discoveredChannel: parseDiscoveredChannel(connectionRaw.discoveredChannel),
     },
     brand: str(b.brand, d.brand).slice(0, 40) || d.brand,
     channelUsername: str(b.channelUsername, d.channelUsername).replace(/^@/, "").slice(0, 32),

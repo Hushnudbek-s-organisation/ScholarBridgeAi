@@ -25,6 +25,11 @@
  *        → the user pressed an inline button (callback_query with `data`)
  *   GET  /_answers                 → answerCallbackQuery calls (toasts)
  *   POST /_block { userId }        → user blocked the bot (my_chat_member)
+ *   POST /_member { status, canPost? }
+ *        → change what getChatMember answers for the bot, so the "the bot is
+ *          not an administrator" / "«Post messages» is off" screens can be
+ *          exercised without a real channel (real Telegram: `member`/`left`
+ *          and `can_post_messages: false`)
  *   POST /_reset                   → clear everything
  */
 import http from "node:http";
@@ -33,7 +38,20 @@ const PORT = Number(process.env.TG_MOCK_PORT || 8099);
 // update_id keeps growing across /_reset, like real Telegram: the server
 // de-duplicates update ids, so reusing one would be (correctly) ignored.
 let lastUpdateId = Math.floor(Date.now() / 1000) * 100;
-const fresh = () => ({ webhook: null, secret: null, messages: [], answers: [], commands: {}, menuButton: null, polls: {}, updateId: lastUpdateId, messageId: 1 });
+const fresh = () => ({
+  webhook: null,
+  secret: null,
+  messages: [],
+  answers: [],
+  commands: {},
+  menuButton: null,
+  polls: {},
+  updateId: lastUpdateId,
+  messageId: 1,
+  // What getChatMember says about the bot. Telegram's real statuses:
+  // `creator | administrator | member | restricted | left | kicked`.
+  member: { status: "administrator", can_post_messages: true },
+});
 let state = fresh();
 
 const json = (res, status, body) => {
@@ -135,6 +153,17 @@ const server = http.createServer(async (req, res) => {
     }
     return json(res, 200, { ok: true, poll });
   }
+  if (url.pathname === "/_member") {
+    // `body` is already read once, above; reading the stream twice hangs.
+    const status = typeof body.status === "string" ? body.status : "administrator";
+    state.member = {
+      status,
+      // Only an administrator of a channel has the right at all; a plain member
+      // never does, whatever the flag says.
+      can_post_messages: status === "administrator" || status === "creator" ? body.canPost !== false : false,
+    };
+    return json(res, 200, { ok: true, member: state.member });
+  }
   if (url.pathname === "/_reset") {
     lastUpdateId = state.updateId;
     state = fresh();
@@ -182,17 +211,19 @@ const server = http.createServer(async (req, res) => {
     case "getChat": {
       const id = String(body.chat_id);
       const isChannel = id.startsWith("-100") || id.startsWith("@");
+      // Telegram always answers with the numeric id, even for an @username.
+      const channelId = id.startsWith("@") ? -1009876543210 : Number(id);
       return json(res, 200, {
         ok: true,
         result: isChannel
-          ? { id: id.startsWith("@") ? id : Number(id), type: "channel", title: "ScholarBridge Test Channel", username: "scholarbridge_test" }
+          ? { id: channelId, type: "channel", title: "ScholarBridge Test Channel", username: "scholarbridge_test" }
           : { id: Number(id) || id, type: "private", first_name: "Test", username: "test_user" },
       });
     }
     case "getChatMember":
       return json(res, 200, {
         ok: true,
-        result: { status: "administrator", can_post_messages: true, user: { id: botId, is_bot: true, first_name: "ScholarBridge Test" } },
+        result: { ...state.member, user: { id: botId, is_bot: true, first_name: "ScholarBridge Test" } },
       });
     case "getChatMemberCount":
       return json(res, 200, { ok: true, result: 128 });
@@ -229,6 +260,20 @@ const server = http.createServer(async (req, res) => {
       if (String(body.chat_id) === "403403") {
         return json(res, 403, { ok: false, error_code: 403, description: "Forbidden: bot was blocked by the user" });
       }
+      /**
+       * The two rejections real Telegram makes that are not about the content,
+       * reproduced here so the recovery ladder in send.ts can be exercised
+       * offline: a button URL that is not absolute https (localhost included),
+       * and markup it cannot parse.
+       */
+      const badUrl = inlineButtonProblem(body.reply_markup);
+      if (badUrl) {
+        return json(res, 400, { ok: false, error_code: 400, description: `Bad Request: BUTTON_URL_INVALID (${badUrl})` });
+      }
+      const badMarkup = markupProblem(body);
+      if (badMarkup) {
+        return json(res, 400, { ok: false, error_code: 400, description: `Bad Request: can't parse entities: ${badMarkup}` });
+      }
       const msg = { message_id: ++state.messageId, chat_id: body.chat_id, text: body.text, reply_markup: body.reply_markup, at: new Date().toISOString() };
       state.messages.push(msg);
       if (state.messages.length > 500) state.messages.shift();
@@ -240,3 +285,46 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => console.log(`[telegram-mock] Bot API mock on http://127.0.0.1:${PORT}`));
+
+/** Telegram rejects any inline button URL that is not a public https URL. */
+function inlineButtonProblem(replyMarkup) {
+  const rows = replyMarkup?.inline_keyboard;
+  if (!Array.isArray(rows)) return null;
+  for (const row of rows) {
+    for (const button of row ?? []) {
+      const url = button?.url ?? button?.web_app?.url;
+      if (url === undefined) continue;
+      let parsed;
+      try {
+        parsed = new URL(String(url));
+      } catch {
+        return String(url);
+      }
+      const host = parsed.hostname.toLowerCase();
+      if (parsed.protocol !== "https:") return String(url);
+      if (!host.includes(".") || host === "localhost" || host.endsWith(".localhost") || /^(?:127\.|10\.|192\.168\.)/.test(host)) {
+        return String(url);
+      }
+    }
+  }
+  return null;
+}
+
+/** The subset of "can't parse entities" that a template mistake produces. */
+function markupProblem(body) {
+  if (body.parse_mode !== "HTML") return null;
+  const text = String(body.text ?? "");
+  const stack = [];
+  const re = /<(\/?)(b|i|u|s|a|code|pre|blockquote|tg-spoiler)(\s[^>]*)?>/gi;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const closing = match[1] === "/";
+    const name = match[2].toLowerCase();
+    if (!closing) stack.push(name);
+    else if (stack[stack.length - 1] === name) stack.pop();
+    else return `Unexpected end tag </${name}> at byte offset ${match.index}`;
+  }
+  if (stack.length) return `Unclosed start tag at byte offset 0`;
+  if (/<(?!\/?[a-z])/i.test(text)) return "Unsupported start tag at byte offset 0";
+  return null;
+}

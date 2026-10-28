@@ -193,9 +193,20 @@ export async function POST(req: Request) {
       const res = await tgCall(token, "setWebhook", {
         url,
         secret_token: webhookSecret(token),
-        // "poll" is the aggregate poll state — the channel publisher learns
-        // vote shares from it. Without it Telegram silently withholds them.
-        allowed_updates: ["message", "callback_query", "my_chat_member", "poll"],
+        /**
+         * Every update type this bot actually uses:
+         *   message          commands, the /id answer, approval edits, forwards
+         *   callback_query   inline buttons (student menu + channel approval)
+         *   my_chat_member   blocked/unblocked, AND being promoted in a channel
+         *                    → channel discovery
+         *   channel_post     a post in a channel the bot administers → discovery
+         *   poll / poll_answer  aggregate poll state for the channel's polls
+         *
+         * Without `channel_post` and `my_chat_member` the bot is never told
+         * which channel it was added to, which is why the operator had to hunt
+         * for a `-100…` id by hand.
+         */
+        allowed_updates: ["message", "callback_query", "my_chat_member", "channel_post", "poll", "poll_answer"],
         drop_pending_updates: true,
       });
       if (!res.ok) return tgJsonError(502, `Telegram: ${res.description ?? "setWebhook failed"}`, "webhook_failed");

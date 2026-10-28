@@ -140,6 +140,13 @@ export const APPROVAL_TEXTS = {
   sendFailed: "Yuborilmadi — sabab jurnalda",
   privateOnly: "Bu tugmalar faqat shaxsiy chatda ishlaydi",
   killSwitch: "⛔ CHANNEL_AUTOPOST o'chirilgan — tasdiq ham yubormaydi",
+  /**
+   * Shown in the panel when a preview could not be delivered to the admin chat
+   * (no chat id, or the bot was never started there). The post is still open:
+   * the decision can be taken from Admin → Kanal.
+   */
+  panelOnly:
+    "Admin chatga yuborilmadi — post panelda «Tasdiqlash kutilmoqda» ro'yxatida. Shu yerdan tasdiqlab kanalga chiqarish mumkin.",
   buttons: {
     approve: "✅ Tasdiqlash",
     reject: "❌ Rad etish",

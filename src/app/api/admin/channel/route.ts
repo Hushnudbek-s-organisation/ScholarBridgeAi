@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { guardAdmin, jsonError, readBody, serverError } from "@/lib/growth/api";
 import { channelOverview, ensurePlanLinks, previewDays, updateSettingsBlock } from "@/lib/channel/admin";
-import { checkChannelConnection } from "@/lib/channel/connect";
+import { checkChannelConnection, saveResolvedChannel } from "@/lib/channel/connect";
 import { channelAdminSummary, runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
-import { resolveChannelRuntime } from "@/lib/channel/config";
+import { normalizeChannelIdentifier, resolveChannelRuntime } from "@/lib/channel/config";
 import { kickChannelAutopilot } from "@/lib/channel/boot";
 import { loadChannelSettings } from "@/lib/channel/repo";
 import { shouldKickAfterConnect } from "@/lib/channel/autopilot";
@@ -47,11 +47,27 @@ export async function PUT(req: Request) {
   const key = String(body.value.key ?? "");
   if (!SETTINGS_KEYS.includes(key as SettingsKey)) return jsonError(400, "Unknown settings key", "bad_key");
   try {
+    /**
+     * The channel reference is normalised before anything is validated, so the
+     * operator can paste exactly what Telegram shows them: `https://t.me/name`,
+     * `t.me/name`, `name`, `@name`, `-100…`. An invite link (`t.me/+AbCd`) is
+     * the one form that cannot be fixed locally — it carries no chat id — so it
+     * gets the actionable hint instead of a generic "invalid value".
+     */
+    let value = body.value.value as Record<string, unknown>;
+    if (key === "connection" && value && typeof value === "object") {
+      const normalized = normalizeChannelIdentifier(String(value.channelId ?? ""));
+      if (!normalized.ok && normalized.reason !== "empty") {
+        return jsonError(400, normalized.hint, normalized.reason);
+      }
+      value = { ...value, channelId: normalized.ok ? normalized.value : "" };
+    }
+
     // The connection block is the one save that must have a visible result:
     // reading the before/after runtimes is what tells us "this just became
     // connected" rather than "an unrelated value was edited".
     const before = key === "connection" ? resolveChannelRuntime(await loadChannelSettings()) : null;
-    const result = await updateSettingsBlock(key as SettingsKey, body.value.value, guard.value.profile.id);
+    const result = await updateSettingsBlock(key as SettingsKey, value, guard.value.profile.id);
     if (!result.ok) return jsonError(400, "Invalid value for this block", "invalid_value");
     /**
      * Connecting the channel starts the publisher — once, right now, so the
@@ -83,7 +99,17 @@ export async function POST(req: Request) {
   try {
     if (action === "verify") {
       const overview = await channelOverview();
-      return NextResponse.json({ ok: true, connection: await checkChannelConnection(overview.runtime) });
+      const connection = await checkChannelConnection(overview.runtime);
+      /**
+       * "Verify" is also the moment to pin the resolved id: an @username can be
+       * renamed away, a `-100…` id cannot. Only on success, only here — a GET
+       * never writes, and the panel fields must not change on their own.
+       */
+      const saved =
+        connection.channel.reachable && connection.channel.id
+          ? await saveResolvedChannel(connection.channel.id, actor).catch(() => ({ ok: false, channelId: null }))
+          : null;
+      return NextResponse.json({ ok: true, connection, savedChannelId: saved?.channelId ?? null });
     }
     if (action === "test") {
       const { sendTestMessage } = await import("@/lib/channel/send");

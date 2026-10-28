@@ -75,7 +75,13 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
   const settings = await loadChannelSettings();
   const runtime = resolveChannelRuntime(settings);
 
-  if (!opts.force && runtime.blockedReason) {
+  /**
+   * Approval mode without an admin chat still runs: the previews cannot be
+   * delivered, but the queue is built and the posts wait in the panel, where
+   * they can be approved. Every other block still blocks.
+   */
+  const panelOnly = runtime.mode === "approval" && runtime.blockedCode === "no_admin_chat";
+  if (!opts.force && runtime.blockedReason && !panelOnly) {
     return {
       attempted: 0,
       sent: 0,
@@ -120,7 +126,17 @@ export async function runPostsNow(actorProfileId: number | null, opts: { force?:
 export async function postNow(planId: number, actorProfileId: number, opts: { toAdminChat?: boolean } = {}) {
   const [row] = await db.select().from(channelPlan).where(eq(channelPlan.id, planId)).limit(1);
   if (!row) return { ok: false as const, error: "not_found" };
-  const outcome = await sendPlanRow(row, { force: true, toAdminChat: opts.toAdminChat, actorProfileId });
+  /**
+   * "Hozir yuborish" publishes to the channel even in approval mode: the
+   * operator has read the preview and pressed the button that says "send".
+   * "Test post" is the opposite — it always goes to the admin chat.
+   */
+  const outcome = await sendPlanRow(row, {
+    force: true,
+    toAdminChat: opts.toAdminChat,
+    direct: !opts.toAdminChat,
+    actorProfileId,
+  });
   await writeChannelAudit({
     actorProfileId,
     action: opts.toAdminChat ? "post_test" : "post_now",

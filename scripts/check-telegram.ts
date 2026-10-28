@@ -522,6 +522,30 @@ check("new UI strings exist in en/uz/ru", () => {
   assert.ok(miniAppSource.includes("formatMessage(t.hello"), "Mini App interpolation uses the shared message formatter");
 });
 
+check("a forwarded channel post reaches the admin, not the command list", () => {
+  // Discovery lives in the Telegram layer, so it is checked here too: the whole
+  // point is that it runs before `message` handling.
+  const service = read("src/lib/telegram/service.ts");
+  const discoveryAt = service.indexOf("await handleChannelDiscovery(update)");
+  assert.ok(discoveryAt > 0, "the webhook calls the discovery handler");
+  assert.ok(discoveryAt < service.indexOf("const msg = update.message;"), "it runs before message routing");
+  // The reply can only go to a human's private chat: a channel has no operator.
+  const handler = read("src/lib/telegram/channelDiscovery.ts");
+  // The confirmation goes to the sender's private chat or the admin chat —
+  // never to the channel itself.
+  assert.match(handler, /candidate\.source !== "channel_post"[\s\S]{0,120}String\(senderId\)/, "reply to the sender");
+  assert.match(handler, /current\.adminChatId\.trim\(\) \|\| null/, "otherwise the admin chat");
+  assert.ok(!/tgSendMessage\([^)]*candidate\.id/.test(handler), "never into the channel");
+  assert.ok(handler.includes("isAdmin"), "only an admin can connect a channel");
+  // Its text bank is Uzbek and reviewable, not generated.
+  const rules = read("src/lib/channel/discovery.ts");
+  assert.ok(rules.includes("DISCOVERY_TEXTS"));
+  for (const key of ["title", "candidate", "connected", "nextInPanel", "noAdminChat", "botNotAdmin", "modeApproval"]) {
+    assert.ok(rules.includes(`  ${key}:`), `DISCOVERY_TEXTS.${key}`);
+  }
+  assert.ok(!/\bopenai\b|\bgroq\b|generateText/i.test(rules + handler), "no model call in discovery");
+});
+
 function summary() {
   console.log(`\n${passed} passed, ${failures.length} failed`);
   if (failures.length) {
