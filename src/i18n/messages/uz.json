@@ -6904,7 +6904,11 @@
       "chatIdHow3": "Raqamni shu maydonga yozib «Ulanishni tekshirish»ni bosing — maydon faqat bot haqiqatan o'sha chatga yeta olganda yashil bo'ladi.",
       "chatIdHowOpen": "Botni Telegramda ochish",
       "chatIdHowNoBot": "Avval bot @username ini kiriting — shundan keyin bu tugma botni ochadi.",
-      "approvalHint": "Har bir post avval admin chatiga keladi va Tasdiqlash / Rad etish / Tahrirlash tugmalari bilan ko'rsatiladi. Admin tasdiqlamaguncha kanalga hech narsa chiqmaydi."
+      "approvalHint": "Har bir post avval admin chatiga keladi va Tasdiqlash / Rad etish / Tahrirlash tugmalari bilan ko'rsatiladi. Admin tasdiqlamaguncha kanalga hech narsa chiqmaydi.",
+      "autostartHint": "Saqlashingiz bilan kanal ulanadi: bot shu zahoti admin chatga bitta xabar va birinchi postni yuboradi, keyin tizim o'zi davom etadi (belgilangan vaqtlarda o'zi tekshiradi).",
+      "autostartDone": "Kanal ulandi — Telegram chatingizga xabar yuborildi. {count} ta post tasdiqlash uchun kutilmoqda.",
+      "autostartQuiet": "Kanal ulandi — Telegram chatingizga xabar yuborildi. Bugun navbatda post yo'q.",
+      "autostartBlocked": "Sozlamalar saqlandi, lekin hozir post ketmaydi: {reason}"
     },
     "plan": {
       "title": "Chiqish ritmi",

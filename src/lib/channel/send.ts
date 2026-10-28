@@ -32,7 +32,9 @@ import {
   PARTS_SEPARATOR,
   splitApprovalParts,
   APPROVAL_STATUS,
+  CONSUMED_POST_STATUSES,
   OPEN_APPROVAL_STATUSES,
+  sendablePlanRows,
 } from "./approval";
 import { pollPreviewText, pollSendParams, pollSendProblem, pollSpecByKey } from "./polls";
 
@@ -726,6 +728,9 @@ export async function refreshApprovalMessage(
 /** Plan rows due now (or a whole day, for the admin queue). */
 export async function duePlanRows(now = new Date(), limit = 5) {
   const day = tashkentDay(now);
+  // Widen the scan so filtering out rows that already produced a post cannot
+  // starve a row that is genuinely due.
+  const scan = limit * 4;
   const hhmm = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Tashkent",
     hour: "2-digit",
@@ -736,8 +741,29 @@ export async function duePlanRows(now = new Date(), limit = 5) {
     .select()
     .from(channelPlan)
     .where(and(eq(channelPlan.planDate, day), eq(channelPlan.status, "planned"), lte(channelPlan.sendAt, hhmm)))
-    .limit(limit);
-  return rows;
+    .limit(scan);
+  if (!rows.length) return rows;
+
+  // A plan row that already has a post (sent, waiting for approval, rejected or
+  // expired) is done. Without this, every tick re-offers the previews that are
+  // still waiting and reports them as "skipped".
+  const consumed = await db
+    .select({ planId: channelPosts.planId })
+    .from(channelPosts)
+    .where(
+      and(
+        inArray(
+          channelPosts.planId,
+          rows.map((row) => row.id)
+        ),
+        inArray(channelPosts.status, [...CONSUMED_POST_STATUSES])
+      )
+    );
+  return sendablePlanRows(
+    rows,
+    consumed.map((row) => row.planId),
+    limit
+  );
 }
 
 /**

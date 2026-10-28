@@ -6904,7 +6904,11 @@
       "chatIdHow3": "Paste the number here and press \"Check connection\" — the field turns green only when the bot can actually reach that chat.",
       "chatIdHowOpen": "Open the bot in Telegram",
       "chatIdHowNoBot": "Set the bot @username first, then this button opens the bot.",
-      "approvalHint": "Every post is sent to the admin chat first, with Approve, Reject and Edit buttons. Nothing reaches the channel until an admin approves it."
+      "approvalHint": "Every post is sent to the admin chat first, with Approve, Reject and Edit buttons. Nothing reaches the channel until an admin approves it.",
+      "autostartHint": "Saving connects the channel: the bot sends one message and the first post to the admin chat right away, then the system keeps going on its own (it checks on a schedule).",
+      "autostartDone": "Channel connected — a message was sent to your Telegram. Posts waiting for approval: {count}.",
+      "autostartQuiet": "Channel connected — a message was sent to your Telegram. Nothing is planned for today.",
+      "autostartBlocked": "Settings saved, but nothing will be posted yet: {reason}"
     },
     "plan": {
       "title": "Publishing rhythm",

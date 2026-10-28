@@ -137,7 +137,20 @@ import {
   parseApprovalCallback,
   splitApprovalParts,
   PARTS_SEPARATOR,
+  CONSUMED_POST_STATUSES,
+  sendablePlanRows,
 } from "../src/lib/channel/approval";
+import {
+  AUTOPILOT_DEFAULT_MINUTES,
+  AUTOPILOT_TEXTS,
+  MODE_LABELS,
+  autopilotEnabled,
+  autopilotIntervalMinutes,
+  cadenceLine,
+  connectMessage,
+  shouldKickAfterConnect,
+} from "../src/lib/channel/autopilot";
+import type { ChannelRuntime } from "../src/lib/channel/config";
 import {
   MAX_POSTS_PER_DAY,
   buildDailyPlan,
@@ -2128,6 +2141,131 @@ check("approval statuses are named once and reused", () => {
   // No copy of the literal strings anywhere else.
   const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
   assert.doesNotMatch(sendSrc, /"awaiting_approval"/, "use APPROVAL_STATUS, not a literal");
+});
+
+check("a plan row that already produced a post is not offered again", () => {
+  const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  // Row 2 is already waiting for a human (or was sent/rejected/expired).
+  assert.deepEqual(sendablePlanRows(rows, [2], 5).map((r) => r.id), [1, 3]);
+  assert.deepEqual(sendablePlanRows(rows, [null, 1, 2, 3], 5), [], "nulls are not ids");
+  assert.deepEqual(sendablePlanRows(rows, [], 2).map((r) => r.id), [1, 2], "the limit still applies");
+  // The approval statuses are exactly the ones that stop a retry.
+  assert.deepEqual(
+    [...CONSUMED_POST_STATUSES].sort(),
+    ["awaiting_approval", "editing", "expired", "rejected", "sent"],
+    "a failed post must stay retryable"
+  );
+
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  assert.match(sendSrc, /inArray\(channelPosts\.status, \[\.\.\.CONSUMED_POST_STATUSES\]\)/);
+  assert.match(sendSrc, /const scan = limit \* 4/, "filtering must not starve a due row");
+});
+
+/* -------------------------------------------------------------------------- */
+/* Autopilot: connecting the channel must start the publisher                 */
+/* -------------------------------------------------------------------------- */
+
+/** A runtime built from panel settings, exactly like the route does it. */
+function runtimeFor(connection: Partial<{ channelId: string; adminChatId: string; mode: string; pausedUntil: string | null }>): ChannelRuntime {
+  const settings = mergeChannelSettings({
+    connection: {
+      channelId: "-1001234567890",
+      adminChatId: "777000111",
+      mode: "approval",
+      pausedUntil: null,
+      ...connection,
+    },
+    siteUrl: "https://example.org",
+  });
+  return resolveChannelRuntime(settings, {}, new Date("2026-03-10T09:00:00+05:00"));
+}
+
+check("the tick interval is bounded, so a typo cannot silence or flood the channel", () => {
+  assert.equal(autopilotIntervalMinutes({}), AUTOPILOT_DEFAULT_MINUTES);
+  assert.equal(autopilotIntervalMinutes({ CHANNEL_TICK_MINUTES: "30" }), 30);
+  assert.equal(autopilotIntervalMinutes({ CHANNEL_TICK_MINUTES: "1" }), 5, "never faster than 5 minutes");
+  assert.equal(autopilotIntervalMinutes({ CHANNEL_TICK_MINUTES: "9999" }), 120, "never slower than 2 hours");
+  assert.equal(autopilotIntervalMinutes({ CHANNEL_TICK_MINUTES: "abc" }), AUTOPILOT_DEFAULT_MINUTES);
+  assert.equal(autopilotIntervalMinutes({ CHANNEL_TICK_MINUTES: "0" }), AUTOPILOT_DEFAULT_MINUTES);
+});
+
+check("the loop is off in development and switchable in production", () => {
+  const prod = { NODE_ENV: "production", DATABASE_URL: "postgres://x" };
+  assert.equal(autopilotEnabled(prod), true);
+  assert.equal(autopilotEnabled({ ...prod, CHANNEL_AUTOPILOT: "off" }), false, "explicit off wins");
+  assert.equal(autopilotEnabled({ ...prod, NODE_ENV: "development" }), false, "next dev stays quiet");
+  assert.equal(autopilotEnabled({ ...prod, NODE_ENV: "development", CHANNEL_AUTOPILOT: "on" }), true);
+  assert.equal(autopilotEnabled({ NODE_ENV: "production" }), false, "no database, no loop");
+});
+
+check("connecting kicks the publisher, re-saving does not", () => {
+  const off = runtimeFor({ mode: "off" });
+  const approval = runtimeFor({});
+  const live = runtimeFor({ mode: "on" });
+  const paused = runtimeFor({ pausedUntil: "2026-03-11" });
+
+  assert.equal(shouldKickAfterConnect(off, approval), true, "off → approval starts it");
+  assert.equal(shouldKickAfterConnect(off, live), true);
+  assert.equal(shouldKickAfterConnect(runtimeFor({ channelId: "" }), live), true, "not connected → connected");
+  assert.equal(shouldKickAfterConnect(approval, approval), false, "saving the same values again stays silent");
+  assert.equal(shouldKickAfterConnect(paused, live), true, "resuming after a pause");
+  assert.equal(shouldKickAfterConnect(approval, off), false, "turning it off must not send anything");
+  assert.equal(shouldKickAfterConnect(approval, paused), false, "pausing must not send anything");
+  assert.equal(shouldKickAfterConnect(approval, runtimeFor({ channelId: "-1009999999999" })), true, "another channel");
+});
+
+check("the connect message says what happened and what happens next", () => {
+  const base = {
+    channelId: "-1001234567890",
+    siteUrl: "https://example.org",
+    problems: [],
+    hasPost: true,
+    minutes: 15,
+  };
+  const approvalMsg = connectMessage({ ...base, mode: "approval" });
+  assert.match(approvalMsg, /Kanal ulandi/);
+  assert.match(approvalMsg, new RegExp(MODE_LABELS.approval));
+  assert.match(approvalMsg, /Tasdiqlash/);
+  assert.ok(approvalMsg.includes(cadenceLine(15)), "the cadence is spelled out");
+  assert.match(approvalMsg, /-1001234567890/);
+
+  // A quiet day must not promise a post that will never come.
+  const quiet = connectMessage({ ...base, mode: "approval", hasPost: false });
+  assert.match(quiet, /navbatda post yo'q/);
+  assert.ok(!quiet.includes("Birinchi post pastda"));
+
+  // Live mode must not read like the approval flow.
+  const liveMsg = connectMessage({ ...base, mode: "on" });
+  assert.ok(!liveMsg.includes("Tasdiqlash"), "live mode has no approve button to explain");
+  assert.match(liveMsg, new RegExp(MODE_LABELS.on));
+
+  // Problems are listed, and the whole thing stays inside one Telegram message.
+  const withProblems = connectMessage({ ...base, mode: "approval", problems: [AUTOPILOT_TEXTS.problemNoChannelAdmin] });
+  assert.match(withProblems, /administrator/);
+  assert.ok(Buffer.byteLength(withProblems, "utf8") < 4096, "one message, never a flood");
+
+  // Escaped like every other operator-visible string.
+  const escaped = connectMessage({ ...base, mode: "approval", channelId: "@a<b>" });
+  assert.ok(!escaped.includes("<b>@a"));
+});
+
+check("the autopilot paths exist where they are claimed to", () => {
+  const routeSrc = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/channel/route.ts"), "utf8");
+  // The kick must be tied to the connection block, not to every settings save.
+  assert.match(routeSrc, /key === "connection" \? resolveChannelRuntime/, "only the connection save checks the runtime");
+  assert.match(routeSrc, /shouldKickAfterConnect\(before, resolveChannelRuntime\(result\.settings\)\)/);
+  assert.match(routeSrc, /kickChannelAutopilot\(guard\.value\.profile\.id\)/, "the save starts the publisher");
+
+  const instr = readFileSync(join(import.meta.dirname, "..", "src/instrumentation.ts"), "utf8");
+  assert.match(instr, /startChannelAutopilot\(\)/, "the loop must start with the server");
+
+  const bootSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/boot.ts"), "utf8");
+  // It may not invent its own sending path, and it may not outlive the process.
+  assert.match(bootSrc, /sendPlanRow\(row, \{ force: true, actorProfileId \}\)/, "the kick uses the normal publisher");
+  assert.match(bootSrc, /unref\?\.\(\)/, "timers must not keep the process alive");
+  assert.match(bootSrc, /runtime\.blockedReason/, "a blocked runtime must stop the kick");
+  // Exactly one post on connect, never a batch.
+  assert.doesNotMatch(bootSrc, /runDuePosts\(/, "the kick hands over one post, the loop does the rest");
 });
 
 // ---------------------------------------------------------------------------

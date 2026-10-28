@@ -416,6 +416,16 @@ type ActFn = (action: string, extra?: Record<string, unknown>) => Promise<(Recor
 type ShowToast = (msg: string) => void;
 type Reload = (live?: boolean) => Promise<void>;
 
+/** What `PUT { key: "connection" }` reports about the publisher kick. */
+interface Kick {
+  kicked: boolean;
+  reason: string | null;
+  messageId: number | null;
+  planned: number;
+  delivered: number;
+  problems: string[];
+}
+
 /* ------------------------------------------------------------------ */
 /* Ulash                                                              */
 /* ------------------------------------------------------------------ */
@@ -558,9 +568,26 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
   const save = async () => {
     setSaving(true);
     try {
-      await api("/api/admin/channel", { method: "PUT", body: JSON.stringify({ key: "connection", value: conn }) });
+      // Saving the connection starts the publisher (one message in the admin
+      // chat, then the first post) — see `kickChannelAutopilot`. The response
+      // says what happened, so the toast is not a lie when it did nothing.
+      const saved = await api<{ kick?: Kick | null }>("/api/admin/channel", {
+        method: "PUT",
+        body: JSON.stringify({ key: "connection", value: conn }),
+      });
       await api("/api/admin/channel", { method: "PUT", body: JSON.stringify({ key: "brand", value: brand }) });
-      showToast(t("saved"));
+      const kick = saved?.kick ?? null;
+      if (kick?.kicked) {
+        showToast(
+          kick.delivered > 0 ? t("connect.autostartDone", { count: kick.delivered }) : t("connect.autostartQuiet")
+        );
+      } else if (kick && !kick.kicked && kick.reason) {
+        // Saving was accepted; the publisher just cannot run yet (off, paused,
+        // unconnected). Say which, instead of a bare "saved".
+        showToast(t("connect.autostartBlocked", { reason: kick.reason }));
+      } else {
+        showToast(t("saved"));
+      }
       await reload(true);
     } catch (err) {
       showToast(err instanceof Error ? err.message : t("saveFailed"));
@@ -725,6 +752,11 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 {t("connect.liveWarning")}
               </p>
             )}
+            {/* The single most common support question: "I connected it, why is
+                nothing happening?" — the answer is that saving starts it. */}
+            <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+              {t("connect.autostartHint")}
+            </p>
             <button className={btnPrimary} onClick={() => void save()} disabled={saving || busy}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
             </button>

@@ -3,6 +3,10 @@ import { guardAdmin, jsonError, readBody, serverError } from "@/lib/growth/api";
 import { channelOverview, ensurePlanLinks, previewDays, updateSettingsBlock } from "@/lib/channel/admin";
 import { checkChannelConnection } from "@/lib/channel/connect";
 import { channelAdminSummary, runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
+import { resolveChannelRuntime } from "@/lib/channel/config";
+import { kickChannelAutopilot } from "@/lib/channel/boot";
+import { loadChannelSettings } from "@/lib/channel/repo";
+import { shouldKickAfterConnect } from "@/lib/channel/autopilot";
 import { SETTINGS_KEYS, type SettingsKey } from "@/lib/channel/settings";
 
 export const dynamic = "force-dynamic";
@@ -43,9 +47,27 @@ export async function PUT(req: Request) {
   const key = String(body.value.key ?? "");
   if (!SETTINGS_KEYS.includes(key as SettingsKey)) return jsonError(400, "Unknown settings key", "bad_key");
   try {
+    // The connection block is the one save that must have a visible result:
+    // reading the before/after runtimes is what tells us "this just became
+    // connected" rather than "an unrelated value was edited".
+    const before = key === "connection" ? resolveChannelRuntime(await loadChannelSettings()) : null;
     const result = await updateSettingsBlock(key as SettingsKey, body.value.value, guard.value.profile.id);
     if (!result.ok) return jsonError(400, "Invalid value for this block", "invalid_value");
-    return NextResponse.json({ ok: true, settings: result.settings });
+    /**
+     * Connecting the channel starts the publisher — once, right now, so the
+     * admin chat gets exactly one message and the first post instead of a
+     * silent save. Everything after that is the in-process loop
+     * (`src/lib/channel/boot.ts`). A failed kick never fails the save: the
+     * settings are already written and the loop will retry.
+     */
+    let kick = null;
+    if (before && shouldKickAfterConnect(before, resolveChannelRuntime(result.settings))) {
+      kick = await kickChannelAutopilot(guard.value.profile.id).catch((error) => {
+        console.warn("[channel] autopilot kick failed:", error instanceof Error ? error.message : error);
+        return null;
+      });
+    }
+    return NextResponse.json({ ok: true, settings: result.settings, kick });
   } catch (error) {
     return serverError("channel settings", error);
   }

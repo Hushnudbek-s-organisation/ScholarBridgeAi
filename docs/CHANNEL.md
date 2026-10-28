@@ -24,6 +24,8 @@ English. No paid AI: everything is rule- and template-based.
 | `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/go/<code>`); the admin panel value wins |
 | `CHANNEL_DISCUSSION_ENABLED` | off | enables the `qa` kind and the "ask in the comments" line |
 | `CHANNEL_APPROVAL_TTL_HOURS` | 6 | how long a preview waits in approval mode before it is retired (1–48) |
+| `CHANNEL_TICK_MINUTES` | 15 | how often the in-process publisher loop ticks (5–120) |
+| `CHANNEL_AUTOPILOT` | — | `off` stops the loop (host with its own cron); `on` also allows it in `next dev` |
 | `TELEGRAM_BOT_TOKEN` | — | already used by the bot (env or Admin → Telegram bot) |
 | `CRON_SECRET` | — | Bearer secret for `/api/cron/*` (Phase 2) |
 
@@ -292,6 +294,48 @@ dry run, which is the safe way to run a staging deployment.
 
 `CHANNEL_AUTOPOST` keeps its meaning in every mode: `off` kills approval mode
 too, and `dryrun` in the environment still caps the panel at previews.
+
+### 9. Connecting the channel starts it — no extra setup
+
+The most common question was "I connected the channel, why is nothing
+happening?". Nothing was scheduled: the publisher only ran when an external
+cron called `/api/cron/channel`, which is a second thing to configure (and
+easy to forget). Now saving the **Ulash** tab does two things at once.
+
+**1. One kick, immediately.** If the save makes the publisher runnable (mode
+not off, channel id + admin chat + site URL set, not paused) and this is a
+*change* — we were off/unconnected/paused before, or another channel, chat or
+mode was chosen — the server runs the publisher once, right away:
+
+* one welcome message in the admin chat: the mode, the channel, the site, how
+  often the loop runs, and anything the connection check already knows is
+  wrong (bot not a channel administrator, admin chat unreachable, no site URL);
+* then **one** post — the first that is due today, or the first still planned
+  when nothing is due yet. One, not three: connecting should not dump a batch
+  into the chat.
+
+In approval mode that first post is a preview with the three buttons; in live
+mode it goes to the channel. Saving the same values again sends nothing.
+
+**2. A loop afterwards.** The server ticks the publisher every
+`CHANNEL_TICK_MINUTES` minutes (default **15**, clamped 5–120), starting one
+minute after boot. Each tick builds today's plan if it is missing and sends
+what is due, exactly as the cron endpoint does — same daily cap, same windows,
+same quiet day, same approval step. Nothing is published twice: the plan is
+idempotent and a post row is reserved before it is sent.
+
+So a deployment with no cron at all now posts by itself. An external cron is
+still supported (and still recommended on hosts that sleep when idle — the loop
+sleeps with the process):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `CHANNEL_TICK_MINUTES` | 15 | tick interval, 5–120 |
+| `CHANNEL_AUTOPILOT` | — | `off` stops the loop; in `next dev` the loop stays off unless it is `on` |
+
+The panel says all of this too: the connection card carries the line
+"Saqlashingiz bilan kanal ulanadi…", and the toast after saving reports whether
+the kick ran, how many posts are waiting, or why it could not run yet.
 
 ### 9a. Approval mode — read every post before it goes public
 

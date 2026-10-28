@@ -47,6 +47,37 @@ export const APPROVAL_STATUS = {
 export const OPEN_APPROVAL_STATUSES = [APPROVAL_STATUS.awaiting, APPROVAL_STATUS.editing] as const;
 
 /**
+ * Post statuses that mean "this plan row has been dealt with".
+ *
+ * A plan row is the *intention*; the post row is what happened to it. In
+ * approval mode the plan row stays `planned` while a preview waits, so the
+ * publisher would keep picking the same row on every tick and skipping it as a
+ * duplicate — noisy, and it hides the honest count in the tick summary. A
+ * failed post is deliberately NOT here: a transient Telegram error should be
+ * retried by the next tick.
+ */
+export const CONSUMED_POST_STATUSES = [
+  "sent",
+  APPROVAL_STATUS.awaiting,
+  APPROVAL_STATUS.editing,
+  APPROVAL_STATUS.rejected,
+  APPROVAL_STATUS.expired,
+] as const;
+
+/**
+ * Filter today's due rows down to the ones that can still be sent: a plan row
+ * that already produced a post must not be offered again by the loop.
+ */
+export function sendablePlanRows<T extends { id: number }>(
+  rows: T[],
+  consumedPlanIds: Array<number | null>,
+  limit: number
+): T[] {
+  const done = new Set(consumedPlanIds.filter((id): id is number => typeof id === "number"));
+  return rows.filter((row) => !done.has(row.id)).slice(0, limit);
+}
+
+/**
  * How the parts of a multi-part post are joined in `channel_posts.html`.
  *
  * The approximate operator must see exactly what the channel will receive, so
