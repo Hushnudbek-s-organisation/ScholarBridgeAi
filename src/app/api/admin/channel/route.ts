@@ -3,6 +3,10 @@ import { guardAdmin, jsonError, readBody, serverError } from "@/lib/growth/api";
 import { channelOverview, ensurePlanLinks, previewDays, updateSettingsBlock } from "@/lib/channel/admin";
 import { checkChannelConnection } from "@/lib/channel/connect";
 import { channelAdminSummary, runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
+import { resolveChannelRuntime } from "@/lib/channel/config";
+import { kickChannelAutopilot } from "@/lib/channel/boot";
+import { loadChannelSettings } from "@/lib/channel/repo";
+import { shouldKickAfterConnect } from "@/lib/channel/autopilot";
 import { SETTINGS_KEYS, type SettingsKey } from "@/lib/channel/settings";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +17,8 @@ export const maxDuration = 120;
  *   GET  ?live=1&days=14  → settings, runtime status, counts, today's queue,
  *                           recent posts, live connection check, plan preview
  *   PUT  { key, value }   → save one settings block (validated, audited)
- *   POST { action }       → verify | test | plan | run | links | preview
+ *   POST { action }       → verify | test | plan | run | links | preview |
+ *                           approve | reject | edit   (see "approval" below)
  */
 export async function GET(req: Request) {
   const guard = await guardAdmin(req);
@@ -42,9 +47,27 @@ export async function PUT(req: Request) {
   const key = String(body.value.key ?? "");
   if (!SETTINGS_KEYS.includes(key as SettingsKey)) return jsonError(400, "Unknown settings key", "bad_key");
   try {
+    // The connection block is the one save that must have a visible result:
+    // reading the before/after runtimes is what tells us "this just became
+    // connected" rather than "an unrelated value was edited".
+    const before = key === "connection" ? resolveChannelRuntime(await loadChannelSettings()) : null;
     const result = await updateSettingsBlock(key as SettingsKey, body.value.value, guard.value.profile.id);
     if (!result.ok) return jsonError(400, "Invalid value for this block", "invalid_value");
-    return NextResponse.json({ ok: true, settings: result.settings });
+    /**
+     * Connecting the channel starts the publisher — once, right now, so the
+     * admin chat gets exactly one message and the first post instead of a
+     * silent save. Everything after that is the in-process loop
+     * (`src/lib/channel/boot.ts`). A failed kick never fails the save: the
+     * settings are already written and the loop will retry.
+     */
+    let kick = null;
+    if (before && shouldKickAfterConnect(before, resolveChannelRuntime(result.settings))) {
+      kick = await kickChannelAutopilot(guard.value.profile.id).catch((error) => {
+        console.warn("[channel] autopilot kick failed:", error instanceof Error ? error.message : error);
+        return null;
+      });
+    }
+    return NextResponse.json({ ok: true, settings: result.settings, kick });
   } catch (error) {
     return serverError("channel settings", error);
   }
@@ -78,6 +101,32 @@ export async function POST(req: Request) {
     if (action === "preview") {
       const days = Number(body.value.days ?? 14);
       return NextResponse.json({ ok: true, preview: await previewDays(days) });
+    }
+    /**
+     * Approval actions from the panel. The same three decisions the Telegram
+     * buttons offer, minus the edit-text round trip: "edit" here takes the new
+     * body in the request, so an operator on a laptop does not have to type it
+     * into a chat. Both paths go through the same guarded functions.
+     */
+    if (action === "approve" || action === "reject" || action === "edit") {
+      const postId = Number(body.value.postId);
+      if (!Number.isInteger(postId) || postId <= 0) return jsonError(400, "postId is required", "bad_request");
+      const { approveApproval, rejectApproval, applyApprovalEdit } = await import("@/lib/channel/send");
+      if (action === "approve") {
+        const outcome = await approveApproval(postId, actor);
+        if (!outcome.ok) return jsonError(409, outcome.reason ?? "approval_failed", "approval_failed");
+        return NextResponse.json({ ok: true, outcome });
+      }
+      if (action === "reject") {
+        const reason = String(body.value.reason ?? "").trim().slice(0, 200) || null;
+        const result = await rejectApproval(postId, actor, reason);
+        if (!result.ok) return jsonError(409, result.reason ?? "already_closed", "already_closed");
+        return NextResponse.json({ ok: true });
+      }
+      const text = String(body.value.text ?? "");
+      const edited = await applyApprovalEdit(postId, text, actor);
+      if (!edited.ok) return jsonError(400, edited.error, edited.error);
+      return NextResponse.json({ ok: true, html: edited.html });
     }
     if (action === "summary") {
       return NextResponse.json({ ok: true, summary: await channelAdminSummary() });

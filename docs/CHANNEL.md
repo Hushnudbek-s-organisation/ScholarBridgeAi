@@ -23,6 +23,9 @@ English. No paid AI: everything is rule- and template-based.
 | `TELEGRAM_ADMIN_CHAT_ID` | — | private chat for dryrun output and failure alerts |
 | `CHANNEL_SITE_URL` | `APP_URL` | origin used in post links (`/go/<code>`); the admin panel value wins |
 | `CHANNEL_DISCUSSION_ENABLED` | off | enables the `qa` kind and the "ask in the comments" line |
+| `CHANNEL_APPROVAL_TTL_HOURS` | 6 | how long a preview waits in approval mode before it is retired (1–48) |
+| `CHANNEL_TICK_MINUTES` | 15 | how often the in-process publisher loop ticks (5–120) |
+| `CHANNEL_AUTOPILOT` | — | `off` stops the loop (host with its own cron); `on` also allows it in `next dev` |
 | `TELEGRAM_BOT_TOKEN` | — | already used by the bot (env or Admin → Telegram bot) |
 | `CRON_SECRET` | — | Bearer secret for `/api/cron/*` (Phase 2) |
 
@@ -286,7 +289,107 @@ dry run, which is the safe way to run a staging deployment.
 | --- | --- |
 | Off | Nothing is planned out and nothing is sent |
 | Dry run | The plan is built and posts go **only** to the admin chat |
+| Approval | The plan is built; each post is sent to the admin chat with **Approve / Reject / Edit**, and reaches the channel only after an admin approves it |
 | Live | Posts go to the channel |
+
+`CHANNEL_AUTOPOST` keeps its meaning in every mode: `off` kills approval mode
+too, and `dryrun` in the environment still caps the panel at previews.
+
+### 9. Connecting the channel starts it — no extra setup
+
+The most common question was "I connected the channel, why is nothing
+happening?". Nothing was scheduled: the publisher only ran when an external
+cron called `/api/cron/channel`, which is a second thing to configure (and
+easy to forget). Now saving the **Ulash** tab does two things at once.
+
+**1. One kick, immediately.** If the save makes the publisher runnable (mode
+not off, channel id + admin chat + site URL set, not paused) and this is a
+*change* — we were off/unconnected/paused before, or another channel, chat or
+mode was chosen — the server runs the publisher once, right away:
+
+* one welcome message in the admin chat: the mode, the channel, the site, how
+  often the loop runs, and anything the connection check already knows is
+  wrong (bot not a channel administrator, admin chat unreachable, no site URL);
+* then **one** post — the first that is due today, or the first still planned
+  when nothing is due yet. One, not three: connecting should not dump a batch
+  into the chat.
+
+In approval mode that first post is a preview with the three buttons; in live
+mode it goes to the channel. Saving the same values again sends nothing.
+
+**2. A loop afterwards.** The server ticks the publisher every
+`CHANNEL_TICK_MINUTES` minutes (default **15**, clamped 5–120), starting one
+minute after boot. Each tick builds today's plan if it is missing and sends
+what is due, exactly as the cron endpoint does — same daily cap, same windows,
+same quiet day, same approval step. Nothing is published twice: the plan is
+idempotent and a post row is reserved before it is sent.
+
+So a deployment with no cron at all now posts by itself. An external cron is
+still supported (and still recommended on hosts that sleep when idle — the loop
+sleeps with the process):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `CHANNEL_TICK_MINUTES` | 15 | tick interval, 5–120 |
+| `CHANNEL_AUTOPILOT` | — | `off` stops the loop; in `next dev` the loop stays off unless it is `on` |
+
+The panel says all of this too: the connection card carries the line
+"Saqlashingiz bilan kanal ulanadi…", and the toast after saving reports whether
+the kick ran, how many posts are waiting, or why it could not run yet.
+
+### 9a. Approval mode — read every post before it goes public
+
+Between "dry run" and "live" there used to be nothing: an operator who wanted
+to check each post had to keep the publisher off and paste posts by hand.
+`Approval` is that step.
+
+**How it works**
+
+1. The cron tick renders the post exactly as it would be published and stores
+   the body on `channel_posts` (`status = awaiting_approval`).
+2. The admin chat receives a header ("🔔 Tasdiqlash kerak", the kind, the
+   number of parts, the deadline), then the post itself. The **last** part
+   carries the buttons:
+
+   | Button | What happens |
+   | --- | --- |
+   | ✅ Tasdiqlash | The **stored** body is published to the channel immediately. It is never re-rendered, so what you read is what the channel gets — "70 kun qoldi" cannot become "69" between the preview and the press |
+   | ❌ Rad etish | Nothing is published; the post is `rejected` and the plan row is `skipped` |
+   | ✏️ Tahrirlash | The bot asks for the new text; the next message (private chat, no command) becomes the body. It goes through the same HTML sanitizer as a template post, the preview message is rewritten, and the buttons appear again |
+
+3. Only an **admin** may press: the Telegram account must be linked to a
+   profile with `is_admin`. Anyone else gets "⛔ Faqat admin tasdiqlay oladi"
+   and nothing changes. A press from a group or channel is refused outright.
+4. Every preview expires after `CHANNEL_APPROVAL_TTL_HOURS` (default **6**,
+   1–48). An expired post never publishes, and the same plan identity is not
+   offered again — approving it the next morning would publish yesterday's
+   deadline under today's date.
+5. Double presses are safe: the row is claimed with a conditional `UPDATE`, so
+   five presses publish once.
+
+**Where to see it**
+
+* In Telegram: the previews arrive in `TELEGRAM_ADMIN_CHAT_ID`.
+* In the panel: **Admin → Kanal**, the "Tasdiqlash kutilmoqda" box above the
+  tabs (approve / reject / rewrite, no Telegram needed). It is above the tabs
+  on purpose — while the mode is *Approval* these are the only posts that can
+  reach the channel, and they expire.
+
+**Polls** are previewed as text and become a real Telegram poll on approval.
+
+**Code map**
+
+| File | Role |
+| --- | --- |
+| `src/lib/channel/approval.ts` | Rules only (statuses, callback format, texts, expiry window). No database, no network |
+| `src/lib/channel/approvalStore.ts` | The queries those rules need (who is an admin, what is pending, expiry) |
+| `src/lib/channel/send.ts` | `sendPlanRowForApproval`, `approveApproval`, `rejectApproval`, `applyApprovalEdit` |
+| `src/lib/telegram/approval.ts` | Authorises the button press and routes the edit reply |
+
+`src/lib/telegram/bot.ts` is deliberately untouched: its callback whitelist is
+scoped to a *linked student's* session, while an approval button is an
+operator action. Keeping them apart means a malformed `ch:` value can never
+fall through into a student command.
 
 ## 10. Admin panel
 
