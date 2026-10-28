@@ -391,6 +391,146 @@ scoped to a *linked student's* session, while an approval button is an
 operator action. Keeping them apart means a malformed `ch:` value can never
 fall through into a student command.
 
+### 9b. "Ulanishni tekshirish" — what each step means
+
+The Verify button runs three real Telegram calls and reports five verdicts. Each
+one is a **code** the panel translates (uz/ru/en), so the message names the
+thing to fix instead of saying "something is wrong":
+
+| Step | Code | What it means |
+| --- | --- | --- |
+| Token | `token_missing` / `token_invalid` | no bot token anywhere, or Telegram answered 401 |
+| Channel | `channel_missing` / `channel_invalid` / `channel_not_found` / `channel_wrong_type` | nothing entered, an invite link, the bot cannot see it, or that id is a group/private chat |
+| Permission | `bot_not_admin` / `no_post_permission` | the bot is in the channel but is not an administrator, or "Post messages" is off — the message names the bot's `@username` |
+| Admin chat | `admin_chat_missing` / `admin_chat_unreachable` | no id, or the bot was never started in that chat |
+| Site | `site_missing` / `site_not_public` | no origin, or a local one (`http://localhost:3000`): Telegram drops links to it |
+
+A successful Verify also **pins the numeric id** Telegram resolved
+(`@name` → `-100…`), because a username can be renamed and a numeric id cannot.
+Only that explicit action writes.
+
+### 9c. A post is never lost to formatting
+
+Telegram rejects a whole message for two reasons that are not about the
+content, and both used to lose the post:
+
+* **`BUTTON_URL_INVALID` / "wrong HTTP URL"** — an inline button whose URL is
+  not a public https URL (typically a deployment configured with the dev
+  origin). Every button is validated *before* the request (`channel/recover.ts`),
+  unusable ones are dropped, and if the API still refuses the keyboard the
+  message is re-sent without it.
+* **"can't parse entities"** — markup Telegram cannot parse. The message is
+  re-sent as plain text (`plainText()` keeps it readable), and the keyboard
+  stays.
+
+That is at most two retries, in `sendMessageWithRecovery` — the only place that
+calls `sendMessage`, so no send path can skip it. A real failure (bot blocked,
+chat deleted) is still reported, not retried.
+
+### 9d. The bot finds the channel by itself
+
+Typing an id or a username was the last step that could go wrong, so the bot
+now watches for the channel and reports it.
+
+`src/lib/channel/discovery.ts` (pure rules) and
+`src/lib/telegram/channelDiscovery.ts` (DB + Telegram) recognise three things:
+
+| Update | When it arrives | Wrong-rights warning |
+|---|---|---|
+| `my_chat_member` with `status` `administrator`/`creator` and `chat.type = channel` | the bot is added to a channel or promoted | — the bot does have rights |
+| `channel_post` | any post in a channel the bot manages | — |
+| private `message` with `forward_from_chat` or `forward_origin.type = "channel"` | an admin forwards a post from any channel | **yes** — a forward proves nothing about administer rights |
+
+Discovery runs **before** every other branch in
+`src/lib/telegram/service.ts`, because a forwarded post is an ordinary private
+message and would otherwise be answered with the command list. A `channel_post`
+carries no sender, so it can only *store* a candidate, never connect a channel
+on a stranger's behalf.
+
+The rules:
+
+1. Only an admin (`resolveChannelApprover`) triggers anything, and the reply
+   always goes to a private chat — never into the channel.
+2. If no channel is configured, the discovered one is adopted immediately and
+   the mode is chosen explicitly: `approval` when an admin chat exists,
+   otherwise the mode is left as is. Nothing is adopted silently over an
+   existing connection: swapping the live channel because someone forwarded a
+   post would be worse than not adopting at all.
+3. The candidate is saved to `channel_settings.connection.discoveredChannel`
+   (`{id, title, username, at}`, numeric id only) so the panel can offer it.
+4. The reply is Uzbek and comes from `DISCOVERY_TEXTS`: title, `@username`,
+   `<code>id</code>`, the mode the operator now has, and — for forwards — the
+   reminder that the bot still needs **Post messages**.
+5. The panel shows an indigo "Aniqlangan kanal" banner above the connect form
+   with one button; the mode goes `off → approval` when adopted that way.
+
+`allowed_updates` in the setWebhook call now requests `message`,
+`callback_query`, `my_chat_member`, `channel_post`, `poll` and `poll_answer`.
+Without `channel_post` in that list Telegram simply never delivers the second
+row of the table.
+
+### 9e. Approval mode that cannot reach a chat still works
+
+Approval mode needs an admin chat to show the preview in. When it has none the
+publisher used to do nothing at all: the post was neither sent nor queued, and
+it vanished until its TTL.
+
+Now the post is stored as `awaiting_approval` **with no chat and no message id**
+and appears in Admin → Kanal → "Tasdiqlash kutilmoqda". The row carries an
+Uzbek note (`APPROVAL_TEXTS.panelOnly`) instead of a failure, so nothing is
+marked `failed` — `failed` is not in that inbox. Approving it from the panel
+publishes the stored text, exactly like the Telegram button
+(`approveApproval` is the one publishing path for both).
+
+Two related rules keep "Send now" honest:
+
+* **Send now (Hozir yuborish)** publishes to the channel even in approval mode —
+  the operator is pressing Send on a row they are looking at. If that post is
+  already waiting for approval, the same press publishes the stored text
+  instead of answering "waiting for approval".
+* **Test post** still goes to the admin chat only, in every mode.
+
+A preview whose header or body fails to send is left `awaiting_approval` with a
+`preview_not_delivered: …` note rather than `failed`, for the same reason.
+
+### 9f. Quick connect: one field, parsed as you type
+
+The top of Admin → Kanal → **Ulash** is now a single field and one button.
+
+The field is parsed **client-side, on every keystroke**, with
+`normalizeChannelIdentifier` — the same function the API uses. That is
+deliberate: a second implementation in the UI would drift, and the preview would
+start promising something the server refuses.
+
+| Pasted | Shown immediately |
+|---|---|
+| `https://t.me/kanal`, `t.me/kanal`, `kanal`, `@kanal`, `https://t.me/s/kanal` | `@kanal`, plus a `t.me/kanal` link to open it and a note that Connect pins the numeric id |
+| `-1001234567890`, `1234567890`, `t.me/c/1234567890/42` | the `-100…` id, described as the form that never changes |
+| `https://t.me/+AbCdEf` | **red**: an invite link carries no id — forward a post to the bot or paste the `-100…` id |
+| `hello world` | **red**: not a channel address, with the three accepted shapes |
+
+**Ulash va tekshirish** then does the whole flow in one press: save the
+normalised value (the `@username` also goes into the brand block so the bot link
+can be built), run the five-step check, and leave the verdict on screen.
+
+* A connection in mode `off` is switched to **approval** — connecting should not
+  start publishing unread, and it must not look connected while nothing can ever
+  be sent.
+* Every failing step is repeated under the field in red, in the operator's
+  language, with `@bot_username` interpolated. For example, with the bot demoted
+  to a plain member in the mock:
+
+  > **Ulanish tugamadi. Buni tuzating:**
+  > @ScholarBridgeTestBot kanalda administrator emas. Telegramda kanal →
+  > Administratorlar → botni qo'shib, «Post messages» ruxsatini bering.
+
+* **Sinov xabari** sits next to it and still goes to the admin chat only.
+
+The full form below is unchanged for the operator who wants every knob. The
+local mock gained `POST /_member {status, canPost}` (`status` is a real Telegram
+status: `creator | administrator | member | ...`) so both red screens can be
+exercised offline.
+
 ## 10. Admin panel
 
 | Tab | Controls |

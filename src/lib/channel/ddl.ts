@@ -226,6 +226,64 @@ export function channelDdlCode(): string {
     .join("\n");
 }
 
+/** Column-list clauses inside a CREATE TABLE that are constraints, not columns. */
+const CONSTRAINT_KEYWORDS = new Set(["unique", "primary", "foreign", "check", "constraint", "exclude"]);
+
+/**
+ * Every (table, column) pair this DDL is responsible for.
+ *
+ * Why parse the DDL instead of reading the drizzle schema: the drizzle schema
+ * says what the *code* expects, the DDL says what the bootstrap actually
+ * creates. Verifying the second is what catches an old database (tables exist,
+ * a later `ALTER … ADD COLUMN` never ran) — which otherwise shows up as a
+ * confusing "column does not exist" on the first post.
+ */
+export function channelColumns(): Array<{ table: string; column: string }> {
+  const out: Array<{ table: string; column: string }> = [];
+  const seen = new Set<string>();
+  const push = (table: string, column: string) => {
+    const key = `${table}.${column}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ table, column });
+  };
+
+  for (const stmt of channelDdlCode().split(";")) {
+    const create = /^\s*create\s+table\s+if\s+not\s+exists\s+"?([a-zA-Z0-9_]+)"?\s*\(/i.exec(stmt);
+    if (create) {
+      const table = create[1];
+      const open = stmt.indexOf("(");
+      const close = stmt.lastIndexOf(")");
+      const body = stmt.slice(open + 1, close);
+      // Top-level commas only: a DEFAULT '[]' or a numeric type never contains
+      // a comma at depth 0, but keeping the depth check makes this safe for
+      // future `numeric(10,2)` columns.
+      let depth = 0;
+      let current = "";
+      const parts: string[] = [];
+      for (const ch of body) {
+        if (ch === "(") depth += 1;
+        if (ch === ")") depth -= 1;
+        if (ch === "," && depth === 0) {
+          parts.push(current);
+          current = "";
+        } else current += ch;
+      }
+      parts.push(current);
+      for (const part of parts) {
+        const first = part.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+        if (!first || CONSTRAINT_KEYWORDS.has(first)) continue;
+        if (!/^[a-z_][a-z0-9_]*$/i.test(first)) continue;
+        push(table, first);
+      }
+      continue;
+    }
+    const alter = /^\s*alter\s+table\s+"?([a-zA-Z0-9_]+)"?\s+add\s+column\s+if\s+not\s+exists\s+"?([a-zA-Z0-9_]+)"?/i.exec(stmt);
+    if (alter) push(alter[1], alter[2]);
+  }
+  return out;
+}
+
 /**
  * Statements to execute one by one.
  *

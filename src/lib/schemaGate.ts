@@ -101,6 +101,35 @@ export function tableExistenceVerify(tables: string[]): () => Promise<{ ok: bool
 }
 
 /**
+ * Which of these (table, column) pairs are missing — one query, no DDL.
+ *
+ * Tables are not enough: the channel publisher adds columns over time with
+ * `ALTER TABLE … ADD COLUMN IF NOT EXISTS`. With `SCHEMA_AUTO_REPAIR=off` the
+ * bootstrap only verifies, so a database created by an older build can have
+ * every table and still fail the first post with "column lane does not exist".
+ * Checking columns turns that into a named, fixable problem.
+ */
+export function columnExistenceVerify(
+  pairs: Array<{ table: string; column: string }>
+): () => Promise<{ ok: boolean; problems: string[] }> {
+  return async () => {
+    if (pairs.length === 0) return { ok: true, problems: [] };
+    const { db } = await import("@/db");
+    const tables = sql.raw(
+      `ARRAY[${[...new Set(pairs.map((p) => p.table))].map((t) => `'${t.replace(/'/g, "''")}'`).join(",")}]::text[]`
+    );
+    const rows = await db.execute<{ table_name: string; column_name: string }>(sql`
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = ANY(${tables})
+    `);
+    const present = new Set((rows.rows ?? []).map((r) => `${r.table_name}.${r.column_name}`));
+    const missing = pairs.filter((p) => !present.has(`${p.table}.${p.column}`)).map((p) => `${p.table}.${p.column}`);
+    return { ok: missing.length === 0, problems: missing };
+  };
+}
+
+/**
  * Run `repair` at most once per process — or, with `SCHEMA_AUTO_REPAIR=off`,
  * only `verify`. Safe to call from every request path: after the first success
  * this is a boolean check.

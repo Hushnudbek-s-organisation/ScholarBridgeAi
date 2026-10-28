@@ -6868,7 +6868,8 @@
       "token": "Bot token (Admin → Telegram)",
       "channel": "Bot is a channel administrator",
       "adminChat": "Admin chat reachable",
-      "siteUrl": "Site URL set"
+      "siteUrl": "Site URL set",
+      "permission": "Bot permissions"
     },
     "connect": {
       "title": "Connection status",
@@ -6908,7 +6909,47 @@
       "autostartHint": "Saving connects the channel: the bot sends one message and the first post to the admin chat right away, then the system keeps going on its own (it checks on a schedule).",
       "autostartDone": "Channel connected — a message was sent to your Telegram. Posts waiting for approval: {count}.",
       "autostartQuiet": "Channel connected — a message was sent to your Telegram. Nothing is planned for today.",
-      "autostartBlocked": "Settings saved, but nothing will be posted yet: {reason}"
+      "autostartBlocked": "Settings saved, but nothing will be posted yet: {reason}",
+      "diag": {
+        "ok": "Ready",
+        "token_missing": "No bot token. Add one in Admin → Telegram (this section never asks for a token).",
+        "token_invalid": "The bot token is invalid (401). Check it in Admin → Telegram. {detail}",
+        "channel_missing": "No channel set. Enter an @username or a -100… id.",
+        "channel_invalid": "Unrecognised channel address. Enter @name, https://t.me/name or a -100… id.",
+        "channel_not_found": "Channel not found. Check the username and that the bot was added as a channel administrator. {detail}",
+        "channel_wrong_type": "That id is not a channel ({type}). Enter the channel's @username or -100… id.",
+        "bot_not_admin": "{botUsername} is not an administrator of the channel. Add the bot in Channel → Administrators and grant “Post messages”.",
+        "no_post_permission": "{botUsername} has “Post messages” switched off. Enable it in the channel's administrator rights.",
+        "admin_chat_missing": "No admin chat id. Open the bot in your chat, press /start and enter the numeric id.",
+        "admin_chat_unreachable": "Could not write to that chat: open the bot there once and press /start. {detail}",
+        "site_missing": "No site URL — links in posts will be omitted.",
+        "site_not_public": "“{siteUrl}” is a local address. Telegram rejects such links — use the public https origin."
+      },
+      "discoveredTitle": "🎯 Channel detected",
+      "discoveredNoTitle": "Untitled channel",
+      "discoveredConnect": "Connect this channel",
+      "discoveredDone": "Channel connected — mode is now Approval; change it if you like.",
+      "quick": {
+        "title": "Quick connect — one field",
+        "hint": "Paste the channel address in any form: @username, t.me/username, -100… ID. It is parsed as you type, so a mistake is named before you press anything.",
+        "label": "Channel address",
+        "placeholder": "@channel_name · https://t.me/channel_name · -1001234567890",
+        "previewOk": "Parsed: {value}",
+        "previewUsername": "That is an @username. Connect resolves it to the numeric ID and stores that, so renaming the channel will not break the connection.",
+        "previewId": "That is a numeric ID — the most reliable form, it never changes.",
+        "previewOpen": "Open the channel in Telegram",
+        "errEmpty": "The channel address is empty.",
+        "errInvite": "That is a private invite link (t.me/+…). It carries no channel id — forward one post from the channel to the bot, or enter the -100… ID.",
+        "errNotChannel": "That does not look like a channel address. Enter @channel_name, https://t.me/channel_name or the -100… ID.",
+        "connect": "Connect and check",
+        "test": "Test message",
+        "connecting": "Connecting…",
+        "connectDone": "Channel saved. The check result is below.",
+        "connectSaved": "Channel saved, but the mode is Off — nothing will be posted.",
+        "fixTitle": "The connection is not finished. Fix this:",
+        "ready": "Everything is ready — the channel is connected and the bot may post.",
+        "modeApprovalNote": "The mode was set to Approval: the first post arrives in the admin chat and goes live once you approve it."
+      }
     },
     "plan": {
       "title": "Publishing rhythm",

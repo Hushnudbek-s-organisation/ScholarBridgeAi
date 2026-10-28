@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { CHANNEL_DDL, channelStatements } from "../src/lib/channel/ddl";
+import { CHANNEL_DDL, channelColumns, channelStatements } from "../src/lib/channel/ddl";
 import {
   POLL_EXPLANATION_MAX,
   POLL_OPEN_PERIOD_SEC,
@@ -125,7 +125,7 @@ import {
   majorsUz,
 } from "../src/lib/channel/templates/format";
 import { lintText, plainText, visibleLength } from "../src/lib/channel/lint";
-import { mergeChannelSettings, settingsFromRows, settingsRows } from "../src/lib/channel/settings";
+import { looksLikeChannelId, mergeChannelSettings, settingsFromRows, settingsRows } from "../src/lib/channel/settings";
 import {
   APPROVAL_STATUS,
   APPROVAL_TEXTS,
@@ -141,7 +141,30 @@ import {
   sendablePlanRows,
 } from "../src/lib/channel/approval";
 import {
-  AUTOPILOT_DEFAULT_MINUTES,
+  INVITE_LINK_HINT,
+  canonicalChannelId,
+  normalizeChannelIdentifier,
+} from "../src/lib/channel/config";
+import { describeChannelTokenSource, pickChannelToken } from "../src/lib/channel/token";
+import {
+  CALLBACK_DATA_MAX,
+  fallbackPlainText,
+  isKeyboardError,
+  isParseError,
+  isUsableButtonUrl,
+  recoveryAttempt,
+  usableButtons,
+  type SendAttempt,
+} from "../src/lib/channel/recover";
+import { isPublicSiteUrl } from "../src/lib/channel/connect";
+import {
+  DISCOVERY_TEXTS,
+  channelCandidateFromUpdate,
+  discoveryMessage,
+  isNewDiscovery,
+} from "../src/lib/channel/discovery";
+import { parseDiscoveredChannel } from "../src/lib/channel/settings";
+import { AUTOPILOT_DEFAULT_MINUTES,
   AUTOPILOT_TEXTS,
   MODE_LABELS,
   autopilotEnabled,
@@ -2073,6 +2096,601 @@ check("every approval carries approve, reject and edit", () => {
   ]);
   // Two rows: the decision is separated from the "do more work" action.
   assert.equal(rows.length, 2);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Phase 3: discovery, approval fallback, direct send                         */
+/* -------------------------------------------------------------------------- */
+
+check("the bot recognises the channel Telegram tells it about", () => {
+  // 1. Promoted in a channel.
+  const promoted = channelCandidateFromUpdate({
+    my_chat_member: {
+      chat: { id: -1001234567890, type: "channel", title: "ScholarBridge", username: "scholarbridge_uz" },
+      new_chat_member: { status: "administrator", user: { is_bot: true } },
+    },
+  });
+  assert.deepEqual(promoted, {
+    id: "-1001234567890",
+    title: "ScholarBridge",
+    username: "scholarbridge_uz",
+    source: "my_chat_member",
+    botIsAdmin: true,
+  });
+
+  // 2. A post in a channel the bot manages.
+  const posted = channelCandidateFromUpdate({
+    channel_post: { chat: { id: -1009876543210, type: "channel", title: "Test" } },
+  });
+  assert.equal(posted?.id, "-1009876543210");
+  assert.equal(posted?.source, "channel_post");
+
+  // 3. An admin forwards a channel post to the bot (old and new Bot API shapes).
+  const forwarded = channelCandidateFromUpdate({
+    message: {
+      chat: { id: 777000111, type: "private" },
+      from: { id: 777000111, is_bot: false },
+      forward_from_chat: { id: -1001111111111, type: "channel", title: "Forwarded" },
+    },
+  });
+  assert.equal(forwarded?.source, "forward");
+  assert.equal(forwarded?.botIsAdmin, false, "a forward says nothing about rights");
+  const forwardedNew = channelCandidateFromUpdate({
+    message: {
+      chat: { id: 777000111, type: "private" },
+      from: { id: 777000111, is_bot: false },
+      forward_origin: { type: "channel", chat: { id: -1001111111111, type: "channel", title: "Forwarded" } },
+    },
+  });
+  assert.equal(forwardedNew?.id, "-1001111111111");
+
+  // Nothing that is not a channel may be adopted.
+  assert.equal(
+    channelCandidateFromUpdate({ my_chat_member: { chat: { id: -1001234567890, type: "supergroup" }, new_chat_member: { status: "administrator" } } }),
+    null,
+    "a supergroup is not a channel"
+  );
+  assert.equal(
+    channelCandidateFromUpdate({ my_chat_member: { chat: { id: 777000111, type: "private" }, new_chat_member: { status: "member" } } }),
+    null
+  );
+  assert.equal(
+    channelCandidateFromUpdate({ my_chat_member: { chat: { id: -1001234567890, type: "channel" }, new_chat_member: { status: "left" } } }),
+    null,
+    "leaving is not a discovery"
+  );
+  // A forward *to* a group is not a private helper conversation.
+  assert.equal(
+    channelCandidateFromUpdate({
+      message: {
+        chat: { id: -1001234567890, type: "group" },
+        from: { id: 5 },
+        forward_from_chat: { id: -1009999999999, type: "channel" },
+      },
+    }),
+    null
+  );
+  // An @username is never the candidate: it can be renamed.
+  assert.equal(
+    channelCandidateFromUpdate({ channel_post: { chat: { id: 0, type: "channel", username: "x" } } } as never),
+    null
+  );
+});
+
+check("discovery is reported once, and says what to do next", () => {
+  const candidate = { id: "-1001234567890", title: "Kanal & Co", username: "kanal", source: "forward" as const, botIsAdmin: false };
+
+  // A channel already configured is not news; neither is one already reported.
+  assert.equal(isNewDiscovery(candidate, { channelId: "-1001234567890", discoveredId: null }), false);
+  assert.equal(isNewDiscovery(candidate, { channelId: "", discoveredId: "-1001234567890" }), false);
+  assert.equal(isNewDiscovery(candidate, { channelId: "-1009999999999", discoveredId: "-1001234567890" }), false);
+  assert.equal(isNewDiscovery(candidate, { channelId: "", discoveredId: null }), true);
+  assert.equal(isNewDiscovery(candidate, { channelId: "-1009999999999", discoveredId: null }), true);
+
+  const message = discoveryMessage({ candidate, connected: false, mode: null, hasAdminChat: true });
+  assert.match(message, /Kanal aniqlandi/);
+  assert.match(message, /-1001234567890/, "the numeric id is the whole point");
+  assert.match(message, /Kanal &amp; Co/, "the title is escaped");
+  assert.match(message, /Admin panel/);
+
+  // Adopted + approval mode: say which mode the operator now has.
+  const adopted = discoveryMessage({ candidate, connected: true, mode: "approval", hasAdminChat: true });
+  assert.match(adopted, /Tasdiqlash bilan/);
+  // Adopted without an admin chat: approval has nowhere to go, say so.
+  const noChat = discoveryMessage({ candidate, connected: true, mode: "approval", hasAdminChat: false });
+  assert.match(noChat, /admin chat ID/i);
+  // …and the same line appears when the mode stayed off for that reason, so the
+  // reply never claims the channel is ready when nothing can be posted yet.
+  const offNoChat = discoveryMessage({ candidate, connected: true, mode: "off", hasAdminChat: false });
+  assert.match(offNoChat, /admin chat ID/i);
+
+  // The bot is not an administrator: that must be said, or the first post fails.
+  const notAdmin = discoveryMessage({
+    candidate: { ...candidate, botIsAdmin: false },
+    connected: true,
+    mode: "approval",
+    hasAdminChat: true,
+  });
+  assert.match(notAdmin, /administrator emas|«Post messages»/);
+
+  // The stored candidate is validated, never trusted.
+  assert.deepEqual(parseDiscoveredChannel({ id: "-1001234567890", title: "T", username: "@u", at: "2026-01-01T00:00:00.000Z" }), {
+    id: "-1001234567890",
+    title: "T",
+    username: "u",
+    at: "2026-01-01T00:00:00.000Z",
+  });
+  assert.equal(parseDiscoveredChannel({ id: "@username" }), null);
+  assert.equal(parseDiscoveredChannel("nonsense"), null);
+  assert.ok(DISCOVERY_TEXTS.nextInPanel.includes("Admin"));
+});
+
+check("the webhook subscribes to the updates discovery needs", () => {
+  const route = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/telegram/route.ts"), "utf8");
+  const setWebhook = route.slice(route.indexOf('"setWebhook"'), route.indexOf("drop_pending_updates"));
+  for (const update of ["message", "callback_query", "my_chat_member", "channel_post", "poll", "poll_answer"]) {
+    assert.ok(setWebhook.includes(`"${update}"`), `setWebhook must request ${update}`);
+  }
+
+  const service = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/service.ts"), "utf8");
+  // Discovery must run before the generic message routing, or a forwarded post
+  // is answered with the command list.
+  const discoveryAt = service.indexOf("await handleChannelDiscovery(update)");
+  const msgAt = service.indexOf("const msg = update.message;");
+  assert.ok(discoveryAt > 0 && msgAt > discoveryAt, "discovery runs first");
+  assert.match(service, /channel_post\?:/, "the update type is typed");
+
+  const handler = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/channelDiscovery.ts"), "utf8");
+  assert.match(handler, /approver\?\.isAdmin/, "only an admin may discover/connect");
+  assert.match(handler, /adopt = !current\.channelId/, "an already-configured channel is never swapped");
+  assert.match(handler, /nextMode/, "adopting picks a mode explicitly");
+});
+
+check("approval without an admin chat lands in the panel, not nowhere", () => {
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  // The preview failing must keep the post OPEN (awaiting_approval), because
+  // that is the status the panel lists and can approve.
+  assert.match(sendSrc, /panelOnlyApproval/, "a missing admin chat is not treated as fatal");
+  assert.match(sendSrc, /status: APPROVAL_STATUS\.awaiting, error: APPROVAL_TEXTS\.panelOnly/);
+  assert.match(sendSrc, /status: APPROVAL_STATUS\.awaiting, error: `preview_not_delivered/);
+  // It must NOT be marked failed: failed is not in the panel's inbox.
+  const approvalBlock = sendSrc.slice(sendSrc.indexOf("async function sendPlanRowForApproval"), sendSrc.indexOf("/** Claim a post for one actor"));
+  assert.doesNotMatch(approvalBlock, /status: "failed"[\s\S]{0,40}channelPosts/, "no failed write inside the preview path");
+
+  const actions = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/adminActions.ts"), "utf8");
+  assert.match(actions, /blockedCode === "no_admin_chat"/, "the runner still builds the queue in that state");
+  // …and send() itself must not skip on that same reason, or the run ends with
+  // "attempted 1, approval 0" and nothing lands in the panel inbox.
+  const blockPos = sendSrc.indexOf("const panelOnlyApproval");
+  const guard = sendSrc.slice(blockPos, sendSrc.indexOf("/** Claim a post for one actor"));
+  assert.match(guard, /blockedReason && !panelOnlyApproval/, "that one reason is exempt, the rest still block");
+  // And the panel's approve path is the same function the Telegram button uses.
+  const api = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/channel/route.ts"), "utf8");
+  assert.match(api, /approveApproval\(postId, actor\)/, "the panel approves through the same guard");
+});
+
+check('"Hozir yuborish" publishes even in approval mode', () => {
+  const actions = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/adminActions.ts"), "utf8");
+  assert.match(actions, /direct: !opts\.toAdminChat/, "Send now bypasses the approval step, Test post does not");
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  assert.match(sendSrc, /opts\.direct && !opts\.toAdminChat \? \("on" as const\)/, "direct forces the channel");
+  // A post that is *already* waiting for approval must be published by that
+  // same press, not skipped with "waiting for approval" — the queue row shows
+  // "Send now" for it too.
+  assert.match(sendSrc, /if \(waiting\) return await approveApproval\(waiting\.id/, "send now publishes the waiting post");
+  // The scheduled path must still go through the approval branch.
+  assert.match(sendSrc, /if \(mode === "approval"\) \{\s*return await sendPlanRowForApproval/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Phase 4: the quick-connect wizard                                          */
+/* -------------------------------------------------------------------------- */
+
+check("the quick-connect field parses with the server's own normaliser", () => {
+  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/admin/ChannelManager.tsx"), "utf8");
+  // One parser, not two: if the panel re-implemented the rules they would drift
+  // and the live preview would promise something the server refuses.
+  assert.match(ui, /import \{ normalizeChannelIdentifier \} from "@\/lib\/channel\/config"/);
+  assert.equal((ui.match(/normalizeChannelIdentifier\(/g) ?? []).length >= 2, true, "used in preview and on submit");
+
+  // The preview must be live (derived from state), not a message after saving.
+  assert.match(ui, /const quickParsed = useMemo\(\(\) => normalizeChannelIdentifier\(quick\), \[quick\]\)/);
+  // The button is dead until the address is usable.
+  assert.match(ui, /disabled=\{!quickParsed\.ok \|\| saving \|\| busy\}/);
+
+  // Every rejection the normaliser can produce has its own sentence, and the
+  // invite-link one says what to do instead.
+  for (const key of ["errEmpty", "errInvite", "errNotChannel"]) assert.ok(ui.includes(`connect.quick.${key}`), key);
+  assert.match(ui, /quickParsed\.reason === "invite_link"/);
+
+  // Connecting from the wizard must not leave the publisher off (nothing would
+  // ever be sent) nor start publishing unread: approval is the only choice that
+  // does both.
+  assert.match(ui, /mode: conn\.mode === "off" \? \("approval" as const\) : conn\.mode/);
+  // …and the @username is kept in brand so the bot link can be built.
+  assert.match(ui, /channelUsername: parsed\.value\.replace\(\/\^@\/, ""\)/);
+  // One press = save + the five-step check.
+  assert.match(ui, /await act\("verify"\)/);
+});
+
+check("a failing step is shown as an instruction, not as a code", () => {
+  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/admin/ChannelManager.tsx"), "utf8");
+  // The red list is built only from steps the server actually failed, and each
+  // one carries the translated sentence — which is where @bot_username appears.
+  assert.match(ui, /const failing = steps\.filter\(\(step\) => !step\.ok && step\.message\)/);
+  assert.match(ui, /connect\.quick\.fixTitle/);
+  assert.match(ui, /connect\.quick\.ready/);
+
+  const messages = JSON.parse(readFileSync(join(import.meta.dirname, "..", "src/i18n/messages/uz.json"), "utf8"));
+  const diag = messages.adminChannel.connect.diag as Record<string, string>;
+  // The two errors an operator actually hits must name the bot by @username,
+  // because "the bot is not an administrator" is useless without knowing which.
+  assert.match(diag.bot_not_admin, /\{botUsername\}/);
+  assert.match(diag.no_post_permission, /\{botUsername\}/);
+  assert.match(diag.bot_not_admin, /Post messages/);
+  // Every connection code the server can return has a sentence in every language.
+  const codes = [
+    "ok",
+    "token_missing",
+    "token_invalid",
+    "channel_missing",
+    "channel_invalid",
+    "channel_not_found",
+    "channel_wrong_type",
+    "bot_not_admin",
+    "no_post_permission",
+    "admin_chat_missing",
+    "admin_chat_unreachable",
+    "site_missing",
+    "site_not_public",
+  ];
+  for (const lang of ["uz", "ru", "en"]) {
+    const d = JSON.parse(readFileSync(join(import.meta.dirname, "..", `src/i18n/messages/${lang}.json`), "utf8"))
+      .adminChannel.connect.diag as Record<string, string>;
+    for (const code of codes) {
+      assert.equal(typeof d[code], "string", `${lang}: diag.${code} is missing`);
+      // "ok" is a one-word verdict; the others must actually explain the fix.
+      if (code !== "ok") assert.ok(d[code].length > 10, `${lang}: diag.${code} says nothing`);
+    }
+  }
+});
+
+check("the quick-connect wizard is translated everywhere", () => {
+  const langs = ["uz", "ru", "en"] as const;
+  const read = (l: string) =>
+    JSON.parse(readFileSync(join(import.meta.dirname, "..", `src/i18n/messages/${l}.json`), "utf8")).adminChannel.connect.quick as Record<
+      string,
+      string
+    >;
+  const uz = read("uz");
+  const keys = Object.keys(uz).sort();
+  assert.ok(keys.length >= 15, `found ${keys.length} keys`);
+  for (const lang of langs) {
+    const block = read(lang);
+    assert.deepEqual(Object.keys(block).sort(), keys, `${lang}: key parity`);
+    for (const [key, value] of Object.entries(block)) {
+      assert.equal(typeof value, "string", `${lang}.${key}`);
+      assert.ok(value.trim().length > 0, `${lang}.${key} is empty`);
+      const placeholder = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join(",");
+      assert.equal(placeholder(value), placeholder(uz[key]), `${lang}.${key}: placeholders`);
+    }
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Phase 2: connection diagnostics, button URLs, send recovery                 */
+/* -------------------------------------------------------------------------- */
+
+check("a button URL is only usable when Telegram will accept it", () => {
+  // The failure this exists for: a deployment configured with the dev origin.
+  assert.equal(isUsableButtonUrl("http://localhost:3000/go/abc"), false);
+  assert.equal(isUsableButtonUrl("https://localhost:3000/go/abc"), false);
+  assert.equal(isUsableButtonUrl("https://127.0.0.1/go/abc"), false);
+  assert.equal(isUsableButtonUrl("https://192.168.1.5/x"), false);
+  assert.equal(isUsableButtonUrl("https://10.0.0.4/x"), false);
+  assert.equal(isUsableButtonUrl("http://example.org/x"), false, "https only");
+  assert.equal(isUsableButtonUrl("/go/abc"), false, "relative");
+  assert.equal(isUsableButtonUrl("example.org"), false);
+  assert.equal(isUsableButtonUrl(""), false);
+  assert.equal(isUsableButtonUrl(null), false);
+  assert.equal(isUsableButtonUrl("https://example.org/go/abc"), true);
+  assert.equal(isUsableButtonUrl("https://t.me/scholarbridge"), true);
+});
+
+check("unusable buttons are dropped, the rest of the keyboard survives", () => {
+  const rows = [
+    [
+      { text: "✅ Tasdiqlash", callback_data: "ch:ok:1" },
+      { text: "Sayt", url: "http://localhost:3000/" },
+    ],
+    [{ text: "Mini App", web_app: { url: "https://localhost/app" } }],
+    [{ text: "Kanal", url: "https://t.me/scholarbridge" }],
+  ];
+  const { rows: clean, dropped } = usableButtons(rows);
+  assert.deepEqual(
+    clean.map((row) => row.map((b) => b.text)),
+    [["✅ Tasdiqlash"], ["Kanal"]],
+    "the decision button keeps working, the broken row disappears"
+  );
+  assert.equal(dropped.length, 2);
+  assert.ok(dropped.some((d) => d.includes("url:http://localhost:3000/")));
+  assert.ok(dropped.some((d) => d.startsWith("web_app:")));
+
+  // A row that becomes empty is removed, not rendered as a gap.
+  assert.deepEqual(usableButtons([[{ text: "x", url: "http://localhost/" }]]).rows, []);
+
+  // Telegram's own limits are enforced before the request, not by a 400.
+  const long = usableButtons([[{ text: "a".repeat(100), url: "https://example.org" }]]);
+  assert.equal(long.rows[0][0].text.length, 64);
+  const bigCallback = usableButtons([[{ text: "x", callback_data: "c".repeat(CALLBACK_DATA_MAX + 1) }]]);
+  assert.deepEqual(bigCallback.rows, []);
+});
+
+check("the recovery ladder keeps a post that is only badly formatted", () => {
+  // "wrong HTTP URL" / BUTTON_URL_INVALID → drop the keyboard, keep the text.
+  for (const description of [
+    "Bad Request: BUTTON_URL_INVALID",
+    "Bad Request: Inline keyboard button URL is invalid",
+    "Bad Request: wrong HTTP URL",
+    "Bad Request: REPLY_MARKUP_INVALID",
+  ]) {
+    assert.equal(isKeyboardError(description), true, description);
+  }
+  const withKeys: SendAttempt = { kind: "html", text: "<b>x</b>", withKeyboard: true };
+  assert.deepEqual(recoveryAttempt(withKeys, "Bad Request: BUTTON_URL_INVALID"), {
+    kind: "html",
+    text: "<b>x</b>",
+    withKeyboard: false,
+  });
+
+  // "can't parse entities" → plain text, still with the keyboard.
+  assert.equal(isParseError("Bad Request: can't parse entities: Unclosed start tag at byte offset 12"), true);
+  assert.equal(isParseError('Bad Request: unsupported start tag "span" at byte offset 3'), true);
+  assert.deepEqual(recoveryAttempt(withKeys, "Bad Request: can't parse entities"), {
+    kind: "plain",
+    text: "x",
+    withKeyboard: true,
+  });
+
+  // Not recoverable: retrying the same content would only waste a request.
+  assert.equal(recoveryAttempt(withKeys, "Forbidden: bot was blocked by the user"), null);
+  assert.equal(recoveryAttempt(withKeys, "Bad Request: chat not found"), null);
+  assert.equal(recoveryAttempt(withKeys, undefined), null);
+  // A plain-text attempt cannot fall further.
+  assert.equal(recoveryAttempt({ kind: "plain", text: "x", withKeyboard: false }, "can't parse entities"), null);
+
+  // The fallback text is readable, not a pile of tags.
+  assert.equal(fallbackPlainText("<b>Kanal</b> &amp; <a href=\"https://x.org\">Bot</a>"), "Kanal & Bot");
+});
+
+check("every send path goes through the recovery ladder", () => {
+  const sendSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/send.ts"), "utf8");
+  assert.match(sendSrc, /async function sendMessageWithRecovery/, "one helper owns the retry logic");
+  // Both the plain and the keyboard send must go through it: every raw
+  // `sendMessage` in the file has to sit inside the helper (the 429 retry is
+  // the second one, and it reuses the same body).
+  const helperStart = sendSrc.indexOf("async function sendMessageWithRecovery");
+  const helperEnd = sendSrc.indexOf("async function sendPart(");
+  assert.ok(helperStart > 0 && helperEnd > helperStart, "the helper must exist on its own");
+  const outside = [...sendSrc.slice(0, helperStart), ...sendSrc.slice(helperEnd)].filter((chunk) =>
+    chunk.includes('"sendMessage"')
+  );
+  assert.deepEqual(outside, [], "no sendMessage call may bypass the recovery ladder");
+  assert.match(sendSrc, /usableButtons\(initialButtons\)/, "buttons are validated before the request");
+  assert.match(sendSrc, /recoveryAttempt\(attempt, last\.description\)/, "failures try the documented fallbacks");
+  assert.match(sendSrc, /async function sendPartWithKeyboard[\s\S]*sendMessageWithRecovery/, "keyboard sends use it too");
+});
+
+check("the connection check reports five translatable steps", () => {
+  const connectSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/connect.ts"), "utf8");
+  // Each step is a code, not an English sentence: the panel translates it.
+  for (const code of [
+    "token_missing",
+    "token_invalid",
+    "channel_missing",
+    "channel_invalid",
+    "channel_not_found",
+    "channel_wrong_type",
+    "bot_not_admin",
+    "no_post_permission",
+    "admin_chat_missing",
+    "admin_chat_unreachable",
+    "site_missing",
+    "site_not_public",
+  ]) {
+    assert.ok(connectSrc.includes(code), `missing code ${code}`);
+  }
+  // The permission message has to name the bot: "make it admin" is useless without it.
+  assert.match(connectSrc, /botUsername: botName/, "the bot's @username is passed to the message");
+  // A group/supergroup id is refused instead of silently accepted.
+  assert.match(connectSrc, /channel_wrong_type/, "non-channel ids are reported");
+  // …and the resolved numeric id can be pinned by the explicit verify action.
+  assert.match(connectSrc, /export async function saveResolvedChannel/);
+
+  const route = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/channel/route.ts"), "utf8");
+  assert.match(route, /saveResolvedChannel\(connection\.channel\.id, actor\)/, "verify stores the resolved id");
+
+  const panel = readFileSync(join(import.meta.dirname, "..", "src/components/admin/ChannelManager.tsx"), "utf8");
+  assert.match(panel, /t\(`diag\.\$\{step\.code\}`/, "the panel translates the code");
+
+  // Every code has a message in all three locales.
+  for (const locale of ["uz", "ru", "en"]) {
+    const messages = JSON.parse(read(`src/i18n/messages/${locale}.json`));
+    const diag = messages.adminChannel?.connect?.diag ?? {};
+    for (const code of ["token_missing", "channel_not_found", "bot_not_admin", "no_post_permission", "site_not_public"]) {
+      assert.ok(typeof diag[code] === "string" && diag[code].length > 10, `${locale}: diag.${code}`);
+    }
+    assert.ok(messages.adminChannel?.steps?.permission, `${locale}: steps.permission`);
+  }
+});
+
+check("a local site URL is called out before it costs a post", () => {
+  assert.equal(isPublicSiteUrl("https://example.org"), true);
+  assert.equal(isPublicSiteUrl("http://example.org"), true);
+  assert.equal(isPublicSiteUrl("http://localhost:3000"), false);
+  assert.equal(isPublicSiteUrl("https://127.0.0.1:3000"), false);
+  assert.equal(isPublicSiteUrl("http://intranet"), false);
+  assert.equal(isPublicSiteUrl(""), false);
+  assert.equal(isPublicSiteUrl(null), false);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Phase 1: identifiers, tokens, schema shape                                 */
+/* -------------------------------------------------------------------------- */
+
+check("a pasted channel link becomes the id Telegram accepts", () => {
+  const eq = (raw: string, want: string, kind: "id" | "username") => {
+    const result = normalizeChannelIdentifier(raw);
+    assert.ok(result.ok, `${raw} should be accepted`);
+    assert.equal(result.value, want, `${raw} → ${result.value}`);
+    assert.equal(result.kind, kind, `${raw} kind`);
+  };
+
+  eq("https://t.me/scholarbridge", "@scholarbridge", "username");
+  eq("http://t.me/scholarbridge", "@scholarbridge", "username");
+  eq("t.me/scholarbridge", "@scholarbridge", "username");
+  eq("telegram.me/scholarbridge", "@scholarbridge", "username");
+  eq("https://t.me/s/scholarbridge", "@scholarbridge", "username"); // web preview link
+  eq("https://t.me/scholarbridge/", "@scholarbridge", "username"); // trailing slash
+  eq("https://t.me/scholarbridge?single=1", "@scholarbridge", "username"); // query
+  eq("scholarbridge_uz", "@scholarbridge_uz", "username"); // bare username
+  eq("@scholarbridge_uz", "@scholarbridge_uz", "username");
+  eq("  @scholarbridge_uz  ", "@scholarbridge_uz", "username"); // pasted with spaces
+  eq("\u200B@scholarbridge_uz", "@scholarbridge_uz", "username"); // zero-width junk
+  eq("-1001234567890", "-1001234567890", "id");
+  eq("-1009876543210", "-1009876543210", "id");
+  // A message link carries the internal id, which Telegram wants with the -100 prefix.
+  eq("https://t.me/c/1234567890/42", "-1001234567890", "id");
+  eq("t.me/c/1234567890", "-1001234567890", "id");
+});
+
+check("an invite link is refused with a fix, not with silence", () => {
+  for (const raw of ["https://t.me/+AbCdEfGhIjK", "t.me/+AbCdEfGhIjK", "t.me/joinchat/AAAAAExyz", "https://t.me/joinchat/AAAAAExyz"]) {
+    const result = normalizeChannelIdentifier(raw);
+    assert.equal(result.ok, false, raw);
+    if (result.ok) continue;
+    assert.equal(result.reason, "invite_link", raw);
+    // The hint has to say what to do instead — that was the whole complaint.
+    assert.match(result.hint, /taklif havolasini emas/, raw);
+    assert.match(result.hint, /-100/, raw);
+    assert.match(result.hint, /forward/, raw);
+    assert.equal(result.hint, INVITE_LINK_HINT);
+  }
+});
+
+check("junk is separated from a real channel reference", () => {
+  const empty = normalizeChannelIdentifier("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.equal(empty.reason, "empty");
+  assert.equal(normalizeChannelIdentifier(null).ok, false);
+  assert.equal(normalizeChannelIdentifier("   ").ok, false);
+
+  for (const raw of ["my channel", "https://example.com/scholarbridge", "ab", "@ab", "t.me/"]) {
+    const result = normalizeChannelIdentifier(raw);
+    assert.equal(result.ok, false, `${raw} must not pass`);
+    if (!result.ok) assert.equal(result.reason, "not_a_channel", raw);
+  }
+});
+
+check("the same rules hold in the settings merge, the env and the runtime", () => {
+  assert.equal(validChannelId("https://t.me/scholar_bridge"), true);
+  assert.equal(validChannelId("t.me/scholar_bridge"), true);
+  assert.equal(validChannelId("scholar_bridge"), true);
+  assert.equal(canonicalChannelId("https://t.me/scholar_bridge"), "@scholar_bridge");
+  assert.equal(canonicalChannelId("my channel"), "my channel", "unusable input is returned unchanged");
+  assert.equal(looksLikeChannelId("https://t.me/scholar_bridge"), true);
+  assert.equal(looksLikeChannelId("t.me/+AbCdEf"), false, "an invite link is never a stored id");
+
+  // A legacy settings row holding a link still resolves to the canonical form…
+  const merged = mergeChannelSettings({ connection: { channelId: "https://t.me/scholar_bridge", mode: "on" } });
+  assert.equal(merged.connection.channelId, "@scholar_bridge");
+
+  // …and so does the environment, whether or not the panel is configured.
+  assert.equal(channelConfig({ TELEGRAM_CHANNEL_ID: "https://t.me/scholar_bridge" }).channelId, "@scholar_bridge");
+  const runtime = resolveChannelRuntime(
+    mergeChannelSettings({ connection: { mode: "on" }, siteUrl: SITE }),
+    { TELEGRAM_CHANNEL_ID: "t.me/scholar_bridge", TELEGRAM_ADMIN_CHAT_ID: "123456789" }
+  );
+  assert.equal(runtime.channelId, "@scholar_bridge");
+  assert.equal(runtime.blockedReason, null, "a link form must count as a connected channel");
+
+  const fromSettings = resolveChannelRuntime(
+    mergeChannelSettings({ connection: { channelId: "-1001234567890", adminChatId: "123456789", mode: "approval" }, siteUrl: SITE }),
+    {}
+  );
+  assert.equal(fromSettings.channelId, "-1001234567890");
+});
+
+check("the channel publisher takes the token in a documented order", () => {
+  const dedicated = "123456789:" + "A".repeat(35);
+  const mainEnv = "987654321:" + "B".repeat(35);
+
+  // 1. The channel-only bot wins…
+  assert.deepEqual(pickChannelToken({ channelEnv: dedicated, main: { token: mainEnv, source: "env" } }), {
+    token: dedicated,
+    dedicated: true,
+    source: "channel_env",
+  });
+  // 2. …otherwise the main bot the operator already connected in Admin → Telegram…
+  assert.deepEqual(pickChannelToken({ channelEnv: "", main: { token: mainEnv, source: "admin" } }), {
+    token: mainEnv,
+    dedicated: false,
+    source: "admin",
+  });
+  // 3. …and nothing at all is reported as nothing, never as a silent fallback.
+  assert.deepEqual(pickChannelToken({ main: { token: null, source: "none" } }), {
+    token: null,
+    dedicated: false,
+    source: "none",
+  });
+  // A typo in the channel-specific variable must not disable publishing.
+  assert.equal(pickChannelToken({ channelEnv: "not-a-token", main: { token: mainEnv, source: "env" } }).token, mainEnv);
+
+  assert.match(describeChannelTokenSource("channel_env"), /TELEGRAM_CHANNEL_BOT_TOKEN/);
+  assert.match(describeChannelTokenSource("admin"), /Admin → Telegram/);
+  assert.match(describeChannelTokenSource("none"), /topilmadi/);
+
+  // The channel modules must not reach for the DM bot directly: one resolver.
+  for (const file of ["send.ts", "connect.ts", "boot.ts", "admin.ts"]) {
+    const src = readFileSync(join(import.meta.dirname, "..", "src/lib/channel", file), "utf8");
+    assert.doesNotMatch(src, /getBotToken\(/, `${file} must use getChannelBotToken`);
+  }
+  const tokenSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/token.ts"), "utf8");
+  assert.match(tokenSrc, /await import\("@\/lib\/telegram\/settings"\)/, "the DB module is imported lazily");
+});
+
+check("the schema check covers columns, not just tables", () => {
+  const columns = channelColumns();
+  const has = (table: string, column: string) => columns.some((c) => c.table === table && c.column === column);
+
+  // Columns added by later ALTERs are exactly the ones a table-only check missed.
+  for (const column of ["lane", "origin", "text_override", "pinned", "skip_reason", "postponed_to"]) {
+    assert.ok(has("channel_plan", column), `channel_plan.${column} must be verified`);
+  }
+  for (const column of ["part", "text_override", "lane", "status", "html"]) {
+    assert.ok(has("channel_posts", column), `channel_posts.${column} must be verified`);
+  }
+  // Constraints are not columns.
+  assert.ok(!has("channel_plan", "unique"));
+  assert.ok(!has("channel_link_clicks", "primary"));
+  assert.ok(columns.length > 100, `expected the whole schema, got ${columns.length} column(s)`);
+
+  const dbSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/db.ts"), "utf8");
+  assert.match(dbSrc, /columnExistenceVerify\(channelColumns\(\)\)/, "the bootstrap must verify columns");
+  assert.match(dbSrc, /createTableBootstrap\([\s\S]*verifyChannelSchema/, "and pass them to the memoised bootstrap");
+});
+
+check("saving the connection normalises before it validates", () => {
+  const route = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/channel/route.ts"), "utf8");
+  const normalizeAt = route.indexOf("normalizeChannelIdentifier(String(value.channelId");
+  const saveAt = route.indexOf("updateSettingsBlock(key as SettingsKey, value");
+  assert.ok(normalizeAt > 0 && saveAt > normalizeAt, "the id is normalised before the block is saved");
+  assert.match(route, /jsonError\(400, normalized\.hint, normalized\.reason\)/, "an invite link returns its hint");
+
+  const adminSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/admin.ts"), "utf8");
+  assert.match(adminSrc, /const normalized = normalizeChannelIdentifier\(String\(obj\.channelId/, "the block validator normalises too");
+  const settingsSrc = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/settings.ts"), "utf8");
+  assert.match(settingsSrc, /return normalizeChannelIdentifier\(raw\)\.ok/, "one definition of a channel id");
 });
 
 check("the stored body splits back into exactly the parts that were sent", () => {

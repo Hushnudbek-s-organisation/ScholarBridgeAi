@@ -43,8 +43,10 @@ import {
   Trash2,
   Wand2,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "../growth/ui";
+import { normalizeChannelIdentifier } from "@/lib/channel/config";
 import { SystemDiagnostics } from "./SystemDiagnostics";
 
 type Tab =
@@ -68,7 +70,14 @@ interface LinkItem {
 }
 
 interface Settings {
-  connection: { channelId: string; adminChatId: string; mode: ChannelMode; pausedUntil: string | null };
+  connection: {
+    channelId: string;
+    adminChatId: string;
+    mode: ChannelMode;
+    pausedUntil: string | null;
+    /** Channel the bot was added to (or a post was forwarded from), if not connected. */
+    discoveredChannel?: { id: string; title: string | null; username: string | null; at: string } | null;
+  };
   brand: string;
   channelUsername: string;
   botUsername: string;
@@ -105,7 +114,16 @@ interface Runtime {
 }
 
 interface ConnectionCheck {
-  token: { set: boolean; source: string; botUsername: string | null; botId: number | null; error: string | null };
+  token: {
+    set: boolean;
+    /** Where the token comes from — the channel-only bot, Admin → Telegram, or the env. */
+    source: string;
+    sourceLabel?: string;
+    dedicated?: boolean;
+    botUsername: string | null;
+    botId: number | null;
+    error: string | null;
+  };
   channel: {
     configured: boolean;
     reachable: boolean;
@@ -118,7 +136,17 @@ interface ConnectionCheck {
   adminChat: { configured: boolean; reachable: boolean; title: string | null; error: string | null };
   siteUrl: string;
   ready: boolean;
+  /** Ordered verdicts from the server; each one is a translatable code. */
+  steps?: ConnectionStep[];
   hints: string[];
+}
+
+/** One diagnostic verdict: which step, whether it passed, and the reason code. */
+interface ConnectionStep {
+  id: "token" | "channel" | "permission" | "adminChat" | "site";
+  ok: boolean;
+  code: string;
+  params?: Record<string, string | number>;
 }
 
 interface QueueRow {
@@ -173,6 +201,8 @@ interface Overview {
   approvals: ApprovalRow[];
   approvalTtlHours: number;
   hasToken: boolean;
+  /** Which bot publishes (human line, never the token). */
+  tokenSource?: string;
   env: {
     killSwitch: boolean;
     autopost: "off" | "dryrun" | "on" | null;
@@ -558,12 +588,86 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
     botUsername: settings.botUsername,
   });
   const [saving, setSaving] = useState(false);
+  /**
+   * The quick-connect field.
+   *
+   * It is parsed locally, as it is typed, with the very same function the
+   * server uses (`normalizeChannelIdentifier`) — so "t.me/kanal", "@kanal",
+   * "kanal" and "-100…" all show what they will become before anything is
+   * saved, and an invite link is refused with the reason instead of a generic
+   * "invalid value for this block" after a round-trip.
+   */
+  const [quick, setQuick] = useState("");
+  const quickParsed = useMemo(() => normalizeChannelIdentifier(quick), [quick]);
+  const quickTrimmed = quick.trim().length > 0;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
     setConn(settings.connection);
     setBrand({ brand: settings.brand, siteUrl: settings.siteUrl, channelUsername: settings.channelUsername, botUsername: settings.botUsername });
   }, [settings]);
+
+  // The candidate the webhook stored, unless it is already the configured one.
+  const discovered = conn.discoveredChannel ?? settings.connection.discoveredChannel ?? null;
+
+  /** Connect the discovered channel with its numeric id — one click, no typing. */
+  const adoptDiscovered = async () => {
+    if (!discovered) return;
+    setSaving(true);
+    try {
+      const next = {
+        ...conn,
+        channelId: discovered.id,
+        // Approval mode is the safe default for an adopted channel: the first
+        // post waits for a human instead of surprising a public audience.
+        mode: conn.mode === "off" ? ("approval" as const) : conn.mode,
+      };
+      setConn(next);
+      await api<{ kick?: Kick | null }>("/api/admin/channel", {
+        method: "PUT",
+        body: JSON.stringify({ key: "connection", value: next }),
+      });
+      showToast(t("connect.discoveredDone"));
+      await reload(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * "Ulash va tekshirish" — the whole connect flow in one press: normalise,
+   * save, then run the five-step check and leave the verdict on screen.
+   *
+   * The mode is set to approval when it was `off`: connecting a channel should
+   * not silently start publishing, but it must also not look connected while
+   * nothing can ever be sent. Approval is the only mode that both sends the
+   * operator their first message and posts nothing unread.
+   */
+  const quickConnect = async () => {
+    const parsed = normalizeChannelIdentifier(quick);
+    if (!parsed.ok) return;
+    setSaving(true);
+    try {
+      const next = { ...conn, channelId: parsed.value, mode: conn.mode === "off" ? ("approval" as const) : conn.mode };
+      const nextBrand =
+        parsed.kind === "username"
+          ? { ...brand, channelUsername: parsed.value.replace(/^@/, "") }
+          : brand;
+      setConn(next);
+      setBrand(nextBrand);
+      await api("/api/admin/channel", { method: "PUT", body: JSON.stringify({ key: "connection", value: next }) });
+      await api("/api/admin/channel", { method: "PUT", body: JSON.stringify({ key: "brand", value: nextBrand }) });
+      // The check re-renders the five rows below; `act` reloads the overview.
+      await act("verify");
+      showToast(t("connect.quick.connectDone"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -596,23 +700,206 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
     }
   };
 
-  const steps = [
-    { ok: hasToken, label: t("steps.token"), hint: connection?.token.botUsername ? `@${connection.token.botUsername}` : undefined },
-    { ok: Boolean(connection?.channel.reachable && connection?.channel.canPost), label: t("steps.channel"), hint: connection?.channel.title ?? undefined },
-    { ok: Boolean(connection?.adminChat.reachable || runtime.adminChatId), label: t("steps.adminChat"), hint: connection?.adminChat.title ?? undefined },
-    { ok: Boolean(runtime.siteUrl), label: t("steps.siteUrl"), hint: runtime.siteUrl || undefined },
-  ];
+  /**
+   * The diagnostic list.
+   *
+   * When the server has run the check (`connection.steps`) we render its five
+   * verdicts, each translated from a stable code — so "bot is not a channel
+   * administrator" is said in the operator's language, with the bot's
+   * @username in it, instead of a generic English hint. Before the first check
+   * the same five rows are shown from the stored settings, so the list never
+   * jumps or disappears.
+   */
+  const diag = connection?.steps ?? [];
+  const stepLabel = (id: string) =>
+    id === "token"
+      ? t("steps.token")
+      : id === "channel"
+        ? t("steps.channel")
+        : id === "permission"
+          ? t("steps.permission")
+          : id === "adminChat"
+            ? t("steps.adminChat")
+            : t("steps.siteUrl");
+
+  const steps: { id: string; ok: boolean; label: string; hint?: string; message?: string }[] = diag.length
+    ? diag.map((step) => ({
+        id: step.id,
+        ok: step.ok,
+        label: stepLabel(step.id),
+        // A passing step reports what it found; a failing one reports what to do.
+        hint: step.ok
+          ? [step.params?.botUsername, step.params?.channelTitle, step.params?.channelUsername, step.params?.chatTitle, step.params?.siteUrl]
+              .filter((value): value is string => typeof value === "string")
+              .join(" · ") || undefined
+          : undefined,
+        message: step.ok ? undefined : t(`diag.${step.code}` as never, (step.params ?? {}) as never),
+      }))
+    : [
+        {
+          id: "token",
+          ok: hasToken,
+          label: t("steps.token"),
+          hint:
+            [connection?.token.botUsername ? `@${connection.token.botUsername}` : null, data.tokenSource]
+              .filter(Boolean)
+              .join(" · ") || undefined,
+        },
+        {
+          id: "channel",
+          ok: Boolean(connection?.channel.reachable && connection?.channel.canPost),
+          label: t("steps.channel"),
+          hint: connection?.channel.title ?? undefined,
+        },
+        {
+          id: "permission",
+          ok: Boolean(connection?.channel.canPost),
+          label: t("steps.permission"),
+          hint: connection?.channel.botStatus ?? undefined,
+        },
+        {
+          id: "adminChat",
+          ok: Boolean(connection?.adminChat.reachable || runtime.adminChatId),
+          label: t("steps.adminChat"),
+          hint: connection?.adminChat.title ?? undefined,
+        },
+        { id: "site", ok: Boolean(runtime.siteUrl), label: t("steps.siteUrl"), hint: runtime.siteUrl || undefined },
+      ];
+
+  // Everything the check reported as failing, already translated and already
+  // naming the bot (`{botUsername}` comes from the server's step params).
+  const failing = steps.filter((step) => !step.ok && step.message);
+  const allGood = diag.length > 0 && steps.every((step) => step.ok);
+  const quickError = !quickParsed.ok
+    ? quickParsed.reason === "invite_link"
+      ? t("connect.quick.errInvite")
+      : quickParsed.reason === "empty"
+        ? t("connect.quick.errEmpty")
+        : t("connect.quick.errNotChannel")
+    : null;
+  const quickUsername = quickParsed.ok && quickParsed.kind === "username" ? quickParsed.value.replace(/^@/, "") : null;
 
   return (
     <div className="space-y-4">
+      {/**
+       * Tez ulash: one field, parsed live, one primary button.
+       *
+       * The form below stays for the operator who wants every knob at once, but
+       * the common case — "I have a channel, connect it" — is a single paste.
+       */}
+      <div className={`${card} border-indigo-200 dark:border-indigo-500/30`}>
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <Zap className="h-4 w-4 text-indigo-500" /> {t("connect.quick.title")}
+        </h3>
+        <p className="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t("connect.quick.hint")}</p>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200" htmlFor="channel-quick-address">
+          {t("connect.quick.label")}
+        </label>
+        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+          <input
+            id="channel-quick-address"
+            className={`${inputCls} sm:flex-1`}
+            value={quick}
+            onChange={(e) => setQuick(e.target.value)}
+            placeholder={t("connect.quick.placeholder")}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            className={`${btnPrimary} justify-center sm:w-auto`}
+            onClick={() => void quickConnect()}
+            disabled={!quickParsed.ok || saving || busy}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{" "}
+            {saving ? t("connect.quick.connecting") : t("connect.quick.connect")}
+          </button>
+          <button
+            className={`${btnGhost} justify-center sm:w-auto`}
+            onClick={() => act("test").then(() => showToast(t("connect.testSent")))}
+            disabled={busy || !conn.channelId}
+          >
+            <Wand2 className="h-3.5 w-3.5" /> {t("connect.quick.test")}
+          </button>
+        </div>
+
+        {/* What the pasted value will become — before anything is saved. */}
+        {quickTrimmed &&
+          (quickParsed.ok ? (
+            <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                {t("connect.quick.previewOk", { value: quickParsed.value })}
+              </p>
+              <p className="mt-0.5 text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+                {quickParsed.kind === "username" ? t("connect.quick.previewUsername") : t("connect.quick.previewId")}
+              </p>
+              {quickUsername && (
+                <a
+                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                  href={`https://t.me/${quickUsername}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <Send className="h-3 w-3" /> t.me/{quickUsername} · {t("connect.quick.previewOpen")}
+                </a>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+              {quickError}
+            </p>
+          ))}
+
+        {/* The verdict, in red, with the fix in the operator's language. */}
+        {failing.length > 0 ? (
+          <div className="mt-2 rounded-xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-500/10">
+            <p className="text-xs font-bold text-rose-800 dark:text-rose-300">{t("connect.quick.fixTitle")}</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+              {failing.map((step, index) => (
+                <li key={`${step.id}-${index}`}>{step.message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : allGood ? (
+          <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+            {t("connect.quick.ready")}
+          </p>
+        ) : null}
+
+        {conn.mode === "approval" && (
+          <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{t("connect.quick.modeApprovalNote")}</p>
+        )}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={card}>
+          {/**
+           * The bot is told which channel it was added to (`my_chat_member`,
+           * `channel_post`) or which one a post was forwarded from. Showing it
+           * here with one button beats asking the operator to find a `-100…` id
+           * that Telegram never displays.
+           */}
+          {discovered && conn.channelId !== discovered.id && (
+            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200">{t("connect.discoveredTitle")}</p>
+              <p className="mt-0.5 text-[11px] text-indigo-800 dark:text-indigo-300">
+                {discovered.title ?? t("connect.discoveredNoTitle")}
+                {discovered.username ? ` · @${discovered.username}` : ""} · <code>{discovered.id}</code>
+              </p>
+              <button
+                className={`${btnPrimary} mt-2`}
+                disabled={saving || busy}
+                onClick={() => void adoptDiscovered()}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" /> {t("connect.discoveredConnect")}
+              </button>
+            </div>
+          )}
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
             <ShieldCheck className="h-4 w-4 text-indigo-500" /> {t("connect.title")}
           </h3>
           <ol className="space-y-2">
             {steps.map((step, index) => (
-              <li key={step.label} className="flex items-start gap-2 text-xs">
+              <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-xs">
                 {step.ok ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                 ) : (
@@ -623,17 +910,19 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
                 <span className={step.ok ? "text-slate-600 dark:text-slate-300" : "font-semibold text-slate-800 dark:text-slate-100"}>
                   {step.label}
                   {step.hint && <span className="mt-0.5 block truncate text-[11px] font-normal text-slate-400">{step.hint}</span>}
+                  {/* The actionable sentence: red, because this is the thing to fix. */}
+                  {step.message && (
+                    <span className="mt-0.5 block text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                      {step.message}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
           </ol>
-          {connection?.hints?.length ? (
-            <ul className="mt-3 space-y-1 rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-              {connection.hints.map((hint) => (
-                <li key={hint}>• {hint}</li>
-              ))}
-            </ul>
-          ) : null}
+          {/* English hints stay out of the UI now that every step is translated;
+              the only one with no step is the deploy-level kill switch, which the
+              form shows separately below. */}
           <div className="mt-3 flex flex-wrap gap-2">
             <button className={btnPrimary} onClick={() => act("verify").then(() => showToast(t("verified")))} disabled={busy}>
               <ShieldCheck className="h-3.5 w-3.5" /> {t("connect.verify")}

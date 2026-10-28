@@ -26,7 +26,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan } from "@/db/schema";
 import { tgSendMessage } from "@/lib/telegram/api";
-import { getBotToken } from "@/lib/telegram/settings";
+import { getChannelBotToken } from "./token";
 import { resolveChannelRuntime, tashkentDay } from "./config";
 import { ensureChannelTables } from "./db";
 import { loadChannelSettings, writeChannelAudit } from "./repo";
@@ -118,7 +118,7 @@ export async function kickChannelAutopilot(
   if (runtime.blockedReason) return idle(runtime.blockedReason);
   if (!runtime.adminChatId) return idle("The admin chat is not set");
 
-  const { token } = await getBotToken();
+  const { token } = await getChannelBotToken();
   if (!token) return idle("The bot token is not set");
 
   // A wrong channel id or a bot that was never promoted is the most common

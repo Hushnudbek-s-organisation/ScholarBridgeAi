@@ -6,7 +6,15 @@
 import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts, scholarshipChannelContent, scholarships } from "@/db/schema";
-import { channelConfig, channelEnvChecklist, resolveChannelRuntime, tashkentDay, type ChannelRuntime, type EnvCheckRow } from "./config";
+import {
+  channelConfig,
+  channelEnvChecklist,
+  normalizeChannelIdentifier,
+  resolveChannelRuntime,
+  tashkentDay,
+  type ChannelRuntime,
+  type EnvCheckRow,
+} from "./config";
 import { countryDisplay, type ChannelCountry } from "./countries";
 import { contentCompleteness, EMPTY_CONTENT, isRichContent, MAX_ABOUT_CHARS, MAX_BULLETS, MAX_TAGLINE_CHARS, type ScholarshipContent } from "./content";
 import { ensureChannelTables } from "./db";
@@ -47,7 +55,7 @@ import {
   type StoryRow,
 } from "./engage";
 import { optionSummary, parseStoredResults, pollSpecByKey, type PollResult } from "./polls";
-import { getBotToken } from "@/lib/telegram/settings";
+import { getChannelBotToken } from "./token";
 import { tgStopPoll } from "@/lib/telegram/api";
 import {
   DEFAULT_CHANNEL_SETTINGS,
@@ -55,6 +63,7 @@ import {
   isChannelMode,
   looksLikeChannelId,
   looksLikeChatId,
+  parseDiscoveredChannel,
   type ChannelSettings,
   type LinkItem,
   type SettingsKey,
@@ -108,7 +117,12 @@ function cleanBlock(key: SettingsKey, value: unknown, siteUrl = ""): unknown | n
 
   if (key === "connection") {
     if (!obj) return null;
-    const channelId = String(obj.channelId ?? "").trim();
+    // Accept what the operator pastes (`t.me/name`, a bare username, `-100…`)
+    // and store one canonical form. Without this a `https://t.me/…` link was
+    // rejected with a bare "invalid value": the panel could not explain it.
+    const normalized = normalizeChannelIdentifier(String(obj.channelId ?? ""));
+    if (!normalized.ok && normalized.reason === "invite_link") return null;
+    const channelId = normalized.ok ? normalized.value : "";
     const adminChatId = String(obj.adminChatId ?? "").trim();
     if (channelId && !looksLikeChannelId(channelId)) return null;
     if (adminChatId && !looksLikeChatId(adminChatId)) return null;
@@ -116,7 +130,16 @@ function cleanBlock(key: SettingsKey, value: unknown, siteUrl = ""): unknown | n
     if (!isChannelMode(mode)) return null;
     const pausedUntil = String(obj.pausedUntil ?? "").trim();
     if (pausedUntil && !/^\d{4}-\d{2}-\d{2}$/.test(pausedUntil)) return null;
-    return { channelId, adminChatId, mode, pausedUntil: pausedUntil || null };
+    // The panel edits the four visible fields. The discovery candidate is set by
+    // the webhook; a form that does not send it back must not erase it (see
+    // `updateSettingsBlock`, which merges the stored one in).
+    return {
+      channelId,
+      adminChatId,
+      mode,
+      pausedUntil: pausedUntil || null,
+      discoveredChannel: parseDiscoveredChannel(obj.discoveredChannel),
+    };
   }
 
   if (key === "brand") {
@@ -206,8 +229,21 @@ function cleanBlock(key: SettingsKey, value: unknown, siteUrl = ""): unknown | n
 
 export async function updateSettingsBlock(key: SettingsKey, raw: unknown, actorProfileId: number): Promise<BlockResult> {
   const before = await loadChannelSettings();
-  const value = cleanBlock(key, raw, before.siteUrl);
+  let value = cleanBlock(key, raw, before.siteUrl);
   if (value === null) return { ok: false, error: "invalid_value" };
+  if (key === "connection") {
+    /**
+     * The webhook owns `discoveredChannel`; the form only renders it. When the
+     * submitted block has none (an older panel build, or a partial save) the
+     * stored candidate is kept — otherwise every "Save" would erase the one
+     * thing that lets the operator connect the channel with one click.
+     */
+    const connection = value as { discoveredChannel?: unknown };
+    const stored = before.connection.discoveredChannel;
+    if (!parseDiscoveredChannel(connection.discoveredChannel) && stored) {
+      connection.discoveredChannel = stored;
+    }
+  }
   const settings = await saveChannelSettingsBlock(key, value, actorProfileId);
   await writeChannelAudit({
     actorProfileId,
@@ -313,6 +349,8 @@ export interface OverviewPayload {
   /** How many stale previews this load retired. */
   expiredOnLoad: number;
   hasToken: boolean;
+  /** Which bot publishes, without the secret (see `channel/token.ts`). */
+  tokenSource: string;
   env: {
     killSwitch: boolean;
     autopost: "off" | "dryrun" | "on" | null;
@@ -332,8 +370,7 @@ export async function channelOverview(): Promise<OverviewPayload> {
   // nobody answered — the panel never shows a preview that can no longer post.
   const expired = await expireStaleApprovals().catch(() => 0);
   const approvals = await pendingApprovals(20).catch(() => []);
-  const { getBotToken } = await import("@/lib/telegram/settings");
-  const { token } = await getBotToken();
+  const { token, source: tokenSource } = await getChannelBotToken();
   return {
     settings,
     runtime,
@@ -344,6 +381,7 @@ export async function channelOverview(): Promise<OverviewPayload> {
     approvalTtlHours: approvalTtlHours(),
     expiredOnLoad: expired,
     hasToken: Boolean(token),
+    tokenSource,
     env: {
       killSwitch: runtime.envKillSwitch,
       autopost: runtime.envAutopost,
@@ -711,7 +749,7 @@ export async function closePoll(id: number, actorProfileId: number): Promise<{ o
   if (!target) return { ok: false, error: "not_found" };
   if (target.poll.status === "closed") return { ok: false, error: "already_closed" };
 
-  const { token } = await getBotToken();
+  const { token } = await getChannelBotToken();
   let reason: string | undefined;
   if (!token) {
     reason = "no_token";

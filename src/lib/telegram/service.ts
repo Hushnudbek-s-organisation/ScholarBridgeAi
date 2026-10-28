@@ -46,6 +46,7 @@ import { CMD_TEXTS } from "./botTexts";
 import { promptPlainSearch, runCallback, runCommand, type BotCtx } from "./bot";
 import { handleLinkStart, loadOwnedRequest, type TgUser } from "./linking";
 import { handleChannelApprovalCallback, handlePendingChannelEdit, isApprovalCallback } from "./approval";
+import { handleChannelDiscovery } from "./channelDiscovery";
 import {
   getLinkByProfile,
   getLinkByTelegramUser,
@@ -87,9 +88,27 @@ export interface TgUpdate {
     total_voter_count?: number;
     is_closed?: boolean;
   };
-  message?: { message_id?: number; chat: TgChat; from?: TgUser; text?: string };
+  message?: {
+    message_id?: number;
+    chat: TgChat;
+    from?: TgUser;
+    text?: string;
+    /** Set when the user forwards a post from a channel — used for discovery. */
+    forward_from_chat?: { id: number; type?: string; title?: string; username?: string };
+    forward_origin?: { type?: string; chat?: { id: number; type?: string; title?: string; username?: string } };
+  };
   callback_query?: { id: string; from: TgUser; data?: string; message?: { message_id: number; chat: TgChat } };
-  my_chat_member?: { chat: TgChat; from: TgUser; new_chat_member?: { status?: string } };
+  my_chat_member?: {
+    chat: TgChat & { title?: string; username?: string };
+    from: TgUser;
+    new_chat_member?: { status?: string; user?: { is_bot?: boolean } };
+  };
+  /**
+   * A post in a channel the bot administers. Telegram only sends these when the
+   * bot was promoted, which is exactly the moment the channel id becomes known
+   * — see `@/lib/channel/discovery.ts`.
+   */
+  channel_post?: { message_id?: number; chat: TgChat & { title?: string; username?: string }; text?: string };
 }
 
 /**
@@ -149,6 +168,20 @@ export async function handleUpdate(update: TgUpdate): Promise<void> {
     await applyPollResult({ pollId: update.poll.id, poll: update.poll });
     return;
   }
+
+  /**
+   * Channel discovery: the bot was promoted in a channel, a post appeared in a
+   * channel it administers, or an admin forwarded a channel post to it.
+   *
+   * Runs before every other branch because a forwarded post is an ordinary
+   * private `message`: without this the bot answers it with the command list.
+   * `handled` is true only for updates that really were about a channel.
+   */
+  const discovery = await handleChannelDiscovery(update).catch((err) => {
+    console.warn("[telegram] channel discovery failed:", err instanceof Error ? err.message : err);
+    return { handled: false, candidate: null, adopted: false, notifiedChatId: null };
+  });
+  if (discovery.handled) return;
 
   // The user blocked / unblocked the bot.
   if (update.my_chat_member) {
