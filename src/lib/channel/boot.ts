@@ -32,6 +32,7 @@ import { ensureChannelTables } from "./db";
 import { loadChannelSettings, writeChannelAudit } from "./repo";
 import { checkChannelConnection } from "./connect";
 import { runPlanForToday } from "./adminActions";
+import { recordTick } from "./whyStore";
 import { sendPlanRow, type SendOutcome } from "./send";
 import {
   AUTOPILOT_TEXTS,
@@ -39,6 +40,9 @@ import {
   autopilotIntervalMinutes,
   connectMessage,
 } from "./autopilot";
+
+/** Skip reasons that describe normal operation, never a fault. */
+const BENIGN_SKIP = ["Waiting for approval in the admin chat", "Already sent earlier"] as const;
 
 /** Outcomes that mean "the operator (or the channel) now has this post". */
 const DELIVERED_STATUSES = ["sent", "dryrun", "approval"] as const;
@@ -170,7 +174,10 @@ export async function kickChannelAutopilot(
       if (row) {
         const outcome = await sendPlanRow(row, { force: true, actorProfileId });
         if (delivered(outcome)) deliveredCount = 1;
-        else problems.push(outcome.reason ?? AUTOPILOT_TEXTS.kickFailed);
+        // "already waiting for approval" is the system working, not a problem:
+        // reporting it in red would teach the operator to ignore red.
+        else if (!BENIGN_SKIP.some((prefix) => (outcome.reason ?? "").startsWith(prefix)))
+          problems.push(outcome.reason ?? AUTOPILOT_TEXTS.kickFailed);
       }
     } catch (err) {
       problems.push(AUTOPILOT_TEXTS.kickFailed);
@@ -219,10 +226,16 @@ export function startChannelAutopilot(): void {
       const settings = await loadChannelSettings();
       const runtime = resolveChannelRuntime(settings);
       // Nothing to do when the publisher is off, paused or unconnected: the
-      // check is repeated on every tick because the panel can change it.
-      if (runtime.blockedReason) return;
+      // check is repeated on every tick because the panel can change it. The
+      // one exception is approval mode with no admin chat — those posts are
+      // parked in the panel, so the queue still has to be built.
+      const panelOnly = runtime.mode === "approval" && runtime.blockedCode === "no_admin_chat";
+      if (runtime.blockedReason && !panelOnly) return;
       const { runPostsNow } = await import("./adminActions");
       const summary = await runPostsNow(null);
+      // The heartbeat is what makes "is the tick actually running?" answerable
+      // from the panel instead of from the host's logs.
+      await recordTick("loop", { attempted: summary.attempted, sent: summary.sent, approval: summary.approval });
       if (summary.attempted > 0) {
         console.log(
           `[channel] tick: ${summary.sent} sent, ${summary.approval} awaiting approval, ${summary.skipped} skipped`

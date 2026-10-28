@@ -58,6 +58,7 @@ import { optionSummary, parseStoredResults, pollSpecByKey, type PollResult } fro
 import { getChannelBotToken } from "./token";
 import { tgStopPoll } from "@/lib/telegram/api";
 import {
+  cleanPriorityCountries,
   DEFAULT_CHANNEL_SETTINGS,
   isAllowedLinkUrl,
   isChannelMode,
@@ -220,6 +221,7 @@ function cleanBlock(key: SettingsKey, value: unknown, siteUrl = ""): unknown | n
       weeklyMinItems: num(obj.weeklyMinItems, DEFAULT_CHANNEL_SETTINGS.plan.weeklyMinItems),
       weeklyPin: obj.weeklyPin === true,
       digestEnabled: obj.digestEnabled === true,
+      priorityCountries: cleanPriorityCountries(obj.priorityCountries, DEFAULT_CHANNEL_SETTINGS.plan.priorityCountries),
       pollCadenceDays: num(obj.pollCadenceDays, DEFAULT_CHANNEL_SETTINGS.pollCadenceDays),
     };
   }

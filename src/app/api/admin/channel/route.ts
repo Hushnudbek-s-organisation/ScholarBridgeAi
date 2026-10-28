@@ -5,6 +5,7 @@ import { checkChannelConnection, saveResolvedChannel } from "@/lib/channel/conne
 import { channelAdminSummary, runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
 import { normalizeChannelIdentifier, resolveChannelRuntime } from "@/lib/channel/config";
 import { kickChannelAutopilot } from "@/lib/channel/boot";
+import { channelWhy, unpublishedCatalogue } from "@/lib/channel/whyStore";
 import { loadChannelSettings } from "@/lib/channel/repo";
 import { shouldKickAfterConnect } from "@/lib/channel/autopilot";
 import { SETTINGS_KEYS, type SettingsKey } from "@/lib/channel/settings";
@@ -28,10 +29,17 @@ export async function GET(req: Request) {
     const live = url.searchParams.get("live") === "1";
     const days = Number(url.searchParams.get("days") ?? 0);
     const overview = await channelOverview();
+    /**
+     * `?why=1` folds the diagnosis into the first load, so the panel opens with
+     * the verdict instead of an extra round-trip. It costs two Telegram calls,
+     * which is why it is opt-in rather than part of every refresh.
+     */
+    const wantWhy = url.searchParams.get("why") === "1";
     return NextResponse.json({
       ...overview,
       connection: live ? await checkChannelConnection(overview.runtime) : null,
       preview: days > 0 ? await previewDays(days) : null,
+      why: wantWhy ? await whyPayload() : null,
       settingsKeys: SETTINGS_KEYS,
     });
   } catch (error) {
@@ -154,6 +162,16 @@ export async function POST(req: Request) {
       if (!edited.ok) return jsonError(400, edited.error, edited.error);
       return NextResponse.json({ ok: true, html: edited.html });
     }
+    /**
+     * "Nega post ketmayapti?" — the whole chain, checked and named.
+     *
+     * Read-only: it runs a live connection check (two Telegram calls) and counts
+     * the catalogue the way the planner does, but changes nothing.
+     */
+    if (action === "why") {
+      return NextResponse.json({ ok: true, ...(await whyPayload()) });
+    }
+
     if (action === "summary") {
       return NextResponse.json({ ok: true, summary: await channelAdminSummary() });
     }
@@ -161,4 +179,23 @@ export async function POST(req: Request) {
   } catch (error) {
     return serverError("channel action", error);
   }
+}
+
+/**
+ * The diagnosis, plus the two things the panel needs next to it: the rows that
+ * cannot be published and the exact monitor URL to paste into UptimeRobot.
+ * The secret itself is never sent — the operator appends it.
+ */
+async function whyPayload() {
+  const why = await channelWhy();
+  const unpublished = why.catalogue.publishable === 0 ? await unpublishedCatalogue(new Date(), 10) : [];
+  const origin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  return {
+    why,
+    unpublished,
+    cron: {
+      secretConfigured: Boolean(process.env.CRON_SECRET),
+      url: origin ? `${origin}/api/cron/channel?secret=<CRON_SECRET>` : "/api/cron/channel?secret=<CRON_SECRET>",
+    },
+  };
 }

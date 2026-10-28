@@ -180,6 +180,148 @@ export function rankCandidates(
   return scored;
 }
 
+// ---------------------------------------------------------------------------
+// Editorial order: nearest deadline first, then what the audience can use
+// ---------------------------------------------------------------------------
+
+/**
+ * How close a deadline is, in bands.
+ *
+ * Bands, not raw days, because two programmes 3 and 5 days away are equally
+ * urgent for the reader — but a programme 5 days away must beat one 40 days
+ * away, which the preference weight alone never guaranteed.
+ */
+export function deadlineTier(facts: Facts): number {
+  const d = facts.deadline;
+  if (d.quality === "exact" && d.daysLeft !== null) {
+    if (d.daysLeft <= 7) return 0;
+    if (d.daysLeft <= 14) return 1;
+    if (d.daysLeft <= 30) return 2;
+    if (d.daysLeft <= 60) return 3;
+    if (d.daysLeft <= 120) return 4;
+    return 5;
+  }
+  if (d.quality === "estimated") return d.daysLeft === null ? 7 : 6;
+  if (d.quality === "evergreen") return 8;
+  return 9;
+}
+
+/**
+ * The spellings that appear in real rows for the same country.
+ *
+ * `eligible_countries`/`country` are free text, so "USA", "US" and "United
+ * States of America" all occur. Without this, a US programme written as "USA"
+ * would sort last on a list whose first entry is "United States".
+ */
+const COUNTRY_ALIASES: Record<string, string> = {
+  usa: "united states",
+  us: "united states",
+  "u s a": "united states",
+  "u s": "united states",
+  "united states of america": "united states",
+  america: "united states",
+  uk: "united kingdom",
+  "u k": "united kingdom",
+  britain: "united kingdom",
+  "great britain": "united kingdom",
+  england: "united kingdom",
+  holland: "netherlands",
+  "the netherlands": "netherlands",
+  korea: "south korea",
+  "republic of korea": "south korea",
+  "korea south": "south korea",
+  uae: "united arab emirates",
+  eu: "european union",
+  "europe": "european union",
+  turkey: "turkiye",
+  turkiye: "turkiye",
+};
+
+const normaliseCountry = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[’'`]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/**
+ * Where a country sits in the operator's priority list; unknown countries sort
+ * after every listed one, and a programme without a country sorts after those.
+ *
+ * Matching is tolerant on purpose: the stored value is free text
+ * ("United States", "USA", "United States of America"), so a substring match in
+ * either direction is accepted rather than silently ranking a US programme last
+ * because the row says "USA".
+ */
+export function countryPriority(country: string | null | undefined, priorities: readonly string[]): number {
+  if (!priorities.length) return 0; // no preference configured: no influence
+  if (!country) return priorities.length + 1;
+  const canonical = canonicalCountry(country);
+  if (!canonical) return priorities.length + 1;
+  for (let i = 0; i < priorities.length; i++) {
+    if (canonicalCountry(priorities[i]) === canonical) return i;
+  }
+  // Last resort: one name contained in the other ("Korea" vs "South Korea").
+  for (let i = 0; i < priorities.length; i++) {
+    const candidate = canonicalCountry(priorities[i]);
+    if (!candidate) continue;
+    if (canonical.includes(candidate) || candidate.includes(canonical)) return i;
+  }
+  return priorities.length;
+}
+
+/** Normalise a country name through the alias table above. */
+function canonicalCountry(value: string | null | undefined): string {
+  const base = normaliseCountry(String(value ?? ""));
+  if (!base) return "";
+  const alias = COUNTRY_ALIASES[base];
+  if (alias) return alias;
+  // "united states (usa)" and similar → try the leading words.
+  const stripped = base.replace(/\s*\(.*$/, "").trim();
+  return COUNTRY_ALIASES[stripped] ?? stripped;
+}
+
+export interface EditorialSortOptions {
+  prefs: Record<string, number>;
+  /** Operator's country order; empty disables the country tie-break. */
+  priorities?: readonly string[];
+  seed: string;
+}
+
+/**
+ * The order the editorial lane picks from.
+ *
+ *   1. deadline tier — the near ones go out while they still matter;
+ *   2. country priority — once nothing is imminent, the countries this audience
+ *      actually applies to come first;
+ *   3. the existing preference score (topic weights learned from polls);
+ *   4. id, so the order is total and the plan is reproducible.
+ */
+export function editorialRank(
+  candidates: readonly Candidate[],
+  options: EditorialSortOptions
+): { candidate: Candidate; score: number; tier: number; priority: number }[] {
+  const priorities = options.priorities ?? [];
+  const rng = seeded(options.seed);
+  const scored = candidates.map((candidate) => ({
+    candidate,
+    score: scoreCandidate(candidate, options.prefs, rng),
+    tier: deadlineTier(candidate.facts),
+    priority: countryPriority(candidate.facts.country, priorities),
+  }));
+  const days = (value: { candidate: Candidate }) => value.candidate.facts.deadline.daysLeft ?? Number.POSITIVE_INFINITY;
+  scored.sort(
+    (a, b) =>
+      a.tier - b.tier ||
+      a.priority - b.priority ||
+      days(a) - days(b) ||
+      b.score - a.score ||
+      a.candidate.facts.id - b.candidate.facts.id
+  );
+  return scored;
+}
+
 export interface BankHistoryRow {
   templateKey: string;
   planDate: string;

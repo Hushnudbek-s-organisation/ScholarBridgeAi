@@ -163,7 +163,9 @@ import {
   discoveryMessage,
   isNewDiscovery,
 } from "../src/lib/channel/discovery";
-import { parseDiscoveredChannel } from "../src/lib/channel/settings";
+import { cleanPriorityCountries, DEFAULT_PRIORITY_COUNTRIES, parseDiscoveredChannel } from "../src/lib/channel/settings";
+import { buildWhy, tickIsStale, waitingForWindow, whySummary } from "../src/lib/channel/why";
+import { countryPriority, deadlineTier, editorialRank } from "../src/lib/channel/select";
 import { AUTOPILOT_DEFAULT_MINUTES,
   AUTOPILOT_TEXTS,
   MODE_LABELS,
@@ -2280,6 +2282,193 @@ check('"Hozir yuborish" publishes even in approval mode', () => {
   assert.match(sendSrc, /if \(waiting\) return await approveApproval\(waiting\.id/, "send now publishes the waiting post");
   // The scheduled path must still go through the approval branch.
   assert.match(sendSrc, /if \(mode === "approval"\) \{\s*return await sendPlanRowForApproval/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Posting order and "why is nothing being posted?"                           */
+/* -------------------------------------------------------------------------- */
+
+check("the nearest deadline is always posted before a closer favourite", () => {
+  // A candidate pool where the *preferred* topic is far away and an unrelated
+  // one closes this week: the near one must win, or the channel announces
+  // scholarships the reader can no longer use.
+  const near = {
+    facts: { id: 1, country: "Germany", deadline: { quality: "exact" as const, daysLeft: 4, date: "2026-11-01" }, fullyFunded: false },
+    topics: ["country:germany"],
+  };
+  const far = {
+    facts: { id: 2, country: "United States", deadline: { quality: "exact" as const, daysLeft: 90, date: "2027-01-26" }, fullyFunded: true },
+    topics: ["country:united-states"],
+  };
+  const order = editorialRank([far, near] as never, {
+    prefs: { "country:united-states": 3 },
+    priorities: ["United States", "Germany"],
+    seed: "t",
+  });
+  assert.equal(order[0].candidate.facts.id, 1, "4 days left beats a 90-day favourite");
+
+  // With both far away, the priority country decides — this is the second half
+  // of the order the operator asked for.
+  const germany = { facts: { id: 3, country: "Germany", deadline: { quality: "exact" as const, daysLeft: 80 }, fullyFunded: false }, topics: [] };
+  const usa = { facts: { id: 4, country: "United States", deadline: { quality: "exact" as const, daysLeft: 80 }, fullyFunded: false }, topics: [] };
+  const byCountry = editorialRank([germany, usa] as never, {
+    prefs: {},
+    priorities: ["United States", "Germany"],
+    seed: "t",
+  });
+  assert.equal(byCountry[0].candidate.facts.id, 4, "the priority country wins when deadlines are equal");
+
+  // Bands, not raw days: 8 days and 13 days are the same urgency for a reader.
+  assert.equal(deadlineTier(near.facts as never), 0);
+  assert.equal(deadlineTier(far.facts as never), 4);
+  assert.equal(deadlineTier({ deadline: { quality: "exact", daysLeft: 8 } } as never), 1);
+  assert.equal(deadlineTier({ deadline: { quality: "estimated", daysLeft: 30 } } as never), 6);
+  assert.equal(deadlineTier({ deadline: { quality: "evergreen", daysLeft: null } } as never), 8);
+});
+
+check("country priority tolerates how the country is actually spelled", () => {
+  const list = ["United States", "Germany", "South Korea"];
+  assert.equal(countryPriority("United States", list), 0);
+  assert.equal(countryPriority("usa", list), 0, "the alias table knows USA");
+  assert.equal(countryPriority("US", list), 0);
+  assert.equal(countryPriority("Korea", list), 2, "Korea is South Korea");
+  assert.equal(countryPriority("United States of America", list), 0);
+  assert.equal(countryPriority("germany", list), 1, "case does not matter");
+  assert.equal(countryPriority("Canada", list), list.length, "unlisted countries sort after");
+  assert.equal(countryPriority(null, list), list.length + 1, "no country sorts last");
+  assert.equal(countryPriority("Canada", []), 0, "an empty list has no influence");
+
+  // The operator's list is cleaned, never trusted.
+  assert.deepEqual(cleanPriorityCountries("Germany\n usa ,  germany ", []), ["Germany", "usa"]);
+  assert.deepEqual(cleanPriorityCountries(undefined, DEFAULT_PRIORITY_COUNTRIES), [...DEFAULT_PRIORITY_COUNTRIES]);
+  assert.deepEqual(cleanPriorityCountries([], ["X"]), [], "an empty list is a valid choice");
+  assert.equal(cleanPriorityCountries(Array.from({ length: 50 }, (_, i) => `C${i}`), []).length, 30);
+});
+
+/** A healthy snapshot; each test breaks exactly one field. */
+function whyInput(overrides: Record<string, unknown> = {}) {
+  return {
+    now: new Date("2026-10-28T09:30:00.000Z"),
+    mode: "approval" as const,
+    pausedUntil: null,
+    envAutopost: null,
+    hasToken: true,
+    channelId: "-1009876543210",
+    adminChatId: "777000111",
+    siteUrl: "https://example.org",
+    connection: {
+      channelConfigured: true,
+      channelReachable: true,
+      channelType: "channel",
+      canPost: true,
+      adminChatReachable: true,
+    },
+    catalogue: { total: 20, active: 18, verified: 12, stale: 2, publishable: 10, withExactDeadline: 6 },
+    plan: { date: "2026-10-28", planned: 2, open: 1, sent: 1, awaiting: 0, nextSendAt: "18:30" },
+    tick: { lastTickAt: new Date("2026-10-28T09:00:00.000Z"), intervalMinutes: 15 },
+    lastDeliveredAt: new Date("2026-10-28T09:05:00.000Z"),
+    lastFailure: null,
+    ...overrides,
+  };
+}
+
+check('"why is nothing being posted?" names the one thing to fix', () => {
+  // Healthy: nothing blocks, and the next send time is reported.
+  const healthy = buildWhy(whyInput() as never);
+  assert.equal(healthy.ready, true);
+  assert.equal(healthy.blocked, null);
+  assert.equal(healthy.nextSendAt, "18:30");
+
+  // Every block, one at a time, and the code that names it.
+  const cases: [Record<string, unknown>, string][] = [
+    [{ hasToken: false }, "token_missing"],
+    [{ envAutopost: "off" }, "env_off"],
+    [{ mode: "off" }, "mode_off"],
+    [{ pausedUntil: "2026-11-05" }, "paused"],
+    [{ channelId: "" }, "channel_missing"],
+    [{ connection: { channelConfigured: true, channelReachable: false, channelType: null, canPost: false, adminChatReachable: true } }, "channel_unreachable"],
+    [{ connection: { channelConfigured: true, channelReachable: true, channelType: "supergroup", canPost: false, adminChatReachable: true } }, "channel_wrong_type"],
+    [{ connection: { channelConfigured: true, channelReachable: true, channelType: "channel", canPost: false, adminChatReachable: true } }, "no_post_permission"],
+    [{ adminChatId: "" }, "admin_chat_missing"],
+    [{ catalogue: { total: 0, active: 0, verified: 0, stale: 0, publishable: 0, withExactDeadline: 0 } }, "catalogue_empty"],
+    [{ catalogue: { total: 20, active: 18, verified: 0, stale: 0, publishable: 0, withExactDeadline: 0 } }, "catalogue_stale"],
+  ];
+  for (const [patch, expected] of cases) {
+    const verdict = buildWhy(whyInput(patch) as never);
+    assert.equal(verdict.ready, false, expected);
+    assert.equal(verdict.blocked?.id, expected, `expected ${expected}, got ${verdict.blocked?.id}`);
+    assert.equal(whySummary(verdict).startsWith(`blocked:${expected}`), true);
+  }
+
+  // A pause that already ended is not a pause.
+  assert.equal(buildWhy(whyInput({ pausedUntil: "2026-10-01" }) as never).blocked, null);
+});
+
+check("a thin catalogue and a silent scheduler are reported, not hidden", () => {
+  // The catalogue answer: "is the data the problem?"
+  const thin = buildWhy(whyInput({ catalogue: { total: 4, active: 4, verified: 2, stale: 0, publishable: 2, withExactDeadline: 0 } }) as never);
+  assert.equal(thin.ready, true, "two publishable programmes still post");
+  assert.ok(thin.warnings.some((w) => w.id === "catalogue_no_deadlines"), "no exact deadline is worth saying");
+
+  // The scheduler answer: nothing has ticked for hours.
+  const stale = buildWhy(
+    whyInput({ tick: { lastTickAt: new Date("2026-10-27T18:00:00.000Z"), intervalMinutes: 15 } }) as never
+  );
+  assert.ok(stale.warnings.some((w) => w.id === "cron_stale"), "a stale tick is the classic cause");
+  assert.equal(tickIsStale({ lastTickAt: null, intervalMinutes: 15 }, new Date()), true, "never having ticked counts as stale");
+  assert.equal(
+    tickIsStale({ lastTickAt: new Date("2026-10-28T09:20:00.000Z"), intervalMinutes: 15 }, new Date("2026-10-28T09:30:00.000Z")),
+    false,
+    "ten minutes on a 15-minute interval is fine"
+  );
+
+  // The window answer: the plan exists, the post is simply not due yet.
+  const waiting = buildWhy(whyInput() as never);
+  assert.ok(waiting.steps.some((s) => s.id === "waiting_for_time"));
+  assert.equal(waitingForWindow("18:30", new Date("2026-10-28T10:00:00.000Z")), true); // 15:00 in Tashkent
+  assert.equal(waitingForWindow("18:30", new Date("2026-10-28T14:00:00.000Z")), false); // 19:00 in Tashkent
+
+  // A quiet day explains an empty plan, and is not a failure.
+  const quiet = buildWhy(whyInput({ plan: { date: "2026-11-01", planned: 0, open: 0, sent: 0, awaiting: 0, nextSendAt: null } }) as never);
+  assert.equal(quiet.ready, true);
+});
+
+check("the welcome message never reports normal operation as a fault", () => {
+  const boot = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/boot.ts"), "utf8");
+  assert.match(boot, /const BENIGN_SKIP = \["Waiting for approval in the admin chat", "Already sent earlier"\]/);
+  assert.match(boot, /BENIGN_SKIP\.some/, "the kick skips those before calling it a problem");
+});
+
+check("the diagnosis offers the fix where there is one", () => {
+  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/admin/ChannelManager.tsx"), "utf8");
+  // Mode Off is the default after install and the most common silence; it gets
+  // a button, and that button never goes straight to Live.
+  assert.match(ui, /why\?\.why\.blocked\?\.id === "mode_off"/);
+  assert.match(ui, /mode: conn\.mode === "off" \? \("approval" as const\) : conn\.mode/);
+  assert.match(ui, /why\?\.why\.blocked\?\.id === "plan_empty"/);
+  // The verdict comes with the first load (server-side `?why=1`), not from a
+  // setState-in-effect, which the lint gate rejects.
+  assert.match(ui, /withWhy \? "why=1" : ""/);
+  assert.match(ui, /void load\(false, true\)/);
+  const route = readFileSync(join(import.meta.dirname, "..", "src/app/api/admin/channel/route.ts"), "utf8");
+  assert.match(route, /url\.searchParams\.get\("why"\) === "1"/);
+  assert.match(route, /why: wantWhy \? await whyPayload\(\) : null/);
+});
+
+check("the cron endpoint can be driven by an uptime monitor", () => {
+  const route = readFileSync(join(import.meta.dirname, "..", "src/app/api/cron/channel/route.ts"), "utf8");
+  // A monitor that can only call a URL still has to authenticate — and the
+  // comparison must stay constant-time.
+  assert.match(route, /url\.searchParams\.get\("secret"\)/);
+  assert.match(route, /safeEqual\(provided, `Bearer \$\{secret\}`\)/);
+  assert.match(route, /recordTick\("cron"/, "every tick leaves a heartbeat");
+  // A deliberate switch must not turn the monitor red.
+  assert.match(route, /skipped: true, code: runtime\.blockedCode/, "off/paused answers 200 with a reason");
+  // Approval without an admin chat still has to build the queue.
+  assert.match(route, /runtime\.blockedCode === "no_admin_chat"/);
+  const boot = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/boot.ts"), "utf8");
+  assert.match(boot, /recordTick\("loop"/, "the in-process loop leaves one too");
+  assert.match(boot, /blockedCode === "no_admin_chat"/, "…and does not skip the panel queue");
 });
 
 /* -------------------------------------------------------------------------- */
