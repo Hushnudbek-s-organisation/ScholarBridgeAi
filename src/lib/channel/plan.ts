@@ -23,7 +23,9 @@
  */
 import {
   choosePoll,
+  countryPriority,
   daysBetween,
+  editorialRank,
   isoWeekNumber,
   nextBankEntry,
   rankCandidates,
@@ -221,6 +223,16 @@ export function buildDailyPlan(input: PlanInput): PlannedItem[] {
   })();
 
   const ranked = rankCandidates(input.candidates, prefs, `rank|${planDate}`);
+  /**
+   * The editorial lane's own order: nearest deadline first, then the countries
+   * this audience applies to. `ranked` stays for the digest list, whose members
+   * are shown as a table and are sorted by date anyway.
+   */
+  const editorial = editorialRank(input.candidates, {
+    prefs,
+    priorities: settings.plan.priorityCountries,
+    seed: `editorial|${planDate}`,
+  });
 
   // ---- lane: weekly (Sunday, first slot, morning window) -------------------
   const isSunday = weekdayOf(planDate) === 6;
@@ -284,7 +296,7 @@ export function buildDailyPlan(input: PlanInput): PlannedItem[] {
 
   // ---- lane: editorial ----------------------------------------------------
   if (items.length < targetCount) {
-    const single = ranked.find(
+    const single = editorial.find(
       ({ candidate }) =>
         !usedScholarshipIds.has(candidate.facts.id) &&
         !lastScholarshipUse(history, planDate, candidate.facts.id, COOLDOWN.single)
@@ -312,7 +324,7 @@ export function buildDailyPlan(input: PlanInput): PlannedItem[] {
   }
 
   if (items.length < targetCount) {
-    const fullyFunded = ranked.find(
+    const fullyFunded = editorial.find(
       ({ candidate }) =>
         candidate.facts.fullyFunded &&
         !usedScholarshipIds.has(candidate.facts.id) &&
@@ -348,7 +360,14 @@ export function buildDailyPlan(input: PlanInput): PlannedItem[] {
       .filter(([label]) =>
         !recentlyUsed(history, planDate, COOLDOWN.spotlightGroup, (row) => row.kind === "country_spotlight" && row.topic === `country:${label}`)
       )
-      .sort((a, b) => (b[1].length - a[1].length) || a[0].localeCompare(b[0]))[0];
+      // A country the audience actually targets wins over a bigger pile
+      // elsewhere — a spotlight nobody can use is just noise.
+      .sort(
+        (a, b) =>
+          countryPriority(a[0], settings.plan.priorityCountries) - countryPriority(b[0], settings.plan.priorityCountries) ||
+          b[1].length - a[1].length ||
+          a[0].localeCompare(b[0])
+      )[0];
 
     if (fullyFunded) {
       const variant = Math.floor(rng() * 3);

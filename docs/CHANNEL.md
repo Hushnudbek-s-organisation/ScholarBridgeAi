@@ -531,6 +531,92 @@ local mock gained `POST /_member {status, canPost}` (`status` is a real Telegram
 status: `creator | administrator | member | ...`) so both red screens can be
 exercised offline.
 
+### 9g. "Nega post ketmayapti?" — and what actually orders the posts
+
+Two things were true at once and neither was visible: a long chain of conditions
+can silently stop the publisher, and the order it picks scholarships in was not
+the order an applicant cares about.
+
+#### The diagnosis
+
+`src/lib/channel/why.ts` (pure) + `src/lib/channel/whyStore.ts` (reads) answer
+"why is nothing arriving?" with one verdict and a checklist, in the operator's
+language:
+
+| Verdict | Meaning | Fix |
+|---|---|---|
+| `token_missing` | no bot token | Admin → Telegram |
+| `env_off` | `CHANNEL_AUTOPOST=off` on the server | hosting env |
+| `mode_off` | the panel switch says Off | **the default after install** |
+| `paused` | the pause date has not passed | clear the date |
+| `channel_missing` / `channel_unreachable` / `channel_wrong_type` | bad or unknown id | the quick-connect field |
+| `bot_not_admin` / `no_post_permission` | the bot cannot post | Channel → Administrators |
+| `admin_chat_missing` / `admin_chat_unreachable` | approval has nowhere to go | send `/start` to the bot |
+| `catalogue_empty` / `catalogue_stale` | nothing publishable | **Admin → Programmes** |
+| `cron_stale` (warning) | nothing has ticked for a while | the monitor URL below |
+
+It also reports what is *not* blocking but explains a quiet channel: a quiet day,
+a post that is simply not due yet, a thin catalogue, and the last real error
+verbatim. The catalogue line is the answer to "is the data the problem?":
+
+> Baza: **2** ta e'lon yuborishga tayyor (14 tadan, 4 tasdiqlangan, 2 tasida aniq
+> muddat).
+
+With the list of rows that are in the table but cannot be published, each with
+the reason (`verification_stale`, `no_reliable_deadline`, `not_open_to_uzbekistan`, …).
+
+That is the honest answer for a thin deployment: a verified row older than
+`VERIFICATION_MAX_AGE_DAYS` (60) is not publishable, so a catalogue that is
+never re-verified runs dry, and the channel degrades into tips and checklists.
+The fix is data, not code.
+
+#### The order
+
+`editorialRank()` in `select.ts` decides which scholarship the editorial lane
+picks, in this order:
+
+1. **deadline tier** — ≤7, ≤14, ≤30, ≤60, ≤120 days, then estimated, then
+   evergreen. The near ones go out while they can still be acted on;
+2. **country priority** — `plan.priorityCountries`, an operator-editable list
+   (default: United States, United Kingdom, Germany, South Korea, Japan, …).
+   Once nothing is imminent, programmes from the countries this audience
+   actually applies to win;
+3. the learned preference score (from polls);
+4. the row id, so the plan is reproducible.
+
+Country matching goes through an alias table (`USA`/`US`/`United States of
+America` → United States, `UK`/`Britain` → United Kingdom, `Korea` → South
+Korea, …), because the column is free text.
+
+The list is a **preference, not a statistic**: nothing in the panel or the posts
+claims how many students go anywhere. University-level relevance is expressed
+the same way — a programme is matched by its country, and the topic weights
+learn the rest from poll answers.
+
+The weekly list and the digest are sorted by date regardless; only the
+"which one do we feature today" decision changed.
+
+#### Keeping it running on a host that sleeps
+
+The in-process loop (`boot.ts`) only ticks while a Node process is alive. On a
+free/sleeping host it sleeps too — which looks exactly like "it is broken".
+`/api/cron/channel` now accepts the secret in the query string as well as a
+Bearer header, so an uptime monitor can drive it:
+
+```
+https://your-site/api/cron/channel?secret=$CRON_SECRET    every 5 minutes
+```
+
+One monitor does both jobs: it keeps the site awake **and** runs the tick. The
+endpoint answers `200` for a deliberate switch (`skipped: true`, with the code)
+so a monitor does not turn red over a paused publisher, `401` for a wrong
+secret, and `500` only for a real failure. Every tick — from cron or from the
+internal loop — writes a heartbeat to `channel_audit`, which is what makes
+`cron_stale` detectable at all.
+
+`/api/health` stays the cheap liveness probe (database ping + commit); it never
+posts anything.
+
 ## 10. Admin panel
 
 | Tab | Controls |

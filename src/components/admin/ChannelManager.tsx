@@ -21,6 +21,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   CalendarClock,
@@ -97,6 +98,8 @@ interface Settings {
     weeklyMinItems: number;
     weeklyPin: boolean;
     digestEnabled: boolean;
+    /** Operator's country order for the editorial lane; empty = no preference. */
+    priorityCountries: string[];
   };
   pollCadenceDays: number;
 }
@@ -310,13 +313,20 @@ export function ChannelManager() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * "Why is nothing being posted?" — fetched with the first load (the server
+   * folds it into `?why=1`), refreshed on demand from the card.
+   */
+  const [whyData, setWhyData] = useState<WhyPayload | null>(null);
 
   const load = useCallback(
-    async (live = false) => {
+    async (live = false, withWhy = false) => {
       setError(null);
       try {
-        const next = await api<Overview>(`/api/admin/channel${live ? "?live=1" : ""}`);
+        const query = [live ? "live=1" : "", withWhy ? "why=1" : ""].filter(Boolean).join("&");
+        const next = await api<Overview & { why?: WhyPayload | null }>(`/api/admin/channel${query ? `?${query}` : ""}`);
         setData(next);
+        if (next.why) setWhyData(next.why);
       } catch (err) {
         setError(err instanceof Error ? err.message : t("loadFailed"));
       }
@@ -326,8 +336,21 @@ export function ChannelManager() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
-    void load(false);
+    void load(false, true);
   }, [load]);
+
+  /** Re-runs the diagnosis (an explicit press, never on a timer). */
+  const recheckWhy = useCallback(async () => {
+    try {
+      const res = await api<WhyPayload & { ok: boolean }>("/api/admin/channel", {
+        method: "POST",
+        body: JSON.stringify({ action: "why" }),
+      });
+      setWhyData(res);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    }
+  }, [showToast, t]);
 
   const act = useCallback(
     async (action: string, extra: Record<string, unknown> = {}) => {
@@ -425,7 +448,17 @@ export function ChannelManager() {
         options={TABS.map((id) => ({ id, label: t(`tabs.${id}`) }))}
       />
 
-      {tab === "connect" && <ConnectTab data={data} act={act} busy={busy} showToast={showToast} reload={load} />}
+      {tab === "connect" && (
+        <ConnectTab
+          data={data}
+          act={act}
+          busy={busy}
+          showToast={showToast}
+          reload={load}
+          why={whyData}
+          onRecheckWhy={recheckWhy}
+        />
+      )}
       {tab === "plan" && <PlanTab settings={settings} showToast={showToast} reload={load} />}
       {tab === "links" && <LinksTab settings={settings} showToast={showToast} reload={load} />}
       {tab === "content" && <ContentTab showToast={showToast} />}
@@ -445,6 +478,30 @@ export function ChannelManager() {
 type ActFn = (action: string, extra?: Record<string, unknown>) => Promise<(Record<string, unknown> & { ok: boolean }) | null>;
 type ShowToast = (msg: string) => void;
 type Reload = (live?: boolean) => Promise<void>;
+
+/** The "why is nothing being posted?" answer (POST { action: "why" }). */
+interface WhyStep {
+  id: string;
+  level: "ok" | "warn" | "block";
+  params?: Record<string, string | number>;
+}
+
+interface WhyPayload {
+  why: {
+    ready: boolean;
+    blocked: WhyStep | null;
+    warnings: WhyStep[];
+    steps: WhyStep[];
+    nextSendAt: string | null;
+    catalogue: { total: number; active: number; verified: number; stale: number; publishable: number; withExactDeadline: number };
+    plan: { date: string; planned: number; open: number; sent: number; awaiting: number; nextSendAt: string | null };
+    tick: { lastTickAt: string | null; lastTickMinutes: number | null; intervalMinutes: number };
+    lastDeliveredAt: string | null;
+    catalogueThin: boolean;
+  };
+  cron: { secretConfigured: boolean; url: string };
+  unpublished: { id: number; title: string; country: string; reason: string; lastVerifiedAt: string | null }[];
+}
 
 /** What `PUT { key: "connection" }` reports about the publisher kick. */
 interface Kick {
@@ -577,7 +634,23 @@ function ApprovalInbox({
   );
 }
 
-function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; act: ActFn; busy: boolean; showToast: ShowToast; reload: Reload }) {
+function ConnectTab({
+  data,
+  act,
+  busy,
+  showToast,
+  reload,
+  why,
+  onRecheckWhy,
+}: {
+  data: Overview;
+  act: ActFn;
+  busy: boolean;
+  showToast: ShowToast;
+  reload: Reload;
+  why: WhyPayload | null;
+  onRecheckWhy: () => Promise<void>;
+}) {
   const t = useTranslations("adminChannel");
   const { settings, runtime, connection, hasToken } = data;
   const [conn, setConn] = useState(settings.connection);
@@ -600,6 +673,50 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
   const [quick, setQuick] = useState("");
   const quickParsed = useMemo(() => normalizeChannelIdentifier(quick), [quick]);
   const quickTrimmed = quick.trim().length > 0;
+
+  const [whyBusy, setWhyBusy] = useState(false);
+
+  /**
+   * "Yoqish" — the fix for the most common reason of all: the mode was left on
+   * Off. It switches to Approval, not Live, so the first post still waits for a
+   * human; the operator can go live once they have seen it work.
+   */
+  const startPublishing = async () => {
+    setSaving(true);
+    try {
+      const next = { ...conn, mode: conn.mode === "off" ? ("approval" as const) : conn.mode };
+      setConn(next);
+      await api("/api/admin/channel", { method: "PUT", body: JSON.stringify({ key: "connection", value: next }) });
+      await reload(true);
+      await onRecheckWhy();
+      showToast(t("why.startDone"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Build today's plan and re-check — the fix for "plan_empty". */
+  const buildToday = async () => {
+    setSaving(true);
+    try {
+      await act("plan");
+      await onRecheckWhy();
+      showToast(t("planBuilt"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const checkWhy = async () => {
+    setWhyBusy(true);
+    try {
+      await onRecheckWhy();
+    } finally {
+      setWhyBusy(false);
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount / prop-sync, same pattern as the other admin managers
@@ -867,6 +984,128 @@ function ConnectTab({ data, act, busy, showToast, reload }: { data: Overview; ac
 
         {conn.mode === "approval" && (
           <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{t("connect.quick.modeApprovalNote")}</p>
+        )}
+      </div>
+
+      {/**
+       * "Nega post ketmayapti?" — the first thing an operator opens this tab for.
+       *
+       * One verdict line, then every condition in fix order. The blocking one is
+       * red and names the fix; warnings are amber; the rest are quiet ticks, so
+       * the list doubles as proof that everything else is fine.
+       */}
+      <div className={`${card} ${why?.why.blocked ? "border-rose-300 dark:border-rose-500/40" : why?.why.ready ? "border-emerald-200 dark:border-emerald-500/30" : ""}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <Activity className="h-4 w-4 text-indigo-500" /> {t("why.title")}
+            </h3>
+            <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              {!why
+                ? whyBusy
+                  ? t("why.checking")
+                  : t("why.checkNow")
+                : why.why.blocked
+                  ? t(`why.${why.why.blocked.id}` as never, (why.why.blocked.params ?? {}) as never)
+                  : why.why.nextSendAt
+                    ? t("why.readyNext", { time: why.why.nextSendAt })
+                    : t("why.readyNoNext")}
+            </p>
+            {why && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                {t("why.catalogueLine", {
+                  publishable: why.why.catalogue.publishable,
+                  total: why.why.catalogue.total,
+                  verified: why.why.catalogue.verified,
+                  exact: why.why.catalogue.withExactDeadline,
+                })}
+              </p>
+            )}
+          </div>
+          <button className={btnGhost} onClick={() => void checkWhy()} disabled={whyBusy}>
+            {whyBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t("why.recheck")}
+          </button>
+        </div>
+
+        {/* The two blocks with an obvious one-press fix get the button, so the
+            answer to "why" is also the way to start it. */}
+        {why?.why.blocked?.id === "mode_off" && (
+          <button
+            className={`${btnPrimary} mt-3`}
+            disabled={saving || busy}
+            onClick={() => void startPublishing()}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} {t("why.startNow")}
+          </button>
+        )}
+        {why?.why.blocked?.id === "plan_empty" && (
+          <button
+            className={`${btnPrimary} mt-3`}
+            disabled={saving || busy}
+            onClick={() => void buildToday()}
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />} {t("why.buildNow")}
+          </button>
+        )}
+
+        {why && (
+          <>
+            <ul className="mt-3 space-y-1.5">
+              {why.why.steps.map((step, index) => (
+                <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-[11px]">
+                  {step.level === "ok" ? (
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  ) : step.level === "warn" ? (
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  ) : (
+                    <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+                  )}
+                  <span
+                    className={
+                      step.level === "block"
+                        ? "font-semibold text-rose-700 dark:text-rose-300"
+                        : step.level === "warn"
+                          ? "text-amber-700 dark:text-amber-300"
+                          : "text-slate-500 dark:text-slate-400"
+                    }
+                  >
+                    {t(`why.${step.id}` as never, (step.params ?? {}) as never)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* The tick. On a sleeping host this is the reason, and the fix is a
+                monitor URL, so it is spelled out instead of hinted at. */}
+            {why.why.tick.lastTickMinutes === null || why.why.tick.lastTickMinutes > Math.max(15, why.why.tick.intervalMinutes * 3) ? (
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] dark:border-amber-500/30 dark:bg-amber-500/10">
+                <p className="font-bold text-amber-900 dark:text-amber-200">{t("why.cronTitle")}</p>
+                <p className="mt-0.5 text-amber-800 dark:text-amber-300">{t("why.cronBody")}</p>
+                <code className="mt-1 block break-all rounded bg-white/70 px-2 py-1 font-mono text-[10px] text-amber-900 dark:bg-slate-900/60 dark:text-amber-200">
+                  {why.cron.url}
+                </code>
+                {!why.cron.secretConfigured && (
+                  <p className="mt-1 font-semibold text-rose-700 dark:text-rose-300">{t("why.cronNoSecret")}</p>
+                )}
+              </div>
+            ) : null}
+
+            {why.unpublished.length > 0 && (
+              <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[11px] dark:border-slate-700 dark:bg-slate-800/60">
+                <p className="font-bold text-slate-700 dark:text-slate-200">{t("why.unpublishedTitle")}</p>
+                <ul className="mt-1 space-y-0.5">
+                  {why.unpublished.map((row) => (
+                    <li key={row.id} className="truncate text-slate-600 dark:text-slate-300">
+                      #{row.id} · {row.title} — {t(`why.reason.${row.reason}` as never)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {why.why.catalogueThin && (
+              <p className="mt-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">{t("why.thin")}</p>
+            )}
+          </>
         )}
       </div>
 
@@ -1179,6 +1418,32 @@ function PlanTab({ settings, showToast, reload }: { settings: Settings; showToas
           </Field>
           <Field label={t("plan.weeklyMinItems")} hint={t("plan.weeklyMinItemsHint")}>
             <input type="number" min={1} max={10} className={inputCls} value={plan.weeklyMinItems} onChange={(e) => setPlan({ ...plan, weeklyMinItems: Number(e.target.value) })} />
+          </Field>
+        </div>
+        {/**
+         * Country priority — the second half of the posting order.
+         *
+         * Nearest deadlines always go first. Once nothing is imminent, this
+         * list decides what "most useful for our readers" means. It is a
+         * preference, not a statistic: nothing here claims how many students
+         * go anywhere, and the operator can reorder it freely.
+         */}
+        <div className="mt-3">
+          <Field label={t("plan.priorityCountries")} hint={t("plan.priorityCountriesHint")}>
+            <textarea
+              className={`${inputCls} min-h-20 font-mono text-[11px]`}
+              rows={4}
+              value={plan.priorityCountries.join("\n")}
+              onChange={(e) =>
+                setPlan({
+                  ...plan,
+                  priorityCountries: e.target.value
+                    .split(/[,\n]/)
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
           </Field>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">

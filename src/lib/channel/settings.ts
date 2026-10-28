@@ -111,12 +111,71 @@ export interface ChannelSettings {
     weeklyMinItems: number;
     weeklyPin: boolean;
     digestEnabled: boolean;
+    /**
+     * Countries the audience actually targets, in the operator's own order.
+     *
+     * After the near deadlines have been posted, the planner prefers these —
+     * the alternative is a channel that keeps re-announcing whatever happens to
+     * sort first, instead of what an Uzbek applicant can realistically act on.
+     * The list is editable in the panel and is a preference, not a statistic:
+     * no number about how many students go where is stored or shown.
+     */
+    priorityCountries: string[];
   };
   /** Minimum days between two polls. */
   pollCadenceDays: number;
 }
 
 export const DEFAULT_FOOTER_LABELS = { channel: "Kanal", bot: "Bot" } as const;
+
+/**
+ * Where the audience most often applies, as a **starting order the operator can
+ * change** — not a measured ranking.
+ *
+ * Names match the `country` column of `scholarships`, so "United States" covers
+ * every US programme. Anything not in the list still gets posted; it just sorts
+ * after these while both are equally far from their deadline.
+ */
+export const DEFAULT_PRIORITY_COUNTRIES = [
+  "United States",
+  "United Kingdom",
+  "Germany",
+  "South Korea",
+  "Japan",
+  "Turkey",
+  "Canada",
+  "Netherlands",
+  "Italy",
+  "France",
+  "Poland",
+  "Hungary",
+  "China",
+  "Malaysia",
+] as const;
+
+/** Normalise an operator-typed country list: trimmed, de-duplicated, capped. */
+export function cleanPriorityCountries(raw: unknown, fallback: readonly string[]): string[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(/[,\n;]/)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    const value = String(item ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+    if (out.length >= 30) break;
+  }
+  // An empty list is a valid choice ("no preference"), but a *corrupt* value
+  // must not silently erase a configured one — the fallback only applies when
+  // the submitted block had no such key at all.
+  return raw === undefined ? [...fallback] : out;
+}
 
 export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
   connection: { channelId: "", adminChatId: "", mode: "off", pausedUntil: null, discoveredChannel: null },
@@ -155,6 +214,7 @@ export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
     weeklyMinItems: 2,
     weeklyPin: false,
     digestEnabled: true,
+    priorityCountries: [...DEFAULT_PRIORITY_COUNTRIES],
   },
   pollCadenceDays: 14,
 };
@@ -367,6 +427,7 @@ export function mergeChannelSettings(raw: unknown): ChannelSettings {
       weeklyMinItems: intIn(plan.weeklyMinItems, d.plan.weeklyMinItems, 1, 10),
       weeklyPin: boolOr(plan.weeklyPin, d.plan.weeklyPin),
       digestEnabled: boolOr(plan.digestEnabled, d.plan.digestEnabled),
+      priorityCountries: cleanPriorityCountries(plan.priorityCountries, d.plan.priorityCountries),
     },
     pollCadenceDays: intIn(b.pollCadenceDays, d.pollCadenceDays, 1, 90),
   };
