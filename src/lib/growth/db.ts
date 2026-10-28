@@ -75,7 +75,18 @@ export function forceGrowthRepair(): Promise<boolean> {
 }
 
 export function growthSchemaStatus() {
-  return schemaGateSnapshot().entries[GATE] ?? { ready: null, at: null, how: null, problems: [] };
+  return (
+    schemaGateSnapshot().entries[GATE] ?? {
+      ready: null,
+      at: null,
+      how: null,
+      problems: [],
+      reason: null,
+      hint: null,
+      detail: null,
+      statement: null,
+    }
+  );
 }
 
 /** Standard 503 body when the tables could not be prepared. */

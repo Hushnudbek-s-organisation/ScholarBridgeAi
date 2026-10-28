@@ -7194,6 +7194,8 @@
     "tokenEnv": "TELEGRAM_BOT_TOKEN (env) dan",
     "tokenMissing": "yo'q — bot sozlamalarida kiriting",
     "allGood": "Hammasi tayyor.",
-    "failed": "Diagnostikani o'qib bo'lmadi."
+    "failed": "Diagnostikani o'qib bo'lmadi.",
+    "detailTitle": "Bazadan kelgan aniq sabab",
+    "schemaArea": "Sxema:"
   }
 }

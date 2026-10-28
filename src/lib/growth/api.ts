@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, requireProfileAccess, type Session } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request";
-import { ensureGrowthTables, GROWTH_UNAVAILABLE } from "./db";
+import { ensureGrowthTables, GROWTH_UNAVAILABLE, growthSchemaStatus } from "./db";
 
 export type Guard<T> = { ok: true; value: T } | { ok: false; response: NextResponse };
 
@@ -15,10 +15,27 @@ export function jsonError(status: number, error: string, code = "error") {
   return NextResponse.json({ error, code }, { status });
 }
 
-/** Tables ready? (lazy DDL + seed on first use). */
+/**
+ * Tables ready? (lazy DDL + seed on first use).
+ *
+ * The 503 carries the *reason* when one is known: "temporarily unavailable" on
+ * its own left the operator with nothing to act on, while the classifier knows
+ * whether it was a permission problem, a read-only database or a missing base
+ * schema. No driver details, no DSN — a code and a plain sentence.
+ */
 export async function guardTables(): Promise<NextResponse | null> {
   const ok = await ensureGrowthTables();
-  return ok ? null : NextResponse.json(GROWTH_UNAVAILABLE, { status: 503 });
+  if (ok) return null;
+  const status = growthSchemaStatus();
+  return NextResponse.json(
+    {
+      ...GROWTH_UNAVAILABLE,
+      reason: (status as { reason?: string | null }).reason ?? null,
+      hint: (status as { hint?: string | null }).hint ?? null,
+      detail: (status as { detail?: string | null }).detail ?? null,
+    },
+    { status: 503 }
+  );
 }
 
 /**

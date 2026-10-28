@@ -51,7 +51,7 @@ import {
 } from "../src/lib/telegram/core";
 import { CMD_TEXTS } from "../src/lib/telegram/botTexts";
 import { isStaticCommand } from "../src/lib/telegram/core";
-import { classifyDbError, createTableBootstrap } from "../src/lib/db/bootstrap";
+import { classifyDbError, createTableBootstrap, statementSubject } from "../src/lib/db/bootstrap";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
 
 let passed = 0;
@@ -381,6 +381,114 @@ check("the chat-id reply exists in every language and names the field", () => {
     assert.ok(/Admin chat ID/.test(text), `${lang}: must name the field`);
     assert.ok(CMD_TEXTS[lang].dbTrouble.length > 20, `${lang}: dbTrouble must explain the outage`);
   }
+});
+
+check("a wrapped driver error is classified, not called \"unclassified\"", () => {
+  /**
+   * The regression this fixes: Drizzle throws `DrizzleQueryError`, whose own
+   * message is the SQL text and whose `cause` holds the Postgres error. Reading
+   * only the outer message produced "unknown" for every real failure, and the
+   * operator only ever saw "the bootstrap failed for an unclassified reason".
+   */
+  const pgError = (code: string, message: string) => Object.assign(new Error(message), { code, severity: "ERROR" });
+  const wrap = (cause: unknown) => {
+    // Same shape as DrizzleQueryError: query text on the outside, reason inside.
+    const error = new Error('Failed query: CREATE TABLE IF NOT EXISTS "channel_plan" (...)');
+    (error as { cause?: unknown }).cause = cause;
+    return error;
+  };
+
+  const cases: [string, string, string][] = [
+    ["42501", "permission denied for schema public", "permission_denied"],
+    ["25006", "cannot execute CREATE TABLE in a read-only transaction", "read_only"],
+    ["42P07", 'relation "channel_plan" already exists', "already_exists"],
+    ["42703", 'column "lane" of relation "channel_plan" does not exist', "schema_outdated"],
+    ["3D000", "database \"scholarbridge\" does not exist", "auth_failed"],
+    ["53300", "sorry, too many clients already", "unreachable"],
+    ["0A000", "extension \"pgcrypto\" is not available", "unsupported"],
+    ["XX000", "something nobody has seen before", "unknown"],
+  ];
+  for (const [code, message, expected] of cases) {
+    const { reason, detail, hint } = classifyDbError(wrap(pgError(code, message)));
+    assert.equal(reason, expected, `${code}: expected ${expected}`);
+    // The detail must carry the driver's sentence, not the SQL text.
+    assert.equal(detail.includes("Failed query"), false, `${code}: detail must not be the query`);
+    assert.ok(detail.length > 0, `${code}: detail must say something`);
+    assert.ok(hint.length > 20, `${code}: needs an operator hint`);
+    // Never leak a connection string, a password or a managed-host name.
+    assert.equal(/postgres(ql)?:\/\//i.test(detail), false, `${code}: no DSN`);
+  }
+
+  // Nested two levels deep (pg-pool wraps the driver error again).
+  const deep = wrap(Object.assign(new Error("Connection terminated unexpectedly"), { cause: pgError("57P01", "terminating connection due to administrator command") }));
+  assert.equal(classifyDbError(deep).reason, "unreachable");
+
+  // Secrets and hostnames are scrubbed from the detail.
+  const leaky = classifyDbError(wrap(pgError("42501", "permission denied for postgresql://user:pw@db.abc.supabase.co:5432/postgres password=hunter2")));
+  assert.equal(leaky.detail.includes("hunter2"), false, "password must be hidden");
+  assert.equal(leaky.detail.includes("supabase.co"), false, "host must be hidden");
+  assert.equal(leaky.detail.includes("<DATABASE_URL>"), true);
+
+  // A missing *parent* table is not a broken bot table: both DDL sets have
+  // foreign keys into the base schema, so on a fresh database the answer must
+  // be "the base schema is missing", not "the bot tables failed".
+  const missingParent = classifyDbError(
+    wrap(pgError("42P01", 'relation "student_profiles" does not exist'))
+  );
+  assert.equal(missingParent.reason, "core_schema_missing");
+  assert.match(missingParent.hint, /base tables|student_profiles/);
+  const missingScholarship = classifyDbError(wrap(pgError("42P01", 'relation "scholarships" does not exist')));
+  assert.equal(missingScholarship.reason, "core_schema_missing");
+
+  // "Which statement?" is reported by table, never as a wall of SQL.
+  assert.equal(statementSubject('CREATE TABLE IF NOT EXISTS "channel_plan" (\n  id serial'), "channel_plan");
+  assert.equal(statementSubject("create table if not exists channel_posts (id serial)"), "channel_posts");
+  assert.equal(statementSubject('ALTER TABLE "channel_plan" ADD COLUMN IF NOT EXISTS lane text'), "channel_plan");
+  assert.equal(statementSubject("CREATE INDEX IF NOT EXISTS idx_plan_date ON channel_plan(plan_date)"), "idx_plan_date");
+  assert.equal(statementSubject("SELECT 1"), null);
+});
+
+check("every gate reports why, not just that it failed", () => {
+  const gate = readFileSync(join(import.meta.dirname, "..", "src/lib/schemaGate.ts"), "utf8");
+  // growth/journey/core share this gate; it used to store only a boolean and
+  // log `err.message`, which for a Drizzle error is the SQL text.
+  assert.match(gate, /classifyDbError\(err\)/);
+  assert.match(gate, /entry\.reason = reason/);
+  assert.match(gate, /failed \(\$\{reason\}\): \$\{detail\}/, "the log line is the classified one");
+  // The classifier lives outside bootstrap.ts so the gate can use it without a cycle.
+  assert.ok(readFileSync(join(import.meta.dirname, "..", "src/lib/db/classify.ts"), "utf8").includes("export function classifyDbError"));
+  assert.equal(/from "@\/lib\/db\/bootstrap"/.test(gate), false, "no import cycle");
+
+  // The 503 body carries the reason, so the red banner is actionable…
+  const growthApi = readFileSync(join(import.meta.dirname, "..", "src/lib/growth/api.ts"), "utf8");
+  assert.match(growthApi, /reason: \(status as \{ reason\?: string \| null \}\)\.reason/);
+  // …and the client appends it to the message it throws.
+  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/growth/ui.tsx"), "utf8");
+  assert.match(ui, /const reason = typeof payload\?\.reason === "string"/);
+});
+
+check("the bot bootstraps the base schema it depends on", () => {
+  const telegramDb = readFileSync(join(import.meta.dirname, "..", "src/lib/telegram/db.ts"), "utf8");
+  const channelDb = readFileSync(join(import.meta.dirname, "..", "src/lib/channel/db.ts"), "utf8");
+  // Both modules have foreign keys into student_profiles / scholarships, so
+  // both must build the base schema first instead of failing on a fresh DB.
+  assert.match(telegramDb, /ensureCoreSchema/, "telegram bootstraps the core schema first");
+  assert.match(channelDb, /ensureCoreSchema/, "channel bootstraps the core schema first");
+  const bootstrap = readFileSync(join(import.meta.dirname, "..", "src/lib/db/bootstrap.ts"), "utf8");
+  assert.match(bootstrap, /if \(prerequisite\)/, "the prerequisite runs before the statements");
+  assert.match(bootstrap, /prerequisite\(\)\.catch/, "a failing prerequisite never masks the real error");
+});
+
+check("a concurrent bootstrap is not reported as a broken panel", () => {
+  // Two processes can create the same table at the same moment; the loser gets
+  // 42P07. If the schema verifies, that is success — otherwise a duplicate
+  // would turn the whole channel panel off until someone pressed Retry.
+  const source = readFileSync(join(import.meta.dirname, "..", "src/lib/db/bootstrap.ts"), "utf8");
+  assert.match(source, /if \(reason === "already_exists"\)/);
+  assert.match(source, /if \(check\.ok\)/, "verify before declaring failure");
+  assert.match(source, /treating as ready/, "…and say so in the log");
+  // The failing statement is named in the log line, so the next incident is one line.
+  assert.match(source, /failed \(\$\{reason\}\) at \$\{subject \?\? "\?"\}/);
 });
 
 check("database errors are classified into actionable reasons", () => {

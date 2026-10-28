@@ -3075,6 +3075,44 @@ check("the autopilot paths exist where they are claimed to", () => {
   assert.doesNotMatch(bootSrc, /runDuePosts\(/, "the kick hands over one post, the loop does the rest");
 });
 
+check("yesterday's queue is retired instead of pretending to wait", () => {
+  const store = read("src/lib/channel/store.ts");
+  // The sender is date-scoped on purpose (no stale news under today's date), so
+  // nothing else would ever touch an older row: it stayed `planned` forever and
+  // the panel showed work that could never run.
+  const fn = /export async function retireStalePlans[\s\S]*?\n}/.exec(store)?.[0] ?? "";
+  assert.ok(fn, "retireStalePlans must exist");
+  assert.match(fn, /lt\(channelPlan\.planDate, today\)/, "only earlier days");
+  assert.match(fn, /eq\(channelPlan\.status, "planned"\)/, "only unprocessed rows");
+  assert.match(fn, /skipReason: "date_passed"/, "the reason is stored, not guessed");
+  // A row that already produced a post is history, not queue.
+  assert.match(fn, /channelPosts/, "rows with a post are left alone");
+
+  const actions = read("src/lib/channel/adminActions.ts");
+  assert.match(actions, /retireStalePlans\(tashkentDay\(\)\)/, "the tick retires them");
+  assert.match(actions, /retired,/, "and the summary reports the count");
+  assert.match(actions, /retired: number;/, "the field is typed");
+});
+
+check("Tables this app creates at runtime are not left open to the anon key", () => {
+  const lockdown = read("src/lib/db/lockdown.ts");
+  assert.match(lockdown, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(lockdown, /REVOKE ALL ON TABLE/);
+  // No anon role on a plain Postgres → the revoke must be conditional.
+  assert.match(lockdown, /FROM pg_roles WHERE rolname IN \('anon', 'authenticated'\)/);
+  // Identifiers are interpolated into DDL, so they are validated first.
+  assert.match(lockdown, /SAFE_NAME/);
+  // Best-effort: a restrictive role must not break the publisher.
+  assert.doesNotMatch(lockdown, /throw /, "lockdown never throws");
+
+  for (const file of ["src/lib/channel/db.ts", "src/lib/telegram/db.ts"]) {
+    assert.match(read(file), /lockDownTables\(tablesInStatements\(/, `${file} locks its tables down`);
+  }
+  const bootstrap = read("src/lib/db/bootstrap.ts");
+  assert.match(bootstrap, /after\?\s*:\s*\(\)\s*=>\s*Promise<unknown>/, "the bootstrap has the hook");
+  assert.match(bootstrap, /await after\(\)\.catch/, "and it can never fail the bootstrap");
+});
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------

@@ -11,7 +11,19 @@ export async function api<T = unknown>(url: string, init?: RequestInit): Promise
     headers: init?.body ? { "Content-Type": "application/json", ...(init?.headers ?? {}) } : init?.headers,
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string })?.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    /**
+     * Keep the *reason* visible.
+     *
+     * A 503 from the table gate says "temporarily unavailable", which is true
+     * and useless. When the server also classified the failure
+     * (`permission_denied`, `read_only`, `core_schema_missing`, …) the message
+     * carries it, so the banner itself is actionable instead of a dead end.
+     */
+    const payload = body as { error?: string; reason?: string | null };
+    const reason = typeof payload?.reason === "string" && payload.reason ? ` [${payload.reason}]` : "";
+    throw new Error(`${payload?.error || `HTTP ${res.status}`}${reason}`);
+  }
   return body as T;
 }
 

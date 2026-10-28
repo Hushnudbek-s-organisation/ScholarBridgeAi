@@ -3,7 +3,7 @@
  * build the plan, and store it. No sending happens here — Phase 1 stops at a
  * stored plan (`CHANNEL_AUTOPOST=off|dryrun` never posts to the channel).
  */
-import { and, eq, gte, isNotNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts, channelPrefs, channelStories, scholarships } from "@/db/schema";
 import { localDay } from "@/lib/telegram/reminders";
@@ -209,6 +209,43 @@ export async function runDailyPlan(
     candidates: loaded.candidates.length,
     items,
   };
+}
+
+/**
+ * Close plan rows whose day has passed.
+ *
+ * The sender only ever looks at *today* (`duePlanRows` filters on `plan_date`),
+ * which is right — nobody wants yesterday's deadline post published today — but
+ * nothing else looked at the old rows either. On the live database three rows
+ * from 2026-10-26 sat in the queue as `planned` forever: the panel showed work
+ * waiting that could never be sent, and "Hozir yuborish" on one of them would
+ * have published a two-day-old announcement under today's date.
+ *
+ * A row disappears from the queue for exactly one reason here, and the reason
+ * is stored, so the panel can explain it (`skip_reason = 'date_passed'`).
+ * Rows that already produced a post are left alone: `channel_posts` owns the
+ * truth for them.
+ */
+export async function retireStalePlans(today = planDateFor(new Date())): Promise<number> {
+  const stale = await db
+    .select({ id: channelPlan.id })
+    .from(channelPlan)
+    .where(and(lt(channelPlan.planDate, today), eq(channelPlan.status, "planned")));
+  if (stale.length === 0) return 0;
+  const ids = stale.map((row) => row.id);
+  // A row that already has a post is history, not queue — do not rewrite it.
+  const consumed = await db
+    .select({ planId: channelPosts.planId })
+    .from(channelPosts)
+    .where(inArray(channelPosts.planId, ids));
+  const done = new Set(consumed.map((row) => row.planId).filter((id): id is number => id !== null));
+  const open = ids.filter((id) => !done.has(id));
+  if (open.length === 0) return 0;
+  await db
+    .update(channelPlan)
+    .set({ status: "skipped", skipReason: "date_passed" })
+    .where(inArray(channelPlan.id, open));
+  return open.length;
 }
 
 /** Ensure the tables exist before the first plan (lazy DDL, like the bot). */

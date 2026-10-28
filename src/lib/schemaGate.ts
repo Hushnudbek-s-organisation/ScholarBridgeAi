@@ -29,6 +29,7 @@
  * request); a success is remembered for the life of the process.
  */
 import { sql } from "drizzle-orm";
+import { classifyDbError } from "@/lib/db/classify";
 
 export type SchemaGateMode = "auto" | "off";
 
@@ -42,6 +43,16 @@ export interface SchemaGateEntry {
   how: "repair" | "verify" | null;
   /** Tables/columns found missing by the last verify (never secrets). */
   problems: string[];
+  /**
+   * Why the last repair failed, when it did: a stable code, plain advice and
+   * the driver's own scrubbed sentence. Without these the whole area collapses
+   * into one opaque "temporarily unavailable" banner.
+   */
+  reason: string | null;
+  hint: string | null;
+  detail: string | null;
+  /** Which statement failed, by table. */
+  statement: string | null;
 }
 
 type Registry = Map<string, SchemaGateEntry>;
@@ -64,7 +75,7 @@ function entryFor(name: string): SchemaGateEntry {
   const reg = registry();
   let entry = reg.get(name);
   if (!entry) {
-    entry = { ready: null, at: 0, inflight: null, how: null, problems: [] };
+    entry = { ready: null, at: 0, inflight: null, how: null, problems: [], reason: null, hint: null, detail: null, statement: null };
     reg.set(name, entry);
   }
   return entry;
@@ -165,11 +176,21 @@ export async function ensureSchemaOnce(
         await work();
         entry.problems = [];
         entry.ready = true;
+        entry.reason = null;
+        entry.hint = null;
+        entry.detail = null;
+        entry.statement = null;
       }
     } catch (err) {
       entry.problems = [];
       entry.ready = false;
-      console.error(`[schema:${name}] ${mode === "off" ? "verification" : "repair"} failed:`, err instanceof Error ? err.message : err);
+      const { reason, hint, detail } = classifyDbError(err);
+      entry.reason = reason;
+      entry.hint = hint;
+      entry.detail = detail;
+      entry.statement = null;
+      // Log the *classified* line: the raw error's message is the SQL text.
+      console.error(`[schema:${name}] ${mode === "off" ? "verification" : "repair"} failed (${reason}): ${detail}`);
     } finally {
       entry.at = Date.now();
       entry.inflight = null;
@@ -195,9 +216,18 @@ export async function forceSchemaRepair(name: string, repair: () => Promise<void
     await repair();
     entry.ready = true;
     entry.problems = [];
+    entry.reason = null;
+    entry.hint = null;
+    entry.detail = null;
+    entry.statement = null;
     return true;
   } catch (err) {
-    console.error(`[schema:${name}] forced repair failed:`, err instanceof Error ? err.message : err);
+    const { reason, hint, detail } = classifyDbError(err);
+    entry.reason = reason;
+    entry.hint = hint;
+    entry.detail = detail;
+    entry.statement = null;
+    console.error(`[schema:${name}] forced repair failed (${reason}): ${detail}`);
     entry.ready = false;
     return false;
   } finally {
@@ -209,11 +239,32 @@ export async function forceSchemaRepair(name: string, repair: () => Promise<void
 /** Diagnostics: what has been resolved in this process, how, and what is missing. */
 export function schemaGateSnapshot(): {
   mode: SchemaGateMode;
-  entries: Record<string, { ready: boolean | null; at: number | null; how: string | null; problems: string[] }>;
+  entries: Record<
+    string,
+    {
+      ready: boolean | null;
+      at: number | null;
+      how: string | null;
+      problems: string[];
+      reason: string | null;
+      hint: string | null;
+      detail: string | null;
+      statement: string | null;
+    }
+  >;
 } {
-  const entries: Record<string, { ready: boolean | null; at: number | null; how: string | null; problems: string[] }> = {};
+  const entries: ReturnType<typeof schemaGateSnapshot>["entries"] = {};
   for (const [name, entry] of registry()) {
-    entries[name] = { ready: entry.ready, at: entry.at || null, how: entry.how, problems: entry.problems };
+    entries[name] = {
+      ready: entry.ready,
+      at: entry.at || null,
+      how: entry.how,
+      problems: entry.problems,
+      reason: entry.reason,
+      hint: entry.hint,
+      detail: entry.detail,
+      statement: entry.statement,
+    };
   }
   return { mode: schemaGateMode(), entries };
 }

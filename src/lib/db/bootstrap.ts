@@ -16,6 +16,7 @@
  * exist (one cheap `to_regclass` query) and the admin diagnostics action can
  * still force the real repair.
  */
+import { classifyDbError, statementSubject } from "./classify";
 import {
   ensureSchemaOnce,
   forceSchemaRepair,
@@ -32,6 +33,18 @@ export interface BootstrapStatus {
   reason: string | null;
   /** Human hint, safe to show in the admin panel (no hostnames, no drivers). */
   hint: string | null;
+  /**
+   * The database's own short verdict — SQLSTATE plus the driver's sentence,
+   * scrubbed of anything that looks like a connection string.
+   *
+   * This exists because "unclassified" was useless to the operator: the real
+   * reason only reached the server log, which they cannot open. It is bounded
+   * and sanitised, so it is safe in the admin panel (a permission error, a
+   * read-only transaction, a missing extension…).
+   */
+  detail: string | null;
+  /** Which statement failed, by table (`channel_plan`) — not the whole DDL. */
+  statement: string | null;
   /** When the last attempt finished (ISO), null before the first one. */
   at: string | null;
 }
@@ -47,53 +60,19 @@ function statusStore(): Map<string, BootstrapStatus> {
   return g[STATUS_KEY]!;
 }
 
-const IDLE: BootstrapStatus = { state: "idle", reason: null, hint: null, at: null };
+const IDLE: BootstrapStatus = { state: "idle", reason: null, hint: null, detail: null, statement: null, at: null };
 
 /**
  * Classify a database error into a stable code plus an operator-facing hint.
  * The driver messages are matched loosely on purpose: a managed Postgres
  * (Supabase/pgBouncer) rewords the same failure in several ways.
  */
-export function classifyDbError(err: unknown): { reason: string; hint: string } {
-  const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  const code = (err as { code?: string } | null)?.code ?? "";
-  const text = `${code} ${raw}`.toLowerCase();
-
-  if (/read[- ]only|25006|cannot execute .* in a read-only transaction/.test(text)) {
-    return {
-      reason: "read_only",
-      hint: "The database connection is read-only — tables cannot be created. Check that DATABASE_URL uses a read-write role and a read-write endpoint (not a read replica, not a read-only pooler).",
-    };
-  }
-  if (/permission denied|42501|must be owner|insufficient privilege/.test(text)) {
-    return {
-      reason: "permission_denied",
-      hint: "The database role may read but not create tables. Grant CREATE on the schema (or run the SQL in supabase/ as the owner).",
-    };
-  }
-  if (/password authentication|28p01|no pg_hba|role .* does not exist|28000|3d000/.test(text)) {
-    return {
-      reason: "auth_failed",
-      hint: "The database rejected the credentials or the database name. Re-check DATABASE_URL in the host's environment.",
-    };
-  }
-  if (/too many clients|remaining connection slots|53300|57p03|pool|econnrefused|enotfound|ehostunreach|etimedout|timeout|terminating connection|57p01/.test(text)) {
-    return {
-      reason: "unreachable",
-      hint: "The database could not be reached or the connection pool is exhausted. Check /api/health and the provider's status; lower PG_POOL_MAX if the plan's connection limit is tight.",
-    };
-  }
-  if (/does not exist|42p01|undefined table/.test(text)) {
-    return {
-      reason: "schema_missing",
-      hint: "A required table is missing. The bootstrap could not create it — run the SQL files in supabase/ once, then reload.",
-    };
-  }
-  return {
-    reason: "unknown",
-    hint: "The table bootstrap failed for an unclassified reason. The server log holds the driver message.",
-  };
-}
+export {
+  classifyDbError,
+  sanitizeDbDetail,
+  statementSubject,
+  type ClassifiedError,
+} from "./classify";
 
 export function createTableBootstrap(
   label: string,
@@ -105,7 +84,26 @@ export function createTableBootstrap(
    * bootstrap also checks its columns, because that module adds columns over
    * time and a table-only check would call an old schema healthy.
    */
-  verifyOverride?: () => Promise<{ ok: boolean; problems: string[] }>
+  verifyOverride?: () => Promise<{ ok: boolean; problems: string[] }>,
+  /**
+   * Tables this module's DDL references (foreign keys into the base schema).
+   *
+   * Both bootstraps used to assume `student_profiles` / `scholarships` were
+   * already there. On a fresh database they are not, the CREATE TABLE fails,
+   * and the panel reports "the bot tables failed" for something the app could
+   * have created itself a moment earlier.
+   */
+  prerequisite?: () => Promise<boolean>,
+  /**
+   * Runs once the tables exist. Used for the Supabase lockdown: tables this app
+   * creates at runtime are born readable/writable by the public `anon` role,
+   * because Supabase grants `public` tables to `anon`/`authenticated` by default
+   * and only `supabase/enable_rls.sql` (a manual step) turns RLS on.
+   *
+   * Best-effort on purpose: a database role that may not alter the tables gets
+   * a warning in the log, never a broken bot or publisher.
+   */
+  after?: () => Promise<unknown>
 ) {
   const gateName = `bootstrap:${label}`;
   const statuses = statusStore();
@@ -114,15 +112,52 @@ export function createTableBootstrap(
     statuses.set(label, next);
   }
 
+  /**
+   * Run every statement, remembering *which* one broke.
+   *
+   * Statements are additive and idempotent, so a single failure used to hide
+   * both its own table and the ones after it. Attributing the failure to a
+   * subject ("channel_plan") is what makes the report actionable.
+   */
   async function attempt(): Promise<void> {
+    let subject: string | null = null;
+    // Best-effort: a failing prerequisite must not mask the real error below.
+    if (prerequisite) {
+      await prerequisite().catch((err) => {
+        console.warn(`[${label}] prerequisite schema step failed:`, err instanceof Error ? err.message : err);
+        return false;
+      });
+    }
     try {
-      for (const stmt of statements()) await run(stmt);
-      setStatus({ state: "ready", reason: null, hint: null, at: new Date().toISOString() });
+      for (const stmt of statements()) {
+        subject = statementSubject(stmt);
+        await run(stmt);
+      }
+      if (after) await after().catch((err) => console.warn(`[${label}] post-bootstrap step skipped:`, err instanceof Error ? err.message : err));
+      setStatus({ state: "ready", reason: null, hint: null, detail: null, statement: null, at: new Date().toISOString() });
     } catch (err) {
-      const { reason, hint } = classifyDbError(err);
+      const { reason, hint, detail } = classifyDbError(err);
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[${label}] schema bootstrap failed (${reason}):`, message);
-      setStatus({ state: "failed", reason, hint, at: new Date().toISOString() });
+
+      /**
+       * "Already there" is not a failure.
+       *
+       * Two processes can bootstrap at the same moment (a cold start plus an
+       * admin pressing Retry), and a concurrent `CREATE … IF NOT EXISTS` can
+       * still lose the race. If the schema verifies, the feature works — so
+       * report green instead of turning the whole panel off over a duplicate.
+       */
+      if (reason === "already_exists") {
+        const check = await (verifyOverride ?? tableExistenceVerify(tablesInStatements(statements())))();
+        if (check.ok) {
+          console.warn(`[${label}] bootstrap hit a duplicate (${detail}); schema verifies, treating as ready.`);
+          setStatus({ state: "ready", reason: null, hint: null, detail: null, statement: null, at: new Date().toISOString() });
+          return;
+        }
+      }
+
+      console.error(`[${label}] schema bootstrap failed (${reason}) at ${subject ?? "?"}:`, message);
+      setStatus({ state: "failed", reason, hint, detail, statement: subject, at: new Date().toISOString() });
       throw err; // the gate records the failure and throttles the retry
     }
   }
@@ -132,13 +167,15 @@ export function createTableBootstrap(
     const result = await check();
     setStatus(
       result.ok
-        ? { state: "ready", reason: null, hint: null, at: new Date().toISOString() }
+        ? { state: "ready", reason: null, hint: null, detail: null, statement: null, at: new Date().toISOString() }
         : {
             state: "failed",
             reason: "schema_missing",
             hint:
               `Missing table(s): ${result.problems.join(", ")}. SCHEMA_AUTO_REPAIR=off keeps DDL out of the ` +
               `request path — run scripts/apply-full-schema.ts once, or press "Retry" in Admin → Diagnostics.`,
+            detail: result.problems.join(", ").slice(0, 240),
+            statement: result.problems[0] ?? null,
             at: new Date().toISOString(),
           }
     );

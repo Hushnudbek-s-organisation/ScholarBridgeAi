@@ -7,10 +7,28 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { lockDownTables } from "@/lib/db/lockdown";
+import { tablesInStatements } from "@/lib/schemaGate";
 import { createTableBootstrap } from "@/lib/db/bootstrap";
+import { ensureCoreSchema } from "@/lib/core/db";
 import { telegramStatements } from "./ddl";
 
-const bootstrap = createTableBootstrap("telegram", telegramStatements, (stmt) => db.execute(sql.raw(stmt)));
+/**
+ * `ensureCoreSchema` runs first: `telegram_links` and friends have foreign keys
+ * into `student_profiles`, so on a fresh database this module used to fail with
+ * "relation student_profiles does not exist" and take the whole bot panel with it.
+ */
+const bootstrap = createTableBootstrap(
+  "telegram",
+  telegramStatements,
+  (stmt) => db.execute(sql.raw(stmt)),
+  undefined,
+  ensureCoreSchema,
+  // Supabase exposes `public` through PostgREST and grants new tables to
+  // `anon`/`authenticated` with RLS off — `telegram_links` holds chat ids, so
+  // the tables this bootstrap creates are locked down immediately.
+  () => lockDownTables(tablesInStatements(telegramStatements()), (stmt) => db.execute(sql.raw(stmt)))
+);
 
 export function ensureTelegramTables(): Promise<boolean> {
   return bootstrap.ensure();
