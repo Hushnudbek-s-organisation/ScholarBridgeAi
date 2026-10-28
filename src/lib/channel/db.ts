@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { createTableBootstrap } from "@/lib/db/bootstrap";
 import { columnExistenceVerify, tableExistenceVerify, tablesInStatements } from "@/lib/schemaGate";
+import { ensureCoreSchema } from "@/lib/core/db";
 import { channelColumns, channelStatements } from "./ddl";
 
 /**
@@ -30,7 +31,10 @@ const bootstrap = createTableBootstrap(
   "channel",
   channelStatements,
   (stmt) => db.execute(sql.raw(stmt)),
-  verifyChannelSchema
+  verifyChannelSchema,
+  // `channel_plan` / `channel_posts` reference `scholarships`, so the base
+  // schema has to exist before this DDL can succeed.
+  ensureCoreSchema
 );
 
 export function ensureChannelTables(): Promise<boolean> {

@@ -4,9 +4,14 @@ import { readJsonBody } from "@/lib/request";
 import { dbDiagnostics } from "@/lib/db/health";
 import {
   channelBootstrapStatus,
+  ensureChannelTables,
   forceChannelRepair,
 } from "@/lib/channel/db";
-import { forceTelegramRepair, telegramBootstrapStatus } from "@/lib/telegram/db";
+import {
+  ensureTelegramTables,
+  forceTelegramRepair,
+  telegramBootstrapStatus,
+} from "@/lib/telegram/db";
 import { forceCoreSchemaRepair } from "@/lib/core/db";
 import { forceJourneyRepair } from "@/lib/journey/db";
 import { forceGrowthRepair } from "@/lib/growth/db";
@@ -30,6 +35,20 @@ export const dynamic = "force-dynamic";
  * name, a hostname or the bot token.
  */
 async function snapshot() {
+  /**
+   * Try the two bootstraps before reporting on them.
+   *
+   * The admin pages ask this endpoint *because* a feature said it was
+   * unavailable, so "idle" was a lie: the routes never got as far as their own
+   * tables (another gate refused first) and the operator saw no reason at all.
+   * Both calls are memoised per process — one cheap round of DDL, then a
+   * boolean — and they swallow their own errors, so this cannot fail the
+   * endpoint on a database that refuses to create tables.
+   */
+  await Promise.all([
+    ensureTelegramTables().catch(() => false),
+    ensureChannelTables().catch(() => false),
+  ]);
   const database = await dbDiagnostics();
   let token: { set: boolean; source: "admin" | "env" | "none" } = { set: false, source: "none" };
   try {

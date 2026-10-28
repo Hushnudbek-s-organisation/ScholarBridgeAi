@@ -8,9 +8,21 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { createTableBootstrap } from "@/lib/db/bootstrap";
+import { ensureCoreSchema } from "@/lib/core/db";
 import { telegramStatements } from "./ddl";
 
-const bootstrap = createTableBootstrap("telegram", telegramStatements, (stmt) => db.execute(sql.raw(stmt)));
+/**
+ * `ensureCoreSchema` runs first: `telegram_links` and friends have foreign keys
+ * into `student_profiles`, so on a fresh database this module used to fail with
+ * "relation student_profiles does not exist" and take the whole bot panel with it.
+ */
+const bootstrap = createTableBootstrap(
+  "telegram",
+  telegramStatements,
+  (stmt) => db.execute(sql.raw(stmt)),
+  undefined,
+  ensureCoreSchema
+);
 
 export function ensureTelegramTables(): Promise<boolean> {
   return bootstrap.ensure();

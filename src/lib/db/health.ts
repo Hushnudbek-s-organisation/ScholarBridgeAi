@@ -31,6 +31,8 @@ export interface DbDiagnostics {
   } | null;
   reason: string | null;
   hint: string | null;
+  /** The driver's own sanitised sentence when the connection itself failed. */
+  detail: string | null;
 }
 
 export async function dbDiagnostics(): Promise<DbDiagnostics> {
@@ -65,6 +67,7 @@ export async function dbDiagnostics(): Promise<DbDiagnostics> {
         details,
         reason: "read_only",
         hint: "DATABASE_URL points at a read-only connection (a replica, or a read-only role/pooler). Switch it to the read-write endpoint.",
+        detail: null,
       };
     }
     if (details.canCreateTables === false) {
@@ -73,6 +76,7 @@ export async function dbDiagnostics(): Promise<DbDiagnostics> {
         details,
         reason: "permission_denied",
         hint: "The role can read but not create tables. Grant CREATE on the schema, or apply the SQL in supabase/ as the owner.",
+        detail: null,
       };
     }
     if (details.canInsert === false) {
@@ -81,11 +85,12 @@ export async function dbDiagnostics(): Promise<DbDiagnostics> {
         details,
         reason: "permission_denied",
         hint: "The role cannot write to app_config. Grant INSERT/UPDATE, or point DATABASE_URL at the owner role.",
+        detail: null,
       };
     }
-    return { reachable: true, details, reason: null, hint: null };
+    return { reachable: true, details, reason: null, hint: null, detail: null };
   } catch (err) {
-    const { reason, hint } = classifyDbError(err);
-    return { reachable: false, details: null, reason, hint };
+    const { reason, hint, detail } = classifyDbError(err);
+    return { reachable: false, details: null, reason, hint, detail };
   }
 }
