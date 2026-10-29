@@ -53,6 +53,14 @@ import { CMD_TEXTS } from "../src/lib/telegram/botTexts";
 import { isStaticCommand } from "../src/lib/telegram/core";
 import { classifyDbError, createTableBootstrap, statementSubject } from "../src/lib/db/bootstrap";
 import { TELEGRAM_DDL, telegramStatements } from "../src/lib/telegram/ddl";
+import {
+  NUDGE_WINDOW_DAYS,
+  accountAgeDays,
+  localDayKey,
+  nudgeDismissKey,
+  nudgeVerdict,
+  staleDismissKeys,
+} from "../src/lib/telegram/nudge";
 
 let passed = 0;
 const failures: string[] = [];
@@ -346,6 +354,83 @@ check("link confirmation: atomic conditional claim + UNIQUE conflict handling", 
   const ddl = read("src/lib/telegram/ddl.ts");
   assert.ok(/profile_id integer not null unique/i.test(ddl), "one Telegram per account");
   assert.ok(/telegram_user_id text not null unique/i.test(ddl), "one account per Telegram");
+});
+
+check("one account = one Telegram, in both directions", () => {
+  const linking = read("src/lib/telegram/linking.ts");
+  // Website side: starting a second link attempt on an account that already has
+  // one is refused before a token is even minted.
+  const start = linking.slice(linking.indexOf("export async function startRequest"), linking.indexOf("export async function loadOwnedRequest"));
+  assert.ok(start.includes("getLinkByProfile(input.profileId)"), "start refuses an account that already has Telegram");
+  assert.ok(start.includes('"already_linked"'), "and it says so");
+  // Telegram side: a Telegram id that already belongs to someone else cannot
+  // take over a second account, and the account's own link is never replaced.
+  assert.ok(linking.includes('failAttempt(req.id, "linked_elsewhere")'), "this Telegram is already on another account");
+  assert.ok(linking.includes('failAttempt(req.id, "account_has_other")'), "this account already has another Telegram");
+  // The database is the last guard, so a race cannot create a second row.
+  const ddl = read("src/lib/telegram/ddl.ts");
+  assert.ok(/profile_id integer not null unique/i.test(ddl));
+  assert.ok(/telegram_user_id text not null unique/i.test(ddl));
+  const schema = read("src/db/schema.ts");
+  assert.ok(/\.references\(\(\) => studentProfiles\.id, \{ onDelete: "cascade" \}\)\.notNull\(\)\.unique\(\)/.test(schema), "drizzle agrees: unique profile_id");
+  assert.ok(/\.unique\(\)/.test(schema.slice(schema.indexOf("telegramUserId: text"))), "drizzle agrees: unique telegram_user_id");
+});
+
+check("the new-account reminder: a ten-day window, computed on the server", () => {
+  assert.equal(NUDGE_WINDOW_DAYS, 10);
+  const now = new Date("2026-10-29T12:00:00Z");
+  assert.equal(accountAgeDays("2026-10-29T09:00:00Z", now), 0);
+  assert.equal(accountAgeDays("2026-10-25T12:00:00Z", now), 4);
+  assert.equal(accountAgeDays(null, now), null);
+  // A future timestamp (clock skew) is "today", never a negative age.
+  assert.equal(accountAgeDays("2026-10-30T12:00:00Z", now), 0);
+
+  const base = { accountAgeDays: 3, linked: false, configured: true };
+  assert.deepEqual(nudgeVerdict(base), { show: true, reason: "shown", daysLeft: 7 });
+  assert.equal(nudgeVerdict({ ...base, linked: true }).reason, "linked");
+  assert.equal(nudgeVerdict({ ...base, configured: false }).reason, "not_configured");
+  assert.equal(nudgeVerdict({ ...base, dismissedToday: true }).reason, "dismissed_today");
+  assert.equal(nudgeVerdict({ ...base, hasProfile: false }).reason, "no_profile");
+  // The window itself: day 10 is still inside, day 11 is not.
+  assert.equal(nudgeVerdict({ ...base, accountAgeDays: 10 }).show, true);
+  assert.equal(nudgeVerdict({ ...base, accountAgeDays: 11 }).show, false);
+  assert.equal(nudgeVerdict({ ...base, accountAgeDays: 11 }).reason, "too_old");
+  // An unknown age is not an excuse to nag an account that may be years old.
+  assert.equal(nudgeVerdict({ ...base, accountAgeDays: null }).show, false);
+
+  // Dismissal is per profile per DAY — the old single flag silenced it forever.
+  assert.equal(nudgeDismissKey(7, "2026-10-29"), "scholarbridge_tg_nudge_7_2026-10-29");
+  assert.notEqual(nudgeDismissKey(7, "2026-10-29"), nudgeDismissKey(7, "2026-10-30"));
+  assert.notEqual(nudgeDismissKey(7, "2026-10-29"), nudgeDismissKey(8, "2026-10-29"));
+  assert.match(localDayKey(new Date(2026, 0, 5, 23, 59)), /^2026-01-05$/);
+  assert.deepEqual(
+    staleDismissKeys(
+      ["scholarbridge_tg_nudge_7_2026-10-28", "scholarbridge_tg_nudge_7_2026-10-29", "scholarbridge_tg_nudge_8_2026-10-28", "unrelated"],
+      7,
+      "2026-10-29"
+    ),
+    ["scholarbridge_tg_nudge_7_2026-10-28"],
+    "only this profile's older keys are pruned"
+  );
+});
+
+check("the reminder is served by the API, not invented by the browser", () => {
+  const route = read("src/app/api/telegram/me/route.ts");
+  assert.ok(route.includes("nudgeVerdict("), "the verdict is computed server-side");
+  assert.ok(route.includes("accountAgeDays(g.session.profile.createdAt)"), "from the profile's real creation date");
+  assert.ok(/nudge: \{ show: nudge\.show, reason: nudge\.reason, daysLeft: nudge\.daysLeft \}/.test(route));
+  const ui = read("src/components/telegram/TelegramNudge.tsx");
+  assert.ok(ui.includes('d?.nudge?.show === true'), "the card obeys the server's verdict");
+  assert.ok(ui.includes("nudgeDismissKey(profileId, localDayKey())"), "dismissal is keyed to the profile and today");
+  assert.ok(!ui.includes("DISMISS_KEY"), "the old permanent dismissal flag is gone");
+  assert.ok(ui.includes("staleDismissKeys("), "old dismissal keys are pruned");
+  // And it is placed in the shell, so it meets the student on any screen.
+  const home = read("src/app/HomeClient.tsx");
+  const shell = home.indexOf("view === \"app\" && activeProfile && (");
+  const nudgeAt = home.indexOf("<TelegramNudge");
+  assert.ok(nudgeAt > 0, "rendered in the app shell");
+  assert.ok(nudgeAt > shell, "inside the app view, above the tab content");
+  assert.ok(home.indexOf("<PageTransition") > nudgeAt, "above the page content, so every tab shows it");
 });
 
 check("notifications API: PUT/PATCH require auth (IDOR fix stays)", () => {

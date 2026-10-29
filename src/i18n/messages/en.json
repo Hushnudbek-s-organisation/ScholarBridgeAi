@@ -3203,10 +3203,10 @@
       "on": "resume alerts",
       "unlink": "disconnect"
     },
-    "nudgeTitle": "Never miss a deadline",
-    "nudgeBody": "Connect Telegram — reminders and sign-in codes come straight to your phone.",
+    "nudgeTitle": "Connect the Telegram bot to use the site fully",
+    "nudgeBody": "Matching grants, deadline reminders and verified announcements arrive in the bot. Connecting takes 20 seconds — you can disconnect any time.",
     "nudgeCta": "Connect",
-    "dismiss": "Hide",
+    "dismiss": "Later",
     "types": {
       "deadline_approaching": "Deadline approaching",
       "deadline_changed": "Deadline changed",
@@ -3377,7 +3377,8 @@
         "deferred": "Deferred"
       },
       "rateLimited": "Too many requests. Please try again later."
-    }
+    },
+    "nudgeDaysLeft": "New-account reminder: shown for {days} more days."
   },
   "adminTelegram": {
     "loading": "Loading…",

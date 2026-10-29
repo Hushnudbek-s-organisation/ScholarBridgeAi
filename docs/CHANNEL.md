@@ -1174,6 +1174,67 @@ session, the header links it, every catalogue page carries the strip, `start=1`
 opens the wizard, the bot link is conditional, and the copy is complete in all
 three languages).
 
+## 11c. The new-account prompt: connect the bot, for ten days (2026-10-29)
+
+The operator's instruction: *after creating an account, when the student comes
+back within ten days, ask them to connect the Telegram bot so they can use the
+site fully — and one account may have one Telegram, never more.*
+
+### What was already true (said plainly)
+
+**One account = one Telegram was already enforced**, in three layers, and no
+code changed for it in this phase:
+
+| Layer | Where | What it refuses |
+| --- | --- | --- |
+| website | `startRequest()` → `getLinkByProfile` | a second link attempt on an account that already has one → `already_linked` (409) |
+| bot | `confirmLinkAttempt()` transaction | a Telegram id already on another account → `linked_elsewhere`; an account that already has another Telegram → `account_has_other` |
+| database | `telegram_links` | `profile_id … unique` **and** `telegram_user_id … unique` — a race cannot create a second row |
+
+`npm run test:telegram` now asserts all three, and
+`npm run test:telegram-integration` already drove cases A/B/C through the real
+bot and the real database.
+
+### What was wrong with the reminder
+
+`TelegramNudge` existed, but:
+
+* it was rendered **only on the dashboard tab**, so a student who opened
+  Projects/Deadlines/anything else never saw it;
+* its dismissal was one permanent flag (`scholarbridge_tg_nudge_dismissed = "1"`):
+  a single tap on day one silenced it **for the life of the account**;
+* nothing knew the account's age, so there was no ten-day window at all — the
+  card could appear on a two-year-old account or never.
+
+### Now
+
+`src/lib/telegram/nudge.ts` (pure, no database):
+
+```
+visible ⟺ bot configured ∧ not linked ∧ account age ≤ 10 days ∧ not dismissed today
+```
+
+* The verdict is computed **on the server** (`GET /api/telegram/me` →
+  `nudge: { show, reason, daysLeft }`, `account: { ageDays, nudgeWindowDays: 10 }`)
+  from `student_profiles.created_at`. The browser cannot invent a window; it only
+  knows whether *today's* banner was dismissed.
+* Dismissal is keyed `scholarbridge_tg_nudge_<profileId>_<local day>`, so "Later"
+  means today, and the reminder returns tomorrow while the account is still new.
+  Older keys are pruned on write. Day 10 is inside the window, day 11 is not.
+* An unknown creation date is `too_old` — never a reason to nag.
+* The card renders in the **app shell**, above the tab content, so it greets the
+  student on whatever screen they open in those first days.
+* The permanent connect card in *Settings → Telegram* is untouched: nothing is
+  lost after day ten, and unlinking later does not resurrect the reminder.
+
+Copy (uz/ru/en): `telegram.nudgeTitle` = *"Saytdan to'liq foydalanish uchun
+Telegram botni ulang"*, `nudgeBody`, `nudgeDaysLeft` (`… yana {days} kun …`),
+`nudgeCta`, `dismiss` = *"Keyinroq"*.
+
+Verified live on a real `next start` against the dev database: a fresh account
+with a configured bot → `show: true, daysLeft: 10`; a 15-day-old account →
+`show: false, reason: "too_old"`; a linked account → `reason: "linked"`.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

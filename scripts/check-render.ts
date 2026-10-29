@@ -48,6 +48,7 @@ import { FaqSection } from "../src/components/FaqSection";
 import { AppErrorFallback } from "../src/components/AppErrorFallback";
 import { PointsBadge } from "../src/components/PointsBadge";
 import { MiniApp } from "../src/components/telegram/MiniApp";
+import { TelegramNudge } from "../src/components/telegram/TelegramNudge";
 
 let passed = 0;
 let failed = 0;
@@ -1103,6 +1104,29 @@ for (const locale of ["en", "uz", "ru"]) {
     Boolean(messages.publicCatalog?.universityHeading && messages.publicCatalog?.scholarshipHeading &&
       messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline && messages.publicCatalog?.catalogNavigation &&
       messages.journey?.opAmountUnknown && messages.pagination?.aria && messages.pagination?.goToPage));
+}
+
+// ---------------------------------------------------------------------------
+section("14a. The new-account Telegram reminder renders without data");
+
+{
+  // The card starts hidden (its verdict arrives from the API), so the first
+  // paint must not throw — and it must not render anything until told to.
+  const nudgeSource = readFileSync(new URL("../src/components/telegram/TelegramNudge.tsx", import.meta.url), "utf8");
+  let error: string | null = null;
+  let html = "";
+  try {
+    html = renderToStaticMarkup(
+      withEnglishIntl(
+        React.createElement(TelegramNudge, { profileId: null, onConnect: () => undefined }) as React.ReactElement
+      )
+    );
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+  check("TelegramNudge renders without a profile and stays silent", error === null && html.trim() === "", error ?? html.slice(0, 80));
+  check("the card asks the server for its verdict", nudgeSource.includes("/api/telegram/me") && nudgeSource.includes("d?.nudge?.show === true"));
+  check("the card has no browser-side day window", !/ageDays|createdAt/.test(nudgeSource));
 }
 
 // ---------------------------------------------------------------------------

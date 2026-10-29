@@ -1038,6 +1038,19 @@ export function Home({
       <div className="flex-1 min-w-0 flex flex-col">
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
+        {/*
+          The new-account reminder lives in the shell, not in one tab: in the
+          first ten days a student may land on any screen, and the point of the
+          prompt is that they meet it when they come in. The component asks the
+          server for the verdict (account age, link, bot configured) and keeps
+          its own "dismissed today" note.
+        */}
+        {view === "app" && activeProfile && (
+          <TelegramNudge
+            profileId={activeProfile.id}
+            onConnect={() => handleNavigateTab("notifications")}
+          />
+        )}
         {/* Pillar 3 — the four-stage guided path, pinned above every screen so
             a newcomer always knows where they are and what comes next. The
             dashboard keeps its own richer journey control center instead. */}
@@ -1074,8 +1087,6 @@ export function Home({
             />
           ) : activeTab === "dashboard" && (
             <div className="space-y-4">
-              {/* "Connect Telegram" nudge — only while not connected; dismissible */}
-              <TelegramNudge profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
               <DailyStreakCard profileId={activeProfile?.id ?? null} compact />
               {/* Spec §3 — the control center. Journey bar, next steps,
                   deadlines, application progress, readiness, recommendations

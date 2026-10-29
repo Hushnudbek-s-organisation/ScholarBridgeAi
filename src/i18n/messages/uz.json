@@ -3203,10 +3203,10 @@
       "on": "xabarlarni yoqish",
       "unlink": "uzish"
     },
-    "nudgeTitle": "Muddatlarni o'tkazib yubormang",
-    "nudgeBody": "Telegramni ulang — eslatmalar va kirish kodlari to'g'ridan-to'g'ri telefoningizga keladi.",
+    "nudgeTitle": "Saytdan to'liq foydalanish uchun Telegram botni ulang",
+    "nudgeBody": "Mos grantlar, muddat eslatmalari va tasdiqlangan e'lonlar botga keladi. Ulash 20 soniya oladi — istalgan vaqtda uzishingiz mumkin.",
     "nudgeCta": "Ulash",
-    "dismiss": "Yashirish",
+    "dismiss": "Keyinroq",
     "types": {
       "deadline_approaching": "Muddat yaqinlashmoqda",
       "deadline_changed": "Muddat o'zgardi",
@@ -3377,7 +3377,8 @@
         "deferred": "Keyinga surildi"
       },
       "rateLimited": "Juda ko'p so'rov. Birozdan keyin urinib ko'ring."
-    }
+    },
+    "nudgeDaysLeft": "Yangi akkauntlar uchun eslatma: yana {days} kun ko'rsatiladi."
   },
   "adminTelegram": {
     "loading": "Yuklanmoqda…",

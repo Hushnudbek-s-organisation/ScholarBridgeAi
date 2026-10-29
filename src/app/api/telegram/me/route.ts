@@ -9,6 +9,7 @@ import { BOT_TEXTS, parseMutedTypes, pickLang, TELEGRAM_NOTIFICATION_TYPES } fro
 import { getLinkByProfile, sendToChat, unlinkProfile } from "@/lib/telegram/service";
 import { normalizeReminderDays, parseReminderDays, DEFAULT_REMINDER_DAYS } from "@/lib/telegram/reminders";
 import { getBotToken, getTelegramSettings } from "@/lib/telegram/settings";
+import { accountAgeDays, NUDGE_WINDOW_DAYS, nudgeVerdict } from "@/lib/telegram/nudge";
 import { tgJsonError, tgTablesOr503 } from "@/lib/telegram/http";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,14 @@ export async function GET(req: Request) {
   try {
     const [settings, { token }, link] = await Promise.all([getTelegramSettings(), getBotToken(), getLinkByProfile(g.session.profile.id)]);
     const configured = Boolean(token && settings.botUsername);
+    /**
+     * The "connect the bot" reminder: a new account (≤ 10 days) with no link
+     * is asked once a day. The verdict is computed here, on the server, so the
+     * browser cannot invent a window — it only decides whether *today's* banner
+     * was already dismissed (a localStorage fact only the browser knows).
+     */
+    const ageDays = accountAgeDays(g.session.profile.createdAt);
+    const nudge = nudgeVerdict({ accountAgeDays: ageDays, linked: Boolean(link), configured });
     return NextResponse.json(
       {
         bot: {
@@ -59,6 +68,8 @@ export async function GET(req: Request) {
           loginEnabled: configured && settings.loginEnabled,
         },
         link: present(link),
+        account: { ageDays, nudgeWindowDays: NUDGE_WINDOW_DAYS },
+        nudge: { show: nudge.show, reason: nudge.reason, daysLeft: nudge.daysLeft },
         types: settings.types,
         defaultReminderDays: DEFAULT_REMINDER_DAYS,
       },
