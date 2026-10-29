@@ -24,7 +24,7 @@ const repoRoot = path.resolve(here, "..");
 
 /** The compiled server: inside the installer, or the repo build in dev. */
 const serverDir = isPackaged
-  ? path.join(process.resourcesPath, "app")
+  ? path.join(process.resourcesPath, "server")
   : path.join(repoRoot, ".next", "standalone");
 const schemaPath = isPackaged
   ? path.join(process.resourcesPath, "schema", "full_schema.sql")

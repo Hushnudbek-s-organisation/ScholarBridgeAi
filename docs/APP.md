@@ -139,9 +139,17 @@ npm run test:desktop-app  # end-to-end test of the boot path (see §8)
 `.next/static/` into it, and hands it to electron-builder, which bundles:
 
 ```
-resources/app/          ← the compiled ScholarBridge server + its node_modules
-resources/schema/full_schema.sql
+resources/app/                    ← the app itself (main.mjs, preload, splash, Electron's deps)
+resources/server/                 ← the compiled ScholarBridge server + its node_modules
+resources/schema/full_schema.sql  ← the schema a new install applies
 ```
+
+`app/` and `server/` are deliberately separate: Electron executes whatever is
+in `resources/app`, so bundling the server there as well merged two
+`package.json` files (the server's has no `main`) and the installed app died
+with `Cannot find module …\resources\app\index.js`. `scripts/build-desktop.mjs`
+now verifies the packed layout and refuses to produce an installer without
+`app/main.mjs`, `server/server.js` and `schema/full_schema.sql`.
 
 so the installed program needs neither Node.js, Docker nor this repository.
 
@@ -323,6 +331,7 @@ database bound to loopback.
 | --- | --- |
 | `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. |
 | `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
+| `node scripts/build-desktop.mjs --verify-only` | Inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
 | `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
 
 Prepare the build first (`npm run desktop:prepare`), then run
@@ -336,6 +345,7 @@ build the real installers on GitHub's machines.
 
 | Symptom | Cause / fix |
 | --- | --- |
+| Windows: *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\index.js”* | The installed build predates 1.0.4, where the compiled server was bundled into `resources/app` and replaced the app's `package.json`. Install the current build (uninstall first is not needed — the installer overwrites the program, your data stays). |
 | Desktop: "could not start" on first launch | Look at *File → Open error log*. Most common: the port range 4310–4335 is busy (close the other copy — only one instance may run), or PostgreSQL cannot run as **root** on Linux (run the app as a normal user). |
 | Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
 | Desktop: works, but no AI answers | No AI provider key is configured in that install. Add one to the deployment env (or use a hosted deployment) — the rest of the app is unaffected. |

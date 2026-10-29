@@ -38,8 +38,13 @@ const config = {
     "!**/*.map",
     "!**/*.md",
   ],
+  // `resources/server` — NOT `resources/app`. Electron loads the program from
+  // `resources/app`, so copying the compiled server there merged two bundles in
+  // one folder: the server's package.json (which has no `main`) replaced the
+  // app's, and Electron then looked for `resources/app/index.js` and died with
+  // "Cannot find module". Keep the two trees strictly apart.
   extraResources: [
-    { from: "../.next/standalone", to: "app", filter: ["**/*"] },
+    { from: "../.next/standalone", to: "server", filter: ["**/*"] },
     { from: "../supabase/full_schema.sql", to: "schema/full_schema.sql" },
   ],
   extraMetadata: {
