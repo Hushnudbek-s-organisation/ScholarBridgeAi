@@ -49,6 +49,7 @@ import { AppErrorFallback } from "../src/components/AppErrorFallback";
 import { PointsBadge } from "../src/components/PointsBadge";
 import { MiniApp } from "../src/components/telegram/MiniApp";
 import { TelegramNudge } from "../src/components/telegram/TelegramNudge";
+import { SourceLanguageProse } from "../src/components/SourceLanguageProse";
 
 let passed = 0;
 let failed = 0;
@@ -1127,6 +1128,38 @@ section("14a. The new-account Telegram reminder renders without data");
   check("TelegramNudge renders without a profile and stays silent", error === null && html.trim() === "", error ?? html.slice(0, 80));
   check("the card asks the server for its verdict", nudgeSource.includes("/api/telegram/me") && nudgeSource.includes("d?.nudge?.show === true"));
   check("the card has no browser-side day window", !/ageDays|createdAt/.test(nudgeSource));
+}
+
+// ---------------------------------------------------------------------------
+section("14b. English catalogue prose is labelled, translated copy is not");
+
+{
+  const englishProse =
+    "No scholarship-specific English score is published; applicants must meet the host university English requirement for the chosen programme.";
+  const labelled = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, {
+      text: englishProse,
+      showLabel: true,
+      label: "Manba tili: inglizcha",
+    }) as React.ReactElement
+  );
+  check("source-language prose carries its label", labelled.includes("Manba tili: inglizcha"));
+  check("source-language prose is marked lang=\"en\" for screen readers", labelled.includes('lang="en"'));
+  check("the prose itself is still shown in full", labelled.includes("No scholarship-specific English score"));
+
+  const translated = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, {
+      text: "IELTS 6.5 yoki unga teng ingliz tili imtihoni",
+      showLabel: false,
+      label: "Manba tili: inglizcha",
+    }) as React.ReactElement
+  );
+  check("localized copy renders without a label", !translated.includes("Manba tili") && !translated.includes('lang="en"'));
+
+  const empty = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, { text: "   ", showLabel: true, label: "x" }) as React.ReactElement
+  );
+  check("empty prose renders nothing at all", empty.trim() === "");
 }
 
 // ---------------------------------------------------------------------------

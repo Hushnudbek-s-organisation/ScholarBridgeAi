@@ -24,15 +24,21 @@ import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/conf
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import {
+  isEnglishProse,
   localizeCountry,
   localizeCoverageType,
   localizeDegreeLevel,
+  localizeEnglishRequirement,
+  localizeFundingType,
   localizeMajorOrField,
+  localizeProse,
   localizeScholarshipDescription,
   localizeScholarshipProvider,
   localizeScholarshipRequirements,
   localizeScholarshipTitle,
+  localizeTuitionCoverage,
 } from "@/lib/catalogLocalizer";
+import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 import { formatMoney } from "@/lib/format";
 
 async function getPageLocale(): Promise<Locale> {
@@ -142,8 +148,12 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   const provider = localizeScholarshipProvider(s.provider, locale);
   const country = localizeCountry(s.country, locale);
   const coverage = localizeCoverageType(s.coverageType, locale);
-  const description = localizeScholarshipDescription(s.description, locale);
-  const requirements = localizeScholarshipRequirements(s.requirements, locale);
+  // Prose is translated as far as the deterministic dictionaries reach; what is
+  // still English keeps its own label so it is never read as a translation.
+  const description = localizeProse(s.description, locale, localizeScholarshipDescription);
+  const requirements = localizeProse(s.requirements, locale, localizeScholarshipRequirements);
+  const tuitionCoverage = localizeProse(s.tuitionCoverage, locale, localizeTuitionCoverage);
+  const englishRequirement = localizeProse(s.englishRequirements, locale, localizeEnglishRequirement);
 
   const degrees = listValues(s.degreeLevels).map((v) => localizeDegreeLevel(v, locale));
   const majors = listValues(s.eligibleMajors).map((v) =>
@@ -158,8 +168,14 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   const deadlineLabel =
     formatDate(s.deadlineDate, locale) ?? (s.deadline && s.deadline.trim() ? s.deadline : null);
 
+  // The funding cell is a table cell: a long English sentence does not fit and
+  // would be unlabelled, so an untranslatable funding description falls back to
+  // the (localized) coverage type rather than showing source prose here.
+  const localizedFunding = localizeFundingType(s.fundingType, locale);
+  const fundingValue = isEnglishProse(localizedFunding) ? coverage : localizedFunding || coverage;
+
   const languageLine =
-    (s.englishRequirements && s.englishRequirements.trim()) ||
+    (englishRequirement.text.trim() ? englishRequirement.text : null) ||
     (s.minIelts != null ? `IELTS ${s.minIelts}+` : null);
 
   const awardValue =
@@ -194,8 +210,9 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   // Benefit bullets — every line is a stored field, never an inference.
   const benefitLines: string[] = [];
   if (coverage) benefitLines.push(coverage);
-  if (s.tuitionCoverage && s.tuitionCoverage !== "None") {
-    benefitLines.push(`${t.tuitionCoverage}: ${s.tuitionCoverage}`);
+  if (tuitionCoverage.text && s.tuitionCoverage !== "None") {
+    const source = tuitionCoverage.sourceLanguage ? ` (${t.sourceLanguageLabel})` : "";
+    benefitLines.push(`${t.tuitionCoverage}: ${tuitionCoverage.text}${source}`);
   }
   if (awardValue) benefitLines.push(`${t.awardValue}: ${awardValue}`);
   if (s.livingAllowance != null && s.livingAllowance > 0) {
@@ -204,12 +221,14 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   if (s.travelAllowance != null && s.travelAllowance > 0) {
     benefitLines.push(`${t.travelAllowance}: ${formatMoney(s.travelAllowance, "USD")}`);
   }
-  if (s.accommodation && s.accommodation.trim()) {
+  // An accommodation line we cannot state in this language is omitted rather
+  // than printed as raw English prose inside a localized bullet list.
+  if (s.accommodation && s.accommodation.trim() && !isEnglishProse(s.accommodation)) {
     benefitLines.push(`${t.accommodation}: ${s.accommodation}`);
   }
 
   const sections = [
-    { id: "about", label: t.about, show: Boolean(description) },
+    { id: "about", label: t.about, show: Boolean(description.text) },
     { id: "who", label: t.whoCanApply, show: Boolean(requirements) || countries.length > 0 || degrees.length > 0 },
     { id: "benefits", label: t.benefits, show: benefitLines.length > 0 },
     { id: "apply", label: t.howToApply, show: true },
@@ -263,18 +282,22 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
               </p>
             </header>
 
-            {description && (
+            {description.text && (
               <Section id="about" title={t.about} icon={<FileText className="h-4 w-4" aria-hidden />}>
-                <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">
-                  {description}
-                </p>
+                <SourceLanguageProse
+                  text={description.text}
+                  showLabel={description.sourceLanguage}
+                  label={t.sourceLanguageLabel}
+                />
               </Section>
             )}
 
             <Section id="who" title={t.whoCanApply} icon={<GraduationCap className="h-4 w-4" aria-hidden />}>
-              <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">
-                {requirements}
-              </p>
+              <SourceLanguageProse
+                text={requirements.text}
+                showLabel={requirements.sourceLanguage}
+                label={t.sourceLanguageLabel}
+              />
               <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-2">
                 <Fact label={t.level} value={degrees.length ? degrees.join(", ") : t.notPublished} />
                 <Fact label={t.eligibleMajors} value={majors.length ? majors.join(", ") : t.notPublished} />
@@ -385,7 +408,11 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 <SideFact icon={<Languages className="h-3.5 w-3.5" aria-hidden />} label={t.language} value={languageLine ?? t.notPublished} />
                 <SideFact icon={<Award className="h-3.5 w-3.5" aria-hidden />} label={t.opportunityType} value={coverage} />
                 <SideFact icon={<GraduationCap className="h-3.5 w-3.5" aria-hidden />} label={t.level} value={degrees.length ? degrees.join(", ") : t.notPublished} />
-                <SideFact icon={<Wallet className="h-3.5 w-3.5" aria-hidden />} label={t.funding} value={s.fundingType || coverage} />
+                <SideFact
+                  icon={<Wallet className="h-3.5 w-3.5" aria-hidden />}
+                  label={t.funding}
+                  value={fundingValue}
+                />
                 <SideFact icon={<Globe2 className="h-3.5 w-3.5" aria-hidden />} label={t.hostCountry} value={country} />
                 <SideFact icon={<CalendarDays className="h-3.5 w-3.5" aria-hidden />} label={t.deadline} value={deadlineLabel ?? t.notPublished} />
                 <SideFact icon={<FileText className="h-3.5 w-3.5" aria-hidden />} label={t.applicationFee} value={feeLabel} />

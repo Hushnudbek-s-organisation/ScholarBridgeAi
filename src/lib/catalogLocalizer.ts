@@ -301,7 +301,7 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
   Architecture: { uz: "Arxitektura", ru: "Архитектура" },
   "Urban Planning": { uz: "Shaharsozlik", ru: "Градостроительство" },
   "Environmental Science": { uz: "Ekologiya va atrof-muhit", ru: "Экология и охрана окружающей среды" },
-  "Climate Science": { uz: "Ilimshunoslik (klimat)", ru: "Климатология" },
+  "Climate Science": { uz: "Iqlimshunoslik", ru: "Климатология" },
   Physics: { uz: "Fizika", ru: "Физика" },
   Mathematics: { uz: "Matematika", ru: "Математика" },
   Chemistry: { uz: "Kimyo", ru: "Химия" },
@@ -371,6 +371,98 @@ const FIELD_NAMES: Record<string, Record<TargetLocale, string>> = {
   Humanities: { uz: "Gumanitar fanlar", ru: "Гуманитарные науки" },
   Veterinary: { uz: "Veterinariya", ru: "Ветеринария" },
   "Veterinary Medicine": { uz: "Veterinariya meditsinasi", ru: "Ветеринарная медицина" },
+  // Phase T (2026-10-30): every one of the 67 distinct `programs.field` values
+  // in the live database, checked one by one against the real data. The labels
+  // below replaced machine-hybrid output ("Life fanlari", "Applied matematika",
+  // "Information fan", "Earth fanlari", "Financial muhandislik").
+  Multidisciplinary: { uz: "Ko'p fanli yo'nalish", ru: "Мультидисциплинарное направление" },
+  "Life Sciences": { uz: "Hayot haqidagi fanlar", ru: "Науки о жизни" },
+  Sciences: { uz: "Tabiiy fanlar", ru: "Естественные науки" },
+  Science: { uz: "Fan", ru: "Наука" },
+  "Information Science": { uz: "Axborot fani", ru: "Информационная наука" },
+  "Earth Sciences": { uz: "Yer haqidagi fanlar", ru: "Науки о Земле" },
+  "Applied Mathematics": { uz: "Amaliy matematika", ru: "Прикладная математика" },
+  "Sports Science": { uz: "Sport fani", ru: "Спортология" },
+  "Financial Engineering": { uz: "Moliyaviy injiniring", ru: "Финансовая инженерия" },
+  "Health Sciences": { uz: "Salomatlik fanlari", ru: "Науки о здоровье" },
+  "Social Sciences": { uz: "Ijtimoiy fanlar", ru: "Общественные науки" },
+  "Computer Science & IT": { uz: "Kompyuter fanlari va AT", ru: "Информатика и ИТ" },
+  "Engineering & Technology": { uz: "Muhandislik va texnologiya", ru: "Инженерия и технологии" },
+  "AI & Machine Learning": { uz: "Sun'iy intellekt va mashinali o'qitish", ru: "ИИ и машинное обучение" },
+  "Electrical Engineering & CS": {
+    uz: "Elektrotexnika va kompyuter fanlari",
+    ru: "Электротехника и информатика",
+  },
+  "Business & Information Systems": {
+    uz: "Biznes va axborot tizimlari",
+    ru: "Бизнес и информационные системы",
+  },
+  "Social Sciences & Law": { uz: "Ijtimoiy fanlar va huquq", ru: "Общественные науки и право" },
+  "Economics & Data Science": { uz: "Iqtisodiyot va ma'lumotlar fani", ru: "Экономика и наука о данных" },
+  "Finance & Economics": { uz: "Moliya va iqtisodiyot", ru: "Финансы и экономика" },
+  "Medicine & Life Sciences": { uz: "Tibbiyot va hayot haqidagi fanlar", ru: "Медицина и науки о жизни" },
+  "Logistics & Supply Chain": { uz: "Logistika va ta'minot zanjiri", ru: "Логистика и цепочки поставок" },
+  "Mathematics & Statistics": { uz: "Matematika va statistika", ru: "Математика и статистика" },
+  "Economics & Finance": { uz: "Iqtisodiyot va moliya", ru: "Экономика и финансы" },
+  "Business & Management": { uz: "Biznes va menejment", ru: "Бизнес и менеджмент" },
+  "Business Economics": { uz: "Biznes iqtisodiyoti", ru: "Экономика бизнеса" },
+  "Business Studies": { uz: "Biznes ta'limoti", ru: "Бизнес-исследования" },
+  "Business Informatics": { uz: "Biznes informatika", ru: "Бизнес-информатика" },
+  "Business Engineering": { uz: "Biznes injiniringi", ru: "Бизнес-инжиниринг" },
+  "Media Studies": { uz: "Media ta'limoti", ru: "Медиаисследования" },
+  "Music and Musicology": { uz: "Musiqa va musiqashunoslik", ru: "Музыка и музыковедение" },
+  "Environmental Engineering": { uz: "Ekologik muhandislik", ru: "Экологическая инженерия" },
+  "Architectural Engineering": { uz: "Arxitektura muhandisligi", ru: "Архитектурная инженерия" },
+  "Transport Management": { uz: "Transport menejmenti", ru: "Управление транспортом" },
+  "Maritime and Air Transport Management": {
+    uz: "Dengiz va havo transporti menejmenti",
+    ru: "Управление морским и воздушным транспортом",
+  },
+  "Land Economy": { uz: "Yer iqtisodiyoti", ru: "Экономика землепользования" },
+  Drama: { uz: "Dramaturgiya", ru: "Драматургия" },
+  Nanobiology: { uz: "Nanobiologiya", ru: "Нанобиология" },
+  Bioinformatics: { uz: "Bioinformatika", ru: "Биоинформатика" },
+  "Biomedical Sciences": { uz: "Biomeditsina fanlari", ru: "Биомедицинские науки" },
+  "Viticulture and Oenology": { uz: "Vitischilik va vinochilik", ru: "Виноградарство и виноделие" },
+  Animation: { uz: "Animatsiya", ru: "Анимация" },
+  "Public and International Affairs": {
+    uz: "Jamoat va xalqaro ishlar",
+    ru: "Общественные и международные отношения",
+  },
+  "STEM Education": { uz: "STEM ta'limi", ru: "STEM-образование" },
+  "Information Technology": { uz: "Axborot texnologiyalari", ru: "Информационные технологии" },
+  "Logistics Management": { uz: "Logistika menejmenti", ru: "Управление логистикой" },
+  // Multi-word live titles that the word layer would have turned into a hybrid.
+  "Marine Biology": { uz: "Dengiz biologiyasi", ru: "Морская биология" },
+  "Marine Science": { uz: "Dengiz fanlari", ru: "Морские науки" },
+  "Life Science": { uz: "Hayot fanlari", ru: "Науки о жизни" },
+  "Life Science and Technology": { uz: "Hayot fanlari va texnologiya", ru: "Науки о жизни и технологии" },
+  "Financial Analysis": { uz: "Moliyaviy tahlil", ru: "Финансовый анализ" },
+  "Fund Management": { uz: "Fond menejmenti", ru: "Управление фондом" },
+  "Management Science": { uz: "Menejment fani", ru: "Наука управления" },
+  "Environmental Law": { uz: "Ekologik huquq", ru: "Экологическое право" },
+  "Scots and English Law": { uz: "Shotlandiya va Angliya huquqi", ru: "Шотландское и английское право" },
+  "Civil Environmental and Architectural Engineering": {
+    uz: "Qurilish, ekologiya va arxitektura muhandisligi",
+    ru: "Строительная, экологическая и архитектурная инженерия",
+  },
+  "East Asian Studies": { uz: "Sharqiy Osiyo tadqiqotlari", ru: "Исследования Восточной Азии" },
+  "Mathematical Sciences": { uz: "Matematik fanlar", ru: "Математические науки" },
+  "Physics/Chemistry/Math": { uz: "Fizika/Kimyo/Matematika", ru: "Физика/Химия/Математика" },
+  "Computational Mathematics and Cybernetics": {
+    uz: "Hisoblash matematikasi va kibernetika",
+    ru: "Вычислительная математика и кибернетика",
+  },
+  // Foreign-language titles the catalogue carries verbatim (Spanish/Portuguese).
+  "Economía": { uz: "Iqtisodiyot", ru: "Экономика" },
+  "Psicología": { uz: "Psixologiya", ru: "Психология" },
+  "Computación": { uz: "Hisoblash texnikasi", ru: "Вычислительная техника" },
+  "Administración de Empresas": { uz: "Biznes boshqaruvi", ru: "Управление бизнесом" },
+  "Administração": { uz: "Boshqaruv", ru: "Управление" },
+  "Agronomía": { uz: "Agronomiya", ru: "Агрономия" },
+  "Abogacía": { uz: "Huquqshunoslik", ru: "Право" },
+  "Medicina": { uz: "Tibbiyot", ru: "Медицина" },
+  "Ingeniería Civil": { uz: "Qurilish muhandisligi", ru: "Строительная инженерия" },
 };
 
 /** Word/alias layer — small tokens that appear inside compound field names. */
@@ -443,7 +535,207 @@ const FIELD_WORD_ALIASES: Array<[RegExp, Record<TargetLocale, string>]> = [
   [/\bstudies\b/i, { uz: "ta'limotlar", ru: "исследования" }],
   [/\bscience\b/i, { uz: "fan", ru: "наука" }],
   [/\bsciences\b/i, { uz: "fanlari", ru: "науки" }],
+  // Phase T (2026-10-30): the words that were still reaching students in
+  // English inside otherwise-translated field and programme names — "Marine
+  // biologiya", "Financial matematika", "Nanoelectronic Systems".
+  [/\bmultidisciplinary\b/i, { uz: "ko'p fanli", ru: "мультидисциплинарный" }],
+  [/\binterdisciplinary\b/i, { uz: "fanlararo", ru: "междисциплинарный" }],
+  [/\bmarine\b/i, { uz: "dengiz", ru: "морской" }],
+  [/\bmaritime\b/i, { uz: "dengiz", ru: "морской" }],
+  [/\bapplied\b/i, { uz: "amaliy", ru: "прикладной" }],
+  [/\bfinancial\b/i, { uz: "moliyaviy", ru: "финансовый" }],
+  [/\bnanoelectronic\b/i, { uz: "nanoelektronik", ru: "наноэлектронный" }],
+  [/\bsystems\b/i, { uz: "tizimlari", ru: "системы" }],
+  [/\banalysis\b/i, { uz: "tahlili", ru: "анализ" }],
+  [/\bfund\b/i, { uz: "fond", ru: "фонд" }],
+  [/\btechnology\b/i, { uz: "texnologiya", ru: "технологии" }],
+  [/\btechnologies\b/i, { uz: "texnologiyalari", ru: "технологии" }],
+  [/\binformation\b/i, { uz: "axborot", ru: "информационный" }],
+  [/\bearth\b/i, { uz: "yer", ru: "земли" }],
+  [/\blife\b/i, { uz: "hayot", ru: "жизни" }],
+  [/\bfood\b/i, { uz: "oziq-ovqat", ru: "пищевой" }],
+  [/\bsports?\b/i, { uz: "sport", ru: "спортивный" }],
+  [/\bfilm\b/i, { uz: "kino", ru: "кино" }],
+  [/\btelevision\b/i, { uz: "televideniye", ru: "телевидение" }],
+  [/\bmusicology\b/i, { uz: "musiqashunoslik", ru: "музыковедение" }],
+  [/\bmusic\b/i, { uz: "musiqa", ru: "музыка" }],
+  [/\bdrama\b/i, { uz: "dramaturgiya", ru: "драматургия" }],
+  [/\bgovernment\b/i, { uz: "davlat boshqaruvi", ru: "государственное управление" }],
+  [/\binternational\b/i, { uz: "xalqaro", ru: "международный" }],
+  [/\bglobal\b/i, { uz: "global", ru: "глобальный" }],
+  [/\bpublic\b/i, { uz: "jamoat", ru: "общественный" }],
+  [/\baffairs\b/i, { uz: "ishlar", ru: "отношения" }],
+  [/\badministration\b/i, { uz: "boshqaruv", ru: "администрирование" }],
+  [/\bsocial\b/i, { uz: "ijtimoiy", ru: "общественный" }],
+  [/\brelations\b/i, { uz: "munosabatlar", ru: "отношения" }],
+  [/\bpolitical\b/i, { uz: "siyosiy", ru: "политический" }],
+  [/\beconomy\b/i, { uz: "iqtisodiyot", ru: "экономика" }],
+  [/\bcommerce\b/i, { uz: "tijorat", ru: "торговля" }],
+  [/\banimation\b/i, { uz: "animatsiya", ru: "анимация" }],
+  [/\bbiomolecular\b/i, { uz: "biomolekulyar", ru: "биомолекулярный" }],
+  [/\bbiological\b/i, { uz: "biologik", ru: "биологический" }],
+  [/\bprocess\b/i, { uz: "jarayonlar", ru: "процессы" }],
+  [/\bcomputational\b/i, { uz: "hisoblash", ru: "вычислительный" }],
+  [/\bcybernetics\b/i, { uz: "kibernetika", ru: "кибернетика" }],
+  [/\bnanobiology\b/i, { uz: "nanobiologiya", ru: "нанобиология" }],
+  [/\bbioinformatics\b/i, { uz: "bioinformatika", ru: "биоинформатика" }],
+  [/\bbiomedical\b/i, { uz: "biomeditsina", ru: "биомедицинский" }],
+  [/\bmolecular\b/i, { uz: "molekulyar", ru: "молекулярный" }],
+  [/\bmath\b/i, { uz: "matematika", ru: "математика" }],
+  [/\bland economy\b/i, { uz: "yer iqtisodiyoti", ru: "экономика землепользования" }],
+  [/\bsciences and technology\b/i, { uz: "fanlar va texnologiya", ru: "науки и технологии" }],
+  [/\barts\b/i, { uz: "san'at", ru: "искусство" }],
+  [/\bhumanities\b/i, { uz: "gumanitar fanlar", ru: "гуманитарные науки" }],
+  [/\blanguages\b/i, { uz: "tillar", ru: "языки" }],
+  [/\blanguage\b/i, { uz: "til", ru: "язык" }],
+  [/\blinguistics\b/i, { uz: "tilshunoslik", ru: "лингвистика" }],
+  [/\btranslation\b/i, { uz: "tarjima", ru: "перевод" }],
+  [/\bliterature\b/i, { uz: "adabiyot", ru: "литература" }],
+  [/\btheology\b/i, { uz: "ilohiyot", ru: "богословие" }],
+  [/\breligion\b/i, { uz: "din", ru: "религия" }],
+  [/\barchaeology\b/i, { uz: "arxeologiya", ru: "археология" }],
+  [/\bgeography\b/i, { uz: "geografiya", ru: "география" }],
+  [/\bgeology\b/i, { uz: "geologiya", ru: "геология" }],
+  [/\boceanography\b/i, { uz: "okeanografiya", ru: "океанография" }],
+  [/\bmeteorology\b/i, { uz: "meteorologiya", ru: "метеорология" }],
+  [/\bmicrobiology\b/i, { uz: "mikrobiologiya", ru: "микробиология" }],
+  [/\bbiochemistry\b/i, { uz: "biokimyo", ru: "биохимия" }],
+  [/\bzoology\b/i, { uz: "zoologiya", ru: "зоология" }],
+  [/\bbotany\b/i, { uz: "botanika", ru: "ботаника" }],
+  [/\bsustainability\b/i, { uz: "barqarorlik", ru: "устойчивое развитие" }],
+  [/\bplanning\b/i, { uz: "rejalashtirish", ru: "планирование" }],
+  [/\btransport\b/i, { uz: "transport", ru: "транспорт" }],
+  [/\baviation\b/i, { uz: "aviatsiya", ru: "авиация" }],
+  [/\belectronics\b/i, { uz: "elektronika", ru: "электроника" }],
+  [/\bcommunications?\b/i, { uz: "kommunikatsiya", ru: "коммуникации" }],
+  [/\bnetworks?\b/i, { uz: "tarmoqlari", ru: "сети" }],
+  [/\bsecurity\b/i, { uz: "xavfsizlik", ru: "безопасность" }],
+  [/\bethics\b/i, { uz: "etika", ru: "этика" }],
+  [/\bgovernance\b/i, { uz: "boshqaruv", ru: "управление" }],
+  [/\bactuarial\b/i, { uz: "aktuariylik", ru: "актуарный" }],
+  [/\binsurance\b/i, { uz: "sug'urta", ru: "страхование" }],
+  [/\bbanking\b/i, { uz: "bank ishi", ru: "банковское дело" }],
+  [/\btaxation\b/i, { uz: "soliqqa tortish", ru: "налогообложение" }],
+  [/\breal estate\b/i, { uz: "ko'chmas mulk", ru: "недвижимость" }],
+  [/\bretail\b/i, { uz: "chakana savdo", ru: "розничная торговля" }],
+  [/\bphotography\b/i, { uz: "fotografiya", ru: "фотография" }],
+  [/\bpainting\b/i, { uz: "rangtasvir", ru: "живопись" }],
+  [/\bsculpture\b/i, { uz: "haykaltaroshlik", ru: "скульптура" }],
+  [/\bceramics\b/i, { uz: "kulolchilik", ru: "керамика" }],
+  [/\btextile\b/i, { uz: "to'qimachilik", ru: "текстиль" }],
+  [/\bmanufacturing\b/i, { uz: "ishlab chiqarish", ru: "производство" }],
+  [/\bquality\b/i, { uz: "sifat", ru: "качество" }],
+  [/\bproject\b/i, { uz: "loyiha", ru: "проект" }],
+  [/\bhuman\b/i, { uz: "inson", ru: "человек" }],
+  [/\bdevelopment\b/i, { uz: "rivojlanish", ru: "развитие" }],
+  [/\benvironment\b/i, { uz: "atrof-muhit", ru: "окружающая среда" }],
+  [/\bconservation\b/i, { uz: "muhofaza", ru: "охрана" }],
+  [/\bforestry\b/i, { uz: "o'rmonchilik", ru: "лесное хозяйство" }],
+  [/\bhorticulture\b/i, { uz: "bog'dorchilik", ru: "садоводство" }],
+  [/\bagronomy\b/i, { uz: "agronomiya", ru: "агрономия" }],
+  [/\bviticul?ture\b/i, { uz: "vitischilik", ru: "виноградарство" }],
+  [/\boenology\b/i, { uz: "vinochilik", ru: "виноделие" }],
+  [/\banimal\b/i, { uz: "hayvon", ru: "животных" }],
+  [/\bnutrition\b/i, { uz: "oziqlanish", ru: "питание" }],
+  [/\bphysiotherapy\b/i, { uz: "fizioterapiya", ru: "физиотерапия" }],
+  [/\bmidwifery\b/i, { uz: "doyalik", ru: "акушерство" }],
+  [/\bradiograph(y|ic)\b/i, { uz: "radiografiya", ru: "радиография" }],
+  [/\boptometry\b/i, { uz: "optometriya", ru: "оптометрия" }],
+  [/\bdental\b/i, { uz: "stomatologiya", ru: "стоматология" }],
+  [/\bsurgery\b/i, { uz: "jarrohlik", ru: "хирургия" }],
+  [/\bpaediatrics\b/i, { uz: "pediatriya", ru: "педиатрия" }],
+  [/\bcardiology\b/i, { uz: "kardiologiya", ru: "кардиология" }],
+  [/\boncology\b/i, { uz: "onkologiya", ru: "онкология" }],
+  [/\bimmunology\b/i, { uz: "immunologiya", ru: "иммунология" }],
+  [/\bpharmacology\b/i, { uz: "farmakologiya", ru: "фармакология" }],
+  [/\bepidemiology\b/i, { uz: "epidemiologiya", ru: "эпидемиология" }],
+  [/\bleadership\b/i, { uz: "yetakchilik", ru: "лидерство" }],
+  [/\bmathematical\b/i, { uz: "matematik", ru: "математические" }],
+  [/\beast asia(n)?\b/i, { uz: "Sharqiy Osiyo", ru: "Восточная Азия" }],
+  [/\bcivil\b/i, { uz: "qurilish", ru: "строительный" }],
+  [/\barctic\b/i, { uz: "Arktika", ru: "Арктика" }],
+  [/\barchitectural\b/i, { uz: "arxitektura", ru: "архитектурный" }],
+  [/\bstudies?\b/i, { uz: "ta'limoti", ru: "исследования" }],
 ];
+
+/**
+ * Every English word the alias layer knows how to translate, paired with what
+ * it becomes. If one of these is still present after the alias pass, the label
+ * was only PARTLY translated — and a half-translated label ("Applied
+ * matematika", "Life fanlari", "Financial muhandislik") reads worse than the
+ * original. `localizeMajorOrField` therefore falls back to the original label
+ * instead of shipping the hybrid: clean or verbatim, never mangled.
+ */
+const ALIAS_WORDS: Array<{ words: string[]; translation: Record<TargetLocale, string> }> =
+  FIELD_WORD_ALIASES.map(([re, translation]) => ({
+    words: re.source
+      .replace(/\\b/g, " ")
+      .replace(/\\/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter((word) => /^[a-z]+$/.test(word)),
+    translation,
+  }));
+
+/**
+ * English words that have no deterministic Uzbek/Russian equivalent in this
+ * engine (institution names, degree plumbing). A label that still contains one
+ * cannot be finished, so it is shown in the source language instead of being
+ * half-replaced.
+ */
+const UNTRANSLATABLE_ENGLISH = new Set([
+  "program",
+  "programme",
+  "programs",
+  "school",
+  "college",
+  "university",
+  "institute",
+  "faculty",
+  "academy",
+  "campus",
+  "graduate",
+  "undergraduate",
+  "degree",
+  "course",
+  "honours",
+  "honors",
+  "diploma",
+  "certificate",
+  "foundation",
+  "executive",
+  "advanced",
+  "professional",
+  "integrated",
+  "joint",
+  "dual",
+  "online",
+  "full-time",
+  "part-time",
+]);
+
+/** True when `value` still contains an English word the alias layer can translate. */
+function hasEnglishResidue(value: string, tl: TargetLocale): boolean {
+  const tokens = new Set(value.toLowerCase().split(/[^a-z'-]+/).filter(Boolean));
+  for (const token of tokens) if (UNTRANSLATABLE_ENGLISH.has(token)) return true;
+  return ALIAS_WORDS.some(
+    (alias) =>
+      alias.translation[tl].toLowerCase() !== alias.words.join(" ") &&
+      alias.words.some((word) => tokens.has(word))
+  );
+}
+
+/**
+ * Exposed for the catalogue-language gate: does this label still read as
+ * English after localization? Used to assert that every live `programs.field`
+ * value is fully translated rather than silently falling back.
+ */
+export function isUntranslatedLabel(original: string | null | undefined, locale: Locale): boolean {
+  if (original == null || original.trim() === "") return false;
+  if (locale === "en") return false;
+  const localized = localizeMajorOrField(original, locale);
+  return localized.trim() === original.trim() && hasEnglishResidue(original, locale);
+}
 
 /**
  * Localize a study-field / major / program-field name. Three layers:
@@ -468,7 +760,7 @@ export function localizeMajorOrField(field: string | null | undefined, locale: L
       return trimmed
         .split(sep)
         .map((part) => localizeMajorOrField(part, locale))
-        .join(sep === " and " ? (tl === "uz" ? " va " : " и ") : sep);
+        .join(sep === " and " || sep === " & " ? (tl === "uz" ? " va " : " и ") : sep);
     }
   }
   // Word/alias layer on the full remaining string.
@@ -478,6 +770,9 @@ export function localizeMajorOrField(field: string | null | undefined, locale: L
       out = out.replace(pattern, translations[tl]);
     }
   }
+  // Anything still English means the alias pass only translated part of the
+  // label. Ship the original rather than a hybrid.
+  if (hasEnglishResidue(out, tl)) return trimmed;
   // Preserve the label's initial capital ("Bioengineering" → "Bioinjiniring").
   if (out && trimmed[0] === trimmed[0].toUpperCase() && trimmed[0] !== trimmed[0].toLowerCase()) {
     out = out.charAt(0).toUpperCase() + out.slice(1);
@@ -556,6 +851,30 @@ const FUNDING_TYPE_NAMES: Record<string, Record<TargetLocale, string>> = {
   "Full funding": { uz: "To'liq moliyalashtirish", ru: "Полное финансирование" },
   "Partial funding": { uz: "Qisman moliyalashtirish", ru: "Частичное финансирование" },
   "Tuition only": { uz: "Faqat kontrakt", ru: "Только обучение" },
+  // Phase T: every short funding_type value that appears in the live catalogue
+  // (45 Merit-based, 22 Fully Funded, 13 Full Funding, 12 Fully funded, …).
+  "Fully Funded": { uz: "To'liq moliyalashtirilgan", ru: "Полностью финансируемая" },
+  "Fully funded": { uz: "To'liq moliyalashtirilgan", ru: "Полностью финансируемая" },
+  "Fully funded scholarship": { uz: "To'liq moliyalashtirilgan stipendiya", ru: "Полностью финансируемая стипендия" },
+  "Full Funding": { uz: "To'liq moliyalashtirish", ru: "Полное финансирование" },
+  Partial: { uz: "Qisman", ru: "Частичная" },
+  "Stipend only": { uz: "Faqat stipendiya", ru: "Только стипендия" },
+  "Government scholarship": { uz: "Hukumat stipendiyasi", ru: "Государственная стипендия" },
+  "Merit-based tuition waiver": {
+    uz: "Natijaga asoslangan kontrakt ozodligi",
+    ru: "Освобождение от оплаты по заслугам",
+  },
+  "Merit-based tuition fee reduction": {
+    uz: "Natijaga asoslangan kontrakt chegirmasi",
+    ru: "Скидка на обучение по заслугам",
+  },
+  "Merit-based tuition discount": {
+    uz: "Natijaga asoslangan kontrakt chegirmasi",
+    ru: "Скидка на обучение по заслугам",
+  },
+  "Merit-based scholarship": { uz: "Natijaga asoslangan stipendiya", ru: "Стипендия по заслугам" },
+  "Need and merit": { uz: "Ehtiyoj va natija", ru: "Потребность и заслуги" },
+  "Tuition fee waiver": { uz: "Kontraktdan ozod qilish", ru: "Освобождение от оплаты обучения" },
 };
 
 export function localizeFundingType(type: string | null | undefined, locale: Locale): string {
@@ -1108,39 +1427,275 @@ export function localizeHighlights<T extends string | unknown[] | null | undefin
  * 7. PATTERN LAYER — PROGRAM NAMES
  * ========================================================================== */
 
-/** Degree prefix table — capture groups are positional (ES2017 target):
- *  1: prefix token, 2: optional "in", 3: field. */
-const DEGREE_PREFIX_PARSERS: Array<{ re: RegExp; kind: "bsc" | "ba" | "beng" | "msc" | "ma" | "meng" | "phd" | "other" }> = [
-  { re: /^(BSc|Bachelor of Science|BS)\s+(?:in\s+)?(.+)$/i, kind: "bsc" },
-  { re: /^(BA|Bachelor of Arts)\s+(?:in\s+)?(.+)$/i, kind: "ba" },
-  { re: /^(BEng|Bachelor of Engineering|BE)\s+(?:in\s+)?(.+)$/i, kind: "beng" },
-  { re: /^(MSc|Master of Science|MS)\s+(?:in\s+)?(.+)$/i, kind: "msc" },
-  { re: /^(MA|Master of Arts)\s+(?:in\s+)?(.+)$/i, kind: "ma" },
-  { re: /^(MEng|Master of Engineering)\s+(?:in\s+)?(.+)$/i, kind: "meng" },
-  { re: /^(PhD|Doctor of Philosophy|DPhil)\s+(?:in\s+)?(.+)$/i, kind: "phd" },
+/**
+ * Phase T (2026-10-30). The live catalogue has 1138 distinct programme titles
+ * built from a small, stable grammar: a degree token (`BSc`, `LLM`, `Master of
+ * Engineering`, `MB BChir`) followed by a field, usually with `in`/`of`, often
+ * with a parenthetical that is a business school, an abbreviation, an honours
+ * marker or a taught language. The parser below handles that grammar
+ * compositionally; when a title does not decompose it returns the ORIGINAL
+ * title verbatim rather than emitting a half-English hybrid.
+ */
+
+type DegreeKind =
+  | "bsc"
+  | "ba"
+  | "beng"
+  | "bba"
+  | "bcom"
+  | "bdes"
+  | "bfa"
+  | "bmus"
+  | "btech"
+  | "bvsc"
+  | "bss"
+  | "llb"
+  | "mbbs"
+  | "mbchir"
+  | "bds"
+  | "md"
+  | "jd"
+  | "dvm"
+  | "pharmd"
+  | "msc"
+  | "ma"
+  | "meng"
+  | "mba"
+  | "mpa"
+  | "mph"
+  | "mfa"
+  | "med"
+  | "mphil"
+  | "mres"
+  | "llm"
+  | "mle"
+  | "phd"
+  | "edd"
+  | "generic-bachelor"
+  | "generic-master"
+  | "generic-doctor";
+
+/**
+ * Degree tokens, LONGEST FIRST. Every token the live catalogue uses is listed
+ * explicitly; the generic `Bachelor`/`Master`/`Doctor` entries catch the rest
+ * (`Bachelor of Design in Animation`, `Master of Land Economy`).
+ */
+const DEGREE_TOKENS: Array<{ re: RegExp; kind: DegreeKind; subjectGroup?: number }> = [
+  // Long forms that imply a specific degree.
+  { re: /^Bachelor of Business Administration\b/i, kind: "bba" },
+  { re: /^Bachelor of Science\b/i, kind: "bsc" },
+  { re: /^Bachelor of Engineering\b/i, kind: "beng" },
+  { re: /^Bachelor of Design\b/i, kind: "bdes" },
+  { re: /^Bachelor of Fine Arts\b/i, kind: "bfa" },
+  { re: /^Bachelor of Laws?\b/i, kind: "llb" },
+  { re: /^Bachelor of Medicine\b/i, kind: "mbbs" },
+  { re: /^Bachelor of Music\b/i, kind: "bmus" },
+  { re: /^Bachelor of Technology\b/i, kind: "btech" },
+  { re: /^Bachelor of Veterinary Science\b/i, kind: "bvsc" },
+  { re: /^Bachelor of Business\b/i, kind: "bba" },
+  { re: /^Master of Business Administration\b/i, kind: "mba" },
+  { re: /^Master of Public Administration\b/i, kind: "mpa" },
+  { re: /^Master of Public Health\b/i, kind: "mph" },
+  { re: /^Master of Laws\b/i, kind: "llm" },
+  { re: /^Master of Engineering\b/i, kind: "meng" },
+  { re: /^Master of Science\b/i, kind: "msc" },
+  { re: /^Master of Arts\b/i, kind: "ma" },
+  { re: /^Master of Education\b/i, kind: "med" },
+  { re: /^Master of Fine Arts\b/i, kind: "mfa" },
+  { re: /^Master of Philosophy\b/i, kind: "mphil" },
+  { re: /^Master of Research\b/i, kind: "mres" },
+  { re: /^Master of Land Economy\b/i, kind: "mle" },
+  { re: /^Master of (Business|Finance|Management|Information Technology|IT)\b/i, kind: "generic-master", subjectGroup: 1 },
+  { re: /^Bachelor of (Finance|Commerce|Management)\b/i, kind: "generic-bachelor", subjectGroup: 1 },
+  { re: /^Doctor of Philosophy\b/i, kind: "phd" },
+  { re: /^Doctor of Medicine\b/i, kind: "md" },
+  { re: /^Doctor of Education\b/i, kind: "edd" },
+  { re: /^Doctor of Veterinary Medicine\b/i, kind: "dvm" },
+  { re: /^Doctor of Pharmacy\b/i, kind: "pharmd" },
+  // Generic long forms — the field follows (`Bachelor of Design in Animation`).
+  { re: /^Bachelor\b/i, kind: "generic-bachelor" },
+  { re: /^Master\b/i, kind: "generic-master" },
+  { re: /^Doctor\b/i, kind: "generic-doctor" },
+  // Abbreviations — longest first, word-boundary safe.
+  { re: /^MB\s?BChir\b/i, kind: "mbchir" },
+  { re: /^MBBS\b/i, kind: "mbbs" },
+  { re: /^MPhil\b/i, kind: "mphil" },
+  { re: /^MRes\b/i, kind: "mres" },
+  { re: /^PharmD\b/i, kind: "pharmd" },
+  { re: /^BTech\b/i, kind: "btech" },
+  { re: /^BVSc\b/i, kind: "bvsc" },
+  { re: /^BEng\b/i, kind: "beng" },
+  { re: /^BDes\b/i, kind: "bdes" },
+  { re: /^BMus\b/i, kind: "bmus" },
+  { re: /^BCom\b/i, kind: "bcom" },
+  { re: /^BBA\b/i, kind: "bba" },
+  { re: /^BFA\b/i, kind: "bfa" },
+  { re: /^BSS\b/i, kind: "bss" },
+  { re: /^BSc\b/i, kind: "bsc" },
+  { re: /^BDS\b/i, kind: "bds" },
+  { re: /^LL\.?M\b/i, kind: "llm" },
+  { re: /^LL\.?B\b/i, kind: "llb" },
+  { re: /^MBA\b/i, kind: "mba" },
+  { re: /^MPA\b/i, kind: "mpa" },
+  { re: /^MPH\b/i, kind: "mph" },
+  { re: /^MEng\b/i, kind: "meng" },
+  { re: /^MEd\b/i, kind: "med" },
+  { re: /^MFA\b/i, kind: "mfa" },
+  { re: /^MSc\b/i, kind: "msc" },
+  { re: /^MLE\b/i, kind: "mle" },
+  { re: /^DPhil\b/i, kind: "phd" },
+  { re: /^PhD\b/i, kind: "phd" },
+  { re: /^EdD\b/i, kind: "edd" },
+  { re: /^DVM\b/i, kind: "dvm" },
+  { re: /^JD\b/, kind: "jd" },
+  { re: /^MD\b/, kind: "md" },
+  { re: /^MA\b/, kind: "ma" },
+  { re: /^MS\b/, kind: "msc" },
+  { re: /^BS\b/, kind: "bsc" },
+  { re: /^BA\b/, kind: "ba" },
+  // Foreign-language degree words the catalogue carries (`Licenciatura en
+  // Economía`). The original token is kept inside the label, never dropped.
+  { re: /^Licenciatura\b/i, kind: "generic-bachelor" },
+  { re: /^Ingenier[ií]a\b/i, kind: "beng" },
 ];
 
-const DEGREE_PREFIX_LABELS: Record<string, Record<TargetLocale, string>> = {
+/** Degree display labels — the acronym stays visible in every locale. */
+const DEGREE_LABELS: Record<DegreeKind, Record<TargetLocale, string>> = {
   bsc: { uz: "bakalavr (BSc)", ru: "бакалавр наук (BSc)" },
   ba: { uz: "bakalavr (BA)", ru: "бакалавр гуманитарных наук (BA)" },
   beng: { uz: "muhandislik bakalavri (BEng)", ru: "бакалавр инженерии (BEng)" },
+  bba: { uz: "biznes boshqaruvi bakalavri (BBA)", ru: "бакалавр бизнеса (BBA)" },
+  bcom: { uz: "tijorat bakalavri (BCom)", ru: "бакалавр коммерции (BCom)" },
+  bdes: { uz: "dizayn bakalavri (BDes)", ru: "бакалавр дизайна (BDes)" },
+  bfa: { uz: "tasviriy san'at bakalavri (BFA)", ru: "бакалавр искусств (BFA)" },
+  bmus: { uz: "musiqa bakalavri (BMus)", ru: "бакалавр музыки (BMus)" },
+  btech: { uz: "texnologiya bakalavri (BTech)", ru: "бакалавр технологий (BTech)" },
+  bvsc: { uz: "veterinariya bakalavri (BVSc)", ru: "бакалавр ветеринарии (BVSc)" },
+  bss: { uz: "ijtimoiy fanlar bakalavri (BSS)", ru: "бакалавр социальных наук (BSS)" },
+  llb: { uz: "huquq bakalavri (LLB)", ru: "бакалавр права (LLB)" },
+  mbbs: { uz: "tibbiyot bakalavri (MBBS)", ru: "бакалавр медицины (MBBS)" },
+  mbchir: { uz: "tibbiyot va jarrohlik bakalavri (MB BChir)", ru: "бакалавр медицины и хирургии (MB BChir)" },
+  bds: { uz: "stomatologiya bakalavri (BDS)", ru: "бакалавр стоматологии (BDS)" },
+  md: { uz: "tibbiyot doktori (MD)", ru: "доктор медицины (MD)" },
+  jd: { uz: "huquq doktori (JD)", ru: "доктор права (JD)" },
+  dvm: { uz: "veterinariya doktori (DVM)", ru: "доктор ветеринарии (DVM)" },
+  pharmd: { uz: "farmatsiya doktori (PharmD)", ru: "доктор фармации (PharmD)" },
   msc: { uz: "magistr (MSc)", ru: "магистр наук (MSc)" },
   ma: { uz: "magistr (MA)", ru: "магистр гуманитарных наук (MA)" },
   meng: { uz: "muhandislik magistri (MEng)", ru: "магистр инженерии (MEng)" },
+  mba: { uz: "biznes boshqaruvi magistri (MBA)", ru: "магистр делового администрирования (MBA)" },
+  mpa: { uz: "davlat boshqaruvi magistri (MPA)", ru: "магистр государственного управления (MPA)" },
+  mph: { uz: "jamoat salomatligi magistri (MPH)", ru: "магистр общественного здравоохранения (MPH)" },
+  mfa: { uz: "tasviriy san'at magistri (MFA)", ru: "магистр искусств (MFA)" },
+  med: { uz: "ta'lim magistri (MEd)", ru: "магистр образования (MEd)" },
+  mphil: { uz: "falsafa magistri (MPhil)", ru: "магистр философии (MPhil)" },
+  mres: { uz: "tadqiqot magistri (MRes)", ru: "магистр исследований (MRes)" },
+  llm: { uz: "huquq magistri (LLM)", ru: "магистр права (LLM)" },
+  mle: { uz: "yer iqtisodiyoti magistri (MLE)", ru: "магистр экономики землепользования (MLE)" },
   phd: { uz: "doktorantura (PhD)", ru: "докторантура (PhD)" },
+  edd: { uz: "ta'lim doktori (EdD)", ru: "доктор образования (EdD)" },
+  "generic-bachelor": { uz: "bakalavr", ru: "бакалавр" },
+  "generic-master": { uz: "magistr", ru: "магистр" },
+  "generic-doctor": { uz: "doktorantura", ru: "докторантура" },
 };
+
+/** `(English-taught)` and friends — the taught language, stated in the locale. */
+const TAUGHT_LANGUAGE_TAGS: Array<{ re: RegExp; label: Record<TargetLocale, string> }> = [
+  { re: /\((?:english[-\s]taught|taught in english)\)/i, label: { uz: "ingliz", ru: "английском" } },
+  { re: /\((?:russian[-\s]taught|taught in russian)\)/i, label: { uz: "rus", ru: "русском" } },
+  { re: /\((?:chinese[-\s]taught|taught in chinese)\)/i, label: { uz: "xitoy", ru: "китайском" } },
+  { re: /\((?:german[-\s]taught|taught in german)\)/i, label: { uz: "nemis", ru: "немецком" } },
+  { re: /\((?:french[-\s]taught|taught in french)\)/i, label: { uz: "fransuz", ru: "французском" } },
+  { re: /\((?:spanish[-\s]taught|taught in spanish)\)/i, label: { uz: "ispan", ru: "испанском" } },
+  { re: /\((?:korean[-\s]taught|taught in korean)\)/i, label: { uz: "koreys", ru: "корейском" } },
+  { re: /\((?:japanese[-\s]taught|taught in japanese)\)/i, label: { uz: "yapon", ru: "японском" } },
+];
+
+/** Words that mark a parenthetical as an institution's proper name. */
+const INSTITUTION_WORDS =
+  /\b(school|college|university|institute|faculty|academy|campus|business\s+school|programme|program)\b/i;
+
+/** `(Hons)` / `(Honours)` — a classification, not part of the field. */
+const HONOURS_MARKER = /\((?:hons?|honours)\.?\)/i;
 
 const PROGRAM_NAME_FULL: Record<string, Record<TargetLocale, string>> = {
   MBA: { uz: "Biznes boshqaruvi magistri (MBA)", ru: "Магистр делового администрирования (MBA)" },
   "Master of Business Administration": { uz: "Biznes boshqaruvi magistri (MBA)", ru: "Магистр делового администрирования (MBA)" },
   "Master of Business Administration (MBA)": { uz: "Biznes boshqaruvi magistri (MBA)", ru: "Магистр делового администрирования (MBA)" },
+  "Master of Engineering": { uz: "Muhandislik magistri (MEng)", ru: "Магистр инженерии (MEng)" },
+  "JD (Juris Doctor)": { uz: "Huquq doktori (JD)", ru: "Доктор права (JD)" },
 };
+
+/** Split a trailing `(…)` off a title. */
+function splitTrailingQualifier(text: string): { base: string; qualifier: string | null } {
+  const match = text.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if (!match) return { base: text.trim(), qualifier: null };
+  return { base: match[1].trim(), qualifier: match[2].trim() };
+}
+
+/**
+ * True when a parenhetical can stand in for the field — i.e. the degree token
+ * carried no field of its own and the parenthesis is not an institution name.
+ */
+function qualifierAsField(qualifier: string, locale: Locale): string | null {
+  if (INSTITUTION_WORDS.test(qualifier)) return null;
+  const localized = localizeMajorOrField(qualifier, locale);
+  if (localized === qualifier) return null;
+  return localized;
+}
+
+/** Code-style parentheticals (`CPES Program`, `TFT`) never become a field. */
+function cleanQualifier(qualifier: string, kind: DegreeKind): string | null {
+  const label = DEGREE_LABELS[kind];
+  const bare = qualifier.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+  // `Doctor of Medicine (M.D.)` / `MBA (MBA)` — the parenthesis repeats the degree.
+  if (label && (bare === "md" || bare === "mba") && /^\((?:MD|MBA)\)$/i.test(qualifier)) return null;
+  const withoutProgram = qualifier.replace(/\s*(?:program|programme)$/i, "").trim();
+  if (withoutProgram !== qualifier && /^[A-Z0-9&.\s-]+$/.test(withoutProgram)) return withoutProgram;
+  return qualifier;
+}
+
+/** Does the degree label already say the field? (`MEng in Engineering`) */
+function labelCoversField(label: string, field: string): boolean {
+  // "MEng in Engineering", "LLB Law", "MBA Business Administration" — the
+  // degree name already says the field, so repeating it reads as a mistake.
+  // A longer field ("Scots and English Law") is real content and is kept.
+  const words = field.trim().split(/\s+/);
+  if (words.length > 2) return false;
+  const tokens = label.toLowerCase().match(/[a-z\u0400-\u04FF']{5,}/g) ?? [];
+  // EVERY word must already be named by the degree label — "Ekologik huquq"
+  // shares "huquq" with "huquq magistri" but is still real content.
+  return words.every((word) => tokens.some((token) => word.toLowerCase().includes(token)));
+}
+
+interface CompositionInput {
+  kind: DegreeKind;
+  field: string | null;
+  qualifier: string | null;
+  honours: boolean;
+  taughtIn: Record<TargetLocale, string> | null;
+  tl: TargetLocale;
+}
+
+function composeProgramName({ kind, field, qualifier, honours, taughtIn, tl }: CompositionInput): string {
+  const label = DEGREE_LABELS[kind][tl];
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+  let out: string;
+  if (!field) out = labelCap;
+  else if (tl === "uz") out = `${field} bo'yicha ${label}`;
+  else out = `${labelCap} — ${field}`;
+  if (honours) out += tl === "uz" ? " (imtiyozli)" : " (с отличием)";
+  if (taughtIn) out += tl === "uz" ? `, ${taughtIn.uz} tilida` : `, обучение на ${taughtIn.ru} языке`;
+  if (qualifier) out += ` — ${qualifier}`;
+  return out;
+}
 
 /**
  * Localize a program name with the spec's compositional rule:
  *   uz: "{Field} bo'yicha bakalavr (BSc)" / "{Field} bo'yicha magistr (MSc)"
  *   ru: "Бакалавр наук (BSc) — {Field}" / "Магистр наук (MSc) — {Field}"
- * `en` returns the input verbatim.
+ * `en` returns the input verbatim; an unparseable title is returned verbatim
+ * rather than reconstructed from half-translated parts.
  */
 export function localizeProgramName(name: string | null | undefined, locale: Locale): string {
   if (locale === "en" || name == null || name === "") return name ?? "";
@@ -1149,30 +1704,86 @@ export function localizeProgramName(name: string | null | undefined, locale: Loc
   const trimmed = name.trim();
   const full = PROGRAM_NAME_FULL[trimmed];
   if (full) return full[tl];
-  for (const { re, kind } of DEGREE_PREFIX_PARSERS) {
-    const m = trimmed.match(re);
-    if (m) {
-      const field = localizeMajorOrField(m[2], locale);
-      const prefix = DEGREE_PREFIX_LABELS[kind][tl];
-      if (tl === "uz") return `${field} bo'yicha ${prefix}`;
-      return `${prefix.charAt(0).toUpperCase()}${prefix.slice(1)} — ${field}`;
+
+  // 1. Markers that are classification, not content.
+  let working = trimmed;
+  let honours = false;
+  if (HONOURS_MARKER.test(working)) {
+    honours = true;
+    working = working.replace(HONOURS_MARKER, " ").replace(/\s+/g, " ").trim();
+  }
+  let taughtIn: Record<TargetLocale, string> | null = null;
+  for (const tag of TAUGHT_LANGUAGE_TAGS) {
+    if (tag.re.test(working)) {
+      taughtIn = tag.label;
+      working = working.replace(tag.re, " ").replace(/\s+/g, " ").trim();
+      break;
     }
   }
-  // "Bachelor in X" / "Master in X" without a degree token.
-  const simple = trimmed.match(/^(Bachelor|Master|Doctor)\s+(?:in\s+)?(.+)$/i);
-  if (simple) {
-    const field = localizeMajorOrField(simple[2], locale);
-    const base = simple[1].toLowerCase();
-    if (tl === "uz") {
-      const prefix = base === "bachelor" ? "bakalavr" : base === "master" ? "magistr" : "doktorantura (PhD)";
-      return `${field} bo'yicha ${prefix}`;
+
+  // 2. Trailing parenthetical.
+  const { base, qualifier } = splitTrailingQualifier(working);
+
+  // 3. Degree token, then the field after `of` / `in` / `en`.
+  for (const { re, kind, subjectGroup } of DEGREE_TOKENS) {
+    const match = base.match(re);
+    if (!match) continue;
+    const subject = subjectGroup != null ? match[subjectGroup] : null;
+    let rest = base.slice(match[0].length);
+    // "Master of Laws (LLM) in Environmental Law" — the parenthesis repeats the
+    // token, the field follows it.
+    rest = rest.replace(/^\s*\(([A-Za-z.]{2,8})\)\s*/, " ");
+    // "LLB Bachelor of Laws" — the long form repeats the abbreviation.
+    rest = rest.replace(/\b(?:Bachelor|Master|Doctor)\s+of\s+(?:[A-Z][a-z]+\s*)+$/i, " ");
+    rest = rest.replace(/^\s*(?:of|in|en)\s+/i, "").replace(/\s+/g, " ").trim();
+
+    let field: string | null = null;
+    let keptQualifier = qualifier;
+    if (rest) {
+      if (isUntranslatedLabel(rest, locale)) return name; // clean or verbatim
+      field = localizeMajorOrField(rest, locale);
+    } else if (subject) {
+      field = localizeMajorOrField(subject, locale);
+    } else if (qualifier) {
+      const fromQualifier = qualifierAsField(qualifier, locale);
+      if (fromQualifier) {
+        field = fromQualifier;
+        keptQualifier = null;
+      }
     }
-    const prefix = base === "bachelor" ? "Бакалавриат" : base === "master" ? "Магистратура" : "Докторантура (PhD)";
-    return `${prefix} — ${field}`;
+
+    const label = DEGREE_LABELS[kind][tl];
+    if (field && labelCoversField(label, field)) field = null;
+    if (keptQualifier) keptQualifier = cleanQualifier(keptQualifier, kind);
+    if (keptQualifier && field && keptQualifier === field) keptQualifier = null;
+    return composeProgramName({ kind, field, qualifier: keptQualifier, honours, taughtIn, tl });
   }
-  // Unknown programme titles may be official names or distinctive wording.
-  // Do not token-translate them: keep the canonical name verbatim unless the
-  // deterministic degree-prefix parser above can safely reconstruct it.
+
+  // 4. No degree token: `College - Field`, or a bare field name.
+  const dash = base.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (dash) {
+    const right = localizeMajorOrField(dash[2].trim(), locale);
+    if (right !== dash[2].trim() && !isUntranslatedLabel(dash[2].trim(), locale)) {
+      const tail = qualifier ? ` (${qualifier})` : "";
+      return `${dash[1].trim()} — ${right}${tail}`;
+    }
+  }
+  const bare = localizeMajorOrField(base, locale);
+  if (bare !== base && !isUntranslatedLabel(base, locale)) {
+    if (!qualifier) return bare;
+    // A parenthesis that carries content ("Physics/Chemistry/Math") is
+    // translated; an institution or a foreign-language original is kept.
+    const inner = localizeMajorOrField(qualifier, locale);
+    if (inner === bare) return bare; // "Medicina (Medicine)" → "Tibbiyot"
+    const tail = inner !== qualifier && !INSTITUTION_WORDS.test(qualifier) ? inner : qualifier;
+    return `${bare} (${tail})`;
+  }
+  // A foreign-language title whose parenthesis is the English field:
+  // "Agronomía (Agriculture)" → "Qishloq xo'jaligi (Agronomía)".
+  if (qualifier) {
+    const inner = localizeMajorOrField(qualifier, locale);
+    if (inner !== qualifier && !isUntranslatedLabel(qualifier, locale)) return `${inner} (${base})`;
+  }
   return name;
 }
 
@@ -1464,6 +2075,195 @@ function translateScholarshipDescription(text: string, locale: Locale): string {
 export function localizeScholarshipRequirements(text: string | null | undefined, locale: Locale): string {
   return localizeRequirementText(text, locale);
 }
+
+/* ============================================================================
+ * 9b. SOURCE-LANGUAGE PROSE — translate what we can, label what we cannot
+ * ========================================================================== */
+
+/**
+ * Phase T (2026-10-30). 547 awards carry ~3000 English free-text strings in
+ * `description`, `requirements`, `tuition_coverage` and
+ * `english_requirements` — 446 of them distinct. A deterministic dictionary
+ * cannot translate free prose, and machine translation is not allowed here.
+ *
+ * The rule the product owner chose: the text stays where it is, but an explicit
+ * "source language: English" label sits directly above it, so a student never
+ * mistakes English for a broken Uzbek translation. Everything that IS
+ * translatable deterministically (test scores, the common coverage phrasings)
+ * is translated first, and then needs no label at all.
+ */
+
+/** English function words — the fingerprint of an untranslated sentence. */
+const ENGLISH_FUNCTION_WORDS = new Set([
+  "the",
+  "of",
+  "and",
+  "is",
+  "are",
+  "was",
+  "were",
+  "to",
+  "for",
+  "with",
+  "by",
+  "in",
+  "on",
+  "that",
+  "this",
+  "these",
+  "which",
+  "from",
+  "at",
+  "as",
+  "be",
+  "not",
+  "or",
+  "an",
+  "its",
+  "their",
+  "they",
+  "will",
+  "can",
+  "must",
+  "should",
+  "who",
+  "when",
+  "if",
+  "also",
+  "may",
+  "has",
+  "have",
+  "does",
+  "than",
+  "there",
+]);
+
+/**
+ * True when a string reads as an English sentence rather than a code, a score
+ * or a proper name. `IELTS 6.5 / TOEFL 94 / DET 120` is NOT prose; `No
+ * scholarship-specific English score is published` is.
+ */
+export function isEnglishProse(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const words = value.toLowerCase().match(/[a-z']+/g) ?? [];
+  if (words.length < 6) return false;
+  let hits = 0;
+  for (const word of words) if (ENGLISH_FUNCTION_WORDS.has(word)) hits++;
+  return hits >= 2;
+}
+
+/**
+ * Should the rendered string carry the "source language: English" label?
+ * True only when the localized output still reads as English prose — a
+ * translated Uzbek/Russian string contains none of the English function words.
+ */
+export function needsSourceLanguageLabel(
+  original: string | null | undefined,
+  localized: string | null | undefined,
+  locale: Locale
+): boolean {
+  if (locale === "en") return false;
+  if (!original || !original.trim()) return false;
+  return isEnglishProse(localized ?? "");
+}
+
+/** Value the caller renders, plus whether it needs the source-language label. */
+export interface LocalizedProse {
+  text: string;
+  sourceLanguage: boolean;
+}
+
+/** Run one dictionary/pattern translator and report whether a label is needed. */
+export function localizeProse(
+  original: string | null | undefined,
+  locale: Locale,
+  translate: (value: string, locale: Locale) => string
+): LocalizedProse {
+  const source = original ?? "";
+  if (!source.trim()) return { text: "", sourceLanguage: false };
+  const text = locale === "en" ? source : translate(source, locale);
+  return { text, sourceLanguage: needsSourceLanguageLabel(source, text, locale) };
+}
+
+/** Coverage phrasings that appear verbatim in the live catalogue, often. */
+const TUITION_COVERAGE_EXACT: Record<string, Record<TargetLocale, string>> = {
+  None: { uz: "Qoplammaydi", ru: "Не покрывается" },
+  "Not specified": { uz: "Ko'rsatilmagan", ru: "Не указано" },
+  "Full tuition": { uz: "To'liq kontrakt", ru: "Полное обучение" },
+  "Full Tuition": { uz: "To'liq kontrakt", ru: "Полное обучение" },
+  "Partial tuition": { uz: "Qisman kontrakt", ru: "Частичное обучение" },
+  "Full tuition waiver": { uz: "To'liq kontraktdan ozod qilish", ru: "Полное освобождение от оплаты" },
+  "Tuition-free education": { uz: "Kontraktsiz ta'lim", ru: "Бесплатное обучение" },
+  "Tuition-free German university": { uz: "Kontraktsiz nemis universiteti", ru: "Бесплатный немецкий университет" },
+  "Tuition-free German state university": {
+    uz: "Kontraktsiz nemis davlat universiteti",
+    ru: "Бесплатный немецкий государственный университет",
+  },
+  "100% Tuition Fee Waiver": { uz: "Kontraktdan 100% ozod qilish", ru: "100% освобождение от оплаты" },
+  "100% Tuition Waiver": { uz: "Kontraktdan 100% ozod qilish", ru: "100% освобождение от оплаты" },
+  "100% Tuition Fee Exemption": { uz: "Kontraktdan 100% ozod qilish", ru: "100% освобождение от оплаты" },
+  "Partial tuition (fee discount)": { uz: "Qisman kontrakt (chegirma)", ru: "Частичное обучение (скидка)" },
+};
+
+/**
+ * Tuition-coverage text. Exact rows and the percentage phrasings are
+ * translated; free prose is returned verbatim for the caller to label.
+ */
+export function localizeTuitionCoverage(text: string | null | undefined, locale: Locale): string {
+  if (locale === "en" || text == null || text === "") return text ?? "";
+  const tl = targetLocale(locale);
+  if (!tl) return text;
+  const trimmed = text.trim();
+  const exact = TUITION_COVERAGE_EXACT[trimmed] ?? TUITION_COVERAGE_EXACT[keyOf(trimmed)];
+  if (exact) return exact[tl];
+  const words = trimmed.toLowerCase();
+  // "Full tuition waiver", "Partial tuition + stipend".
+  const simple = words.match(/^(full|partial)\s+tuition(?:\s+(?:fee\s+)?(?:waiver|exemption|discount|reduction))?$/);
+  if (simple) {
+    const full = simple[1] === "full";
+    if (tl === "uz") return full ? "To'liq kontrakt" : "Qisman kontrakt";
+    return full ? "Полное обучение" : "Частичное обучение";
+  }
+  // "100% of the annual tuition fee waived", "50% tuition waiver".
+  const percent = words.match(/^(\d{1,3})\s*(?:%|per\s?cent|percent)\s+(?:of\s+)?(?:the\s+)?(?:annual\s+|programme\s+|program\s+)?tuition\s*(?:fee|fees)?\s*(?:waiver|exemption|discount|reduction|covered|paid)?$/);
+  if (percent) {
+    const value = percent[1];
+    if (tl === "uz") return `Kontraktning ${value}% qismi qoplanadi`;
+    return `Покрывается ${value}% стоимости обучения`;
+  }
+  return text;
+}
+
+/** English-language requirement phrasings that are safe to rebuild. */
+export function localizeEnglishRequirement(text: string | null | undefined, locale: Locale): string {
+  if (locale === "en" || text == null || text === "") return text ?? "";
+  const tl = targetLocale(locale);
+  if (!tl) return text;
+  const trimmed = text.trim();
+  const equivalent = trimmed.match(/^IELTS\s+([\d.]+)\+?\s+or equivalent English test$/i);
+  if (equivalent) {
+    return tl === "uz"
+      ? `IELTS ${equivalent[1]} yoki unga teng ingliz tili imtihoni`
+      : `IELTS ${equivalent[1]} или эквивалентный экзамен по английскому`;
+  }
+  const simple = trimmed.match(/^IELTS\s+([\d.]+)\+?$/i);
+  if (simple) return `IELTS ${simple[1]}+`;
+  const noScore = trimmed.match(/^No (?:award|scholarship|scheme)[\s\S]*$/i);
+  if (noScore) {
+    // A sentence that explains *why* there is no score — the reason is content,
+    // so the sentence is left to the label rather than truncated into a guess.
+    return text;
+  }
+  return text;
+}
+
+/** Every prose a scholarship card can show, translated as far as determinism goes. */
+export const SCHOLARSHIP_PROSE_TRANSLATORS = {
+  description: localizeScholarshipDescription,
+  requirements: localizeScholarshipRequirements,
+  tuitionCoverage: localizeTuitionCoverage,
+  englishRequirement: localizeEnglishRequirement,
+} as const;
 
 /* ============================================================================
  * 10. SEARCH EXPANSION — multilingual → English canonical keywords

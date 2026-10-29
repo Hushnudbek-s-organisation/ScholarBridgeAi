@@ -1235,6 +1235,86 @@ Verified live on a real `next start` against the dev database: a fresh account
 with a configured bot → `show: true, daysLeft: 10`; a 15-day-old account →
 `show: false, reason: "too_old"`; a linked account → `reason: "linked"`.
 
+## 11d. The catalogue in Uzbek: names translated, prose labelled (2026-10-30)
+
+Phase Q fixed the *channel* copy. This section is the same rule applied to the
+**website catalogue**, where 3030 active programmes and 547 scholarships are
+stored in English and rendered into uz / ru at request time.
+
+### What the live data actually contains (measured, not assumed)
+
+| Table | Rows | Distinct text |
+|---|---|---|
+| `programs` (active) | 3030 | 1138 programme names, **67** `field` values |
+| `scholarships` (active) | 547 | 446 distinct `tuition_coverage` strings, plus `description`, `requirements`, `english_requirements` |
+
+Two different problems hide in that.
+
+**Names are finite.** They are built from a small grammar — a degree token
+(`BSc`, `LLM`, `MB BChir`, `Master of Engineering`) plus a field, often a
+`(Hons)` / `(English-taught)` marker and sometimes a business school in
+parentheses. A dictionary plus a parser covers them completely.
+
+**Prose is not.** `"No scholarship-specific English score is published;
+applicants must meet the host university's English language requirement…"` has
+446 siblings. It cannot be dictionary-translated, and machine translation is
+not used in this project. The product owner's ruling (2026-10-30) is: **the text
+stays where it is, with an explicit "Manba tili: inglizcha" label directly
+above it.** Nothing is silently dropped, nothing is machine-mangled, and a
+student never mistakes English for a broken Uzbek translation.
+
+### What was wrong before this phase (verified in the code, not guessed)
+
+1. **67 field labels → 12 were not translated at all** and several were
+   machine-hybrids that read as typos: `Life fanlari`, `Applied matematika`,
+   `Information fan`, `Earth fanlari`, `Financial muhandislik`, `Sports fan`.
+2. **Programme names fell straight through the parser.** `LLB Law`,
+   `Bachelor of Design in Animation` → `of dizayn in Animation bo'yicha
+   bakalavr`, `Master of Engineering` → `of muhandislik bo'yicha magistr`,
+   `Master of Laws (LLM) in Environmental Law` → `of Laws (LLM) in ekologik
+   huquq bo'yicha magistr`. Half-translated titles were the norm, not the
+   exception.
+3. **`tuition_coverage`, `english_requirements`, `description` and
+   `requirements` were printed as raw English with no label at all** on the
+   uz/ru detail page.
+
+### The rule now
+
+* **Clean or verbatim.** `localizeMajorOrField` returns the original label when
+  any English word survives the alias pass — a half-translated label reads worse
+  than the source. `isUntranslatedLabel()` is the exported probe the gate uses.
+* **Names are parsed, not word-swapped.** Degree tokens (30+ forms, longest
+  first) → field → composition, with `(Hons)` → *imtiyozli*, `(English-taught)`
+  → *ingliz tilida*, and institution parentheticals kept verbatim because they
+  are proper nouns (`MBA — Edinburgh Business School`).
+* **Prose is labelled.** `localizeProse()` runs the deterministic translator and
+  then asks `needsSourceLanguageLabel()`; `SourceLanguageProse` renders the
+  label plus `<p lang="en">`. Text that IS translated (test scores, the common
+  coverage phrasings) gets no label.
+* **The funding cell never holds a sentence.** A long English `funding_type`
+  falls back to the localized coverage type instead of dumping prose into a
+  table cell.
+
+### Verified
+
+* `npm run test:catalogue-language` — **17/17**, against
+  `scripts/fixtures/live-catalogue-vocab.json` (all 67 live field values, 146
+  live programme titles, 12 synthetic degree shapes). 67/67 fields translated,
+  **157 of 158** titles fully localized, the one holdout a real institution
+  string returned verbatim.
+* `npm run test:render` — **354/0**, including the new section *14b*: the label
+  appears for English prose, disappears for translated copy, and `lang="en"` is
+  set only in the labelled case.
+
+Regenerate the fixture with:
+
+```sql
+-- fields
+select field, count(*) from programs where is_active group by 1 order by 2 desc;
+-- a name sample that covers every shape
+select distinct name from programs where is_active order by md5(name) limit 150;
+```
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

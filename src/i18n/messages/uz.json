@@ -6803,6 +6803,7 @@
     "noFee": "To'lov ko'rsatilmagan",
     "providerLabel": "Tashkilotchi",
     "sourceLabel": "Manba",
+    "sourceLanguageLabel": "Manba tili: inglizcha",
     "verifiedNote": "Bu sahifadagi har bir ma'lumot yuqoridagi rasmiy manbadan olingan va oxirgi marta {date} kuni tekshirilgan.",
     "notFoundTitle": "Stipendiya topilmadi",
     "notFoundBody": "Bu stipendiya arxivlangan bo'lishi mumkin. To'liq katalogni ko'rib chiqing.",

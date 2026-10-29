@@ -6803,6 +6803,7 @@
     "noFee": "No fee stated",
     "providerLabel": "Provider",
     "sourceLabel": "Source",
+    "sourceLanguageLabel": "Source language: English",
     "verifiedNote": "Every figure on this page comes from the official source above and was last checked on {date}.",
     "notFoundTitle": "Scholarship not found",
     "notFoundBody": "This scholarship may have been retired. Browse the full catalogue instead.",
