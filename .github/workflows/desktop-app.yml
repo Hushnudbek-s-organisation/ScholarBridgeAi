@@ -74,7 +74,19 @@ jobs:
       # installer with electron-builder (scripts/build-desktop.mjs).
       - name: Build the installer
         shell: bash
-        run: node scripts/build-desktop.mjs
+        run: |
+          set -o pipefail
+          node scripts/build-desktop.mjs 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Log downloads are not always available; make the reason visible
+            # as a workflow annotation (and in the run summary).
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error title=Desktop build::$line"
+            done < <(tail -n 20 build.log)
+            { echo "### Desktop build failed"; echo '```'; tail -n 60 build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit "$status"
+          fi
 
       - name: Upload the installer
         uses: actions/upload-artifact@v4
