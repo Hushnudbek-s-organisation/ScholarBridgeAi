@@ -100,7 +100,11 @@ export function translateEnglishRequirement(raw: string | null | undefined): str
     return `${parts.join(" · ")}${equivalent ? " yoki ekvivalent imtihon" : ""}`;
   }
 
-  if (/no (?:single |separate |scholarship[- ]level )?(?:english )?(?:score|requirement)|sets no (?:single |separate )?(?:score|language)|no language (?:score|requirement) is published|sets no score/i.test(text)) {
+  if (
+    /no (?:single |separate |scholarship[- ]level |fixed |formal )?(?:english(?:[- ]language)? )?(?:score|requirement|ielts|toefl|cut-?off|minimum|threshold)|sets no (?:single |separate |fixed )?(?:score|language|ielts|toefl|cut-?off)|no language (?:score|requirement) is published/i.test(
+      text
+    )
+  ) {
     return "Yagona til balli yo'q — talab tanlangan dasturga bog'liq";
   }
   const cefr = /\b(italian|english|french|german|spanish)\b[^.;]{0,20}?\b(?:cefr\s*)?(a2|b1|b2|c1|c2)\b/i.exec(text);

@@ -232,6 +232,15 @@ Guarantees, each one asserted in `scripts/check-channel.ts`:
 * Coverage measured against 15 real rows: `Til talabi` 13/15, `Kimlar uchun`
   14/15, `Foydali tomonlari` 10/15; the remainder omit the section.
 
+**Reminder posts read the same facts.** `urgency` (`⏳ Muddat yaqinlashmoqda` and
+its three siblings) is the kind that actually fires on a busy day, and it used
+to be a title, a date and one funding word — nothing a reader could act on, and
+the second variant did not even say who the award is for. All four variants now
+print `🔤 Til talabi` and a `🎓 Kimlar uchun` block of up to three ➡️ bullets,
+taken from **the same** `languageLabel()` / `eligibilityBullets()` the card uses,
+so the two renderers can never disagree. Escaping, the six-bullet cap and the
+"no English prose" rule are shared, not re-implemented.
+
 ### 4c. Weekly deadlines post
 
 `weekly_deadlines` is Sunday-only. Scope comes from the planner: open, verified

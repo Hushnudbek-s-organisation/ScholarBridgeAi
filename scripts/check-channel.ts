@@ -660,6 +660,50 @@ check("every scholarship template variant renders clean for every data shape", (
   }
 });
 
+check("a reminder post carries the same Uzbek facts as the card", () => {
+  /**
+   * The real shape that prompted this: a verified award with English prose, no
+   * stored IELTS/GPA and no allowances. Before, all four reminder variants were
+   * a title, a date and "To'liq moliyalashtirish" — nothing a reader could act
+   * on, and one variant did not even say who the award is for.
+   */
+  const proseOnly = facts({
+    id: 437,
+    title: "University of Waikato Doctoral Scholarship",
+    country: "New Zealand",
+    degreeLevels: '["PhD"]',
+    eligibleMajors: '["All Majors"]',
+    minGpa: null,
+    minIelts: null,
+    coverageType: "Full Tuition + Stipend",
+    englishRequirements: "The scholarship sets no IELTS cutoff; the university's doctoral English-language requirements apply.",
+    requirements: "Candidates must be a citizen of New Zealand or an international student with an Offer of Place.",
+    tuitionCoverage: "Domestic tuition fees are covered for the tenure.",
+    deadlineDate: "2026-11-04",
+    deadlineType: "exact",
+  });
+  for (let v = 0; v < TEMPLATE_VARIANTS.urgency; v++) {
+    const out = renderUrgency(proseOnly, 30, v, cardChrome());
+    assert.ok(out, `reminder v${v} did not render`);
+    assertClean(out.html, `reminder v${out.key}`, { allowUrgency: true });
+    const text = plainText(out.html);
+    assert.ok(/Til talabi/.test(text), `reminder v${v}: no language line — ${text}`);
+    assert.ok(/Kimlar uchun/.test(text), `reminder v${v}: no eligibility block`);
+    assert.ok(/Doktorantura/.test(text), `reminder v${v}: degree level missing`);
+    // The same rule as the card: the English never reaches the channel.
+    for (const english of ["cutoff", "Candidates must", "Domestic tuition", "Offer of Place"]) {
+      assert.ok(!text.includes(english), `reminder v${v}: English leaked — ${english}`);
+    }
+  }
+  // A record with no prose at all still renders a reminder, just a shorter one.
+  const bare = facts({ minGpa: null, minIelts: null, requirements: null, englishRequirements: null });
+  for (let v = 0; v < TEMPLATE_VARIANTS.urgency; v++) {
+    const out = renderUrgency(bare, 30, v, cardChrome());
+    assert.ok(out, `bare reminder v${v} did not render`);
+    assertClean(out.html, `bare reminder v${out.key}`, { allowUrgency: true });
+  }
+});
+
 check("digest, spotlight, weekly, story and Q&A variants render clean", () => {
   const items = [FULL, facts({ id: 2, title: "Second award", deadlineDate: "2026-11-02" }), facts({ id: 3, title: "Third award", deadlineDate: "2026-11-20" })];
   for (let v = 0; v < TEMPLATE_VARIANTS.deadline_digest; v++) {
