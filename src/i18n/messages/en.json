@@ -6986,11 +6986,11 @@
       "priorityCountriesHint": "One per line. The nearest deadlines always go first; once they run out, programmes from these countries win."
     },
     "links": {
-      "footerTitle": "Footer and social links",
-      "footerMain": "Main footer",
-      "footerMainHint": "Shown at the end of ordinary posts; default is the Kanal and Bot usernames from above",
+      "footerTitle": "End-of-post line and social links",
+      "footerMain": "Line at the end of every post (socials)",
+      "footerMainHint": "Shown at the end of every post — e.g. Instagram | Telegram | YouTube. Left empty, the Kanal and Bot links above are used instead.",
       "footerSocial": "Social footer (weekly post)",
-      "footerSocialHint": "Only what you add here appears — nothing is invented",
+      "footerSocialHint": "Extra links for the weekly post. Only what you add here appears — nothing is invented.",
       "add": "Add link",
       "remove": "Remove",
       "labelPlaceholder": "Label",

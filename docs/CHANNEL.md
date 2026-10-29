@@ -183,9 +183,38 @@ Rules, enforced by `scripts/check-channel.ts`:
 An empty section disappears **with its heading and its blank line**. Length
 policy: at 1800 visible characters the `about` block is trimmed at a word
 boundary (`…`); at 4096 it is dropped; then each bullet list is cut to four; if
-it still does not fit the post is skipped rather than truncated. Eligibility,
-benefits and about are **never** generated or translated by anything: they come
-from the admin form or not at all.
+it still does not fit the post is skipped rather than truncated.
+
+### 4b-2a. One card for every award, fully in Uzbek (2026-10-29, kechqurun)
+
+The operator's reference post was reproduced field by field, and three things
+were still wrong in the live output:
+
+| Was | Now |
+| --- | --- |
+| `eligible_majors` printed as stored English (`Computer Science`) or, on 300 rows, as a whole English sentence | `fields.uz.ts` — a curated field vocabulary (`kompyuter fanlari`). An unknown name or a sentence is **dropped**, never printed |
+| `Dastur haqida` existed only when an admin had typed Uzbek copy — i.e. on almost no award | composed from stored columns (`Ushbu dastur {locative}da {degrees} bosqichini {funding} asosida…`) plus up to one sentence *read* out of `description` (`Ta'lim ingliz tilida olib boriladi.`, `Dastur muddati 2 yil.`) |
+| `urgency` (the kind readers see most often) was a 5-line nudge with no sections, no hashtags, no footer | the same card as every other award, with `⏰️ Muddat yaqin: N kun qoldi` on top; the countdown is printed once |
+| Country names outside the seeded 22 printed in English, with no flag and no locative form | `CHANNEL_COUNTRIES` covers all 58 values the catalogue stores, and `loadChannelCountries()` now inserts **missing** keys (not only seeds an empty table) |
+| A missing `coverage_type` label silently removed the `Moliyalashtirish:` line | the label table covers every value in the column (`Full Tuition Waiver`, `Tuition Credit`, `Full Ride`, …) |
+
+The headline now ends with a one-liner built from stored facts, the same way the
+reference post does:
+
+```
+🇳🇿 <b>University of Waikato Doctoral Scholarship</b> — Yangi Zelandiyada doktorantura (PhD) uchun to'liq kontrakt va stipendiya grant
+```
+
+Authored `tagline_uz` in Admin → Kanal → Kontent still wins over it. A country
+the table does not know produces no place clause at all — the sentence never
+writes a plain name where Uzbek needs `-da`.
+
+**The footer is the operator's.** `Admin → Kanal → Linklar → Post oxiridagi
+qator` holds the `💼 Label | Label | Label` line, in order, exactly as typed —
+that is where the social networks go (Instagram, Telegram, YouTube, …). It now
+prints on **every** kind including urgency; leave it empty to fall back to the
+channel and bot links. Nothing is generated there, and no third-party brand name
+is ever a default.
 
 ### 4b-3. English prose is read, never printed
 

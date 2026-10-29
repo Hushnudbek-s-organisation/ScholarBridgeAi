@@ -249,79 +249,49 @@ export function renderFullyFunded(
   return post ? { key: `ff_v${v + 1}`, html: post.html } : null;
 }
 
-export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostChrome | null = null): Rendered | null {
+/**
+ * `urgency` — the same card as every other award, with one banner on top.
+ *
+ * It used to be a thin nudge: title, provider, a funding word, a link. The
+ * operator's rule is the opposite — no post may carry less than the reference
+ * format — and most of the posts a reader actually sees in a week are urgency
+ * ones (nearest deadline first, docs §5). So the shape is now identical to
+ * `scholarship_single`: `Moliyalashtirish`, `Til talabi`, `Kimlar uchun`,
+ * `Foydali tomonlari`, `Dastur haqida`, the deadline, the tracked link, the
+ * hashtags and the footer — plus `⏰️ Muddat yaqin: N kun qoldi` at the top.
+ *
+ * The banner is the only place the word "shoshiling" is allowed, and only on
+ * the last day (docs §6).
+ */
+export function renderUrgency(
+  f: Facts,
+  rung: number,
+  variant = 0,
+  chrome: PostChrome | null = null,
+  extra: { content?: ScholarshipContent | null; country?: CountryDisplay | null } = {}
+): Rendered | null {
   const d = f.deadline;
   if (d.quality !== "exact" || d.daysLeft === null || d.daysLeft < 0 || d.daysLeft > rung) return null;
   const left = daysLeftUz(d.daysLeft);
   if (!left) return null;
   const lastDay = d.daysLeft <= 1;
   const v = ((variant % 4) + 4) % 4;
-  const link = ctaBlock(f, chrome);
-  const headline = lastDay ? `⏰ <b>${clipHtml(f.title, 110)}</b>` : `⏳ <b>${clipHtml(f.title, 110)}</b>`;
 
-  if (v === 0) {
-    return {
-      key: "urgency_v1",
-      html: block(
-        headline,
-        `${lastDay ? "Shoshiling: " : ""}${cap(left)}.`,
-        row(`🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null, deadlineDateLine(f)),
-        row(fundingLine(f), languageLine(f), requirementsLine(f), eligibilityLine(f)),
-        whoBlock(f, 3),
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 1) {
-    return {
-      key: "urgency_v2",
-      html: block(
-        `${lastDay ? "⚠️ Oxirgi imkoniyat" : "⏳ Muddat yaqinlashmoqda"}`,
-        `🎓 <b>${clipHtml(f.title, 110)}</b>`,
-        row(
-          `🏛 ${f.provider}`,
-          f.country ? `📍 ${f.country}` : null,
-          `⏳ ${cap(left)}`
-        ),
-        row(fundingLine(f), languageLine(f), requirementsLine(f), eligibilityLine(f)),
-        whoBlock(f, 3),
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 2) {
-    return {
-      key: "urgency_v3",
-      html: block(
-        headline,
-        row(
-          `• Muddat: ${cap(deadlinePlain(f) as string)}`,
-          `• Tashkilot: ${f.provider}`,
-          f.country ? `• Davlat: ${f.country}` : null,
-          fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null,
-          languageLabel(f, null) ? `• Til talabi: ${languageLabel(f, null)}` : null
-        ),
-        whoBlock(f, 3),
-        `📌 ${cap(left)}.${lastDay ? " Shoshiling — ariza qabuli bugun yopiladi." : " Hujjatlarni oldindan tayyorlab qo'ying."}`,
-        row(eligibilityLine(f), link),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  return {
-    key: "urgency_v4",
-    html: block(
-      `🗓 ${lastDay ? "Bugun oxirgi kun" : `Muddatgacha ${d.daysLeft} kun`}`,
-      `🎓 <b>${clipHtml(f.title, 110)}</b>`,
-      `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-      row(fundingLine(f), languageLine(f), requirementsLine(f)),
-      whoBlock(f, 3),
-      row(link, providerLink(f)),
-      footerBlock(chrome)
-    ),
-  };
+  const card = renderScholarshipCard({
+    facts: f,
+    content: extra.content ?? null,
+    country: extra.country ?? null,
+    chrome: chrome ? { ...chrome, variant: v } : { ...EMPTY_CHROME, variant: v },
+    // The banner above already counts the days down.
+    suppressCountdown: true,
+  });
+  if (!card) return null;
+
+  const banner = lastDay
+    ? "⏰️ <b>Shoshiling — ariza qabuli bugun yopiladi</b>"
+    : `⏰️ <b>Muddat yaqin:</b> ${left}`;
+
+  return { key: `urgency_v${v + 1}`, html: `${banner}\n\n${card.html}` };
 }
 
 // ---------------------------------------------------------------------------

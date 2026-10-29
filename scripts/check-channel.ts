@@ -324,13 +324,14 @@ const minutesOf = (time: string) => {
 };
 
 /** Chrome for the card checks: tracked link, funding tag, footer. */
-function cardChrome() {
+function cardChrome(overrides: Record<string, unknown> = {}) {
   return {
     siteUrl: SITE,
     shortLink: { url: `${SITE}/go/card1`, visible: "scholarbridge.example/go/card1" },
     hashtags: ["grant", "toliq_moliyalashtiriladi"],
     footer: [{ label: "Kanal", url: "https://t.me/scholarbridge" }],
     variant: 0,
+    ...overrides,
   };
 }
 
@@ -632,8 +633,19 @@ check("only known coverage, degree and country labels are translated", () => {
   assert.equal(degreesUz('["Master\'s","PhD"]'), "magistratura, doktorantura (PhD)");
   assert.equal(degreesUz('["Diploma"]'), null);
   assert.equal(majorsUz('["All Majors"]'), "barcha yo'nalishlar");
-  assert.equal(majorsUz('["Mathematics","Physics"]'), "Mathematics, Physics");
+  // Field names are translated now, not echoed in English.
+  assert.equal(majorsUz('["Mathematics","Physics"]'), "matematika, fizika");
+  assert.equal(majorsUz('["Computer Science"]'), "kompyuter fanlari");
+  assert.equal(majorsUz('["Economics, business and management"]'), "iqtisodiyot, biznes va menejment");
+  // A stored English sentence is prose, not a field name: it is dropped.
+  assert.equal(majorsUz('["Most full-time undergraduate degrees at Monash campuses in Australia; Medicine/MD excluded"]'), null);
+  assert.equal(majorsUz('["Underwater Basket Weaving"]'), null);
   assert.equal(majorsUz("[]"), null);
+  // Coverage labels that used to fall through to silence.
+  assert.equal(coverageUz("Full Tuition Waiver"), "kontraktdan to'liq ozod qilish");
+  assert.equal(coverageUz("Tuition Credit"), "kontrakt hisobiga kredit");
+  assert.equal(coverageUz("Full Ride"), "to'liq moliyalashtirish (barcha xarajatlar)");
+  assert.equal(coverageUz("Living-expenses grant"), "yashash xarajatlari uchun grant");
   assert.equal(countryUz("United States"), "AQSh");
   assert.equal(countryUz("Canada"), "Kanada");
   assert.equal(countryUz("Wakanda"), "Wakanda"); // stored value, never transliterated
@@ -1613,10 +1625,29 @@ check("known countries get a flag and a locative form; unknown ones do not", () 
 
   assert.equal(countryDisplay(null), null);
   assert.ok(resolveCountry("kanada"));
-  assert.equal(CHANNEL_COUNTRIES.length, 22);
+  // Every country the live catalogue actually stores must be in the table —
+  // otherwise its flag, locative and hashtag silently vanish from the post.
+  assert.equal(CHANNEL_COUNTRIES.length, 57);
+  const STORED_COUNTRIES = [
+    "United States", "United Kingdom", "Australia", "Germany", "Canada",
+    "South Korea", "China", "Hong Kong SAR", "Sweden", "Japan", "Netherlands",
+    "New Zealand", "France", "Hungary", "Singapore", "Switzerland", "Belgium",
+    "Ireland", "Malaysia", "Spain", "India", "Turkey", "Finland", "Saudi Arabia",
+    "United Arab Emirates", "Russia", "Italy", "Taiwan", "Uzbekistan", "Czechia",
+    "Denmark", "Austria", "Indonesia", "Colombia", "Multiple countries", "Norway",
+    "Qatar", "Mexico", "Chile", "Thailand", "Kazakhstan", "Slovakia", "Brazil",
+    "Slovenia", "Serbia", "Azerbaijan", "Macau SAR", "Latvia", "Brunei", "Poland",
+    "Argentina", "Lebanon", "Multiple", "Iceland", "South Africa", "European Union",
+    "Estonia", "Romania",
+  ];
+  for (const stored of STORED_COUNTRIES) {
+    const display = countryDisplay(stored);
+    assert.ok(display?.known, `no country row for "${stored}"`);
+    assert.ok(display?.flag, `no flag for "${stored}"`);
+  }
   for (const country of CHANNEL_COUNTRIES) {
     assert.ok(country.key && country.nameUz && country.flag, `incomplete country row: ${country.key}`);
-    assert.ok(!country.hashtag.includes("#"), "hashtags are stored without #");
+    if (country.hashtag) assert.ok(!country.hashtag.includes("#"), "hashtags are stored without #");
   }
 });
 
@@ -3453,15 +3484,114 @@ check("the card prints stored facts and never English database prose", () => {
     assert.ok(text.includes(expected), `missing: ${expected}`);
   }
   // The row's `description`/`requirements` are English in production and must
-  // never reach an Uzbek post — the card is built from structured facts only.
-  // The raw English must never reach the post: it is read by the translator and
-  // re-stated in Uzbek. `description` has no translator at all — it is authored
-  // copy only.
+  // never reach an Uzbek post. Both are *read* by the deterministic translator
+  // and re-stated in Uzbek; neither is ever printed raw.
   const source = read("src/lib/channel/templates/card.uz.ts").replace(/\/\*[\s\S]*?\*\//g, "");
-  assert.ok(!source.includes("description"), "description is authored copy only");
+  assert.ok(!/descriptionRaw\s*\}/.test(source), "description never printed raw");
+  assert.ok(source.includes("aboutSentences(facts.descriptionRaw"), "description goes through the translator");
   assert.ok(!/\.requirementsRaw\b(?!\s*\))/.test(source.replace(/translateRequirements\([^)]*\)/g, "")), "requirementsRaw goes through the translator");
   // A number without a stored period may not be given one.
   assert.ok(!/oylik|yillik|yiliga/i.test(text), "never invents a payment period");
+});
+
+check("every award post carries the whole reference card — no thinner kind", () => {
+  // The operator's rule: a post may not say less than the reference format.
+  // `urgency` used to be a thin nudge; it is the kind readers see most often.
+  const f = facts({
+    livingAllowance: 900,
+    deadlineDate: addDays(PLAN_DATE, 6).slice(0, 10),
+    description: "The programme is taught in English and lasts two years.",
+    degreeLevels: '["PhD"]',
+    eligibleMajors: '["All Majors"]',
+  });
+  const chrome = cardChrome({ footer: [{ label: "Instagram", url: "https://instagram.com/x" }] });
+  const urgent = renderUrgency(f, 30, 0, chrome, { content: null, country: countryDisplay("Canada") });
+  assert.ok(urgent, "urgency did not render");
+  assertClean(urgent.html, "urgency card");
+  const text = plainText(urgent.html);
+  for (const block of ["Moliyalashtirish:", "Til talabi:", "Kimlar uchun", "Foydali tomonlari", "Dastur haqida", "Oxirgi muddat:", "Batafsil:", "Instagram"]) {
+    assert.ok(text.includes(block), `urgency post is missing: ${block}`);
+  }
+  assert.match(urgent.html, /^⏰️ <b>Muddat yaqin:<\/b>/, "the banner leads");
+  assert.match(urgent.html, /\n\n#/, "hashtags are their own block");
+  // The banner already counts the days down; the deadline line must not repeat it.
+  assert.equal((text.match(/kun qoldi/g) ?? []).length, 1, "the countdown appears once");
+  // The same facts produce the same sections in the plain card.
+  const plain = plainText(renderScholarshipSingle(f, 0, chrome, { content: null, country: countryDisplay("Canada") })?.html ?? "");
+  for (const block of ["Moliyalashtirish:", "Til talabi:", "Kimlar uchun", "Foydali tomonlari", "Dastur haqida"]) {
+    assert.ok(plain.includes(block), `card post is missing: ${block}`);
+  }
+});
+
+check("the headline carries an Uzbek one-liner built from stored facts", () => {
+  const f = facts({ country: "Japan", degreeLevels: '["Master\'s","PhD"]' });
+  const out = renderScholarshipSingle(f, 0, cardChrome(), { content: null, country: countryDisplay("Japan") });
+  assert.ok(out);
+  const first = plainText(out.html.split("\n")[0]);
+  assert.ok(/Yaponiyada magistratura, doktorantura \(PhD\) uchun/.test(first), first);
+  assertClean(first, "tagline");
+  // An unknown country never produces a half sentence with an English name.
+  const unknown = renderScholarshipSingle(facts({ country: "Neverland" }), 0, cardChrome(), {
+    content: null,
+    country: countryDisplay("Neverland"),
+  });
+  assert.ok(unknown);
+  assert.ok(!plainText(unknown.html).includes("Neverlandda"), "no invented locative");
+  // Authored copy still wins.
+  const authored = renderScholarshipSingle(facts(), 0, cardChrome(), { content: RICH_CONTENT, country: countryDisplay("Canada") });
+  assert.ok(plainText(authored?.html ?? "").includes("Kanadada bepul o'qish imkoniyati"));
+});
+
+check("Dastur haqida exists without typed copy, in Uzbek, from stored facts only", () => {
+  const f = facts({
+    country: "Japan",
+    degreeLevels: '["Master\'s"]',
+    coverageType: "Full Funding",
+    description: "The programme is taught in English and lasts two years. Open to all international students.",
+  });
+  const out = renderScholarshipSingle(f, 0, cardChrome(), { content: null, country: countryDisplay("Japan") });
+  assert.ok(out);
+  const html = out.html;
+  const text = plainText(html);
+  assert.ok(text.includes("Dastur haqida"), "the section exists without authored copy");
+  assert.ok(text.includes("Ushbu dastur Yaponiyada magistratura bosqichini to'liq moliyalashtirish asosida"), text.split("Dastur haqida")[1]?.slice(0, 120) ?? "");
+  assert.ok(text.includes("Ta'lim ingliz tilida olib boriladi."), "the English description is restated, not copied");
+  // At most two bullets: the composed sentence plus one recognised fact.
+  const aboutText = (text.split("Dastur haqida")[1] ?? "").split("Oxirgi muddat")[0] ?? "";
+  const aboutLines = aboutText.split("\n").filter((line) => line.startsWith("➡️"));
+  assert.ok(aboutLines.length <= 2, `${aboutLines.length} about bullets`);
+
+  // A description that only states a duration is still read correctly.
+  const durationOnly = renderScholarshipSingle(
+    facts({ country: "Japan", degreeLevels: '["Master\'s"]', description: "The programme lasts two years." }),
+    0,
+    cardChrome(),
+    { content: null, country: countryDisplay("Japan") }
+  );
+  assert.ok(/Dastur muddati 2 yil\./.test(plainText(durationOnly?.html ?? "")), "a stated duration is carried over");
+  // Nothing English from the source may survive in the section.
+  const section = text.split("Dastur haqida")[1] ?? "";
+  assert.ok(!/\b(?:the|programme|taught|years|open|students)\b/i.test(section), "no English leftover in the about section");
+  // The raw description never appears verbatim.
+  assert.ok(!html.includes("Open to all international students."), "description is not copied verbatim");
+});
+
+check("field names are translated and an English sentence is dropped", () => {
+  const translated = renderScholarshipSingle(
+    facts({ eligibleMajors: '["Computer Science","Mechanical Engineering"]' }),
+    0,
+    cardChrome()
+  );
+  const text = plainText(translated?.html ?? "");
+  assert.ok(/kompyuter fanlari, mashinasozlik muhandisligi/i.test(text), text);
+
+  const dropped = renderScholarshipSingle(
+    facts({ eligibleMajors: '["Most full-time undergraduate degrees at Monash campuses in Australia; Medicine/MD excluded"]' }),
+    0,
+    cardChrome()
+  );
+  const droppedText = plainText(dropped?.html ?? "");
+  assert.ok(!droppedText.includes("Monash"), "a stored English sentence is not printed");
 });
 
 check("a thin record produces a short honest card", () => {

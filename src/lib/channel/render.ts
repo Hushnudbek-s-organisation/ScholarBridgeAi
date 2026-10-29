@@ -172,7 +172,13 @@ export function renderPlanItemWithReason(item: PlannedItem, data: RenderData): R
     }
     case "urgency": {
       if (!facts) return { post: null, reason: "missing_facts" };
-      const html = renderUrgency(facts, item.rung ?? 3, variant, chrome)?.html ?? null;
+      // Same card, same chrome as the other award posts: the reference format is
+      // the floor for every post (docs §4b-4), and a deadline nudge is no excuse
+      // for a thinner one.
+      chrome.hashtags = hashtagsFor(item.kind, data, facts, content ?? null);
+      const country = countryDisplay(facts.countryRaw ?? null, data.countries);
+      const html =
+        renderUrgency(facts, item.rung ?? 3, variant, chrome, { content, country })?.html ?? null;
       return single(html, `urgency_v${(variant % 4) + 1}`);
     }
     case "deadline_digest": {

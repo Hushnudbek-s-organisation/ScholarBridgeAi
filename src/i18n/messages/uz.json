@@ -6986,11 +6986,11 @@
       "priorityCountriesHint": "Har biri yangi qatorda. Eng yaqin muddatlar doim birinchi bo'ladi; ular tugagach, shu davlatlardagi dasturlar ustun turadi."
     },
     "links": {
-      "footerTitle": "Futer va ijtimoiy tarmoq havolalari",
-      "footerMain": "Asosiy futer",
-      "footerMainHint": "Oddiy postlar oxirida chiqadi; standart holatda yuqoridagi Kanal va Bot username'lari ishlatiladi",
+      "footerTitle": "Post oxiridagi qator va ijtimoiy tarmoqlar",
+      "footerMain": "Post oxiridagi qator (ijtimoiy tarmoqlar)",
+      "footerMainHint": "Har bir post oxirida chiqadi — masalan Instagram | Telegram | YouTube. Bo'sh qoldirsangiz yuqoridagi Kanal va Bot havolalari ishlatiladi.",
       "footerSocial": "Ijtimoiy futer (haftalik post)",
-      "footerSocialHint": "Faqat shu yerda qo'shilgan havolalar chiqadi — hech narsa o'ylab topilmaydi",
+      "footerSocialHint": "Haftalik postda chiqadigan qo'shimcha havolalar. Faqat shu yerda qo'shilgani chiqadi — hech narsa o'ylab topilmaydi.",
       "add": "Havola qo'shish",
       "remove": "Olib tashlash",
       "labelPlaceholder": "Nomi",

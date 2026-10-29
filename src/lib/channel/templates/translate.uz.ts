@@ -342,6 +342,81 @@ const SENTENCE_BANK: Array<{ re: RegExp; uz: (m: RegExpMatchArray) => string }> 
   { re: /^applications? (?:are|is) (?:accepted|open) (?:online|year-round)/i, uz: () => "Ariza onlayn topshiriladi" },
 ];
 
+/**
+ * Facts a whole `description` can state about the programme itself.
+ *
+ * Same rule as everywhere else in this file: the English is *read*, never
+ * rendered. A sentence is emitted only when its shape is recognised, so
+ * "Dastur haqida" can exist on an award nobody has written Uzbek copy for
+ * without a single English word or a single invented fact.
+ */
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+
+const ABOUT_BANK: Array<{ re: RegExp; uz: (m: RegExpMatchArray) => string }> = [
+  {
+    re: /\b(?:taught|delivered|offered|instruction)\s+(?:entirely\s+|fully\s+|completely\s+)?in\s+english\b/i,
+    uz: () => "Ta'lim ingliz tilida olib boriladi.",
+  },
+  {
+    re: /\b(?:taught|delivered|offered|instruction)\s+(?:entirely\s+|fully\s+)?in\s+(german|french|italian|spanish|chinese|japanese|korean|russian|turkish|polish|dutch)\b/i,
+    uz: (m) => {
+      const names: Record<string, string> = {
+        german: "nemis", french: "fransuz", italian: "italyan", spanish: "ispan",
+        chinese: "xitoy", japanese: "yapon", korean: "koreys", russian: "rus",
+        turkish: "turk", polish: "polyak", dutch: "golland",
+      };
+      return `Ta'lim ${names[m[1].toLowerCase()] ?? m[1].toLowerCase()} tilida olib boriladi.`;
+    },
+  },
+  {
+    // "lasts two years" is as common in this column as "lasts 2 years".
+    re: /\b(\d|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*[-–]\s*|\s+)years?\b(?!\s*old)/i,
+    uz: (m) => `Dastur muddati ${/^\d+$/.test(m[1]) ? m[1] : String(WORD_NUMBERS[m[1].toLowerCase()] ?? m[1])} yil.`,
+  },
+  {
+    re: /\b(?:fully|completely)\s+funded\b/i,
+    uz: () => "Dastur to'liq moliyalashtiriladi.",
+  },
+  {
+    re: /\b(?:open to|available to)\s+(?:all\s+)?(?:international\s+)?(?:students|applicants|candidates)\b/i,
+    uz: () => "Dastur barcha xalqaro talabalar uchun ochiq.",
+  },
+  {
+    re: /\b(?:online|distance[- ]learning|remote)\b/i,
+    uz: () => "Dastur onlayn formatda o'tkaziladi.",
+  },
+];
+
+/**
+ * `description` → at most two honest sentences about the programme.
+ *
+ * Each sentence is de-duplicated against what the post already says, so a
+ * "fully funded" description never repeats the funding header.
+ */
+export function aboutSentences(
+  raw: string | null | undefined,
+  existing: readonly string[] = [],
+  max = 2
+): string[] {
+  const text = stripNoise(raw ?? "");
+  if (!text || text.length < 12) return [];
+  const seen = existing.map((line) => line.toLowerCase());
+  const out: string[] = [];
+  for (const entry of ABOUT_BANK) {
+    if (out.length >= max) break;
+    const match = entry.re.exec(text);
+    if (!match) continue;
+    const sentence = entry.uz(match);
+    const low = sentence.toLowerCase();
+    if (seen.some((line) => line === low || line.includes(low.replace(/\.$/, "")))) continue;
+    if (out.includes(sentence)) continue;
+    out.push(sentence);
+  }
+  return out;
+}
+
 export function translateSentence(raw: string): string | null {
   const text = stripNoise(raw).replace(/[.;]+$/, "");
   if (!text) return null;
