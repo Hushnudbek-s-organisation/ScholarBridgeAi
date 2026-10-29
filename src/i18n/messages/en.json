@@ -7280,5 +7280,65 @@
     "failed": "Could not read diagnostics.",
     "detailTitle": "Exact reason from the database",
     "schemaArea": "Schema:"
+  },
+  "publicFeatures": {
+    "metaTitle": "Features — what the site does",
+    "metaDescription": "What the site gives you beyond the one grant you saw in the channel: fit scoring, admission chance, a deadline plan, documents, an AI assistant and a Telegram bot.",
+    "navLabel": "Features",
+    "heroEyebrow": "The next step after the channel",
+    "heroTitle": "You saw one grant. What does the site do next?",
+    "heroBody": "This is not just a list of announcements: the site picks grants that match your profile, estimates your admission chance, tracks deadlines and helps with the paperwork. Browsing needs no account.",
+    "heroPrimary": "Create a free account",
+    "heroSecondary": "Browse scholarships",
+    "heroBot": "Open the Telegram bot",
+    "freeNote": "Browsing is free and needs no account. An account is only for saving, deadline reminders and the AI assistant.",
+    "featuresTitle": "What is in one place",
+    "featuresBody": "Each part works on its own and together they become one plan.",
+    "stepOneTitle": "Profile",
+    "stepOneBody": "A form that takes minutes: level, field, country, GPA and language score.",
+    "stepTwoTitle": "Fit",
+    "stepTwoBody": "The site shows matching grants, universities and your admission chance.",
+    "stepThreeTitle": "Plan",
+    "stepThreeBody": "A plan across deadlines, documents and steps — with reminders.",
+    "stepsTitle": "How it works",
+    "promoTitle": "This page is only part of the site",
+    "promoBody": "Fit scoring, admission chance, a deadline plan, documents and an AI assistant in one place. Browsing works without an account.",
+    "promoCta": "See what it does",
+    "promoStart": "Start for free",
+    "backToCatalog": "Back to the catalogue",
+    "features": {
+      "match": {
+        "title": "Fit score",
+        "body": "Every grant and university is scored against your level, field, GPA and language score — with the reason it fits or does not."
+      },
+      "chancing": {
+        "title": "Admission chance",
+        "body": "Chance is estimated from requirements and past outcomes: strong, moderate or low."
+      },
+      "deadlines": {
+        "title": "Deadlines and plan",
+        "body": "Nearest deadlines in one place; every grant gets a step-by-step task plan."
+      },
+      "documents": {
+        "title": "Documents and essays",
+        "body": "A document checklist, essay review, CV templates and recommendation letters."
+      },
+      "ai": {
+        "title": "AI assistant",
+        "body": "Answers questions about your profile, motivation letter and interview preparation."
+      },
+      "visa": {
+        "title": "Visa and departure",
+        "body": "Visa requirements, apostille, insurance and the first steps after arrival."
+      },
+      "money": {
+        "title": "Cost plan",
+        "body": "Tuition, living and travel costs are calculated; fee-waiver options are shown."
+      },
+      "telegram": {
+        "title": "Telegram bot",
+        "body": "New matching grants, deadline reminders and verified announcements — in chat."
+      }
+    }
   }
 }

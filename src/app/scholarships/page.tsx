@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { ArrowRight, Award, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
+import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages.server";
+import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { asc, eq, sql } from "drizzle-orm";
@@ -156,7 +157,7 @@ export default async function ScholarshipsPage({
     // Keep database/provider details out of the public response and logs.
     console.error("Scholarship catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
-      <LocaleProvider initialLocale={locale}>
+      <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
@@ -189,7 +190,7 @@ export default async function ScholarshipsPage({
   });
 
   return (
-    <LocaleProvider initialLocale={locale}>
+    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
       <PublicCatalogHeader />
       <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <header className="mb-6">
@@ -275,6 +276,8 @@ export default async function ScholarshipsPage({
         )}
 
         <Pagination currentPage={currentPage} totalPages={totalPages} />
+
+        <PublicFeaturePromo className="mt-6" />
 
         <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
           {copy.independentGuide}

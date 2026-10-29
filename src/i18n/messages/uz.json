@@ -7280,5 +7280,65 @@
     "failed": "Diagnostikani o'qib bo'lmadi.",
     "detailTitle": "Bazadan kelgan aniq sabab",
     "schemaArea": "Sxema:"
+  },
+  "publicFeatures": {
+    "metaTitle": "Imkoniyatlar — sayt nima qiladi",
+    "metaDescription": "Kanalda ko‘rgan bitta grantdan tashqari sayt nima beradi: moslik balli, qabul ehtimoli, muddatlar rejasi, hujjatlar, AI yordamchi va Telegram bot.",
+    "navLabel": "Imkoniyatlar",
+    "heroEyebrow": "Kanaldan keyingi qadam",
+    "heroTitle": "Bitta grantni ko‘rdingiz. Sayt bundan keyin nima qiladi?",
+    "heroBody": "Bu shunchaki e’lonlar ro‘yxati emas: sayt profilingizga mos grantlarni tanlaydi, qabul ehtimolini hisoblaydi, muddatlarni kuzatadi va hujjatlarni tayyorlashda yordam beradi. Ko‘rish uchun akkaunt shart emas.",
+    "heroPrimary": "Bepul akkaunt ochish",
+    "heroSecondary": "Grantlarni ko‘rish",
+    "heroBot": "Telegram botni ochish",
+    "freeNote": "Ko‘rish bepul va akkauntsiz. Akkaunt faqat saqlash, muddat eslatmalari va AI yordamchi uchun kerak.",
+    "featuresTitle": "Bir joyda nima bor",
+    "featuresBody": "Har bir bo‘lim alohida ishlaydi, birgalikda esa bitta rejaga aylanadi.",
+    "stepOneTitle": "Profil",
+    "stepOneBody": "Bir necha daqiqada anketa: daraja, yo‘nalish, davlat, GPA va til balli.",
+    "stepTwoTitle": "Moslik",
+    "stepTwoBody": "Sayt mos grantlar, universitetlar va qabul ehtimolini ko‘rsatadi.",
+    "stepThreeTitle": "Reja",
+    "stepThreeBody": "Muddatlar, hujjatlar va qadamlar bo‘yicha reja — eslatmalar bilan.",
+    "stepsTitle": "Qanday ishlaydi",
+    "promoTitle": "Bu sahifa — saytning faqat bir qismi",
+    "promoBody": "Moslik balli, qabul ehtimoli, muddatlar rejasi, hujjatlar va AI yordamchi bir joyda. Ko‘rish akkauntsiz ham mumkin.",
+    "promoCta": "Imkoniyatlarni ko‘rish",
+    "promoStart": "Bepul boshlash",
+    "backToCatalog": "Katalogga qaytish",
+    "features": {
+      "match": {
+        "title": "Moslik balli",
+        "body": "Har bir grant va universitet darajangiz, yo‘nalishingiz, GPA va til ballingizga qarab baholanadi — nega mos yoki mos emasligi yozib ko‘rsatiladi."
+      },
+      "chancing": {
+        "title": "Qabul ehtimoli",
+        "body": "Talablar va o‘tgan yillardagi natijalar asosida qabul ehtimoli taxmin qilinadi: kuchli, o‘rtacha yoki past."
+      },
+      "deadlines": {
+        "title": "Muddatlar va reja",
+        "body": "Yaqin muddatlar bir joyda; har bir grant uchun qadam-baqadam vazifalar rejasi tuziladi."
+      },
+      "documents": {
+        "title": "Hujjatlar va esse",
+        "body": "Hujjatlar ro‘yxati, esse tekshiruvi, CV va tavsiyanoma uchun shablonlar."
+      },
+      "ai": {
+        "title": "AI yordamchi",
+        "body": "Anketa, motivatsion xat va intervyuga tayyorgarlik bo‘yicha savollaringizga javob beradi."
+      },
+      "visa": {
+        "title": "Viza va jo‘nash",
+        "body": "Viza talablari, apostil, sug‘urta va yetib borgandan keyingi birinchi qadamlar."
+      },
+      "money": {
+        "title": "Xarajatlar rejasi",
+        "body": "O‘qish, yashash va yo‘l xarajatlari hisoblanadi; to‘lovdan ozod qilish imkoniyatlari ko‘rsatiladi."
+      },
+      "telegram": {
+        "title": "Telegram bot",
+        "body": "Yangi mos grantlar, muddat eslatmalari va tasdiqlangan e’lonlar — chatda."
+      }
+    }
   }
 }

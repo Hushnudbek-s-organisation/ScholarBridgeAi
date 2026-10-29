@@ -1120,6 +1120,60 @@ deployed the first tick installs it by itself; `npm run test:integration` proves
 the claim on a fresh database ("the first bootstrap installs the whole dictionary
 into a fresh database", 12 732 terms, version `pdf-12732-1949`).
 
+## 11b. The public path: from a post to the product (2026-10-29)
+
+Every channel post ends in `/go/<code>` → `/scholarships/<id>`. Before this
+section existed, that page was the whole of a visitor's experience: no link to
+the product, no explanation of what the site does, and the app itself behind an
+account. The operator's question was exactly that — *"the site's features are
+never visible; find a way."*
+
+### What is public (no account, no session)
+
+| Page | What it proves |
+| --- | --- |
+| `/scholarships`, `/scholarships/<id>` | the award, its requirements, the official link |
+| `/universities`, `/universities/<id>` | the institution, programmes, costs |
+| **`/features`** (new) | what the platform does beyond one award |
+
+`/features` is a server component: it reads only bundled copy, needs no session
+and no client fetch, and it is in the sitemap. The Telegram bot link on it is
+printed **only** when the deployment has a configured bot (`getTelegramSettings`),
+never hardcoded.
+
+### The three entry points, all on every public page
+
+1. the header's third navigation item (`Imkoniyatlar` / `Возможности` /
+   `Features`) — added to `PublicCatalogHeader`, so it exists on every catalogue
+   page by construction;
+2. a promo strip at the end of each catalogue page
+   (`PublicFeaturePromo`): `Bu sahifa — saytning faqat bir qismi` + two buttons;
+3. the bottom of every channel-linked award page, i.e. exactly where a reader
+   from Telegram finishes reading.
+
+### One click to a real account
+
+`/?start=1` opens the onboarding wizard directly for a visitor with no session
+(the parameter is removed from the URL afterwards so Back/Forward and bookmarks
+behave). A signed-in student is never hijacked: the session restore wins.
+
+### What the page says, and what it refuses to say
+
+Browsing is free and account-free; an account is **only** for saving, deadline
+reminders and the AI assistant. The eight feature cards describe shipped
+functionality (fit score, admission chance, deadline plan, documents and essays,
+AI assistant, visa/departure, cost plan, Telegram bot) — no numbers, no
+testimonials, no promises, consistent with §4b and docs/CHANNEL.md §6.
+
+The catalogue pages now also pass the **server-resolved dictionary** to
+`LocaleProvider`. The promo is a client component, so without it the strip
+painted English for an Uzbek visitor until hydration finished.
+
+Checks: `npm run test:render` §14 (9 checks — the page exists and reads no
+session, the header links it, every catalogue page carries the strip, `start=1`
+opens the wizard, the bot link is conditional, and the copy is complete in all
+three languages).
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

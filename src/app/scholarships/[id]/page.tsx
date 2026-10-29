@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
+import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { dictionaries, clientMessagesFor, messagesFor } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
@@ -431,6 +432,13 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
             </div>
           </aside>
         </div>
+
+        {/*
+          A channel post lands exactly here, and until now this page had no way
+          out to the product: a reader saw one grant, went back to the list, and
+          never learned the site does anything else.
+        */}
+        <PublicFeaturePromo className="mt-6" />
 
         <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
           {copy.publicCatalog.independentGuide}

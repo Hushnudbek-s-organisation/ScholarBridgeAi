@@ -21,8 +21,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
+import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages.server";
+import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
@@ -226,7 +227,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   ];
 
   return (
-    <LocaleProvider initialLocale={locale}>
+    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
       <PublicCatalogHeader />
       <main className="mx-auto max-w-5xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link
@@ -442,6 +443,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           </aside>
         </div>
 
+
+        <PublicFeaturePromo className="mt-6" />
         <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
           {catalog.independentGuide}
         </p>

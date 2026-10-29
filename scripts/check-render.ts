@@ -1084,8 +1084,12 @@ const paginationSource = readFileSync(new URL("../src/components/Pagination.tsx"
 const catalogHeaderSource = readFileSync(new URL("../src/components/PublicCatalogHeader.tsx", import.meta.url), "utf8");
 const activeUniversitiesPredicates = universitiesPageSource.match(/from\(universitiesTable\)\s*\.where\(eq\(universitiesTable\.isActive, true\)\)/g) ?? [];
 const activeScholarshipsPredicates = scholarshipsPageSource.match(/from\(scholarshipsTable\)\s*\.where\(eq\(scholarshipsTable\.isActive, true\)\)/g) ?? [];
-check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(universitiesPageSource));
-check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(scholarshipsPageSource));
+// The provider must receive the server-resolved dictionary, not only the
+// locale: the promo strip on these pages is a client component, so without the
+// messages it painted English until hydration finished.
+const providerWithMessages = /<LocaleProvider initialLocale=\{locale\} initialMessages=\{clientMessagesFor\(locale\)\}>/;
+check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && providerWithMessages.test(universitiesPageSource));
+check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && providerWithMessages.test(scholarshipsPageSource));
 check("both public catalog pages share language/theme navigation", /<PublicCatalogHeader\s*\/>/.test(universitiesPageSource) && /<PublicCatalogHeader\s*\/>/.test(scholarshipsPageSource) && /LanguageSwitcher/.test(catalogHeaderSource) && /ThemeToggle/.test(catalogHeaderSource));
 check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdScholarshipAmount\(scholarship\)/.test(scholarshipsPageSource) && /awardCurrency: scholarshipsTable\.awardCurrency/.test(scholarshipsPageSource));
 check("university total and page data both filter to active rows", activeUniversitiesPredicates.length >= 2, `found ${activeUniversitiesPredicates.length}`);
@@ -1099,6 +1103,43 @@ for (const locale of ["en", "uz", "ru"]) {
     Boolean(messages.publicCatalog?.universityHeading && messages.publicCatalog?.scholarshipHeading &&
       messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline && messages.publicCatalog?.catalogNavigation &&
       messages.journey?.opAmountUnknown && messages.pagination?.aria && messages.pagination?.goToPage));
+}
+
+// ---------------------------------------------------------------------------
+section("14. The public site introduces itself (channel post → product)");
+
+const featuresPageSource = readFileSync(new URL("../src/app/features/page.tsx", import.meta.url), "utf8");
+const promoSource = readFileSync(new URL("../src/components/PublicFeaturePromo.tsx", import.meta.url), "utf8");
+const homeClientSource = readFileSync(new URL("../src/app/HomeClient.tsx", import.meta.url), "utf8");
+const detailPages = [
+  "../src/app/scholarships/[id]/page.tsx",
+  "../src/app/scholarships/page.tsx",
+  "../src/app/universities/page.tsx",
+  "../src/app/universities/[id]/page.tsx",
+].map((path) => [path, readFileSync(new URL(path, import.meta.url), "utf8")] as const);
+
+check("a public /features page exists and reads no session", /export default async function FeaturesPage/.test(featuresPageSource) && !/SESSION_COOKIE|getProfile|api\/auth/.test(featuresPageSource));
+check("the features page is reachable from every catalogue page's header", /href="\/features"/.test(catalogHeaderSource));
+check("every catalogue page ends with the promo strip", detailPages.every(([, source]) => /<PublicFeaturePromo/.test(source)), detailPages.filter(([, source]) => !/<PublicFeaturePromo/.test(source)).map(([path]) => path).join(", "));
+check("the promo strip links to /features and to the one-click start", /href="\/features"/.test(promoSource) && /href="\/\?start=1"/.test(promoSource));
+// Resolved on the server and passed as a prop: an effect that set state would
+// trip react-hooks/set-state-in-effect, and the wizard would only appear after
+// hydration.
+const homePageSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+check("start=1 opens onboarding directly for a visitor without a session",
+  /startParam === "1"/.test(homePageSource) && /startNow=\{startNow\}/.test(homePageSource) &&
+  /hasSessionCookie \? "restoring" : startNow \? "wizard" : "landing"/.test(homeClientSource));
+check("the features page offers the bot only when the deployment configured one", /getTelegramSettings\(\)/.test(featuresPageSource) && /\^\[A-Za-z0-9_\]\{4,64\}\$/.test(featuresPageSource));
+
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale);
+  const copy = messages.publicFeatures;
+  const featureKeys = ["match", "chancing", "deadlines", "documents", "ai", "visa", "money", "telegram"];
+  check(`public features copy is complete in ${locale}`,
+    Boolean(copy?.metaTitle && copy?.heroTitle && copy?.heroBody && copy?.heroPrimary && copy?.heroSecondary &&
+      copy?.freeNote && copy?.promoTitle && copy?.promoBody && copy?.promoCta && copy?.promoStart && copy?.navLabel &&
+      copy?.stepOneTitle && copy?.stepTwoTitle && copy?.stepThreeTitle &&
+      featureKeys.every((key) => copy?.features?.[key]?.title && copy?.features?.[key]?.body)));
 }
 
 // ---------------------------------------------------------------------------
