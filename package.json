@@ -91,7 +91,9 @@
     "test:duplicates": "tsx scripts/check-catalog-duplicates.ts",
     "test:deadlines": "tsx scripts/check-deadline-integrity.ts",
     "test:scholarship-detail": "tsx scripts/check-scholarship-detail.ts",
-    "lexicon:seed": "tsx scripts/seed-lexicon.ts"
+    "lexicon:seed": "tsx scripts/seed-lexicon.ts",
+    "channel:rehearse": "tsx scripts/rehearse-channel.ts",
+    "test:channel-e2e": "tsx scripts/rehearse-channel.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

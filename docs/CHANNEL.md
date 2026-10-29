@@ -370,6 +370,29 @@ nearest-deadline rows (37 and 771 at 2026-10-30, 437 at 2026-10-31) render the
 same way: 570–669 characters, all lint-clean, `Foydali tomonlari` present only
 where the row states something checkable.
 
+### 4b-6. The publishing rehearsal
+
+`check-channel.ts` proves the *text*. `scripts/rehearse-channel.ts`
+(`npm run channel:rehearse`) proves the *pipeline*: it starts the local Bot API
+mock (`scripts/telegram-mock.mjs`), points `TELEGRAM_API_BASE` at it, and runs
+the same `runDuePosts` the cron calls, against a real Postgres — no network, no
+live channel.
+
+| It asserts | Why it matters |
+|---|---|
+| mode `on`, one due row → **one** `sendMessage` to the channel chat, post row `sent`, plan row `sent` | the whole chain: render → link → reserve → send → store |
+| a second tick sends nothing | the dedupe key is what stops a double post |
+| a row whose `send_at` passed hours ago is still published | `duePlanRows` asks `send_at <= now`, so a tick *after* the window is enough — this is exactly the case that used to end in silence |
+| a row from **yesterday** is retired (`skip_reason = date_passed`), not posted late | the other half of the same rule: no stale news under today's date |
+| mode `approval` → preview only to the admin chat, `awaiting_approval`, channel untouched | the approval gate is real, not a UI label |
+| the preview carries exactly `ch:ok`, `ch:no`, `ch:ed` for one post | "exactly three actions" |
+| `approveApproval` publishes the **stored** text to the channel | what the operator approved is what goes out |
+| every message the mock received lints clean | the same rules the sender applies |
+
+It refuses a non-local `DATABASE_URL` (it writes rows), and restores the settings
+it touched and deletes every row it created — two consecutive runs pass, so it
+is safe to keep in a loop. Measured: 14 checks, 14 pass.
+
 ### 4c. Weekly deadlines post
 
 `weekly_deadlines` is Sunday-only. Scope comes from the planner: open, verified
