@@ -52,11 +52,11 @@ if (!fs.existsSync(path.join(repoRoot, "desktop", "node_modules"))) {
 
 if (!skipBuild) {
   if (!process.env.DATABASE_URL) {
-    fail(
-      "DATABASE_URL is required for the build (Next reads the database while collecting page data).\n" +
-        "  Locally:  npm run db:dev   (in another terminal), then\n" +
-        "            DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge npm run desktop:dist"
-    );
+    // No real database is needed: every route is dynamic and the pool is lazy,
+    // so `next build` only needs the variable to exist. (Verified by building
+    // against an unreachable address.)
+    process.env.DATABASE_URL = "postgresql://build:build@127.0.0.1:1/scholarbridge";
+    console.log("[build] no DATABASE_URL set — using a placeholder; the app creates its own database.");
   }
   say("Compiling the self-contained server (next build, standalone)…");
   run("npm", ["run", "build"], {

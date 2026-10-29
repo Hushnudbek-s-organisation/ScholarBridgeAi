@@ -43,6 +43,12 @@ jobs:
               desktop/release/*.deb
 
     env:
+      # Placeholder only. `next build` never opens a connection (the pool is
+      # lazy and every route is dynamic), so no database is needed on the
+      # runner; the INSTALLED app starts its own PostgreSQL and passes the real
+      # DATABASE_URL to the bundled server. Verified: a build with an
+      # unreachable address succeeds.
+      DATABASE_URL: postgresql://build:build@127.0.0.1:1/scholarbridge
       SESSION_SECRET: desktop-build-session-secret-not-used-at-runtime-000000
       NEXT_TELEMETRY_DISABLED: "1"
       # Unsigned builds on purpose (no paid certificate in this project):
@@ -63,20 +69,6 @@ jobs:
       - name: Install desktop dependencies
         run: npm ci --no-audit --no-fund
         working-directory: desktop
-
-      # A build-only database. GitHub's service containers are Linux-only, so
-      # every runner starts the repository's embedded Postgres instead; the
-      # script applies supabase/full_schema.sql and exports DATABASE_URL.
-      - name: Start the build database
-        shell: bash
-        run: |
-          node scripts/ci-desktop-db.mjs > ci-db.log 2>&1 &
-          for i in $(seq 1 180); do
-            [ -f .ci-db-ready ] && break
-            sleep 2
-          done
-          cat ci-db.log
-          test -f .ci-db-ready || { echo "the build database did not start"; exit 1; }
 
       # Compiles the standalone server, copies static assets, and packages the
       # installer with electron-builder (scripts/build-desktop.mjs).

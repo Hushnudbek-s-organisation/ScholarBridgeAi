@@ -76,20 +76,20 @@ them to a GitHub **Release**, which gives you stable download links to share.
 
 ## 2. Build the desktop app yourself
 
-Requirements: Node.js 20–22 and — only for the build step — a PostgreSQL
-database that `next build` can read (the *installed* app brings its own; the
-build does not).
+Requirements: Node.js 20–22. No database is needed for the build (every route
+is dynamic and the connection pool is lazy, so `next build` never connects);
+the *installed* app creates and starts its own PostgreSQL.
 
 ```bash
 npm ci                          # app dependencies
 cd desktop && npm ci && cd ..   # Electron + embedded PostgreSQL for the app
 
-# a database for the build (first time: initialises + seeds a local one)
-npm run db:dev:init             # leave it running in this terminal
+# build the installer for this OS
+DATABASE_URL=postgresql://build:build@127.0.0.1:1/scholarbridge npm run desktop:dist
 
-# in a second terminal:
-DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge \
-  npm run desktop:dist
+# (the DATABASE_URL is only a placeholder for the build — see
+# scripts/build-desktop.mjs; you may also run `npm run db:dev:init` first if
+# you want a real database while developing)
 ```
 
 Output: `desktop/release/` — `.exe` (+ portable `.exe`) on Windows, `.dmg` on

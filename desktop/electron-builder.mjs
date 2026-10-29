@@ -22,6 +22,11 @@ const config = {
   // the schema SQL from disk. Keeping the files real avoids the whole class of
   // "works in dev, ENOENT inside the installer" bugs for ~40 MB of extra disk.
   asar: false,
+  // Smaller installer, same app: LZMA instead of the default normal
+  // compression, and only the Chromium UI locales this audience can use
+  // (every other language pack is ~0.5 MB of dead weight each).
+  compression: "maximum",
+  electronLanguages: ["en-US", "ru"],
   files: [
     "main.mjs",
     "boot.mjs",
@@ -29,7 +34,9 @@ const config = {
     "splash.html",
     "build/icon.png",
     "package.json",
+    // Documentation and source maps are not needed at runtime.
     "!**/*.map",
+    "!**/*.md",
   ],
   extraResources: [
     { from: "../.next/standalone", to: "app", filter: ["**/*"] },
