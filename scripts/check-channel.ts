@@ -187,6 +187,7 @@ import {
 } from "../src/lib/channel/settings";
 import { buildWhy, tickIsStale, waitingForWindow, whySummary } from "../src/lib/channel/why";
 import { countryPriority, deadlineTier, editorialRank } from "../src/lib/channel/select";
+import { dictionaryStateOf, dictionaryStatusOf, dictionarySummary } from "../src/lib/channel/selfcheck";
 import { AUTOPILOT_DEFAULT_MINUTES,
   AUTOPILOT_TEXTS,
   MODE_LABELS,
@@ -3685,6 +3686,96 @@ check("the dictionary has a tab in the panel, in all three languages", () => {
       assert.ok(keys.includes(key), `${loc}: lexicon.${key} missing`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Dictionary self-check (the panel's "is the dictionary in the database?")
+// ---------------------------------------------------------------------------
+
+section("Dictionary self-check");
+
+const dictFacts = (overrides: Partial<Parameters<typeof dictionaryStateOf>[0]> = {}) => ({
+  rows: 12_732,
+  adminRows: 0,
+  installedVersion: "pdf-12732-1949",
+  bundledVersion: "pdf-12732-1949",
+  bundledTerms: 12_732,
+  ...overrides,
+});
+
+check("a database that matches the bundled version is 'installed'", () => {
+  const status = dictionaryStatusOf(dictFacts());
+  assert.equal(status.state, "installed");
+  assert.equal(status.ready, true);
+  assert.equal(status.advice, "none");
+});
+
+check("an empty table is 'pending' — a fresh deployment, not a failure", () => {
+  const status = dictionaryStatusOf(dictFacts({ rows: 0, installedVersion: null }));
+  assert.equal(status.state, "pending");
+  assert.equal(status.advice, "install");
+  assert.equal(status.ready, false);
+});
+
+check("a different installed version is 'stale' and asks for a re-import", () => {
+  const status = dictionaryStatusOf(dictFacts({ installedVersion: "pdf-older" }));
+  assert.equal(status.state, "stale");
+  assert.equal(status.advice, "reimport");
+  // Stale still translates: it is a warning, never a hard failure.
+  assert.equal(status.ready, false);
+});
+
+check("rows with no recorded version are 'stale', not 'installed'", () => {
+  assert.equal(dictionaryStateOf(dictFacts({ installedVersion: null })), "stale");
+});
+
+check("a table that cannot be read is 'unavailable', not 'empty'", () => {
+  const status = dictionaryStatusOf(dictFacts({ rows: 0, installedVersion: null, readFailed: true }));
+  assert.equal(status.state, "unavailable");
+  assert.equal(status.advice, "checkDatabase");
+});
+
+check("operator edits are reported without changing the verdict", () => {
+  const status = dictionaryStatusOf(dictFacts({ adminRows: 12, rows: 12_744 }));
+  assert.equal(status.state, "installed");
+  assert.equal(status.adminRows, 12);
+});
+
+check("the summary line names the version and the row count", () => {
+  const line = dictionarySummary(dictionaryStatusOf(dictFacts()));
+  assert.match(line, /12732/);
+  assert.match(line, /pdf-12732-1949/);
+});
+
+check("every dictionary state has a message in all three languages", () => {
+  for (const loc of ["uz", "ru", "en"] as const) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: {
+        dictionary?: { title?: string; state?: Record<string, string>; advice?: Record<string, string>; importNow?: string };
+      };
+    };
+    const dict = messages.adminChannel?.dictionary;
+    assert.ok(dict?.title, `${loc}: dictionary.title missing`);
+    assert.ok(dict?.importNow, `${loc}: dictionary.importNow missing`);
+    for (const state of ["installed", "pending", "stale", "unavailable"]) {
+      assert.ok(dict?.state?.[state], `${loc}: dictionary.state.${state} missing`);
+    }
+    for (const advice of ["none", "install", "reimport", "checkDatabase"]) {
+      assert.ok(dict?.advice?.[advice], `${loc}: dictionary.advice.${advice} missing`);
+    }
+  }
+});
+
+check("the panel shows the dictionary card and its import button", () => {
+  const panel = read("src/components/admin/ChannelManager.tsx");
+  assert.match(panel, /<DictionaryCard dictionary=\{data\.dictionary\}/);
+  assert.match(panel, /t\("dictionary\.importNow"\)/);
+});
+
+check("the explicit repair installs the dictionary too, not only the tables", () => {
+  const source = read("src/lib/channel/db.ts");
+  const repair = source.slice(source.indexOf("export async function forceChannelRepair"));
+  assert.match(repair.slice(0, 600), /installLexicon/);
 });
 
 // ---------------------------------------------------------------------------

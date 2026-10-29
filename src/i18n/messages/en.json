@@ -7214,6 +7214,26 @@
       "noResultsHint": "Try an English term such as tuition or transcript.",
       "empty": "No corrections yet",
       "emptyHint": "Search for a term above to correct its Uzbek gloss."
+    },
+    "dictionary": {
+      "title": "Translation dictionary",
+      "state": {
+        "installed": "installed",
+        "pending": "not imported yet",
+        "stale": "outdated version",
+        "unavailable": "could not be read"
+      },
+      "advice": {
+        "none": "Post text is translated with this dictionary.",
+        "install": "The first tick imports it by itself — or run it now.",
+        "reimport": "The bundled dictionary changed: import it again (your edits are kept).",
+        "checkDatabase": "The table could not be read: check the database connection and grants."
+      },
+      "facts": "{rows}/{terms} terms · version {version}",
+      "edited": "{count} rows edited by hand",
+      "importNow": "Import now",
+      "imported": "{rows} terms written to the database",
+      "importFailed": "The import did not run — the reason is in the audit log."
     }
   },
   "adminDiagnostics": {

@@ -2469,6 +2469,111 @@ async function main() {
     ...phaseMRows.map((row: any) => row.id),
   ]));
 
+  // ---- Phase N: the dictionary installs itself into a fresh database ------
+  // The live deployment never needs a manual import step: the channel
+  // bootstrap runs the DDL and then the versioned lexicon import. That claim is
+  // only worth making if a fresh database proves it, so this block starts from
+  // a database with no lexicon rows at all.
+  const channelDb = await import("../src/lib/channel/db");
+  const { dictionaryStatus } = await import("../src/lib/channel/selfcheckStore");
+  const { installLexicon } = await import("../src/lib/channel/lexicon/store");
+
+  const beforeBootstrap = await dictionaryStatus();
+  check(
+    "channel: before any bootstrap the dictionary is honestly reported as not imported",
+    beforeBootstrap.state === "pending" && beforeBootstrap.rows === 0 && beforeBootstrap.ready === false,
+    `${beforeBootstrap.state} rows=${beforeBootstrap.rows}`
+  );
+
+  channelDb.resetChannelTablesMemo();
+  const channelTablesReady = await channelDb.ensureChannelTables();
+  const installed = await dictionaryStatus();
+  check(
+    "channel: the first bootstrap installs the whole dictionary into a fresh database",
+    channelTablesReady === true && installed.state === "installed" && installed.rows >= 12_000,
+    `ready=${channelTablesReady} state=${installed.state} rows=${installed.rows}`
+  );
+  check(
+    "channel: the installed version is the version this build bundles",
+    installed.installedVersion === installed.bundledVersion && installed.bundledVersion.length > 0,
+    `${installed.installedVersion} vs ${installed.bundledVersion}`
+  );
+  check(
+    "channel: every bundled term is in the database (no silent truncation)",
+    installed.rows === installed.bundledTerms,
+    `rows=${installed.rows} bundled=${installed.bundledTerms}`
+  );
+
+  const secondInstall = await installLexicon();
+  check(
+    "channel: a second install is a no-op — the import is versioned, not repeated",
+    secondInstall.installed === false && secondInstall.size === installed.rows,
+    `installed=${secondInstall.installed} size=${secondInstall.size}`
+  );
+
+  // An explicit repair must do the same thing: an operator's "retry" cannot
+  // leave the tables created and the dictionary empty.
+  await db.delete(schema.translationLexicon);
+  await db.delete(schema.translationLexiconMeta);
+  const emptied = await dictionaryStatus();
+  channelDb.resetChannelTablesMemo();
+  const repaired = await channelDb.forceChannelRepair();
+  const afterRepair = await dictionaryStatus();
+  check(
+    "channel: an explicit repair re-installs the dictionary, not just the tables",
+    emptied.state === "pending" && repaired === true && afterRepair.state === "installed" && afterRepair.rows === afterRepair.bundledTerms,
+    `emptied=${emptied.state} repair=${repaired} after=${afterRepair.state}/${afterRepair.rows}`
+  );
+
+  // Admin edits survive an import — the operator's corrections are the reason
+  // the dictionary is editable in the panel at all.
+  const [editedRow] = await db
+    .select({ en: schema.translationLexicon.en })
+    .from(schema.translationLexicon)
+    .limit(1);
+  if (editedRow) {
+    await db
+      .insert(schema.translationLexicon)
+      .values({ key: "phase-n-admin-term", en: "phase-n admin term", uz: "Faza-N atamasi", source: "admin" })
+      .onConflictDoNothing();
+  }
+  await installLexicon();
+  const adminRows = await db
+    .select({ en: schema.translationLexicon.en, source: schema.translationLexicon.source })
+    .from(schema.translationLexicon);
+  const keptAdmin = adminRows.filter((row) => row.source === "admin");
+  check(
+    "channel: an import never deletes an operator's own rows",
+    keptAdmin.length >= 1 && keptAdmin.some((row) => row.en === "phase-n admin term"),
+    `admin rows=${keptAdmin.length}`
+  );
+
+  const adminChannelRoute = await import("../src/app/api/admin/channel/route");
+  const adminCookie = `sb_session=${adminToken}`;
+  const channelOverviewRes = await call(adminChannelRoute.GET as any, "/api/admin/channel", {
+    headers: { cookie: adminCookie },
+  });
+  check(
+    "admin channel panel reports the dictionary state next to the other counts",
+    channelOverviewRes.status === 200 &&
+      channelOverviewRes.body?.dictionary?.ready === true &&
+      // The fixture's admin row is on top of the bundled terms, and the panel
+      // must count it separately rather than treating it as an import drift.
+      channelOverviewRes.body?.dictionary?.rows ===
+        channelOverviewRes.body?.dictionary?.bundledTerms + channelOverviewRes.body?.dictionary?.adminRows,
+    JSON.stringify(channelOverviewRes.body?.dictionary)?.slice(0, 220)
+  );
+  const reimportRes = await call(adminChannelRoute.POST as any, "/api/admin/channel", {
+    method: "POST",
+    headers: { cookie: adminCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "dictionary" }),
+  });
+  check(
+    "admin channel panel can re-import the dictionary in one action",
+    reimportRes.status === 200 && reimportRes.body?.ok === true && reimportRes.body?.dictionary?.ready === true,
+    `${reimportRes.status} ${JSON.stringify(reimportRes.body?.result ?? reimportRes.body?.error)}`
+  );
+
   // ---- A20: rate limits shared across instances ---------------------------
   const { checkSharedRateLimit } = await import("../src/lib/rate-limit-shared");
   const { resetRateLimits } = await import("../src/lib/rate-limit");

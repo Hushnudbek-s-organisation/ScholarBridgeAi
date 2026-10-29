@@ -175,6 +175,25 @@ export async function POST(req: Request) {
     if (action === "summary") {
       return NextResponse.json({ ok: true, summary: await channelAdminSummary() });
     }
+    /**
+     * "Put the dictionary in the database now" — the operator's explicit import.
+     *
+     * The bootstrap already does this on its first tick, so this is the
+     * recovery path: a table emptied by hand, a bundled version that changed, an
+     * environment where the first tick failed. Admin rows (`source = 'admin'`)
+     * are never touched — only the PDF-imported rows are replaced.
+     */
+    if (action === "dictionary") {
+      const { installLexicon } = await import("@/lib/channel/lexicon/store");
+      const { dictionaryStatus } = await import("@/lib/channel/selfcheckStore");
+      const result = await installLexicon();
+      const dictionary = await dictionaryStatus();
+      if (result.error) {
+        // The reason is a sanitised sentence, never a DSN.
+        return NextResponse.json({ ok: false, result, dictionary }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, result, dictionary });
+    }
     return jsonError(400, "Unknown action", "bad_action");
   } catch (error) {
     return serverError("channel action", error);

@@ -932,6 +932,25 @@ posts anything.
 | Hikoyalar | Admin-written stories; only approved rows are postable |
 | Jurnal | Append-only `channel_audit` trail of every mutation |
 
+**Lug'at card (Ulash tab).** Next to "Nega post ketmayapti?" the panel shows the
+translation dictionary's state: how many terms are in *this* database, which
+version is installed, how many rows an operator edited by hand, and — when it is
+not ready — one **Import qilish** button. Four states, all computed on the server
+(`src/lib/channel/selfcheck.ts`):
+
+| State | Meaning | Advice |
+| --- | --- | --- |
+| `installed` | The DB copy matches the version this build bundles | nothing to do |
+| `pending` | The tables exist, the import has not run yet (fresh deployment) | the first tick installs it, or press the button |
+| `stale` | A different version is installed (the bundled dictionary changed) | re-import; admin edits are kept |
+| `unavailable` | The table could not be read at all | check the database connection/grants |
+
+An import only ever deletes `source = 'pdf'` rows, so an operator's corrections
+(`source = 'admin'`) survive a re-import — that is asserted in
+`npm run test:integration`. An explicit **repair** (`forceChannelRepair`) also
+installs the dictionary: creating the tables and leaving the dictionary empty was
+one silent failure mode too many.
+
 Every mutation passes `guardAdmin` (admin session + rate limit), the global CSRF
 proxy and is written to `channel_audit`. The bot token never appears in any
 response.
@@ -946,6 +965,33 @@ identity as its key, so a duplicate tick sends nothing twice. Call it every
 
 `mode = off`, a pause, or an unconfigured channel makes the tick return
 `{"skipped": true}` without touching Telegram.
+
+### 11a. 2026-10-29 — why the live channel had not posted, verified from the database
+
+The deployed instance (Render, `main`) was audited read-only through the live
+Supabase project. Every fact below is a row, not an assumption:
+
+| Fact | Evidence |
+| --- | --- |
+| The scheduler runs | `channel_audit`: a `tick` row every 15 minutes, `posts_run` alongside it |
+| It attempts nothing | `posts_run` reports `attempted: 0` on every tick — no plan row was due yet |
+| The mode is **approval** | `channel_settings.connection.mode = "approval"`, set by the operator on 2026-10-28 15:36 (`channel_audit` id 108, before → `on`, after → `approval`) |
+| Posts were never sent | `channel_posts` = 0 rows |
+| Three older plan rows are gone | retired with reason `date_passed` (audit id 93) — a fully missed day is closed, not sent late |
+| One post is scheduled | `channel_plan` id 4: 2026-10-29, `send_at 20:35`, kind `urgency`, scholarship 437, status `planned` |
+
+So the publisher is healthy and the channel is *waiting*: at 20:35 Tashkent the
+tick turns that row into a preview in the admin chat, and nothing reaches the
+channel until the admin presses **Approve**. That is approval mode working as
+designed, not a bug.
+
+**The dictionary is not in the live database yet** — `information_schema` lists
+the thirteen `channel_*` tables and no `translation_lexicon*` tables. The reason
+is deployment, not code: the dictionary ships in PR #116, which is not merged, so
+the running build has no code that creates the table. The moment that build is
+deployed the first tick installs it by itself; `npm run test:integration` proves
+the claim on a fresh database ("the first bootstrap installs the whole dictionary
+into a fresh database", 12 732 terms, version `pdf-12732-1949`).
 
 ## 12. Short links
 

@@ -7214,6 +7214,26 @@
       "noResultsHint": "Inglizcha atama bilan sinab ko'ring: tuition, transcript.",
       "empty": "Hozircha tuzatish yo'q",
       "emptyHint": "Yuqoridan atama qidirib, o'zbekcha izohini tuzating."
+    },
+    "dictionary": {
+      "title": "Tarjima lug'ati",
+      "state": {
+        "installed": "o'rnatilgan",
+        "pending": "hali import qilinmagan",
+        "stale": "eski versiya",
+        "unavailable": "o'qib bo'lmadi"
+      },
+      "advice": {
+        "none": "Post matni shu lug'atdan tarjima qilinadi.",
+        "install": "Birinchi tick o'zi import qiladi — xohlasangiz hoziroq boshlang.",
+        "reimport": "Ilovadagi lug'at yangilangan: qayta import qiling (siz tuzatgan qatorlar saqlanadi).",
+        "checkDatabase": "Jadval o'qilmadi: baza ulanishi yoki ruxsatni tekshiring."
+      },
+      "facts": "{rows}/{terms} atama · versiya {version}",
+      "edited": "{count} qator qo'lda tuzatilgan",
+      "importNow": "Import qilish",
+      "imported": "{rows} atama bazaga yozildi",
+      "importFailed": "Import bajarilmadi — sabab jurnalda ko'rinadi."
     }
   },
   "adminDiagnostics": {

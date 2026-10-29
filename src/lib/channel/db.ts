@@ -63,8 +63,16 @@ export async function ensureChannelTables(): Promise<boolean> {
  * Admin "retry" action: run the DDL even when the request path is configured
  * not to (`SCHEMA_AUTO_REPAIR=off`), because this is an explicit operator step.
  */
-export function forceChannelRepair(): Promise<boolean> {
-  return bootstrap.forceRepair();
+export async function forceChannelRepair(): Promise<boolean> {
+  const ok = await bootstrap.forceRepair();
+  /**
+   * The dictionary is part of "the channel tables are ready": `ensure()` installs
+   * it, so an explicit repair has to do the same. Without this, an operator's
+   * retry would create the tables and leave translation silently degraded —
+   * the one failure mode that is invisible in a post preview.
+   */
+  if (ok) await installLexicon().catch(() => null);
+  return ok;
 }
 
 /** Admin diagnostics: why the tables are (not) ready — never the raw error. */

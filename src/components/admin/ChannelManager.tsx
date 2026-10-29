@@ -218,6 +218,26 @@ interface Overview {
     checklist: EnvRow[];
   };
   connection: ConnectionCheck | null;
+  /** The EN→UZ dictionary's state in this database (see `channel/selfcheck`). */
+  dictionary?: DictionaryState;
+}
+
+/**
+ * What the server reports about the translation dictionary.
+ *
+ * `state` is the verdict, the rest is the evidence behind it: rows in the
+ * database, the version that is installed, and the version this build bundles.
+ */
+interface DictionaryState {
+  rows: number;
+  adminRows: number;
+  installedVersion: string | null;
+  bundledVersion: string;
+  bundledTerms: number;
+  readFailed?: boolean;
+  state: "installed" | "pending" | "stale" | "unavailable";
+  advice: "none" | "install" | "reimport" | "checkDatabase";
+  ready: boolean;
 }
 
 interface PreviewDay {
@@ -522,6 +542,90 @@ interface Kick {
 /* ------------------------------------------------------------------ */
 /* Ulash                                                              */
 /* ------------------------------------------------------------------ */
+
+/**
+ * The translation dictionary's state, and the one button that fixes it.
+ *
+ * Why it is here: a post can go out on time and still be wrong, if the EN→UZ
+ * dictionary is not in *this* database. The server reports the bundled version
+ * against the installed one, so "installed" is a fact, not a hope; "pending"
+ * (a fresh deployment before its first tick) and "stale" (the bundled
+ * dictionary changed) each get the import button. Admin edits are counted but
+ * never overwritten — the import only replaces `source = 'pdf'` rows.
+ */
+function DictionaryCard({
+  dictionary: status,
+  act,
+  busy,
+  showToast,
+}: {
+  dictionary?: DictionaryState;
+  act: ActFn;
+  busy: boolean;
+  showToast: ShowToast;
+}) {
+  const t = useTranslations("adminChannel");
+  const [importing, setImporting] = useState(false);
+  if (!status) return null;
+  const tone =
+    status.state === "installed"
+      ? "border-emerald-200 dark:border-emerald-500/30"
+      : status.state === "unavailable"
+        ? "border-rose-200 dark:border-rose-500/30"
+        : "border-amber-200 dark:border-amber-500/30";
+  const badge =
+    status.state === "installed"
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200"
+      : status.state === "unavailable"
+        ? "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200"
+        : "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200";
+
+  const runImport = async () => {
+    setImporting(true);
+    try {
+      const res = await act("dictionary");
+      if (!res) return;
+      const next = res.dictionary as DictionaryState | undefined;
+      showToast(
+        res.ok && next?.ready ? t("dictionary.imported", { rows: next.rows }) : t("dictionary.importFailed")
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className={`${card} ${tone}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <BookOpen className="h-4 w-4 text-indigo-500" /> {t("dictionary.title")}
+          </h3>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge}`}>
+              {t(`dictionary.state.${status.state}` as never)}
+            </span>
+            <span>{t(`dictionary.advice.${status.advice}` as never)}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {t("dictionary.facts", {
+              rows: status.rows,
+              terms: status.bundledTerms,
+              version: status.installedVersion ?? status.bundledVersion,
+            })}
+            {status.adminRows > 0 ? ` · ${t("dictionary.edited", { count: status.adminRows })}` : ""}
+          </p>
+        </div>
+        {!status.ready && (
+          <button className={btnGhost} onClick={() => void runImport()} disabled={busy || importing}>
+            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{" "}
+            {t("dictionary.importNow")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Approval inbox — the posts sitting in the admin chat.
@@ -1114,6 +1218,14 @@ function ConnectTab({
           </>
         )}
       </div>
+
+      {/**
+       * The dictionary, next to the "why" card: a post can be published on time
+       * and still be wrong, if the EN→UZ dictionary is not in this database.
+       * The state comes from the server (bundled version vs installed version),
+       * so this card never guesses.
+       */}
+      <DictionaryCard dictionary={data.dictionary} act={act} busy={busy} showToast={showToast} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={card}>
