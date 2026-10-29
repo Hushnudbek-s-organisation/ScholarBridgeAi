@@ -6862,7 +6862,8 @@
       "audit": "Jurnal",
       "polls": "So'rovnomalar",
       "prefs": "Qiziqish",
-      "stories": "Hikoyalar"
+      "stories": "Hikoyalar",
+      "lexicon": "Lug'at"
     },
     "steps": {
       "token": "Bot tokeni (Admin → Telegram)",
@@ -7174,6 +7175,35 @@
       "startNow": "Yuborishni yoqish (tasdiqlash bilan)",
       "startDone": "Yuborish yoqildi — birinchi post admin chatga keldi.",
       "buildNow": "Bugungi rejani tuzish"
+    },
+    "lexicon": {
+      "title": "Lug'at",
+      "hint": "Kanal tarjima qiladigan har bir inglizcha atama shu yerdan olinadi. Lug'at ilova ichida va bazada saqlanadi; izohni o'zgartirsangiz, keyingi post shuni aytadi — deploy kerak emas.",
+      "bundled": "Ilovada",
+      "inDatabase": "Bazada",
+      "edited": "Siz tuzatgan",
+      "version": "Ilovadagi versiya",
+      "installedVersion": "O'rnatilgan versiya",
+      "notInstalled": "hali o'rnatilmagan",
+      "search": "Qidirish",
+      "searchPlaceholder": "masalan: tuition, motivation letter, proof of funds",
+      "import": "Qayta yuklash",
+      "installed": "Yuklandi: {count} atama",
+      "alreadyCurrent": "Allaqachon yangilangan",
+      "editTitle": "Izohni tuzatish",
+      "english": "Inglizcha atama",
+      "uzbek": "O'zbekcha izoh (postda shu yoziladi)",
+      "russian": "Ruscha izoh (ixtiyoriy)",
+      "editHint": "Faqat qisqa ibora. Tuzatishingiz darhol amal qiladi; postda hech qachon ro'yxatda yo'q izoh chiqmaydi.",
+      "edit": "Tuzatish",
+      "reset": "Asl holatiga qaytarish",
+      "resetDone": "Lug'atdagi asl izoh qaytarildi",
+      "sourceAdmin": "sizniki",
+      "sourcePdf": "lug'at",
+      "noResults": "Hech narsa topilmadi",
+      "noResultsHint": "Inglizcha atama bilan sinab ko'ring: tuition, transcript.",
+      "empty": "Hozircha tuzatish yo'q",
+      "emptyHint": "Yuqoridan atama qidirib, o'zbekcha izohini tuzating."
     }
   },
   "adminDiagnostics": {

@@ -88,6 +88,20 @@ export function lookup(text: string): LexiconEntry | null {
 }
 
 /**
+ * The bundled gloss for a headword, ignoring operator edits.
+ *
+ * `reset` needs exactly this: restoring a term means putting the dictionary's
+ * own gloss back, not deleting the row. (Deleting was the old behaviour, and it
+ * quietly emptied the table one correction at a time — the bundle kept
+ * translating, so nothing looked broken until an operator searched for a term
+ * they had "restored".)
+ */
+export function bundledGloss(text: string): LexiconEntry | null {
+  const key = normalise(text);
+  return BUNDLED[key] ?? null;
+}
+
+/**
  * Connectors a term list needs and a dictionary never bothers to define.
  * Deliberately tiny: every entry is a word that appears *inside* requirement
  * lists and carries no meaning of its own.
@@ -222,9 +236,23 @@ export function translateFragment(text: string | null | undefined): FragmentTran
   return { uz, hits, glue };
 }
 
-/** Words that only appear in an *English* sentence, never in an Uzbek gloss. */
+/**
+ * Words that only appear in an *English* sentence, never in an Uzbek gloss.
+ *
+ * The lookbehind is load-bearing: Uzbek writes its digraphs with an apostrophe
+ * (`ilg'or`, `o'qish`), and JavaScript counts the apostrophe as a word
+ * boundary — so a plain `\bor\b` rejects `ilg'or` and, with it, every gloss
+ * containing "advanced". 74 entries in the supplied dictionary were being
+ * dropped that way; only the genuine English ones (provider names such as
+ * "American University of Beirut") are still refused.
+ */
 const ENGLISH_LEFTOVER =
-  /\b(?:the|and|or|of|must|should|will|with|students?|applicants?|candidates?|required|requirements?|please|your)\b/i;
+  /(?<!['\u2019])\b(?:the|and|or|of|must|should|will|with|students?|applicants?|candidates?|required|requirements?|please|your)\b/i;
+
+/** True when `text` still reads as English. One rule, used everywhere. */
+export function looksEnglish(text: string | null | undefined): boolean {
+  return ENGLISH_LEFTOVER.test(String(text ?? ""));
+}
 
 /**
  * A dictionary gloss often lists two senses (`to'liq / tugallamoq`). Inside a

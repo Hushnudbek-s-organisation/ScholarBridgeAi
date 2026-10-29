@@ -276,6 +276,42 @@ Both are gated:
   patterns already said is dropped, and the bullet is capped at 120 characters.
 * No English may survive: a gloss carrying `the/and/must/students` is rejected.
 
+**Correcting a gloss is a panel job, not a deploy.** Admin → Kanal → **Lug'at**
+(`/api/admin/channel/lexicon`) searches the table by headword or gloss, saves a
+correction, restores the original, or re-imports the bundled list:
+
+| Action | What it does | What it cannot do |
+|---|---|---|
+| `search` | matches `en` or `uz`, operator-edited rows first | — |
+| `save` | upserts the row with `source = 'admin'` | add English (the gloss is validated by `checkGloss`, the renderer's own rule) or set `source` itself |
+| `reset` | puts the dictionary's own gloss back (`bundledGloss`), and only deletes a row the operator added themselves | lose a term: a headword the bundle knows keeps its row, with its original gloss |
+| `install` | re-imports the bundled list if the version changed | touch operator rows |
+
+Every change is written to `channel_audit` (`lexicon_save` / `lexicon_reset` /
+`lexicon_install`) and takes effect on the next post, because the save reloads
+the overlay. Measured against a real Postgres, through the HTTP endpoint
+with an admin session: correcting `tuition` made the row `source = admin` (1
+edited, 12 732 rows) and changed the very next render to the operator's wording;
+`reset` restored the printed gloss **and kept the row** (it is a `pdf` row
+again); a word the dictionary lacks (`colloquium`) produced **no bullet at
+all**, then one once added, then none again after removal; an English gloss and
+an empty one were refused with `bad_gloss_english` / `bad_gloss_empty`; an
+unknown action with `bad_action`; and `install` on a current copy reported
+`installed: false` without rewriting anything.
+
+Two known edges, both measured:
+
+* **Uzbek apostrophes.** JavaScript counts `'` as a word boundary, so a plain
+  `/\bor\b/` reads `ilg'or` as English — it was silently dropping 74 legitimate
+  glosses, every "advanced …" phrase among them. The leftover rule now has an
+  apostrophe lookbehind (`looksEnglish`), which is the single definition used by
+  the renderer, the fragment gate and the admin validator alike.
+* **207 rows still carry English** in the supplied PDF itself (provider names
+  such as *American University of Beirut*, or *U of T*): those are refused by
+  the same rule rather than printed, and an operator can correct any of them in
+  the panel. The dictionary is 12 732 headwords; ~1.6% of its glosses are not
+  clean Uzbek as printed, and none of them can reach a post.
+
 Measured on eight real awards, shape 2 puts Uzbek term chips on 4 of them; the
 other four are prose with no dictionary term in them, and stay as short as they
 were. That is the honest size of the gain — the dictionary names vocabulary, it

@@ -103,10 +103,13 @@ import {
 } from "../src/lib/channel/templates/translate.uz";
 import {
   LEXICON_META,
+  bundledGloss,
   lexiconSize,
+  looksEnglish,
   lookup,
   translateFragment,
 } from "../src/lib/channel/lexicon";
+import { checkGloss } from "../src/lib/channel/lexicon/store";
 import { ctaLine, footerLine, hashtagLine } from "../src/lib/channel/templates/chrome";
 import {
   EMPTY_CONTENT,
@@ -3420,6 +3423,100 @@ check("a record with only English fields still posts Uzbek sections", () => {
   // The raw English must be gone from the post itself.
   for (const english of ["citizen", "aged", "Submit a motivation", "or equivalent English test", "amount payable"]) {
     assert.ok(!text.includes(english), `English leaked into the post: ${english}`);
+  }
+});
+
+check("Uzbek apostrophes are not mistaken for English words", () => {
+  // JS counts `'` as a word boundary, so a plain /\bor\b/ flags `ilg'or` and
+  // silently dropped 74 legitimate glosses — every "advanced …" phrase among
+  // them. The lookbehind in ENGLISH_LEFTOVER is what keeps them.
+  assert.equal(looksEnglish("ilg'or"), false, "ilg'or is Uzbek, not English");
+  assert.equal(looksEnglish("Ilg'or kompyuter fanlari"), false);
+  assert.equal(looksEnglish("O'qish to'lovi"), false);
+  assert.equal(looksEnglish("American University of Beirut moliyaviy yordam"), true, "a real English name is caught");
+  assert.equal(looksEnglish("the tuition fee"), true);
+  // …and the term survives the whole translator, not just the guard.
+  const advanced = translateFragment("advanced computer science");
+  assert.ok(advanced, "a legitimate gloss was dropped by the leftover rule");
+  assert.match(advanced.uz, /kompyuter/i);
+  const gloss = checkGloss("Ilg'or daraja");
+  assert.equal(gloss.ok, true, "the gloss validator uses the same rule");
+});
+
+check("an operator's gloss is what the post will say — and nothing else can be typed", () => {
+  // The rule the admin API rejects with is the renderer's own rule, so it is
+  // asserted here rather than duplicated: a short Uzbek/Russian phrase passes,
+  // an English sentence, an empty box and a number do not.
+  assert.deepEqual(checkGloss("Kontrakt to'lovi"), { ok: true, uz: "Kontrakt to'lovi" });
+  assert.equal(checkGloss("  Kontrakt   to'lovi  ").ok, true, "whitespace is normalised, not rejected");
+  const normalised = checkGloss("  Kontrakt   to'lovi  ");
+  assert.equal(normalised.ok && normalised.uz, "Kontrakt to'lovi", "inner whitespace is collapsed");
+  for (const bad of ["", "   ", "123", "the tuition fee", "students must submit"]) {
+    assert.equal(checkGloss(bad).ok, false, `accepted a non-gloss: ${JSON.stringify(bad)}`);
+  }
+  // Over-long text is cut, never posted whole.
+  const long = checkGloss("a".repeat(400));
+  assert.ok(long.ok, "long text is still a gloss");
+  if (long.ok) assert.equal(long.uz.length, 120, "a gloss is capped at 120 characters");
+});
+
+check("the dictionary can be corrected from the admin panel, without a deploy", () => {
+  const routeSrc = read("src/app/api/admin/channel/lexicon/route.ts");
+  // Reading and writing both go through the admin guard; writes are rate-limited.
+  assert.match(routeSrc, /guardAdmin\(req\)/, "GET must be admin-only");
+  assert.match(routeSrc, /guardAdmin\(req, \{ write: true \}\)/, "POST must be an admin write");
+  // The only thing a caller may set is the gloss: `source` is never taken from
+  // the body, so a request cannot mark a row as someone else's or as bundled.
+  assert.match(routeSrc, /source: "admin"/, "operator rows are stamped, not supplied");
+  assert.doesNotMatch(routeSrc, /body\.value\.source/, "the source column is not client-controlled");
+  assert.match(routeSrc, /onConflictDoUpdate/, "correcting an existing term must not fail on the PK");
+  assert.match(routeSrc, /checkGloss\(body\.value\.uz\)/, "the gloss is validated, not trusted");
+  assert.match(routeSrc, /action !== "install" && action !== "save" && action !== "reset"/, "unknown actions are refused up front");
+  // Searching "tuition" must not bury `tuition` under longer phrases.
+  assert.match(routeSrc, /translationLexicon\.key} = \$\{q\.toLowerCase\(\)\}/, "the exact headword ranks first");
+  // "Restore original" puts the dictionary's own gloss back instead of deleting
+  // the row: an earlier version deleted it, and two terms were quietly lost
+  // from the table the first time an operator corrected and then reverted them.
+  assert.match(routeSrc, /bundledGloss\(key\)/, "reset must consult the bundled gloss first");
+  assert.match(routeSrc, /source: "pdf"/, "a restored row is a dictionary row again");
+  assert.match(
+    routeSrc,
+    /eq\(translationLexicon\.source, "admin"\)/,
+    "deleting is limited to rows the operator added"
+  );
+  assert.ok(bundledGloss("tuition"), "the bundle must answer for its own terms");
+  assert.equal(bundledGloss("colloquium"), null, "a word the dictionary lacks has no bundled gloss");
+  assert.match(routeSrc, /refreshOverlay\(\)/, "a correction takes effect on the next render");
+  assert.match(routeSrc, /writeChannelAudit\(/, "every dictionary change is logged");
+  // Installing is idempotent and versioned, so the button is safe to press.
+  const storeSrc = read("src/lib/channel/lexicon/store.ts");
+  assert.match(storeSrc, /installedVersion\(\)/, "an install compares the version first");
+  assert.match(storeSrc, /eq\(translationLexicon\.source, "pdf"\)/, "an import replaces bundled rows only");
+  // ...and an operator's corrections survive a re-import, which is the whole
+  // point of the two sources.
+  assert.doesNotMatch(storeSrc, /delete\(translationLexicon\)(?!\s*\.where\(eq\(translationLexicon\.source, "pdf"\)\))/, "an import may only delete bundled rows");
+});
+
+check("the dictionary has a tab in the panel, in all three languages", () => {
+  const ui = read("src/components/admin/ChannelManager.tsx");
+  assert.match(ui, /\| "lexicon"/, "the tab is in the Tab union");
+  assert.match(ui, /\n  "lexicon",\n/, "and in the TABS list");
+  assert.match(ui, /tab === "lexicon" && <LexiconTab/, "the tab renders its component");
+  // The panel talks to the dictionary API only, and shows the honest count.
+  assert.match(ui, /\/api\/admin\/channel\/lexicon/, "the panel uses the dictionary API");
+  for (const call of ["install", "save", "reset"]) {
+    assert.match(ui, new RegExp(`action: "${call}"`), `the panel cannot ${call}`);
+  }
+  for (const loc of ["en", "uz", "ru"]) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: { tabs?: Record<string, string>; lexicon?: Record<string, string> };
+    };
+    assert.ok(messages.adminChannel?.tabs?.lexicon, `${loc}: tab label missing`);
+    const keys = Object.keys(messages.adminChannel?.lexicon ?? {});
+    assert.ok(keys.length >= 24, `${loc}: only ${keys.length} dictionary strings`);
+    for (const key of ["title", "hint", "search", "edit", "reset", "import", "notInstalled"]) {
+      assert.ok(keys.includes(key), `${loc}: lexicon.${key} missing`);
+    }
   }
 });
 
