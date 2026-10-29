@@ -34,45 +34,73 @@ the same everywhere. There is no second implementation to keep in sync.
 
 ---
 
-## 1. Get the apps without building anything
+## 1. Download and install
 
-The repository ships two GitHub Actions workflows that build real installers
-on GitHub's machines:
+Ready-made builds are attached to the repository's **Releases** page — no
+building required:
 
-1. Open the repository on GitHub → **Actions**.
-2. **Desktop app** → *Run workflow* → wait ~10 minutes.
-3. Download the artifact for your platform:
-   * `scholarbridge-windows` → `ScholarBridge-Setup.exe` (installer) and
-     `ScholarBridge-Portable.exe` (no install),
-   * `scholarbridge-macos` → `ScholarBridge-arm64.dmg` / `ScholarBridge-x64.dmg`,
-   * `scholarbridge-linux` → `ScholarBridge.AppImage` and `ScholarBridge.deb`.
-4. **Android APK** → *Run workflow* → download
-   `scholarbridge-android-apk` → `ScholarBridge.apk`.
+**➡ https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi/releases/latest**
 
-Because the file names are stable, “always the newest build” links keep
-working:
+| Your device | File | Size | Link (always the newest build) |
+| --- | --- | --- | --- |
+| **Android phone / tablet** | `ScholarBridge.apk` | **4 MB** | `…/releases/latest/download/ScholarBridge.apk` |
+| **Windows 10/11 — installer** | `ScholarBridge-Setup.exe` | **145 MB** | `…/releases/latest/download/ScholarBridge-Setup.exe` |
+| Windows — no installation | `ScholarBridge-Portable.exe` | 121 MB | `…/releases/latest/download/ScholarBridge-Portable.exe` |
+| macOS — Apple Silicon (M1–M4) | `ScholarBridge-arm64.dmg` | 158 MB | `…/releases/latest/download/ScholarBridge-arm64.dmg` |
+| macOS — Intel | `ScholarBridge-x64.dmg` | 161 MB | `…/releases/latest/download/ScholarBridge-x64.dmg` |
+| Linux — any distribution | `ScholarBridge.AppImage` | 120 MB | `…/releases/latest/download/ScholarBridge.AppImage` |
+| Linux — Debian/Ubuntu package | `ScholarBridge.deb` | 116 MB | `…/releases/latest/download/ScholarBridge.deb` |
 
-```
-.../releases/latest/download/ScholarBridge.apk
-.../releases/latest/download/ScholarBridge-Setup.exe
-.../releases/latest/download/ScholarBridge-Portable.exe
-.../releases/latest/download/ScholarBridge.AppImage
-.../releases/latest/download/ScholarBridge.deb
-.../releases/latest/download/ScholarBridge-arm64.dmg
-.../releases/latest/download/ScholarBridge-x64.dmg
-```
+(Prefix every link with `https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi`;
+the sizes are the actual files of release `v1.0.3`.)
 
-(prefix: `https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi`).
+### Why the Android app is 4 MB and the desktop app is 145 MB
 
-Pushing a tag (`git tag v1.0.0 && git push origin v1.0.0`) attaches all of
-them to a GitHub **Release**, which gives you stable download links to share.
+They do different jobs. The **APK is a client**: a thin installed shell that
+talks to a ScholarBridge server, so it carries no database and no web runtime —
+hence 4 MB. The **desktop app is the server**: the installer contains the
+compiled ScholarBridge server (~110 MB), a complete PostgreSQL (~60 MB
+compressed) and the Chromium runtime Electron needs (~120 MB), which is why it
+is the size of any Electron app such as Slack, Discord or VS Code.
 
-> Windows SmartScreen and macOS Gatekeeper will warn that the app is from an
-> unknown publisher, because this project has no paid code-signing
-> certificate. Windows: *More info → Run anyway*. macOS: right-click the app →
-> *Open*. This is expected for unsigned builds (see §7).
+### Install — Windows
 
----
+1. Download `ScholarBridge-Setup.exe`.
+2. Windows SmartScreen shows *“Windows protected your PC”* (the build is not
+   code-signed — see §7): **More info → Run anyway**.
+3. Keep the default folder → **Install** → the app opens from the Start menu
+   and the desktop shortcut.
+4. First launch: 30–60 s (it creates its own database). Later launches: seconds.
+5. `ScholarBridge-Portable.exe` does the same without installing anything —
+   handy on a USB stick.
+
+### Install — Android
+
+1. Download `ScholarBridge.apk` **on the phone** (or transfer it by USB/Drive).
+2. Open it. Android asks to allow installing from this source →
+   **Settings → Allow from this source** → back → **Install**.
+3. Open the app. It asks for a **server address** the first time:
+   * on the laptop open ScholarBridge → **Share → Show phone connection (QR)**,
+   * scan that QR with the phone (or type the address it shows), and press
+     **Connect**.
+4. The address is remembered — next time the app opens straight into your
+   account. The laptop app must be running and both devices on the same Wi-Fi
+   (or point the app at a hosted deployment, §5).
+
+### Install — macOS and Linux
+
+* **macOS:** open the `.dmg` → drag *ScholarBridge* into *Applications* →
+  first launch: right-click the app → **Open** (unsigned build).
+* **Linux AppImage:** `chmod +x ScholarBridge.AppImage && ./ScholarBridge.AppImage`
+  (install `libfuse2` if your distribution needs it).
+* **Linux .deb:** `sudo apt install ./ScholarBridge.deb`, then start
+  *ScholarBridge* from your applications menu.
+
+### Prefer to build it yourself?
+
+The same two workflows build these binaries on GitHub's machines; run them
+from **Actions → “Desktop app”** / **“Android APK”** and download the artifact.
+Building locally is described in §2 (desktop) and §4 (Android).
 
 ## 2. Build the desktop app yourself
 

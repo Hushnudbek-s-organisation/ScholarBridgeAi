@@ -15,6 +15,11 @@ the database comes from the `embedded-postgres` dev dependency.
 
 ## Desktop app and Android app
 
+**Download the ready-made builds:** [latest release](https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi/releases/latest)
+— `ScholarBridge.apk` (Android, 4 MB), `ScholarBridge-Setup.exe` (Windows,
+145 MB), `.dmg` (macOS), `.AppImage`/`.deb` (Linux). Install steps and the
+reason for the size difference are in [`docs/APP.md`](./docs/APP.md).
+
 Both are installed programs built from this codebase, not a website in a tab:
 
 ```bash
