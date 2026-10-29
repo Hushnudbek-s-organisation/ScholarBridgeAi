@@ -1,0 +1,24 @@
+{
+  "name": "scholarbridge-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ScholarBridgeAI Android app \u2014 the installed ScholarBridge client for phones and tablets.",
+  "scripts": {
+    "add:android": "cap add android",
+    "sync": "cap sync android",
+    "open": "cap open android",
+    "apk": "cd android && ./gradlew assembleDebug",
+    "apk:release": "cd android && ./gradlew assembleRelease",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "pngjs": "7.0.0"
+  }
+}

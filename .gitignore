@@ -39,3 +39,20 @@ yarn-error.log*
 # python bytecode (import scripts)
 __pycache__/
 *.pyc
+
+# desktop app (Electron) — installed build output, never committed
+/desktop/node_modules/
+/desktop/release/
+/desktop/build/*.ico
+/desktop/build/*.icns
+
+# mobile app (Capacitor) — node_modules; generated Android build output and
+# signing material stay local (android/.gitignore covers app/build)
+/mobile/node_modules/
+/mobile/android/local.properties
+/mobile/android/keystore.properties
+/mobile/android/*.jks
+/mobile/android/*.keystore
+
+# desktop app self-test scratch folder
+/.desktop-test-data/

@@ -13,6 +13,38 @@ Put `DATABASE_URL=postgresql://sb:sb@127.0.0.1:5433/scholarbridge` and a
 `SESSION_SECRET` in `.env.local` (see `.env.example`). No Docker needed —
 the database comes from the `embedded-postgres` dev dependency.
 
+## Desktop app and Android app
+
+**Download the ready-made builds:** [latest release](https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi/releases/latest)
+— `ScholarBridge.apk` (Android, 4 MB), `ScholarBridge-Setup.exe` (Windows,
+145 MB), `.dmg` (macOS), `.AppImage`/`.deb` (Linux). Install steps and the
+reason for the size difference are in [`docs/APP.md`](./docs/APP.md).
+
+Both are installed programs built from this codebase, not a website in a tab:
+
+```bash
+npm ci && (cd desktop && npm ci)   # app + Electron prerequisites
+npm run db:dev:init                # a database for `next build` (first time)
+npm run desktop:prepare            # compile the bundled server
+npm run desktop                    # run the desktop app
+npm run desktop:dist               # build the installer for this OS
+```
+
+- **Desktop** — the installer bundles the compiled server *and* runs its own
+  private PostgreSQL inside the app, so it opens like any other program and
+  works offline (AI features need the internet). Windows `.exe`, macOS `.dmg`,
+  Linux `.AppImage`/`.deb`; *Share → Allow phone on this Wi-Fi* shows a QR code
+  so a phone can use the same install over the local network.
+- **Android** — `mobile/` is a complete Capacitor/Gradle project (`npm run
+  mobile:apk`, or open `mobile/android` in Android Studio). The `.apk` installs
+  with its own icon and asks once for the server address (the laptop's, or a
+  hosted deployment) and remembers it.
+
+GitHub Actions builds the real binaries for you: **Actions → “Desktop app”** and
+**Actions → “Android APK”** produce downloadable installers/APKs, and a `v*`
+tag attaches them to a Release. Full guide, data locations, signing and
+troubleshooting: [`docs/APP.md`](./docs/APP.md).
+
 ## AI providers and Google SDK
 
 Provider-specific AI calls are server-side. The canonical Google Generative AI

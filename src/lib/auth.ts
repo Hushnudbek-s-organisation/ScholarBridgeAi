@@ -28,6 +28,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles, telegramLinks, userSessions } from "@/db/schema";
 import { clientIp } from "@/lib/rate-limit";
+import { plainHttpDeployment } from "@/lib/security";
 import { sanitizeProfile } from "@/lib/password";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { withDbRetry } from "@/db/retry";
@@ -283,10 +284,19 @@ export async function revokeSessionToken(token: string | null): Promise<void> {
 // Cookie plumbing
 // ---------------------------------------------------------------------------
 
-/** True when the response must only ever travel over HTTPS. */
+/**
+ * True when the response must only ever travel over HTTPS.
+ *
+ * `APP_PLAIN_HTTP=1` (desktop app / phone on the same Wi-Fi, see
+ * `plainHttpDeployment`) is the one exception: the cookie is then issued
+ * without `Secure` unless the request itself arrived over HTTPS. Without this
+ * the browser silently discarded the session cookie on `http://` and every
+ * sign-in appeared to succeed and then bounce back to the landing page.
+ */
 export function isSecureContext(req?: Request): boolean {
-  if (process.env.NODE_ENV === "production") return true;
   const proto = req?.headers?.get("x-forwarded-proto");
+  if (plainHttpDeployment()) return proto === "https";
+  if (process.env.NODE_ENV === "production") return true;
   return proto === "https";
 }
 
