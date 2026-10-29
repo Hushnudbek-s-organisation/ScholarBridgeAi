@@ -7234,6 +7234,29 @@
       "importNow": "Import now",
       "imported": "{rows} terms written to the database",
       "importFailed": "The import did not run — the reason is in the audit log."
+    },
+    "webhook": {
+      "title": "Bot webhook (the buttons go through it)",
+      "state": {
+        "ok": "connected",
+        "missing": "not connected",
+        "wrong_url": "pointing at another address",
+        "error": "failing",
+        "unknown": "could not be checked"
+      },
+      "advice": {
+        "none": "The Approve / Reject buttons work.",
+        "connect": "The buttons do nothing: no webhook is set — press the button below.",
+        "move": "The webhook points at an old address — reconnect it.",
+        "retry": "Telegram reports an error — reconnect and try again.",
+        "checkTeam": "Telegram did not answer: check the bot token and the network."
+      },
+      "none": "no webhook",
+      "pending": "{count} updates queued",
+      "lastError": "Last error: {message}",
+      "dedicated": "A dedicated channel bot is in use — that bot's webhook is checked here.",
+      "fix": "Connect / fix",
+      "fixed": "Webhook connected — the buttons work now."
     }
   },
   "adminDiagnostics": {

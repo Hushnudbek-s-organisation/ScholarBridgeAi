@@ -19,6 +19,7 @@ import { countryDisplay, type ChannelCountry } from "./countries";
 import { contentCompleteness, EMPTY_CONTENT, isRichContent, MAX_ABOUT_CHARS, MAX_BULLETS, MAX_TAGLINE_CHARS, type ScholarshipContent } from "./content";
 import { ensureChannelTables } from "./db";
 import { dictionaryStatus } from "./selfcheckStore";
+import { publisherWebhook } from "./webhookStore";
 import {
   clickCounts,
   deleteChannelCountry,
@@ -360,6 +361,11 @@ export interface OverviewPayload {
    * different problems, and only the operator can fix the second one.
    */
   dictionary: Awaited<ReturnType<typeof dictionaryStatus>>;
+  /**
+   * Whether the publisher bot's webhook is connected — the difference between
+   * an approval button that works and one that visibly does nothing.
+   */
+  webhook: Awaited<ReturnType<typeof publisherWebhook>> | null;
   env: {
     killSwitch: boolean;
     autopost: "off" | "dryrun" | "on" | null;
@@ -392,6 +398,11 @@ export async function channelOverview(): Promise<OverviewPayload> {
     hasToken: Boolean(token),
     tokenSource,
     dictionary: await dictionaryStatus(),
+    // Memoised for ten minutes when healthy: the panel is opened far more often
+    // than a webhook can change, and every check is a Telegram round trip.
+    // A Telegram outage must not blank the whole panel: the channel overview is
+    // also what the operator opens *because* something is wrong.
+    webhook: await publisherWebhook().catch(() => null),
     env: {
       killSwitch: runtime.envKillSwitch,
       autopost: runtime.envAutopost,

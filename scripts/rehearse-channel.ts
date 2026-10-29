@@ -34,6 +34,8 @@ import { retireStalePlans } from "@/lib/channel/store";
 import { approveApproval, duePlanRows, runDuePosts } from "@/lib/channel/send";
 import { lintText } from "@/lib/channel/lint";
 import { tashkentDay } from "@/lib/channel/config";
+import { ensurePublisherWebhook, publisherWebhook, resetWebhookMemo } from "@/lib/channel/webhookStore";
+import { handlePublisherUpdate } from "@/lib/telegram/publisher";
 
 const SITE = "https://rehearsal.invalid";
 const CHANNEL_ID = "-1009999999999";
@@ -376,6 +378,55 @@ async function main() {
       const [row] = await db.select().from(channelPosts).where(eq(channelPosts.id, pending.id));
       assert(row.status === "sent", `status ${row.status}`);
     });
+    // --- 5. the approval buttons' transport (Phase O) --------------------
+    // A press only reaches the app if the *publisher* bot's webhook exists.
+    // The mock starts with none, exactly like a deployment that lost it.
+    await check("a deployment with no webhook is reported as 'missing'", async () => {
+      resetWebhookMemo();
+      const before = await publisherWebhook({ memo: false });
+      assert(before.state === "missing", `state ${before.state}`);
+      assert(before.reconnect === true, "a missing webhook must ask for a repair");
+      assert((before.expectedUrl ?? "").endsWith("/api/telegram/webhook"), `expected ${before.expectedUrl}`);
+    });
+
+    await check("the tick repairs the missing webhook by itself", async () => {
+      const fixed = await ensurePublisherWebhook();
+      assert(fixed.repaired === true, `repaired=${fixed.repaired} reason=${fixed.reason}`);
+      assert(fixed.status.state === "ok", `state ${fixed.status.state}`);
+      const info = (await (await fetch(`${base}/bot${process.env.TELEGRAM_CHANNEL_BOT_TOKEN}/getWebhookInfo`)).json()) as {
+        result?: { url?: string };
+      };
+      assert(info.result?.url === fixed.status.expectedUrl, `mock url ${info.result?.url}`);
+    });
+
+    await check("a healthy webhook is not re-registered on every tick", async () => {
+      resetWebhookMemo();
+      const again = await ensurePublisherWebhook();
+      assert(again.repaired === false, "the tick re-registered a healthy webhook");
+      assert(again.reason === "ok", `reason ${again.reason}`);
+    });
+
+    await check("a dedicated publisher bot's approval press is answered by that bot", async () => {
+      // The webhook route hands a publisher-bot update here; the toast must come
+      // back through the publisher's own token, never the DM bot's.
+      const result = await handlePublisherUpdate(
+        {
+          callback_query: {
+            id: "rehearsal-cb-1",
+            data: "ch:ok:999999",
+            from: { id: 7292856664, is_bot: false },
+            message: { message_id: 1, chat: { id: 7292856664, type: "private" } },
+          },
+        },
+        process.env.TELEGRAM_CHANNEL_BOT_TOKEN!
+      );
+      assert(result.handled === "approval", `handled=${result.handled}`);
+      const answers = (await (await fetch(`${base}/_answers`)).json()) as { answers?: Array<{ id: string; text: string }> };
+      const answer = (answers.answers ?? []).find((row) => row.id === "rehearsal-cb-1");
+      assert(answer, "the button was never answered — it would spin forever");
+      assert(answer.text.length > 0, "the toast was empty, so the operator learns nothing");
+    });
+
     await check("every message the mock received lints clean", async () => {
       const seen = [...(await messagesTo(base, CHANNEL_ID)), ...(await messagesTo(base, ADMIN_CHAT_ID))];
       const dirty = seen

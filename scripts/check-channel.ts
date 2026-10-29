@@ -188,6 +188,7 @@ import {
 import { buildWhy, tickIsStale, waitingForWindow, whySummary } from "../src/lib/channel/why";
 import { countryPriority, deadlineTier, editorialRank } from "../src/lib/channel/select";
 import { dictionaryStateOf, dictionaryStatusOf, dictionarySummary } from "../src/lib/channel/selfcheck";
+import { ALLOWED_UPDATES, webhookAdvice, webhookUrlFor, webhookVerdict } from "../src/lib/channel/webhook";
 import { AUTOPILOT_DEFAULT_MINUTES,
   AUTOPILOT_TEXTS,
   MODE_LABELS,
@@ -3776,6 +3777,131 @@ check("the explicit repair installs the dictionary too, not only the tables", ()
   const source = read("src/lib/channel/db.ts");
   const repair = source.slice(source.indexOf("export async function forceChannelRepair"));
   assert.match(repair.slice(0, 600), /installLexicon/);
+});
+
+// ---------------------------------------------------------------------------
+// The publisher bot's webhook (why an approval button can do nothing)
+// ---------------------------------------------------------------------------
+
+section("Publisher webhook");
+
+const SITE_WEBHOOK = "https://scholarbridge.example/api/telegram/webhook";
+
+check("the expected webhook URL comes from the configured site URL", () => {
+  assert.equal(webhookUrlFor("https://scholarbridge.example"), SITE_WEBHOOK);
+  assert.equal(webhookUrlFor("https://scholarbridge.example/"), SITE_WEBHOOK);
+  // http (or nothing) cannot be a Telegram webhook: no URL is better than a
+  // wrong one, because the panel must say "set the site URL" instead.
+  assert.equal(webhookUrlFor("http://localhost:3000"), null);
+  assert.equal(webhookUrlFor(""), null);
+  assert.equal(webhookUrlFor(null), null);
+});
+
+check("the webhook subscribes to callback_query — the approval buttons", () => {
+  assert.ok((ALLOWED_UPDATES as readonly string[]).includes("callback_query"));
+  assert.ok((ALLOWED_UPDATES as readonly string[]).includes("message"));
+});
+
+check("no registered webhook is 'missing' and must be repaired", () => {
+  const verdict = webhookVerdict({ registeredUrl: "", expectedUrl: SITE_WEBHOOK, pending: 4, lastError: null });
+  assert.equal(verdict.state, "missing");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict, 4), "connect");
+});
+
+check("a webhook still pointing at the old deployment is 'wrong_url'", () => {
+  const verdict = webhookVerdict({
+    registeredUrl: "https://old-deployment.example/api/telegram/webhook",
+    expectedUrl: SITE_WEBHOOK,
+    pending: 12,
+    lastError: null,
+  });
+  assert.equal(verdict.state, "wrong_url");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict), "move");
+});
+
+check("a registered webhook that Telegram reports an error for is 'error'", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 2, lastError: "401 Unauthorized" });
+  assert.equal(verdict.state, "error");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict), "retry");
+});
+
+check("a healthy webhook is left alone", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 0, lastError: null });
+  assert.equal(verdict.state, "ok");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict), "none");
+});
+
+check("a growing queue behind a healthy webhook is flagged, not 'fixed'", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 500, lastError: null });
+  assert.equal(verdict.state, "ok");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict, 500), "retry");
+});
+
+check("Telegram not answering is 'unknown' and is never 'repaired' on a guess", () => {
+  const verdict = webhookVerdict({ registeredUrl: "", expectedUrl: SITE_WEBHOOK, pending: 0, lastError: null, unreachable: true });
+  assert.equal(verdict.state, "unknown");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict), "checkTeam");
+});
+
+check("the channel tick verifies and repairs the webhook", () => {
+  const cron = read("src/app/api/cron/channel/route.ts");
+  assert.match(cron, /ensurePublisherWebhook\(\)/);
+  // A webhook problem must never fail the tick itself.
+  assert.match(cron, /ensurePublisherWebhook\(\)\.catch\(\(\) => null\)/);
+});
+
+check("the webhook route accepts a dedicated publisher bot, not only the DM bot", () => {
+  const route = read("src/app/api/telegram/webhook/route.ts");
+  assert.match(route, /getChannelBotToken/);
+  assert.match(route, /forPublisher/);
+  assert.match(route, /handlePublisherUpdate/);
+});
+
+check("a dedicated publisher bot can only do channel work", () => {
+  const publisher = read("src/lib/telegram/publisher.ts");
+  assert.match(publisher, /isApprovalCallback/);
+  assert.match(publisher, /handlePendingChannelEdit/);
+  // It must never fall through into the DM bot's command routing.
+  assert.ok(!/handleUpdate|runCallback|runCommand/.test(publisher));
+  // Update ids are numbered per bot: claiming them against the DM bot's table
+  // could drop an unrelated update of the other bot.
+  assert.ok(!/claimUpdate/.test(publisher));
+});
+
+check("a refused approval is written to the audit trail", () => {
+  const approval = read("src/lib/telegram/approval.ts");
+  assert.match(approval, /approval_blocked/);
+  for (const code of ["not_admin", "tables_unavailable", "skipped", "send_failed", "already_closed"]) {
+    assert.ok(approval.includes(`"${code}"`), `audit code ${code} missing`);
+  }
+});
+
+check("the panel shows the webhook state and one fix button", () => {
+  const panel = read("src/components/admin/ChannelManager.tsx");
+  assert.match(panel, /<WebhookCard webhook=\{data\.webhook\}/);
+  assert.match(panel, /t\("webhook\.fix"\)/);
+});
+
+check("every webhook state and advice has a message in all three languages", () => {
+  for (const loc of ["uz", "ru", "en"] as const) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: { webhook?: { title?: string; fix?: string; state?: Record<string, string>; advice?: Record<string, string> } };
+    };
+    const hook = messages.adminChannel?.webhook;
+    assert.ok(hook?.title && hook?.fix, `${loc}: webhook title/fix missing`);
+    for (const state of ["ok", "missing", "wrong_url", "error", "unknown"]) {
+      assert.ok(hook?.state?.[state], `${loc}: webhook.state.${state} missing`);
+    }
+    for (const advice of ["none", "connect", "move", "retry", "checkTeam"]) {
+      assert.ok(hook?.advice?.[advice], `${loc}: webhook.advice.${advice} missing`);
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------

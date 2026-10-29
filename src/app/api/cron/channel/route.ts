@@ -5,6 +5,7 @@ import { ensureChannelTables } from "@/lib/channel/db";
 import { runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
 import { loadChannelSettings } from "@/lib/channel/repo";
 import { recordTick } from "@/lib/channel/whyStore";
+import { ensurePublisherWebhook } from "@/lib/channel/webhookStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -66,6 +67,17 @@ async function handle(req: Request) {
         { status: 200 }
       );
     }
+    /**
+     * The approval buttons only work if the bot that sends the preview has a
+     * webhook. A deployment can lose it (a domain move, a rotated
+     * SESSION_SECRET, a bot swapped in the environment) and the only visible
+     * symptom is a *button that does nothing* — so the tick re-checks it and
+     * repairs it when it is definitely broken. Bounded and memoised: one
+     * getWebhookInfo every ten minutes, a setWebhook only when needed, and a
+     * failure here never fails the tick.
+     */
+    const webhook = await ensurePublisherWebhook().catch(() => null);
+
     const plan = await runPlanForToday(null);
     const posts = await runPostsNow(null);
     await recordTick("cron", {
@@ -74,8 +86,12 @@ async function handle(req: Request) {
       sent: posts.sent,
       approval: posts.approval,
       failed: posts.failed,
+      webhook: webhook ? `${webhook.status.state}${webhook.repaired ? ">repaired" : ""}` : "unknown",
     });
-    return NextResponse.json({ ok: true, day: plan.planDate, plan, posts }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, day: plan.planDate, plan, posts, webhook: webhook ? { state: webhook.status.state, repaired: webhook.repaired } : null },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("/api/cron/channel error:", error);
     return NextResponse.json({ ok: false, error: "Channel tick failed" }, { status: 500 });

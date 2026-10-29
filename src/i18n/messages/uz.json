@@ -7234,6 +7234,29 @@
       "importNow": "Import qilish",
       "imported": "{rows} atama bazaga yozildi",
       "importFailed": "Import bajarilmadi — sabab jurnalda ko'rinadi."
+    },
+    "webhook": {
+      "title": "Bot webhook'i (tugmalar shu orqali ishlaydi)",
+      "state": {
+        "ok": "ulangan",
+        "missing": "ulanmagan",
+        "wrong_url": "boshqa manzilga ulangan",
+        "error": "xato bilan ishlayapti",
+        "unknown": "tekshirib bo'lmadi"
+      },
+      "advice": {
+        "none": "Tasdiqlash/rad etish tugmalari ishlaydi.",
+        "connect": "Tugmalar ishlamaydi: webhook ulanmagan — pastdagi tugmani bosing.",
+        "move": "Webhook eski manzilga qaratilgan — qayta ulang.",
+        "retry": "Telegram xato qaytaryapti — qayta ulab ko'ring.",
+        "checkTeam": "Telegram javob bermadi: bot tokeni va tarmoqni tekshiring."
+      },
+      "none": "webhook yo'q",
+      "pending": "{count} ta yangilanish navbatda",
+      "lastError": "Oxirgi xato: {message}",
+      "dedicated": "Kanal uchun alohida bot ishlatilmoqda — bu botning webhook'i tekshiriladi.",
+      "fix": "Ulash / tuzatish",
+      "fixed": "Webhook ulandi — tugmalar endi ishlaydi."
     }
   },
   "adminDiagnostics": {

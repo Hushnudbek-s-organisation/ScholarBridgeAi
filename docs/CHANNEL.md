@@ -920,7 +920,7 @@ posts anything.
 
 | Tab | Controls |
 | --- | --- |
-| Ulash | Bot/channel/admin-chat wiring, mode, pause, connection check, test message, build plan, run now, short-link refresh |
+| Ulash | Bot/channel/admin-chat wiring, mode, pause, connection check, test message, build plan, run now, short-link refresh, dictionary state, **bot webhook** state |
 | Reja | Posts per day (cap 3), budget range, morning/evening windows, quiet day, weekly list minimum, weekly pin, Thursday digest, poll cadence, 14-day preview |
 | Linklar | Main footer (Kanal/Bot defaults), social footer, hashtags per kind/level/weekly, link-preview switches |
 | Kontent | Search a scholarship, write its Uzbek copy, completeness badge, live rich preview |
@@ -965,6 +965,59 @@ identity as its key, so a duplicate tick sends nothing twice. Call it every
 
 `mode = off`, a pause, or an unconfigured channel makes the tick return
 `{"skipped": true}` without touching Telegram.
+
+### 11a-1. 2026-10-29 — "Approve tugmasi hech narsa qilmayapti"
+
+**Report.** The admin chat received the preview with three buttons. Pressing
+**Tasdiqlash** did nothing: no post in `@grantlar_bridge`, no error anywhere.
+
+**What the database proved.** The press never reached this application:
+
+| Evidence | Reading |
+| --- | --- |
+| `channel_posts` id 1: `awaiting_approval`, `error` empty, `sent_at` null | the approval code never claimed it |
+| `channel_audit`: no `approval_approve` and no `approval_blocked` row | no decision was recorded at all |
+| `telegram_updates`: zero rows, 7 inserts ever | almost no update from Telegram has ever arrived |
+| `channel_audit`: a `tick` every 15 minutes, still healthy | the app itself is fine — only *incoming* updates are missing |
+
+**Why.** Approve/Reject/Edit are inline buttons. Telegram delivers a press as a
+`callback_query` **to the webhook of the bot that sent the message**. If that
+webhook is missing, still points at an old deployment, or rejects the secret
+(rotated `SESSION_SECRET`), the button is dead — and Telegram shows the operator
+nothing. A dedicated publisher bot made this worse: only the DM bot's webhook
+was ever registered, so a `TELEGRAM_CHANNEL_BOT_TOKEN` bot's buttons could never
+work.
+
+**What changed (this phase).**
+
+1. `src/lib/channel/webhook.ts` — the rules: expected URL, allowed updates, and
+   a five-state verdict (`ok` / `missing` / `wrong_url` / `error` / `unknown`).
+   `unknown` is never "repaired" on a guess.
+2. `src/lib/channel/webhookStore.ts` — asks Telegram
+   (`getWebhookInfo`) and re-registers (`setWebhook`) **only** when the verdict
+   is definite. A healthy answer is memoised for 10 minutes, a failure is not.
+3. **Self-heal on the tick**: `/api/cron/channel` calls
+   `ensurePublisherWebhook()` before planning. A deployment that lost its
+   webhook repairs itself within one tick (~15 minutes) with no operator action.
+   A failure there never fails the tick.
+4. **The panel tells the truth**: Ulash tab → *Bot webhook* card, showing the
+   state, the registered URL, the queue length and the last Telegram error, with
+   one **Ulash / tuzatish** button (`POST {action:"webhook"}` — forced, and
+   audited as `webhook_repaired`).
+5. **Dedicated publisher bots work**: the webhook route now authenticates the
+   publisher bot's secret as well, and hands its updates to
+   `handlePublisherUpdate`, which can do exactly two things (approval buttons,
+   the parked edit text) and nothing else. It deliberately never claims
+   `telegram_updates` — update ids are numbered per bot.
+6. **A refused press is recorded**: `approval_blocked` audit rows with a code
+   (`not_admin`, `tables_unavailable`, `skipped`, `send_failed`,
+   `already_closed`) and Telegram's own reason. The toast lasts three seconds;
+   the row does not.
+
+**Operating rule that follows from this.** If an approval button does nothing,
+check *Bot webhook* first — the card names the fault. The admin panel's own
+**Tasdiqlash** button in the approval inbox does not depend on Telegram at all,
+so it is always the fallback that publishes.
 
 ### 11a. 2026-10-29 — why the live channel had not posted, verified from the database
 

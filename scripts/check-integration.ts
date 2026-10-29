@@ -2548,6 +2548,72 @@ async function main() {
     `admin rows=${keptAdmin.length}`
   );
 
+  // ---- Phase O: a refused approval must leave a trace --------------------
+  // The live report was "I pressed Approve and nothing happened". Telegram's
+  // toast disappears in three seconds; the audit row does not.
+  const { handleChannelApprovalCallback } = await import("../src/lib/telegram/approval");
+  const [approvalFixture] = await db
+    .insert(schema.channelPosts)
+    .values({
+      kind: "scholarship_single",
+      mode: "approval",
+      chatId: "7292856664",
+      html: "<b>Fixture</b> approval body",
+      status: "awaiting_approval",
+      dedupeKey: `phase-o|${Date.now()}`,
+    })
+    .returning();
+  const strangerToast = await handleChannelApprovalCallback({
+    data: `ch:ok:${approvalFixture.id}`,
+    chatId: "7292856664",
+    chatType: "private",
+    telegramUserId: 999_000_111,
+  });
+  const blockedRows = await db
+    .select({ action: schema.channelAudit.action, entityId: schema.channelAudit.entityId, after: schema.channelAudit.after })
+    .from(schema.channelAudit);
+  const notAdminRow = blockedRows.find(
+    (row) => row.action === "approval_blocked" && row.entityId === String(approvalFixture.id) && String(row.after ?? "").includes("not_admin")
+  );
+  check(
+    "channel: an approval press by a non-admin is refused AND recorded",
+    Boolean(notAdminRow) && strangerToast.length > 0,
+    `rows=${blockedRows.filter((r) => r.action === "approval_blocked").length} toast=${strangerToast.slice(0, 40)}`
+  );
+
+  // The same press from the linked ADMIN reaches the publisher, which refuses
+  // it for a reason of its own (no channel configured in this test database) —
+  // and that reason is recorded instead of vanishing.
+  const [linkedAdmin] = await db
+    .insert(schema.telegramLinks)
+    .values({ profileId: adminProfile.id, telegramUserId: "555000111", chatId: "555000111" })
+    .returning();
+  await handleChannelApprovalCallback({
+    data: `ch:ok:${approvalFixture.id}`,
+    chatId: "7292856664",
+    chatType: "private",
+    telegramUserId: 555000111,
+  });
+  const afterAdmin = await db
+    .select({ action: schema.channelAudit.action, after: schema.channelAudit.after })
+    .from(schema.channelAudit)
+    .where(eq(schema.channelAudit.entityId, String(approvalFixture.id)));
+  // Which refusal branch is reached depends on the environment (no bot token
+  // here, no channel configured there) — what must never happen again is a
+  // refused press with no recorded reason.
+  check(
+    "channel: an admin approval that cannot publish records the exact reason",
+    afterAdmin.some((row) => {
+      const after = String(row.after ?? "");
+      return row.action === "approval_blocked" && /"(send_failed|skipped)"/.test(after) && /"reason":"[^"]+"/.test(after);
+    }),
+    JSON.stringify(afterAdmin.map((r) => r.after)).slice(0, 200)
+  );
+
+  await db.delete(schema.channelAudit).where(eq(schema.channelAudit.entityId, String(approvalFixture.id)));
+  await db.delete(schema.channelPosts).where(eq(schema.channelPosts.id, approvalFixture.id));
+  await db.delete(schema.telegramLinks).where(eq(schema.telegramLinks.id, linkedAdmin.id));
+
   const adminChannelRoute = await import("../src/app/api/admin/channel/route");
   const adminCookie = `sb_session=${adminToken}`;
   const channelOverviewRes = await call(adminChannelRoute.GET as any, "/api/admin/channel", {

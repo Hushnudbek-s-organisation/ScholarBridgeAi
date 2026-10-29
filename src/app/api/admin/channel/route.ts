@@ -6,7 +6,7 @@ import { channelAdminSummary, runPlanForToday, runPostsNow } from "@/lib/channel
 import { normalizeChannelIdentifier, resolveChannelRuntime } from "@/lib/channel/config";
 import { kickChannelAutopilot } from "@/lib/channel/boot";
 import { channelWhy, unpublishedCatalogue } from "@/lib/channel/whyStore";
-import { loadChannelSettings } from "@/lib/channel/repo";
+import { loadChannelSettings, writeChannelAudit } from "@/lib/channel/repo";
 import { shouldKickAfterConnect } from "@/lib/channel/autopilot";
 import { SETTINGS_KEYS, type SettingsKey } from "@/lib/channel/settings";
 
@@ -183,6 +183,27 @@ export async function POST(req: Request) {
      * environment where the first tick failed. Admin rows (`source = 'admin'`)
      * are never touched — only the PDF-imported rows are replaced.
      */
+    /**
+     * "Ulanishni tiklash" — re-register the publisher bot's webhook now.
+     *
+     * The tick repairs a broken webhook by itself, but the operator should not
+     * have to wait for the next tick (or trust one) after pressing a button
+     * that did nothing. `force` also re-registers a webhook that *looks* fine:
+     * Telegram can lose it without reporting an error, and this is the only
+     * way back except a redeploy.
+     */
+    if (action === "webhook") {
+      const { ensurePublisherWebhook } = await import("@/lib/channel/webhookStore");
+      const result = await ensurePublisherWebhook({ force: true });
+      await writeChannelAudit({
+        actorProfileId: actor,
+        action: "webhook_repaired",
+        entity: "settings",
+        entityId: "webhook",
+        after: { repaired: result.repaired, reason: result.reason, state: result.status.state },
+      });
+      return NextResponse.json({ ok: result.reason !== "failed", result, webhook: result.status });
+    }
     if (action === "dictionary") {
       const { installLexicon } = await import("@/lib/channel/lexicon/store");
       const { dictionaryStatus } = await import("@/lib/channel/selfcheckStore");
