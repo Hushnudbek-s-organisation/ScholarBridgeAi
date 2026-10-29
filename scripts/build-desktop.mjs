@@ -178,6 +178,66 @@ const size = (dir) => {
 };
 say(`Standalone server ready — ${Math.round(size(standalone) / 1024 / 1024)} MB in .next/standalone`);
 
+/**
+ * Next's standalone output keeps one relative symlink
+ * (`<server>/.next/node_modules/pg-<hash> -> ../../node_modules/pg`).
+ * electron-builder's archiver cannot follow it on Windows — packaging failed
+ * there with "WARNING: The system cannot find the path specified" — so the
+ * installer is built from a staged copy with every link replaced by the real
+ * files. The layout inside the package is unchanged.
+ */
+const stagingDir = path.join(desktopDir, "build-resources", "server");
+say("Staging a symlink-free copy of the server for packaging…");
+fs.rmSync(stagingDir, { recursive: true, force: true });
+fs.mkdirSync(path.dirname(stagingDir), { recursive: true });
+fs.cpSync(standalone, stagingDir, { recursive: true });
+
+/**
+ * Replace every symlink with the real file/folder.
+ *
+ * `fs.cpSync`'s `dereference` option does not do this for symlink sources, so
+ * it is done explicitly: copy, then walk and swap each link for its target.
+ * A dangling link (which Windows could never resolve either) is dropped.
+ */
+let replacedLinks = 0;
+let droppedLinks = 0;
+function materialiseLinks(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isSymbolicLink()) {
+      let real;
+      try {
+        real = fs.realpathSync(full);
+      } catch {
+        fs.rmSync(full, { force: true });
+        droppedLinks += 1;
+        continue;
+      }
+      const target = fs.statSync(real);
+      fs.rmSync(full, { recursive: true, force: true });
+      fs.cpSync(real, full, { recursive: target.isDirectory() });
+      replacedLinks += 1;
+      if (target.isDirectory()) materialiseLinks(full);
+    } else if (entry.isDirectory()) {
+      materialiseLinks(full);
+    }
+  }
+}
+materialiseLinks(stagingDir);
+
+const countLinks = (dir) =>
+  fs.readdirSync(dir, { withFileTypes: true }).reduce((total, entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isSymbolicLink()) return total + 1;
+    return entry.isDirectory() ? total + countLinks(full) : total;
+  }, 0);
+const links = countLinks(stagingDir);
+if (links) fail(`${links} symlink(s) survived staging — Windows packaging would fail`);
+say(
+  `Staged server: ${Math.round(size(stagingDir) / 1024 / 1024)} MB, no symlinks` +
+    (replacedLinks ? ` (${replacedLinks} link(s) materialised${droppedLinks ? `, ${droppedLinks} dangling dropped` : ""})` : "")
+);
+
 if (packageOnly) {
   say("Skipping the installer (--no-package).");
   process.exit(0);

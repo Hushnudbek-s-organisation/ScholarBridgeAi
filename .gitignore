@@ -43,6 +43,7 @@ __pycache__/
 # desktop app (Electron) — installed build output, never committed
 /desktop/node_modules/
 /desktop/release/
+/desktop/build-resources/
 /desktop/build/*.ico
 /desktop/build/*.icns
 

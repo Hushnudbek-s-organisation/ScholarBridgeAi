@@ -144,6 +144,11 @@ resources/server/                 ← the compiled ScholarBridge server + its no
 resources/schema/full_schema.sql  ← the schema a new install applies
 ```
 
+The server bundle is staged first (`desktop/build-resources/server`): Next's
+standalone output contains one relative symlink (`pg-<hash> → ../../node_modules/pg`)
+that electron-builder cannot archive on Windows, so the build replaces every
+link with the real files before packaging.
+
 `app/` and `server/` are deliberately separate: Electron executes whatever is
 in `resources/app`, so bundling the server there as well merged two
 `package.json` files (the server's has no `main`) and the installed app died
