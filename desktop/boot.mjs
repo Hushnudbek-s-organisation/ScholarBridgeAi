@@ -140,6 +140,9 @@ export async function startLocalServer(options) {
     log = () => {},
     onStatus = () => {},
     serverTimeoutMs = 180_000,
+    // Warm the catalogue in the background after the server answers (a fresh
+    // install has an empty database that the request path seeds).
+    warmUp = true,
   } = options;
 
   if (!fs.existsSync(path.join(appDir, "server.js"))) {
@@ -275,6 +278,17 @@ export async function startLocalServer(options) {
     }
     if (!healthy) {
       throw new Error("The ScholarBridge server did not answer in time. Open the log for details.");
+    }
+
+    // First run only: the empty database is filled by the catalogue routes
+    // (SEED_ON_REQUEST=on). Kick that off in the background *now* so the
+    // student's first page load is not the one waiting for the catalogue.
+    if (warmUp) {
+      const clients = [
+        fetch(`${appUrl}/api/universities?limit=1`).catch(() => {}),
+        fetch(`${appUrl}/api/scholarships?limit=1`).catch(() => {}),
+      ];
+      void Promise.all(clients);
     }
 
     log("[server] ready");

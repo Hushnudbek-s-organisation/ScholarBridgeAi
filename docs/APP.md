@@ -112,7 +112,9 @@ so the installed program needs neither Node.js, Docker nor this repository.
 
 The first launch takes 30–60 seconds because the app initialises a PostgreSQL
 cluster and applies `supabase/full_schema.sql`; later launches take a couple of
-seconds. The folder holds:
+seconds. The catalogue (universities, programmes, scholarships) is filled in the
+background right after startup, so the first page that shows lists may take a
+bit longer than the ones after it. The folder holds:
 
 * `postgres/` — your database (back this up: it *is* your data),
 * `session-secret` — the key that signs your login cookie (per install),
