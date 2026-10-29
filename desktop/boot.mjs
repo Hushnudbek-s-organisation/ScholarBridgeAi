@@ -58,6 +58,85 @@ export function ensureSessionSecret(dataDir) {
 }
 
 /**
+ * Password of the private database's `scholarbridge` role.
+ *
+ * It MUST be stable: PostgreSQL stores the password hash when the cluster is
+ * initialised, so a freshly generated password on every launch fails with
+ * `password authentication failed for user "scholarbridge"` (28P01) from the
+ * second start onwards. It is generated once, kept next to the cluster
+ * (0600) and reused.
+ */
+export function ensureDbPassword(dataDir) {
+  const file = path.join(dataDir, "db-password");
+  if (fs.existsSync(file)) {
+    const existing = fs.readFileSync(file, "utf8").trim();
+    if (existing.length >= 16) return existing;
+  }
+  fs.mkdirSync(dataDir, { recursive: true });
+  const password = randomBytes(24).toString("hex");
+  fs.writeFileSync(file, password, { mode: 0o600 });
+  return password;
+}
+
+/**
+ * Reset the password of an existing cluster whose password was lost.
+ *
+ * This is the repair path for installs created before the password was
+ * persisted (their cluster holds a hash of a password nobody kept): the
+ * cluster is stopped, `pg_hba.conf` is replaced for one boot by a loopback-only
+ * `trust` policy, the password is reset with `ALTER ROLE`, and the original
+ * authentication rules are restored before the app continues. No data is
+ * touched, so an existing install is fixed instead of having to be deleted.
+ */
+async function resetDatabasePassword(instance, dataDir, databaseUrl, log) {
+  const hba = path.join(dataDir, "postgres", "pg_hba.conf");
+  const backup = `${hba}.scholarbridge-backup`;
+  if (!fs.existsSync(hba)) throw new Error("pg_hba.conf is missing; cannot repair the database password.");
+
+  log("[db] the cluster's password is not the one on disk — resetting it (data is kept)");
+  await instance.stop();
+  fs.copyFileSync(hba, backup);
+  try {
+    // Only loopback may connect, and only while the server has no known
+    // password: this window exists for milliseconds and the port stays on
+    // 127.0.0.1.
+    fs.writeFileSync(
+      hba,
+      ["local all all trust", "host all all 127.0.0.1/32 trust", "host all all ::1/128 trust", ""].join("\n")
+    );
+    await instance.start();
+    const { Client } = await import("pg");
+    const url = new URL(databaseUrl);
+    const password = decodeURIComponent(url.password);
+    const client = new Client({
+      host: "127.0.0.1",
+      port: Number(url.port),
+      user: decodeURIComponent(url.username),
+      database: "postgres",
+    });
+    await client.connect();
+    try {
+      await client.query(`ALTER ROLE "${url.username}" WITH PASSWORD '${password.replace(/'/g, "''")}'`);
+    } finally {
+      await client.end().catch(() => {});
+    }
+    log("[db] password reset");
+  } finally {
+    await instance.stop();
+    fs.copyFileSync(backup, hba);
+    fs.rmSync(backup, { force: true });
+    await instance.start();
+  }
+}
+
+/** True when PostgreSQL rejected the credentials (SQLSTATE 28P01). */
+function isAuthFailure(error) {
+  const code = error && typeof error === "object" ? error.code : undefined;
+  if (code === "28P01") return true;
+  return /password authentication failed|28P01/i.test(String(error && error.message ? error.message : error));
+}
+
+/**
  * Apply `full_schema.sql` to a fresh database (and re-apply it when the file
  * changes, e.g. after an app update). The script is written to be idempotent —
  * it creates what is missing and never drops data — so a re-run is safe.
@@ -174,7 +253,7 @@ export async function startLocalServer(options) {
     log("[db] starting private PostgreSQL…");
     const { default: EmbeddedPostgres } = await import("embedded-postgres");
     const chosenDbPort = await findFreePort(dbPort, 25);
-    const dbPassword = randomBytes(16).toString("hex");
+    const dbPassword = ensureDbPassword(dataDir);
 
     pg = new EmbeddedPostgres({
       databaseDir: path.join(dataDir, "postgres"),
@@ -195,11 +274,28 @@ export async function startLocalServer(options) {
     await pg.start();
     log(`[db] listening on 127.0.0.1:${chosenDbPort}`);
 
+    const dbUrl = `postgresql://scholarbridge:${dbPassword}@127.0.0.1:${chosenDbPort}/scholarbridge`;
+
+    // Prove the stored password is the one this cluster knows. Installs made
+    // before the password was persisted hold a hash of a password that was
+    // never kept, and every launch after the first used to die here.
+    const probe = async () => {
+      const { Client } = await import("pg");
+      const client = new Client({ connectionString: dbUrl.replace(/\/[^/]*$/, "/postgres") });
+      await client.connect();
+      await client.end().catch(() => {});
+    };
+    try {
+      await probe();
+    } catch (error) {
+      if (!isAuthFailure(error)) throw error;
+      await resetDatabasePassword(pg, dataDir, dbUrl, log);
+      await probe();
+    }
+
     await pg.createDatabase("scholarbridge").catch(() => {
       /* already exists — the normal case on every run after the first */
     });
-
-    const dbUrl = `postgresql://scholarbridge:${dbPassword}@127.0.0.1:${chosenDbPort}/scholarbridge`;
 
     onStatus("schema");
     await applySchema(dbUrl, schemaPath, dataDir, log);

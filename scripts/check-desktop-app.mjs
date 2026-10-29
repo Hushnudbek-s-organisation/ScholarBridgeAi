@@ -118,6 +118,63 @@ async function main() {
 
   check("shutdown released the app port", await fetch(`http://127.0.0.1:${PORT}/api/health`).then(() => false).catch(() => true));
 
+  // ---------------------------------------------------------------------------
+  // Second launch — the case that broke 1.0.3 on Windows: the cluster keeps the
+  // password it was initialised with, so a password regenerated on start-up
+  // fails with `password authentication failed for user "scholarbridge"`.
+  // ---------------------------------------------------------------------------
+  console.log("\n— second launch with the same data folder —");
+  let second;
+  try {
+    second = await startLocalServer({
+      appDir,
+      dataDir,
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT,
+      dbPort: DB_PORT,
+      warmUp: false,
+      log: (line) => {
+        if (process.env.DESKTOP_TEST_VERBOSE === "1") console.log(`    ${line}`);
+      },
+    });
+    const health2 = await fetch(`${second.url}/api/health`).then((r) => r.json());
+    check("a restart reuses the existing database", health2.ok === true, JSON.stringify(health2));
+    check("the database password is on disk", fs.existsSync(path.join(dataDir, "db-password")));
+  } finally {
+    if (second) await second.stop();
+  }
+
+  // Simulate an install from before the password was persisted: the cluster
+  // knows a password that is not the one in the file, and nobody kept it.
+  console.log("\n— launch after the stored password was lost (1.0.3 installs) —");
+  const passwordFile = path.join(dataDir, "db-password");
+  const known = fs.readFileSync(passwordFile, "utf8");
+  fs.writeFileSync(passwordFile, "a-password-this-cluster-never-knew", { mode: 0o600 });
+  let repaired;
+  try {
+    repaired = await startLocalServer({
+      appDir,
+      dataDir,
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT,
+      dbPort: DB_PORT,
+      warmUp: false,
+      log: (line) => {
+        if (process.env.DESKTOP_TEST_VERBOSE === "1") console.log(`    ${line}`);
+      },
+    });
+    const health3 = await fetch(`${repaired.url}/api/health`).then((r) => r.json());
+    check("an unknown database password is repaired, not fatal", health3.ok === true, JSON.stringify(health3));
+    check("the repair keeps the data (schema still there)", fs.existsSync(path.join(dataDir, "postgres", "PG_VERSION")));
+    check("the temporary trust window was closed again", !fs.existsSync(path.join(dataDir, "postgres", "pg_hba.conf.scholarbridge-backup")));
+  } finally {
+    if (repaired) await repaired.stop();
+  }
+  // Back to the password the app now owns: a further launch must just work.
+  fs.writeFileSync(passwordFile, known.trim(), { mode: 0o600 });
+
   fs.rmSync(dataDir, { recursive: true, force: true });
 
   console.log("");
