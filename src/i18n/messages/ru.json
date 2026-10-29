@@ -4539,7 +4539,17 @@
     },
     "allDegrees": "🎓 Все уровни обучения",
     "allStatuses": "🗓 Все статусы",
-    "allBasis": "🎯 Любое основание"
+    "allBasis": "🎯 Любое основание",
+    "filterChance": "Шанс (по требованиям)",
+    "filterChanceMeets": "✅ Требования выполнены",
+    "filterChanceBelow": "⚠️ Требования не выполнены",
+    "filterChanceUnknown": "❔ Не определено",
+    "allChance": "🎯 Любой шанс",
+    "filterFit": "Совпадение",
+    "filterFitStrong": "⭐ Отличное",
+    "filterFitGood": "👍 Хорошее",
+    "filterFitLow": "🔻 Низкое",
+    "allFit": "🎯 Любое совпадение"
   },
   "chancing": {
     "signIn": "Войдите, чтобы увидеть оценки соответствия профиля.",

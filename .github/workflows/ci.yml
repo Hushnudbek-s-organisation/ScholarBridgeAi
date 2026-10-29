@@ -66,6 +66,11 @@ jobs:
       - name: Discovery matcher tests — university/scholarship Match %
         run: bash ci/run-step.sh "Discovery matcher tests — university/scholarship Match %" npm run test:match
 
+      # Offline: the combined relevance number (fit + university + chance) the
+      # catalogue sorts by, and the two personal filters built on it.
+      - name: Combined ranking + personal filter tests (offline)
+        run: bash ci/run-step.sh "Combined ranking + personal filter tests (offline)" npm run test:ranking
+
       - name: AI settings tests
         run: bash ci/run-step.sh "AI settings tests" npm run test:ai-settings
 

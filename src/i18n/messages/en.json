@@ -4539,7 +4539,17 @@
     },
     "allDegrees": "🎓 All degree levels",
     "allStatuses": "🗓 All statuses",
-    "allBasis": "🎯 Any award basis"
+    "allBasis": "🎯 Any award basis",
+    "filterChance": "Chance (published requirements)",
+    "filterChanceMeets": "✅ Requirements met",
+    "filterChanceBelow": "⚠️ Requirements not met",
+    "filterChanceUnknown": "❔ Not determined",
+    "allChance": "🎯 Any chance",
+    "filterFit": "Fit",
+    "filterFitStrong": "⭐ Strong fit",
+    "filterFitGood": "👍 Good fit",
+    "filterFitLow": "🔻 Low fit",
+    "allFit": "🎯 Any fit"
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",

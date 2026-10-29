@@ -4539,7 +4539,17 @@
     },
     "allDegrees": "🎓 Barcha darajalar",
     "allStatuses": "🗓 Barcha holatlar",
-    "allBasis": "🎯 Har qanday asos"
+    "allBasis": "🎯 Har qanday asos",
+    "filterChance": "Imkoniyat (e'lon qilingan talablar)",
+    "filterChanceMeets": "✅ Talablar mos",
+    "filterChanceBelow": "⚠️ Talab mos emas",
+    "filterChanceUnknown": "❔ Aniqlanmagan",
+    "allChance": "🎯 Har qanday imkoniyat",
+    "filterFit": "Moslik",
+    "filterFitStrong": "⭐ Juda mos",
+    "filterFitGood": "👍 Mos",
+    "filterFitLow": "🔻 Past moslik",
+    "allFit": "🎯 Har qanday moslik"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",

@@ -47,6 +47,21 @@ export const SCHOLARSHIP_STATUS_OPTIONS = [
 export type ScholarshipStatusOption = (typeof SCHOLARSHIP_STATUS_OPTIONS)[number];
 
 export const SCHOLARSHIP_BASIS_OPTIONS = ["merit", "need"] as const;
+
+/**
+ * The two personal dimensions. They are computed from the student's own profile
+ * (`scholarshipGates.ts`), so they are only offered when a profile is loaded —
+ * an anonymous visitor has no answer, and a filter that always returns nothing
+ * teaches people the catalogue is empty.
+ *
+ * `chance` is the published-gate check (meets / below / unknown), never an
+ * admission probability; `fit` is the existing match score in three bands.
+ */
+export const SCHOLARSHIP_CHANCE_OPTIONS = ["meets", "below", "unknown"] as const;
+export type ScholarshipChanceOption = (typeof SCHOLARSHIP_CHANCE_OPTIONS)[number];
+
+export const SCHOLARSHIP_FIT_OPTIONS = ["strong", "good", "low"] as const;
+export type ScholarshipFitOption = (typeof SCHOLARSHIP_FIT_OPTIONS)[number];
 export type ScholarshipBasisOption = (typeof SCHOLARSHIP_BASIS_OPTIONS)[number];
 
 export type ScholarshipSortOption = "relevance" | "deadline" | "amount" | "title";
@@ -67,7 +82,14 @@ export const SCHOLARSHIP_GROUP_OPTIONS: readonly ScholarshipGroupOption[] = [
   "status",
 ];
 
-export type ScholarshipFilterDimension = "country" | "degrees" | "coverages" | "statuses" | "basis";
+export type ScholarshipFilterDimension =
+  | "country"
+  | "degrees"
+  | "coverages"
+  | "statuses"
+  | "basis"
+  | "chance"
+  | "fit";
 
 export interface ScholarshipFilters {
   /** Canonical English country name, or `All`. */
@@ -77,6 +99,10 @@ export interface ScholarshipFilters {
   statuses: string[];
   /** Any of: `merit`, `need`. Empty means "any basis". */
   basis: string[];
+  /** Any of: `meets`, `below`, `unknown`. Empty means "any chance". */
+  chance: string[];
+  /** Any of: `strong`, `good`, `low`. Empty means "any fit". */
+  fit: string[];
 }
 
 export const EMPTY_SCHOLARSHIP_FILTERS: ScholarshipFilters = {
@@ -85,6 +111,8 @@ export const EMPTY_SCHOLARSHIP_FILTERS: ScholarshipFilters = {
   coverages: [],
   statuses: [],
   basis: [],
+  chance: [],
+  fit: [],
 };
 
 /** Per-value result counts, so every control shows what it would return. */
@@ -94,6 +122,8 @@ export interface ScholarshipFacets {
   coverages: Record<string, number>;
   statuses: Record<string, number>;
   basis: Record<string, number>;
+  chance: Record<string, number>;
+  fit: Record<string, number>;
 }
 
 export const EMPTY_SCHOLARSHIP_FACETS: ScholarshipFacets = {
@@ -102,6 +132,8 @@ export const EMPTY_SCHOLARSHIP_FACETS: ScholarshipFacets = {
   coverages: {},
   statuses: {},
   basis: {},
+  chance: {},
+  fit: {},
 };
 
 /** The subset of a catalogue row the filters read. */
@@ -112,6 +144,10 @@ export interface ScholarshipFilterRow {
   meritBased?: boolean | null;
   financialNeedBased?: boolean | null;
   computedStatus?: string | null;
+  /** From `evaluateChance` — only set when a profile was loaded. */
+  chanceBucket?: string | null;
+  /** From `fitBucket(matchScore)` — only set when a profile was loaded. */
+  fitBucket?: string | null;
 }
 
 /** `degreeLevels` is a JSON array in the catalogue; malformed values yield []. */
@@ -155,7 +191,9 @@ export function scholarshipActiveFilterCount(filters: ScholarshipFilters): numbe
     (filters.degrees.length > 0 ? 1 : 0) +
     (filters.coverages.length > 0 ? 1 : 0) +
     (filters.statuses.length > 0 ? 1 : 0) +
-    (filters.basis.length > 0 ? 1 : 0)
+    (filters.basis.length > 0 ? 1 : 0) +
+    (filters.chance.length > 0 ? 1 : 0) +
+    (filters.fit.length > 0 ? 1 : 0)
   );
 }
 
@@ -207,6 +245,18 @@ export function scholarshipMatchesFilters(
       (filters.basis.includes("merit") && row.meritBased === true) ||
       (filters.basis.includes("need") && row.financialNeedBased === true);
     if (!matchesBasis) return false;
+  }
+
+  // Personal dimensions. A row with no bucket (anonymous visitor, or a profile
+  // that made no gate comparable) is simply not in any selected bucket.
+  if (!skipped.has("chance") && filters.chance.length > 0) {
+    const bucket = (row.chanceBucket ?? "").trim();
+    if (!filters.chance.some((want) => sameCanonical(bucket, want))) return false;
+  }
+
+  if (!skipped.has("fit") && filters.fit.length > 0) {
+    const bucket = (row.fitBucket ?? "").trim();
+    if (!filters.fit.some((want) => sameCanonical(bucket, want))) return false;
   }
 
   return true;

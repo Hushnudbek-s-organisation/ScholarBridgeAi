@@ -2343,10 +2343,130 @@ async function main() {
       inactiveSearch.status === 200 &&
       !inactiveSearch.body?.results?.some((r: any) => r.kind === "scholarship" && r.id === inactiveScholarship.id)
   );
+  // ---- Phase M: combined relevance + the two personal filters -------------
+  // Two awards with identical published gates, one at each fixture university,
+  // plus one identical award that links no university. The order between the
+  // linked pair must follow the UNIVERSITY match, and the unlinked row must be
+  // scorable on the parts it has (never treated as a zero).
+  const linkedValues = {
+    provider: "Phase M Fixture Provider",
+    country: "Germany",
+    description: "Combined-ranking fixture.",
+    requirements: "Fixture only.",
+    websiteUrl: "https://example.org/phase-m",
+    verificationStatus: "verified" as const,
+    minGpa: 3.5,
+    minIelts: 6.5,
+    degreeLevels: '["Bachelor"]',
+  };
+  const phaseMRows = await db
+    .insert(schema.scholarships)
+    .values([
+      { ...linkedValues, title: "Beacon Combined Ranking Award A", universityId: uniA.id },
+      { ...linkedValues, title: "Beacon Combined Ranking Award B", universityId: uniB.id },
+      { ...linkedValues, title: "Beacon Combined Ranking Award C", universityId: null },
+    ])
+    .returning();
+  const awardA = phaseMRows.find((row: any) => row.title.endsWith("Award A"))!;
+  const awardB = phaseMRows.find((row: any) => row.title.endsWith("Award B"))!;
+  const awardC = phaseMRows.find((row: any) => row.title.endsWith("Award C"))!;
+
+  // The catalogue bundle is cached for 5 minutes and only an admin write
+  // invalidates it; the fixtures above were inserted directly, so drop it.
+  const { invalidateCatalogCache } = await import("../src/lib/catalogCache");
+  invalidateCatalogCache();
+
+  const rankedCatalog = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&perPage=20&facets=1`
+  );
+  const rankedRows: any[] = rankedCatalog.body?.scholarships ?? [];
+  const rowA = rankedRows.find((row) => row.id === awardA.id);
+  const rowB = rankedRows.find((row) => row.id === awardB.id);
+  const rowC = rankedRows.find((row) => row.id === awardC.id);
+  check(
+    "scholarships: the personalised response carries a combined relevance score and both personal buckets",
+    rankedCatalog.status === 200 &&
+      rankedRows.length === 3 &&
+      rankedRows.every(
+        (row) =>
+          typeof row.relevanceScore === "number" &&
+          row.fitBucket != null &&
+          row.chanceBucket === "meets", // GPA 3.7 ≥ 3.5, IELTS 7.5 ≥ 6.5, Bachelor published
+      ),
+    JSON.stringify(rankedRows.map((r) => [r.title, r.relevanceScore, r.fitBucket, r.chanceBucket]))
+  );
+  // The university score must follow the matcher, not a guess: compute both and
+  // assert the route placed the better-matching university's award first.
+  const { calculateUniversityMatch } = await import("../src/lib/matching");
+  const uniScoreA = calculateUniversityMatch(profile as any, uniA as any).matchScore;
+  const uniScoreB = calculateUniversityMatch(profile as any, uniB as any).matchScore;
+  const expectedFirst = uniScoreA >= uniScoreB ? rowA : rowB;
+  const expectedSecond = uniScoreA >= uniScoreB ? rowB : rowA;
+  check(
+    "scholarships: equal published gates — the better-matching university ranks first",
+    rowA?.universityMatchScore != null &&
+      rowB?.universityMatchScore != null &&
+      rankedRows.indexOf(expectedFirst) < rankedRows.indexOf(expectedSecond) &&
+      expectedFirst.relevanceScore > expectedSecond.relevanceScore,
+    `uniA=${uniScoreA} uniB=${uniScoreB} order=${JSON.stringify(rankedRows.map((r) => [r.title, r.relevanceScore, r.universityMatchScore]))}`
+  );
+  check(
+    "scholarships: an award with no university link is scored on the parts it has, not as a zero",
+    rowC?.universityMatchScore == null && typeof rowC?.relevanceScore === "number" && rowC.relevanceScore > 0
+  );
+  check(
+    "scholarships: the list is ordered by the combined score (descending)",
+    rankedRows.every((row, i) => i === 0 || rankedRows[i - 1].relevanceScore >= row.relevanceScore)
+  );
+  check(
+    "scholarships: the facet payload counts the two personal buckets",
+    typeof rankedCatalog.body?.facets?.chance?.meets === "number" &&
+      rankedCatalog.body.facets.chance.meets >= 3 &&
+      typeof rankedCatalog.body?.facets?.fit === "object"
+  );
+
+  const chanceFiltered = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&chance=below&perPage=20`
+  );
+  check(
+    "scholarships: ?chance=below returns none of the awards whose gates are met",
+    chanceFiltered.status === 200 && (chanceFiltered.body?.scholarships ?? []).length === 0,
+    JSON.stringify((chanceFiltered.body?.scholarships ?? []).map((r: any) => r.title))
+  );
+  const chanceMeets = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&chance=meets&perPage=20`
+  );
+  check(
+    "scholarships: ?chance=meets keeps exactly those three awards",
+    chanceMeets.status === 200 && (chanceMeets.body?.scholarships ?? []).length === 3
+  );
+  const fitFiltered = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&fit=low&perPage=20`
+  );
+  check(
+    "scholarships: ?fit=low drops the strong-fit awards",
+    fitFiltered.status === 200 && (fitFiltered.body?.scholarships ?? []).length === 0
+  );
+  const anonChance = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?search=${encodeURIComponent("Beacon Combined Ranking")}&chance=meets&perPage=20`,
+    { headers: anonHdr }
+  );
+  check(
+    "scholarships: an anonymous caller's personal filter is dropped, not silently empty",
+    anonChance.status === 200 && (anonChance.body?.scholarships ?? []).length === 3 &&
+      (anonChance.body?.scholarships ?? []).every((row: any) => row.chanceBucket == null && row.relevanceScore == null)
+  );
+
   await db.delete(schema.scholarships).where(inArray(schema.scholarships.id, [
     searchTarget.id,
     ...focusedRows.map((row: any) => row.id),
     inactiveScholarship.id,
+    ...phaseMRows.map((row: any) => row.id),
   ]));
 
   // ---- A20: rate limits shared across instances ---------------------------

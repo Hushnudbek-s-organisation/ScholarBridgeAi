@@ -8,8 +8,10 @@ import { countryTranslationKey } from "@/lib/countries";
 import { localizeCoverageType, localizeDegreeLevel } from "@/lib/catalogLocalizer";
 import {
   SCHOLARSHIP_BASIS_OPTIONS,
+  SCHOLARSHIP_CHANCE_OPTIONS,
   SCHOLARSHIP_COVERAGE_OPTIONS,
   SCHOLARSHIP_DEGREE_OPTIONS,
+  SCHOLARSHIP_FIT_OPTIONS,
   SCHOLARSHIP_STATUS_OPTIONS,
   scholarshipActiveFilterCount,
   scholarshipStatusMessageKey,
@@ -30,6 +32,13 @@ import {
  * publish never appears. Field of study is deliberately absent — almost every
  * row says "All Majors", so it would be decoration.
  *
+ * Two dimensions are personal and therefore only appear once a profile is
+ * loaded (`hasProfile`):
+ *   • **Chance** — do the requirements the award itself publishes match this
+ *     student's GPA / IELTS / degree level? It is an evidence check on
+ *     published gates, NOT an admission probability (see `chancing.ts`).
+ *   • **Fit** — the same match score the cards show, banded.
+ *
  * The panel is presentational: the hub owns the state and passes it down.
  */
 
@@ -38,6 +47,8 @@ export interface ScholarshipFiltersPanelProps {
   facets: ScholarshipFacets;
   onChange: (next: ScholarshipFilters) => void;
   onReset: () => void;
+  /** Personal dimensions (chance, fit) are only answerable with a profile. */
+  hasProfile?: boolean;
 }
 
 function Field({
@@ -62,6 +73,19 @@ function Field({
   );
 }
 
+/** Explicit label keys — the panel never builds a translation key by string join. */
+const CHANCE_LABEL_KEY: Record<string, string> = {
+  meets: "filterChanceMeets",
+  below: "filterChanceBelow",
+  unknown: "filterChanceUnknown",
+};
+
+const FIT_LABEL_KEY: Record<string, string> = {
+  strong: "filterFitStrong",
+  good: "filterFitGood",
+  low: "filterFitLow",
+};
+
 const SELECT_CLASS =
   "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm";
 
@@ -70,6 +94,7 @@ export function ScholarshipFiltersPanel({
   facets,
   onChange,
   onReset,
+  hasProfile = false,
 }: ScholarshipFiltersPanelProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
@@ -89,7 +114,10 @@ export function ScholarshipFiltersPanel({
   // The selects are single-choice in the UI ("All" = no filter). The filter
   // model stays multi-valued so the API and deep links keep working if a
   // second value is ever needed.
-  const setSingle = (key: "degrees" | "coverages" | "statuses" | "basis", value: string) => {
+  const setSingle = (
+    key: "degrees" | "coverages" | "statuses" | "basis" | "chance" | "fit",
+    value: string,
+  ) => {
     onChange({ ...filters, [key]: value === "All" ? [] : [value] });
   };
 
@@ -186,6 +214,46 @@ export function ScholarshipFiltersPanel({
           ))}
         </select>
       </Field>
+
+      {/* ---- Chance: published-gate check (personal, profile required) */}
+      {hasProfile && (
+        <Field label={t("filterChance")} htmlFor="scholarship-filter-chance">
+          <select
+            id="scholarship-filter-chance"
+            value={filters.chance[0] ?? "All"}
+            onChange={(event) => setSingle("chance", event.target.value)}
+            aria-label={t("allChance")}
+            className={SELECT_CLASS}
+          >
+            <option value="All">{t("allChance")}</option>
+            {SCHOLARSHIP_CHANCE_OPTIONS.map((bucket) => (
+              <option key={bucket} value={bucket}>
+                {t(CHANCE_LABEL_KEY[bucket] ?? bucket)} ({facets.chance[bucket] ?? 0})
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      {/* ---- Fit: the card's match score, banded (personal) */}
+      {hasProfile && (
+        <Field label={t("filterFit")} htmlFor="scholarship-filter-fit">
+          <select
+            id="scholarship-filter-fit"
+            value={filters.fit[0] ?? "All"}
+            onChange={(event) => setSingle("fit", event.target.value)}
+            aria-label={t("allFit")}
+            className={SELECT_CLASS}
+          >
+            <option value="All">{t("allFit")}</option>
+            {SCHOLARSHIP_FIT_OPTIONS.map((bucket) => (
+              <option key={bucket} value={bucket}>
+                {t(FIT_LABEL_KEY[bucket] ?? bucket)} ({facets.fit[bucket] ?? 0})
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       {/* Reset lives at the end of the row and only appears when it does
           something — a permanently disabled "Clear" is noise. */}

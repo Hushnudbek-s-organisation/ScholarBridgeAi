@@ -31,6 +31,7 @@
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",
+    "test:ranking": "tsx scripts/check-scholarship-ranking.ts",
     "test:api-security": "tsx scripts/check-api-anonymous.ts",
     "test:chancing": "tsx scripts/check-chancing.ts",
     "test:roadmap": "tsx scripts/check-roadmap.ts",
