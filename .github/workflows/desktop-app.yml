@@ -1,0 +1,100 @@
+# Builds the installable ScholarBridge desktop app for Windows, macOS and
+# Linux. Each run uploads the installer as a downloadable artifact; pushing a
+# tag like `v1.0.0` also attaches them to a GitHub Release.
+#
+# The app is self-contained: the compiled server (Next.js standalone output)
+# and the SQL schema are bundled as resources, and the app starts its own
+# PostgreSQL on the user's machine. That is why this job needs a database at
+# BUILD time only — `next build` reads it while collecting page data.
+name: Desktop app
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows (x64 .exe)
+            artifact: scholarbridge-windows
+            pattern: desktop/release/*.exe
+          - os: macos-latest
+            name: macOS (.dmg)
+            artifact: scholarbridge-macos
+            pattern: desktop/release/*.dmg
+          - os: ubuntu-latest
+            name: Linux (AppImage + .deb)
+            artifact: scholarbridge-linux
+            pattern: |
+              desktop/release/*.AppImage
+              desktop/release/*.deb
+
+    services:
+      # Only used by `next build`; the installed app ships its own database.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scholarbridge
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/scholarbridge
+      SESSION_SECRET: desktop-build-session-secret-not-used-at-runtime-000000
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install desktop dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: desktop
+
+      - name: Load the schema into the build database
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/full_schema.sql
+        shell: bash
+
+      # Compiles the standalone server, copies static assets, and packages the
+      # installer with electron-builder (scripts/build-desktop.mjs).
+      - name: Build the installer
+        run: node scripts/build-desktop.mjs
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.pattern }}

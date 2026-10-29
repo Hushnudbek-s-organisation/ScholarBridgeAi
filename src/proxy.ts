@@ -7,6 +7,7 @@ import {
   isOversizedApiJsonBody,
   miniAppFrameAncestors,
   strictTransportSecurity,
+  upgradesInsecureRequests,
   xFrameOptions,
 } from "@/lib/security";
 
@@ -77,7 +78,10 @@ export function contentSecurityPolicy(nonce: string, opts: { miniApp?: boolean }
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
     "frame-src": ["'self'"],
-    "upgrade-insecure-requests": [],
+    // Skipped for the plain-HTTP desktop/LAN deployment: there it would
+    // rewrite the app's own asset URLs to https:// and the page would load
+    // without styles or scripts (see `plainHttpDeployment`).
+    ...(upgradesInsecureRequests() ? { "upgrade-insecure-requests": [] } : {}),
   };
 
   return Object.entries(directives)
