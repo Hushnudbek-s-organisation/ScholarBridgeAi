@@ -220,7 +220,7 @@ const COUNTRY_UZ: Record<string, string> = {
   austria: "Avstriya",
   belgium: "Belgiya",
   ireland: "Irlandiya",
-  poland: "Polandiya",
+  poland: "Polsha",
   czechia: "Chexiya",
   "czech republic": "Chexiya",
   hungary: "Vengriya",
@@ -253,6 +253,21 @@ const COUNTRY_UZ: Record<string, string> = {
   global: "Xalqaro",
   worldwide: "Xalqaro",
 };
+
+/**
+ * True when `text` *is* a country name, in either language.
+ *
+ * Requirement prose is full of country names ("a New Zealand citizen"), and the
+ * dictionary happily translates them, so the term scanner turned "New Zealand"
+ * into a `Kimlar uchun` bullet — a place is not a requirement, and the country
+ * is already printed in the header. Used to refuse such a chip.
+ */
+export function isCountryName(text: string | null | undefined): boolean {
+  const key = (text ?? "").trim().toLowerCase();
+  if (!key) return false;
+  if (key in COUNTRY_UZ) return true;
+  return Object.values(COUNTRY_UZ).some((name) => name.toLowerCase() === key);
+}
 
 export function countryUz(raw: string | null | undefined): string | null {
   const name = (raw ?? "").trim();

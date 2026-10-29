@@ -31,9 +31,9 @@ export interface RichPostInput {
 export function richDeadlineLine(facts: Facts): string {
   const { quality, date } = facts.deadline;
   const formatted = formatDateUz(date);
-  if (quality === "exact" && formatted) return `🕓Oxirgi muddat: ${formatted}`;
-  if (quality === "estimated") return `🕓Taxminiy muddat: ${formatted ?? "taxminan"}`;
-  return "🕓Muddat: rasmiy sahifada ko'rsatilgan";
+  if (quality === "exact" && formatted) return `⏰️<b>Oxirgi muddat:</b> ${formatted}`;
+  if (quality === "estimated") return `⏰️<b>Taxminiy muddat:</b> ${formatted ?? "taxminan"}`;
+  return "⏰️<b>Muddat:</b> rasmiy sahifada ko'rsatilgan";
 }
 
 function headline(facts: Facts, tagline: string, country: CountryDisplay | null, variant: number): string {
@@ -93,8 +93,8 @@ export function renderScholarshipRich(input: RichPostInput): Rendered | null {
   const build = (opts: { about: string | null; bullets: number }): string =>
     compose({
       headline: headline(facts, esc(content.taglineUz as string), country, chrome.variant),
-      funding: `Moliyalashtirish: ${esc(content.fundingTypeUz as string)}`,
-      language: content.languageReqUz ? `Til talabi: ${esc(content.languageReqUz)}` : null,
+      funding: `<b>Moliyalashtirish:</b> ${esc(content.fundingTypeUz as string)}`,
+      language: content.languageReqUz ? `<b>Til talabi:</b> ${esc(content.languageReqUz)}` : null,
       eligibility: bullets(content.eligibilityUz.slice(0, opts.bullets)),
       benefits: bullets(content.benefitsUz.slice(0, opts.bullets)),
       about: opts.about ? esc(opts.about) : null,

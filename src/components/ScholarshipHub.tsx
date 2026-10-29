@@ -20,6 +20,8 @@ import {
 import {
   EMPTY_SCHOLARSHIP_FACETS,
   EMPTY_SCHOLARSHIP_FILTERS,
+  SCHOLARSHIP_CHANCE_OPTIONS,
+  SCHOLARSHIP_FIT_OPTIONS,
   SCHOLARSHIP_GROUP_OPTIONS,
   SCHOLARSHIP_SORT_OPTIONS,
   parseScholarshipDegreeLevels,
@@ -87,6 +89,14 @@ export interface Scholarship {
   matchScore?: number;
   matchBreakdown?: MatchBreakdown | null;
   isEligible?: boolean;
+  /** Published-gate verdict (meets / below / unknown) — not an admission chance. */
+  chanceBucket?: string | null;
+  /** The match score in three bands (strong / good / low). */
+  fitBucket?: string | null;
+  /** Match score of the university this award belongs to, when it links one. */
+  universityMatchScore?: number | null;
+  /** Combined fit + university + chance number the list is ordered by. */
+  relevanceScore?: number | null;
   // Why this match (spec §22)
   matchReasons?: string[];
   matchIssues?: string[];
@@ -154,6 +164,14 @@ function readStoredFilters(): {
         coverages: stringsOnly(stored.coverages),
         statuses: stringsOnly(stored.statuses),
         basis: stringsOnly(stored.basis),
+        // Personal dimensions: a stored selection survives back-navigation, but
+        // never for a value the API would reject.
+        chance: stringsOnly(stored.chance).filter((value) =>
+          (SCHOLARSHIP_CHANCE_OPTIONS as readonly string[]).includes(value)
+        ),
+        fit: stringsOnly(stored.fit).filter((value) =>
+          (SCHOLARSHIP_FIT_OPTIONS as readonly string[]).includes(value)
+        ),
       },
       sortBy: SCHOLARSHIP_SORT_OPTIONS.includes(parsed?.sortBy as ScholarshipSortOption)
         ? (parsed?.sortBy as ScholarshipSortOption)
@@ -346,6 +364,8 @@ export function ScholarshipHub({
     if (filters.coverages.length > 0) params.set("coverageTypes", filters.coverages.join(","));
     if (filters.statuses.length > 0) params.set("status", filters.statuses.join(","));
     if (filters.basis.length > 0) params.set("basis", filters.basis.join(","));
+    if (filters.chance.length > 0) params.set("chance", filters.chance.join(","));
+    if (filters.fit.length > 0) params.set("fit", filters.fit.join(","));
     if (sortBy !== "relevance") params.set("sort", sortBy);
     if (groupBy !== "none") params.set("groupBy", groupBy);
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
@@ -623,6 +643,7 @@ export function ScholarshipHub({
             facets={facets}
             onChange={setFilters}
             onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+            hasProfile={Boolean(activeProfile)}
           />
         </div>
       </div>

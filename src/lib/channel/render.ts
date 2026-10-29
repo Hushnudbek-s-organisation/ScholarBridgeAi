@@ -75,9 +75,18 @@ export function hashtagsFor(
   const country = facts ? countryDisplay(facts.countryRaw ?? null, data.countries) : null;
   const countryTag = country?.key ? (data.settings.hashtags.countries[country.key] ?? country.hashtag) : null;
   const kindTags = data.settings.hashtags.kinds[kind as string] ?? [];
+  // The reference post ends with a funding tag. It is chosen by stored data,
+  // never by the editor: `to'liq_moliyalashtiriladi` only appears on an award
+  // the database calls fully funded.
+  const fundingTag = facts
+    ? facts.fullyFunded
+      ? data.settings.hashtags.funding.full
+      : data.settings.hashtags.funding.partial
+    : null;
   return buildHashtags([
     ...kindTags,
     countryTag,
+    fundingTag,
     facts ? levelTag(facts, data.settings) : null,
     ...(content?.extraHashtags ?? []),
   ]);
@@ -147,13 +156,18 @@ export function renderPlanItemWithReason(item: PlannedItem, data: RenderData): R
     }
     case "scholarship_single": {
       if (!facts) return { post: null, reason: "missing_facts" };
-      const html = renderScholarshipSingle(facts, variant, chrome)?.html ?? null;
-      const out = html ? { key: `single_v${(variant % 3) + 1}`, html } : null;
-      return single(out?.html ?? null, out?.key ?? "");
+      // Authored copy (Admin → Kanal → Kontent) replaces the structured
+      // sections when it exists; the country adds the flag to the headline.
+      chrome.hashtags = hashtagsFor(item.kind, data, facts, content ?? null);
+      const country = countryDisplay(facts.countryRaw ?? null, data.countries);
+      const html = renderScholarshipSingle(facts, variant, chrome, { content, country })?.html ?? null;
+      return single(html, `single_v${(variant % 3) + 1}`);
     }
     case "fully_funded": {
       if (!facts) return { post: null, reason: "missing_facts" };
-      const html = renderFullyFunded(facts, variant, chrome)?.html ?? null;
+      chrome.hashtags = hashtagsFor(item.kind, data, facts, content ?? null);
+      const country = countryDisplay(facts.countryRaw ?? null, data.countries);
+      const html = renderFullyFunded(facts, variant, chrome, { content, country })?.html ?? null;
       return single(html, `ff_v${(variant % 3) + 1}`);
     }
     case "urgency": {

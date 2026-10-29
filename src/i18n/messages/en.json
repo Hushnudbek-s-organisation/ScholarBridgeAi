@@ -4539,7 +4539,17 @@
     },
     "allDegrees": "🎓 All degree levels",
     "allStatuses": "🗓 All statuses",
-    "allBasis": "🎯 Any award basis"
+    "allBasis": "🎯 Any award basis",
+    "filterChance": "Chance (published requirements)",
+    "filterChanceMeets": "✅ Requirements met",
+    "filterChanceBelow": "⚠️ Requirements not met",
+    "filterChanceUnknown": "❔ Not determined",
+    "allChance": "🎯 Any chance",
+    "filterFit": "Fit",
+    "filterFitStrong": "⭐ Strong fit",
+    "filterFitGood": "👍 Good fit",
+    "filterFitLow": "🔻 Low fit",
+    "allFit": "🎯 Any fit"
   },
   "chancing": {
     "signIn": "Sign in to see your profile fit assessments.",
@@ -6862,7 +6872,8 @@
       "audit": "Log",
       "polls": "Polls",
       "prefs": "Interests",
-      "stories": "Stories"
+      "stories": "Stories",
+      "lexicon": "Dictionary"
     },
     "steps": {
       "token": "Bot token (Admin → Telegram)",
@@ -7174,6 +7185,78 @@
       "startNow": "Start publishing (with approval)",
       "startDone": "Publishing is on — the first post arrived in the admin chat.",
       "buildNow": "Build today's plan"
+    },
+    "lexicon": {
+      "title": "Dictionary",
+      "hint": "Every English term the channel translates comes from here. The dictionary is bundled with the app and also stored in the database; changing a gloss changes what the next post says, with no deploy.",
+      "bundled": "In the app",
+      "inDatabase": "In the database",
+      "edited": "Corrected by you",
+      "version": "Bundled version",
+      "installedVersion": "Installed version",
+      "notInstalled": "not installed yet",
+      "search": "Search",
+      "searchPlaceholder": "e.g. tuition, motivation letter, proof of funds",
+      "import": "Re-import now",
+      "installed": "Imported: {count} terms",
+      "alreadyCurrent": "Already up to date",
+      "editTitle": "Correct a gloss",
+      "english": "English headword",
+      "uzbek": "Uzbek gloss (this is what the post will say)",
+      "russian": "Russian gloss (optional)",
+      "editHint": "Short phrase only. Your correction overrides the bundled gloss immediately; a post never shows a gloss that is not on file.",
+      "edit": "Edit",
+      "reset": "Restore original",
+      "resetDone": "Restored to the bundled gloss",
+      "sourceAdmin": "yours",
+      "sourcePdf": "dictionary",
+      "noResults": "Nothing found",
+      "noResultsHint": "Try an English term such as tuition or transcript.",
+      "empty": "No corrections yet",
+      "emptyHint": "Search for a term above to correct its Uzbek gloss."
+    },
+    "dictionary": {
+      "title": "Translation dictionary",
+      "state": {
+        "installed": "installed",
+        "pending": "not imported yet",
+        "stale": "outdated version",
+        "unavailable": "could not be read"
+      },
+      "advice": {
+        "none": "Post text is translated with this dictionary.",
+        "install": "The first tick imports it by itself — or run it now.",
+        "reimport": "The bundled dictionary changed: import it again (your edits are kept).",
+        "checkDatabase": "The table could not be read: check the database connection and grants."
+      },
+      "facts": "{rows}/{terms} terms · version {version}",
+      "edited": "{count} rows edited by hand",
+      "importNow": "Import now",
+      "imported": "{rows} terms written to the database",
+      "importFailed": "The import did not run — the reason is in the audit log."
+    },
+    "webhook": {
+      "title": "Bot webhook (the buttons go through it)",
+      "state": {
+        "ok": "connected",
+        "missing": "not connected",
+        "wrong_url": "pointing at another address",
+        "error": "failing",
+        "unknown": "could not be checked"
+      },
+      "advice": {
+        "none": "The Approve / Reject buttons work.",
+        "connect": "The buttons do nothing: no webhook is set — press the button below.",
+        "move": "The webhook points at an old address — reconnect it.",
+        "retry": "Telegram reports an error — reconnect and try again.",
+        "checkTeam": "Telegram did not answer: check the bot token and the network."
+      },
+      "none": "no webhook",
+      "pending": "{count} updates queued",
+      "lastError": "Last error: {message}",
+      "dedicated": "A dedicated channel bot is in use — that bot's webhook is checked here.",
+      "fix": "Connect / fix",
+      "fixed": "Webhook connected — the buttons work now."
     }
   },
   "adminDiagnostics": {

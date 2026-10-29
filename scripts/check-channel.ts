@@ -95,6 +95,21 @@ import {
   type WeeklyItem,
 } from "../src/lib/channel/templates/weekly.uz";
 import { renderScholarshipRich, SOFT_LIMIT, HARD_LIMIT, trimAtWord } from "../src/lib/channel/templates/rich.uz";
+import {
+  dictionaryLine,
+  translateCoverage,
+  translateEnglishRequirement,
+  translateRequirements,
+} from "../src/lib/channel/templates/translate.uz";
+import {
+  LEXICON_META,
+  bundledGloss,
+  lexiconSize,
+  looksEnglish,
+  lookup,
+  translateFragment,
+} from "../src/lib/channel/lexicon";
+import { checkGloss } from "../src/lib/channel/lexicon/gloss";
 import { ctaLine, footerLine, hashtagLine } from "../src/lib/channel/templates/chrome";
 import {
   EMPTY_CONTENT,
@@ -122,6 +137,7 @@ import {
   esc,
   formatDateUz,
   formatDayWithWeekdayUz,
+  isCountryName,
   majorsUz,
 } from "../src/lib/channel/templates/format";
 import { lintText, plainText, visibleLength } from "../src/lib/channel/lint";
@@ -163,9 +179,16 @@ import {
   discoveryMessage,
   isNewDiscovery,
 } from "../src/lib/channel/discovery";
-import { cleanPriorityCountries, DEFAULT_PRIORITY_COUNTRIES, parseDiscoveredChannel } from "../src/lib/channel/settings";
+import {
+  cleanPriorityCountries,
+  DEFAULT_CHANNEL_SETTINGS,
+  DEFAULT_PRIORITY_COUNTRIES,
+  parseDiscoveredChannel,
+} from "../src/lib/channel/settings";
 import { buildWhy, tickIsStale, waitingForWindow, whySummary } from "../src/lib/channel/why";
 import { countryPriority, deadlineTier, editorialRank } from "../src/lib/channel/select";
+import { dictionaryStateOf, dictionaryStatusOf, dictionarySummary } from "../src/lib/channel/selfcheck";
+import { ALLOWED_UPDATES, webhookAdvice, webhookUrlFor, webhookVerdict } from "../src/lib/channel/webhook";
 import { AUTOPILOT_DEFAULT_MINUTES,
   AUTOPILOT_TEXTS,
   MODE_LABELS,
@@ -264,6 +287,11 @@ function row(overrides: Partial<FactsRow> = {}): FactsRow {
     eligibleMajors: '["All Majors"]',
     minGpa: 3.5,
     minIelts: 6.5,
+    livingAllowance: null,
+    travelAllowance: null,
+    requirements: null,
+    englishRequirements: null,
+    tuitionCoverage: null,
     websiteUrl: "https://example.edu/scholarship",
     applicationUrl: null,
     ...overrides,
@@ -294,6 +322,17 @@ const minutesOf = (time: string) => {
   assert.ok(m, `bad send_at ${time}`);
   return Number(m[1]) * 60 + Number(m[2]);
 };
+
+/** Chrome for the card checks: tracked link, funding tag, footer. */
+function cardChrome() {
+  return {
+    siteUrl: SITE,
+    shortLink: { url: `${SITE}/go/card1`, visible: "scholarbridge.example/go/card1" },
+    hashtags: ["grant", "toliq_moliyalashtiriladi"],
+    footer: [{ label: "Kanal", url: "https://t.me/scholarbridge" }],
+    variant: 0,
+  };
+}
 
 function assertClean(html: string, label: string, opts: { allowUrgency?: boolean } = {}) {
   const issues = lintText(html, opts);
@@ -340,6 +379,18 @@ check("the six channel tables are declared", () => {
     assert.ok(CHANNEL_DDL.includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from DDL`);
     assert.ok(new RegExp(`pgTable\\(\\s*"${table}"`).test(read("src/db/schema.ts")), `${table} missing from drizzle schema`);
   }
+});
+
+check("the dictionary tables are declared for the database", () => {
+  for (const table of ["translation_lexicon", "translation_lexicon_meta"]) {
+    assert.ok(CHANNEL_DDL.includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from DDL`);
+    assert.ok(new RegExp(`pgTable\\(\\s*"${table}"`).test(read("src/db/schema.ts")), `${table} missing from drizzle schema`);
+    assert.ok(read("supabase/add_channel.sql").includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from the SQL file`);
+  }
+  assert.ok(
+    read("src/lib/channel/lexicon/store.ts").includes("installLexicon"),
+    "the dictionary must be installed by the channel bootstrap"
+  );
 });
 
 check("every DDL column exists in the drizzle schema", () => {
@@ -636,6 +687,131 @@ check("every scholarship template variant renders clean for every data shape", (
         assert.equal(out, null, `${label}: urgency must not render without an exact deadline`);
       }
     }
+  }
+});
+
+check("the academic dictionary is bundled, and it knows the channel's terms", () => {
+  assert.ok(lexiconSize() >= 12000, `dictionary too small: ${lexiconSize()}`);
+  assert.equal(LEXICON_META.pages, 606, "dictionary page count changed — regenerate the asset");
+  for (const [term, expected] of [
+    ["program", "O'quv dasturi"],
+    ["tuition", "O'qish to'lovi"],
+    ["motivation letter", "motivatsion xat"],
+    ["interview", "suhbat"],
+    ["deadline", "Muddat"],
+    ["full tuition", "To'liq kontrakt"],
+  ] as const) {
+    const entry = lookup(term);
+    assert.ok(entry, `dictionary lost "${term}"`);
+    assert.ok(
+      entry.uz.toLowerCase().includes(expected.toLowerCase()),
+      `"${term}" → "${entry.uz}", expected to contain "${expected}"`
+    );
+  }
+});
+
+check("the dictionary translates a fragment only when it knows every word", () => {
+  const full = translateFragment("bachelor's degree and a motivation letter");
+  assert.ok(full, "a fully-known fragment must translate");
+  assert.equal(full.uz.toLowerCase().includes("bakalavr"), true, full.uz);
+  assert.equal(full.uz.toLowerCase().includes("motivatsion"), true, full.uz);
+  for (const token of full.uz.match(/[A-Za-z']+/g) ?? []) {
+    assert.ok(!/^(the|and|or|of|must|required)$/i.test(token), `English leftover: ${token}`);
+  }
+  // One word we do not know cancels the whole fragment — never half a line.
+  assert.equal(translateFragment("bachelor's degree and a snorkel"), null, "unknown word must cancel the fragment");
+  assert.equal(translateFragment("candidates must hold a degree"), null, "unknown subject noun must cancel it");
+  assert.equal(translateFragment(""), null, "empty input");
+  // Numbers, amounts and test acronyms pass through instead of blocking.
+  const withNumber = translateFragment("minimum GPA 3.2");
+  assert.ok(withNumber, "numbers must not block a fragment");
+  assert.ok(/3\.2/.test(withNumber.uz), withNumber.uz);
+});
+
+check("the dictionary extends the card with terms the patterns miss", () => {
+  const sentence =
+    "Strong academic record, English proficiency, a motivation letter and 3 recommendation letters from the applicant's professors.";
+  const bullets = translateRequirements(sentence, { degrees: null, minGpa: null });
+  const joined = bullets.join(" · ").toLowerCase();
+  assert.ok(joined.includes("akademik"), `dictionary terms missing from the bullets: ${bullets.join(" | ")}`);
+  assert.ok(joined.includes("tavsiyanoma"), `recommendation letters missing: ${bullets.join(" | ")}`);
+
+  // Called on its own (as the card does when the patterns already spoke), the
+  // dictionary bullet must not repeat them and must stay short.
+  const line = dictionaryLine(sentence, ["Bakalavr darajasi", "Tavsiyanoma"]);
+  assert.ok(line, "the dictionary found nothing in a term-heavy sentence");
+  assert.ok(line.length <= 120, `dictionary bullet too long: ${line.length}`);
+  assert.ok(!line.includes("Bakalavr"), `dictionary bullet repeats the degree: ${line}`);
+  for (const word of line.match(/[A-Za-z][A-Za-z'-]{3,}/g) ?? []) {
+    assert.ok(
+      !/^(?:strong|academic|record|english|proficiency|motivation|letter|letters|recommendation|applicant)$/i.test(word),
+      `English leaked into the dictionary bullet: ${word} (${line})`
+    );
+  }
+  // A sentence with nothing the dictionary knows adds no bullet at all.
+  assert.equal(dictionaryLine("Lorem ipsum dolor sit amet", []), null, "unknown prose must add nothing");
+
+  // End to end: the card prints those terms in Uzbek and nothing English.
+  const card = renderScholarshipSingle(
+    facts({
+      requirements:
+        "Strong academic record, English proficiency, a motivation letter and 3 recommendation letters from the applicant's professors.",
+      englishRequirements: "IELTS 6.5 or equivalent English test",
+      tuitionCoverage: "Full tuition",
+    }),
+    0,
+    cardChrome()
+  );
+  assert.ok(card, "card did not render");
+  assertClean(card.html, "dictionary card");
+  const text = plainText(card.html);
+  assert.ok(/Akademik/i.test(text), `card lost the dictionary terms: ${text}`);
+  for (const english of ["academic", "recommendation", "professors", "Strong"]) {
+    assert.ok(!text.includes(english), `English leaked into the card: ${english}`);
+  }
+});
+
+check("a reminder post carries the same Uzbek facts as the card", () => {
+  /**
+   * The real shape that prompted this: a verified award with English prose, no
+   * stored IELTS/GPA and no allowances. Before, all four reminder variants were
+   * a title, a date and "To'liq moliyalashtirish" — nothing a reader could act
+   * on, and one variant did not even say who the award is for.
+   */
+  const proseOnly = facts({
+    id: 437,
+    title: "University of Waikato Doctoral Scholarship",
+    country: "New Zealand",
+    degreeLevels: '["PhD"]',
+    eligibleMajors: '["All Majors"]',
+    minGpa: null,
+    minIelts: null,
+    coverageType: "Full Tuition + Stipend",
+    englishRequirements: "The scholarship sets no IELTS cutoff; the university's doctoral English-language requirements apply.",
+    requirements: "Candidates must be a citizen of New Zealand or an international student with an Offer of Place.",
+    tuitionCoverage: "Domestic tuition fees are covered for the tenure.",
+    deadlineDate: "2026-11-04",
+    deadlineType: "exact",
+  });
+  for (let v = 0; v < TEMPLATE_VARIANTS.urgency; v++) {
+    const out = renderUrgency(proseOnly, 30, v, cardChrome());
+    assert.ok(out, `reminder v${v} did not render`);
+    assertClean(out.html, `reminder v${out.key}`, { allowUrgency: true });
+    const text = plainText(out.html);
+    assert.ok(/Til talabi/.test(text), `reminder v${v}: no language line — ${text}`);
+    assert.ok(/Kimlar uchun/.test(text), `reminder v${v}: no eligibility block`);
+    assert.ok(/Doktorantura/.test(text), `reminder v${v}: degree level missing`);
+    // The same rule as the card: the English never reaches the channel.
+    for (const english of ["cutoff", "Candidates must", "Domestic tuition", "Offer of Place"]) {
+      assert.ok(!text.includes(english), `reminder v${v}: English leaked — ${english}`);
+    }
+  }
+  // A record with no prose at all still renders a reminder, just a shorter one.
+  const bare = facts({ minGpa: null, minIelts: null, requirements: null, englishRequirements: null });
+  for (let v = 0; v < TEMPLATE_VARIANTS.urgency; v++) {
+    const out = renderUrgency(bare, 30, v, cardChrome());
+    assert.ok(out, `bare reminder v${v} did not render`);
+    assertClean(out.html, `bare reminder v${out.key}`, { allowUrgency: true });
   }
 });
 
@@ -1190,11 +1366,11 @@ check("the rich post renders the exact agreed layout", () => {
   const code = scholarshipLinkCode(1, "site");
   const expected = [
     "🇨🇦 <b>Global Excellence Scholarship</b> — Kanadada bepul o'qish imkoniyati",
-    "Moliyalashtirish: To'liq kontrakt + stipendiya\nTil talabi: IELTS 6.5",
+    "<b>Moliyalashtirish:</b> To'liq kontrakt + stipendiya\n<b>Til talabi:</b> IELTS 6.5",
     "<b>Kimlar uchun</b>\n➡️ Bakalavr yo'nalishi\n➡️ GPA 3.5 dan yuqori",
     "<b>Foydali tomonlari</b>\n➡️ Kontrakt to'liq qoplanadi\n➡️ Oylik stipendiya",
     "<b>Dastur haqida</b>\nDastur har yili 20 talabani qabul qiladi.",
-    `🕓Oxirgi muddat: 12-noyabr, 2026\n➡️Batafsil: <a href="${SITE}/go/${code}">scholarbridge.example/go/${code}</a>`,
+    `⏰️<b>Oxirgi muddat:</b> 12-noyabr, 2026\n➡️Batafsil: <a href="${SITE}/go/${code}">scholarbridge.example/go/${code}</a>`,
     "#grant #kanada #bakalavr",
     '💼 <a href="https://t.me/scholarbridge">Kanal</a> | <a href="https://t.me/scholarbridgebot">Bot</a>',
   ].join("\n\n");
@@ -1290,7 +1466,7 @@ check("estimated and rolling deadlines never look exact", () => {
     chrome: richChrome(),
   });
   assert.ok(estimated);
-  assert.ok(estimated.html.includes("🕓Muddat: rasmiy sahifada ko'rsatilgan"));
+  assert.ok(estimated.html.includes("⏰️<b>Muddat:</b> rasmiy sahifada ko'rsatilgan"));
   assert.ok(!estimated.html.includes("Oxirgi muddat"));
 
   const estimated2 = renderScholarshipRich({
@@ -1315,7 +1491,7 @@ check("estimated and rolling deadlines never look exact", () => {
     chrome: richChrome(),
   });
   assert.ok(ranged);
-  assert.ok(ranged.html.includes("🕓Taxminiy muddat:"), "a range end is an estimate, not a deadline");
+  assert.ok(ranged.html.includes("⏰️<b>Taxminiy muddat:</b>"), "a range end is an estimate, not a deadline");
 });
 
 check("rolling and estimated awards never enter an urgency post", () => {
@@ -2326,6 +2502,144 @@ check("the nearest deadline is always posted before a closer favourite", () => {
   assert.equal(deadlineTier({ deadline: { quality: "evergreen", daysLeft: null } } as never), 8);
 });
 
+check("the country order is read from the stored name, not the printed label", () => {
+  /**
+   * Regression: `editorialRank` fed `facts.country` — the *Uzbek* label — into
+   * `countryPriority`, which matches English names. Every country therefore
+   * scored "not in the list" (14) and the operator's order did nothing at all.
+   */
+  const dates = { now: new Date("2026-10-29T12:00:00Z"), siteUrl: "https://example.test" };
+  const make = (country: string, id: number) =>
+    buildFacts(
+      {
+        id,
+        title: "T",
+        provider: "P",
+        country,
+        deadlineDate: "2026-11-05",
+        deadlineType: "fixed",
+        isActive: true,
+        verificationStatus: "verified",
+        lastVerifiedAt: "2026-10-26",
+      } as never,
+      dates
+    );
+  const japan = make("Japan", 1);
+  const usa = make("United States", 2);
+  const list = DEFAULT_PRIORITY_COUNTRIES;
+  assert.equal(japan.country, "Yaponiya", "the label is Uzbek");
+  assert.equal(usa.country, "AQSh");
+  // The stored name ranks correctly…
+  assert.equal(countryPriority(japan.countryRaw, list), 4);
+  assert.equal(countryPriority(usa.countryRaw, list), 0);
+  // …and the label must not quietly rank last either (defence in depth).
+  assert.equal(countryPriority(japan.country, list), 4, "the Uzbek label resolves too");
+  assert.equal(countryPriority(usa.country, list), 0);
+  assert.equal(countryPriority("Yangi Zelandiya", list), list.length, "an unlisted country stays unlisted");
+});
+
+check("inside an urgency band, the nearest deadline still wins", () => {
+  /**
+   * The other half of the operator's rule: the country order breaks ties, it
+   * does not let a favourite country jump a nearer award. Both are tier 0.
+   */
+  const nearNz = {
+    facts: { id: 10, country: "Yangi Zelandiya", countryRaw: "New Zealand", deadline: { quality: "exact" as const, daysLeft: 1 } },
+    topics: [],
+  };
+  const farUs = {
+    facts: { id: 11, country: "AQSh", countryRaw: "United States", deadline: { quality: "exact" as const, daysLeft: 6 } },
+    topics: [],
+  };
+  const order = editorialRank([farUs, nearNz] as never, {
+    prefs: {},
+    priorities: DEFAULT_PRIORITY_COUNTRIES,
+    seed: "t",
+  });
+  assert.equal(order[0].candidate.facts.id, 10, "a 1-day award beats a 6-day favourite");
+  // Same deadline → the favourite country comes first, every time.
+  const sameDay = editorialRank(
+    [
+      { facts: { id: 12, country: "Yangi Zelandiya", countryRaw: "New Zealand", deadline: { quality: "exact" as const, daysLeft: 3 } }, topics: [] },
+      { facts: { id: 13, country: "Germaniya", countryRaw: "Germany", deadline: { quality: "exact" as const, daysLeft: 3 } }, topics: [] },
+    ] as never,
+    { prefs: {}, priorities: DEFAULT_PRIORITY_COUNTRIES, seed: "t" }
+  );
+  assert.equal(sameDay[0].candidate.facts.id, 13, "Germany (priority 2) is ahead of New Zealand (unlisted)");
+});
+
+check("when two awards close the same day, the favourite country gets the urgency post", () => {
+  // Same deadline, one country in the operator's list and one not. The urgent
+  // lane used to tie-break on the topic score, so the winner depended on
+  // rotation history rather than on what the audience applies to.
+  const mk = (id: number, countryRaw: string, label: string) => ({
+    id,
+    title: `T${id}`,
+    provider: "P",
+    country: countryRaw,
+    degreeLevels: '["Master\'s"]',
+    deadlineDate: "2026-11-12",
+    deadlineType: "fixed",
+    coverageType: "Full Tuition",
+    awardBasis: null,
+    rounds: null,
+    recurrence: null,
+    eligibleCountries: "[]",
+    isActive: true,
+    verificationStatus: "verified",
+    lastVerifiedAt: "2026-10-26",
+    __label: label,
+  });
+  const now = new Date("2026-11-10T12:00:00+05:00");
+  const candidates = [mk(60, "Thailand", "Thailand"), mk(61, "Germany", "Germany")].map((r) => ({
+    facts: buildFacts(r as never, { now, siteUrl: "https://example.test" }),
+    topics: topicKeys({ country: r.country, degreeLevels: r.degreeLevels, eligibleMajors: null, fullyFunded: true }),
+  }));
+  const settings = mergeChannelSettings({ plan: { dailyCap: 1, budgetMin: 1, budgetMax: 1 } });
+  const plan = buildDailyPlan({ planDate: "2026-11-10", candidates, settings });
+  assert.equal(plan[0]?.kind, "urgency", `expected an urgency post, got ${plan[0]?.kind}`);
+  assert.equal(plan[0]?.scholarshipId, 61, "Germany (priority 2) must take the urgency slot over unlisted Thailand");
+});
+
+check("the real catalogue slice is planned nearest-deadline-first", () => {
+  // A 45-row excerpt of the live Supabase catalogue (2026-10-29), used as a
+  // fixture so the ordering rules are checked against real data, not invented
+  // numbers. Regenerate with the SQL in docs/CHANNEL.md §4d.
+  const slice = JSON.parse(read("scripts/fixtures/catalogue-slice.json")) as { rows: FactsRow[] };
+  const now = new Date("2026-10-29T15:00:00+05:00");
+  const candidates = slice.rows
+    .filter((row) => publishable(row as never, now).ok)
+    .map((row) => ({
+      facts: buildFacts(row, { now, siteUrl: "https://example.test" }),
+      topics: topicKeys({
+        country: row.country,
+        degreeLevels: row.degreeLevels,
+        eligibleMajors: row.eligibleMajors,
+        fullyFunded: isFullyFunded(row as never),
+      }),
+    }));
+  assert.ok(candidates.length >= 40, `only ${candidates.length} candidates survived the gate`);
+
+  const plan = buildDailyPlan({ planDate: "2026-10-30", candidates, settings: DEFAULT_CHANNEL_SETTINGS });
+  const scholarshipItems = plan.filter((item) => item.scholarshipId !== null);
+  assert.ok(scholarshipItems.length >= 1, "the slice produced no post");
+
+  const chosen = candidates.find((c) => c.facts.id === scholarshipItems[0].scholarshipId);
+  const nearest = Math.min(...candidates.map((c) => c.facts.deadline.daysLeft ?? Infinity));
+  assert.equal(chosen?.facts.deadline.daysLeft, nearest, "the first post is not the nearest deadline");
+  // The whole plan is non-decreasing in days-left, ignoring the poll.
+  const days = scholarshipItems.map(
+    (item) => candidates.find((c) => c.facts.id === item.scholarshipId)?.facts.deadline.daysLeft ?? Infinity
+  );
+  assert.deepEqual(days, [...days].sort((a, b) => a - b), `the plan is not nearest-first: ${days.join(", ")}`);
+  // And nothing unverified/inactive ever enters it (the fixture is all-verified,
+  // so this asserts the gate ran, not the fixture).
+  for (const row of slice.rows) {
+    const check = publishable(row as never, now);
+    assert.equal(check.ok, true, `${row.id} should be publishable: ${check.reason}`);
+  }
+});
+
 check("country priority tolerates how the country is actually spelled", () => {
   const list = ["United States", "Germany", "South Korea"];
   assert.equal(countryPriority("United States", list), 0);
@@ -3111,6 +3425,483 @@ check("Tables this app creates at runtime are not left open to the anon key", ()
   const bootstrap = read("src/lib/db/bootstrap.ts");
   assert.match(bootstrap, /after\?\s*:\s*\(\)\s*=>\s*Promise<unknown>/, "the bootstrap has the hook");
   assert.match(bootstrap, /await after\(\)\.catch/, "and it can never fail the bootstrap");
+});
+
+check("the standard card follows the published shape, in order", () => {
+  const f = facts({ livingAllowance: 1400, travelAllowance: 500, eligibleCountries: '["Uzbekistan"]' });
+  const out = renderScholarshipSingle(f, 0, cardChrome());
+  assert.ok(out, "card did not render");
+  assertClean(out.html, "card");
+  const lines = out.html.split("\n");
+  const idx = (needle: string) => lines.findIndex((line) => line.includes(needle));
+  assert.ok(idx("🏛 Example University") > idx("<b>Global Excellence Scholarship</b>"), "provider follows the title");
+  assert.ok(idx("<b>Moliyalashtirish:</b>") > idx("🏛 Example University"), "funding before the sections");
+  assert.ok(idx("<b>Til talabi:</b>") > idx("<b>Moliyalashtirish:</b>"), "language under funding");
+  assert.ok(idx("<b>Kimlar uchun</b>") > idx("<b>Til talabi:</b>"));
+  assert.ok(idx("<b>Foydali tomonlari</b>") > idx("<b>Kimlar uchun</b>"));
+  assert.ok(idx("⏰️<b>Oxirgi muddat:</b>") > idx("<b>Foydali tomonlari</b>"), "deadline after the sections");
+  assert.ok(idx("Rasmiy manba") > idx("⏰️<b>"), "the official source sits under the deadline");
+  assert.ok(idx("➡️Batafsil:") > idx("Rasmiy manba"), "the tracked link is the last content line");
+  assert.match(out.html, /^➡️ /m, "bullets use the published arrow");
+  assert.match(out.html, /\n\n#/, "hashtags are their own block");
+});
+
+check("the card prints stored facts and never English database prose", () => {
+  const f = facts({ livingAllowance: 1400, travelAllowance: 500, eligibleCountries: '["Uzbekistan"]' });
+  const text = plainText(renderScholarshipSingle(f, 0, cardChrome())?.html ?? "");
+  for (const expected of ["Moliyalashtirish: To'liq", "Til talabi: IELTS 6.5+", "Bakalavr", "GPA 3.5+", "Yashash uchun to'lov: $1,400", "Yo'l xarajatlari: $500", "🇺🇿 O'zbekistonliklar uchun ochiq", "17 kun qoldi"]) {
+    assert.ok(text.includes(expected), `missing: ${expected}`);
+  }
+  // The row's `description`/`requirements` are English in production and must
+  // never reach an Uzbek post — the card is built from structured facts only.
+  // The raw English must never reach the post: it is read by the translator and
+  // re-stated in Uzbek. `description` has no translator at all — it is authored
+  // copy only.
+  const source = read("src/lib/channel/templates/card.uz.ts").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(!source.includes("description"), "description is authored copy only");
+  assert.ok(!/\.requirementsRaw\b(?!\s*\))/.test(source.replace(/translateRequirements\([^)]*\)/g, "")), "requirementsRaw goes through the translator");
+  // A number without a stored period may not be given one.
+  assert.ok(!/oylik|yillik|yiliga/i.test(text), "never invents a payment period");
+});
+
+check("a thin record produces a short honest card", () => {
+  const out = renderScholarshipSingle(MINIMAL, 0, cardChrome());
+  assert.ok(out, "the minimal record still renders");
+  const text = plainText(out.html);
+  assert.ok(!text.includes("Kimlar uchun"), "no empty audience section");
+  assert.ok(!text.includes("Foydali tomonlari"), "no empty benefits section");
+  assert.ok(!text.includes("Dastur haqida"), "no empty about section");
+  assert.ok(!text.includes("📍"), "no country flag line without a country");
+  assert.ok(!out.html.includes("\n\n\n"), "no gap where a section was dropped");
+  // No tagline, no dangling separator.
+  assert.ok(!/<b>[^<]*<\/b>\s*[—-]\s*$/.test(out.html.split("\n")[0]), "no orphaned dash");
+});
+
+check("authored Uzbek copy replaces the structured sections", () => {
+  const out = renderScholarshipSingle(facts(), 0, cardChrome(), { content: RICH_CONTENT, country: countryDisplay("Canada") });
+  assert.ok(out);
+  const text = plainText(out.html);
+  assert.ok(text.includes("Kanadada bepul o'qish imkoniyati"), "the authored tagline leads the headline");
+  assert.ok(text.includes("Bakalavr yo'nalishi"), "authored eligibility wins");
+  assert.ok(text.includes("Kontrakt to'liq qoplanadi"), "authored benefits win");
+  assert.ok(text.includes("Dastur haqida"), "authored about appears");
+  assert.ok(out.html.startsWith("🇨🇦"), "the flag comes from the country table");
+});
+
+check("English data becomes Uzbek lines, not English leftovers", () => {
+  const cases: Array<[string, string | null]> = [
+    ["IELTS 6.5 or equivalent English test", "IELTS 6.5+ yoki ekvivalent imtihon"],
+    ["IELTS 6.5 / TOEFL 85 / DET 115", "IELTS 6.5+ · TOEFL 85+ · DET 115+"],
+    ["A Chinese-taught programme requires HSK level 4.", "HSK 4-daraja"],
+    ["The scholarship sets no separate English score; the degree programme requirement applies.", "Yagona til balli yo'q — talab tanlangan dasturga bog'liq"],
+    ["Not verified for this row: the institution page could not be read.", null],
+  ];
+  for (const [english, expected] of cases) {
+    const got = translateEnglishRequirement(english);
+    assert.equal(got, expected, `english requirement: ${english}`);
+    if (got) assertClean(got, `translated: ${english}`);
+  }
+
+  const coverage: Array<[string, string | null]> = [
+    ["Full tuition", "Kontrakt to'liq qoplanadi"],
+    ["Partial tuition", "Kontraktning bir qismi qoplanadi"],
+    // "100%" would trip the absolute-claim lint, so a range ending at the full
+    // fee is worded out loud instead.
+    ["Between 50% and 100% of the amount payable", "Kontraktning 50%idan to'liq qismigacha qoplanadi"],
+    ["100% of annual tuition fees", "Kontrakt to'liq qoplanadi"],
+    ["The scheme pays a stipend of HK$344,400 a year", "Stipendiya: HK$344,400 (yiliga)"],
+    ["None", null],
+  ];
+  for (const [english, expected] of coverage) {
+    assert.equal(translateCoverage(english), expected, `coverage: ${english}`);
+  }
+});
+
+check("translation restates facts and never invents a number", () => {
+  const samples = [
+    "Be a citizen of a partner country and be nominated by the ministry of education. Minimum GPA of 3.2 required.",
+    "Applicants aged 30 or under, with at least a 70 per cent average and two recommendation letters.",
+    "Master's or PhD applicants; submit a research proposal and a CV; interview may be required.",
+  ];
+  for (const english of samples) {
+    const lines = translateRequirements(english, { degrees: null, minGpa: null });
+    assert.ok(lines.length > 0, `nothing translated from: ${english}`);
+    // Every digit in the output must already exist in the source text.
+    for (const line of lines) {
+      for (const digit of line.match(/\d+(?:[.,]\d+)?/g) ?? []) {
+        assert.ok(english.includes(digit.replace(",", ".")) || english.includes(digit), `invented number ${digit} in "${line}"`);
+      }
+      // No English sentence may survive: an Uzbek line never ends a word with
+      // the English "-tion", never contains "the", "must", "required".
+      assert.ok(!/\b(?:the|must|required|applicants?|students?)\b/i.test(line), `English leftover in "${line}"`);
+      assertClean(line, `translated line: ${line}`);
+    }
+  }
+  assert.deepEqual(translateRequirements("", {}), [], "empty input yields nothing");
+  assert.deepEqual(translateRequirements(null, {}), [], "null input yields nothing");
+});
+
+check("a record with only English fields still posts Uzbek sections", () => {
+  const englishOnly = facts({
+    requirements: "Be a citizen of a partner country, aged 30 or under, with at least 3.0 GPA. Submit a motivation letter and a CV.",
+    englishRequirements: "IELTS 6.5 or equivalent English test",
+    tuitionCoverage: "Between 50% and 100% of the amount payable",
+    degreeLevels: '["Master\'s"]',
+    eligibleMajors: '["Economics"]',
+    minGpa: null,
+    minIelts: null,
+    livingAllowance: null,
+    travelAllowance: null,
+  });
+  const out = renderScholarshipSingle(englishOnly, 0, cardChrome());
+  assert.ok(out, "card did not render");
+  assertClean(out.html, "english-only card");
+  const text = plainText(out.html);
+  for (const expected of [
+    "Til talabi: IELTS 6.5+ yoki ekvivalent imtihon",
+    "Yosh chegarasi: 30 yoshgacha",
+    "Motivatsion xat",
+    "CV",
+    "Kontraktning 50%idan to'liq qismigacha qoplanadi",
+  ]) {
+    assert.ok(text.includes(expected), `missing: ${expected}`);
+  }
+  // The raw English must be gone from the post itself.
+  for (const english of ["citizen", "aged", "Submit a motivation", "or equivalent English test", "amount payable"]) {
+    assert.ok(!text.includes(english), `English leaked into the post: ${english}`);
+  }
+});
+
+check("Uzbek apostrophes are not mistaken for English words", () => {
+  // JS counts `'` as a word boundary, so a plain /\bor\b/ flags `ilg'or` and
+  // silently dropped 74 legitimate glosses — every "advanced …" phrase among
+  // them. The lookbehind in ENGLISH_LEFTOVER is what keeps them.
+  assert.equal(looksEnglish("ilg'or"), false, "ilg'or is Uzbek, not English");
+  assert.equal(looksEnglish("Ilg'or kompyuter fanlari"), false);
+  assert.equal(looksEnglish("O'qish to'lovi"), false);
+  assert.equal(looksEnglish("American University of Beirut moliyaviy yordam"), true, "a real English name is caught");
+  assert.equal(looksEnglish("the tuition fee"), true);
+  // …and the term survives the whole translator, not just the guard.
+  const advanced = translateFragment("advanced computer science");
+  assert.ok(advanced, "a legitimate gloss was dropped by the leftover rule");
+  assert.match(advanced.uz, /kompyuter/i);
+  const gloss = checkGloss("Ilg'or daraja");
+  assert.equal(gloss.ok, true, "the gloss validator uses the same rule");
+});
+
+check("a place is not a requirement, and a floor without a value is not a fact", () => {
+  // Live prose (University of Waikato, 2026-10-29) produced exactly these two
+  // bad bullets: "Yangi Zelandiya" (the country was already in the header) and
+  // "Minimal GPA" (a floor with no number). Both are refused now.
+  const waikato =
+    "Candidates must: be a New Zealand citizen, permanent resident or residence-class visa holder, OR an international student. " +
+    "Selection is based on academic merit - a minimum GPA of A- on the qualification used for entry is required - plus research experience.";
+  const bullets = translateRequirements(waikato, { minGpa: null });
+  assert.ok(!bullets.includes("Yangi Zelandiya"), `a country became a requirement: ${bullets.join(" | ")}`);
+  assert.ok(!bullets.some((b) => /^minimal gpa$/i.test(b)), `a valueless floor was posted: ${bullets.join(" | ")}`);
+  // The grade is in the text, so it is printed with it.
+  assert.ok(bullets.includes("Minimal GPA: A-"), `the letter-grade floor was lost: ${bullets.join(" | ")}`);
+  // A numeric floor still wins over the letter reader.
+  const numeric = translateRequirements("A minimum GPA of 3.5 is required.", { minGpa: null });
+  assert.ok(numeric.includes("GPA 3.5+"), `numeric floor broken: ${numeric.join(" | ")}`);
+
+  // A country name is recognised in both languages, and a real requirement is not.
+  assert.equal(isCountryName("Yangi Zelandiya"), true);
+  assert.equal(isCountryName("New Zealand"), true);
+  assert.equal(isCountryName("Motivatsion xat"), false);
+  assert.equal(countryUz("Poland"), "Polsha", "the Uzbek name for Poland must match channel_countries");
+});
+
+check("an operator's gloss is what the post will say — and nothing else can be typed", () => {
+  // The rule the admin API rejects with is the renderer's own rule, so it is
+  // asserted here rather than duplicated: a short Uzbek/Russian phrase passes,
+  // an English sentence, an empty box and a number do not.
+  assert.deepEqual(checkGloss("Kontrakt to'lovi"), { ok: true, uz: "Kontrakt to'lovi" });
+  assert.equal(checkGloss("  Kontrakt   to'lovi  ").ok, true, "whitespace is normalised, not rejected");
+  const normalised = checkGloss("  Kontrakt   to'lovi  ");
+  assert.equal(normalised.ok && normalised.uz, "Kontrakt to'lovi", "inner whitespace is collapsed");
+  for (const bad of ["", "   ", "123", "the tuition fee", "students must submit"]) {
+    assert.equal(checkGloss(bad).ok, false, `accepted a non-gloss: ${JSON.stringify(bad)}`);
+  }
+  // Over-long text is cut, never posted whole.
+  const long = checkGloss("a".repeat(400));
+  assert.ok(long.ok, "long text is still a gloss");
+  if (long.ok) assert.equal(long.uz.length, 120, "a gloss is capped at 120 characters");
+});
+
+check("the dictionary can be corrected from the admin panel, without a deploy", () => {
+  const routeSrc = read("src/app/api/admin/channel/lexicon/route.ts");
+  // Reading and writing both go through the admin guard; writes are rate-limited.
+  assert.match(routeSrc, /guardAdmin\(req\)/, "GET must be admin-only");
+  assert.match(routeSrc, /guardAdmin\(req, \{ write: true \}\)/, "POST must be an admin write");
+  // The only thing a caller may set is the gloss: `source` is never taken from
+  // the body, so a request cannot mark a row as someone else's or as bundled.
+  assert.match(routeSrc, /source: "admin"/, "operator rows are stamped, not supplied");
+  assert.doesNotMatch(routeSrc, /body\.value\.source/, "the source column is not client-controlled");
+  assert.match(routeSrc, /onConflictDoUpdate/, "correcting an existing term must not fail on the PK");
+  assert.match(routeSrc, /checkGloss\(body\.value\.uz\)/, "the gloss is validated, not trusted");
+  assert.match(routeSrc, /action !== "install" && action !== "save" && action !== "reset"/, "unknown actions are refused up front");
+  // Searching "tuition" must not bury `tuition` under longer phrases.
+  assert.match(routeSrc, /translationLexicon\.key} = \$\{q\.toLowerCase\(\)\}/, "the exact headword ranks first");
+  // "Restore original" puts the dictionary's own gloss back instead of deleting
+  // the row: an earlier version deleted it, and two terms were quietly lost
+  // from the table the first time an operator corrected and then reverted them.
+  assert.match(routeSrc, /bundledGloss\(key\)/, "reset must consult the bundled gloss first");
+  assert.match(routeSrc, /source: "pdf"/, "a restored row is a dictionary row again");
+  assert.match(
+    routeSrc,
+    /eq\(translationLexicon\.source, "admin"\)/,
+    "deleting is limited to rows the operator added"
+  );
+  assert.ok(bundledGloss("tuition"), "the bundle must answer for its own terms");
+  assert.equal(bundledGloss("colloquium"), null, "a word the dictionary lacks has no bundled gloss");
+  assert.match(routeSrc, /refreshOverlay\(\)/, "a correction takes effect on the next render");
+  assert.match(routeSrc, /writeChannelAudit\(/, "every dictionary change is logged");
+  // Installing is idempotent and versioned, so the button is safe to press.
+  const storeSrc = read("src/lib/channel/lexicon/store.ts");
+  assert.match(storeSrc, /installedVersion\(\)/, "an install compares the version first");
+  assert.match(storeSrc, /eq\(translationLexicon\.source, "pdf"\)/, "an import replaces bundled rows only");
+  // ...and an operator's corrections survive a re-import, which is the whole
+  // point of the two sources.
+  assert.doesNotMatch(storeSrc, /delete\(translationLexicon\)(?!\s*\.where\(eq\(translationLexicon\.source, "pdf"\)\))/, "an import may only delete bundled rows");
+});
+
+check("the dictionary has a tab in the panel, in all three languages", () => {
+  const ui = read("src/components/admin/ChannelManager.tsx");
+  assert.match(ui, /\| "lexicon"/, "the tab is in the Tab union");
+  assert.match(ui, /\n  "lexicon",\n/, "and in the TABS list");
+  assert.match(ui, /tab === "lexicon" && <LexiconTab/, "the tab renders its component");
+  // The panel talks to the dictionary API only, and shows the honest count.
+  assert.match(ui, /\/api\/admin\/channel\/lexicon/, "the panel uses the dictionary API");
+  for (const call of ["install", "save", "reset"]) {
+    assert.match(ui, new RegExp(`action: "${call}"`), `the panel cannot ${call}`);
+  }
+  for (const loc of ["en", "uz", "ru"]) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: { tabs?: Record<string, string>; lexicon?: Record<string, string> };
+    };
+    assert.ok(messages.adminChannel?.tabs?.lexicon, `${loc}: tab label missing`);
+    const keys = Object.keys(messages.adminChannel?.lexicon ?? {});
+    assert.ok(keys.length >= 24, `${loc}: only ${keys.length} dictionary strings`);
+    for (const key of ["title", "hint", "search", "edit", "reset", "import", "notInstalled"]) {
+      assert.ok(keys.includes(key), `${loc}: lexicon.${key} missing`);
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Dictionary self-check (the panel's "is the dictionary in the database?")
+// ---------------------------------------------------------------------------
+
+section("Dictionary self-check");
+
+const dictFacts = (overrides: Partial<Parameters<typeof dictionaryStateOf>[0]> = {}) => ({
+  rows: 12_732,
+  adminRows: 0,
+  installedVersion: "pdf-12732-1949",
+  bundledVersion: "pdf-12732-1949",
+  bundledTerms: 12_732,
+  ...overrides,
+});
+
+check("a database that matches the bundled version is 'installed'", () => {
+  const status = dictionaryStatusOf(dictFacts());
+  assert.equal(status.state, "installed");
+  assert.equal(status.ready, true);
+  assert.equal(status.advice, "none");
+});
+
+check("an empty table is 'pending' — a fresh deployment, not a failure", () => {
+  const status = dictionaryStatusOf(dictFacts({ rows: 0, installedVersion: null }));
+  assert.equal(status.state, "pending");
+  assert.equal(status.advice, "install");
+  assert.equal(status.ready, false);
+});
+
+check("a different installed version is 'stale' and asks for a re-import", () => {
+  const status = dictionaryStatusOf(dictFacts({ installedVersion: "pdf-older" }));
+  assert.equal(status.state, "stale");
+  assert.equal(status.advice, "reimport");
+  // Stale still translates: it is a warning, never a hard failure.
+  assert.equal(status.ready, false);
+});
+
+check("rows with no recorded version are 'stale', not 'installed'", () => {
+  assert.equal(dictionaryStateOf(dictFacts({ installedVersion: null })), "stale");
+});
+
+check("a table that cannot be read is 'unavailable', not 'empty'", () => {
+  const status = dictionaryStatusOf(dictFacts({ rows: 0, installedVersion: null, readFailed: true }));
+  assert.equal(status.state, "unavailable");
+  assert.equal(status.advice, "checkDatabase");
+});
+
+check("operator edits are reported without changing the verdict", () => {
+  const status = dictionaryStatusOf(dictFacts({ adminRows: 12, rows: 12_744 }));
+  assert.equal(status.state, "installed");
+  assert.equal(status.adminRows, 12);
+});
+
+check("the summary line names the version and the row count", () => {
+  const line = dictionarySummary(dictionaryStatusOf(dictFacts()));
+  assert.match(line, /12732/);
+  assert.match(line, /pdf-12732-1949/);
+});
+
+check("every dictionary state has a message in all three languages", () => {
+  for (const loc of ["uz", "ru", "en"] as const) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: {
+        dictionary?: { title?: string; state?: Record<string, string>; advice?: Record<string, string>; importNow?: string };
+      };
+    };
+    const dict = messages.adminChannel?.dictionary;
+    assert.ok(dict?.title, `${loc}: dictionary.title missing`);
+    assert.ok(dict?.importNow, `${loc}: dictionary.importNow missing`);
+    for (const state of ["installed", "pending", "stale", "unavailable"]) {
+      assert.ok(dict?.state?.[state], `${loc}: dictionary.state.${state} missing`);
+    }
+    for (const advice of ["none", "install", "reimport", "checkDatabase"]) {
+      assert.ok(dict?.advice?.[advice], `${loc}: dictionary.advice.${advice} missing`);
+    }
+  }
+});
+
+check("the panel shows the dictionary card and its import button", () => {
+  const panel = read("src/components/admin/ChannelManager.tsx");
+  assert.match(panel, /<DictionaryCard dictionary=\{data\.dictionary\}/);
+  assert.match(panel, /t\("dictionary\.importNow"\)/);
+});
+
+check("the explicit repair installs the dictionary too, not only the tables", () => {
+  const source = read("src/lib/channel/db.ts");
+  const repair = source.slice(source.indexOf("export async function forceChannelRepair"));
+  assert.match(repair.slice(0, 600), /installLexicon/);
+});
+
+// ---------------------------------------------------------------------------
+// The publisher bot's webhook (why an approval button can do nothing)
+// ---------------------------------------------------------------------------
+
+section("Publisher webhook");
+
+const SITE_WEBHOOK = "https://scholarbridge.example/api/telegram/webhook";
+
+check("the expected webhook URL comes from the configured site URL", () => {
+  assert.equal(webhookUrlFor("https://scholarbridge.example"), SITE_WEBHOOK);
+  assert.equal(webhookUrlFor("https://scholarbridge.example/"), SITE_WEBHOOK);
+  // http (or nothing) cannot be a Telegram webhook: no URL is better than a
+  // wrong one, because the panel must say "set the site URL" instead.
+  assert.equal(webhookUrlFor("http://localhost:3000"), null);
+  assert.equal(webhookUrlFor(""), null);
+  assert.equal(webhookUrlFor(null), null);
+});
+
+check("the webhook subscribes to callback_query — the approval buttons", () => {
+  assert.ok((ALLOWED_UPDATES as readonly string[]).includes("callback_query"));
+  assert.ok((ALLOWED_UPDATES as readonly string[]).includes("message"));
+});
+
+check("no registered webhook is 'missing' and must be repaired", () => {
+  const verdict = webhookVerdict({ registeredUrl: "", expectedUrl: SITE_WEBHOOK, pending: 4, lastError: null });
+  assert.equal(verdict.state, "missing");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict, 4), "connect");
+});
+
+check("a webhook still pointing at the old deployment is 'wrong_url'", () => {
+  const verdict = webhookVerdict({
+    registeredUrl: "https://old-deployment.example/api/telegram/webhook",
+    expectedUrl: SITE_WEBHOOK,
+    pending: 12,
+    lastError: null,
+  });
+  assert.equal(verdict.state, "wrong_url");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict), "move");
+});
+
+check("a registered webhook that Telegram reports an error for is 'error'", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 2, lastError: "401 Unauthorized" });
+  assert.equal(verdict.state, "error");
+  assert.equal(verdict.reconnect, true);
+  assert.equal(webhookAdvice(verdict), "retry");
+});
+
+check("a healthy webhook is left alone", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 0, lastError: null });
+  assert.equal(verdict.state, "ok");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict), "none");
+});
+
+check("a growing queue behind a healthy webhook is flagged, not 'fixed'", () => {
+  const verdict = webhookVerdict({ registeredUrl: SITE_WEBHOOK, expectedUrl: SITE_WEBHOOK, pending: 500, lastError: null });
+  assert.equal(verdict.state, "ok");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict, 500), "retry");
+});
+
+check("Telegram not answering is 'unknown' and is never 'repaired' on a guess", () => {
+  const verdict = webhookVerdict({ registeredUrl: "", expectedUrl: SITE_WEBHOOK, pending: 0, lastError: null, unreachable: true });
+  assert.equal(verdict.state, "unknown");
+  assert.equal(verdict.reconnect, false);
+  assert.equal(webhookAdvice(verdict), "checkTeam");
+});
+
+check("the channel tick verifies and repairs the webhook", () => {
+  const cron = read("src/app/api/cron/channel/route.ts");
+  assert.match(cron, /ensurePublisherWebhook\(\)/);
+  // A webhook problem must never fail the tick itself.
+  assert.match(cron, /ensurePublisherWebhook\(\)\.catch\(\(\) => null\)/);
+});
+
+check("the webhook route accepts a dedicated publisher bot, not only the DM bot", () => {
+  const route = read("src/app/api/telegram/webhook/route.ts");
+  assert.match(route, /getChannelBotToken/);
+  assert.match(route, /forPublisher/);
+  assert.match(route, /handlePublisherUpdate/);
+});
+
+check("a dedicated publisher bot can only do channel work", () => {
+  const publisher = read("src/lib/telegram/publisher.ts");
+  assert.match(publisher, /isApprovalCallback/);
+  assert.match(publisher, /handlePendingChannelEdit/);
+  // It must never fall through into the DM bot's command routing.
+  assert.ok(!/handleUpdate|runCallback|runCommand/.test(publisher));
+  // Update ids are numbered per bot: claiming them against the DM bot's table
+  // could drop an unrelated update of the other bot.
+  assert.ok(!/claimUpdate/.test(publisher));
+});
+
+check("a refused approval is written to the audit trail", () => {
+  const approval = read("src/lib/telegram/approval.ts");
+  assert.match(approval, /approval_blocked/);
+  for (const code of ["not_admin", "tables_unavailable", "skipped", "send_failed", "already_closed"]) {
+    assert.ok(approval.includes(`"${code}"`), `audit code ${code} missing`);
+  }
+});
+
+check("the panel shows the webhook state and one fix button", () => {
+  const panel = read("src/components/admin/ChannelManager.tsx");
+  assert.match(panel, /<WebhookCard webhook=\{data\.webhook\}/);
+  assert.match(panel, /t\("webhook\.fix"\)/);
+});
+
+check("every webhook state and advice has a message in all three languages", () => {
+  for (const loc of ["uz", "ru", "en"] as const) {
+    const messages = JSON.parse(read(`src/i18n/messages/${loc}.json`)) as {
+      adminChannel?: { webhook?: { title?: string; fix?: string; state?: Record<string, string>; advice?: Record<string, string> } };
+    };
+    const hook = messages.adminChannel?.webhook;
+    assert.ok(hook?.title && hook?.fix, `${loc}: webhook title/fix missing`);
+    for (const state of ["ok", "missing", "wrong_url", "error", "unknown"]) {
+      assert.ok(hook?.state?.[state], `${loc}: webhook.state.${state} missing`);
+    }
+    for (const advice of ["none", "connect", "move", "retry", "checkTeam"]) {
+      assert.ok(hook?.advice?.[advice], `${loc}: webhook.advice.${advice} missing`);
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ import {
   rejectApproval,
 } from "@/lib/channel/send";
 import { linkPreviewFor } from "@/lib/channel/settings";
-import { loadChannelSettings } from "@/lib/channel/repo";
+import { loadChannelSettings, writeChannelAudit } from "@/lib/channel/repo";
 
 export { isApprovalCallback };
 
@@ -58,20 +58,51 @@ export async function handleChannelApprovalCallback(input: ApprovalCallbackInput
   const parsed = parseApprovalCallback(input.data);
   if (!parsed) return APPROVAL_TEXTS.unknownPost;
 
-  if (!(await ensureChannelTables().catch(() => false))) return APPROVAL_TEXTS.sendFailed;
+  /**
+   * Every refusal is written down.
+   *
+   * On 2026-10-29 an operator pressed Approve, saw nothing happen, and there was
+   * no row anywhere to explain it — the press had not even reached this code.
+   * The toast Telegram shows disappears in three seconds; `channel_audit` does
+   * not. An audit row per decision is what makes "the button is dead" a
+   * diagnosable fact instead of a report.
+   */
+  const explain = async (code: string, extra: Record<string, unknown> = {}) => {
+    await writeChannelAudit({
+      actorProfileId: null,
+      action: "approval_blocked",
+      entity: "post",
+      entityId: String(parsed.postId),
+      after: { action: parsed.action, code, telegramUserId: String(input.telegramUserId ?? ""), ...extra },
+    });
+    return code;
+  };
+
+  if (!(await ensureChannelTables().catch(() => false))) {
+    await explain("tables_unavailable");
+    return APPROVAL_TEXTS.sendFailed;
+  }
 
   const approver = await resolveChannelApprover(input.telegramUserId).catch(() => null);
-  if (!approver || !approver.isAdmin) return APPROVAL_TEXTS.notAdmin;
+  if (!approver || !approver.isAdmin) {
+    await explain("not_admin");
+    return APPROVAL_TEXTS.notAdmin;
+  }
 
   if (parsed.action === "approve") {
     const outcome = await approveApproval(parsed.postId, approver.profileId);
     if (outcome.ok) return APPROVAL_TEXTS.approved;
-    if (outcome.status === "skipped") return outcome.reason ?? APPROVAL_TEXTS.rejectedAlready;
+    if (outcome.status === "skipped") {
+      await explain("skipped", { reason: outcome.reason ?? null });
+      return outcome.reason ?? APPROVAL_TEXTS.rejectedAlready;
+    }
+    await explain("send_failed", { reason: outcome.reason ?? null });
     return APPROVAL_TEXTS.sendFailed;
   }
 
   if (parsed.action === "reject") {
     const result = await rejectApproval(parsed.postId, approver.profileId, "Rejected in Telegram");
+    if (!result.ok) await explain("already_closed");
     return result.ok ? APPROVAL_TEXTS.rejected : APPROVAL_TEXTS.rejectedAlready;
   }
 
@@ -81,7 +112,10 @@ export async function handleChannelApprovalCallback(input: ApprovalCallbackInput
     .set({ status: APPROVAL_STATUS.editing, chatId: input.chatId, updatedAt: new Date() })
     .where(and(eq(channelPosts.id, parsed.postId), inArray(channelPosts.status, [APPROVAL_STATUS.awaiting, APPROVAL_STATUS.editing])))
     .returning({ id: channelPosts.id });
-  if (!claimed.length) return APPROVAL_TEXTS.rejectedAlready;
+  if (!claimed.length) {
+    await explain("already_closed");
+    return APPROVAL_TEXTS.rejectedAlready;
+  }
 
   const settings = await loadChannelSettings().catch(() => null);
   const [row] = await db

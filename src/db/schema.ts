@@ -1484,6 +1484,32 @@ export const channelPlan = pgTable(
   ]
 );
 
+/**
+ * The channel's translation dictionary, copied from the bundled asset
+ * (`src/lib/channel/lexicon/lexicon.uz.json`). Rows with `source = 'admin'`
+ * override the bundled gloss at render time; everything else is the imported
+ * PDF text and is never edited by the app itself.
+ */
+export const translationLexicon = pgTable(
+  "translation_lexicon",
+  {
+    key: text("key").primaryKey(),
+    en: text("en").notNull(),
+    uz: text("uz").notNull(),
+    ru: text("ru"),
+    source: text("source").notNull().default("pdf"), // pdf | admin
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_translation_lexicon_en").on(table.en)]
+);
+
+/** Which version of the bundled dictionary is installed (one row). */
+export const translationLexiconMeta = pgTable("translation_lexicon_meta", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 /** Delivery log for the channel (also the admin view's source of truth). */
 export const channelPosts = pgTable(
   "channel_posts",

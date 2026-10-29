@@ -14,6 +14,7 @@
  *   So'rovlar — polls, their aggregate results and a manual close
  *   Qiziqish  — learned topic weights (from poll shares), correctable by hand
  *   Hikoyalar — admin-written stories; only approved ones may be posted
+ *   Lug'at    — the EN→UZ dictionary: search it, correct a gloss, re-import
  *   Jurnal    — the append-only audit trail
  *
  * Nothing here can show or accept the bot token: it lives in Admin → Telegram.
@@ -24,6 +25,7 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  BookOpen,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -37,6 +39,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Send,
   Server,
   Settings2,
@@ -61,6 +64,7 @@ type Tab =
   | "polls"
   | "prefs"
   | "stories"
+  | "lexicon"
   | "audit";
 
 type ChannelMode = "off" | "dryrun" | "approval" | "on";
@@ -214,6 +218,50 @@ interface Overview {
     checklist: EnvRow[];
   };
   connection: ConnectionCheck | null;
+  /** The EN→UZ dictionary's state in this database (see `channel/selfcheck`). */
+  dictionary?: DictionaryState;
+  /**
+   * Whether the publisher bot's webhook is connected. `null` when Telegram
+   * could not be asked — never treated as "broken".
+   */
+  webhook?: WebhookState | null;
+}
+
+/**
+ * The publisher bot's webhook, as the server sees it.
+ *
+ * `state` is the verdict; `advice` says which fix applies; `expectedUrl` vs
+ * `registeredUrl` shows a deployment that moved without moving its webhook.
+ */
+interface WebhookState {
+  tokenSource: string;
+  dedicated: boolean;
+  expectedUrl: string | null;
+  registeredUrl: string | null;
+  pending: number;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  state: "ok" | "missing" | "wrong_url" | "error" | "unknown";
+  advice: "none" | "connect" | "move" | "retry" | "checkTeam";
+  reconnect: boolean;
+}
+
+/**
+ * What the server reports about the translation dictionary.
+ *
+ * `state` is the verdict, the rest is the evidence behind it: rows in the
+ * database, the version that is installed, and the version this build bundles.
+ */
+interface DictionaryState {
+  rows: number;
+  adminRows: number;
+  installedVersion: string | null;
+  bundledVersion: string;
+  bundledTerms: number;
+  readFailed?: boolean;
+  state: "installed" | "pending" | "stale" | "unavailable";
+  advice: "none" | "install" | "reimport" | "checkDatabase";
+  ready: boolean;
 }
 
 interface PreviewDay {
@@ -296,6 +344,7 @@ const TABS: Tab[] = [
   "polls",
   "prefs",
   "stories",
+  "lexicon",
   "audit",
 ];
 
@@ -468,6 +517,7 @@ export function ChannelManager() {
       {tab === "polls" && <PollsTab showToast={showToast} />}
       {tab === "prefs" && <PrefsTab showToast={showToast} />}
       {tab === "stories" && <StoriesTab showToast={showToast} />}
+      {tab === "lexicon" && <LexiconTab showToast={showToast} />}
       {tab === "audit" && <AuditTab />}
 
       <Toast message={toast} />
@@ -516,6 +566,175 @@ interface Kick {
 /* ------------------------------------------------------------------ */
 /* Ulash                                                              */
 /* ------------------------------------------------------------------ */
+
+/**
+ * The translation dictionary's state, and the one button that fixes it.
+ *
+ * Why it is here: a post can go out on time and still be wrong, if the EN→UZ
+ * dictionary is not in *this* database. The server reports the bundled version
+ * against the installed one, so "installed" is a fact, not a hope; "pending"
+ * (a fresh deployment before its first tick) and "stale" (the bundled
+ * dictionary changed) each get the import button. Admin edits are counted but
+ * never overwritten — the import only replaces `source = 'pdf'` rows.
+ */
+function DictionaryCard({
+  dictionary: status,
+  act,
+  busy,
+  showToast,
+}: {
+  dictionary?: DictionaryState;
+  act: ActFn;
+  busy: boolean;
+  showToast: ShowToast;
+}) {
+  const t = useTranslations("adminChannel");
+  const [importing, setImporting] = useState(false);
+  if (!status) return null;
+  const tone =
+    status.state === "installed"
+      ? "border-emerald-200 dark:border-emerald-500/30"
+      : status.state === "unavailable"
+        ? "border-rose-200 dark:border-rose-500/30"
+        : "border-amber-200 dark:border-amber-500/30";
+  const badge =
+    status.state === "installed"
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200"
+      : status.state === "unavailable"
+        ? "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200"
+        : "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200";
+
+  const runImport = async () => {
+    setImporting(true);
+    try {
+      const res = await act("dictionary");
+      if (!res) return;
+      const next = res.dictionary as DictionaryState | undefined;
+      showToast(
+        res.ok && next?.ready ? t("dictionary.imported", { rows: next.rows }) : t("dictionary.importFailed")
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className={`${card} ${tone}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <BookOpen className="h-4 w-4 text-indigo-500" /> {t("dictionary.title")}
+          </h3>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge}`}>
+              {t(`dictionary.state.${status.state}` as never)}
+            </span>
+            <span>{t(`dictionary.advice.${status.advice}` as never)}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {t("dictionary.facts", {
+              rows: status.rows,
+              terms: status.bundledTerms,
+              version: status.installedVersion ?? status.bundledVersion,
+            })}
+            {status.adminRows > 0 ? ` · ${t("dictionary.edited", { count: status.adminRows })}` : ""}
+          </p>
+        </div>
+        {!status.ready && (
+          <button className={btnGhost} onClick={() => void runImport()} disabled={busy || importing}>
+            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{" "}
+            {t("dictionary.importNow")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The publisher bot's webhook — why an approval button does nothing.
+ *
+ * Telegram delivers a button press to the webhook of the bot that sent the
+ * message. If that webhook is missing, points at an old deployment, or is
+ * failing, the button looks alive and does nothing: no error in the app, no row
+ * in the database. This card makes that state visible and gives the operator
+ * the one action that fixes it.
+ */
+function WebhookCard({
+  webhook,
+  act,
+  busy,
+  showToast,
+}: {
+  webhook?: WebhookState | null;
+  act: ActFn;
+  busy: boolean;
+  showToast: ShowToast;
+}) {
+  const t = useTranslations("adminChannel");
+  const [fixing, setFixing] = useState(false);
+  if (!webhook) return null;
+  const tone =
+    webhook.state === "ok"
+      ? "border-emerald-200 dark:border-emerald-500/30"
+      : webhook.state === "unknown"
+        ? "border-slate-200 dark:border-slate-700"
+        : "border-rose-300 dark:border-rose-500/40";
+  const badge =
+    webhook.state === "ok"
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200"
+      : webhook.state === "unknown"
+        ? "border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-transparent dark:text-slate-200"
+        : "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200";
+
+  const repair = async () => {
+    setFixing(true);
+    try {
+      const res = await act("webhook");
+      if (!res) return;
+      const next = res.webhook as WebhookState | undefined;
+      showToast(
+        res.ok && next?.state === "ok" ? t("webhook.fixed") : t(`webhook.advice.${next?.advice ?? "checkTeam"}` as never)
+      );
+    } finally {
+      setFixing(false);
+    }
+  };
+
+  return (
+    <div className={`${card} ${tone}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <Link2 className="h-4 w-4 text-indigo-500" /> {t("webhook.title")}
+          </h3>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge}`}>
+              {t(`webhook.state.${webhook.state}` as never)}
+            </span>
+            <span>{t(`webhook.advice.${webhook.advice}` as never)}</span>
+          </p>
+          <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">
+            {webhook.registeredUrl ?? t("webhook.none")}
+            {webhook.pending > 0 ? ` · ${t("webhook.pending", { count: webhook.pending })}` : ""}
+          </p>
+          {webhook.lastError && (
+            <p className="mt-1 break-words text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+              {t("webhook.lastError", { message: webhook.lastError })}
+            </p>
+          )}
+          {webhook.dedicated && (
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("webhook.dedicated")}</p>
+          )}
+        </div>
+        <button className={btnGhost} onClick={() => void repair()} disabled={busy || fixing}>
+          {fixing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}{" "}
+          {t("webhook.fix")}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Approval inbox — the posts sitting in the admin chat.
@@ -1107,6 +1326,17 @@ function ConnectTab({
             )}
           </>
         )}
+      </div>
+
+      {/**
+       * The dictionary, next to the "why" card: a post can be published on time
+       * and still be wrong, if the EN→UZ dictionary is not in this database.
+       * The state comes from the server (bundled version vs installed version),
+       * so this card never guesses.
+       */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DictionaryCard dictionary={data.dictionary} act={act} busy={busy} showToast={showToast} />
+        <WebhookCard webhook={data.webhook} act={act} busy={busy} showToast={showToast} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -2707,6 +2937,224 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
                 <button className={btnGhost} onClick={() => void remove(row.id)} aria-label={t("delete")}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LexiconRow {
+  key: string;
+  en: string;
+  uz: string;
+  ru: string | null;
+  source: string;
+}
+
+interface LexiconPayload {
+  meta: { bundled: number; version: string; installed: string | null; pages: number; source: string };
+  rows: LexiconRow[];
+  total: number;
+  edited: number;
+  query: string;
+}
+
+/**
+ * Admin → Kanal → Lug'at.
+ *
+ * The channel speaks Uzbek, and the English database text it reads
+ * (`requirements`, `english_requirements`, …) is turned into Uzbek with the
+ * academic dictionary. This tab is how the operator owns that dictionary:
+ * search a headword, correct its gloss, and the correction is what the next
+ * post says — no deploy, no code change. `source = admin` rows override the
+ * bundled list; "Asl holatiga qaytarish" removes the override.
+ */
+function LexiconTab({ showToast }: { showToast: ShowToast }) {
+  const t = useTranslations("adminChannel");
+  const [data, setData] = useState<LexiconPayload | null>(null);
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<{ key: string; en: string; uz: string; ru: string } | null>(null);
+
+  const load = useCallback(
+    async (q: string) => {
+      try {
+        const res = await api<LexiconPayload>(`/api/admin/channel/lexicon${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+        setData(res);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : t("loadFailed"));
+      }
+    },
+    [showToast, t]
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount, same pattern as the other admin managers
+    void load("");
+  }, [load]);
+
+  const save = async () => {
+    if (!draft) return;
+    setBusy(true);
+    try {
+      await api("/api/admin/channel/lexicon", {
+        method: "POST",
+        body: JSON.stringify({ action: "save", key: draft.key, en: draft.en, uz: draft.uz, ru: draft.ru }),
+      });
+      showToast(t("saved"));
+      setDraft(null);
+      await load(query);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("saveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async (key: string) => {
+    try {
+      await api("/api/admin/channel/lexicon", { method: "POST", body: JSON.stringify({ action: "reset", key }) });
+      showToast(t("lexicon.resetDone"));
+      await load(query);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    }
+  };
+
+  const install = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ result: { installed: boolean; size: number } }>("/api/admin/channel/lexicon", {
+        method: "POST",
+        body: JSON.stringify({ action: "install" }),
+      });
+      showToast(res.result.installed ? t("lexicon.installed", { count: res.result.size }) : t("lexicon.alreadyCurrent"));
+      await load(query);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("actionFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <BookOpen className="h-4 w-4 text-indigo-500" /> {t("lexicon.title")}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">{t("lexicon.hint")}</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <StatCard label={t("lexicon.bundled")} value={data ? String(data.meta.bundled) : "—"} />
+          <StatCard label={t("lexicon.inDatabase")} value={data ? String(data.total) : "—"} />
+          <StatCard label={t("lexicon.edited")} value={data ? String(data.edited) : "—"} />
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">
+          {t("lexicon.version")}: {data?.meta.version ?? "—"} · {t("lexicon.installedVersion")}:{" "}
+          {data?.meta.installed ?? t("lexicon.notInstalled")}
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-[12rem] flex-1">
+            <Field label={t("lexicon.search")}>
+              <input
+                className={inputCls}
+                value={query}
+                placeholder={t("lexicon.searchPlaceholder")}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void load(query.trim());
+                }}
+              />
+            </Field>
+          </div>
+          <button className={btnPrimary} onClick={() => void load(query.trim())}>
+            <Search className="h-3.5 w-3.5" /> {t("lexicon.search")}
+          </button>
+          <button className={btnGhost} onClick={() => void install()} disabled={busy}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{" "}
+            {t("lexicon.import")}
+          </button>
+        </div>
+      </div>
+
+      {draft && (
+        <div className={card}>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t("lexicon.editTitle")}</h3>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <Field label={t("lexicon.english")}>
+              <input className={inputCls} value={draft.en} readOnly />
+            </Field>
+            <Field label={t("lexicon.uzbek")}>
+              <input
+                className={inputCls}
+                value={draft.uz}
+                onChange={(e) => setDraft({ ...draft, uz: e.target.value })}
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label={t("lexicon.russian")}>
+                <input
+                  className={inputCls}
+                  value={draft.ru}
+                  onChange={(e) => setDraft({ ...draft, ru: e.target.value })}
+                />
+              </Field>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">{t("lexicon.editHint")}</p>
+          <div className="mt-3 flex gap-2">
+            <button className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.uz.trim()}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
+            </button>
+            <button className={btnGhost} onClick={() => setDraft(null)}>
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!data ? (
+        <LoadingBlock label={t("loading")} />
+      ) : !data.rows.length ? (
+        <EmptyState
+          icon={BookOpen}
+          title={data.query ? t("lexicon.noResults") : t("lexicon.empty")}
+          body={data.query ? t("lexicon.noResultsHint") : t("lexicon.emptyHint")}
+        />
+      ) : (
+        <div className={`${card} space-y-2`}>
+          {data.rows.map((row) => (
+            <div
+              key={row.key}
+              className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2 last:border-0 last:pb-0 dark:border-slate-800"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.en}</p>
+                <p className="truncate text-xs text-slate-600 dark:text-slate-300">{row.uz}</p>
+                {row.ru ? <p className="truncate text-[11px] text-slate-400">{row.ru}</p> : null}
+              </div>
+              <div className="flex items-center gap-1">
+                <span
+                  className={`${chip} ${
+                    row.source === "admin" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {row.source === "admin" ? t("lexicon.sourceAdmin") : t("lexicon.sourcePdf")}
+                </span>
+                <button
+                  className={btnGhost}
+                  onClick={() => setDraft({ key: row.key, en: row.en, uz: row.uz, ru: row.ru ?? "" })}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t("lexicon.edit")}
+                </button>
+                {row.source === "admin" && (
+                  <button className={btnGhost} onClick={() => void reset(row.key)}>
+                    <XCircle className="h-3.5 w-3.5" /> {t("lexicon.reset")}
+                  </button>
+                )}
               </div>
             </div>
           ))}

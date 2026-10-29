@@ -12,9 +12,12 @@
  * win promise, and "shoshiling" only in the last-day message.
  * Proofread list: docs/CHANNEL.md.
  */
-import { esc, formatDateUz, daysLeftUz } from "./format";
+import { bullets, esc, formatDateUz, daysLeftUz } from "./format";
 import type { Kind, PostChrome, Rendered } from "./chrome";
-import { ctaLine, footerLine } from "./chrome";
+import { ctaLine, EMPTY_CHROME, footerLine } from "./chrome";
+import { renderScholarshipCard, eligibilityBullets, languageLabel } from "./card.uz";
+import type { ScholarshipContent } from "../content";
+import type { CountryDisplay } from "../countries";
 import type { Facts } from "./facts";
 import { TIP_BANK, type TipEntry } from "./tips.uz";
 import { CHECKLIST_BANK, type ChecklistEntry } from "./checklist.uz";
@@ -140,11 +143,21 @@ function fundingLine(f: Facts): string | null {
   return plain ? `💰 ${cap(plain)}` : null;
 }
 
+/**
+ * `🔤 Til talabi: …` — exactly what the card says, from the card's own reader.
+ *
+ * A reminder post used to show only `IELTS 6.5`, which loses TOEFL/HSK and any
+ * award whose requirement is English prose (`english_requirements`); the
+ * language label is already escaped by `languageLabel()`.
+ */
+function languageLine(f: Facts): string | null {
+  const label = languageLabel(f, null);
+  return label ? `🔤 Til talabi: ${label}` : null;
+}
+
+/** `📊 Minimal talab: GPA 3.5+` — the structured floors the columns hold. */
 function requirementsPlain(f: Facts): string | null {
-  const parts: string[] = [];
-  if (f.minGpa !== null) parts.push(`GPA ${f.minGpa}+`);
-  if (f.minIelts !== null) parts.push(`IELTS ${f.minIelts}+`);
-  return parts.length ? parts.join(" · ") : null;
+  return f.minGpa !== null ? `GPA ${f.minGpa}+` : null;
 }
 
 function requirementsLine(f: Facts): string | null {
@@ -152,14 +165,17 @@ function requirementsLine(f: Facts): string | null {
   return plain ? `📊 Minimal talab: ${plain}` : null;
 }
 
-function audiencePlain(f: Facts): string | null {
-  const parts = [f.degrees, f.majors].filter((p): p is string => Boolean(p));
-  return parts.length ? parts.join(" · ") : null;
-}
-
-function audienceLine(f: Facts): string | null {
-  const plain = audiencePlain(f);
-  return plain ? `🎓 Kim uchun: ${plain}` : null;
+/**
+ * `🎓 Kimlar uchun` — up to three ➡️ bullets from the card's eligibility
+ * reader, so a reminder states who qualifies (degree, major, GPA, citizenship,
+ * nomination, documents) instead of only the title and the date. Escaped by
+ * `bullets()`; the same reader the card uses, so the two can never disagree.
+ */
+function whoBlock(f: Facts, max = 3): string | null {
+  const items = eligibilityBullets(f, null).slice(0, max);
+  if (!items.length) return null;
+  const body = bullets(items);
+  return body ? `🎓 <b>Kimlar uchun</b>\n${body}` : null;
 }
 
 /** Only printed when the data explicitly lists Uzbekistan. */
@@ -186,110 +202,53 @@ function siteButtonLine(opts: RenderOptions, path: string, label: string): strin
 // Scholarship posts
 // ---------------------------------------------------------------------------
 
-export function renderScholarshipSingle(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
+/**
+ * `scholarship_single` — the standard card (see `card.uz.ts`).
+ *
+ * It used to be three dense compact variants; the operator asked for the shape
+ * every Uzbek grant channel uses: bold title, `Moliyalashtirish` / `Til talabi`,
+ * then ➡️ bullet sections. The three variants now only vary the headline style
+ * (and the three CTA wordings in `chrome.ts`), so the layout is recognisable
+ * across the channel while the wording still rotates.
+ */
+export function renderScholarshipSingle(
+  f: Facts,
+  variant = 0,
+  chrome: PostChrome | null = null,
+  extra: { content?: ScholarshipContent | null; country?: CountryDisplay | null } = {}
+): Rendered | null {
   const v = ((variant % 3) + 3) % 3;
-  const link = ctaBlock(f, chrome);
-  if (v === 0) {
-    return {
-      key: "single_v1",
-      html: block(
-        row(`🎓 <b>${clipHtml(f.title, 120)}</b>`, `🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null),
-        row(fundingLine(f), deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(audienceLine(f), link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 1) {
-    return {
-      key: "single_v2",
-      html: block(
-        `🎓 <b>${clipHtml(f.title, 120)}</b>`,
-        `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-        row(fundingLine(f), deadlineLine(f)),
-        row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        "ℹ️ Ariza yuborishdan oldin talablarni rasmiy sahifada tekshiring.",
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  const bullets = row(
-    `• Tashkilot: ${f.provider}`,
-    f.country ? `• Davlat: ${f.country}` : null,
-    fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null,
-    deadlinePlain(f) ? `• Muddat: ${cap(deadlinePlain(f) as string)}` : null,
-    requirementsPlain(f) ? `• Talab: ${requirementsPlain(f)}` : null,
-    audiencePlain(f) ? `• Kim uchun: ${audiencePlain(f)}` : null
-  );
-  return {
-    key: "single_v3",
-    html: block(
-      `📌 <b>${clipHtml(f.title, 120)}</b>`,
-      bullets,
-      row(eligibilityLine(f), link, providerLink(f)),
-      footerBlock(chrome)
-    ),
-  };
-}
-
-export function renderFullyFunded(f: Facts, variant = 0, chrome: PostChrome | null = null): Rendered | null {
-  if (!f.fullyFunded) return null;
-  const v = ((variant % 3) + 3) % 3;
-  const link = ctaBlock(f, chrome);
-  if (v === 0) {
-    return {
-      key: "ff_v1",
-      html: block(
-        `💰 <b>${clipHtml(f.title, 120)}</b> — to'liq moliyalashtirish`,
-        `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-        row(deadlineLine(f), requirementsLine(f), eligibilityLine(f)),
-        row(audienceLine(f), link, providerLink(f)),
-        "Shartlar va qamrovni rasmiy e'londa tasdiqlang.",
-        footerBlock(chrome)
-      ),
-    };
-  }
-  if (v === 1) {
-    return {
-      key: "ff_v2",
-      html: block(
-        `💰 <b>${clipHtml(f.title, 120)}</b>`,
-        row(
-          `🏛 ${f.provider}`,
-          f.country ? `📍 ${f.country}` : null,
-          f.coverage ? `💳 E'londagi qamrov: ${cap(f.coverage)}` : null,
-          deadlineLine(f)
-        ),
-        "Bu e'londa moliyalashtirish to'liq deb ko'rsatilgan — kontrakt to'liq qoplanadi.",
-        row(requirementsLine(f), audienceLine(f), eligibilityLine(f)),
-        row(link, providerLink(f)),
-        footerBlock(chrome)
-      ),
-    };
-  }
-  return {
-    key: "ff_v3",
-    html: block(
-      `💸 To'liq moliyalashtirish`,
-      `🎓 <b>${clipHtml(f.title, 120)}</b>`,
-      row(
-        `• Tashkilot: ${f.provider}`,
-        f.country ? `• Davlat: ${f.country}` : null,
-        deadlinePlain(f) ? `• Muddat: ${cap(deadlinePlain(f) as string)}` : null,
-        requirementsPlain(f) ? `• Talab: ${requirementsPlain(f)}` : null
-      ),
-      row(eligibilityLine(f), link, providerLink(f)),
-      "To'liq moliyalashtirish qamrovi har bir dasturda farq qiladi — rasmiy e'lonni o'qing.",
-      footerBlock(chrome)
-    ),
-  };
+  const post = renderScholarshipCard({
+    facts: f,
+    content: extra.content ?? null,
+    country: extra.country ?? null,
+    chrome: chrome ?? { ...EMPTY_CHROME, variant: v },
+  });
+  return post ? { key: `single_v${v + 1}`, html: post.html } : null;
 }
 
 /**
- * Urgency post. Never produced for estimated/evergreen deadlines, and the
- * word "shoshiling" appears only when a day or less is actually left.
+ * `fully_funded` — the same card, only ever for an award the data calls full.
+ * A partial award stays silent here; the planner then falls back to the
+ * standard card instead of mislabelling it.
  */
+export function renderFullyFunded(
+  f: Facts,
+  variant = 0,
+  chrome: PostChrome | null = null,
+  extra: { content?: ScholarshipContent | null; country?: CountryDisplay | null } = {}
+): Rendered | null {
+  if (!f.fullyFunded) return null;
+  const v = ((variant % 3) + 3) % 3;
+  const post = renderScholarshipCard({
+    facts: f,
+    content: extra.content ?? null,
+    country: extra.country ?? null,
+    chrome: chrome ?? { ...EMPTY_CHROME, variant: v },
+  });
+  return post ? { key: `ff_v${v + 1}`, html: post.html } : null;
+}
+
 export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostChrome | null = null): Rendered | null {
   const d = f.deadline;
   if (d.quality !== "exact" || d.daysLeft === null || d.daysLeft < 0 || d.daysLeft > rung) return null;
@@ -307,7 +266,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostC
         headline,
         `${lastDay ? "Shoshiling: " : ""}${cap(left)}.`,
         row(`🏛 ${f.provider}`, f.country ? `📍 ${f.country}` : null, deadlineDateLine(f)),
-        row(fundingLine(f), requirementsLine(f), audienceLine(f), eligibilityLine(f)),
+        row(fundingLine(f), languageLine(f), requirementsLine(f), eligibilityLine(f)),
+        whoBlock(f, 3),
         row(link, providerLink(f)),
         footerBlock(chrome)
       ),
@@ -324,7 +284,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostC
           f.country ? `📍 ${f.country}` : null,
           `⏳ ${cap(left)}`
         ),
-        row(fundingLine(f), requirementsLine(f), eligibilityLine(f)),
+        row(fundingLine(f), languageLine(f), requirementsLine(f), eligibilityLine(f)),
+        whoBlock(f, 3),
         row(link, providerLink(f)),
         footerBlock(chrome)
       ),
@@ -339,8 +300,10 @@ export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostC
           `• Muddat: ${cap(deadlinePlain(f) as string)}`,
           `• Tashkilot: ${f.provider}`,
           f.country ? `• Davlat: ${f.country}` : null,
-          fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null
+          fundingPlain(f) ? `• Moliyalashtirish: ${cap(fundingPlain(f) as string)}` : null,
+          languageLabel(f, null) ? `• Til talabi: ${languageLabel(f, null)}` : null
         ),
+        whoBlock(f, 3),
         `📌 ${cap(left)}.${lastDay ? " Shoshiling — ariza qabuli bugun yopiladi." : " Hujjatlarni oldindan tayyorlab qo'ying."}`,
         row(eligibilityLine(f), link),
         footerBlock(chrome)
@@ -353,7 +316,8 @@ export function renderUrgency(f: Facts, rung: number, variant = 0, chrome: PostC
       `🗓 ${lastDay ? "Bugun oxirgi kun" : `Muddatgacha ${d.daysLeft} kun`}`,
       `🎓 <b>${clipHtml(f.title, 110)}</b>`,
       `🏛 ${f.provider}${f.country ? ` · ${f.country}` : ""}`,
-      row(fundingLine(f), requirementsLine(f)),
+      row(fundingLine(f), languageLine(f), requirementsLine(f)),
+      whoBlock(f, 3),
       row(link, providerLink(f)),
       footerBlock(chrome)
     ),

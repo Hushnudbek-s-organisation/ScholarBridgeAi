@@ -31,6 +31,7 @@
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",
+    "test:ranking": "tsx scripts/check-scholarship-ranking.ts",
     "test:api-security": "tsx scripts/check-api-anonymous.ts",
     "test:chancing": "tsx scripts/check-chancing.ts",
     "test:roadmap": "tsx scripts/check-roadmap.ts",
@@ -90,7 +91,10 @@
     "test:task-sync": "node scripts/check-task-sync.mjs",
     "test:duplicates": "tsx scripts/check-catalog-duplicates.ts",
     "test:deadlines": "tsx scripts/check-deadline-integrity.ts",
-    "test:scholarship-detail": "tsx scripts/check-scholarship-detail.ts"
+    "test:scholarship-detail": "tsx scripts/check-scholarship-detail.ts",
+    "lexicon:seed": "tsx scripts/seed-lexicon.ts",
+    "channel:rehearse": "tsx scripts/rehearse-channel.ts",
+    "test:channel-e2e": "tsx scripts/rehearse-channel.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

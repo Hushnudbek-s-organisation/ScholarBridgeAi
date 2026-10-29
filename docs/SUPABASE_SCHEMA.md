@@ -1617,6 +1617,25 @@ and the migration is safely retried.
 | `before` | text | yes | — | JSON snapshot before the change |
 | `after` | text | yes | — | JSON snapshot after the change |
 | `created_at` | timestamp |  | yes |  |
+### `translation_lexicon`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `key` | text |  | — | PK: normalised English headword (`motivation letter`) |
+| `en` | text |  | — | headword as printed in the dictionary |
+| `uz` | text |  | — | short Uzbek gloss |
+| `ru` | text | yes | — | Russian gloss, when the source had one |
+| `source` | text |  | `pdf` | `pdf` = imported; `admin` = edited by an operator and wins at render |
+| `updated_at` | timestamp |  | yes |  |
+
+### `translation_lexicon_meta`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `key` | text |  | — | PK (`version`) |
+| `value` | text |  | — | installed bundled-dictionary version |
+| `updated_at` | timestamp |  | yes |  |
+
 ### `test_attempts`
 
 | column | type | null | default | notes |

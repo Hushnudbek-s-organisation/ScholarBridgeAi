@@ -235,6 +235,52 @@ const COUNTRY_ALIASES: Record<string, string> = {
   "europe": "european union",
   turkey: "turkiye",
   turkiye: "turkiye",
+  // The Uzbek labels from `templates/format.ts`. A caller that hands us the
+  // display name by mistake must still rank the country correctly instead of
+  // silently landing on "not in the list" — which is exactly what happened
+  // before: every country scored `priorities.length`.
+  aqsh: "united states",
+  "buyuk britaniya": "united kingdom",
+  kanada: "canada",
+  germaniya: "germany",
+  fransiya: "france",
+  italiya: "italy",
+  ispaniya: "spain",
+  niderlandiya: "netherlands",
+  shvetsiya: "sweden",
+  norvegiya: "norway",
+  daniya: "denmark",
+  finlandiya: "finland",
+  shveytsariya: "switzerland",
+  avstriya: "austria",
+  belgiya: "belgium",
+  irlandiya: "ireland",
+  polsha: "poland",
+  chexiya: "czechia",
+  vengriya: "hungary",
+  portugaliya: "portugal",
+  gretsiya: "greece",
+  turkiya: "turkiye",
+  yaponiya: "japan",
+  "janubiy koreya": "south korea",
+  koreya: "south korea",
+  xitoy: "china",
+  gonkong: "hong kong",
+  singapur: "singapore",
+  malayziya: "malaysia",
+  hindiston: "india",
+  avstraliya: "australia",
+  "yangi zelandiya": "new zealand",
+  "birlashgan arab amirliklari": "united arab emirates",
+  qatar: "qatar",
+  "saudiya arabistoni": "saudi arabia",
+  isroil: "israel",
+  rossiya: "russia",
+  ozbekiston: "uzbekistan",
+  qozogiston: "kazakhstan",
+  "janubiy afrika": "south africa",
+  braziliya: "brazil",
+  meksika: "mexico",
 };
 
 const normaliseCountry = (value: string): string =>
@@ -293,10 +339,11 @@ export interface EditorialSortOptions {
  * The order the editorial lane picks from.
  *
  *   1. deadline tier — the near ones go out while they still matter;
- *   2. country priority — once nothing is imminent, the countries this audience
- *      actually applies to come first;
- *   3. the existing preference score (topic weights learned from polls);
- *   4. id, so the order is total and the plan is reproducible.
+ *   2. exact days left — inside a band, tomorrow beats next week;
+ *   3. country priority — among awards that close on the same day, the
+ *      countries this audience actually applies to come first;
+ *   4. the existing preference score (topic weights learned from polls);
+ *   5. id, so the order is total and the plan is reproducible.
  */
 export function editorialRank(
   candidates: readonly Candidate[],
@@ -308,14 +355,27 @@ export function editorialRank(
     candidate,
     score: scoreCandidate(candidate, options.prefs, rng),
     tier: deadlineTier(candidate.facts),
-    priority: countryPriority(candidate.facts.country, priorities),
+    /**
+     * `countryRaw` — the value stored in the database — not `country`, which is
+     * the Uzbek label ("Yaponiya", "AQSh") meant for printing.
+     *
+     * Feeding the label in made every country score `priorities.length`, i.e.
+     * "not in the list": the operator's country order had no effect on the plan
+     * at all. The alias table now also knows the Uzbek spellings, so a label
+     * that slips through still resolves instead of silently sorting last.
+     */
+    priority: countryPriority(candidate.facts.countryRaw ?? candidate.facts.country, priorities),
   }));
   const days = (value: { candidate: Candidate }) => value.candidate.facts.deadline.daysLeft ?? Number.POSITIVE_INFINITY;
   scored.sort(
     (a, b) =>
       a.tier - b.tier ||
-      a.priority - b.priority ||
+      // Nearest deadline first — the operator's first rule. The country order is
+      // a tie-break inside a band, not a way for a farther award in a favourite
+      // country to jump a nearer one: a 7-day US programme must not be announced
+      // before a 1-day one anywhere else.
       days(a) - days(b) ||
+      a.priority - b.priority ||
       b.score - a.score ||
       a.candidate.facts.id - b.candidate.facts.id
   );

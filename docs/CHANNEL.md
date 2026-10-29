@@ -110,8 +110,8 @@ least one body section (`isRichContent`). The section order is fixed:
 
 ```
 {flag} <b>{title}</b> — {tagline}
-Moliyalashtirish: {funding_type_uz}
-Til talabi: {language_req_uz}
+<b>Moliyalashtirish:</b> {funding_type_uz}
+<b>Til talabi:</b> {language_req_uz}
 
 <b>Kimlar uchun</b>
 ➡️ {eligibility_uz…}
@@ -120,16 +120,65 @@ Til talabi: {language_req_uz}
 ➡️ {benefits_uz…}
 
 <b>Dastur haqida</b>
-{about_uz}
+➡️ {about_uz}
 
-🕓Oxirgi muddat: 15-dekabr, 2026      (exact)
-🕓Taxminiy muddat: …                  (estimated — never called a deadline)
-🕓Muddat: rasmiy sahifada ko'rsatilgan (rolling)
+⏰️<b>Oxirgi muddat:</b> 15-dekabr, 2026      (exact)
+⏰️<b>Taxminiy muddat:</b> …                  (estimated — never called a deadline)
+⏰️<b>Muddat:</b> rasmiy sahifada ko'rsatilgan (rolling)
 ➡️Batafsil: <a href="SITE/go/CODE">SITE/go/CODE</a>
 
-{hashtags — kind + country + level + editor extras, deduped, max 5}
+{hashtags — kind + country + funding + level + editor extras, deduped, max 5}
 💼 {Kanal} | {Bot}
 ```
+
+### 4b-2. Standard card (`scholarship_single`, `fully_funded`)
+
+Same shape, built from **structured facts** instead of authored copy, so the
+500+ awards without Uzbek copy still post in the published format:
+
+```
+{flag} <b>{title}</b>[ — {tagline, only if authored}]
+🏛 {provider}
+
+<b>Moliyalashtirish:</b> To'liq          (fully funded)
+<b>Moliyalashtirish:</b> Kontraktning bir qismi   (partial: the Uzbek coverage label)
+<b>Til talabi:</b> IELTS 6.5+           (only when min_ielts is stored, or authored)
+
+<b>Kimlar uchun</b>
+➡️ Magistratura                          (degree_levels → Uzbek)
+➡️ Iqtisod, statistika                   (eligible_majors)
+➡️ GPA 3.0+                              (min_gpa)
+➡️ 🇺🇿 O'zbekistonliklar uchun ochiq      (only when eligible_countries names Uzbekistan)
+
+<b>Foydali tomonlari</b>
+➡️ To'liq moliyalashtirish               (fully funded rows only — never repeats a partial header)
+➡️ Yashash uchun to'lov: $1,400          (living_allowance, when > 0)
+➡️ Yo'l xarajatlari: $500                (travel_allowance, when > 0)
+
+⏰️<b>Oxirgi muddat:</b> 27-yanvar, 2027 · 90 kun qoldi
+🏛 Rasmiy manba: <a href="{application_url|website_url}">havola</a>
+➡️Batafsil: <a href="SITE/go/CODE">SITE/go/CODE</a>
+
+#grant #toliq_moliyalashtiriladi #magistratura
+💼 {Kanal} | {Bot}
+```
+
+Rules, enforced by `scripts/check-channel.ts`:
+
+* **Uzbek only.** `description`, `requirements`, `english_requirements`,
+  `tuition_coverage` and `expected_deadline_period` are English prose in
+  production data and are never printed as they are; the card is built from the
+  already-translated structured fields, or from the *facts* those English
+  fields state — see §4b-3.
+* **No invented period.** A stored allowance is printed as a bare amount. The
+  row does not record whether it is monthly or yearly, so the card never says.
+* **No repetition.** The header already states the coverage, so a partial award
+  gets no coverage bullet — only amounts, or no section at all.
+* **Authored copy wins.** When `scholarship_channel_content` has the Uzbek
+  fields for that award, its bullets replace the structured ones (that is the
+  rich post's content, in the same card layout).
+* **Funding hashtag** is data-driven: `#toliq_moliyalashtiriladi` only on an
+  award `isFullyFunded` accepts. Editable in settings (`hashtags.funding`).
 
 An empty section disappears **with its heading and its blank line**. Length
 policy: at 1800 visible characters the `about` block is trimmed at a word
@@ -137,6 +186,212 @@ boundary (`…`); at 4096 it is dropped; then each bullet list is cut to four; i
 it still does not fit the post is skipped rather than truncated. Eligibility,
 benefits and about are **never** generated or translated by anything: they come
 from the admin form or not at all.
+
+### 4b-3. English prose is read, never printed
+
+547 active awards carry their prose in English (`requirements` alone has 3,009
+sentences, 2,766 of them distinct), so a sentence dictionary cannot cover them.
+Instead `src/lib/channel/templates/translate.uz.ts` **reads the facts out of the
+English** with a fixed set of patterns and says them in fixed Uzbek lines. No
+per-post model call, no free text, nothing to review at send time.
+
+| What it reads | Example source | Line it produces |
+|---|---|---|
+| Test scores | `IELTS 6.5 or equivalent` | `IELTS 6.5+ yoki ekvivalent imtihon` |
+| | `IELTS 6.5 / TOEFL 92` | `IELTS 6.5+ · TOEFL 92+` |
+| CEFR levels | `B2 Italian` | `Italyan tili B2 darajasi` |
+| Score-less wording | `sets no single score; each host…` | `Yagona til balli yo'q — talab tanlangan dasturga bog'liq` |
+| Degree levels | `Master's or PhD` | `Magistratura · Doktorantura` |
+| Grade | `GPA of 3.2`, `70 per cent` | `GPA 3.2+`, `O'rtacha ball 70%+` |
+| Citizenship | `citizen of a partner country` | `Hamkor davlatlar fuqarolari uchun` |
+| Exclusivity | `hold no other scholarship` | `Boshqa stipendiya olmaslik sharti` |
+| Nomination | `be nominated by the ministry` | `Universitet yoki vazirlik tavsiyasi (nominatsiya) kerak` |
+| Age | `under 28 for master` | `Yosh chegarasi: 28 yoshgacha` |
+| Documents | `motivation letter, CV, interview` | `Motivatsion xat \| CV \| Suhbat (intervju)` |
+| Coverage | `Between 50% and 100%…` | `Kontraktning 50%idan to'liq qismigacha qoplanadi` |
+| Amount | `stipend of HK$344,400 a year` | `Stipendiya: HK$344,400 (yiliga)` |
+
+Guarantees, each one asserted in `scripts/check-channel.ts`:
+
+* **Fixed lines only.** Output is a bank of Uzbek strings; unknown English is
+  **dropped**, never rendered word-by-word (a half-English bullet is worse than
+  no bullet).
+* **No invented number.** Every digit in a produced line already exists in the
+  source sentence; the check fails otherwise.
+* **No English leftover** — `the`, `must`, `required`, `applicants` may not
+  survive into a card.
+* **`100%` is never printed**: the lint (§6) treats it as an absolute promise
+  and the sender would refuse the post, so a range that reaches the full fee is
+  worded out loud.
+* **The header wins.** A stated percentage or amount replaces the generic
+  `To'liq moliyalashtirish` bullet; the generic bullet appears only when the
+  award is fully funded and no finer figure exists.
+* **Authored copy still wins** over every translated line, and
+  `description` has **no** translator: it is either the admin's Uzbek or it is
+  omitted.
+* Coverage measured against 15 real rows: `Til talabi` 13/15, `Kimlar uchun`
+  14/15, `Foydali tomonlari` 10/15; the remainder omit the section.
+
+### 4b-4. The academic dictionary (12 732 terms, in the database)
+
+The patterns above cover the *shapes* a requirement sentence takes; they cannot
+name every term inside it. For that the channel ships the operator's own
+dictionary — the 606-page *ScholarBridgeAI akademik tarjima lug'ati* (12 467
+units) — as data:
+
+| Where | What |
+|---|---|
+| `scripts/import/lexicon/extract_pdf.py` | reads the PDF's table rules and emits the term list; `--pdf`, `--out`, optional `--raw` |
+| `src/lib/channel/lexicon/lexicon.uz.json` | 12 732 EN→UZ headwords (plus the RU gloss where the source had one), 1 949 of them slash aliases |
+| `src/lib/channel/lexicon/index.ts` | `lookup`, `translateFragment`, `translateList`, `phraseScan` |
+| `src/lib/channel/lexicon/store.ts` | installs the same rows into `translation_lexicon` and loads admin edits |
+| `translation_lexicon` / `translation_lexicon_meta` | the database copy + which version is installed |
+
+**It is in the database.** `ensureChannelTables()` installs the dictionary
+(versioned, chunked, ~13 statements once). A fresh environment therefore needs
+no extra step, and `npm run lexicon:seed` does it on demand (`-- --status` only
+reports). Rows created by the bootstrap are covered by the same RLS lockdown as
+the other channel tables.
+
+**An operator's gloss wins.** Editing a row to `source = 'admin'` makes it
+override the bundled copy at render time; the publisher reloads those rows once
+per tick (`refreshOverlay`). Re-importing a newer PDF deletes only
+`source = 'pdf'` rows, so a correction is never silently undone.
+
+Two ways a term becomes a bullet in `Kimlar uchun` (`dictionaryLine`):
+
+1. a requirement **list** whose fragments all resolve —
+   `bachelor's degree, motivation letter` → `Bakalavr darajasi · Motivatsion xat`;
+2. otherwise the **terms** the sentence contains — `strong academic record,
+   English proficiency` → `Akademik ma'lumotlar · Ingliz tili darajasi`.
+
+Both are gated:
+
+* `translateFragment` returns `null` unless **every** word is a known term, a
+  number, an allow-listed acronym (IELTS, GPA, CV, PhD…) or one of a dozen
+  connectors (`and`, `or`, `at least`…). One unknown word cancels the fragment —
+  a dictionary cannot conjugate a verb, so "candidates must have submitted" is
+  refused by design rather than half-translated.
+* A gloss that reads as two senses is refused inside a bullet, anything the
+  patterns already said is dropped, and the bullet is capped at 120 characters.
+* No English may survive: a gloss carrying `the/and/must/students` is rejected.
+
+**Correcting a gloss is a panel job, not a deploy.** Admin → Kanal → **Lug'at**
+(`/api/admin/channel/lexicon`) searches the table by headword or gloss, saves a
+correction, restores the original, or re-imports the bundled list:
+
+| Action | What it does | What it cannot do |
+|---|---|---|
+| `search` | matches `en` or `uz`, operator-edited rows first | — |
+| `save` | upserts the row with `source = 'admin'` | add English (the gloss is validated by `checkGloss`, the renderer's own rule) or set `source` itself |
+| `reset` | puts the dictionary's own gloss back (`bundledGloss`), and only deletes a row the operator added themselves | lose a term: a headword the bundle knows keeps its row, with its original gloss |
+| `install` | re-imports the bundled list if the version changed | touch operator rows |
+
+Every change is written to `channel_audit` (`lexicon_save` / `lexicon_reset` /
+`lexicon_install`) and takes effect on the next post, because the save reloads
+the overlay. Measured against a real Postgres, through the HTTP endpoint
+with an admin session: correcting `tuition` made the row `source = admin` (1
+edited, 12 732 rows) and changed the very next render to the operator's wording;
+`reset` restored the printed gloss **and kept the row** (it is a `pdf` row
+again); a word the dictionary lacks (`colloquium`) produced **no bullet at
+all**, then one once added, then none again after removal; an English gloss and
+an empty one were refused with `bad_gloss_english` / `bad_gloss_empty`; an
+unknown action with `bad_action`; and `install` on a current copy reported
+`installed: false` without rewriting anything.
+
+Two known edges, both measured:
+
+* **Uzbek apostrophes.** JavaScript counts `'` as a word boundary, so a plain
+  `/\bor\b/` reads `ilg'or` as English — it was silently dropping 74 legitimate
+  glosses, every "advanced …" phrase among them. The leftover rule now has an
+  apostrophe lookbehind (`looksEnglish`), which is the single definition used by
+  the renderer, the fragment gate and the admin validator alike.
+* **207 rows still carry English** in the supplied PDF itself (provider names
+  such as *American University of Beirut*, or *U of T*): those are refused by
+  the same rule rather than printed, and an operator can correct any of them in
+  the panel. The dictionary is 12 732 headwords; ~1.6% of its glosses are not
+  clean Uzbek as printed, and none of them can reach a post.
+
+**What the dictionary may not say.** Rendering the live queue (below) showed two
+bullets that came from real prose and were both wrong:
+
+| Chip | Why it was refused |
+|---|---|
+| `Yangi Zelandiya` | a *place*, not a requirement — the country is already in the header. `isCountryName()` knows the names in both languages |
+| `Minimal GPA` | a floor with **no value**: the dictionary's gloss for "minimum GPA", printed next to no number. A chip that starts with *minimal/maksimal/kamida* and carries no digit is dropped |
+
+The second one was hiding a fact instead of inventing one: the Waikato row says
+"a minimum GPA of **A-** on the qualification used for entry", which has no
+digit, so the numeric GPA reader skipped it. A letter grade is now read too —
+`Minimal GPA: A-` — and the bare chip disappears because the real line covers it.
+
+Measured on eight real awards, shape 2 puts Uzbek term chips on 4 of them; the
+other four are prose with no dictionary term in them, and stay as short as they
+were. That is the honest size of the gain — the dictionary names vocabulary, it
+does not translate sentences, and nothing here is ever guessed.
+
+**Reminder posts read the same facts.** `urgency` (`⏳ Muddat yaqinlashmoqda` and
+its three siblings) is the kind that actually fires on a busy day, and it used
+to be a title, a date and one funding word — nothing a reader could act on, and
+the second variant did not even say who the award is for. All four variants now
+print `🔤 Til talabi` and a `🎓 Kimlar uchun` block of up to three ➡️ bullets,
+taken from **the same** `languageLabel()` / `eligibilityBullets()` the card uses,
+so the two renderers can never disagree. Escaping, the six-bullet cap and the
+"no English prose" rule are shared, not re-implemented.
+
+### 4b-5. Checked against the live queue
+
+The renderer is pure, so the live queue can be rendered from a copy of the
+production rows without touching Telegram. Done on 2026-10-29 14:05 Tashkent,
+against plan row 4 (`urgency_v4`, University of Waikato Doctoral Scholarship,
+due 20:35 the same day):
+
+```
+⏳ University of Waikato Doctoral Scholarship
+
+• Muddat: 31-oktabr, 2026 · 2 kun qoldi
+• Tashkilot: University of Waikato
+• Davlat: Yangi Zelandiya
+• Moliyalashtirish: To'liq kontrakt va stipendiya
+• Til talabi: Yagona til balli yo'q — talab tanlangan dasturga bog'liq
+
+🎓 Kimlar uchun
+➡️ Doktorantura (PhD)
+➡️ Minimal GPA: A-
+➡️ Xalqaro talabalar uchun
+
+📌 2 kun qoldi. Hujjatlarni oldindan tayyorlab qo'ying.
+
+➡️To'liq ma'lumot: {SITE}/go/2fc3yu
+```
+
+553 characters, `lintText` clean, no English left, no `100%`. The three
+nearest-deadline rows (37 and 771 at 2026-10-30, 437 at 2026-10-31) render the
+same way: 570–669 characters, all lint-clean, `Foydali tomonlari` present only
+where the row states something checkable.
+
+### 4b-6. The publishing rehearsal
+
+`check-channel.ts` proves the *text*. `scripts/rehearse-channel.ts`
+(`npm run channel:rehearse`) proves the *pipeline*: it starts the local Bot API
+mock (`scripts/telegram-mock.mjs`), points `TELEGRAM_API_BASE` at it, and runs
+the same `runDuePosts` the cron calls, against a real Postgres — no network, no
+live channel.
+
+| It asserts | Why it matters |
+|---|---|
+| mode `on`, one due row → **one** `sendMessage` to the channel chat, post row `sent`, plan row `sent` | the whole chain: render → link → reserve → send → store |
+| a second tick sends nothing | the dedupe key is what stops a double post |
+| a row whose `send_at` passed hours ago is still published | `duePlanRows` asks `send_at <= now`, so a tick *after* the window is enough — this is exactly the case that used to end in silence |
+| a row from **yesterday** is retired (`skip_reason = date_passed`), not posted late | the other half of the same rule: no stale news under today's date |
+| mode `approval` → preview only to the admin chat, `awaiting_approval`, channel untouched | the approval gate is real, not a UI label |
+| the preview carries exactly `ch:ok`, `ch:no`, `ch:ed` for one post | "exactly three actions" |
+| `approveApproval` publishes the **stored** text to the channel | what the operator approved is what goes out |
+| every message the mock received lints clean | the same rules the sender applies |
+
+It refuses a non-local `DATABASE_URL` (it writes rows), and restores the settings
+it touched and deletes every row it created — two consecutive runs pass, so it
+is safe to keep in a loop. Measured: 14 checks, 14 pass.
 
 ### 4c. Weekly deadlines post
 
@@ -576,17 +831,61 @@ The fix is data, not code.
 picks, in this order:
 
 1. **deadline tier** — ≤7, ≤14, ≤30, ≤60, ≤120 days, then estimated, then
-   evergreen. The near ones go out while they can still be acted on;
-2. **country priority** — `plan.priorityCountries`, an operator-editable list
+   evergreen;
+2. **exact days left** — inside a band, tomorrow beats next week. This is the
+   half that was missing: the country order used to come first *within* a band,
+   so a 7-day award in a favourite country could be announced before a 1-day
+   one somewhere else;
+3. **country priority** — `plan.priorityCountries`, an operator-editable list
    (default: United States, United Kingdom, Germany, South Korea, Japan, …).
-   Once nothing is imminent, programmes from the countries this audience
-   actually applies to win;
-3. the learned preference score (from polls);
-4. the row id, so the plan is reproducible.
+   Among awards that close on the **same day**, the countries this audience
+   actually applies to win. The urgent lane uses the same tie-break, so a
+   same-day favourite gets the urgency post rather than an unrelated country
+   that happened to be next in the rotation;
+4. the learned preference score (from polls);
+5. the row id, so the plan is reproducible.
+
+**The country order never worked until 2026-10-29.** `editorialRank` passed
+`facts.country` — the *Uzbek* label the templates print (`Yaponiya`, `AQSh`) —
+into `countryPriority`, which matches English names. Every country therefore
+scored `priorities.length`, i.e. "not in the list", and the operator's list had
+exactly no effect on the plan. It now reads `facts.countryRaw` (the stored
+value), and the alias table also knows the Uzbek spellings, so a label that
+slips through still resolves instead of silently sorting last.
 
 Country matching goes through an alias table (`USA`/`US`/`United States of
 America` → United States, `UK`/`Britain` → United Kingdom, `Korea` → South
-Korea, …), because the column is free text.
+Korea, `Germaniya` → Germany, …), because the column is free text.
+
+#### §4d. Checked against the live catalogue
+
+`scripts/fixtures/catalogue-slice.json` is a 45-row excerpt of the production
+catalogue (2026-10-29): every active, verified award with a deadline in the next
+45 days, nearest first. `check-channel.ts` plans it and asserts that the plan is
+non-decreasing in days-left and that the first post targets the nearest
+deadline — real data, not invented numbers. Regenerate with:
+
+```sql
+select id, country, deadline_date, deadline_type, coverage_type, left(title, 42)
+from scholarships
+where is_active and verification_status = 'verified'
+  and deadline_date between current_date and current_date + 45
+order by deadline_date, id limit 45;
+```
+
+Planned from that slice on 2026-10-29 (no history, default settings):
+
+| Day | slot 0 | slot 1 |
+|---|---|---|
+| 29-oktabr | urgency · 1 kun · Australia (UNSW Scientia) | poll |
+| 30-oktabr | urgency · 0 kun · Australia (UNSW Scientia) | single · 0 kun · Australia (Global University Award) |
+| 31-oktabr | urgency · 0 kun · **Japan** (Honjo) | single · 0 kun · China (CLEC) |
+| 1-noyabr | weekly · 12 ta | single · 5 kun · Canada (Toronto Pearson) |
+| 2-noyabr | urgency · 0 kun · United Kingdom (Imperial) | single · 1 kun · India (IIT Kanpur) |
+
+On 31 October six awards close on the same day; Japan (priority 4) takes the
+urgency slot ahead of China (12) and the four unlisted countries, which is the
+tie-break doing its job.
 
 The list is a **preference, not a statistic**: nothing in the panel or the posts
 claims how many students go anywhere. University-level relevance is expressed
@@ -621,7 +920,7 @@ posts anything.
 
 | Tab | Controls |
 | --- | --- |
-| Ulash | Bot/channel/admin-chat wiring, mode, pause, connection check, test message, build plan, run now, short-link refresh |
+| Ulash | Bot/channel/admin-chat wiring, mode, pause, connection check, test message, build plan, run now, short-link refresh, dictionary state, **bot webhook** state |
 | Reja | Posts per day (cap 3), budget range, morning/evening windows, quiet day, weekly list minimum, weekly pin, Thursday digest, poll cadence, 14-day preview |
 | Linklar | Main footer (Kanal/Bot defaults), social footer, hashtags per kind/level/weekly, link-preview switches |
 | Kontent | Search a scholarship, write its Uzbek copy, completeness badge, live rich preview |
@@ -632,6 +931,25 @@ posts anything.
 | Qiziqish | Learned topic weights (from poll shares), hand-correctable, reset-all |
 | Hikoyalar | Admin-written stories; only approved rows are postable |
 | Jurnal | Append-only `channel_audit` trail of every mutation |
+
+**Lug'at card (Ulash tab).** Next to "Nega post ketmayapti?" the panel shows the
+translation dictionary's state: how many terms are in *this* database, which
+version is installed, how many rows an operator edited by hand, and — when it is
+not ready — one **Import qilish** button. Four states, all computed on the server
+(`src/lib/channel/selfcheck.ts`):
+
+| State | Meaning | Advice |
+| --- | --- | --- |
+| `installed` | The DB copy matches the version this build bundles | nothing to do |
+| `pending` | The tables exist, the import has not run yet (fresh deployment) | the first tick installs it, or press the button |
+| `stale` | A different version is installed (the bundled dictionary changed) | re-import; admin edits are kept |
+| `unavailable` | The table could not be read at all | check the database connection/grants |
+
+An import only ever deletes `source = 'pdf'` rows, so an operator's corrections
+(`source = 'admin'`) survive a re-import — that is asserted in
+`npm run test:integration`. An explicit **repair** (`forceChannelRepair`) also
+installs the dictionary: creating the tables and leaving the dictionary empty was
+one silent failure mode too many.
 
 Every mutation passes `guardAdmin` (admin session + rate limit), the global CSRF
 proxy and is written to `channel_audit`. The bot token never appears in any
@@ -647,6 +965,86 @@ identity as its key, so a duplicate tick sends nothing twice. Call it every
 
 `mode = off`, a pause, or an unconfigured channel makes the tick return
 `{"skipped": true}` without touching Telegram.
+
+### 11a-1. 2026-10-29 — "Approve tugmasi hech narsa qilmayapti"
+
+**Report.** The admin chat received the preview with three buttons. Pressing
+**Tasdiqlash** did nothing: no post in `@grantlar_bridge`, no error anywhere.
+
+**What the database proved.** The press never reached this application:
+
+| Evidence | Reading |
+| --- | --- |
+| `channel_posts` id 1: `awaiting_approval`, `error` empty, `sent_at` null | the approval code never claimed it |
+| `channel_audit`: no `approval_approve` and no `approval_blocked` row | no decision was recorded at all |
+| `telegram_updates`: zero rows, 7 inserts ever | almost no update from Telegram has ever arrived |
+| `channel_audit`: a `tick` every 15 minutes, still healthy | the app itself is fine — only *incoming* updates are missing |
+
+**Why.** Approve/Reject/Edit are inline buttons. Telegram delivers a press as a
+`callback_query` **to the webhook of the bot that sent the message**. If that
+webhook is missing, still points at an old deployment, or rejects the secret
+(rotated `SESSION_SECRET`), the button is dead — and Telegram shows the operator
+nothing. A dedicated publisher bot made this worse: only the DM bot's webhook
+was ever registered, so a `TELEGRAM_CHANNEL_BOT_TOKEN` bot's buttons could never
+work.
+
+**What changed (this phase).**
+
+1. `src/lib/channel/webhook.ts` — the rules: expected URL, allowed updates, and
+   a five-state verdict (`ok` / `missing` / `wrong_url` / `error` / `unknown`).
+   `unknown` is never "repaired" on a guess.
+2. `src/lib/channel/webhookStore.ts` — asks Telegram
+   (`getWebhookInfo`) and re-registers (`setWebhook`) **only** when the verdict
+   is definite. A healthy answer is memoised for 10 minutes, a failure is not.
+3. **Self-heal on the tick**: `/api/cron/channel` calls
+   `ensurePublisherWebhook()` before planning. A deployment that lost its
+   webhook repairs itself within one tick (~15 minutes) with no operator action.
+   A failure there never fails the tick.
+4. **The panel tells the truth**: Ulash tab → *Bot webhook* card, showing the
+   state, the registered URL, the queue length and the last Telegram error, with
+   one **Ulash / tuzatish** button (`POST {action:"webhook"}` — forced, and
+   audited as `webhook_repaired`).
+5. **Dedicated publisher bots work**: the webhook route now authenticates the
+   publisher bot's secret as well, and hands its updates to
+   `handlePublisherUpdate`, which can do exactly two things (approval buttons,
+   the parked edit text) and nothing else. It deliberately never claims
+   `telegram_updates` — update ids are numbered per bot.
+6. **A refused press is recorded**: `approval_blocked` audit rows with a code
+   (`not_admin`, `tables_unavailable`, `skipped`, `send_failed`,
+   `already_closed`) and Telegram's own reason. The toast lasts three seconds;
+   the row does not.
+
+**Operating rule that follows from this.** If an approval button does nothing,
+check *Bot webhook* first — the card names the fault. The admin panel's own
+**Tasdiqlash** button in the approval inbox does not depend on Telegram at all,
+so it is always the fallback that publishes.
+
+### 11a. 2026-10-29 — why the live channel had not posted, verified from the database
+
+The deployed instance (Render, `main`) was audited read-only through the live
+Supabase project. Every fact below is a row, not an assumption:
+
+| Fact | Evidence |
+| --- | --- |
+| The scheduler runs | `channel_audit`: a `tick` row every 15 minutes, `posts_run` alongside it |
+| It attempts nothing | `posts_run` reports `attempted: 0` on every tick — no plan row was due yet |
+| The mode is **approval** | `channel_settings.connection.mode = "approval"`, set by the operator on 2026-10-28 15:36 (`channel_audit` id 108, before → `on`, after → `approval`) |
+| Posts were never sent | `channel_posts` = 0 rows |
+| Three older plan rows are gone | retired with reason `date_passed` (audit id 93) — a fully missed day is closed, not sent late |
+| One post is scheduled | `channel_plan` id 4: 2026-10-29, `send_at 20:35`, kind `urgency`, scholarship 437, status `planned` |
+
+So the publisher is healthy and the channel is *waiting*: at 20:35 Tashkent the
+tick turns that row into a preview in the admin chat, and nothing reaches the
+channel until the admin presses **Approve**. That is approval mode working as
+designed, not a bug.
+
+**The dictionary is not in the live database yet** — `information_schema` lists
+the thirteen `channel_*` tables and no `translation_lexicon*` tables. The reason
+is deployment, not code: the dictionary ships in PR #116, which is not merged, so
+the running build has no code that creates the table. The moment that build is
+deployed the first tick installs it by itself; `npm run test:integration` proves
+the claim on a fresh database ("the first bootstrap installs the whole dictionary
+into a fresh database", 12 732 terms, version `pdf-12732-1949`).
 
 ## 12. Short links
 

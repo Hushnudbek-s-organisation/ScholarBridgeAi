@@ -11,6 +11,7 @@ import { lockDownTables } from "@/lib/db/lockdown";
 import { columnExistenceVerify, tableExistenceVerify, tablesInStatements } from "@/lib/schemaGate";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { channelColumns, channelStatements } from "./ddl";
+import { installLexicon } from "./lexicon/store";
 
 /**
  * "Is the channel schema there?" — every table the publisher creates *and*
@@ -43,16 +44,35 @@ const bootstrap = createTableBootstrap(
   () => lockDownTables(tablesInStatements(channelStatements()), (stmt) => db.execute(sql.raw(stmt)))
 );
 
-export function ensureChannelTables(): Promise<boolean> {
-  return bootstrap.ensure();
+export async function ensureChannelTables(): Promise<boolean> {
+  const ok = await bootstrap.ensure();
+  if (ok) {
+    /**
+     * The translation dictionary lives in the database too (`translation_lexicon`).
+     * Installing it here means "the tables exist" and "the dictionary is in
+     * them" are the same fact, and a fresh deployment needs no extra step. The
+     * install is versioned and a no-op after the first run; a failure only
+     * degrades translation, so it never turns a working channel red.
+     */
+    await installLexicon().catch(() => null);
+  }
+  return ok;
 }
 
 /**
  * Admin "retry" action: run the DDL even when the request path is configured
  * not to (`SCHEMA_AUTO_REPAIR=off`), because this is an explicit operator step.
  */
-export function forceChannelRepair(): Promise<boolean> {
-  return bootstrap.forceRepair();
+export async function forceChannelRepair(): Promise<boolean> {
+  const ok = await bootstrap.forceRepair();
+  /**
+   * The dictionary is part of "the channel tables are ready": `ensure()` installs
+   * it, so an explicit repair has to do the same. Without this, an operator's
+   * retry would create the tables and leave translation silently degraded —
+   * the one failure mode that is invisible in a post preview.
+   */
+  if (ok) await installLexicon().catch(() => null);
+  return ok;
 }
 
 /** Admin diagnostics: why the tables are (not) ready — never the raw error. */

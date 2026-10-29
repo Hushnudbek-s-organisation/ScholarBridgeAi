@@ -1,6 +1,14 @@
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
-import { calculateScholarshipMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
+import {
+  calculateScholarshipMatch,
+  calculateUniversityMatch,
+  type MatchBreakdown,
+  type ReasonDetail,
+  type UniversityData,
+} from "@/lib/matching";
+import { evaluateChance, fitBucket, type ChanceResult, type FitBucket } from "@/lib/scholarshipGates";
+import { combinedRelevance } from "@/lib/scholarshipRanking";
 import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -9,7 +17,7 @@ import { seedDatabase } from "@/db/seed";
 import { db } from "@/db";
 import { savedUniversities, universities } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { getCachedScholarshipsBundle, getCachedProfileForMatching } from "@/lib/catalogCache";
+import { getCachedScholarshipsBundle, getCachedProfileForMatching, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
@@ -24,6 +32,8 @@ import { runMercuryDecision } from "@/lib/ai/decide";
 import {
   EMPTY_SCHOLARSHIP_FILTERS,
   SCHOLARSHIP_BASIS_OPTIONS,
+  SCHOLARSHIP_CHANCE_OPTIONS,
+  SCHOLARSHIP_FIT_OPTIONS,
   SCHOLARSHIP_COVERAGE_OPTIONS,
   SCHOLARSHIP_DEGREE_OPTIONS,
   SCHOLARSHIP_GROUP_OPTIONS,
@@ -111,6 +121,10 @@ export async function GET(req: Request) {
       ),
       statuses: parseFilterTokens(listParam(searchParams, "status", "statuses"), SCHOLARSHIP_STATUS_OPTIONS),
       basis: parseFilterTokens(listParam(searchParams, "basis"), SCHOLARSHIP_BASIS_OPTIONS),
+      // Personal dimensions: only a loaded profile can answer them, and the
+      // server drops them for an anonymous caller further down.
+      chance: parseFilterTokens(listParam(searchParams, "chance", "chances"), SCHOLARSHIP_CHANCE_OPTIONS),
+      fit: parseFilterTokens(listParam(searchParams, "fit", "fits"), SCHOLARSHIP_FIT_OPTIONS),
     };
     const sortBy: ScholarshipSortOption = SCHOLARSHIP_SORT_OPTIONS.includes(sortParam) ? sortParam : "relevance";
     const groupBy: ScholarshipGroupOption = SCHOLARSHIP_GROUP_OPTIONS.includes(groupParam) ? groupParam : "none";
@@ -140,6 +154,14 @@ export async function GET(req: Request) {
           personalisedProfileId = pId;
         }
       }
+    }
+
+    // The two personal filters are unanswerable without a profile. Rather than
+    // return a silently empty catalogue (a stale deep link, an expired
+    // session), an anonymous caller simply gets the unfiltered list.
+    if (!matchProfile) {
+      filters.chance = [];
+      filters.fit = [];
     }
 
     // One fingerprint for the whole response: any score-relevant profile edit
@@ -228,6 +250,32 @@ export async function GET(req: Request) {
     // with the scholarship's own lastVerifiedAt only as a date fallback).
     const sourceMap = bundle.sourceMap;
 
+    /**
+     * The universities these awards sit at, for the combined ordering.
+     *
+     * Only loaded when a profile is present (nothing personal to compute
+     * otherwise) and at least one award actually links a university. The
+     * university match is memoised per university id inside the request: many
+     * awards share one university, and the score depends only on the profile
+     * and the university.
+     */
+    let unisById: Map<number, UniversityData> | null = null;
+    if (matchProfile && allScholarships.some((s) => s.universityId != null)) {
+      const uniBundle = await getCachedUniversitiesBundle();
+      unisById = new Map(uniBundle.unis.map((uni) => [uni.id, uni as unknown as UniversityData]));
+    }
+    const uniMatchMemo = new Map<number, number | null>();
+    const universityMatchFor = (universityId: number | null): number | null => {
+      if (!matchProfile || universityId == null) return null;
+      if (uniMatchMemo.has(universityId)) return uniMatchMemo.get(universityId) ?? null;
+      const uni = unisById?.get(universityId);
+      // An award linked to a university that is not in the catalogue has no
+      // university part — it is not scored as a zero.
+      const score = uni ? calculateUniversityMatch(matchProfile, uni).matchScore ?? null : null;
+      uniMatchMemo.set(universityId, score);
+      return score;
+    };
+
     const mapped = allScholarships.map((s) => {
       const isVerified = s.verificationStatus === "verified";
       // Historical seed rows contain unsupported amounts, eligibility and
@@ -291,6 +339,26 @@ export async function GET(req: Request) {
       }
       // Computed application status from dates (spec §6) — never stale.
       const statusInfo = withStatus(publicRow, locale);
+      // Three answers the list is ordered by, computed once per row: the
+      // scholarship fit (already above), the fit of the university behind it,
+      // and whether the published gates are met.
+      const chanceInfo: ChanceResult | null =
+        matchProfile && isVerified
+          ? evaluateChance(matchProfile, {
+              minGpa: s.minGpa,
+              minIelts: s.minIelts,
+              degreeLevels: s.degreeLevels,
+            })
+          : null;
+      const rowFit: FitBucket | null = isVerified ? fitBucket(matchInfo.matchScore) : null;
+      const universityFit = isVerified ? universityMatchFor(s.universityId) : null;
+      const relevance = matchProfile && isVerified
+        ? combinedRelevance({
+            fit: matchInfo.matchScore,
+            university: universityFit,
+            chance: chanceInfo?.bucket ?? null,
+          })
+        : { score: null, parts: [] };
       const src = sourceMap.get(s.id) || null;
       // Saved-university coverage (Module 1) — empty refs means no private
       // saved list was available, and every flag below stays honestly false.
@@ -307,6 +375,11 @@ export async function GET(req: Request) {
         matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "scholarship", matchInfo.issueDetails, matchInfo.potentialIssues),
         matchBreakdown: matchInfo.breakdown ?? null,
+        // Personal filters read these two; the browser also shows them.
+        chanceBucket: chanceInfo?.bucket ?? null,
+        fitBucket: rowFit,
+        universityMatchScore: universityFit,
+        relevanceScore: relevance.score,
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,
@@ -344,6 +417,10 @@ export async function GET(req: Request) {
           (row) => [...(row.meritBased === true ? ["merit"] : []), ...(row.financialNeedBased === true ? ["need"] : [])],
           SCHOLARSHIP_BASIS_OPTIONS,
         ),
+        // Personal dimensions. Empty for an anonymous caller (no buckets were
+        // computed), which is exactly how the panel knows to hide them.
+        chance: countValues(without("chance"), (row) => [row.chanceBucket ?? ""], SCHOLARSHIP_CHANCE_OPTIONS),
+        fit: countValues(without("fit"), (row) => [row.fitBucket ?? ""], SCHOLARSHIP_FIT_OPTIONS),
       };
     }
 
@@ -373,6 +450,15 @@ export async function GET(req: Request) {
       // saved list exists, so the anonymous ordering is unchanged.
       results.sort((a, b) => {
         if (a.covTier !== b.covTier) return b.covTier - a.covTier;
+        // The combined number decides the order: it reads the scholarship fit,
+        // the university behind it and the published-gate verdict together.
+        // A row with no relevance (unverified, or a sparse profile) falls
+        // through to the old fit/deadline tie-breaks instead of leading.
+        if (a.relevanceScore != null || b.relevanceScore != null) {
+          if (a.relevanceScore == null) return 1;
+          if (b.relevanceScore == null) return -1;
+          if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore;
+        }
         if (a.matchScore == null && b.matchScore == null) return 0;
         if (a.matchScore == null) return 1;
         if (b.matchScore == null) return -1;

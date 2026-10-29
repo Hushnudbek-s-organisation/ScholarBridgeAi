@@ -2343,11 +2343,302 @@ async function main() {
       inactiveSearch.status === 200 &&
       !inactiveSearch.body?.results?.some((r: any) => r.kind === "scholarship" && r.id === inactiveScholarship.id)
   );
+  // ---- Phase M: combined relevance + the two personal filters -------------
+  // Two awards with identical published gates, one at each fixture university,
+  // plus one identical award that links no university. The order between the
+  // linked pair must follow the UNIVERSITY match, and the unlinked row must be
+  // scorable on the parts it has (never treated as a zero).
+  const linkedValues = {
+    provider: "Phase M Fixture Provider",
+    country: "Germany",
+    description: "Combined-ranking fixture.",
+    requirements: "Fixture only.",
+    websiteUrl: "https://example.org/phase-m",
+    verificationStatus: "verified" as const,
+    minGpa: 3.5,
+    minIelts: 6.5,
+    degreeLevels: '["Bachelor"]',
+  };
+  const phaseMRows = await db
+    .insert(schema.scholarships)
+    .values([
+      { ...linkedValues, title: "Beacon Combined Ranking Award A", universityId: uniA.id },
+      { ...linkedValues, title: "Beacon Combined Ranking Award B", universityId: uniB.id },
+      { ...linkedValues, title: "Beacon Combined Ranking Award C", universityId: null },
+    ])
+    .returning();
+  const awardA = phaseMRows.find((row: any) => row.title.endsWith("Award A"))!;
+  const awardB = phaseMRows.find((row: any) => row.title.endsWith("Award B"))!;
+  const awardC = phaseMRows.find((row: any) => row.title.endsWith("Award C"))!;
+
+  // The catalogue bundle is cached for 5 minutes and only an admin write
+  // invalidates it; the fixtures above were inserted directly, so drop it.
+  const { invalidateCatalogCache } = await import("../src/lib/catalogCache");
+  invalidateCatalogCache();
+
+  const rankedCatalog = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&perPage=20&facets=1`
+  );
+  const rankedRows: any[] = rankedCatalog.body?.scholarships ?? [];
+  const rowA = rankedRows.find((row) => row.id === awardA.id);
+  const rowB = rankedRows.find((row) => row.id === awardB.id);
+  const rowC = rankedRows.find((row) => row.id === awardC.id);
+  check(
+    "scholarships: the personalised response carries a combined relevance score and both personal buckets",
+    rankedCatalog.status === 200 &&
+      rankedRows.length === 3 &&
+      rankedRows.every(
+        (row) =>
+          typeof row.relevanceScore === "number" &&
+          row.fitBucket != null &&
+          row.chanceBucket === "meets", // GPA 3.7 ≥ 3.5, IELTS 7.5 ≥ 6.5, Bachelor published
+      ),
+    JSON.stringify(rankedRows.map((r) => [r.title, r.relevanceScore, r.fitBucket, r.chanceBucket]))
+  );
+  // The university score must follow the matcher, not a guess: compute both and
+  // assert the route placed the better-matching university's award first.
+  const { calculateUniversityMatch } = await import("../src/lib/matching");
+  const uniScoreA = calculateUniversityMatch(profile as any, uniA as any).matchScore;
+  const uniScoreB = calculateUniversityMatch(profile as any, uniB as any).matchScore;
+  const expectedFirst = uniScoreA >= uniScoreB ? rowA : rowB;
+  const expectedSecond = uniScoreA >= uniScoreB ? rowB : rowA;
+  check(
+    "scholarships: equal published gates — the better-matching university ranks first",
+    rowA?.universityMatchScore != null &&
+      rowB?.universityMatchScore != null &&
+      rankedRows.indexOf(expectedFirst) < rankedRows.indexOf(expectedSecond) &&
+      expectedFirst.relevanceScore > expectedSecond.relevanceScore,
+    `uniA=${uniScoreA} uniB=${uniScoreB} order=${JSON.stringify(rankedRows.map((r) => [r.title, r.relevanceScore, r.universityMatchScore]))}`
+  );
+  check(
+    "scholarships: an award with no university link is scored on the parts it has, not as a zero",
+    rowC?.universityMatchScore == null && typeof rowC?.relevanceScore === "number" && rowC.relevanceScore > 0
+  );
+  check(
+    "scholarships: the list is ordered by the combined score (descending)",
+    rankedRows.every((row, i) => i === 0 || rankedRows[i - 1].relevanceScore >= row.relevanceScore)
+  );
+  check(
+    "scholarships: the facet payload counts the two personal buckets",
+    typeof rankedCatalog.body?.facets?.chance?.meets === "number" &&
+      rankedCatalog.body.facets.chance.meets >= 3 &&
+      typeof rankedCatalog.body?.facets?.fit === "object"
+  );
+
+  const chanceFiltered = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&chance=below&perPage=20`
+  );
+  check(
+    "scholarships: ?chance=below returns none of the awards whose gates are met",
+    chanceFiltered.status === 200 && (chanceFiltered.body?.scholarships ?? []).length === 0,
+    JSON.stringify((chanceFiltered.body?.scholarships ?? []).map((r: any) => r.title))
+  );
+  const chanceMeets = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&chance=meets&perPage=20`
+  );
+  check(
+    "scholarships: ?chance=meets keeps exactly those three awards",
+    chanceMeets.status === 200 && (chanceMeets.body?.scholarships ?? []).length === 3
+  );
+  const fitFiltered = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&fit=low&perPage=20`
+  );
+  check(
+    "scholarships: ?fit=low drops the strong-fit awards",
+    fitFiltered.status === 200 && (fitFiltered.body?.scholarships ?? []).length === 0
+  );
+  const anonChance = await call(
+    scholarshipsRoute.GET as any,
+    `/api/scholarships?search=${encodeURIComponent("Beacon Combined Ranking")}&chance=meets&perPage=20`,
+    { headers: anonHdr }
+  );
+  check(
+    "scholarships: an anonymous caller's personal filter is dropped, not silently empty",
+    anonChance.status === 200 && (anonChance.body?.scholarships ?? []).length === 3 &&
+      (anonChance.body?.scholarships ?? []).every((row: any) => row.chanceBucket == null && row.relevanceScore == null)
+  );
+
   await db.delete(schema.scholarships).where(inArray(schema.scholarships.id, [
     searchTarget.id,
     ...focusedRows.map((row: any) => row.id),
     inactiveScholarship.id,
+    ...phaseMRows.map((row: any) => row.id),
   ]));
+
+  // ---- Phase N: the dictionary installs itself into a fresh database ------
+  // The live deployment never needs a manual import step: the channel
+  // bootstrap runs the DDL and then the versioned lexicon import. That claim is
+  // only worth making if a fresh database proves it, so this block starts from
+  // a database with no lexicon rows at all.
+  const channelDb = await import("../src/lib/channel/db");
+  const { dictionaryStatus } = await import("../src/lib/channel/selfcheckStore");
+  const { installLexicon } = await import("../src/lib/channel/lexicon/store");
+
+  const beforeBootstrap = await dictionaryStatus();
+  check(
+    "channel: before any bootstrap the dictionary is honestly reported as not imported",
+    beforeBootstrap.state === "pending" && beforeBootstrap.rows === 0 && beforeBootstrap.ready === false,
+    `${beforeBootstrap.state} rows=${beforeBootstrap.rows}`
+  );
+
+  channelDb.resetChannelTablesMemo();
+  const channelTablesReady = await channelDb.ensureChannelTables();
+  const installed = await dictionaryStatus();
+  check(
+    "channel: the first bootstrap installs the whole dictionary into a fresh database",
+    channelTablesReady === true && installed.state === "installed" && installed.rows >= 12_000,
+    `ready=${channelTablesReady} state=${installed.state} rows=${installed.rows}`
+  );
+  check(
+    "channel: the installed version is the version this build bundles",
+    installed.installedVersion === installed.bundledVersion && installed.bundledVersion.length > 0,
+    `${installed.installedVersion} vs ${installed.bundledVersion}`
+  );
+  check(
+    "channel: every bundled term is in the database (no silent truncation)",
+    installed.rows === installed.bundledTerms,
+    `rows=${installed.rows} bundled=${installed.bundledTerms}`
+  );
+
+  const secondInstall = await installLexicon();
+  check(
+    "channel: a second install is a no-op — the import is versioned, not repeated",
+    secondInstall.installed === false && secondInstall.size === installed.rows,
+    `installed=${secondInstall.installed} size=${secondInstall.size}`
+  );
+
+  // An explicit repair must do the same thing: an operator's "retry" cannot
+  // leave the tables created and the dictionary empty.
+  await db.delete(schema.translationLexicon);
+  await db.delete(schema.translationLexiconMeta);
+  const emptied = await dictionaryStatus();
+  channelDb.resetChannelTablesMemo();
+  const repaired = await channelDb.forceChannelRepair();
+  const afterRepair = await dictionaryStatus();
+  check(
+    "channel: an explicit repair re-installs the dictionary, not just the tables",
+    emptied.state === "pending" && repaired === true && afterRepair.state === "installed" && afterRepair.rows === afterRepair.bundledTerms,
+    `emptied=${emptied.state} repair=${repaired} after=${afterRepair.state}/${afterRepair.rows}`
+  );
+
+  // Admin edits survive an import — the operator's corrections are the reason
+  // the dictionary is editable in the panel at all.
+  const [editedRow] = await db
+    .select({ en: schema.translationLexicon.en })
+    .from(schema.translationLexicon)
+    .limit(1);
+  if (editedRow) {
+    await db
+      .insert(schema.translationLexicon)
+      .values({ key: "phase-n-admin-term", en: "phase-n admin term", uz: "Faza-N atamasi", source: "admin" })
+      .onConflictDoNothing();
+  }
+  await installLexicon();
+  const adminRows = await db
+    .select({ en: schema.translationLexicon.en, source: schema.translationLexicon.source })
+    .from(schema.translationLexicon);
+  const keptAdmin = adminRows.filter((row) => row.source === "admin");
+  check(
+    "channel: an import never deletes an operator's own rows",
+    keptAdmin.length >= 1 && keptAdmin.some((row) => row.en === "phase-n admin term"),
+    `admin rows=${keptAdmin.length}`
+  );
+
+  // ---- Phase O: a refused approval must leave a trace --------------------
+  // The live report was "I pressed Approve and nothing happened". Telegram's
+  // toast disappears in three seconds; the audit row does not.
+  const { handleChannelApprovalCallback } = await import("../src/lib/telegram/approval");
+  const [approvalFixture] = await db
+    .insert(schema.channelPosts)
+    .values({
+      kind: "scholarship_single",
+      mode: "approval",
+      chatId: "7292856664",
+      html: "<b>Fixture</b> approval body",
+      status: "awaiting_approval",
+      dedupeKey: `phase-o|${Date.now()}`,
+    })
+    .returning();
+  const strangerToast = await handleChannelApprovalCallback({
+    data: `ch:ok:${approvalFixture.id}`,
+    chatId: "7292856664",
+    chatType: "private",
+    telegramUserId: 999_000_111,
+  });
+  const blockedRows = await db
+    .select({ action: schema.channelAudit.action, entityId: schema.channelAudit.entityId, after: schema.channelAudit.after })
+    .from(schema.channelAudit);
+  const notAdminRow = blockedRows.find(
+    (row) => row.action === "approval_blocked" && row.entityId === String(approvalFixture.id) && String(row.after ?? "").includes("not_admin")
+  );
+  check(
+    "channel: an approval press by a non-admin is refused AND recorded",
+    Boolean(notAdminRow) && strangerToast.length > 0,
+    `rows=${blockedRows.filter((r) => r.action === "approval_blocked").length} toast=${strangerToast.slice(0, 40)}`
+  );
+
+  // The same press from the linked ADMIN reaches the publisher, which refuses
+  // it for a reason of its own (no channel configured in this test database) —
+  // and that reason is recorded instead of vanishing.
+  const [linkedAdmin] = await db
+    .insert(schema.telegramLinks)
+    .values({ profileId: adminProfile.id, telegramUserId: "555000111", chatId: "555000111" })
+    .returning();
+  await handleChannelApprovalCallback({
+    data: `ch:ok:${approvalFixture.id}`,
+    chatId: "7292856664",
+    chatType: "private",
+    telegramUserId: 555000111,
+  });
+  const afterAdmin = await db
+    .select({ action: schema.channelAudit.action, after: schema.channelAudit.after })
+    .from(schema.channelAudit)
+    .where(eq(schema.channelAudit.entityId, String(approvalFixture.id)));
+  // Which refusal branch is reached depends on the environment (no bot token
+  // here, no channel configured there) — what must never happen again is a
+  // refused press with no recorded reason.
+  check(
+    "channel: an admin approval that cannot publish records the exact reason",
+    afterAdmin.some((row) => {
+      const after = String(row.after ?? "");
+      return row.action === "approval_blocked" && /"(send_failed|skipped)"/.test(after) && /"reason":"[^"]+"/.test(after);
+    }),
+    JSON.stringify(afterAdmin.map((r) => r.after)).slice(0, 200)
+  );
+
+  await db.delete(schema.channelAudit).where(eq(schema.channelAudit.entityId, String(approvalFixture.id)));
+  await db.delete(schema.channelPosts).where(eq(schema.channelPosts.id, approvalFixture.id));
+  await db.delete(schema.telegramLinks).where(eq(schema.telegramLinks.id, linkedAdmin.id));
+
+  const adminChannelRoute = await import("../src/app/api/admin/channel/route");
+  const adminCookie = `sb_session=${adminToken}`;
+  const channelOverviewRes = await call(adminChannelRoute.GET as any, "/api/admin/channel", {
+    headers: { cookie: adminCookie },
+  });
+  check(
+    "admin channel panel reports the dictionary state next to the other counts",
+    channelOverviewRes.status === 200 &&
+      channelOverviewRes.body?.dictionary?.ready === true &&
+      // The fixture's admin row is on top of the bundled terms, and the panel
+      // must count it separately rather than treating it as an import drift.
+      channelOverviewRes.body?.dictionary?.rows ===
+        channelOverviewRes.body?.dictionary?.bundledTerms + channelOverviewRes.body?.dictionary?.adminRows,
+    JSON.stringify(channelOverviewRes.body?.dictionary)?.slice(0, 220)
+  );
+  const reimportRes = await call(adminChannelRoute.POST as any, "/api/admin/channel", {
+    method: "POST",
+    headers: { cookie: adminCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "dictionary" }),
+  });
+  check(
+    "admin channel panel can re-import the dictionary in one action",
+    reimportRes.status === 200 && reimportRes.body?.ok === true && reimportRes.body?.dictionary?.ready === true,
+    `${reimportRes.status} ${JSON.stringify(reimportRes.body?.result ?? reimportRes.body?.error)}`
+  );
 
   // ---- A20: rate limits shared across instances ---------------------------
   const { checkSharedRateLimit } = await import("../src/lib/rate-limit-shared");

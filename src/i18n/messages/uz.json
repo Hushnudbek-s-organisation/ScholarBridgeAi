@@ -4539,7 +4539,17 @@
     },
     "allDegrees": "🎓 Barcha darajalar",
     "allStatuses": "🗓 Barcha holatlar",
-    "allBasis": "🎯 Har qanday asos"
+    "allBasis": "🎯 Har qanday asos",
+    "filterChance": "Imkoniyat (e'lon qilingan talablar)",
+    "filterChanceMeets": "✅ Talablar mos",
+    "filterChanceBelow": "⚠️ Talab mos emas",
+    "filterChanceUnknown": "❔ Aniqlanmagan",
+    "allChance": "🎯 Har qanday imkoniyat",
+    "filterFit": "Moslik",
+    "filterFitStrong": "⭐ Juda mos",
+    "filterFitGood": "👍 Mos",
+    "filterFitLow": "🔻 Past moslik",
+    "allFit": "🎯 Har qanday moslik"
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",
@@ -6862,7 +6872,8 @@
       "audit": "Jurnal",
       "polls": "So'rovnomalar",
       "prefs": "Qiziqish",
-      "stories": "Hikoyalar"
+      "stories": "Hikoyalar",
+      "lexicon": "Lug'at"
     },
     "steps": {
       "token": "Bot tokeni (Admin → Telegram)",
@@ -7174,6 +7185,78 @@
       "startNow": "Yuborishni yoqish (tasdiqlash bilan)",
       "startDone": "Yuborish yoqildi — birinchi post admin chatga keldi.",
       "buildNow": "Bugungi rejani tuzish"
+    },
+    "lexicon": {
+      "title": "Lug'at",
+      "hint": "Kanal tarjima qiladigan har bir inglizcha atama shu yerdan olinadi. Lug'at ilova ichida va bazada saqlanadi; izohni o'zgartirsangiz, keyingi post shuni aytadi — deploy kerak emas.",
+      "bundled": "Ilovada",
+      "inDatabase": "Bazada",
+      "edited": "Siz tuzatgan",
+      "version": "Ilovadagi versiya",
+      "installedVersion": "O'rnatilgan versiya",
+      "notInstalled": "hali o'rnatilmagan",
+      "search": "Qidirish",
+      "searchPlaceholder": "masalan: tuition, motivation letter, proof of funds",
+      "import": "Qayta yuklash",
+      "installed": "Yuklandi: {count} atama",
+      "alreadyCurrent": "Allaqachon yangilangan",
+      "editTitle": "Izohni tuzatish",
+      "english": "Inglizcha atama",
+      "uzbek": "O'zbekcha izoh (postda shu yoziladi)",
+      "russian": "Ruscha izoh (ixtiyoriy)",
+      "editHint": "Faqat qisqa ibora. Tuzatishingiz darhol amal qiladi; postda hech qachon ro'yxatda yo'q izoh chiqmaydi.",
+      "edit": "Tuzatish",
+      "reset": "Asl holatiga qaytarish",
+      "resetDone": "Lug'atdagi asl izoh qaytarildi",
+      "sourceAdmin": "sizniki",
+      "sourcePdf": "lug'at",
+      "noResults": "Hech narsa topilmadi",
+      "noResultsHint": "Inglizcha atama bilan sinab ko'ring: tuition, transcript.",
+      "empty": "Hozircha tuzatish yo'q",
+      "emptyHint": "Yuqoridan atama qidirib, o'zbekcha izohini tuzating."
+    },
+    "dictionary": {
+      "title": "Tarjima lug'ati",
+      "state": {
+        "installed": "o'rnatilgan",
+        "pending": "hali import qilinmagan",
+        "stale": "eski versiya",
+        "unavailable": "o'qib bo'lmadi"
+      },
+      "advice": {
+        "none": "Post matni shu lug'atdan tarjima qilinadi.",
+        "install": "Birinchi tick o'zi import qiladi — xohlasangiz hoziroq boshlang.",
+        "reimport": "Ilovadagi lug'at yangilangan: qayta import qiling (siz tuzatgan qatorlar saqlanadi).",
+        "checkDatabase": "Jadval o'qilmadi: baza ulanishi yoki ruxsatni tekshiring."
+      },
+      "facts": "{rows}/{terms} atama · versiya {version}",
+      "edited": "{count} qator qo'lda tuzatilgan",
+      "importNow": "Import qilish",
+      "imported": "{rows} atama bazaga yozildi",
+      "importFailed": "Import bajarilmadi — sabab jurnalda ko'rinadi."
+    },
+    "webhook": {
+      "title": "Bot webhook'i (tugmalar shu orqali ishlaydi)",
+      "state": {
+        "ok": "ulangan",
+        "missing": "ulanmagan",
+        "wrong_url": "boshqa manzilga ulangan",
+        "error": "xato bilan ishlayapti",
+        "unknown": "tekshirib bo'lmadi"
+      },
+      "advice": {
+        "none": "Tasdiqlash/rad etish tugmalari ishlaydi.",
+        "connect": "Tugmalar ishlamaydi: webhook ulanmagan — pastdagi tugmani bosing.",
+        "move": "Webhook eski manzilga qaratilgan — qayta ulang.",
+        "retry": "Telegram xato qaytaryapti — qayta ulab ko'ring.",
+        "checkTeam": "Telegram javob bermadi: bot tokeni va tarmoqni tekshiring."
+      },
+      "none": "webhook yo'q",
+      "pending": "{count} ta yangilanish navbatda",
+      "lastError": "Oxirgi xato: {message}",
+      "dedicated": "Kanal uchun alohida bot ishlatilmoqda — bu botning webhook'i tekshiriladi.",
+      "fix": "Ulash / tuzatish",
+      "fixed": "Webhook ulandi — tugmalar endi ishlaydi."
     }
   },
   "adminDiagnostics": {
