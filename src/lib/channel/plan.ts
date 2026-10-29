@@ -270,7 +270,19 @@ export function buildDailyPlan(input: PlanInput): PlannedItem[] {
         if (usedScholarshipIds.has(candidate.facts.id)) return false;
         return !lastScholarshipUse(history, planDate, candidate.facts.id, 7);
       })
-      .sort((a, b) => (a.candidate.facts.deadline.daysLeft ?? 0) - (b.candidate.facts.deadline.daysLeft ?? 0));
+      /**
+       * Nearest first — and when several close on the same day, the country the
+       * audience actually applies to gets the urgency treatment (the post with
+       * the biggest visual weight). Without the second key the tie fell back to
+       * the topic score, so a same-day favourite could lose to an unrelated
+       * country purely on rotation history.
+       */
+      .sort(
+        (a, b) =>
+          (a.candidate.facts.deadline.daysLeft ?? 0) - (b.candidate.facts.deadline.daysLeft ?? 0) ||
+          countryPriority(a.candidate.facts.countryRaw ?? a.candidate.facts.country, settings.plan.priorityCountries) -
+            countryPriority(b.candidate.facts.countryRaw ?? b.candidate.facts.country, settings.plan.priorityCountries)
+      );
     if (urgent.length > 0) {
       const { candidate } = urgent[0];
       const rung = urgencyRung(candidate.facts.deadline) ?? URGENT_RUNG_MAX;

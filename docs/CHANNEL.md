@@ -831,17 +831,61 @@ The fix is data, not code.
 picks, in this order:
 
 1. **deadline tier** — ≤7, ≤14, ≤30, ≤60, ≤120 days, then estimated, then
-   evergreen. The near ones go out while they can still be acted on;
-2. **country priority** — `plan.priorityCountries`, an operator-editable list
+   evergreen;
+2. **exact days left** — inside a band, tomorrow beats next week. This is the
+   half that was missing: the country order used to come first *within* a band,
+   so a 7-day award in a favourite country could be announced before a 1-day
+   one somewhere else;
+3. **country priority** — `plan.priorityCountries`, an operator-editable list
    (default: United States, United Kingdom, Germany, South Korea, Japan, …).
-   Once nothing is imminent, programmes from the countries this audience
-   actually applies to win;
-3. the learned preference score (from polls);
-4. the row id, so the plan is reproducible.
+   Among awards that close on the **same day**, the countries this audience
+   actually applies to win. The urgent lane uses the same tie-break, so a
+   same-day favourite gets the urgency post rather than an unrelated country
+   that happened to be next in the rotation;
+4. the learned preference score (from polls);
+5. the row id, so the plan is reproducible.
+
+**The country order never worked until 2026-10-29.** `editorialRank` passed
+`facts.country` — the *Uzbek* label the templates print (`Yaponiya`, `AQSh`) —
+into `countryPriority`, which matches English names. Every country therefore
+scored `priorities.length`, i.e. "not in the list", and the operator's list had
+exactly no effect on the plan. It now reads `facts.countryRaw` (the stored
+value), and the alias table also knows the Uzbek spellings, so a label that
+slips through still resolves instead of silently sorting last.
 
 Country matching goes through an alias table (`USA`/`US`/`United States of
 America` → United States, `UK`/`Britain` → United Kingdom, `Korea` → South
-Korea, …), because the column is free text.
+Korea, `Germaniya` → Germany, …), because the column is free text.
+
+#### §4d. Checked against the live catalogue
+
+`scripts/fixtures/catalogue-slice.json` is a 45-row excerpt of the production
+catalogue (2026-10-29): every active, verified award with a deadline in the next
+45 days, nearest first. `check-channel.ts` plans it and asserts that the plan is
+non-decreasing in days-left and that the first post targets the nearest
+deadline — real data, not invented numbers. Regenerate with:
+
+```sql
+select id, country, deadline_date, deadline_type, coverage_type, left(title, 42)
+from scholarships
+where is_active and verification_status = 'verified'
+  and deadline_date between current_date and current_date + 45
+order by deadline_date, id limit 45;
+```
+
+Planned from that slice on 2026-10-29 (no history, default settings):
+
+| Day | slot 0 | slot 1 |
+|---|---|---|
+| 29-oktabr | urgency · 1 kun · Australia (UNSW Scientia) | poll |
+| 30-oktabr | urgency · 0 kun · Australia (UNSW Scientia) | single · 0 kun · Australia (Global University Award) |
+| 31-oktabr | urgency · 0 kun · **Japan** (Honjo) | single · 0 kun · China (CLEC) |
+| 1-noyabr | weekly · 12 ta | single · 5 kun · Canada (Toronto Pearson) |
+| 2-noyabr | urgency · 0 kun · United Kingdom (Imperial) | single · 1 kun · India (IIT Kanpur) |
+
+On 31 October six awards close on the same day; Japan (priority 4) takes the
+urgency slot ahead of China (12) and the four unlisted countries, which is the
+tie-break doing its job.
 
 The list is a **preference, not a statistic**: nothing in the panel or the posts
 claims how many students go anywhere. University-level relevance is expressed

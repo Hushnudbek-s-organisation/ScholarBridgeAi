@@ -109,7 +109,7 @@ import {
   lookup,
   translateFragment,
 } from "../src/lib/channel/lexicon";
-import { checkGloss } from "../src/lib/channel/lexicon/store";
+import { checkGloss } from "../src/lib/channel/lexicon/gloss";
 import { ctaLine, footerLine, hashtagLine } from "../src/lib/channel/templates/chrome";
 import {
   EMPTY_CONTENT,
@@ -179,7 +179,12 @@ import {
   discoveryMessage,
   isNewDiscovery,
 } from "../src/lib/channel/discovery";
-import { cleanPriorityCountries, DEFAULT_PRIORITY_COUNTRIES, parseDiscoveredChannel } from "../src/lib/channel/settings";
+import {
+  cleanPriorityCountries,
+  DEFAULT_CHANNEL_SETTINGS,
+  DEFAULT_PRIORITY_COUNTRIES,
+  parseDiscoveredChannel,
+} from "../src/lib/channel/settings";
 import { buildWhy, tickIsStale, waitingForWindow, whySummary } from "../src/lib/channel/why";
 import { countryPriority, deadlineTier, editorialRank } from "../src/lib/channel/select";
 import { AUTOPILOT_DEFAULT_MINUTES,
@@ -2493,6 +2498,144 @@ check("the nearest deadline is always posted before a closer favourite", () => {
   assert.equal(deadlineTier({ deadline: { quality: "exact", daysLeft: 8 } } as never), 1);
   assert.equal(deadlineTier({ deadline: { quality: "estimated", daysLeft: 30 } } as never), 6);
   assert.equal(deadlineTier({ deadline: { quality: "evergreen", daysLeft: null } } as never), 8);
+});
+
+check("the country order is read from the stored name, not the printed label", () => {
+  /**
+   * Regression: `editorialRank` fed `facts.country` — the *Uzbek* label — into
+   * `countryPriority`, which matches English names. Every country therefore
+   * scored "not in the list" (14) and the operator's order did nothing at all.
+   */
+  const dates = { now: new Date("2026-10-29T12:00:00Z"), siteUrl: "https://example.test" };
+  const make = (country: string, id: number) =>
+    buildFacts(
+      {
+        id,
+        title: "T",
+        provider: "P",
+        country,
+        deadlineDate: "2026-11-05",
+        deadlineType: "fixed",
+        isActive: true,
+        verificationStatus: "verified",
+        lastVerifiedAt: "2026-10-26",
+      } as never,
+      dates
+    );
+  const japan = make("Japan", 1);
+  const usa = make("United States", 2);
+  const list = DEFAULT_PRIORITY_COUNTRIES;
+  assert.equal(japan.country, "Yaponiya", "the label is Uzbek");
+  assert.equal(usa.country, "AQSh");
+  // The stored name ranks correctly…
+  assert.equal(countryPriority(japan.countryRaw, list), 4);
+  assert.equal(countryPriority(usa.countryRaw, list), 0);
+  // …and the label must not quietly rank last either (defence in depth).
+  assert.equal(countryPriority(japan.country, list), 4, "the Uzbek label resolves too");
+  assert.equal(countryPriority(usa.country, list), 0);
+  assert.equal(countryPriority("Yangi Zelandiya", list), list.length, "an unlisted country stays unlisted");
+});
+
+check("inside an urgency band, the nearest deadline still wins", () => {
+  /**
+   * The other half of the operator's rule: the country order breaks ties, it
+   * does not let a favourite country jump a nearer award. Both are tier 0.
+   */
+  const nearNz = {
+    facts: { id: 10, country: "Yangi Zelandiya", countryRaw: "New Zealand", deadline: { quality: "exact" as const, daysLeft: 1 } },
+    topics: [],
+  };
+  const farUs = {
+    facts: { id: 11, country: "AQSh", countryRaw: "United States", deadline: { quality: "exact" as const, daysLeft: 6 } },
+    topics: [],
+  };
+  const order = editorialRank([farUs, nearNz] as never, {
+    prefs: {},
+    priorities: DEFAULT_PRIORITY_COUNTRIES,
+    seed: "t",
+  });
+  assert.equal(order[0].candidate.facts.id, 10, "a 1-day award beats a 6-day favourite");
+  // Same deadline → the favourite country comes first, every time.
+  const sameDay = editorialRank(
+    [
+      { facts: { id: 12, country: "Yangi Zelandiya", countryRaw: "New Zealand", deadline: { quality: "exact" as const, daysLeft: 3 } }, topics: [] },
+      { facts: { id: 13, country: "Germaniya", countryRaw: "Germany", deadline: { quality: "exact" as const, daysLeft: 3 } }, topics: [] },
+    ] as never,
+    { prefs: {}, priorities: DEFAULT_PRIORITY_COUNTRIES, seed: "t" }
+  );
+  assert.equal(sameDay[0].candidate.facts.id, 13, "Germany (priority 2) is ahead of New Zealand (unlisted)");
+});
+
+check("when two awards close the same day, the favourite country gets the urgency post", () => {
+  // Same deadline, one country in the operator's list and one not. The urgent
+  // lane used to tie-break on the topic score, so the winner depended on
+  // rotation history rather than on what the audience applies to.
+  const mk = (id: number, countryRaw: string, label: string) => ({
+    id,
+    title: `T${id}`,
+    provider: "P",
+    country: countryRaw,
+    degreeLevels: '["Master\'s"]',
+    deadlineDate: "2026-11-12",
+    deadlineType: "fixed",
+    coverageType: "Full Tuition",
+    awardBasis: null,
+    rounds: null,
+    recurrence: null,
+    eligibleCountries: "[]",
+    isActive: true,
+    verificationStatus: "verified",
+    lastVerifiedAt: "2026-10-26",
+    __label: label,
+  });
+  const now = new Date("2026-11-10T12:00:00+05:00");
+  const candidates = [mk(60, "Thailand", "Thailand"), mk(61, "Germany", "Germany")].map((r) => ({
+    facts: buildFacts(r as never, { now, siteUrl: "https://example.test" }),
+    topics: topicKeys({ country: r.country, degreeLevels: r.degreeLevels, eligibleMajors: null, fullyFunded: true }),
+  }));
+  const settings = mergeChannelSettings({ plan: { dailyCap: 1, budgetMin: 1, budgetMax: 1 } });
+  const plan = buildDailyPlan({ planDate: "2026-11-10", candidates, settings });
+  assert.equal(plan[0]?.kind, "urgency", `expected an urgency post, got ${plan[0]?.kind}`);
+  assert.equal(plan[0]?.scholarshipId, 61, "Germany (priority 2) must take the urgency slot over unlisted Thailand");
+});
+
+check("the real catalogue slice is planned nearest-deadline-first", () => {
+  // A 45-row excerpt of the live Supabase catalogue (2026-10-29), used as a
+  // fixture so the ordering rules are checked against real data, not invented
+  // numbers. Regenerate with the SQL in docs/CHANNEL.md §4d.
+  const slice = JSON.parse(read("scripts/fixtures/catalogue-slice.json")) as { rows: FactsRow[] };
+  const now = new Date("2026-10-29T15:00:00+05:00");
+  const candidates = slice.rows
+    .filter((row) => publishable(row as never, now).ok)
+    .map((row) => ({
+      facts: buildFacts(row, { now, siteUrl: "https://example.test" }),
+      topics: topicKeys({
+        country: row.country,
+        degreeLevels: row.degreeLevels,
+        eligibleMajors: row.eligibleMajors,
+        fullyFunded: isFullyFunded(row as never),
+      }),
+    }));
+  assert.ok(candidates.length >= 40, `only ${candidates.length} candidates survived the gate`);
+
+  const plan = buildDailyPlan({ planDate: "2026-10-30", candidates, settings: DEFAULT_CHANNEL_SETTINGS });
+  const scholarshipItems = plan.filter((item) => item.scholarshipId !== null);
+  assert.ok(scholarshipItems.length >= 1, "the slice produced no post");
+
+  const chosen = candidates.find((c) => c.facts.id === scholarshipItems[0].scholarshipId);
+  const nearest = Math.min(...candidates.map((c) => c.facts.deadline.daysLeft ?? Infinity));
+  assert.equal(chosen?.facts.deadline.daysLeft, nearest, "the first post is not the nearest deadline");
+  // The whole plan is non-decreasing in days-left, ignoring the poll.
+  const days = scholarshipItems.map(
+    (item) => candidates.find((c) => c.facts.id === item.scholarshipId)?.facts.deadline.daysLeft ?? Infinity
+  );
+  assert.deepEqual(days, [...days].sort((a, b) => a - b), `the plan is not nearest-first: ${days.join(", ")}`);
+  // And nothing unverified/inactive ever enters it (the fixture is all-verified,
+  // so this asserts the gate ran, not the fixture).
+  for (const row of slice.rows) {
+    const check = publishable(row as never, now);
+    assert.equal(check.ok, true, `${row.id} should be publishable: ${check.reason}`);
+  }
 });
 
 check("country priority tolerates how the country is actually spelled", () => {

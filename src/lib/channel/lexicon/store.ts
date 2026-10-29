@@ -19,10 +19,17 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { translationLexicon, translationLexiconMeta } from "@/db/schema";
-import { looksEnglish, overlay, vocabulary, lexiconVersion } from "./index";
+import { overlay, vocabulary, lexiconVersion } from "./index";
 
 /** Rows per INSERT: large enough to be quick, small enough to stay one query. */
 const CHUNK = 400;
+
+/**
+ * Re-exported so the admin route has one import for "the dictionary's rules".
+ * The implementation lives in `./gloss` (no database import) — see the note
+ * there.
+ */
+export { checkGloss } from "./gloss";
 
 export interface LexiconInstallResult {
   installed: boolean;
@@ -30,30 +37,6 @@ export interface LexiconInstallResult {
   size: number;
   version: string;
   error?: string;
-}
-
-/**
- * The Uzbek gloss an operator types is what a post will literally print, so it
- * is validated with the same rule the renderer applies to anything it emits:
- * it must be a short phrase in Uzbek/Russian letters, and it must not still
- * contain the English function words that mean a sentence slipped through.
- *
- * Shared by the admin API (which rejects) and the offline checks (which assert),
- * so there is exactly one definition of "that is not a gloss".
- */
-const GLOSS_MAX = 120;
-
-export function checkGloss(raw: unknown):
-  | { ok: true; uz: string }
-  | { ok: false; error: "bad_gloss_empty" | "bad_gloss_letters" | "bad_gloss_english" } {
-  const uz = String(raw ?? "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, GLOSS_MAX);
-  if (!uz) return { ok: false, error: "bad_gloss_empty" };
-  if (!/[A-Za-z\u0400-\u04FF]/.test(uz)) return { ok: false, error: "bad_gloss_letters" };
-  if (looksEnglish(uz)) return { ok: false, error: "bad_gloss_english" };
-  return { ok: true, uz };
 }
 
 export async function installedVersion(): Promise<string | null> {
