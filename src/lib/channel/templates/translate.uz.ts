@@ -22,6 +22,7 @@
  */
 
 import { phraseScan, translateList } from "../lexicon";
+import { isCountryName } from "./format";
 
 export interface SignalContext {
   /** Degrees already listed from structured columns, to avoid a repeat. */
@@ -152,6 +153,19 @@ export function translateRequirements(raw: string | null | undefined, ctx: Signa
   if (ctx.minGpa === null || ctx.minGpa === undefined) {
     const gpa = new RegExp(`(?:gpa|grade point (?:average|equivalent))[^0-9]{0,24}(${NUMBER})`, "i").exec(text);
     if (gpa) push(`GPA ${gpa[1].replace(",", ".")}+`);
+    /**
+     * A letter-grade floor carries no digit: "a minimum GPA of A- on the
+     * qualification used for entry is required" (University of Waikato). The
+     * numeric reader above cannot see it, and the dictionary turned the bare
+     * phrase into a `Minimal GPA` bullet — a floor with no value, which is
+     * worse than saying nothing. The grade is in the text, so it is printed.
+     */
+    else {
+      // The sign must be captured with the letter: `\b` alone stops between
+      // "A" and "-", so the bullet would say "A" for an A- floor.
+      const letter = /\b(?:gpa|grade point average|grade average)\b\s*(?:of|:)?\s*([A-C][+-]?)(?![A-Za-z0-9])/i.exec(text);
+      if (letter) push(`Minimal GPA: ${letter[1]}`);
+    }
   }
 
   // --- percentage floor ---------------------------------------------------
@@ -229,10 +243,24 @@ export function translateRequirements(raw: string | null | undefined, ctx: Signa
  * repeats itself, and a fragment that reads as more than one sense is refused
  * rather than shrunk.
  */
+/**
+ * A chip that names a place, or a threshold with no value, is not a requirement.
+ *
+ * Both came straight out of live prose: "New Zealand" became a bullet (the
+ * country is already in the header), and "Minimal GPA" — the dictionary's gloss
+ * for the phrase "minimum GPA" — promised a floor without saying where it is.
+ */
+function isRequirementChip(chip: string): boolean {
+  if (isCountryName(chip)) return false;
+  if (/\b(?:minimal|maksimal|kamida)\b/i.test(chip) && !/\d/.test(chip)) return false;
+  return true;
+}
+
 export function dictionaryLine(raw: string, existing: readonly string[] = []): string | null {
   const seen = existing.map((line) => line.toLowerCase());
   const fresh = (fragment: string) => {
     if (fragment.length > 55 || fragment.includes(",") || fragment.includes(" / ")) return false;
+    if (!isRequirementChip(fragment)) return false;
     if (fragment.split(" ").length < 2) return false;
     const low = fragment.toLowerCase();
     return !seen.some((line) => line === low || line.includes(low) || low.includes(line));

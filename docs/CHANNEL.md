@@ -312,6 +312,19 @@ Two known edges, both measured:
   the panel. The dictionary is 12 732 headwords; ~1.6% of its glosses are not
   clean Uzbek as printed, and none of them can reach a post.
 
+**What the dictionary may not say.** Rendering the live queue (below) showed two
+bullets that came from real prose and were both wrong:
+
+| Chip | Why it was refused |
+|---|---|
+| `Yangi Zelandiya` | a *place*, not a requirement — the country is already in the header. `isCountryName()` knows the names in both languages |
+| `Minimal GPA` | a floor with **no value**: the dictionary's gloss for "minimum GPA", printed next to no number. A chip that starts with *minimal/maksimal/kamida* and carries no digit is dropped |
+
+The second one was hiding a fact instead of inventing one: the Waikato row says
+"a minimum GPA of **A-** on the qualification used for entry", which has no
+digit, so the numeric GPA reader skipped it. A letter grade is now read too —
+`Minimal GPA: A-` — and the bare chip disappears because the real line covers it.
+
 Measured on eight real awards, shape 2 puts Uzbek term chips on 4 of them; the
 other four are prose with no dictionary term in them, and stay as short as they
 were. That is the honest size of the gain — the dictionary names vocabulary, it
@@ -325,6 +338,37 @@ print `🔤 Til talabi` and a `🎓 Kimlar uchun` block of up to three ➡️ bu
 taken from **the same** `languageLabel()` / `eligibilityBullets()` the card uses,
 so the two renderers can never disagree. Escaping, the six-bullet cap and the
 "no English prose" rule are shared, not re-implemented.
+
+### 4b-5. Checked against the live queue
+
+The renderer is pure, so the live queue can be rendered from a copy of the
+production rows without touching Telegram. Done on 2026-10-29 14:05 Tashkent,
+against plan row 4 (`urgency_v4`, University of Waikato Doctoral Scholarship,
+due 20:35 the same day):
+
+```
+⏳ University of Waikato Doctoral Scholarship
+
+• Muddat: 31-oktabr, 2026 · 2 kun qoldi
+• Tashkilot: University of Waikato
+• Davlat: Yangi Zelandiya
+• Moliyalashtirish: To'liq kontrakt va stipendiya
+• Til talabi: Yagona til balli yo'q — talab tanlangan dasturga bog'liq
+
+🎓 Kimlar uchun
+➡️ Doktorantura (PhD)
+➡️ Minimal GPA: A-
+➡️ Xalqaro talabalar uchun
+
+📌 2 kun qoldi. Hujjatlarni oldindan tayyorlab qo'ying.
+
+➡️To'liq ma'lumot: {SITE}/go/2fc3yu
+```
+
+553 characters, `lintText` clean, no English left, no `100%`. The three
+nearest-deadline rows (37 and 771 at 2026-10-30, 437 at 2026-10-31) render the
+same way: 570–669 characters, all lint-clean, `Foydali tomonlari` present only
+where the row states something checkable.
 
 ### 4c. Weekly deadlines post
 

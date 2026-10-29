@@ -137,6 +137,7 @@ import {
   esc,
   formatDateUz,
   formatDayWithWeekdayUz,
+  isCountryName,
   majorsUz,
 } from "../src/lib/channel/templates/format";
 import { lintText, plainText, visibleLength } from "../src/lib/channel/lint";
@@ -3441,6 +3442,29 @@ check("Uzbek apostrophes are not mistaken for English words", () => {
   assert.match(advanced.uz, /kompyuter/i);
   const gloss = checkGloss("Ilg'or daraja");
   assert.equal(gloss.ok, true, "the gloss validator uses the same rule");
+});
+
+check("a place is not a requirement, and a floor without a value is not a fact", () => {
+  // Live prose (University of Waikato, 2026-10-29) produced exactly these two
+  // bad bullets: "Yangi Zelandiya" (the country was already in the header) and
+  // "Minimal GPA" (a floor with no number). Both are refused now.
+  const waikato =
+    "Candidates must: be a New Zealand citizen, permanent resident or residence-class visa holder, OR an international student. " +
+    "Selection is based on academic merit - a minimum GPA of A- on the qualification used for entry is required - plus research experience.";
+  const bullets = translateRequirements(waikato, { minGpa: null });
+  assert.ok(!bullets.includes("Yangi Zelandiya"), `a country became a requirement: ${bullets.join(" | ")}`);
+  assert.ok(!bullets.some((b) => /^minimal gpa$/i.test(b)), `a valueless floor was posted: ${bullets.join(" | ")}`);
+  // The grade is in the text, so it is printed with it.
+  assert.ok(bullets.includes("Minimal GPA: A-"), `the letter-grade floor was lost: ${bullets.join(" | ")}`);
+  // A numeric floor still wins over the letter reader.
+  const numeric = translateRequirements("A minimum GPA of 3.5 is required.", { minGpa: null });
+  assert.ok(numeric.includes("GPA 3.5+"), `numeric floor broken: ${numeric.join(" | ")}`);
+
+  // A country name is recognised in both languages, and a real requirement is not.
+  assert.equal(isCountryName("Yangi Zelandiya"), true);
+  assert.equal(isCountryName("New Zealand"), true);
+  assert.equal(isCountryName("Motivatsion xat"), false);
+  assert.equal(countryUz("Poland"), "Polsha", "the Uzbek name for Poland must match channel_countries");
 });
 
 check("an operator's gloss is what the post will say — and nothing else can be typed", () => {
