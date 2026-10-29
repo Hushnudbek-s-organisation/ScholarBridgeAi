@@ -38,8 +38,16 @@ const config = {
     "!**/*.map",
     "!**/*.md",
   ],
+  // `resources/server` — NOT `resources/app`. Electron loads the program from
+  // `resources/app`, so copying the compiled server there merged two bundles in
+  // one folder: the server's package.json (which has no `main`) replaced the
+  // app's, and Electron then looked for `resources/app/index.js` and died with
+  // "Cannot find module". Keep the two trees strictly apart.
+  // `desktop/build-resources/server` is a symlink-free copy of the standalone
+  // build (scripts/build-desktop.mjs stages it): electron-builder's archiver
+  // cannot follow Next's `pg-<hash>` relative symlink on Windows.
   extraResources: [
-    { from: "../.next/standalone", to: "app", filter: ["**/*"] },
+    { from: "build-resources/server", to: "server", filter: ["**/*"] },
     { from: "../supabase/full_schema.sql", to: "schema/full_schema.sql" },
   ],
   extraMetadata: {

@@ -99,8 +99,14 @@ async function main() {
     }
     const builder = (await import("../desktop/electron-builder.mjs")).default;
     check("the installer bundles the server and the schema",
-      builder.extraResources.some((r) => r.to === "app") &&
+      builder.extraResources.some((r) => r.to === "server") &&
         builder.extraResources.some((r) => r.to === "schema/full_schema.sql"));
+    // Electron runs whatever is in resources/app. Copying the compiled server
+    // into that folder merges two package.json files and the app cannot start
+    // ("Cannot find module …/resources/app/index.js"), so this must stay false.
+    check("the compiled server is not mixed into resources/app",
+      !builder.extraResources.some((r) => r.to === "app"),
+      "extraResources must target `server`, not `app`");
     check("the window loads the bundled app (not a remote page)",
       /loadURL\(url\)/.test(fs.readFileSync(path.join(repoRoot, "desktop", "main.mjs"), "utf8")));
     check("the renderer gets no Node.js access",
