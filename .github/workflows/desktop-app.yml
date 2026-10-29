@@ -60,6 +60,9 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/scholarbridge
       SESSION_SECRET: desktop-build-session-secret-not-used-at-runtime-000000
       NEXT_TELEMETRY_DISABLED: "1"
+      # Unsigned builds on purpose (no paid certificate in this project):
+      # stop electron-builder from hunting for an identity on macOS.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -76,9 +79,12 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: desktop
 
+      # Cross-platform (no psql client on the Windows/macOS runners): the
+      # repository's own apply script, which reads supabase/full_schema.sql.
       - name: Load the schema into the build database
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/full_schema.sql
-        shell: bash
+        run: npm run db:apply-full-schema
+        env:
+          SCHOLARBRIDGE_ALLOW_FULL_SCHEMA_APPLY: "YES"
 
       # Compiles the standalone server, copies static assets, and packages the
       # installer with electron-builder (scripts/build-desktop.mjs).
