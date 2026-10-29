@@ -3849,11 +3849,36 @@ check("Telegram not answering is 'unknown' and is never 'repaired' on a guess", 
   assert.equal(webhookAdvice(verdict), "checkTeam");
 });
 
-check("the channel tick verifies and repairs the webhook", () => {
+check("BOTH tick paths verify and repair the webhook", () => {
+  // The live deployment only ever runs the in-process loop: no `cron`-source
+  // tick exists in the audit trail at all. A self-check wired into the cron
+  // route alone therefore never ran — the 2026-10-29 gap this check closes.
   const cron = read("src/app/api/cron/channel/route.ts");
-  assert.match(cron, /ensurePublisherWebhook\(\)/);
-  // A webhook problem must never fail the tick itself.
-  assert.match(cron, /ensurePublisherWebhook\(\)\.catch\(\(\) => null\)/);
+  const boot = read("src/lib/channel/boot.ts");
+  assert.match(cron, /maintainPublisherTransport\(/);
+  assert.match(boot, /maintainPublisherTransport\(/);
+  // The loop's heartbeat must carry the verdict, or the panel cannot tell
+  // "ticking with a dead webhook" from "ticking fine".
+  assert.match(boot, /webhook: `\$\{transport\.state\}/);
+});
+
+check("a preview is never sent with buttons that cannot work", () => {
+  const send = read("src/lib/channel/send.ts");
+  // The repair happens before the approval message is composed, i.e. before the
+  // operator can see a button that would do nothing.
+  const sendBlock = send.slice(send.indexOf("await maintainPublisherTransport()"));
+  const headerAt = send.indexOf("const header = approvalHeader({");
+  assert.ok(send.indexOf("maintainPublisherTransport()") < headerAt, "transport check must precede the header");
+  assert.ok(sendBlock.length > 0);
+});
+
+check("a repair tells the admin the buttons work again", () => {
+  // Otherwise the operator, whose last press failed, has no reason to retry.
+  const store = read("src/lib/channel/webhookStore.ts");
+  assert.match(store, /APPROVAL_TEXTS\.webhookRepaired/);
+  assert.match(store, /notifyChatId/);
+  const approval = read("src/lib/channel/approval.ts");
+  assert.match(approval, /webhookRepaired:/);
 });
 
 check("the webhook route accepts a dedicated publisher bot, not only the DM bot", () => {

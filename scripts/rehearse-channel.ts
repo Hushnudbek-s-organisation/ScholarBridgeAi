@@ -34,7 +34,7 @@ import { retireStalePlans } from "@/lib/channel/store";
 import { approveApproval, duePlanRows, runDuePosts } from "@/lib/channel/send";
 import { lintText } from "@/lib/channel/lint";
 import { tashkentDay } from "@/lib/channel/config";
-import { ensurePublisherWebhook, publisherWebhook, resetWebhookMemo } from "@/lib/channel/webhookStore";
+import { ensurePublisherWebhook, maintainPublisherTransport, publisherWebhook, resetWebhookMemo } from "@/lib/channel/webhookStore";
 import { handlePublisherUpdate } from "@/lib/telegram/publisher";
 
 const SITE = "https://rehearsal.invalid";
@@ -358,6 +358,16 @@ async function main() {
       const ids = new Set(parsed.map((match) => match?.[2]));
       assert(ids.size === 1, `the actions point at ${ids.size} different posts`);
     });
+    await check("the preview registered the webhook before the operator saw a button", async () => {
+      // The mock starts with NO webhook, exactly like a deployment that moved.
+      // Sending the preview must fix that first: a press on a dead button leaves
+      // no trace anywhere, which is how a working publisher looked broken.
+      const info = (await (await fetch(`${base}/bot${process.env.TELEGRAM_CHANNEL_BOT_TOKEN}/getWebhookInfo`)).json()) as {
+        result?: { url?: string };
+      };
+      assert(info.result?.url === `${SITE}/api/telegram/webhook`, `webhook is "${info.result?.url ?? ""}"`);
+    });
+
     await check("the post waits in the panel", async () => {
       const rows = await db.select().from(channelPosts).where(eq(channelPosts.scholarshipId, award.id));
       const waiting = rows.find((row) => row.status === "awaiting_approval");
@@ -381,7 +391,10 @@ async function main() {
     // --- 5. the approval buttons' transport (Phase O) --------------------
     // A press only reaches the app if the *publisher* bot's webhook exists.
     // The mock starts with none, exactly like a deployment that lost it.
+    // Sending a preview already repairs the webhook (see the `send.ts` hook), so
+    // these two checks first break it exactly like a deployment move would.
     await check("a deployment with no webhook is reported as 'missing'", async () => {
+      await fetch(`${base}/bot${process.env.TELEGRAM_CHANNEL_BOT_TOKEN}/deleteWebhook`, { method: "POST" });
       resetWebhookMemo();
       const before = await publisherWebhook({ memo: false });
       assert(before.state === "missing", `state ${before.state}`);
@@ -404,6 +417,27 @@ async function main() {
       const again = await ensurePublisherWebhook();
       assert(again.repaired === false, "the tick re-registered a healthy webhook");
       assert(again.reason === "ok", `reason ${again.reason}`);
+    });
+
+    await check("the tick wrapper reports the verdict and never throws", async () => {
+      resetWebhookMemo();
+      const transport = await maintainPublisherTransport();
+      assert(transport.state === "ok", `state ${transport.state}`);
+      assert(transport.repaired === false, "a healthy webhook was re-registered");
+    });
+
+    await check("a repair warns the admin chat once, so the button gets a second press", async () => {
+      // Break the webhook the way a deployment move does, then let the tick
+      // wrapper repair it: the admin must be told, or nobody retries a button
+      // that failed a minute ago.
+      await fetch(`${base}/bot${process.env.TELEGRAM_CHANNEL_BOT_TOKEN}/deleteWebhook`, { method: "POST" });
+      resetWebhookMemo();
+      const before = await messagesTo(base, ADMIN_CHAT_ID);
+      const transport = await maintainPublisherTransport({ notifyChatId: ADMIN_CHAT_ID });
+      assert(transport.repaired === true, `repaired=${transport.repaired} state=${transport.state}`);
+      const after = await messagesTo(base, ADMIN_CHAT_ID);
+      assert(after.length === before.length + 1, `${after.length - before.length} new message(s)`);
+      assert(/qayta ulandi/i.test(after[after.length - 1]?.text ?? ""), after[after.length - 1]?.text?.slice(0, 60));
     });
 
     await check("a dedicated publisher bot's approval press is answered by that bot", async () => {

@@ -158,6 +158,34 @@ export async function ensurePublisherWebhook(options: { force?: boolean } = {}):
   return { repaired: true, reason: "repaired", status: after };
 }
 
+/**
+ * The one call every tick makes.
+ *
+ * `ensurePublisherWebhook` is the fix; this is the *tick-shaped* wrapper: it
+ * never throws (a tick must not die because Telegram was slow), it reports one
+ * compact line for the audit heartbeat, and after a real repair it tells the
+ * admin chat that the buttons work again — an operator who was told "the button
+ * is dead" otherwise has no reason to press it a second time.
+ */
+export async function maintainPublisherTransport(
+  options: { notifyChatId?: string | null } = {}
+): Promise<{ state: WebhookState; repaired: boolean; reason: EnsureResult["reason"] }> {
+  try {
+    const result = await ensurePublisherWebhook();
+    if (result.repaired && options.notifyChatId) {
+      const { token } = await getChannelBotToken().catch(() => ({ token: null }));
+      if (token) {
+        const { tgSendMessage } = await import("@/lib/telegram/api");
+        const { APPROVAL_TEXTS } = await import("./approval");
+        await tgSendMessage(token, options.notifyChatId, APPROVAL_TEXTS.webhookRepaired).catch(() => undefined);
+      }
+    }
+    return { state: result.status.state, repaired: result.repaired, reason: result.reason };
+  } catch {
+    return { state: "unknown", repaired: false, reason: "unreachable" };
+  }
+}
+
 /** Test seam: forget the memo (the integration checks call this). */
 export function resetWebhookMemo(): void {
   lastCheck = null;

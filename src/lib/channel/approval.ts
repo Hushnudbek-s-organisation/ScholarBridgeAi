@@ -147,6 +147,13 @@ export const APPROVAL_TEXTS = {
    */
   panelOnly:
     "Admin chatga yuborilmadi — post panelda «Tasdiqlash kutilmoqda» ro'yxatida. Shu yerdan tasdiqlab kanalga chiqarish mumkin.",
+  /**
+   * Sent to the admin chat once, right after the publisher bot's webhook was
+   * repaired. Without it the operator has no reason to try a button that was
+   * dead a minute ago — and would conclude it is still dead.
+   */
+  webhookRepaired:
+    "🔗 <b>Bot qayta ulandi</b>\nTasdiqlash tugmalari endi ishlaydi. Kutilayotgan postni yana bir marta tasdiqlang (yoki Admin → Kanal → Tasdiqlash).",
   buttons: {
     approve: "✅ Tasdiqlash",
     reject: "❌ Rad etish",

@@ -966,6 +966,51 @@ identity as its key, so a duplicate tick sends nothing twice. Call it every
 `mode = off`, a pause, or an unconfigured channel makes the tick return
 `{"skipped": true}` without touching Telegram.
 
+### 11a-2. 2026-10-29 (kechqurun) — deploy tekshirildi: nima ishladi, nima ishlamadi
+
+PR #116 `b560af6` bilan main'ga qo'shildi. O'sha kuni kechqurun live Supabase
+o'qib chiqildi (read-only), va ikkita fakt aniqlandi:
+
+**Ishladi — lug'at o'zi o'rnatildi.** Merge 16:40:29 UTC, lug'at esa
+**16:44:10** da bazada edi:
+
+```
+translation_lexicon        12 732 satr   (admin: 0)
+translation_lexicon_meta   version = pdf-12732-1949
+```
+
+Ya'ni hech kim hech narsa qo'lda kiritmagan — birinchi tick `ensureChannelTables`
+→ `installLexicon` zanjirini o'zi ishga tushirgan. §11 dagi «birinchi tick
+o'rnatadi» degan da'vo endi deployda isbotlangan, faqat testda emas.
+
+**Ishlamadi — webhook o'zini tuzatish hech qachon ishga tushmagan.**
+`channel_audit` dagi barcha heartbeat satrlari `entity_id = "loop"`. Birorta
+`cron` satri yo'q. Ya'ni O bosqichida yozilgan o'z-o'zini tuzatish **faqat
+`/api/cron/channel` ichida** edi, uni esa bu deployment'da hech kim chaqirmaydi
+(UptimeRobot hali sozlanmagan). In-process loop — yagona ishlab turgan tick —
+webhook'ni umuman tekshirmagan. Natija: buzuq webhook buzuq qoladi, tugma o'lik
+qoladi, va buni aytadigan hech qanday satr yozilmaydi.
+
+**Tuzatildi (shu bosqich).**
+
+1. `maintainPublisherTransport()` — tick shaklidagi yagona chaqiruv: hech qachon
+   throw qilmaydi, audit uchun bitta qisqa satr qaytaradi.
+2. **Loop ham, cron ham** shu funksiyani chaqiradi (`boot.ts`, `cron/channel`).
+   Loop heartbeat'i endi `webhook: "ok"` / `"missing>repaired"` kabi maydonni
+   olib yuradi — panel "tick ishlayapti, lekin webhook o'lik" holatini ajratadi.
+3. **Preview yuborishdan oldin** (`send.ts`) transport tekshiriladi: operator
+   tugmani ko'rganda u **allaqachon** ishlaydi. Buzuq tugma bosilganda hech
+   qanday iz qolmasligi — 2026-10-29 dagi asosiy muammo edi.
+4. **Tuzatilganda admin chatga bitta xabar** ketadi
+   (`APPROVAL_TEXTS.webhookRepaired`): "Bot qayta ulandi, tugmalar endi
+   ishlaydi, kutilayotgan postni yana tasdiqlang." Busiz oxirgi bosishi
+   muvaffaqiyatsiz bo'lgan operator qayta bosishga sabab ko'rmaydi.
+
+**Shu sababli qoida:** yangi tick-bosqichi qo'shsangiz, u **ikkala** yo'lda ham
+(`boot.ts` loop va `/api/cron/channel`) bo'lishi shart. `scripts/check-channel.ts`
+buni matn darajasida qulflaydi ("BOTH tick paths verify and repair the webhook"),
+`npm run channel:rehearse` esa mock Telegram bilan 21 tekshiruvda isbotlaydi.
+
 ### 11a-1. 2026-10-29 — "Approve tugmasi hech narsa qilmayapti"
 
 **Report.** The admin chat received the preview with three buttons. Pressing

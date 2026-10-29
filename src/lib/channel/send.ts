@@ -38,6 +38,7 @@ import {
 } from "./approval";
 import { pollPreviewText, pollSendParams, pollSendProblem, pollSpecByKey } from "./polls";
 import { recoveryAttempt, usableButtons, type SendAttempt } from "./recover";
+import { maintainPublisherTransport } from "./webhookStore";
 
 export interface SendOutcome {
   ok: boolean;
@@ -553,6 +554,15 @@ async function sendPlanRowForApproval(
       parts,
     };
   }
+
+  /**
+   * The buttons in this preview are only alive if the publisher bot's webhook
+   * is. Repair it *now*, before the operator sees the message — a press on a
+   * dead button leaves no trace at all, which is exactly how a working
+   * publisher looked broken on 2026-10-29. Memoised: a healthy webhook costs
+   * one `getWebhookInfo` every ten minutes, not one per post.
+   */
+  await maintainPublisherTransport().catch(() => null);
 
   const header = approvalHeader({
     kind: row.kind,

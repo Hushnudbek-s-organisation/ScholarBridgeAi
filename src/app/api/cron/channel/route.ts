@@ -5,7 +5,7 @@ import { ensureChannelTables } from "@/lib/channel/db";
 import { runPlanForToday, runPostsNow } from "@/lib/channel/adminActions";
 import { loadChannelSettings } from "@/lib/channel/repo";
 import { recordTick } from "@/lib/channel/whyStore";
-import { ensurePublisherWebhook } from "@/lib/channel/webhookStore";
+import { maintainPublisherTransport } from "@/lib/channel/webhookStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -71,12 +71,11 @@ async function handle(req: Request) {
      * The approval buttons only work if the bot that sends the preview has a
      * webhook. A deployment can lose it (a domain move, a rotated
      * SESSION_SECRET, a bot swapped in the environment) and the only visible
-     * symptom is a *button that does nothing* — so the tick re-checks it and
-     * repairs it when it is definitely broken. Bounded and memoised: one
-     * getWebhookInfo every ten minutes, a setWebhook only when needed, and a
-     * failure here never fails the tick.
+     * symptom is a *button that does nothing* — so every tick re-checks it and
+     * repairs it when it is definitely broken. Memoised, and a failure here
+     * never fails the tick.
      */
-    const webhook = await ensurePublisherWebhook().catch(() => null);
+    const webhook = await maintainPublisherTransport({ notifyChatId: settings.connection.adminChatId || null });
 
     const plan = await runPlanForToday(null);
     const posts = await runPostsNow(null);
@@ -86,10 +85,10 @@ async function handle(req: Request) {
       sent: posts.sent,
       approval: posts.approval,
       failed: posts.failed,
-      webhook: webhook ? `${webhook.status.state}${webhook.repaired ? ">repaired" : ""}` : "unknown",
+      webhook: `${webhook.state}${webhook.repaired ? ">repaired" : ""}`,
     });
     return NextResponse.json(
-      { ok: true, day: plan.planDate, plan, posts, webhook: webhook ? { state: webhook.status.state, repaired: webhook.repaired } : null },
+      { ok: true, day: plan.planDate, plan, posts, webhook: { state: webhook.state, repaired: webhook.repaired } },
       { status: 200 }
     );
   } catch (error) {
