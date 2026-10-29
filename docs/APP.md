@@ -52,7 +52,7 @@ building required:
 | Linux — Debian/Ubuntu package | `ScholarBridge.deb` | 116 MB | `…/releases/latest/download/ScholarBridge.deb` |
 
 (Prefix every link with `https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi`;
-the sizes are the actual files of release `v1.0.3`.)
+the sizes are the actual files of release `v1.0.7`.)
 
 ### Why the Android app is 4 MB and the desktop app is 145 MB
 
@@ -73,6 +73,9 @@ is the size of any Electron app such as Slack, Discord or VS Code.
 4. First launch: 30–60 s (it creates its own database). Later launches: seconds.
 5. `ScholarBridge-Portable.exe` does the same without installing anything —
    handy on a USB stick.
+6. **Upgrading from a broken build (1.0.3)**: uninstall it first (Settings →
+   Apps → ScholarBridge), then install this one. Your database and account stay
+   in `%APPDATA%\ScholarBridge` and are picked up again automatically.
 
 ### Install — Android
 
