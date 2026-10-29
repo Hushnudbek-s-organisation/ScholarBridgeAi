@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { channelPlan, channelPosts } from "@/db/schema";
 import { resolveChannelRuntime, tashkentDay } from "./config";
 import { ensureChannelTables } from "./db";
+import { refreshOverlay } from "./lexicon/store";
 import { ensurePlanLinks, todayQueue } from "./admin";
 import { loadChannelSettings, writeChannelAudit } from "./repo";
 import { runDuePosts, sendPlanRow } from "./send";
@@ -74,6 +75,8 @@ export interface RunPostsSummary {
 /** Send everything that is due right now (at most the daily cap). */
 export async function runPostsNow(actorProfileId: number | null, opts: { force?: boolean } = {}): Promise<RunPostsSummary> {
   await ensureChannelTables();
+  // Operator-edited dictionary glosses win over the bundled copy from here on.
+  await refreshOverlay().catch(() => 0);
   const settings = await loadChannelSettings();
   const runtime = resolveChannelRuntime(settings);
 

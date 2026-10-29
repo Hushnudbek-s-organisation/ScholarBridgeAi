@@ -21,6 +21,8 @@
  * before it is published.
  */
 
+import { phraseScan, translateList } from "../lexicon";
+
 export interface SignalContext {
   /** Degrees already listed from structured columns, to avoid a repeat. */
   degrees?: string | null;
@@ -198,7 +200,52 @@ export function translateRequirements(raw: string | null | undefined, ctx: Signa
   if (/\binterview\b/i.test(text)) push("Suhbat (intervju)");
   if (/\bapplication fee\b/i.test(text) && /\bno\b|\bfree\b|\bwithout\b/i.test(text)) push("Ariza uchun to'lov yo'q");
 
+  // --- dictionary terms ---------------------------------------------------
+  /**
+   * The academic dictionary (12 732 headwords, `lexicon.uz.json`) covers what
+   * the patterns above cannot name: `strong academic transcript`, `research
+   * proposal`, `proof of funds`. `translateList` only returns fragments whose
+   * every word the dictionary knows, so a partly-understood sentence adds
+   * nothing rather than a half-English line.
+   */
+  const fromDictionary = dictionaryLine(text, out);
+  if (fromDictionary) push(fromDictionary);
+
   return out.slice(0, 6);
+}
+
+/**
+ * `Kimlar uchun` bullet built from dictionary terms.
+ *
+ * Two shapes, in order of quality:
+ *
+ *  1. a requirement *list* whose fragments all resolve end-to-end
+ *     (`bachelor's degree, motivation letter` → `Bakalavr darajasi ·
+ *     Motivatsion xat`) — this is what the column usually looks like;
+ *  2. otherwise the terms the sentence does contain (`strong academic record,
+ *     English proficiency` → `Akademik ma'lumotlar · ingliz tili darajasi`).
+ *
+ * Anything the patterns above already said is dropped, so the post never
+ * repeats itself, and a fragment that reads as more than one sense is refused
+ * rather than shrunk.
+ */
+export function dictionaryLine(raw: string, existing: readonly string[] = []): string | null {
+  const seen = existing.map((line) => line.toLowerCase());
+  const fresh = (fragment: string) => {
+    if (fragment.length > 55 || fragment.includes(",") || fragment.includes(" / ")) return false;
+    if (fragment.split(" ").length < 2) return false;
+    const low = fragment.toLowerCase();
+    return !seen.some((line) => line === low || line.includes(low) || low.includes(line));
+  };
+
+  const list = translateList(raw, 5).filter(fresh);
+  const chips = phraseScan(raw, 4).filter(fresh);
+  const chosen = (list.length >= 2 ? list.slice(0, 3) : chips.slice(0, 3)).map(
+    (part) => part.charAt(0).toUpperCase() + part.slice(1)
+  );
+  if (chosen.length === 0) return null;
+  const line = chosen.join(" · ");
+  return line.length > 120 ? null : line;
 }
 
 /**

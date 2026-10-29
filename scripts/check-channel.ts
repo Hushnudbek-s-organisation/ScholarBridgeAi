@@ -96,10 +96,17 @@ import {
 } from "../src/lib/channel/templates/weekly.uz";
 import { renderScholarshipRich, SOFT_LIMIT, HARD_LIMIT, trimAtWord } from "../src/lib/channel/templates/rich.uz";
 import {
+  dictionaryLine,
   translateCoverage,
   translateEnglishRequirement,
   translateRequirements,
 } from "../src/lib/channel/templates/translate.uz";
+import {
+  LEXICON_META,
+  lexiconSize,
+  lookup,
+  translateFragment,
+} from "../src/lib/channel/lexicon";
 import { ctaLine, footerLine, hashtagLine } from "../src/lib/channel/templates/chrome";
 import {
   EMPTY_CONTENT,
@@ -361,6 +368,18 @@ check("the six channel tables are declared", () => {
     assert.ok(CHANNEL_DDL.includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from DDL`);
     assert.ok(new RegExp(`pgTable\\(\\s*"${table}"`).test(read("src/db/schema.ts")), `${table} missing from drizzle schema`);
   }
+});
+
+check("the dictionary tables are declared for the database", () => {
+  for (const table of ["translation_lexicon", "translation_lexicon_meta"]) {
+    assert.ok(CHANNEL_DDL.includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from DDL`);
+    assert.ok(new RegExp(`pgTable\\(\\s*"${table}"`).test(read("src/db/schema.ts")), `${table} missing from drizzle schema`);
+    assert.ok(read("supabase/add_channel.sql").includes(`CREATE TABLE IF NOT EXISTS ${table} (`), `${table} missing from the SQL file`);
+  }
+  assert.ok(
+    read("src/lib/channel/lexicon/store.ts").includes("installLexicon"),
+    "the dictionary must be installed by the channel bootstrap"
+  );
 });
 
 check("every DDL column exists in the drizzle schema", () => {
@@ -657,6 +676,87 @@ check("every scholarship template variant renders clean for every data shape", (
         assert.equal(out, null, `${label}: urgency must not render without an exact deadline`);
       }
     }
+  }
+});
+
+check("the academic dictionary is bundled, and it knows the channel's terms", () => {
+  assert.ok(lexiconSize() >= 12000, `dictionary too small: ${lexiconSize()}`);
+  assert.equal(LEXICON_META.pages, 606, "dictionary page count changed — regenerate the asset");
+  for (const [term, expected] of [
+    ["program", "O'quv dasturi"],
+    ["tuition", "O'qish to'lovi"],
+    ["motivation letter", "motivatsion xat"],
+    ["interview", "suhbat"],
+    ["deadline", "Muddat"],
+    ["full tuition", "To'liq kontrakt"],
+  ] as const) {
+    const entry = lookup(term);
+    assert.ok(entry, `dictionary lost "${term}"`);
+    assert.ok(
+      entry.uz.toLowerCase().includes(expected.toLowerCase()),
+      `"${term}" → "${entry.uz}", expected to contain "${expected}"`
+    );
+  }
+});
+
+check("the dictionary translates a fragment only when it knows every word", () => {
+  const full = translateFragment("bachelor's degree and a motivation letter");
+  assert.ok(full, "a fully-known fragment must translate");
+  assert.equal(full.uz.toLowerCase().includes("bakalavr"), true, full.uz);
+  assert.equal(full.uz.toLowerCase().includes("motivatsion"), true, full.uz);
+  for (const token of full.uz.match(/[A-Za-z']+/g) ?? []) {
+    assert.ok(!/^(the|and|or|of|must|required)$/i.test(token), `English leftover: ${token}`);
+  }
+  // One word we do not know cancels the whole fragment — never half a line.
+  assert.equal(translateFragment("bachelor's degree and a snorkel"), null, "unknown word must cancel the fragment");
+  assert.equal(translateFragment("candidates must hold a degree"), null, "unknown subject noun must cancel it");
+  assert.equal(translateFragment(""), null, "empty input");
+  // Numbers, amounts and test acronyms pass through instead of blocking.
+  const withNumber = translateFragment("minimum GPA 3.2");
+  assert.ok(withNumber, "numbers must not block a fragment");
+  assert.ok(/3\.2/.test(withNumber.uz), withNumber.uz);
+});
+
+check("the dictionary extends the card with terms the patterns miss", () => {
+  const sentence =
+    "Strong academic record, English proficiency, a motivation letter and 3 recommendation letters from the applicant's professors.";
+  const bullets = translateRequirements(sentence, { degrees: null, minGpa: null });
+  const joined = bullets.join(" · ").toLowerCase();
+  assert.ok(joined.includes("akademik"), `dictionary terms missing from the bullets: ${bullets.join(" | ")}`);
+  assert.ok(joined.includes("tavsiyanoma"), `recommendation letters missing: ${bullets.join(" | ")}`);
+
+  // Called on its own (as the card does when the patterns already spoke), the
+  // dictionary bullet must not repeat them and must stay short.
+  const line = dictionaryLine(sentence, ["Bakalavr darajasi", "Tavsiyanoma"]);
+  assert.ok(line, "the dictionary found nothing in a term-heavy sentence");
+  assert.ok(line.length <= 120, `dictionary bullet too long: ${line.length}`);
+  assert.ok(!line.includes("Bakalavr"), `dictionary bullet repeats the degree: ${line}`);
+  for (const word of line.match(/[A-Za-z][A-Za-z'-]{3,}/g) ?? []) {
+    assert.ok(
+      !/^(?:strong|academic|record|english|proficiency|motivation|letter|letters|recommendation|applicant)$/i.test(word),
+      `English leaked into the dictionary bullet: ${word} (${line})`
+    );
+  }
+  // A sentence with nothing the dictionary knows adds no bullet at all.
+  assert.equal(dictionaryLine("Lorem ipsum dolor sit amet", []), null, "unknown prose must add nothing");
+
+  // End to end: the card prints those terms in Uzbek and nothing English.
+  const card = renderScholarshipSingle(
+    facts({
+      requirements:
+        "Strong academic record, English proficiency, a motivation letter and 3 recommendation letters from the applicant's professors.",
+      englishRequirements: "IELTS 6.5 or equivalent English test",
+      tuitionCoverage: "Full tuition",
+    }),
+    0,
+    cardChrome()
+  );
+  assert.ok(card, "card did not render");
+  assertClean(card.html, "dictionary card");
+  const text = plainText(card.html);
+  assert.ok(/Akademik/i.test(text), `card lost the dictionary terms: ${text}`);
+  for (const english of ["academic", "recommendation", "professors", "Strong"]) {
+    assert.ok(!text.includes(english), `English leaked into the card: ${english}`);
   }
 });
 

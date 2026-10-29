@@ -216,6 +216,28 @@ CREATE TABLE IF NOT EXISTS channel_audit (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_channel_audit_created ON channel_audit(created_at);
+
+-- The academic dictionary (12 732 EN→UZ headwords) copied into the database so
+-- an operator can correct or extend a gloss without a deploy. 'key' is the
+-- normalised headword; 'source' separates the imported rows ('pdf') from rows a
+-- human edited ('admin'), and only the latter override the bundled copy.
+CREATE TABLE IF NOT EXISTS translation_lexicon (
+  key TEXT PRIMARY KEY,
+  en TEXT NOT NULL,
+  uz TEXT NOT NULL,
+  ru TEXT,
+  source TEXT NOT NULL DEFAULT 'pdf',
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_translation_lexicon_en ON translation_lexicon(en);
+
+-- One row per import: which version of the bundled dictionary is installed.
+CREATE TABLE IF NOT EXISTS translation_lexicon_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 `;
 
 /** Individual statements (the pg driver runs one statement per query). */

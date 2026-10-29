@@ -1397,6 +1397,19 @@ CREATE TABLE IF NOT EXISTS "test_tasks" (
   "sort_order" integer NOT NULL DEFAULT 0,
   "created_at" timestamp NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS "translation_lexicon" (
+  "key" text PRIMARY KEY,
+  "en" text NOT NULL,
+  "uz" text NOT NULL,
+  "ru" text,
+  "source" text NOT NULL DEFAULT 'pdf',
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "translation_lexicon_meta" (
+  "key" text PRIMARY KEY,
+  "value" text NOT NULL,
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS "university_rankings" (
   "id" serial PRIMARY KEY,
   "university_id" integer NOT NULL CONSTRAINT "university_rankings_university_id_fkey" REFERENCES "universities" ("id") ON DELETE CASCADE,
@@ -2629,6 +2642,15 @@ ALTER TABLE "test_tasks" ADD COLUMN IF NOT EXISTS "due_date" date;
 ALTER TABLE "test_tasks" ADD COLUMN IF NOT EXISTS "is_completed" boolean NOT NULL DEFAULT FALSE;
 ALTER TABLE "test_tasks" ADD COLUMN IF NOT EXISTS "sort_order" integer NOT NULL DEFAULT 0;
 ALTER TABLE "test_tasks" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
+-- ---------- translation_lexicon ----------
+ALTER TABLE "translation_lexicon" ADD COLUMN IF NOT EXISTS "en" text;
+ALTER TABLE "translation_lexicon" ADD COLUMN IF NOT EXISTS "uz" text;
+ALTER TABLE "translation_lexicon" ADD COLUMN IF NOT EXISTS "ru" text;
+ALTER TABLE "translation_lexicon" ADD COLUMN IF NOT EXISTS "source" text NOT NULL DEFAULT 'pdf';
+ALTER TABLE "translation_lexicon" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
+-- ---------- translation_lexicon_meta ----------
+ALTER TABLE "translation_lexicon_meta" ADD COLUMN IF NOT EXISTS "value" text;
+ALTER TABLE "translation_lexicon_meta" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 -- ---------- university_rankings ----------
 ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "university_id" integer;
 ALTER TABLE "university_rankings" ADD COLUMN IF NOT EXISTS "ranking_provider" text;
@@ -2789,6 +2811,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_test_bookings_profile') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_test_bookings_profile" ON "test_bookings" ("profile_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_test_bookings_profile skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_test_bookings_profile skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_test_bookings_date') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_test_bookings_date" ON "test_bookings" ("test_date"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_test_bookings_date skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_test_bookings_date skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_test_tasks_plan') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_test_tasks_plan" ON "test_tasks" ("test_plan_id"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_test_tasks_plan skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_test_tasks_plan skipped: column missing'; END; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_translation_lexicon_en') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_translation_lexicon_en" ON "translation_lexicon" ("en"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_translation_lexicon_en skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_translation_lexicon_en skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_university_ranking_edition') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "uq_university_ranking_edition" ON "university_rankings" ("university_id", "ranking_provider", "ranking_name", "ranking_year"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index uq_university_ranking_edition skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index uq_university_ranking_edition skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_university_rankings_year_rank') THEN BEGIN CREATE INDEX IF NOT EXISTS "idx_university_rankings_year_rank" ON "university_rankings" ("ranking_year", "rank"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index idx_university_rankings_year_rank skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index idx_university_rankings_year_rank skipped: column missing'; END; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'university_scholarships_university_id_scholarship_name_key') THEN BEGIN CREATE UNIQUE INDEX IF NOT EXISTS "university_scholarships_university_id_scholarship_name_key" ON "university_scholarships" ("university_id", "scholarship_name"); EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'index university_scholarships_university_id_scholarship_name_key skipped: existing rows violate uniqueness'; WHEN undefined_column THEN RAISE NOTICE 'index university_scholarships_university_id_scholarship_name_key skipped: column missing'; END; END IF; END $$;

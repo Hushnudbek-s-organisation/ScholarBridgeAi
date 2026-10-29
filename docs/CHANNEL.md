@@ -232,6 +232,55 @@ Guarantees, each one asserted in `scripts/check-channel.ts`:
 * Coverage measured against 15 real rows: `Til talabi` 13/15, `Kimlar uchun`
   14/15, `Foydali tomonlari` 10/15; the remainder omit the section.
 
+### 4b-4. The academic dictionary (12 732 terms, in the database)
+
+The patterns above cover the *shapes* a requirement sentence takes; they cannot
+name every term inside it. For that the channel ships the operator's own
+dictionary — the 606-page *ScholarBridgeAI akademik tarjima lug'ati* (12 467
+units) — as data:
+
+| Where | What |
+|---|---|
+| `scripts/import/lexicon/extract_pdf.py` | reads the PDF's table rules and emits the term list; `--pdf`, `--out`, optional `--raw` |
+| `src/lib/channel/lexicon/lexicon.uz.json` | 12 732 EN→UZ headwords (plus the RU gloss where the source had one), 1 949 of them slash aliases |
+| `src/lib/channel/lexicon/index.ts` | `lookup`, `translateFragment`, `translateList`, `phraseScan` |
+| `src/lib/channel/lexicon/store.ts` | installs the same rows into `translation_lexicon` and loads admin edits |
+| `translation_lexicon` / `translation_lexicon_meta` | the database copy + which version is installed |
+
+**It is in the database.** `ensureChannelTables()` installs the dictionary
+(versioned, chunked, ~13 statements once). A fresh environment therefore needs
+no extra step, and `npm run lexicon:seed` does it on demand (`-- --status` only
+reports). Rows created by the bootstrap are covered by the same RLS lockdown as
+the other channel tables.
+
+**An operator's gloss wins.** Editing a row to `source = 'admin'` makes it
+override the bundled copy at render time; the publisher reloads those rows once
+per tick (`refreshOverlay`). Re-importing a newer PDF deletes only
+`source = 'pdf'` rows, so a correction is never silently undone.
+
+Two ways a term becomes a bullet in `Kimlar uchun` (`dictionaryLine`):
+
+1. a requirement **list** whose fragments all resolve —
+   `bachelor's degree, motivation letter` → `Bakalavr darajasi · Motivatsion xat`;
+2. otherwise the **terms** the sentence contains — `strong academic record,
+   English proficiency` → `Akademik ma'lumotlar · Ingliz tili darajasi`.
+
+Both are gated:
+
+* `translateFragment` returns `null` unless **every** word is a known term, a
+  number, an allow-listed acronym (IELTS, GPA, CV, PhD…) or one of a dozen
+  connectors (`and`, `or`, `at least`…). One unknown word cancels the fragment —
+  a dictionary cannot conjugate a verb, so "candidates must have submitted" is
+  refused by design rather than half-translated.
+* A gloss that reads as two senses is refused inside a bullet, anything the
+  patterns already said is dropped, and the bullet is capped at 120 characters.
+* No English may survive: a gloss carrying `the/and/must/students` is rejected.
+
+Measured on eight real awards, shape 2 puts Uzbek term chips on 4 of them; the
+other four are prose with no dictionary term in them, and stay as short as they
+were. That is the honest size of the gain — the dictionary names vocabulary, it
+does not translate sentences, and nothing here is ever guessed.
+
 **Reminder posts read the same facts.** `urgency` (`⏳ Muddat yaqinlashmoqda` and
 its three siblings) is the kind that actually fires on a busy day, and it used
 to be a title, a date and one funding word — nothing a reader could act on, and

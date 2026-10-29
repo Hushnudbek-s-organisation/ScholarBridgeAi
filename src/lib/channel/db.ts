@@ -11,6 +11,7 @@ import { lockDownTables } from "@/lib/db/lockdown";
 import { columnExistenceVerify, tableExistenceVerify, tablesInStatements } from "@/lib/schemaGate";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { channelColumns, channelStatements } from "./ddl";
+import { installLexicon } from "./lexicon/store";
 
 /**
  * "Is the channel schema there?" — every table the publisher creates *and*
@@ -43,8 +44,19 @@ const bootstrap = createTableBootstrap(
   () => lockDownTables(tablesInStatements(channelStatements()), (stmt) => db.execute(sql.raw(stmt)))
 );
 
-export function ensureChannelTables(): Promise<boolean> {
-  return bootstrap.ensure();
+export async function ensureChannelTables(): Promise<boolean> {
+  const ok = await bootstrap.ensure();
+  if (ok) {
+    /**
+     * The translation dictionary lives in the database too (`translation_lexicon`).
+     * Installing it here means "the tables exist" and "the dictionary is in
+     * them" are the same fact, and a fresh deployment needs no extra step. The
+     * install is versioned and a no-op after the first run; a failure only
+     * degrades translation, so it never turns a working channel red.
+     */
+    await installLexicon().catch(() => null);
+  }
+  return ok;
 }
 
 /**
