@@ -71,12 +71,17 @@ jobs:
           SCHOLARBRIDGE_DEFAULT_SERVER: ${{ inputs.server }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
+      # A stable file name means the link never changes:
+      #   .../releases/latest/download/ScholarBridge.apk
       - name: Collect the APK
         shell: bash
         run: |
           mkdir -p dist
-          find mobile/android/app/build/outputs/apk -name '*.apk' -exec cp {} dist/ \;
+          apk="$(find mobile/android/app/build/outputs/apk -name '*.apk' | head -1)"
+          test -n "$apk" || { echo "no APK was produced"; exit 1; }
+          cp "$apk" dist/ScholarBridge.apk
           ls -la dist
+          echo "APK size: $(( $(stat -c%s dist/ScholarBridge.apk) / 1024 / 1024 )) MB ($(stat -c%s dist/ScholarBridge.apk) bytes)"
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4

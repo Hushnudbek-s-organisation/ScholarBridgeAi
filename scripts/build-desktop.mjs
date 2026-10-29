@@ -94,9 +94,45 @@ if (packageOnly) {
   process.exit(0);
 }
 
+const desktopDir = path.join(repoRoot, "desktop");
 const platformFlag =
   process.platform === "win32" ? "--win" : process.platform === "darwin" ? "--mac" : "--linux";
 say(`Packaging with electron-builder (${platformFlag})…`);
-run("npm", ["run", "dist", "--", platformFlag], { cwd: path.join(repoRoot, "desktop") });
+// `dist` passes `--config electron-builder.mjs`: electron-builder does not
+// auto-discover an .mjs config, and without it the app was packaged with
+// DEFAULT settings — no bundled server, no schema, output in `dist/`.
+run("npm", ["run", "dist", "--", platformFlag], { cwd: desktopDir });
 
-say("Done. Installers are in desktop/release/");
+/**
+ * Give the installers stable, version-free names so a download link never
+ * changes: github.com/<owner>/<repo>/releases/latest/download/<name>.
+ * The version is still visible inside the installer and in the app's About.
+ */
+const outDir = path.join(desktopDir, "release");
+if (!fs.existsSync(outDir)) fail("electron-builder produced no release/ folder");
+const files = fs.readdirSync(outDir);
+const renames = [];
+for (const file of files) {
+  let target = null;
+  if (file.endsWith(".exe")) {
+    target = /setup/i.test(file) ? "ScholarBridge-Setup.exe" : "ScholarBridge-Portable.exe";
+  } else if (file.endsWith(".dmg")) {
+    target = /arm64/.test(file) ? "ScholarBridge-arm64.dmg" : "ScholarBridge-x64.dmg";
+  } else if (file.endsWith(".AppImage")) {
+    target = "ScholarBridge.AppImage";
+  } else if (file.endsWith(".deb")) {
+    target = "ScholarBridge.deb";
+  }
+  if (!target || file === target) continue;
+  fs.renameSync(path.join(outDir, file), path.join(outDir, target));
+  renames.push(`${file} → ${target}`);
+}
+if (renames.length) say(`Stable names: ${renames.join(", ")}`);
+
+const installers = fs.readdirSync(outDir).filter((f) => /\.(exe|dmg|AppImage|deb)$/i.test(f));
+if (!installers.length) fail("electron-builder finished but produced no installer");
+say("Done:");
+for (const file of installers) {
+  const mb = Math.round(fs.statSync(path.join(outDir, file)).size / 1024 / 1024);
+  console.log(`  desktop/release/${file}  (${mb} MB)`);
+}

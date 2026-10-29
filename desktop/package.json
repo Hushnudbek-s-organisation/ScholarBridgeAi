@@ -11,10 +11,10 @@
   "type": "module",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --publish never",
-    "dist:win": "electron-builder --win nsis portable --publish never",
-    "dist:mac": "electron-builder --mac dmg --publish never",
-    "dist:linux": "electron-builder --linux AppImage deb --publish never"
+    "dist": "electron-builder --config electron-builder.mjs --publish never",
+    "dist:win": "electron-builder --config electron-builder.mjs --win nsis portable --publish never",
+    "dist:mac": "electron-builder --config electron-builder.mjs --mac dmg --publish never",
+    "dist:linux": "electron-builder --config electron-builder.mjs --linux AppImage deb --publish never"
   },
   "dependencies": {
     "embedded-postgres": "18.4.0-beta.17",

@@ -42,12 +42,27 @@ on GitHub's machines:
 1. Open the repository on GitHub → **Actions**.
 2. **Desktop app** → *Run workflow* → wait ~10 minutes.
 3. Download the artifact for your platform:
-   * `scholarbridge-windows` → `ScholarBridge Setup 1.0.0.exe` (installer) and
-     a portable `.exe`,
-   * `scholarbridge-macos` → `ScholarBridge-1.0.0.dmg`,
-   * `scholarbridge-linux` → `.AppImage` and `.deb`.
+   * `scholarbridge-windows` → `ScholarBridge-Setup.exe` (installer) and
+     `ScholarBridge-Portable.exe` (no install),
+   * `scholarbridge-macos` → `ScholarBridge-arm64.dmg` / `ScholarBridge-x64.dmg`,
+   * `scholarbridge-linux` → `ScholarBridge.AppImage` and `ScholarBridge.deb`.
 4. **Android APK** → *Run workflow* → download
-   `scholarbridge-android-apk` → `app-debug.apk`.
+   `scholarbridge-android-apk` → `ScholarBridge.apk`.
+
+Because the file names are stable, “always the newest build” links keep
+working:
+
+```
+.../releases/latest/download/ScholarBridge.apk
+.../releases/latest/download/ScholarBridge-Setup.exe
+.../releases/latest/download/ScholarBridge-Portable.exe
+.../releases/latest/download/ScholarBridge.AppImage
+.../releases/latest/download/ScholarBridge.deb
+.../releases/latest/download/ScholarBridge-arm64.dmg
+.../releases/latest/download/ScholarBridge-x64.dmg
+```
+
+(prefix: `https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi`).
 
 Pushing a tag (`git tag v1.0.0 && git push origin v1.0.0`) attaches all of
 them to a GitHub **Release**, which gives you stable download links to share.
