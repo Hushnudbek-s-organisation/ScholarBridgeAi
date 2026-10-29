@@ -167,8 +167,9 @@ Rules, enforced by `scripts/check-channel.ts`:
 
 * **Uzbek only.** `description`, `requirements`, `english_requirements`,
   `tuition_coverage` and `expected_deadline_period` are English prose in
-  production data and are never printed; the card is built from the
-  already-translated structured fields.
+  production data and are never printed as they are; the card is built from the
+  already-translated structured fields, or from the *facts* those English
+  fields state — see §4b-3.
 * **No invented period.** A stored allowance is printed as a bare amount. The
   row does not record whether it is monthly or yearly, so the card never says.
 * **No repetition.** The header already states the coverage, so a partial award
@@ -185,6 +186,51 @@ boundary (`…`); at 4096 it is dropped; then each bullet list is cut to four; i
 it still does not fit the post is skipped rather than truncated. Eligibility,
 benefits and about are **never** generated or translated by anything: they come
 from the admin form or not at all.
+
+### 4b-3. English prose is read, never printed
+
+547 active awards carry their prose in English (`requirements` alone has 3,009
+sentences, 2,766 of them distinct), so a sentence dictionary cannot cover them.
+Instead `src/lib/channel/templates/translate.uz.ts` **reads the facts out of the
+English** with a fixed set of patterns and says them in fixed Uzbek lines. No
+per-post model call, no free text, nothing to review at send time.
+
+| What it reads | Example source | Line it produces |
+|---|---|---|
+| Test scores | `IELTS 6.5 or equivalent` | `IELTS 6.5+ yoki ekvivalent imtihon` |
+| | `IELTS 6.5 / TOEFL 92` | `IELTS 6.5+ · TOEFL 92+` |
+| CEFR levels | `B2 Italian` | `Italyan tili B2 darajasi` |
+| Score-less wording | `sets no single score; each host…` | `Yagona til balli yo'q — talab tanlangan dasturga bog'liq` |
+| Degree levels | `Master's or PhD` | `Magistratura · Doktorantura` |
+| Grade | `GPA of 3.2`, `70 per cent` | `GPA 3.2+`, `O'rtacha ball 70%+` |
+| Citizenship | `citizen of a partner country` | `Hamkor davlatlar fuqarolari uchun` |
+| Exclusivity | `hold no other scholarship` | `Boshqa stipendiya olmaslik sharti` |
+| Nomination | `be nominated by the ministry` | `Universitet yoki vazirlik tavsiyasi (nominatsiya) kerak` |
+| Age | `under 28 for master` | `Yosh chegarasi: 28 yoshgacha` |
+| Documents | `motivation letter, CV, interview` | `Motivatsion xat \| CV \| Suhbat (intervju)` |
+| Coverage | `Between 50% and 100%…` | `Kontraktning 50%idan to'liq qismigacha qoplanadi` |
+| Amount | `stipend of HK$344,400 a year` | `Stipendiya: HK$344,400 (yiliga)` |
+
+Guarantees, each one asserted in `scripts/check-channel.ts`:
+
+* **Fixed lines only.** Output is a bank of Uzbek strings; unknown English is
+  **dropped**, never rendered word-by-word (a half-English bullet is worse than
+  no bullet).
+* **No invented number.** Every digit in a produced line already exists in the
+  source sentence; the check fails otherwise.
+* **No English leftover** — `the`, `must`, `required`, `applicants` may not
+  survive into a card.
+* **`100%` is never printed**: the lint (§6) treats it as an absolute promise
+  and the sender would refuse the post, so a range that reaches the full fee is
+  worded out loud.
+* **The header wins.** A stated percentage or amount replaces the generic
+  `To'liq moliyalashtirish` bullet; the generic bullet appears only when the
+  award is fully funded and no finer figure exists.
+* **Authored copy still wins** over every translated line, and
+  `description` has **no** translator: it is either the admin's Uzbek or it is
+  omitted.
+* Coverage measured against 15 real rows: `Til talabi` 13/15, `Kimlar uchun`
+  14/15, `Foydali tomonlari` 10/15; the remainder omit the section.
 
 ### 4c. Weekly deadlines post
 

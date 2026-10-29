@@ -28,6 +28,7 @@ import type { PostChrome, Rendered } from "./chrome";
 import { ctaLine, footerLine, hashtagLine } from "./chrome";
 import type { Facts } from "./facts";
 import { bullets, esc, daysLeftUz, formatDateUz } from "./format";
+import { translateCoverage, translateEnglishRequirement, translateRequirements } from "./translate.uz";
 
 /** Soft target — past this the "about" paragraph is trimmed first. */
 export const CARD_SOFT_LIMIT = 1800;
@@ -79,9 +80,17 @@ export function fundingLabel(facts: Facts): string | null {
   return facts.coverage ? cap(facts.coverage) : null;
 }
 
-/** IELTS is the only language number we store; otherwise it is authored copy. */
+/**
+ * `Til talabi`.
+ *
+ * Authored copy first, then the English `english_requirements` text rendered
+ * into Uzbek (it is the only place TOEFL/DET/HSK and "no single score" live),
+ * then the structured IELTS floor as the last resort.
+ */
 export function languageLabel(facts: Facts, content: ScholarshipContent | null): string | null {
   if (content?.languageReqUz) return esc(content.languageReqUz);
+  const translated = translateEnglishRequirement(facts.englishRequirementRaw);
+  if (translated) return esc(translated);
   if (facts.minIelts !== null) return `IELTS ${facts.minIelts}+`;
   return null;
 }
@@ -100,6 +109,21 @@ export function eligibilityBullets(facts: Facts, content: ScholarshipContent | n
   if (facts.majors) out.push(cap(facts.majors));
   if (facts.minGpa !== null) out.push(`GPA ${facts.minGpa}+`);
   if (facts.eligibility === "uz_eligible") out.push("🇺🇿 O'zbekistonliklar uchun ochiq");
+  /**
+   * The English `requirements` prose, read for the facts it states and written
+   * back in Uzbek. Structured bullets above come first, so the translated ones
+   * only add what the columns do not hold (nomination, documents, an age cap,
+   * an exclusivity clause). Duplicates are dropped, and the list stops at six
+   * bullets — a wall of text is not a post.
+   */
+  const translated = translateRequirements(facts.requirementsRaw, {
+    degrees: facts.degrees,
+    minGpa: facts.minGpa,
+  });
+  for (const line of translated) {
+    if (out.length >= 6) break;
+    if (!out.includes(line)) out.push(line);
+  }
   return out;
 }
 
@@ -115,7 +139,18 @@ export function benefitBullets(facts: Facts, content: ScholarshipContent | null)
   // becomes a *benefit* bullet when the award is fully funded — there the
   // bullet adds what the one-word header cannot: everything is covered.
   // A partial award repeats nothing; it lists amounts or has no section.
-  if (facts.fullyFunded) out.push("To'liq moliyalashtirish");
+  /**
+   * A stated percentage or amount beats our own boolean: "Kontraktning 50–100%
+   * qismi" tells the reader more than "To'liq moliyalashtirish" ever could.
+   * Otherwise the generic full-funding bullet is added only on an award the
+   * data calls full — a partial award gets nothing here rather than a repeat of
+   * the header.
+   */
+  const coverage = translateCoverage(facts.tuitionCoverageRaw);
+  const specific = coverage && (coverage.includes("%") || coverage.startsWith("Stipendiya"));
+  if (specific) out.push(coverage as string);
+  else if (facts.fullyFunded) out.push("To'liq moliyalashtirish");
+  else if (coverage) out.push(coverage);
   const living = facts.livingAllowance !== null ? moneyUsd(facts.livingAllowance) : null;
   if (living) out.push(`Yashash uchun to'lov: ${living}`);
   const travel = facts.travelAllowance !== null ? moneyUsd(facts.travelAllowance) : null;

@@ -95,6 +95,11 @@ import {
   type WeeklyItem,
 } from "../src/lib/channel/templates/weekly.uz";
 import { renderScholarshipRich, SOFT_LIMIT, HARD_LIMIT, trimAtWord } from "../src/lib/channel/templates/rich.uz";
+import {
+  translateCoverage,
+  translateEnglishRequirement,
+  translateRequirements,
+} from "../src/lib/channel/templates/translate.uz";
 import { ctaLine, footerLine, hashtagLine } from "../src/lib/channel/templates/chrome";
 import {
   EMPTY_CONTENT,
@@ -266,6 +271,9 @@ function row(overrides: Partial<FactsRow> = {}): FactsRow {
     minIelts: 6.5,
     livingAllowance: null,
     travelAllowance: null,
+    requirements: null,
+    englishRequirements: null,
+    tuitionCoverage: null,
     websiteUrl: "https://example.edu/scholarship",
     applicationUrl: null,
     ...overrides,
@@ -3153,12 +3161,12 @@ check("the card prints stored facts and never English database prose", () => {
   }
   // The row's `description`/`requirements` are English in production and must
   // never reach an Uzbek post — the card is built from structured facts only.
-  // Only the code, not the doc comment that names those fields to explain why
-  // they are excluded.
+  // The raw English must never reach the post: it is read by the translator and
+  // re-stated in Uzbek. `description` has no translator at all — it is authored
+  // copy only.
   const source = read("src/lib/channel/templates/card.uz.ts").replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const field of ["description", "requirements", "englishRequirements", "tuitionCoverage", "expectedDeadlinePeriod"]) {
-    assert.ok(!source.includes(field), `${field} must not be printed`);
-  }
+  assert.ok(!source.includes("description"), "description is authored copy only");
+  assert.ok(!/\.requirementsRaw\b(?!\s*\))/.test(source.replace(/translateRequirements\([^)]*\)/g, "")), "requirementsRaw goes through the translator");
   // A number without a stored period may not be given one.
   assert.ok(!/oylik|yillik|yiliga/i.test(text), "never invents a payment period");
 });
@@ -3185,6 +3193,90 @@ check("authored Uzbek copy replaces the structured sections", () => {
   assert.ok(text.includes("Kontrakt to'liq qoplanadi"), "authored benefits win");
   assert.ok(text.includes("Dastur haqida"), "authored about appears");
   assert.ok(out.html.startsWith("🇨🇦"), "the flag comes from the country table");
+});
+
+check("English data becomes Uzbek lines, not English leftovers", () => {
+  const cases: Array<[string, string | null]> = [
+    ["IELTS 6.5 or equivalent English test", "IELTS 6.5+ yoki ekvivalent imtihon"],
+    ["IELTS 6.5 / TOEFL 85 / DET 115", "IELTS 6.5+ · TOEFL 85+ · DET 115+"],
+    ["A Chinese-taught programme requires HSK level 4.", "HSK 4-daraja"],
+    ["The scholarship sets no separate English score; the degree programme requirement applies.", "Yagona til balli yo'q — talab tanlangan dasturga bog'liq"],
+    ["Not verified for this row: the institution page could not be read.", null],
+  ];
+  for (const [english, expected] of cases) {
+    const got = translateEnglishRequirement(english);
+    assert.equal(got, expected, `english requirement: ${english}`);
+    if (got) assertClean(got, `translated: ${english}`);
+  }
+
+  const coverage: Array<[string, string | null]> = [
+    ["Full tuition", "Kontrakt to'liq qoplanadi"],
+    ["Partial tuition", "Kontraktning bir qismi qoplanadi"],
+    // "100%" would trip the absolute-claim lint, so a range ending at the full
+    // fee is worded out loud instead.
+    ["Between 50% and 100% of the amount payable", "Kontraktning 50%idan to'liq qismigacha qoplanadi"],
+    ["100% of annual tuition fees", "Kontrakt to'liq qoplanadi"],
+    ["The scheme pays a stipend of HK$344,400 a year", "Stipendiya: HK$344,400 (yiliga)"],
+    ["None", null],
+  ];
+  for (const [english, expected] of coverage) {
+    assert.equal(translateCoverage(english), expected, `coverage: ${english}`);
+  }
+});
+
+check("translation restates facts and never invents a number", () => {
+  const samples = [
+    "Be a citizen of a partner country and be nominated by the ministry of education. Minimum GPA of 3.2 required.",
+    "Applicants aged 30 or under, with at least a 70 per cent average and two recommendation letters.",
+    "Master's or PhD applicants; submit a research proposal and a CV; interview may be required.",
+  ];
+  for (const english of samples) {
+    const lines = translateRequirements(english, { degrees: null, minGpa: null });
+    assert.ok(lines.length > 0, `nothing translated from: ${english}`);
+    // Every digit in the output must already exist in the source text.
+    for (const line of lines) {
+      for (const digit of line.match(/\d+(?:[.,]\d+)?/g) ?? []) {
+        assert.ok(english.includes(digit.replace(",", ".")) || english.includes(digit), `invented number ${digit} in "${line}"`);
+      }
+      // No English sentence may survive: an Uzbek line never ends a word with
+      // the English "-tion", never contains "the", "must", "required".
+      assert.ok(!/\b(?:the|must|required|applicants?|students?)\b/i.test(line), `English leftover in "${line}"`);
+      assertClean(line, `translated line: ${line}`);
+    }
+  }
+  assert.deepEqual(translateRequirements("", {}), [], "empty input yields nothing");
+  assert.deepEqual(translateRequirements(null, {}), [], "null input yields nothing");
+});
+
+check("a record with only English fields still posts Uzbek sections", () => {
+  const englishOnly = facts({
+    requirements: "Be a citizen of a partner country, aged 30 or under, with at least 3.0 GPA. Submit a motivation letter and a CV.",
+    englishRequirements: "IELTS 6.5 or equivalent English test",
+    tuitionCoverage: "Between 50% and 100% of the amount payable",
+    degreeLevels: '["Master\'s"]',
+    eligibleMajors: '["Economics"]',
+    minGpa: null,
+    minIelts: null,
+    livingAllowance: null,
+    travelAllowance: null,
+  });
+  const out = renderScholarshipSingle(englishOnly, 0, cardChrome());
+  assert.ok(out, "card did not render");
+  assertClean(out.html, "english-only card");
+  const text = plainText(out.html);
+  for (const expected of [
+    "Til talabi: IELTS 6.5+ yoki ekvivalent imtihon",
+    "Yosh chegarasi: 30 yoshgacha",
+    "Motivatsion xat",
+    "CV",
+    "Kontraktning 50%idan to'liq qismigacha qoplanadi",
+  ]) {
+    assert.ok(text.includes(expected), `missing: ${expected}`);
+  }
+  // The raw English must be gone from the post itself.
+  for (const english of ["citizen", "aged", "Submit a motivation", "or equivalent English test", "amount payable"]) {
+    assert.ok(!text.includes(english), `English leaked into the post: ${english}`);
+  }
 });
 
 // ---------------------------------------------------------------------------
