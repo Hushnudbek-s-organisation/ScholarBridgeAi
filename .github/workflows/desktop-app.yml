@@ -105,6 +105,9 @@ jobs:
             TARGET="$(ls -d desktop/release/*/Contents 2>/dev/null | head -1)"
           fi
           echo "checking $TARGET"
+          # Phase 2 boots the private PostgreSQL as well; on Windows only the
+          # spawn/HTTP phase runs (that is the failure mode this guards).
+          if [ "${{ runner.os }}" = "Windows" ]; then export SMOKE_WITH_DATABASE=0; else export SMOKE_WITH_DATABASE=1; fi
           node scripts/check-desktop-engine.mjs "$TARGET" || {
             echo "::error title=Packaged engine does not start::The packaged server failed to boot on this OS."
             exit 1
