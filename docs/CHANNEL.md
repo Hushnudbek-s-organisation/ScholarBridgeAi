@@ -1524,6 +1524,74 @@ the panel wiring, and the new label present in all three message files.
 integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
 `next build` OK.
 
+## 11h. A university page that speaks the reader's language (2026-10-30)
+
+The university profile at `/universities/[id]` printed the stored English
+description verbatim under an Uzbek heading. Measured against the live
+catalogue (356 active universities):
+
+| shape | rows | before | after |
+| --- | --- | --- | --- |
+| "… is a premier global research university in …" | 194 | English paragraph | rendered in the page language |
+| "… is a <public\|private> university in …" with a funding sentence | 46 | English paragraph | rendered |
+| "… is a <public\|private> university in …" without one | 108 | English paragraph | rendered |
+| "Institution identity seed…" | 4 | translated (dictionary) | unchanged |
+| no known shape / funding headline outside the vocabulary | 4–10 | English paragraph | **verbatim + label** |
+
+`UNI_TEMPLATE_1` in `catalogLocalizer.ts` was written for a third shape
+("ranked in the top N") that the catalogue no longer produces, so it matched
+nothing. The two live shapes are now parsed as structured facts in
+`src/lib/universityProse.ts`: name, city, country, type, founded year, tuition,
+living costs, accommodation, funding headline, post-study window and the
+Top-10 guide position. The sentences are re-written per language, not
+substituted word by word.
+
+**The rule is clean or verbatim.** The funding headline keeps the scheme names
+exactly as stored (students search for them by name) and renders the payment
+side from a closed vocabulary — "Full Tuition Waiver" is
+"to‘liq kontraktdan ozod qilish" / "полное освобождение от оплаты обучения",
+never "kontrakt imtiyozi". One word outside that vocabulary and the *whole*
+description stays in English: `universityDescriptionState()` reports
+`verbatim: true` by comparing the result with the source, and the page renders
+it through `SourceLanguageProse` with the existing label
+(`Manba tili: inglizcha` / `Язык источника: английский` / `Source language: English`,
+`universityDetail.sourceLanguageLabel`). 35 of the 41 distinct funding
+headlines in live data render; the rest are labelled rather than guessed.
+
+Highlight badges follow the same rule. Three defects measured before the fix:
+
+* `Located in Cambridge, MA, United States (Founded 1861)` left the English
+  "United Statesda joylashgan" — the parser read "MA" as the country. It now
+  reads the place as city + country and prints `Joylashuvi: Kembrij, MA, AQSH`.
+* `CITY_NAMES.Cambridge` said **"Kembridge"** in Uzbek. Now "Kembrij".
+* `Post-study work visa opportunity: 3 year(s)`, `Comprehensive undergraduate,
+  master's, and doctoral research programs` and `Uzbek applicants guide:
+  United States Top-10 #1` were printed in English; all three now have
+  templates.
+
+The old phrase-substitution layer could also produce half-translated badges
+("stipendiya: MIT Need-Based stipendiya + …"). It now only counts as a
+translation when the phrases account for the **whole** badge; otherwise the
+badge is returned untouched and the list shows one source-language label under
+the chips.
+
+### Verified
+
+`npm run test:university-prose` — **17/17** (new): all three live shapes in uz
+and ru, no English sentence frame left behind, the numbers preserved, city and
+country localized (AQSH, Kembrij, Tucson, AZ), the unknown-funding row falling
+back to the exact source string, the seed note still translated, `en`
+unchanged and unlabelled, `localizeUniversityDescription` and
+`universityDescriptionState` agreeing, the six MIT badges (five rendered, the
+unknown scholarship badge returned whole), the mangled badge asserted *not*
+produced, and the type-column case-insensitivity.
+
+`npm run test:catalogue-language` 19/0 · `test:render` 354/0 ·
+`test:localization` 16/0 · `test:catalogue-order` 12/0 · `test:deadline-day`
+13/0 · `test:opportunity-notes` 10/0 · `test:opportunities` 27/0 ·
+`test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security 90 ·
+portability 57/0 · `check:i18n` passed · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

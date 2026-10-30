@@ -37,6 +37,7 @@
  */
 
 import type { Locale } from "@/i18n/config";
+import { localizeUniversityNarrative } from "@/lib/universityProse";
 import { dictionaries } from "@/i18n/messages.server";
 import { countryTranslationKey } from "@/lib/countries";
 import { memoizedLocalize, memoizedText, type LocalizedFields } from "@/lib/localizeMemo";
@@ -151,7 +152,7 @@ export function localizeCountry(country: string | null | undefined, locale: Loca
 
 const CITY_NAMES: Record<string, Record<TargetLocale, string>> = {
   London: { uz: "London", ru: "Лондон" },
-  Cambridge: { uz: "Kembridge", ru: "Кембридж" },
+  Cambridge: { uz: "Kembrij", ru: "Кембридж" },
   Oxford: { uz: "Oksford", ru: "Оксфорд" },
   Manchester: { uz: "Manchester", ru: "Манчестер" },
   Edinburgh: { uz: "Edinburg", ru: "Эдинбург" },
@@ -895,7 +896,10 @@ export function localizeUniversityType(type: string | null | undefined, locale: 
   if (locale === "en" || type == null || type === "") return type ?? "";
   const tl = targetLocale(locale);
   if (!tl) return type;
-  const hit = UNIVERSITY_TYPE_NAMES[type] ?? UNIVERSITY_TYPE_NAMES[keyOf(type)];
+  // Case-insensitive: the column holds "Public"/"Private" in most rows and
+  // lowercase "public"/"private" inside the generated descriptions.
+  const canonical = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  const hit = UNIVERSITY_TYPE_NAMES[type] ?? UNIVERSITY_TYPE_NAMES[canonical] ?? UNIVERSITY_TYPE_NAMES[keyOf(type)];
   return hit ? hit[tl] : type;
 }
 
@@ -1042,6 +1046,23 @@ export function localizeRequirementText(text: string | null | undefined, locale:
   return memoizedText("requirement-text", locale, text, () => translateRequirementText(text, locale));
 }
 
+/**
+ * The description plus the fact the profile page needs: was it rendered in the
+ * page language, or is it the source sentence shown as-is? Identity comparison
+ * is the honest test — if the translator handed the input back unchanged, the
+ * page must label it (see `SourceLanguageProse`) instead of passing English off
+ * as a translation.
+ */
+export function universityDescriptionState(
+  text: string | null | undefined,
+  locale: Locale
+): { text: string; verbatim: boolean } {
+  const source = text ?? "";
+  if (locale === "en" || source.trim() === "") return { text: source, verbatim: false };
+  const translated = localizeUniversityDescription(source, locale);
+  return { text: translated, verbatim: translated.trim() === source.trim() };
+}
+
 /** The uncached translation — `memoizedText` remembers the result per input. */
 function translateRequirementText(text: string, locale: Locale): string {
   // `text` is non-empty and `locale` is uz/ru here — the caller guarantees it.
@@ -1164,6 +1185,11 @@ function translateUniversityDescription(text: string, locale: Locale): string {
   const tl = targetLocale(locale) ?? "uz";
   const exact = UNIVERSITY_DESCRIPTIONS[text.trim()];
   if (exact) return exact[tl];
+  // The two shapes the live catalogue actually stores (194 + 154 of 356 rows).
+  // `localizeUniversityNarrative` returns the source text when it cannot render
+  // every segment, which keeps the rule "clean or verbatim".
+  const narrative = localizeUniversityNarrative(text, locale);
+  if (!narrative.verbatim) return narrative.text;
   // Template 1 — "premier global research university in {city}, {country}, ...".
   const m = text.match(UNI_TEMPLATE_1);
   if (m) {
@@ -1314,15 +1340,47 @@ function localizeDynamicHighlight(text: string, locale: Locale, tl: TargetLocale
       : `№${ranking[1]} в мировом рейтинге QS`;
   }
 
-  const location = text.match(/^Located in ([^,]+),\s*([^(]+?)(?:\s*\(Founded (\d+)\))?$/i);
+  // "Located in Cambridge, MA, United States (Founded 1861)". The place has
+  // three parts, not two: the old parser read "MA" as the country and glued a
+  // locative onto it ("United Statesda"), and the city dictionary supplied a
+  // misspelling ("Kembridge"). A labelled field avoids the grammar entirely.
+  const location = text.match(/^Located in (.+?)(?:\s*\(Founded (\d{4})\))?$/i);
   if (location) {
-    const city = localizeCity(location[1].trim(), locale);
-    const country = localizeCountry(location[2].trim(), locale);
-    const year = location[3];
+    const parts = location[1].split(",").map((p) => p.trim()).filter(Boolean);
+    const countryRaw = parts.length > 1 ? parts[parts.length - 1] : "";
+    const cityRaw = parts.slice(0, Math.max(1, parts.length - 1)).join(", ");
+    const city = localizeCity(cityRaw, locale) || cityRaw;
+    const country = countryRaw ? localizeCountry(countryRaw, locale) || countryRaw : "";
+    const place = [city, country].filter(Boolean).join(", ");
+    const year = location[2];
     if (tl === "uz") {
-      return `${city}, ${country}da joylashgan${year ? ` (${year}-yilda tashkil etilgan)` : ""}`;
+      return `Joylashuvi: ${place}${year ? ` (${year}-yilda tashkil etilgan)` : ""}`;
     }
-    return `Расположен в г. ${city}, ${country}${year ? ` (основан в ${year} г.)` : ""}`;
+    return `Расположение: ${place}${year ? ` (основан в ${year} г.)` : ""}`;
+  }
+
+  // "Post-study work visa opportunity: 3 year(s)".
+  const visa = text.match(/^Post-study work visa opportunity:\s*([\d.]+)\s*year\(s\)$/i);
+  if (visa) {
+    return tl === "uz"
+      ? `O'qishdan keyin ishlash vizasi: ${visa[1]} yilgacha`
+      : `Виза для работы после учёбы: до ${visa[1]} лет`;
+  }
+
+  // "Comprehensive undergraduate, master's, and doctoral research programs".
+  if (/^Comprehensive undergraduate, master's, and doctoral research programs$/i.test(text)) {
+    return tl === "uz"
+      ? "Bakalavriat, magistratura va doktorantura bo'yicha keng qamrovli ilmiy dasturlar"
+      : "Полный спектр программ: бакалавриат, магистратура и докторантура";
+  }
+
+  // "Uzbek applicants guide: United States Top-10 #1".
+  const guide = text.match(/^Uzbek applicants guide:\s*(.+?)\s+Top-10\s+#?(\d+)$/i);
+  if (guide) {
+    const country = localizeCountry(guide[1].trim(), locale) || guide[1].trim();
+    return tl === "uz"
+      ? `O'zbekistonlik abituriyentlar uchun qo'llanma: ${country} Top-10 #${guide[2]}`
+      : `Справочник для абитуриентов из Узбекистана: ${country} Top-10 #${guide[2]}`;
   }
 
   const international = text.match(/^(\d+(?:\.\d+)?)%\s+international student body$/i);
@@ -1365,12 +1423,20 @@ export function localizeHighlightItem<T>(item: T, locale: Locale): T {
     if (exact) return exact[tl] as unknown as T;
     const dynamic = localizeDynamicHighlight(item, locale, tl);
     if (dynamic) return dynamic as unknown as T;
-    // Pattern layer for unknown badges — phrase substitutions.
+    // Pattern layer for unknown badges — phrase substitutions, all or nothing.
+    // The layer only counts as a translation when the phrases account for the
+    // WHOLE badge: if any English words are left over the original is returned
+    // untouched, because "stipendiya: MIT Need-Based Aid - Full Ride (100%
+    // Demonstrated Need: …) [Yes]" is worse than the English it replaced — the
+    // page labels a source-language line, it cannot un-label a mangled one.
     let out: string = item;
+    let residue: string = item;
     for (const [pattern, translations] of HIGHLIGHT_PHRASES) {
-      if (pattern.test(out)) out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+      if (item.search(pattern) === -1) continue;
+      out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+      residue = residue.replace(new RegExp(pattern.source, pattern.flags), "");
     }
-    return out as unknown as T;
+    return (/[A-Za-z]/.test(residue) ? item : out) as unknown as T;
   }
   if (item && typeof item === "object") {
     const rec = item as { title?: string; text?: string };
@@ -1392,10 +1458,13 @@ export function localizeHighlightItem<T>(item: T, locale: Locale): T {
           newText = dynamic;
         } else {
           let out = text;
+          let residue = text;
           for (const [pattern, translations] of HIGHLIGHT_PHRASES) {
-            if (pattern.test(out)) out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+            if (text.search(pattern) === -1) continue;
+            out = out.replace(new RegExp(pattern.source, pattern.flags), translations[tl]);
+            residue = residue.replace(new RegExp(pattern.source, pattern.flags), "");
           }
-          newText = out;
+          newText = /[A-Za-z]/.test(residue) ? text : out;
         }
       }
     }

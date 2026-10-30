@@ -33,10 +33,11 @@ import {
   localizeDegreeLevel,
   localizeHighlights,
   localizeMajorOrField,
-  localizeUniversityDescription,
   localizeUniversityType,
+  universityDescriptionState,
 } from "@/lib/catalogLocalizer";
 import { formatMoney, formatNumber } from "@/lib/format";
+import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 
 /**
  * Public university profile — /universities/[id].
@@ -136,10 +137,19 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   const place = [localizeCity(u.city, locale), country].filter(Boolean).join(", ");
   const type = u.universityType ? localizeUniversityType(u.universityType, locale) : null;
   const degree = u.degreeLevel ? localizeDegreeLevel(u.degreeLevel, locale) : null;
-  const description = u.description ? localizeUniversityDescription(u.description, locale) : null;
+  // 348 of the 356 stored descriptions are machine-generated sentences that the
+  // dictionary layer cannot render faithfully. Those keep their English text and
+  // get the "source language: English" label rather than a half-translated
+  // sentence; readable copy renders as ordinary localized prose.
+  const description = u.description ? universityDescriptionState(u.description, locale) : null;
   // `highlights` is a JSON-array column; localize the array, then flatten it to
   // the labels the page lists.
+  const storedHighlights = u.highlights ? listValues(u.highlights) : [];
   const highlights = u.highlights ? listValues(localizeHighlights(u.highlights, locale)) : [];
+  // Badges fall under the same rule: a badge that could not be rendered cleanly
+  // stays in English, and the list says so once instead of labelling each chip.
+  const highlightsInSource =
+    locale !== "en" && highlights.some((item, index) => item === storedHighlights[index]);
   const fields = (bundle?.programFieldsByUni.get(u.id) ?? [])
     .slice(0, 16)
     .map((field) => localizeMajorOrField(field, locale));
@@ -301,8 +311,12 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {/* ------------------------------------------------------- main */} 
           <div className="space-y-4">
             <Section id="overview" title={t.overview} icon={<Globe2 className="h-4 w-4" aria-hidden />}>
-              {description ? (
-                <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">{description}</p>
+              {description && description.text ? (
+                <SourceLanguageProse
+                  text={description.text}
+                  showLabel={description.verbatim}
+                  label={t.sourceLanguageLabel}
+                />
               ) : (
                 <p className="text-sm text-slate-600">{t.overviewNotPublished}</p>
               )}
@@ -324,6 +338,12 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                       </li>
                     )}
                   </ul>
+                  {highlightsInSource && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
+                      <Languages className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>{t.sourceLanguageLabel}</span>
+                    </p>
+                  )}
                 </>
               )}
             </Section>

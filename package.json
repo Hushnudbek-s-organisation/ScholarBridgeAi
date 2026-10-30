@@ -32,6 +32,7 @@
     "test:catalogue-order": "tsx scripts/check-catalogue-order.ts",
     "test:deadline-day": "tsx scripts/check-deadline-day.ts",
     "test:opportunity-notes": "tsx scripts/check-opportunity-notes.ts",
+    "test:university-prose": "tsx scripts/check-university-prose.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",
