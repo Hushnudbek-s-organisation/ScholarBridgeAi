@@ -316,7 +316,7 @@ accident:
 
 | Where | How it is set | How the user changes it |
 | --- | --- | --- |
-| Desktop | `desktop/server-default.mjs` → `DEFAULT_SERVER_URL` | *Server → Open the online site…* (the address is saved in `desktop-config.json`), then restart-free |
+| Desktop | `desktop/server-default.mjs` → `DEFAULT_SERVER_URL` (`https://scholarbridgeai-9bmd.onrender.com`) | *Server → Open the online site…* (the address is saved in `desktop-config.json`), then restart-free |
 | Android | `mobile/www/config.js` → `SCHOLARBRIDGE_DEFAULT_SERVER` | the connect screen; the address is remembered on the phone |
 
 Ship a build for another deployment (a fork, a staging site):
@@ -414,7 +414,7 @@ build the real installers on GitHub's machines.
 | Sign-in: *“Incorrect email or password”* although the password is certainly right | Three causes, all visible now. **(1)** In 1.0.16 and later the form can show the typed password (eye button) — a trailing space or a Cyrillic keyboard layout is the most common culprit, and both are stripped automatically now. **(2)** The account must exist **in this app**: the desktop build keeps its own database in `%APPDATA%\ScholarBridge`, so an account created on the website, or on another laptop/phone, is not there. The form offers *“Create an account with this email”* right under the error. **(3)** Eight attempts in 15 minutes from one address are throttled; a **successful** sign-in now clears that budget, so a correct password never inherits an earlier mistake. |
 | Sign-up: *“Your password must be at least 8 characters”* although the password **is** 8 characters | Fixed in **1.0.16**. That one message was printed for every refusal and for all three fields: a correct 8-character password was reported as too short when the **name** or **email** was the actual problem, and a blocked password such as `12345678` was also reported as a length problem. 1.0.16 reports each field separately (*“Enter your email address.”*, *“That email address is not complete…”*), tells a blocked password apart (*“too easy to guess”*), normalises spaces/capitals in the email, and shows a `n / 8 characters` counter with a show-password button. |
 | Sign-up: *“Could not create the account”* with no reason | Older than 1.0.16, where a duplicate email, a throttled address and a rejected password could all end in the same sentence. 1.0.16 says which one it is (and how many minutes the sign-up throttle has left). |
-| Desktop: *“Could not open scholarbridge-ai.onrender.com”* | The site could not be reached. No internet, or the **free Render plan was asleep** — the first open after a quiet period can take up to a minute; press **Try again**. The dialog also offers **Use the offline copy**, which works with no internet (separate database). |
+| Desktop: *“Could not open scholarbridgeai-9bmd.onrender.com”* | The site could not be reached. No internet, or the **free Render plan was asleep** — the first open after a quiet period can take up to a minute; press **Try again**. The dialog also offers **Use the offline copy**, which works with no internet (separate database). |
 | Desktop: the app opens a site that is not yours | *Server → Open the online site…* and type your address (it is saved), or start it with `SCHOLARBRIDGE_SERVER_URL=…`. *Server* shows which address is in use. |
 | Desktop: signed in on the website, but the app asks to sign in | Expected — the website in a browser and the app are two separate cookie stores. Sign in once in the app; the session is kept for 7 days. |
 | Desktop: signed in online, but the *offline copy* says the account does not exist | Two databases. *Server → Back to the online site* returns to the shared one. |
@@ -424,7 +424,7 @@ build the real installers on GitHub's machines.
 | Phone: app opens but shows the connect screen again | The address was unreachable, so it was not saved. Check the laptop's *Share → Show phone connection*. |
 | Android build: `SDK location not found` | Set `ANDROID_HOME`, or create `mobile/android/local.properties` with `sdk.dir=/path/to/Android/Sdk`. |
 | Android build: Gradle download fails | First build needs internet for Gradle + Android dependencies. In mainland networks configure a mirror, or build with the GitHub workflow. |
-| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow **fails the build** when the tag (`v1.0.17`) and that number disagree. |
+| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow **fails the build** when the tag (`v1.0.18`) and that number disagree. |
 | macOS: "app is damaged" | Unsigned build, quarantine attribute: `xattr -dr com.apple.quarantine /Applications/ScholarBridge.app`. |
 | Linux: `.AppImage` will not run | Make it executable: `chmod +x ScholarBridge-1.0.0.AppImage`, and install `libfuse2` if your distribution needs it. |
 

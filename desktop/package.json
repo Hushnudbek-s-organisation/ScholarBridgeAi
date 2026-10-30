@@ -1,7 +1,7 @@
 {
   "name": "scholarbridge-desktop",
   "productName": "ScholarBridge",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "private": true,
   "description": "ScholarBridgeAI — the desktop app. A real installed program: the ScholarBridge server and a private PostgreSQL database run inside the app, so it works without a website tab and without Docker.",
   "author": "ScholarBridgeAI",
