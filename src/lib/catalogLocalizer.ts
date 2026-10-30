@@ -2574,16 +2574,22 @@ const UNIVERSITY_LOCALIZED_FIELDS = [
   "programMajor",
   "description",
   "highlights",
+  // `worldRanking` is not translated, but it IS an input of the translation:
+  // the stored prose and ranking chip carry a QS number that may be out of
+  // date, and the verified column replaces it. Without it in the signature a
+  // corrected rank would keep serving the memoised old one.
+  "worldRanking",
 ] as const;
 
 function translateUniversityFields<T extends UniversityRowLike>(uni: T, locale: Locale): LocalizedFields {
+  const rank = typeof uni.worldRanking === "number" ? uni.worldRanking : null;
   const out: LocalizedFields = {};
   if (typeof uni.city === "string") out.city = localizeCity(uni.city, locale);
   if (typeof uni.country === "string") out.country = localizeCountry(uni.country, locale);
   if (typeof uni.universityType === "string") out.universityType = localizeUniversityType(uni.universityType, locale);
   if (typeof uni.programMajor === "string") out.programMajor = localizeMajorOrField(uni.programMajor, locale);
-  if (typeof uni.description === "string") out.description = localizeUniversityDescription(uni.description, locale);
-  if (typeof uni.highlights === "string") out.highlights = localizeHighlights(uni.highlights, locale);
+  if (typeof uni.description === "string") out.description = localizeUniversityDescription(uni.description, locale, rank);
+  if (typeof uni.highlights === "string") out.highlights = localizeHighlights(uni.highlights, locale, rank);
   return out;
 }
 
@@ -2597,9 +2603,9 @@ function translateUniversityFields<T extends UniversityRowLike>(uni: T, locale: 
  * memo stores translated strings only and the caller always gets a new object.
  */
 export function localizeUniversityRow<T extends UniversityRowLike>(uni: T, locale: Locale): T {
-  if (locale === "en") return passthrough(uni);
+  if (locale === "en") return reconcileUniversityRowRanks(uni) as T;
   const tl = targetLocale(locale);
-  if (!tl) return uni;
+  if (!tl) return reconcileUniversityRowRanks(uni) as T;
   // An array of highlights cannot be expressed as a translated string — take
   // the plain path rather than teaching the memo about shapes.
   const arrayHighlights = uni.highlights != null && typeof uni.highlights !== "string";
@@ -2612,8 +2618,78 @@ export function localizeUniversityRow<T extends UniversityRowLike>(uni: T, local
     ...uni,
     ...fields,
     // Arrays/objects pass through the (uncached) translator untouched.
-    ...(arrayHighlights ? { highlights: localizeHighlights(uni.highlights as Str, locale) } : {}),
+    ...(arrayHighlights
+      ? {
+          highlights: localizeHighlights(
+            uni.highlights as Str,
+            locale,
+            typeof uni.worldRanking === "number" ? uni.worldRanking : null
+          ),
+        }
+      : {}),
+    // A catalogue card shows the same prose as the profile page; it has to be
+    // able to say when that prose is the source sentence rather than a
+    // translation (the profile page and the detail panel do).
+    ...universityProseFlags(uni, locale),
   };
+}
+
+/**
+ * The two "this is the source language" flags for a row, for a view that shows
+ * the description or the badges without the profile page's own computation.
+ * `null` means the text rendered in the page language.
+ */
+function universityProseFlags(
+  uni: UniversityRowLike,
+  locale: Locale
+): { descriptionSourceLanguage?: "en" | null; highlightsSourceLanguage?: "en" | null } {
+  if (!targetLocale(locale)) return {};
+  const out: { descriptionSourceLanguage?: "en" | null; highlightsSourceLanguage?: "en" | null } = {};
+  if (typeof uni.description === "string" && uni.description.trim() !== "") {
+    out.descriptionSourceLanguage = universityDescriptionState(
+      uni.description,
+      locale,
+      typeof uni.worldRanking === "number" ? uni.worldRanking : null
+    ).verbatim
+      ? "en"
+      : null;
+  }
+  if (typeof uni.highlights === "string") {
+    const stored = localizeHighlights(
+      uni.highlights,
+      "en",
+      typeof uni.worldRanking === "number" ? uni.worldRanking : null
+    );
+    const rendered = localizeHighlights(uni.highlights, locale, typeof uni.worldRanking === "number" ? uni.worldRanking : null);
+    if (typeof stored === "string" && typeof rendered === "string") {
+      try {
+        const src = JSON.parse(stored) as unknown;
+        const dst = JSON.parse(rendered) as unknown;
+        if (Array.isArray(src) && Array.isArray(dst)) {
+          out.highlightsSourceLanguage = dst.some((item, index) => item === src[index]) ? "en" : null;
+        }
+      } catch {
+        // Not a JSON array — the card renders it as one string; no flag.
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * `en` and unknown locales: no translation, but the QS figure still has to be
+ * the verified one. Returns the SAME object when nothing needs changing, so
+ * "no translation" stays a no-op for every row whose prose already agrees.
+ */
+function reconcileUniversityRowRanks<T extends UniversityRowLike>(uni: T): T {
+  const rank = typeof uni.worldRanking === "number" ? uni.worldRanking : null;
+  if (rank == null) return uni;
+  const description =
+    typeof uni.description === "string" ? reconcileEmbeddedRank(uni.description, rank) : uni.description;
+  const highlights =
+    typeof uni.highlights === "string" ? reconcileEmbeddedRank(uni.highlights, rank) : uni.highlights;
+  if (description === uni.description && highlights === uni.highlights) return uni;
+  return { ...uni, ...(description !== uni.description ? { description } : {}), ...(highlights !== uni.highlights ? { highlights } : {}) };
 }
 
 interface ScholarshipRowLike {

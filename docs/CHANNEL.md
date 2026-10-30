@@ -1695,6 +1695,57 @@ the flag is derived from the profile page's rule).
 integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
 `next build` OK.
 
+## 11k. The catalogue cards match the profile page they lead to (2026-10-30)
+
+Phase Y fixed the QS figure on `/universities/[id]` and on `GET
+/api/universities/[id]`. The hub's card list is a **different** endpoint:
+`GET /api/universities` localizes every row through `localizeUniversityRow`,
+which passed neither the verified rank nor the source-language facts onward.
+Measured with the real University of Latvia row (prose `#200`, QS 2026 position
+**801**) before the fix:
+
+| locale | description | ranking chip |
+| --- | --- | --- |
+| en | still `#200` (path is a passthrough) | still `#200` |
+| uz | `200-o'rin`, from the stale text | `#200` |
+| ru | `200-е место`, from the stale text | `№200` |
+
+A student could read «QS o‘rni: #801» on the profile page and `#200` on the card
+that led there.
+
+### What changed
+
+* `localizeUniversityRow` passes `worldRanking` into the description and badge
+  translators, and reconciles the stored prose for `en` (and any locale it does
+  not translate) through the same `reconcileEmbeddedRank` Phase Y introduced.
+  An agreeing row is still returned as **the same object**, so "no translation"
+  remains a no-op.
+* `worldRanking` was added to `UNIVERSITY_LOCALIZED_FIELDS` — it is not
+  translated, but it *is* an input of the translation, so without it in the memo
+  signature a corrected rank would keep serving the translation computed for the
+  old one (asserted).
+* The row now carries `descriptionSourceLanguage` / `highlightsSourceLanguage`
+  (`"en" | null`), derived from the same rules the profile page and the detail
+  panel use, and `UniversityExplorer` prints the same label above a `lang="en"`
+  paragraph and under the badge row.
+
+### Verified
+
+`npm run test:university-list` — **15/15** (new): the verified rank in all three
+locales for both the description and the chip, the English card corrected, an
+agreeing row unchanged (and the same reference), the stored row never mutated, a
+row with no verified rank untouched, the memo not serving a translation built
+for an older rank, the two flags set exactly for the rows that need them (WIUT
+description, the untranslatable MIT scholarship badge) and clear for the rest, no
+flags on the English page, plus the route, memo and card wiring.
+
+`test:university-hub` 11/0 · `test:university-rank` 17/0 ·
+`test:university-prose` 17/0 · `test:catalogue-language` 19/0 · `test:render`
+354/0 · `test:localization` 16/0 · `test:catalogue-order` 12/0 ·
+`test:deadline-day` 13/0 · `test:opportunity-notes` 10/0 · `test:opportunities`
+27/0 · `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security
+90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from
