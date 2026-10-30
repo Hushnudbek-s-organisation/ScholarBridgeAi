@@ -13,6 +13,7 @@
  * exercises the real boot path end to end.
  */
 import { spawn, spawnSync } from "node:child_process";
+import { extractTarGz } from "./tar.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -203,6 +204,47 @@ export async function applySchema(connectionString, schemaPath, dataDir, log = (
 }
 
 /**
+ * Unpack the bundled engine archive into the app's data folder.
+ *
+ * The installer carries the compiled server as ONE file (`engine.tar.gz`)
+ * rather than ~3600 loose files: a per-file extraction can silently drop
+ * files on Windows (antivirus quarantine, interrupted write), which reached a
+ * user as `MODULE_NOT_FOUND` at engine start-up while the same package booted
+ * perfectly in CI. Writing the tree ourselves is atomic — it goes to a
+ * temporary folder and is renamed into place only when complete — and the
+ * `.version` marker makes an interrupted or partial unpack simply redo itself
+ * on the next launch.
+ *
+ * Returns the folder that contains `server.js`.
+ */
+export async function ensureEngine({ archive, dataDir, log = () => {} }) {
+  if (!archive || !fs.existsSync(archive)) return null;
+  const stat = fs.statSync(archive);
+  const version = `${stat.size}-${Math.round(stat.mtimeMs)}`;
+  const engineDir = path.join(dataDir, "engine");
+  const marker = path.join(engineDir, ".version");
+  const installed = fs.existsSync(marker) ? fs.readFileSync(marker, "utf8").trim() : "";
+
+  if (installed === version && fs.existsSync(path.join(engineDir, "server.js"))) {
+    return engineDir;
+  }
+
+  const staging = path.join(dataDir, "engine.new");
+  fs.rmSync(staging, { recursive: true, force: true });
+  const started = Date.now();
+  log("[engine] unpacking the app engine (done once per version)…");
+  const files = extractTarGz(archive, staging);
+  if (!fs.existsSync(path.join(staging, "server.js"))) {
+    throw new Error("The bundled engine archive is incomplete (server.js is missing).");
+  }
+  fs.writeFileSync(path.join(staging, ".version"), version);
+  fs.rmSync(engineDir, { recursive: true, force: true });
+  fs.renameSync(staging, engineDir);
+  log(`[engine] ${files} files unpacked in ${Date.now() - started} ms → ${engineDir}`);
+  return engineDir;
+}
+
+/**
  * The runtime the engine runs on.
  *
  * Preferred: the official Node.js shipped inside the app (`resources/node`).
@@ -268,6 +310,7 @@ function waitForExit(child, ms) {
 export async function startLocalServer(options) {
   const {
     appDir: appDirInput,
+    engineArchive,
     dataDir,
     schemaPath,
     host = "127.0.0.1",
@@ -281,15 +324,23 @@ export async function startLocalServer(options) {
     warmUp = true,
   } = options;
 
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  // Packaged builds ship `engine.tar.gz`; unpack it into the data folder and
+  // run from there. A loose folder (development, or an older package) is used
+  // as-is.
+  const unpacked = await ensureEngine({ archive: engineArchive, dataDir, log });
   // Absolute paths: the server is spawned with this folder as its cwd, so a
   // relative path would resolve twice (…/.next/standalone/.next/standalone).
-  const appDir = path.resolve(appDirInput);
+  const appDir = path.resolve(unpacked || appDirInput);
+  if (!appDirInput && !unpacked) {
+    throw new Error("Neither an engine archive nor an engine folder was provided.");
+  }
   if (!fs.existsSync(path.join(appDir, "server.js"))) {
     throw new Error(
       `The bundled server is missing (${appDir}). Build it first: npm run desktop:prepare`
     );
   }
-  fs.mkdirSync(dataDir, { recursive: true });
 
   let pg;
   let child;

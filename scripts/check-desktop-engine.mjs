@@ -32,17 +32,26 @@ if (!root) {
 }
 
 const resources = path.resolve(root, "resources");
-const serverDir = path.join(resources, "server");
 const schemaPath = path.join(resources, "schema", "full_schema.sql");
+const engineArchive = path.join(resources, "engine.tar.gz");
 const binary = process.platform === "win32" ? "node.exe" : "node";
 const bundledNode = path.join(resources, "node", binary);
 
-for (const required of [path.join(serverDir, "server.js"), schemaPath]) {
-  if (!fs.existsSync(required)) {
-    console.error(`✖ missing from the package: ${required}`);
-    process.exit(1);
-  }
+if (!fs.existsSync(schemaPath)) {
+  console.error(`✖ missing from the package: ${schemaPath}`);
+  process.exit(1);
 }
+if (!fs.existsSync(engineArchive) && !fs.existsSync(path.join(resources, "server", "server.js"))) {
+  console.error("✖ the package carries no engine (neither engine.tar.gz nor server/)");
+  process.exit(1);
+}
+
+// Unpack the engine exactly as the installed app does, then run it from there.
+const { ensureEngine } = await import("../desktop/boot.mjs");
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "scholarbridge-engine-"));
+const serverDir = (await ensureEngine({ archive: engineArchive, dataDir, log: (line) => console.log(`  ${line}`) }))
+  || path.join(resources, "server");
+console.log(`engine: ${serverDir}`);
 
 const failures = [];
 const collectOutput = () => {
@@ -131,8 +140,7 @@ async function phaseSpawnOnly() {
 // Phase 2 — the whole boot path, including the private database.
 // ---------------------------------------------------------------------------
 async function phaseFullBoot() {
-  console.log("phase 2: full boot (private database → schema → engine → landing page)");
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "scholarbridge-smoke-"));
+  console.log("phase 2: full boot (private database → engine archive → schema → engine → landing page)");
   const { startLocalServer } = await import("../desktop/boot.mjs");
   let server;
   try {
@@ -160,7 +168,6 @@ async function phaseFullBoot() {
     failures.push(`full boot failed: ${error && error.message}`);
   } finally {
     if (server) await server.stop().catch(() => {});
-    fs.rmSync(dataDir, { recursive: true, force: true });
   }
 }
 
@@ -170,6 +177,8 @@ if (process.env.SMOKE_WITH_DATABASE === "1") {
 } else {
   console.log("phase 2 skipped (SMOKE_WITH_DATABASE is not 1)");
 }
+
+fs.rmSync(dataDir, { recursive: true, force: true });
 
 if (failures.length) {
   console.error(`\n✖ packaged engine check FAILED on ${process.platform}/${process.arch}:`);

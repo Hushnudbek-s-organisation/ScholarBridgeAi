@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRuntime, startLocalServer } from "../desktop/boot.mjs";
+import { ensureEngine, resolveRuntime, startLocalServer } from "../desktop/boot.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(repoRoot, ".desktop-test-data");
@@ -98,9 +98,13 @@ async function main() {
       check(`desktop/${file} ships with the app`, fs.existsSync(path.join(repoRoot, "desktop", file)));
     }
     const builder = (await import("../desktop/electron-builder.mjs")).default;
-    check("the installer bundles the server and the schema",
-      builder.extraResources.some((r) => r.to === "server") &&
+    check("the installer bundles the engine archive and the schema",
+      builder.extraResources.some((r) => r.to === "engine.tar.gz") &&
         builder.extraResources.some((r) => r.to === "schema/full_schema.sql"));
+    // One file, not ~3600: a per-file extraction can silently drop files on
+    // Windows (that surfaced as MODULE_NOT_FOUND at engine start-up).
+    check("the engine ships as a single archive, not a loose tree",
+      !builder.extraResources.some((r) => r.to === "server"));
     // Electron runs whatever is in resources/app. Copying the compiled server
     // into that folder merges two package.json files and the app cannot start
     // ("Cannot find module …/resources/app/index.js"), so this must stay false.
@@ -256,6 +260,82 @@ async function main() {
     check("the rebuilt cluster is UTF-8", false, String(error && error.message));
   }
   fs.rmSync(legacyDataDir, { recursive: true, force: true });
+
+  // ---------------------------------------------------------------------------
+  // The engine archive: packing, unpacking and self-repair.
+  // ---------------------------------------------------------------------------
+  console.log("\n— engine archive —");
+  const { writeTarGz, extractTarGz } = await import("../desktop/tar.mjs");
+  const archiveWork = path.join(repoRoot, ".desktop-test-archive");
+  fs.rmSync(archiveWork, { recursive: true, force: true });
+  try {
+    // A tree with a path longer than tar's 100-byte name field, like Next's.
+    const deepDir = path.join(
+      archiveWork,
+      "tree",
+      "node_modules",
+      "next",
+      "dist",
+      "client",
+      "components",
+      "router-reducer",
+      "reducers"
+    );
+    fs.mkdirSync(deepDir, { recursive: true });
+    const deepFile = path.join(deepDir, "has-interception-route-in-current-tree.js");
+    fs.writeFileSync(deepFile, "module.exports = 42;\n");
+    fs.writeFileSync(path.join(archiveWork, "tree", "server.js"), "console.log('engine');\n");
+
+    const archive = path.join(archiveWork, "engine.tar.gz");
+    writeTarGz(path.join(archiveWork, "tree"), archive);
+    const files = extractTarGz(archive, path.join(archiveWork, "out"));
+    check("the archive round-trips a deep path", files === 2 && fs.existsSync(path.join(archiveWork, "out", deepFile.split("tree" + path.sep)[1])),
+      `${files} files`);
+    check("an extracted long-path file has identical content",
+      fs.readFileSync(path.join(archiveWork, "out", deepFile.split("tree" + path.sep)[1]), "utf8") === "module.exports = 42;\n");
+
+    // A corrupt/truncated archive must fail loudly, never silently.
+    fs.writeFileSync(path.join(archiveWork, "broken.tar.gz"), "not a tar.gz");
+    let threw = false;
+    try {
+      extractTarGz(path.join(archiveWork, "broken.tar.gz"), path.join(archiveWork, "broken"));
+    } catch {
+      threw = true;
+    }
+    check("a corrupt archive fails instead of producing a half-engine", threw);
+  } finally {
+    fs.rmSync(archiveWork, { recursive: true, force: true });
+  }
+
+  // ensureEngine: unpacks once, reuses the marker, and re-does a partial unpack.
+  console.log("\n— engine unpacking (ensureEngine) —");
+  const engineWork = path.join(repoRoot, ".desktop-test-engine");
+  fs.rmSync(engineWork, { recursive: true, force: true });
+  try {
+    const tree = path.join(engineWork, "tree");
+    fs.mkdirSync(path.join(tree, "node_modules"), { recursive: true });
+    fs.writeFileSync(path.join(tree, "server.js"), "// engine\n");
+    fs.writeFileSync(path.join(tree, "node_modules", "dep.js"), "module.exports = 1;\n");
+    const archive = path.join(engineWork, "engine.tar.gz");
+    writeTarGz(tree, archive);
+
+    const dir = await ensureEngine({ archive, dataDir: path.join(engineWork, "data") });
+    check("ensureEngine unpacks the archive", Boolean(dir) && fs.existsSync(path.join(dir, "server.js")));
+    check("the unpacked engine carries its dependencies", fs.existsSync(path.join(dir, "node_modules", "dep.js")));
+
+    // Second call must not redo the work.
+    const marker = path.join(dir, ".version");
+    const stamp = fs.statSync(marker).mtimeMs;
+    await ensureEngine({ archive, dataDir: path.join(engineWork, "data") });
+    check("a second launch reuses the unpacked engine", fs.statSync(marker).mtimeMs === stamp);
+
+    // A half-unpacked folder (crash) must be redone, not trusted.
+    fs.rmSync(path.join(dir, "server.js"));
+    const repaired = await ensureEngine({ archive, dataDir: path.join(engineWork, "data") });
+    check("a half-unpacked engine is repaired", fs.existsSync(path.join(repaired, "server.js")));
+  } finally {
+    fs.rmSync(engineWork, { recursive: true, force: true });
+  }
 
   // ---------------------------------------------------------------------------
   // The engine runtime and its failure reporting.

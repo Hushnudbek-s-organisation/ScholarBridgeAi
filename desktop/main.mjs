@@ -23,9 +23,11 @@ const isPackaged = app.isPackaged;
 const repoRoot = path.resolve(here, "..");
 
 /** The compiled server: inside the installer, or the repo build in dev. */
-const serverDir = isPackaged
-  ? path.join(process.resourcesPath, "server")
-  : path.join(repoRoot, ".next", "standalone");
+// Packaged: the engine arrives as one archive and is unpacked into the data
+// folder on first launch (see boot.mjs → ensureEngine). Development: the build
+// output is used directly.
+const engineArchive = isPackaged ? path.join(process.resourcesPath, "engine.tar.gz") : "";
+const serverDir = isPackaged ? "" : path.join(repoRoot, ".next", "standalone");
 const schemaPath = isPackaged
   ? path.join(process.resourcesPath, "schema", "full_schema.sql")
   : path.join(repoRoot, "supabase", "full_schema.sql");
@@ -179,6 +181,7 @@ async function boot() {
   const allowLan = Boolean(config.allowLan);
   server = await startLocalServer({
     appDir: serverDir,
+    engineArchive,
     dataDir,
     schemaPath,
     host: allowLan ? "0.0.0.0" : "127.0.0.1",
@@ -373,7 +376,14 @@ function reportBootError(err) {
     .showMessageBox({
       type: "error",
       title: "ScholarBridge could not start",
-      message: message.split("\n")[0] + hint,
+      // Lead with the informative line: "Cannot find module 'X'", not just
+      // "the engine stopped while starting".
+      message:
+        (message
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => /cannot find|not found|error:|ENOENT|EACCES|EADDRINUSE/i.test(line)) ||
+          message.split("\n")[0]) + hint,
       detail: detail.join("\n"),
       buttons: ["Copy details", "Open log folder", "Quit"],
       defaultId: 2,

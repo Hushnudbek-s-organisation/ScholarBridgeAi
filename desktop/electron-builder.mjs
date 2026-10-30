@@ -47,7 +47,11 @@ const config = {
   // build (scripts/build-desktop.mjs stages it): electron-builder's archiver
   // cannot follow Next's `pg-<hash>` relative symlink on Windows.
   extraResources: [
-    { from: "build-resources/server", to: "server", filter: ["**/*"] },
+    // ONE file instead of ~3600: a per-file installer extraction can drop files
+    // on Windows (antivirus), which surfaced as MODULE_NOT_FOUND at engine
+    // start-up. The app unpacks this itself, atomically (boot.mjs →
+    // ensureEngine).
+    { from: "build-resources/engine.tar.gz", to: "engine.tar.gz" },
     // The official Node.js runtime the engine runs on (see
     // scripts/build-desktop.mjs → stageNodeRuntime). Optional: when the folder
     // is empty the app falls back to Electron's built-in Node.

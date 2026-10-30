@@ -120,8 +120,10 @@ function verifyPackagedLayout() {
     if (fs.existsSync(path.join(appDir, "index.js"))) {
       problems.push(`${label}/app/index.js exists — the compiled server was copied into resources/app`);
     }
-    if (!fs.existsSync(path.join(serverDir, "server.js"))) {
-      problems.push(`${label}/server/server.js is missing — the app would not find its engine`);
+    const archive = path.join(resources, "engine.tar.gz");
+    const looseServer = path.join(serverDir, "server.js");
+    if (!fs.existsSync(archive) && !fs.existsSync(looseServer)) {
+      problems.push(`${label}/engine.tar.gz is missing — the app would have no engine to run`);
     }
     if (!fs.existsSync(path.join(resources, "schema", "full_schema.sql"))) {
       problems.push(`${label}/schema/full_schema.sql is missing — a new install could not create its database`);
@@ -240,6 +242,20 @@ say(
   `Staged server: ${Math.round(size(stagingDir) / 1024 / 1024)} MB, no symlinks` +
     (replacedLinks ? ` (${replacedLinks} link(s) materialised${droppedLinks ? `, ${droppedLinks} dangling dropped` : ""})` : "")
 );
+
+// Pack the staged server into the single archive that ships.
+const engineArchive = path.join(desktopDir, "build-resources", "engine.tar.gz");
+{
+  const { writeTarGz, directorySize } = await import("../desktop/tar.mjs");
+  fs.rmSync(engineArchive, { force: true });
+  const bytes = writeTarGz(stagingDir, engineArchive);
+  say(
+    `Engine archive: ${Math.round(bytes / 1024 / 1024)} MB ` +
+      `(from ${Math.round(directorySize(stagingDir) / 1024 / 1024)} MB of files)`
+  );
+  // The loose copy is not shipped; removing it keeps the build folder small.
+  fs.rmSync(stagingDir, { recursive: true, force: true });
+}
 
 await stageNodeRuntime();
 
