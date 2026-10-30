@@ -1409,6 +1409,63 @@ depends on today, which SQL does not have without a parameter; the bundle path
 is the normal one and is exact. The gate asserts the fallback no longer pages
 by `id`.
 
+## 11f. One clock: the closing day belongs to the applicant (2026-10-30)
+
+### The bug, measured before it was fixed
+
+Two engines answered "can this be applied to today?":
+
+* `computeScholarshipStatus()` (`src/lib/scholarshipStatus.ts`) — the six-state
+  filter vocabulary, also **written back** into `application_status` by
+  `runRefresh()`;
+* `deadlineStateOf()` (`src/lib/catalogueOrder.ts`) — the verdict the public
+  catalogue renders (Phase U).
+
+A `date` column arrives as **midnight UTC**, and the status engine compared it
+with `new Date()`. Measured on the live date (2026-10-30, 07:01 UTC):
+
+```
+deadline today       -> closed      ← the one day it can be applied to
+deadline yesterday   -> closed
+deadline tomorrow    -> open
+range ending today   -> closed
+```
+
+So on the closing day the app said **YOPILGAN**, while the public page (which
+compares days) said open. Worse: `runRefresh()` writes the verdict into
+`application_status`, so a nightly run at 00:05 UTC **closed the award in the
+database** for the whole final day.
+
+### The rule now
+
+All deadline comparisons are whole-day comparisons, in UTC, in one place —
+`daysBetweenYmd` / `ymdOf` / `todayYmd` in `catalogueOrder.ts`:
+
+* the deadline day itself is **open** at every hour (00:00:01 … 23:59:59);
+* a date range keeps its **last day** open;
+* with several rounds, the latest round decides and its own day counts;
+* `computeScholarshipStatus(s, now = new Date())` takes its clock as a
+  parameter, so the verdict is testable and every caller agrees.
+
+### Verified
+
+`npm run test:deadline-day` — **13/13** (new):
+
+* the closing day is open at five different hours; day before open, day after
+  closed; ranges and rounds too;
+* **the two engines never contradict**: the real 45-row slice from
+  `scripts/fixtures/catalogue-slice.json` × 7 dates, asserting the app's
+  open/closed answer and the catalogue's `passed` verdict agree on every row;
+* the dashboard countdown (`daysUntil`) is 0 on the deadline day, matching the
+  verdict;
+* source checks: `computeScholarshipStatus` has no hidden clock inside its body
+  and no `now <= deadline`-style comparison, `refresh.ts` still goes through the
+  shared engine, and the three consumers do not compute a status of their own.
+
+`test:render` 354/0 · `test:catalogue-order` 12/0 · `test:catalogue-language`
+19/0 · `test:localization` 16/0 · integration 351/0 · channel 196/0 · dataset
+50/0 · security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

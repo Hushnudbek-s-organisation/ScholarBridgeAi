@@ -112,6 +112,32 @@ export function orderForBrowsing<T extends DeadlineFields>(rows: readonly T[], t
   return ranked.map((entry) => entry.row);
 }
 
+/**
+ * Whole-day distance from `todayYmd` to a `YYYY-MM-DD`: 0 means "that very
+ * day", 1 tomorrow, -1 yesterday. `null` when either side is not a date.
+ *
+ * Every deadline comparison in this codebase must be a *day* comparison. A
+ * `date` column arrives as midnight UTC, so the obvious `now <= deadline` turns
+ * an award closed at 00:00:01 on the one day a student can still apply to it.
+ */
+export function daysBetweenYmd(fromYmd: string, toYmd: string | null | undefined): number | null {
+  if (!toYmd) return null;
+  const from = Date.parse(`${fromYmd.slice(0, 10)}T00:00:00Z`);
+  const to = Date.parse(`${String(toYmd).slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return Math.round((to - from) / 86_400_000);
+}
+
+/** `YYYY-MM-DD` for any date-ish value, or `null`. */
+export function ymdOf(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.toISOString().slice(0, 10) : null;
+  }
+  const text = String(value).trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : null;
+}
+
 /** Today in the catalogue's own terms (`YYYY-MM-DD`, UTC). */
 export function todayYmd(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
