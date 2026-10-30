@@ -178,6 +178,19 @@ check("institution names in parentheses stay verbatim (proper nouns)", () => {
   );
 });
 
+check("a foreign-language title that is also a field is never made into a degree", () => {
+  // "Ingeniería Civil" is the Spanish name of a programme. The Spanish
+  // `Ingeniería → BEng` token used to match first and produced
+  // "Qurilish bo'yicha muhandislik bakalavri (BEng)" — a bachelor's degree the
+  // catalogue never promised, invented from a title.
+  const civil = localizeProgramName("Ingeniería Civil", "uz");
+  assert.equal(civil, "Qurilish muhandisligi");
+  assert.ok(!/bakalavr|BEng|magistr/i.test(civil), `a degree was invented: ${civil}`);
+  // The same rule keeps the original name when the bracket is the translation.
+  assert.equal(localizeProgramName("Abogacía (Law)", "uz"), "Huquqshunoslik");
+  assert.equal(localizeProgramName("Medicina (Medicine)", "uz"), "Tibbiyot");
+});
+
 check("`en` returns every title and field byte-identical", () => {
   for (const name of ALL_NAMES) assert.equal(localizeProgramName(name, "en"), name);
   for (const field of vocab.fields) assert.equal(localizeMajorOrField(field, "en"), field);
@@ -199,6 +212,21 @@ check("untranslatable catalogue prose asks for the source-language label", () =>
       needsSourceLanguageLabel(text, text, "uz"),
       `no label requested for: ${text.slice(0, 60)}…`
     );
+  }
+});
+
+check("a short English value without function words is labelled too", () => {
+  // Five words, no "the/of/and": the sentence detector alone missed this, and
+  // an unlabelled English phrase on an Uzbek page is the exact bug this phase
+  // exists to close.
+  const short = ["Merit-based tuition waiver", "Need-based aid and fee exemption", "Tuition fee reduction for international students"];
+  for (const text of short) {
+    assert.ok(isEnglishProse(text), `not detected: ${text}`);
+    assert.ok(needsSourceLanguageLabel(text, text, "uz"), `no label requested: ${text}`);
+  }
+  // …and the dictionary values it must not start labelling.
+  for (const text of ["To'liq kontrakt", "Kontraktsiz nemis davlat universiteti", "Tibbiyot", "Fizika (ENS)"]) {
+    assert.ok(!isEnglishProse(text), `false positive: ${text}`);
   }
 });
 

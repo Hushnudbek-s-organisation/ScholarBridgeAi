@@ -1724,6 +1724,20 @@ export function localizeProgramName(name: string | null | undefined, locale: Loc
   // 2. Trailing parenthetical.
   const { base, qualifier } = splitTrailingQualifier(working);
 
+  // 2b. A title written in another language that is already a field label is a
+  // field, not a degree. "Ingeniería Civil" matched the Spanish
+  // `Ingeniería → BEng` token and came out as "Qurilish bo'yicha muhandislik
+  // bakalavri (BEng)" — a bachelor's degree the catalogue never promised.
+  if (/[^\x00-\x7F]/.test(base)) {
+    const fieldHit = FIELD_NAMES[base] ?? FIELD_NAMES[keyOf(base)];
+    if (fieldHit) {
+      const translated = qualifier ? localizeMajorOrField(qualifier, locale) : "";
+      const sameThing = translated && keyOf(translated) === keyOf(fieldHit[tl]);
+      const tail = translated && !sameThing ? ` (${translated})` : qualifier && !translated ? ` (${qualifier})` : "";
+      return `${fieldHit[tl]}${tail}`;
+    }
+  }
+
   // 3. Degree token, then the field after `of` / `in` / `en`.
   for (const { re, kind, subjectGroup } of DEGREE_TOKENS) {
     const match = base.match(re);
@@ -2139,17 +2153,61 @@ const ENGLISH_FUNCTION_WORDS = new Set([
 ]);
 
 /**
- * True when a string reads as an English sentence rather than a code, a score
- * or a proper name. `IELTS 6.5 / TOEFL 94 / DET 120` is NOT prose; `No
- * scholarship-specific English score is published` is.
+ * English words a *translation* never contains. They are what is left when the
+ * dictionary gives up on a short value that has no function words at all
+ * ("Merit-based tuition waiver", "Partial tuition fee reduction"): five words,
+ * zero "the/of/and", and still plainly English on an Uzbek page.
+ */
+const ENGLISH_CONTENT_WORDS = new Set([
+  "tuition", "fee", "fees", "waiver", "scholarship", "scholarships", "fellowship",
+  "funding", "fund", "funds", "stipend", "award", "awards", "grant", "grants",
+  "coverage", "covered", "covers", "deadline", "application", "applications",
+  "applicant", "applicants", "university", "universities", "college", "colleges",
+  "program", "programme", "programs", "programmes", "course", "courses",
+  "degree", "degrees", "bachelor", "masters", "doctoral", "semester", "semesters",
+  "credit", "credits", "academic", "faculty", "research", "study", "studies",
+  "student", "students", "language", "english", "german", "french", "spanish",
+  "score", "scores", "test", "tests", "requirement", "requirements", "merit",
+  "merit-based", "need", "need-based", "based", "full", "partial", "percent",
+  "monthly", "annual", "year", "years", "month", "months", "week", "weeks",
+  "value", "awarded", "offered", "provided", "reduction", "reduced", "exemption",
+  "exempted", "remission", "remitted", "subsidy", "subsidised", "subsidized",
+  "eligible", "eligibility", "criteria", "selection", "selected", "nominat",
+  "nomination", "nominated", "interview", "interviews", "documents", "document",
+  "certificate", "certificates", "transcript", "transcripts", "recommendation",
+  "recommendations", "statement", "essay", "essays", "portfolio", "admission",
+  "admissions", "enrolment", "enrollment", "enrolled", "undergraduate",
+  "postgraduate", "graduate", "international", "national", "nationality",
+  "resident", "residence", "citizen", "citizens", "country", "countries",
+  "institution", "institutions", "school", "schools", "deposit", "insurance",
+  "allowance", "accommodation", "housing", "travel", "airfare", "book", "books",
+]);
+
+/**
+ * True when a string reads as English rather than as a code, a score or a
+ * proper name. `IELTS 6.5 / TOEFL 94 / DET 120` is NOT English prose — a test
+ * score is the same string in every language — and neither is `Tibbiyot`.
+ *
+ * Two detections, because two kinds of English reach the page:
+ *   · a sentence: six+ words with English function words ("No scholarship-level
+ *     IELTS figure; English requirements follow each programme's admission
+ *     rules");
+ *   · a short value: no function word at all, but a word only English uses
+ *     ("Merit-based tuition waiver"). Before this, such a value was rendered
+ *     bare on an Uzbek page and nobody noticed.
  */
 export function isEnglishProse(value: string | null | undefined): boolean {
   if (!value) return false;
-  const words = value.toLowerCase().match(/[a-z']+/g) ?? [];
-  if (words.length < 6) return false;
+  const words = value.toLowerCase().match(/[a-z][a-z'-]*/g) ?? [];
+  if (words.length === 0) return false;
   let hits = 0;
   for (const word of words) if (ENGLISH_FUNCTION_WORDS.has(word)) hits++;
-  return hits >= 2;
+  if (words.length >= 6 && hits >= 2) return true;
+  // A single English content word is enough for a short value; for a long one
+  // require two, so one leftover proper noun does not condemn a translation.
+  let content = 0;
+  for (const word of words) if (ENGLISH_CONTENT_WORDS.has(word)) content++;
+  return words.length <= 8 ? content >= 1 : content >= 2;
 }
 
 /**

@@ -1314,6 +1314,33 @@ select field, count(*) from programs where is_active group by 1 order by 2 desc;
 -- a name sample that covers every shape
 select distinct name from programs where is_active order by md5(name) limit 150;
 ```
+### Two holes found by reading the output, and closed (2026-10-30, same phase)
+
+Both were invisible to the gate that shipped with the phase, because the gate
+only asked "is the result translated or verbatim?" — never "is it *right*?".
+
+1. **A foreign title was turned into a degree the catalogue never offered.**
+   `Ingeniería Civil` (Spanish, a programme name) matched the `Ingeniería → BEng`
+   token before the field dictionary and rendered as *"Qurilish bo'yicha
+   muhandislik bakalavri (BEng)"*. Fixed by consulting the exact field label
+   first whenever the title contains non-ASCII letters; the label now renders as
+   `Qurilish muhandisligi`. `Abogacía (Law)` and `Medicina (Medicine)` follow the
+   same rule and collapse to `Huquqshunoslik` / `Tibbiyot`, since the bracket
+   repeats what the field already says.
+2. **A short English value was never labelled.** `isEnglishProse()` required six
+   words and two function words, so `Merit-based tuition waiver`,
+   `Need-based aid and fee exemption` and
+   `Tuition fee reduction for international students` reached the Uzbek page
+   bare — the exact failure Phase T exists to prevent, wearing a different hat.
+   The detector now also counts *English content words* (a word a translation
+   never contains); one is enough for a value of eight words or fewer, two for a
+   longer string, so a single leftover proper noun cannot condemn a translation.
+
+Both rules are pinned by the gate: *"a foreign-language title that is also a
+field is never made into a degree"* and *"a short English value without function
+words is labelled too"* — **19/19** now, with `To'liq kontrakt`,
+`Kontraktsiz nemis davlat universiteti`, `Tibbiyot` and `Fizika (ENS)` asserted to
+stay *unlabelled*.
 
 ## 12. Short links
 
