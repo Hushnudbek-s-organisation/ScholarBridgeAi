@@ -354,22 +354,47 @@ function reportBootError(err) {
   log(`[fatal] ${message}`);
   log(err instanceof Error && err.stack ? err.stack : "");
   setSplash("error", `${message}\n\nDetails are in:\n${logFile}`);
+
   const hint =
     process.platform === "linux" && /root|initdb|permission/i.test(message)
       ? "\n\nIf you are running as root, PostgreSQL refuses to start — run the app as a normal user."
       : "";
+
+  // The dialog carries the engine's own last lines: asking a student to find
+  // and copy a log file is a round trip that a readable message avoids.
+  const detail = [];
+  if (err && err.logFile) detail.push(`Log: ${err.logFile}`);
+  detail.push(`Data folder: ${dataDir}`);
+  detail.push("");
+  detail.push("Copy these details if you need help:");
+  detail.push(message);
+
   dialog
     .showMessageBox({
       type: "error",
       title: "ScholarBridge could not start",
-      message: message + hint,
-      buttons: ["Open log folder", "Quit"],
-      defaultId: 1,
-      cancelId: 1,
+      message: message.split("\n")[0] + hint,
+      detail: detail.join("\n"),
+      buttons: ["Copy details", "Open log folder", "Quit"],
+      defaultId: 2,
+      cancelId: 2,
+      noLink: true,
     })
     .then((choice) => {
-      if (choice.response === 0) shell.openPath(dataDir).catch(() => {});
-      app.quit();
+      if (choice.response === 0) {
+        clipboard.writeText(
+          [
+            `ScholarBridge ${app.getVersion()} — ${process.platform} ${process.arch}`,
+            `Electron ${process.versions.electron}, Node ${process.versions.node}`,
+            `Data folder: ${dataDir}`,
+            "",
+            message,
+          ].join("\n")
+        );
+        return reportBootError(err);
+      }
+      if (choice.response === 1) shell.openPath(dataDir).catch(() => {});
+      return app.quit();
     })
     .catch(() => app.quit());
 }

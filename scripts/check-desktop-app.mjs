@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { startLocalServer } from "../desktop/boot.mjs";
+import { resolveRuntime, startLocalServer } from "../desktop/boot.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(repoRoot, ".desktop-test-data");
@@ -256,6 +256,61 @@ async function main() {
     check("the rebuilt cluster is UTF-8", false, String(error && error.message));
   }
   fs.rmSync(legacyDataDir, { recursive: true, force: true });
+
+  // ---------------------------------------------------------------------------
+  // The engine runtime and its failure reporting.
+  // ---------------------------------------------------------------------------
+  console.log("\n— engine runtime and error reporting —");
+  const fakeServerDir = path.join(repoRoot, ".desktop-test-runtime", "server");
+  const fakeNodeDir = path.join(repoRoot, ".desktop-test-runtime", "node");
+  fs.mkdirSync(fakeServerDir, { recursive: true });
+  try {
+    const withoutBundle = resolveRuntime(fakeServerDir);
+    check("without a bundled runtime the app uses the host Node/Electron", /Node|Electron/.test(withoutBundle.label), withoutBundle.label);
+
+    // Ship a "bundled runtime" (a copy of this Node) and check it is preferred.
+    fs.mkdirSync(fakeNodeDir, { recursive: true });
+    const binary = process.platform === "win32" ? "node.exe" : "node";
+    fs.copyFileSync(process.execPath, path.join(fakeNodeDir, binary));
+    fs.chmodSync(path.join(fakeNodeDir, binary), 0o755);
+    const withBundle = resolveRuntime(fakeServerDir);
+    check("a bundled runtime in resources/node is preferred", withBundle.command === path.join(fakeNodeDir, binary), withBundle.command);
+    check("the bundled runtime is reported in the log", /bundled Node v/.test(withBundle.label), withBundle.label);
+  } catch (error) {
+    check("the bundled runtime is preferred", false, String(error && error.message));
+  } finally {
+    fs.rmSync(path.join(repoRoot, ".desktop-test-runtime"), { recursive: true, force: true });
+  }
+
+  // A broken engine must say WHY: the dialog shows these lines, so the student
+  // does not have to dig through a log file.
+  console.log("\n— a failing engine explains itself —");
+  const brokenDir = path.join(repoRoot, ".desktop-test-broken");
+  fs.mkdirSync(path.join(brokenDir, "server"), { recursive: true });
+  fs.writeFileSync(path.join(brokenDir, "server", "server.js"), 'throw new Error("simulated engine failure");\n');
+  try {
+    await startLocalServer({
+      appDir: path.join(brokenDir, "server"),
+      dataDir: path.join(brokenDir, "data"),
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT + 20,
+      dbPort: DB_PORT + 20,
+      warmUp: false,
+      serverTimeoutMs: 60_000,
+      log: () => {},
+    });
+    check("a broken engine fails", false, "it started");
+  } catch (error) {
+    check("a broken engine fails", true);
+    check(
+      "the failure message carries the engine's own output",
+      /simulated engine failure/.test(String(error && error.message)),
+      String(error && error.message).slice(0, 160)
+    );
+  } finally {
+    fs.rmSync(brokenDir, { recursive: true, force: true });
+  }
 
   console.log("");
   if (failures.length) {

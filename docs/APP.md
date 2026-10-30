@@ -144,8 +144,19 @@ npm run test:desktop-app  # end-to-end test of the boot path (see §8)
 ```
 resources/app/                    ← the app itself (main.mjs, preload, splash, Electron's deps)
 resources/server/                 ← the compiled ScholarBridge server + its node_modules
+resources/node/                   ← the official Node.js runtime the server runs on
 resources/schema/full_schema.sql  ← the schema a new install applies
 ```
+
+The engine runs on the **bundled Node.js**, not on Electron's built-in Node.
+Electron can execute a script "as node", but that Node has a different module
+ABI than the official runtime, and the server bundle contains native modules
+(`sharp`): on Windows such a child process exits immediately with code 1 —
+which reached users as "the server stopped while starting". Shipping the real
+runtime removes that whole class of failure; `resources/node` is the binary
+the app starts, and the app falls back to Electron's Node only if it is
+missing. This is also why the installer is ~30 MB larger than a plain Electron
+app of the same content.
 
 The server bundle is staged first (`desktop/build-resources/server`): Next's
 standalone output contains one relative symlink (`pg-<hash> → ../../node_modules/pg`)
@@ -340,8 +351,9 @@ database bound to loopback.
 
 | Command | What it proves |
 | --- | --- |
-| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. Then launches it **again** on the same folder (the password must be stable), once more with the stored password corrupted, and once against a cluster created as **WIN1251** (a non-UTF-8 Windows install), which must be rebuilt as UTF-8 automatically. 28 assertions. |
+| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. Then launches it **again** on the same folder (the password must be stable), once more with the stored password corrupted, once against a cluster created as **WIN1251** (a non-UTF-8 Windows install), which must be rebuilt as UTF-8 automatically, and checks that a bundled `resources/node` runtime is preferred over Electron's Node and that a broken engine's own output reaches the error message. 33 assertions. |
 | `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
+| `node scripts/check-desktop-engine.mjs <unpacked dir>` | Boots the engine **from the built package** (its own `resources/server` and `resources/node`) and requires `/api/health` plus a rendered landing page. Runs in CI on Windows, macOS and Linux after packaging, so a broken engine is caught before an installer is published — the gap that let the "server stopped while starting" build ship. |
 | `node scripts/build-desktop.mjs --verify-only` | Inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
 | `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
 
@@ -360,6 +372,7 @@ build the real installers on GitHub's machines.
 | *“password authentication failed for user \"scholarbridge\"”* right after the splash screen | The installed build is **older than 1.0.8**: it generated a new database password on every launch while PostgreSQL keeps the one from the first launch, so only the very first start could connect. Install 1.0.8 or newer — it keeps the password in `db-password` and, if an existing cluster's password was lost, resets it in a closed loopback-only window (`ALTER ROLE`) **without touching your data**. Nothing has to be deleted. |
 | Windows: *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\index.js”* | The installed build predates 1.0.4, where the compiled server was bundled into `resources/app` and replaced the app's `package.json`. Install the current build (uninstall first is not needed — the installer overwrites the program, your data stays). |
 | Desktop: "could not start" on first launch | Look at *File → Open error log*. Most common: the port range 4310–4335 is busy (close the other copy — only one instance may run), or PostgreSQL cannot run as **root** on Linux (run the app as a normal user). |
+| *“The ScholarBridge engine stopped while starting (code 1)”* | The installed build is **older than 1.0.10**: it ran the server on Electron's built-in Node, whose module ABI does not match the native modules in the server bundle, so the engine died instantly. 1.0.10 ships and uses the official Node.js runtime. The dialog now also shows the engine's own last lines — press **Copy details** and send them if anything still fails. |
 | Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
 | Desktop: works, but no AI answers | No AI provider key is configured in that install. Add one to the deployment env (or use a hosted deployment) — the rest of the app is unaffected. |
 | Phone: "Could not reach …" | Phone and laptop on different networks; sharing off; firewall blocking port 4310 (allow the app on *private* networks); guest Wi-Fi isolating devices; laptop asleep. |

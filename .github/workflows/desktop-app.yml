@@ -89,6 +89,27 @@ jobs:
           fi
           exit "$status"
 
+      # Boot the packaged engine on the OS that built it — the runtime and the
+      # server bundle from resources/, exactly as the installed app does. A
+      # Windows-only engine failure once reached a user because nothing ran the
+      # package before it was published.
+      - name: Smoke-test the packaged engine
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) TARGET="desktop/release/win-unpacked" ;;
+            macOS)   TARGET="desktop/release/mac-arm64/ScholarBridge.app/Contents" ;;
+            *)       TARGET="desktop/release/linux-unpacked" ;;
+          esac
+          if [ ! -d "$TARGET/resources" ]; then
+            TARGET="$(ls -d desktop/release/*/Contents 2>/dev/null | head -1)"
+          fi
+          echo "checking $TARGET"
+          node scripts/check-desktop-engine.mjs "$TARGET" || {
+            echo "::error title=Packaged engine does not start::The packaged server failed to boot on this OS."
+            exit 1
+          }
+
       - name: Upload the installer
         uses: actions/upload-artifact@v4
         with:

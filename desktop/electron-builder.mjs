@@ -48,6 +48,10 @@ const config = {
   // cannot follow Next's `pg-<hash>` relative symlink on Windows.
   extraResources: [
     { from: "build-resources/server", to: "server", filter: ["**/*"] },
+    // The official Node.js runtime the engine runs on (see
+    // scripts/build-desktop.mjs → stageNodeRuntime). Optional: when the folder
+    // is empty the app falls back to Electron's built-in Node.
+    { from: "build-resources/node", to: "node", filter: ["**/*"] },
     { from: "../supabase/full_schema.sql", to: "schema/full_schema.sql" },
   ],
   extraMetadata: {

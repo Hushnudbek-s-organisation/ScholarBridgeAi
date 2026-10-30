@@ -12,7 +12,7 @@
  * Nothing here talks to Electron APIs, so `scripts/check-desktop-app.mjs`
  * exercises the real boot path end to end.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -202,6 +202,32 @@ export async function applySchema(connectionString, schemaPath, dataDir, log = (
   }
 }
 
+/**
+ * The runtime the engine runs on.
+ *
+ * Preferred: the official Node.js shipped inside the app (`resources/node`).
+ * Fallback: Electron itself in "run as node" mode. The fallback is what older
+ * builds used exclusively, and on Windows the child exited immediately with
+ * code 1, which surfaced to the student as "the server stopped while starting".
+ */
+export function resolveRuntime(serverDir) {
+  const binary = process.platform === "win32" ? "node.exe" : "node";
+  const packaged = path.resolve(serverDir, "..", "node", binary);
+  if (fs.existsSync(packaged)) {
+    const check = spawnSync(packaged, ["--version"], { encoding: "utf8", timeout: 15_000 });
+    const version = String(check.stdout || "").trim();
+    if (check.status === 0 && version.startsWith("v")) {
+      return { command: packaged, env: {}, label: `bundled Node ${version}` };
+    }
+  }
+  return {
+    command: process.execPath,
+    // Electron only behaves as Node when this is set.
+    env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+    label: process.versions.electron ? `Electron ${process.versions.electron} (as node)` : `Node ${process.version}`,
+  };
+}
+
 /** Local IPv4 addresses a phone on the same Wi-Fi could use. */
 export function lanAddresses() {
   const out = [];
@@ -379,13 +405,14 @@ export async function startLocalServer(options) {
     const appUrl = `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${serverPort}`;
     log(`[server] starting on ${host}:${serverPort}`);
 
-    child = spawn(process.execPath, [path.join(appDir, "server.js")], {
+    const runtime = resolveRuntime(appDir);
+    log(`[server] runtime: ${runtime.label}`);
+
+    child = spawn(runtime.command, [path.join(appDir, "server.js")], {
       cwd: appDir,
       env: {
         ...process.env,
-        // Electron re-executed as Node, so the app does not need a Node.js
-        // installation on the machine (ignored when running under plain Node).
-        ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+        ...runtime.env,
         NODE_ENV: "production",
         NEXT_TELEMETRY_DISABLED: "1",
         PORT: String(serverPort),
@@ -406,6 +433,13 @@ export async function startLocalServer(options) {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    // Keep the engine's own output: when it dies, these lines are the only
+    // useful explanation, and the student can copy them from the dialog.
+    const engineLog = [];
+    const remember = (line) => {
+      engineLog.push(line);
+      if (engineLog.length > 40) engineLog.shift();
+    };
     const pipe = (stream, tag) => {
       let buffer = "";
       stream.setEncoding("utf8");
@@ -413,7 +447,11 @@ export async function startLocalServer(options) {
         buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) if (line.trim()) log(`[${tag}] ${line}`);
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          remember(line);
+          log(`[${tag}] ${line}`);
+        }
       });
     };
     pipe(child.stdout, "server");
@@ -430,9 +468,14 @@ export async function startLocalServer(options) {
     let healthy = false;
     while (Date.now() < deadline) {
       if (exitInfo) {
-        throw new Error(
-          `The ScholarBridge server stopped while starting (code ${exitInfo.code}). Open the log for details.`
+        const tail = engineLog.slice(-12).join("\n");
+        const error = new Error(
+          `The ScholarBridge engine stopped while starting (code ${exitInfo.code}).` +
+            (tail ? `\n\n${tail}` : "")
         );
+        error.engineOutput = tail;
+        error.logFile = path.join(dataDir, "scholarbridge.log");
+        throw error;
       }
       try {
         const res = await fetch(`${appUrl}/api/health`, { signal: AbortSignal.timeout(3_000) });
@@ -446,7 +489,13 @@ export async function startLocalServer(options) {
       await new Promise((resolve) => setTimeout(resolve, 750));
     }
     if (!healthy) {
-      throw new Error("The ScholarBridge server did not answer in time. Open the log for details.");
+      const tail = engineLog.slice(-12).join("\n");
+      const error = new Error(
+        "The ScholarBridge engine did not answer in time." + (tail ? `\n\n${tail}` : "")
+      );
+      error.engineOutput = tail;
+      error.logFile = path.join(dataDir, "scholarbridge.log");
+      throw error;
     }
 
     // First run only: the empty database is filled by the catalogue routes
