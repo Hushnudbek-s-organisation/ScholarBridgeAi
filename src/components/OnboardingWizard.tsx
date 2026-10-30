@@ -56,6 +56,12 @@ interface OnboardingWizardProps {
    * and every following step saves through PUT /api/profiles/:id.
    */
   profile: StudentProfile | null;
+  /**
+   * Email to start with — set when the sign-in form sends someone here after a
+   * failed sign-in ("create an account with this email"), so the address they
+   * already typed is not asked for again.
+   */
+  initialEmail?: string;
   onCreated?: (profile: StudentProfile) => void;
   onComplete: (updated: StudentProfile) => void;
 }
@@ -140,7 +146,7 @@ const inputCls =
   "sb-field min-h-11 w-full rounded-xl border px-4 py-3 text-sm text-slate-800 focus:outline-none motion-reduce:transition-none";
 const labelCls = "block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5";
 
-export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
+export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete }: OnboardingWizardProps) {
   const tCountry = useTranslations("countryNames");
   const tCommon = useTranslations("common");
   const tOnboarding = useTranslations("onboarding");
@@ -186,7 +192,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const placeholderEmail = isTelegramPlaceholderEmail(profile?.email) ? profile!.email : "";
   const [form, setForm] = useState<FormState>({
     name: profile?.name || "",
-    email: placeholderEmail ? "" : profile?.email || "",
+    email: placeholderEmail ? "" : profile?.email || initialEmail?.trim().toLowerCase() || "",
     password: "",
     degreeLevel: profile?.degreeLevel || "",
     targetMajor: profile?.targetMajor || "",

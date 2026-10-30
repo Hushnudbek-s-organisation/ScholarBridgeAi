@@ -14,7 +14,8 @@ interface ProfilePickerProps {
   currentId: number | null;
   onClose: () => void;
   onSelect: (profile: StudentProfile) => void;
-  onAddNew: () => void;
+  /** Start a new account, optionally carrying the email already typed. */
+  onAddNew: (email?: string) => void;
   /** Server-side hint (e.g. "sign in to open this account"). */
   notice?: string;
 }
@@ -306,7 +307,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                       <p className="font-medium text-red-600/90">{t("noAccountHint")}</p>
                       <button
                         type="button"
-                        onClick={onAddNew}
+                        onClick={() => onAddNew(email.trim().toLowerCase() || undefined)}
                         className="min-h-9 w-full rounded-lg border border-red-300 bg-white px-2 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
                       >
                         {t("createWithThisEmail")}
@@ -327,7 +328,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
           </div>
 
           <button
-            onClick={onAddNew}
+            onClick={() => onAddNew()}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             <Plus className="h-3.5 w-3.5" /> {t("createAccount")}
