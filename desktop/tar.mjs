@@ -136,6 +136,11 @@ export function extractTarGz(archiveFile, targetDir) {
   // Accept both: a plain tar (what the installer ships, so the platform
   // compressor does the work once) and a gzipped one.
   const tar = raw.length > 2 && raw[0] === 0x1f && raw[1] === 0x8b ? zlib.gunzipSync(raw) : raw;
+  // Sanity-check the first header: a corrupt or truncated file must fail here,
+  // never produce a half-written engine that fails later at start-up.
+  if (tar.length < BLOCK || tar.subarray(257, 262).toString("latin1") !== "ustar") {
+    throw new Error("not a tar archive (bad header)");
+  }
   const root = path.resolve(targetDir);
   fs.mkdirSync(root, { recursive: true });
 
