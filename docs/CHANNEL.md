@@ -1746,6 +1746,58 @@ flags on the English page, plus the route, memo and card wiring.
 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security
 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
 
+## 11l. The landing marquee states verified QS positions (2026-10-30)
+
+The first screen of the product is a 24-card university marquee, each card
+carrying a blue `QS #N` badge. It is server-rendered, so those badges are what a
+crawler and a first-time visitor read before anything else.
+
+The numbers were typed by hand when the marquee was designed and had drifted
+from the edition the catalogue itself was corrected to
+(`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`, source table
+`data/qs2026_top1500.csv`). Measured against that table:
+
+| card | badge said | official QS 2026 |
+| --- | --- | ---: |
+| UC Berkeley | #18 | **17** |
+| Technical University of Munich | #23 | **22** |
+| The University of Sydney | #26 | **25** |
+| The University of Tokyo | #37 | **36** |
+| "KAIST & Seoul National University" | #39–53 | SNU **38**; **KAIST is not in the edition at all** (removed) |
+
+So 5 of 24 public cards stated a ranking they could not support — one of them a
+range that covered a university the edition does not rank.
+
+### What changed
+
+* `MarqueeUniversityItem` no longer has a free-form `rank` string. It carries
+  `qsRank: number` (the verified position) and `qsName` (the official spelling,
+  used by the gate), and the badge renders `` `QS #${university.qsRank}` ``.
+* The four wrong numbers are corrected; the KAIST & SNU card is replaced by
+  **Seoul National University — QS #38**, with SNU's own Commons photo already
+  vetted in this repository (`SNU_gate.jpg`), so no new unverified image URL is
+  introduced.
+* `scripts/check-landing-ranks.ts` reads `data/qs2026_top1500.csv` and fails the
+  build if any card disagrees with it — the numbers can no longer drift.
+
+### Verified
+
+`npm run test:landing-ranks` — **10/10** (new): every card matches the official
+table, no card claims a rank for a university missing from the edition, the badge
+value is always an integer position (never a range), the marquee is still 3 × 8
+cards with unique names and photos, each row stays ascending, every photo is a
+Commons URL, and the component renders the number rather than a stored label.
+Reintroducing two of the old values (Berkeley #18, Tokyo #37) makes the gate
+fail with both rows named.
+
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:university-rank` 17/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 ·
+`test:opportunity-notes` 10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 ·
+`test:dataset` 50/0 · integration 351/0 · security 90 · portability 57/0 ·
+`check:i18n` passed · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

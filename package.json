@@ -36,6 +36,7 @@
     "test:university-rank": "tsx scripts/check-university-rank.ts",
     "test:university-hub": "tsx scripts/check-university-hub.ts",
     "test:university-list": "tsx scripts/check-university-list.ts",
+    "test:landing-ranks": "tsx scripts/check-landing-ranks.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",
