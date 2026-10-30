@@ -1592,6 +1592,66 @@ produced, and the type-column case-insensitivity.
 `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security 90 ·
 portability 57/0 · `check:i18n` passed · `next build` OK.
 
+## 11i. One university page states one QS rank (2026-10-30)
+
+The catalogue corrected its ranks to the official QS 2026 edition on 2026-10-23
+(`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`: 181 rows fixed, 139 filled, 16
+already right). The stored **descriptions** and **ranking chips** were generated
+from the sequence that document debunked, so they still state the old numbers.
+Measured on the live catalogue (356 active universities):
+
+| | rows |
+| --- | ---: |
+| descriptions naming a QS position | 194 |
+| ranking chips naming one | 194 |
+| **disagreeing with `universities.world_ranking`** | **178** |
+| rows with no verified rank (nothing to reconcile) | 0 |
+
+Worst case: University of Latvia reads `QS World Ranking #200` in its prose and
+is **801** in QS 2026 — off by 601 places.
+
+Phase X made that prose readable in Uzbek and Russian, which turned a dormant
+contradiction into a visible one: the same profile printed
+«QS jahon reytingida 200-o'rin» in the text and «QS o'rni: #801» in the facts row.
+
+### What changed
+
+`reconcileEmbeddedRank(text, rank)` in `src/lib/universityProse.ts` replaces the
+figure inside `QS World Ranking #N` / `QS World University Ranking #N` with the
+catalogue's verified rank. The stored sentence keeps its shape and its wording;
+only the number is brought up to date. It is applied *before* translation, so:
+
+* uz, ru **and** en state the same number (an English page is not exempt);
+* `localizeUniversityDescription`, `universityDescriptionState`,
+  `localizeHighlightItem` and `localizeHighlights` take an optional rank;
+* a row with no verified rank keeps its prose untouched — the number is never
+  invented, and a non-QS position ("Top 10 in the UK #3") is never rewritten;
+* `GET /api/universities/[id]` corrects the row **before** it is cached, so the
+  hub cards that render `description`/`highlights` cannot contradict the profile
+  page, and the later uz/ru localization works from the corrected text.
+
+The chip comparison that drives the "source language: English" label is made
+against the corrected strings, so fixing a number alone never counts as a
+translation.
+
+### Verified
+
+`npm run test:university-rank` — **17/17** (new), over the real Latvia (801),
+UPC (392), MIT (1) and Macau rows: the replacement and the no-op case, a null /
+`0` / `NaN` rank, a non-QS `#`, all three locales for the description and the
+chip, the Agreeing row rendering unchanged, no invented rank when the prose
+states none, page wiring (both localizers receive `u.worldRanking`) and API
+wiring (the correction precedes the cache read and write).
+
+`test:university-prose` 17/0 · `test:catalogue-language` 19/0 · `test:render`
+354/0 · `test:localization` 16/0 · `test:catalogue-order` 12/0 ·
+`test:deadline-day` 13/0 · `test:opportunity-notes` 10/0 · `test:opportunities`
+27/0 · `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 ·
+security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
+No catalogue rows were written: the correction is a read-path transform over the
+value the catalogue already verified.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

@@ -37,7 +37,7 @@
  */
 
 import type { Locale } from "@/i18n/config";
-import { localizeUniversityNarrative } from "@/lib/universityProse";
+import { localizeUniversityNarrative, reconcileEmbeddedRank } from "@/lib/universityProse";
 import { dictionaries } from "@/i18n/messages.server";
 import { countryTranslationKey } from "@/lib/countries";
 import { memoizedLocalize, memoizedText, type LocalizedFields } from "@/lib/localizeMemo";
@@ -1055,9 +1055,10 @@ export function localizeRequirementText(text: string | null | undefined, locale:
  */
 export function universityDescriptionState(
   text: string | null | undefined,
-  locale: Locale
+  locale: Locale,
+  qsRank: number | null = null
 ): { text: string; verbatim: boolean } {
-  const source = text ?? "";
+  const source = reconcileEmbeddedRank(text ?? "", qsRank);
   if (locale === "en" || source.trim() === "") return { text: source, verbatim: false };
   const translated = localizeUniversityDescription(source, locale);
   return { text: translated, verbatim: translated.trim() === source.trim() };
@@ -1172,11 +1173,19 @@ const UNIVERSITY_DESCRIPTIONS: Record<string, Record<TargetLocale, string>> = {
     },
 };
 
-export function localizeUniversityDescription(text: string | null | undefined, locale: Locale): string {
-  if (locale === "en" || text == null || text === "") return text ?? "";
+export function localizeUniversityDescription(
+  text: string | null | undefined,
+  locale: Locale,
+  qsRank: number | null = null
+): string {
+  // The stored sentence may carry an out-of-date QS number; the catalogue's
+  // verified rank wins before anything is rendered or translated, so `en` is
+  // corrected too and the memo key is the corrected sentence.
+  const source = reconcileEmbeddedRank(text ?? "", qsRank);
+  if (locale === "en" || source === "") return source;
   const tl = targetLocale(locale);
-  if (!tl) return text;
-  return memoizedText("university-description", locale, text, () => translateUniversityDescription(text, locale));
+  if (!tl) return source;
+  return memoizedText("university-description", locale, source, () => translateUniversityDescription(source, locale));
 }
 
 /** The uncached translation — `memoizedText` remembers the result per input. */
@@ -1414,7 +1423,18 @@ const HIGHLIGHT_TITLE_MAP: Record<string, Record<TargetLocale, string>> = {
 };
 
 /** Localize one highlight — `{title, text}` object or plain string badge. */
-export function localizeHighlightItem<T>(item: T, locale: Locale): T {
+export function localizeHighlightItem<T>(item: T, locale: Locale, qsRank: number | null = null): T {
+  // The ranking chip carries the same out-of-date number as the description, so
+  // the catalogue's verified rank is applied before the (locale-aware) layers
+  // below — and before the `en` shortcut, because the English page shows the
+  // same chip.
+  const reconciled: T =
+    typeof item === "string"
+      ? (reconcileEmbeddedRank(item, qsRank) as unknown as T)
+      : item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string"
+        ? ({ ...(item as object), text: reconcileEmbeddedRank((item as unknown as { text: string }).text, qsRank) } as T)
+        : item;
+  item = reconciled;
   if (locale === "en") return item;
   const tl = targetLocale(locale);
   if (!tl) return item;
@@ -1479,15 +1499,20 @@ export function localizeHighlightItem<T>(item: T, locale: Locale): T {
  * Localize a `highlights` value: a JSON-array string (DB `text` column), a
  * parsed array, or NULL. NULL and unrecognized shapes pass through untouched.
  */
-export function localizeHighlights<T extends string | unknown[] | null | undefined>(highlights: T, locale: Locale): T {
-  if (locale === "en") return highlights;
+export function localizeHighlights<T extends string | unknown[] | null | undefined>(
+  highlights: T,
+  locale: Locale,
+  qsRank: number | null = null
+): T {
   const tl = targetLocale(locale);
-  if (!tl) return highlights;
+  // `en` is normally a no-op, but a corrected rank still has to reach the chips
+  // the English page prints — the same stale number is on it.
+  if (!tl && qsRank == null) return highlights;
   if (typeof highlights === "string") {
-    return mapJsonStringArray(highlights, (item) => localizeHighlightItem(item, locale)) as T;
+    return mapJsonStringArray(highlights, (item) => localizeHighlightItem(item, locale, qsRank)) as T;
   }
   if (Array.isArray(highlights)) {
-    return highlights.map((item) => localizeHighlightItem(item, locale)) as T;
+    return highlights.map((item) => localizeHighlightItem(item, locale, qsRank)) as T;
   }
   return highlights;
 }

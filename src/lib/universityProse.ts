@@ -279,6 +279,28 @@ function fundingTerms(raw: string, tl: "uz" | "ru"): string | null {
 }
 
 /**
+ * The stored description and the ranking chip were both generated from a
+ * pre-correction rank sequence, and the catalogue then corrected its ranks to
+ * the official QS 2026 edition (docs/QS2026_RANK_VERIFICATION_2026-10-23.md):
+ * measured 2026-10-30, **178 of the 194** universities that state a QS position
+ * in their prose state a different number from `universities.world_ranking` —
+ * off by 601 places for the University of Latvia (prose #200, QS 2026 801).
+ *
+ * Phase X made both sentences readable in Uzbek and Russian, so the profile now
+ * printed two contradictory QS ranks in the reader's own language. The stored
+ * sentence keeps its shape; only the figure is brought up to the catalogue's
+ * verified one. A row with no verified rank keeps its prose untouched — the
+ * number is never invented, and a non-QS "#' is never rewritten.
+ */
+export function reconcileEmbeddedRank(text: string, rank: number | null | undefined): string {
+  if (!text) return text;
+  if (rank == null || !Number.isFinite(rank) || rank <= 0) return text;
+  return text.replace(/(QS World(?: University)? Rankings? #)(\d+)/g, (whole, prefix: string, digits: string) =>
+    digits === String(rank) ? whole : `${prefix}${rank}`
+  );
+}
+
+/**
  * Render a stored university description in `locale`, or say it could not be
  * rendered. `en` is handled by the caller (it is the source language).
  */

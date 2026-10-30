@@ -38,6 +38,7 @@ import {
 } from "@/lib/catalogLocalizer";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { SourceLanguageProse } from "@/components/SourceLanguageProse";
+import { reconcileEmbeddedRank } from "@/lib/universityProse";
 
 /**
  * Public university profile — /universities/[id].
@@ -141,11 +142,21 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // dictionary layer cannot render faithfully. Those keep their English text and
   // get the "source language: English" label rather than a half-translated
   // sentence; readable copy renders as ordinary localized prose.
-  const description = u.description ? universityDescriptionState(u.description, locale) : null;
+  // `u.worldRanking` is the corrected QS 2026 figure (docs/QS2026_RANK_VERIFICATION_2026-10-23.md);
+  // the stored prose and the ranking chip were generated before that correction
+  // and still state the old sequence — 178 of 194 disagree. Passing the rank in
+  // makes the page state one QS number, not two.
+  const description = u.description ? universityDescriptionState(u.description, locale, u.worldRanking) : null;
   // `highlights` is a JSON-array column; localize the array, then flatten it to
   // the labels the page lists.
-  const storedHighlights = u.highlights ? listValues(u.highlights) : [];
-  const highlights = u.highlights ? listValues(localizeHighlights(u.highlights, locale)) : [];
+  // Compared against the same corrected numbers the localized chips carry, so a
+  // rank fix alone never counts as "translated" when the chip is still English.
+  const storedHighlights = u.highlights
+    ? listValues(u.highlights).map((item) => reconcileEmbeddedRank(item, u.worldRanking))
+    : [];
+  const highlights = u.highlights
+    ? listValues(localizeHighlights(u.highlights, locale, u.worldRanking))
+    : [];
   // Badges fall under the same rule: a badge that could not be rendered cleanly
   // stays in English, and the list says so once instead of labelling each chip.
   const highlightsInSource =

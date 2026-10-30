@@ -33,6 +33,7 @@
     "test:deadline-day": "tsx scripts/check-deadline-day.ts",
     "test:opportunity-notes": "tsx scripts/check-opportunity-notes.ts",
     "test:university-prose": "tsx scripts/check-university-prose.ts",
+    "test:university-rank": "tsx scripts/check-university-rank.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",
