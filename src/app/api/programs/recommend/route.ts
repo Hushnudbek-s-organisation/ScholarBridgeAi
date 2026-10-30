@@ -34,6 +34,7 @@ import {
   studyInterestRecommendationTerms,
 } from "@/lib/studyInterests";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { verifiedQsRankNumber } from "@/lib/universityRank";
 import { resolveProgramDepartmentProfile } from "@/lib/programChancing";
 
 export const dynamic = "force-dynamic";
@@ -290,7 +291,7 @@ export async function POST(req: Request) {
     const unis = new Map<number, RecommendUniversity>();
     for (const u of uniRows) {
       benchmarkByUniId.set(u.id, matchQsUniversityBenchmark(u));
-      verifiedRankByUniId.set(u.id, u.worldRanking ?? null);
+      verifiedRankByUniId.set(u.id, verifiedQsRankNumber(u));
       unis.set(u.id, {
         id: u.id,
         name: u.name,

@@ -15,6 +15,7 @@ import { subjectAffinity } from "@/lib/subjectAffinity";
 import { matchesUniversityType } from "@/lib/universityType";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { verifiedQsRank } from "@/lib/universityRank";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 
 /**
@@ -53,7 +54,14 @@ export async function GET(req: Request) {
     // this response-local copy. Institution type is handled separately and
     // remains unknown unless its own evidence says otherwise.
     let allUnis = bundle.unis.map((uni) => {
-      if (uni.verificationStatus === "verified") return { ...uni };
+      if (uni.verificationStatus === "verified") {
+        // Phase AD: a rank whose edition was never recorded is not a QS
+        // position, so it is not published, filtered or sorted on either.
+        if (uni.worldRanking != null && verifiedQsRank(uni) == null) {
+          return { ...uni, worldRanking: null };
+        }
+        return { ...uni };
+      }
       return {
         ...uni,
         worldRanking: null,

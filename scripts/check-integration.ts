@@ -157,6 +157,8 @@ async function main() {
       country: "Germany",
       city: "Fixture City",
       worldRanking: 50,
+      // Phase AD: a verified rank records the edition it belongs to.
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A verified integration-test university fixture.",
       websiteUrl: "https://phase12-tum-fixture.example",
@@ -178,6 +180,7 @@ async function main() {
       country: "Germany",
       city: "Fixture City",
       worldRanking: 60,
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A verified integration-test university fixture.",
       websiteUrl: "https://phase12-lmu-fixture.example",
@@ -561,9 +564,35 @@ async function main() {
         undisclosedRow.postStudyWorkVisaYears === null,
       JSON.stringify(undisclosedRow)
     );
+
+    // Phase AD: a *verified* row whose rank records no edition is not a QS
+    // position either — the API must withhold the figure, not print it bare.
+    await db.update(schema.universities).set({
+      verificationStatus: "verified",
+      worldRanking: 42,
+      qsRankYear: null,
+      annualTuitionUsd: 1500,
+      annualLivingEstUsd: 11000,
+      minIelts: 6.5,
+      postStudyWorkVisaYears: 2,
+    }).where(eq(schema.universities.id, uniA.id));
+    const undatedNumbers = await catalogue();
+    const undatedRow = undatedNumbers.rows.find((row) => row.id === uniA.id);
+    check(
+      "universities: a rank with no recorded edition is withheld, not published bare",
+      undatedNumbers.status === 200 && undatedRow != null && undatedRow.worldRanking === null && undatedRow.annualTuitionUsd != null,
+      `status ${undatedNumbers.status}; row ${JSON.stringify(undatedRow)}`
+    );
+    const undatedFiltered = await catalogue("minRank=1");
+    check(
+      "universities: an undated rank cannot satisfy a rank filter",
+      undatedFiltered.status === 200 && !undatedFiltered.rows.some((row) => row.id === uniA.id),
+      `status ${undatedFiltered.status}; rows ${JSON.stringify(undatedFiltered.rows.map((row) => row.id))}`
+    );
+    await db.update(schema.universities).set({ worldRanking: uniA.worldRanking, qsRankYear: uniA.qsRankYear }).where(eq(schema.universities.id, uniA.id));
   } finally {
     for (const uni of [uniA, uniB]) {
-      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));
+      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, qsRankYear: uni.qsRankYear, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));
     }
     await db.update(schema.studentProfiles).set({ degreeLevel: profile.degreeLevel }).where(eq(schema.studentProfiles.id, profile.id));
     await pool.query("ALTER TABLE universities ALTER COLUMN degree_level SET NOT NULL");
@@ -2113,6 +2142,7 @@ async function main() {
       country: "Switzerland",
       city: "Zurich",
       worldRanking: 20,
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A public research university.",
       websiteUrl: "https://ethz.ch",

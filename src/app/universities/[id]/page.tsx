@@ -39,6 +39,7 @@ import {
 import { formatMoney, formatNumber } from "@/lib/format";
 import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 import { reconcileEmbeddedRank } from "@/lib/universityProse";
+import { verifiedQsRank } from "@/lib/universityRank";
 
 /**
  * Public university profile — /universities/[id].
@@ -90,6 +91,9 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
 
   const country = localizeCountry(university.country, locale);
   const verified = university.verificationStatus === "verified";
+  // Phase AD: a rank with no recorded edition is not a QS position, so the
+  // <meta> description states "unknown" rather than an unsupported number.
+  const qsPosition = verifiedQsRank(university);
   return {
     title: formatMessage(t.metaTitle, { name: university.name, country }),
     description: formatMessage(t.metaDescription, {
@@ -101,8 +105,8 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
       ielts: verified && university.minIelts != null
         ? formatNumber(university.minIelts, { decimals: 1 })
         : t.metaUnknown,
-      rank: verified && university.worldRanking != null
-        ? `#${formatNumber(university.worldRanking)}`
+      rank: verified && qsPosition
+        ? `#${formatNumber(qsPosition.rank)}`
         : t.metaUnknown,
     }),
   };
@@ -129,6 +133,10 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // Any figure on this page depends on a verified row. Unverified institutions
   // keep their identity (name, city, links) and lose their numbers.
   const verified = u.verificationStatus === "verified";
+  // Phase AD — the one QS position this page may state: `null` when the row
+  // records no edition (`qs_rank_year`), when the number is broken, or when the
+  // row is unverified. Every rank below, and the prose reconciliation, reads it.
+  const qsPosition = verified ? verifiedQsRank(u) : null;
   const number = (value: number | null, decimals = 0) =>
     value == null ? null : formatNumber(value, { decimals });
   const verifiedValue = (value: number | null, decimals = 0) =>
@@ -146,16 +154,16 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // the stored prose and the ranking chip were generated before that correction
   // and still state the old sequence — 178 of 194 disagree. Passing the rank in
   // makes the page state one QS number, not two.
-  const description = u.description ? universityDescriptionState(u.description, locale, u.worldRanking) : null;
+  const description = u.description ? universityDescriptionState(u.description, locale, qsPosition?.rank ?? null) : null;
   // `highlights` is a JSON-array column; localize the array, then flatten it to
   // the labels the page lists.
   // Compared against the same corrected numbers the localized chips carry, so a
   // rank fix alone never counts as "translated" when the chip is still English.
   const storedHighlights = u.highlights
-    ? listValues(u.highlights).map((item) => reconcileEmbeddedRank(item, u.worldRanking))
+    ? listValues(u.highlights).map((item) => reconcileEmbeddedRank(item, qsPosition?.rank ?? null))
     : [];
   const highlights = u.highlights
-    ? listValues(localizeHighlights(u.highlights, locale, u.worldRanking))
+    ? listValues(localizeHighlights(u.highlights, locale, qsPosition?.rank ?? null))
     : [];
   // Badges fall under the same rule: a badge that could not be rendered cleanly
   // stays in English, and the list says so once instead of labelling each chip.
@@ -217,7 +225,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
   const facts: { icon: React.ReactNode; label: string; value: string | null }[] = [
     { icon: <Building2 className="h-3.5 w-3.5" aria-hidden />, label: t.typeLabel, value: type ?? degree },
-    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: verifiedValue(u.worldRanking) },
+    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: verifiedValue(qsPosition?.rank ?? null) },
     { icon: <Wallet className="h-3.5 w-3.5" aria-hidden />, label: t.tuitionLabel, value: tuitionLocal ?? tuitionUsd },
     { icon: <Banknote className="h-3.5 w-3.5" aria-hidden />, label: t.livingLabel, value: livingLocal ?? livingUsd },
     { icon: <CalendarDays className="h-3.5 w-3.5" aria-hidden />, label: t.foundedLabel, value: verifiedValue(u.foundedYear) },
@@ -291,10 +299,10 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {/* The three numbers a student decides with, as badges — three, not
               the eight the card used to stack. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {verifiedValue(u.worldRanking) && (
+            {verifiedValue(qsPosition?.rank ?? null) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
                 <Trophy className="h-3 w-3" aria-hidden />
-                {t.rankLabel}: #{verifiedValue(u.worldRanking)}
+                {t.rankLabel}: #{verifiedValue(qsPosition?.rank ?? null)}
               </span>
             )}
             {(tuitionLocal ?? tuitionUsd) && (

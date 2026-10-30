@@ -1060,11 +1060,15 @@ export function UniversityExplorer({
                     )}
                   </div>
 
-                  {/* World Rank Badge */}
-                  <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-amber-300" />
-                    {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
-                  </div>
+                  {/* World Rank Badge — only when the API published a position
+                      (Phase AD: a rank with no recorded edition is dropped
+                      upstream, so the card shows no badge at all). */}
+                  {uni.worldRanking != null && (
+                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-amber-300" />
+                      {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
+                    </div>
+                  )}
 
                   {/* Title & Country Overlay */}
                   <div className="absolute bottom-3 left-3 right-3 text-white">

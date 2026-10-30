@@ -1867,6 +1867,99 @@ gate fail with all three named.
 integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
 `tsc --noEmit` clean · `next build` OK.
 
+## 11n. A rank with no recorded edition is not a QS position (2026-10-30)
+
+Phases Y, Z, AA, AB and AC took the same rule to every screen that states a
+ranking: **a QS number is the verified position of the edition it names, or it
+is not printed.** Every one of them read the rank and ignored the column beside
+it — `qs_rank_year`, the edition the number belongs to.
+
+Measured from the live catalogue on 2026-10-30:
+
+| | rows |
+| --- | ---: |
+| active universities | 356 |
+| carry a `world_ranking` | 350 |
+| … that record an edition (`qs_rank_year = 2026`) | 348 |
+| … that record **no edition** | **2** |
+
+| id | institution | `world_ranking` | `qs_rank_year` | in QS 2026? |
+| --- | --- | ---: | --- | --- |
+| 37 | KAIST (Korea Advanced Institute of Science & Technology) | 53 | `NULL` | **no** |
+| 298 | École des Ponts ParisTech | 205 | `NULL` | **no** |
+
+Both rows were imported from *"Top 300 Universities dataset (user PDF, 2026)"* —
+a dataset whose "2026" is its own label, not a QS edition — and both are marked
+`verification_status = 'verified'`. KAIST's 53 is exactly the false `QS #53`
+Phase AC removed from the chancing benchmark table; it is not in
+`data/qs2026_top1500.csv` at any rank.
+
+Until now those two numbers were printed, without a year, on: the profile page
+(hero badge, the Rank fact, the `<meta>` description), the catalogue cards and
+their modal (`QS Ranking #53`), the rank table cell, the chancing badge and the
+shortlist dropdown ("QS #53 — KAIST"), the programme recommendation cards, the
+planner comparison list and the dashboard cards.
+
+### What changed
+
+* **`src/lib/universityRank.ts`** (new, pure — no database, no React, no
+  environment) holds the rule: `verifiedQsRank(row)` returns `{ rank, year }`
+  only when the row records a plausible edition year; `verifiedQsRankNumber()`
+  is the shorthand the payloads use. `null` is the answer for an unranked row,
+  a broken number, and a number with no edition.
+* **Every read path goes through it**: `GET /api/universities` (which also stops
+  filtering and sorting on an undated rank), `GET /api/universities/[id]`,
+  `GET /api/chancing` (both the card and the shortlist), `GET /api/programs/recommend`,
+  `GET /api/planning`, `GET /api/dashboard`, and the profile page — including
+  the figure handed to the prose reconcilers, so the description is never
+  corrected *to* a number the edition does not publish.
+* **The cards omit the badge** instead of printing `QS Ranking —`: both the
+  explorer card and the explorer modal hide the block when the API published no
+  position.
+* **`scripts/check-university-rank-year.ts`** (new gate, `test:university-rank-year`)
+  pins the helper, all six endpoints, the page, the two cards and the data
+  contract. `test:university-rank` and `test:qs-benchmarks` were updated where
+  their source assertions named the old expression — the properties they protect
+  are unchanged and are re-asserted against the new one.
+* **Integration fixtures** now record the edition (`qsRankYear: 2026`) with
+  their ranks, and two new endpoint-level assertions prove the behaviour end to
+  end: a verified row with `world_ranking = 42` and `qs_rank_year = NULL` comes
+  back with `worldRanking: null` and cannot satisfy `minRank=1`.
+
+### What did **not** change
+
+The catalogue rows themselves. `universities.id = 37` still stores 53 and id 298
+still stores 205 — recording the edition (or clearing the number) is a data
+decision, and the rule above is a read-path one. The admin editor already has
+the field: set `qsRankYear = 2026` on a row and its rank reappears everywhere;
+set it back to `NULL` and the rank disappears again. `university_rankings` still
+holds its pre-correction QS snapshot (unchanged, as noted in Phase AC).
+
+KAIST's stored description still contains the sentence *"(QS World Ranking
+#37)"*. Under the Phase X rule stored prose is shown as written (clean or
+verbatim) and is never machine-rewritten; it is no longer reconciled to the
+undated 53, so the page does not manufacture agreement with a number it refuses
+to publish. Correcting that sentence is a catalogue-content task for the owner.
+
+### Verified
+
+`npm run test:university-rank-year` — **14/14** (new): the two live row shapes
+resolve to `null`, a recorded edition resolves to a position, broken numbers
+(0, negative, fractional, NaN, ∞) and broken editions (0, 53, 1999, 2101,
+fractional) resolve to `null`, the module stays pure, and all six endpoints, the
+page, both cards and the schema/admin contract are pinned. Making the helper
+ignore the edition year, or restoring the raw column in the chancing route,
+fails 4 of the 14 and names the file.
+
+`test:university-rank` **17/0** · `test:university-list` 15/0 ·
+`test:university-hub` 11/0 · `test:qs-benchmarks` 13/0 · `test:chancing` 28/0 ·
+`test:landing-ranks` 10/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration **353/0** (2 new) · security 90 · portability 57/0 · `check:i18n`
+passed · `tsc --noEmit` clean · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

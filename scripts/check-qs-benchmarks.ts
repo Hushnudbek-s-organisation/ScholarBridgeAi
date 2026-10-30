@@ -230,9 +230,19 @@ check("no badge prints a null rank", () => {
 });
 
 check("both APIs prefer the verified rank over the curated table", () => {
+  // Phase AD put both sites behind `verifiedQsRank` (a rank counts only when
+  // its edition is recorded); the order this gate protects is unchanged.
   const chancing = readFileSync(join(ROOT, "src/app/api/chancing/route.ts"), "utf8");
-  assert.match(chancing, /worldRanking: uni\.worldRanking \?\? qsBenchmark\.qsRank/, "chancing lost the DB-first order");
-  assert.match(chancing, /worldRanking: u\.worldRanking \?\? b\.qsRank/, "the shortlist lost the DB-first order");
+  assert.match(
+    chancing,
+    /worldRanking: verifiedQsRank\(uni\)\?\.rank \?\? qsBenchmark\.qsRank/,
+    "chancing lost the DB-first order"
+  );
+  assert.match(
+    chancing,
+    /worldRanking: verifiedQsRank\(u\)\?\.rank \?\? b\.qsRank/,
+    "the shortlist lost the DB-first order"
+  );
 
   const recommend = readFileSync(join(ROOT, "src/app/api/programs/recommend/route.ts"), "utf8");
   assert.match(

@@ -204,30 +204,40 @@ const page = readFileSync(join(ROOT, "src/app/universities/[id]/page.tsx"), "utf
 const route = readFileSync(join(ROOT, "src/app/api/universities/[id]/route.ts"), "utf8");
 
 check("the profile page passes the verified rank into both localizers", () => {
+  // Phase AD: the figure is `qsPosition.rank` — `verifiedQsRank(u)`, which is
+  // null unless the row records the edition. Same requirement, one source.
   assert.match(
     page,
-    /universityDescriptionState\(\s*u\.description,\s*locale,\s*u\.worldRanking\s*\)/,
+    /universityDescriptionState\(\s*u\.description,\s*locale,\s*qsPosition\?\.rank \?\? null\s*\)/,
     "the description is rendered without the verified rank"
   );
   assert.match(
     page,
-    /localizeHighlights\(\s*u\.highlights,\s*locale,\s*u\.worldRanking\s*\)/,
+    /localizeHighlights\(\s*u\.highlights,\s*locale,\s*qsPosition\?\.rank \?\? null\s*\)/,
     "the chips are rendered without the verified rank"
   );
 });
 
 check("the profile page compares chips against the corrected strings", () => {
-  assert.match(page, /reconcileEmbeddedRank\(item, u\.worldRanking\)/);
+  assert.match(page, /reconcileEmbeddedRank\(item, qsPosition\?\.rank \?\? null\)/);
 });
 
 check("the detail API corrects before it caches or localizes", () => {
-  const correction = route.indexOf('localizeUniversityDescription(uni.description, "en", uni.worldRanking)');
+  // Phase AD moved the figure from `uni.worldRanking` to `qsRank`, the value
+  // `verifiedQsRankNumber` returns (null when the row records no edition). The
+  // property this gate protects is unchanged: the correction runs on the raw
+  // row, before anything is cached or localized.
+  const correction = route.indexOf('localizeUniversityDescription(uni.description, "en", qsRank)');
   const cacheWrite = route.indexOf("setCachedUniversityDetailBase(uniId, basePayload)");
   const cacheRead = route.indexOf("getCachedUniversityDetailBase(uniId)");
   assert.ok(correction > 0, "the API does not correct the description");
   assert.ok(cacheWrite > correction, "the cache is written before the correction");
   assert.ok(cacheRead > correction, "the cache is read before the correction");
-  assert.match(route, /localizeHighlights\(uni\.highlights, "en", uni\.worldRanking\)/);
+  assert.match(route, /localizeHighlights\(uni\.highlights, "en", qsRank\)/);
+  assert.ok(
+    route.indexOf("const qsRank = verifiedQsRankNumber(uni);") < correction,
+    "the corrected figure does not come from the verified rank"
+  );
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

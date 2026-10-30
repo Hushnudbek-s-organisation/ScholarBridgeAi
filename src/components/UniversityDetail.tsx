@@ -628,16 +628,21 @@ export function UniversityDetail({
                   </span>
                 </div>
               )}
-              <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
-                <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
-                <span className="text-xs font-bold">
-                  {t("qsRanking")}
-                  {/* The edition is data, not copy: the label used to hardcode
-                      "2027" while every stored rank is the 2026 edition. */}
-                  {uni.qsRankYear ? ` ${uni.qsRankYear}` : ""}
-                </span>
-                <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
-              </div>
+              {/* Phase AD: a rank whose edition was never recorded is not a QS
+                  position, and the list API already drops it — so the block is
+                  omitted rather than rendered as "QS Ranking —". */}
+              {uni.worldRanking != null && (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
+                  <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
+                  <span className="text-xs font-bold">
+                    {t("qsRanking")}
+                    {/* The edition is data, not copy: the label used to hardcode
+                        "2027" while every stored rank is the 2026 edition. */}
+                    {uni.qsRankYear ? ` ${uni.qsRankYear}` : ""}
+                  </span>
+                  <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
+                </div>
+              )}
               {/* Pillar 5.1 — rank-verified state-scholarship eligibility. Stated
                   as a criterion match, never as an award promise. */}
               {uni.worldRanking != null && uni.worldRanking <= 300 && (

@@ -19,6 +19,7 @@ import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { ADMISSION_PROBABILITY, type ChancingProfile } from "@/lib/chancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { verifiedQsRank } from "@/lib/universityRank";
 import {
   evaluateUniversityAndProgramChance,
   PROGRAM_DEPARTMENT_PROFILES,
@@ -426,7 +427,9 @@ export async function GET(req: Request) {
         flagEmoji: uni.flagEmoji,
         // QS 2026 verified value from the catalogue first; the benchmark table
         // is a gated fallback (Phase AC) and is null for unranked institutions.
-        worldRanking: uni.worldRanking ?? qsBenchmark.qsRank,
+        // Phase AD: "verified" includes the edition — `qs_rank_year` must be
+        // recorded, or the stored number is not a position at all.
+        worldRanking: verifiedQsRank(uni)?.rank ?? qsBenchmark.qsRank,
         officialWebsiteUrl: uni.officialWebsiteUrl || uni.websiteUrl || qsBenchmark.officialUrl,
         fitScore: fit.matchScore,
         fitReasons: translateReasons(locale, "university", fit.reasonDetails, fit.reasons),
@@ -474,7 +477,7 @@ export async function GET(req: Request) {
           name: u.name,
           country: u.country,
           flagEmoji: u.flagEmoji,
-          worldRanking: u.worldRanking ?? b.qsRank,
+          worldRanking: verifiedQsRank(u)?.rank ?? b.qsRank,
           acceptRatePct: b.acceptRatePct,
         };
       })
