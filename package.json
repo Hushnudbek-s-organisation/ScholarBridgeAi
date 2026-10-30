@@ -34,6 +34,8 @@
     "db:schema": "tsx scripts/ensure-schema.ts",
     "db:core-repair-sql": "tsx scripts/gen-core-repair-sql.ts",
     "test:security": "tsx scripts/check-security.ts",
+    "test:auth": "tsx scripts/check-auth-credentials.ts",
+    "test:auth-flow": "node desktop/auth-flow.mjs",
     "test:localization": "tsx scripts/check-localization-perf.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",

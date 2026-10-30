@@ -63,6 +63,21 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # The tag IS the version the app reports (Help/About, the log line in the
+      # data folder, the title of the error dialog). When the two drift, a
+      # tester cannot tell which build they are looking at — refuse to ship.
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          app_version="$(node -p "require('./desktop/package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "tag=${tag_version} desktop/package.json=${app_version}"
+          if [ "$app_version" != "$tag_version" ]; then
+            echo "::error title=Version mismatch::The tag v${tag_version} does not match desktop/package.json (${app_version}). Bump the version before tagging."
+            exit 1
+          fi
+
       - name: Install app dependencies
         run: npm ci --no-audit --no-fund
 
