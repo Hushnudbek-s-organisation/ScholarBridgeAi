@@ -1652,6 +1652,49 @@ security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
 No catalogue rows were written: the correction is a read-path transform over the
 value the catalogue already verified.
 
+## 11j. The hub's university panel tells the truth about what it shows (2026-10-30)
+
+`UniversityExplorer` opens `UniversityDetail` when a student clicks a card on the
+public hub. Two things on that panel were not true.
+
+**1. The ranking edition.** The badge read «QS World Ranking **2027**» — a year
+hardcoded in all three message files — while every stored rank is the **2026**
+edition (`universities.qs_rank_year`, and every `university_rankings` row), and
+the profile page says «Ranking edition: 2026». The copy no longer carries a year;
+the panel prints `uni.qsRankYear` from the row.
+
+**2. The source language.** The About paragraph renders `uni.description` exactly
+as the API returns it. The API translates for uz/ru, but **10 of the 356**
+descriptions cannot be rendered faithfully — the four hand-written ones (WIUT,
+IUT, NewUU, CTU, which match no template) and six whose funding headline is
+outside the vocabulary. Those stayed English with no label, which is what Phase T
+and Phase X forbid on the profile page. `localizeDetailPayload` now reports
+`descriptionSourceLanguage: "en" | null`, derived from the same
+`universityDescriptionState(...).verbatim` rule the profile page uses, and the
+panel prints the same label («Manba tili: inglizcha» / «Язык источника:
+английский» / “Source language: English”) above a `lang="en"` paragraph.
+
+The label wording is asserted to be byte-identical to
+`universityDetail.sourceLanguageLabel`, so a student sees one phrase for one
+fact on both surfaces.
+
+### Verified
+
+`npm run test:university-hub` — **11/11** (new): the flag set for an
+untranslatable row (WIUT) and clear for a translated one (MIT) in uz and ru, no
+flag on the English page, no flag for an empty description, the two labels
+matching across surfaces, the ranking copy free of any four-digit year in all
+three locales, the panel reading `uni.qsRankYear`, the panel containing no
+hardcoded year outside comments, and the API wiring (the whole row is shipped,
+the flag is derived from the profile page's rule).
+
+`test:university-prose` 17/0 · `test:university-rank` 17/0 · `test:render` 354/0
+· `test:catalogue-language` 19/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

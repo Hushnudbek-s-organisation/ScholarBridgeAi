@@ -3306,7 +3306,24 @@ export function localizeDetailPayload<T extends DetailPayloadLike>(payload: T, l
   if (locale === "en") return passthrough(payload);
   const tl = targetLocale(locale);
   if (!tl) return payload;
-  const university = payload.university ? (localizeUniversityRow(payload.university as UniversityRowLike, locale) as unknown) : payload.university;
+  const rawUniversity = payload.university as UniversityRowLike | null | undefined;
+  const localizedUniversity = rawUniversity
+    ? (localizeUniversityRow(rawUniversity, locale) as unknown as { [key: string]: unknown })
+    : payload.university;
+  // The student has to be able to tell a translation from the source sentence:
+  // 10 of the 356 descriptions cannot be rendered faithfully (the four
+  // hand-written rows, and six whose funding headline is outside the
+  // vocabulary) and stay English. The flag says so, so a view can label them
+  // exactly as the profile page does.
+  const descriptionSourceLanguage: "en" | null =
+    rawUniversity && typeof rawUniversity.description === "string" && rawUniversity.description.trim() !== ""
+      ? universityDescriptionState(rawUniversity.description, locale).verbatim
+        ? "en"
+        : null
+      : null;
+  const university = localizedUniversity
+    ? { ...localizedUniversity, descriptionSourceLanguage }
+    : payload.university;
   const programs = Array.isArray(payload.programs)
     ? payload.programs.map((p) => localizeProgramRow(p as ProgramRowLike, locale))
     : payload.programs;
