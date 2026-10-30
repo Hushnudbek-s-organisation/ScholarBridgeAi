@@ -118,7 +118,144 @@ async function main() {
 
   check("shutdown released the app port", await fetch(`http://127.0.0.1:${PORT}/api/health`).then(() => false).catch(() => true));
 
+  // ---------------------------------------------------------------------------
+  // Second launch — the case that broke 1.0.3 on Windows: the cluster keeps the
+  // password it was initialised with, so a password regenerated on start-up
+  // fails with `password authentication failed for user "scholarbridge"`.
+  // ---------------------------------------------------------------------------
+  console.log("\n— second launch with the same data folder —");
+  let second;
+  try {
+    second = await startLocalServer({
+      appDir,
+      dataDir,
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT,
+      dbPort: DB_PORT,
+      warmUp: false,
+      log: (line) => {
+        if (process.env.DESKTOP_TEST_VERBOSE === "1") console.log(`    ${line}`);
+      },
+    });
+    const health2 = await fetch(`${second.url}/api/health`).then((r) => r.json());
+    check("a restart reuses the existing database", health2.ok === true, JSON.stringify(health2));
+    check("the database password is on disk", fs.existsSync(path.join(dataDir, "db-password")));
+  } finally {
+    if (second) await second.stop();
+  }
+
+  // Simulate an install from before the password was persisted: the cluster
+  // knows a password that is not the one in the file, and nobody kept it.
+  console.log("\n— launch after the stored password was lost (1.0.3 installs) —");
+  const passwordFile = path.join(dataDir, "db-password");
+  const known = fs.readFileSync(passwordFile, "utf8");
+  fs.writeFileSync(passwordFile, "a-password-this-cluster-never-knew", { mode: 0o600 });
+  let repaired;
+  try {
+    repaired = await startLocalServer({
+      appDir,
+      dataDir,
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT,
+      dbPort: DB_PORT,
+      warmUp: false,
+      log: (line) => {
+        if (process.env.DESKTOP_TEST_VERBOSE === "1") console.log(`    ${line}`);
+      },
+    });
+    const health3 = await fetch(`${repaired.url}/api/health`).then((r) => r.json());
+    check("an unknown database password is repaired, not fatal", health3.ok === true, JSON.stringify(health3));
+    check("the repair keeps the data (schema still there)", fs.existsSync(path.join(dataDir, "postgres", "PG_VERSION")));
+    check("the temporary trust window was closed again", !fs.existsSync(path.join(dataDir, "postgres", "pg_hba.conf.scholarbridge-backup")));
+  } finally {
+    if (repaired) await repaired.stop();
+  }
+  // Back to the password the app now owns: a further launch must just work.
+  fs.writeFileSync(passwordFile, known.trim(), { mode: 0o600 });
+
   fs.rmSync(dataDir, { recursive: true, force: true });
+
+  // ---------------------------------------------------------------------------
+  // An install created on a non-UTF-8 Windows: initdb followed the OS code page
+  // (WIN1251 on a Russian system), so the schema could never be applied —
+  //   character with byte sequence 0xf0 0x9f 0x8c 0x90 … has no equivalent in
+  //   encoding "WIN1251"
+  // The app must rebuild that empty cluster as UTF-8 by itself.
+  // ---------------------------------------------------------------------------
+  console.log("\n— install whose database was created as WIN1251 (non-UTF-8 Windows) —");
+  const legacyDataDir = path.join(repoRoot, ".desktop-test-data-win1251");
+  const legacyServerDir = path.join(legacyDataDir, "postgres");
+  fs.rmSync(legacyDataDir, { recursive: true, force: true });
+  let legacyCluster;
+  let recovered;
+  try {
+    const { default: EmbeddedPostgres } = await import("embedded-postgres");
+    legacyCluster = new EmbeddedPostgres({
+      databaseDir: legacyServerDir,
+      user: "scholarbridge",
+      password: "a-password-from-an-older-build",
+      port: DB_PORT + 10,
+      persistent: true,
+      initdbFlags: ["--encoding=WIN1251", "--locale=C"],
+      onLog: () => {},
+      onError: () => {},
+    });
+    await legacyCluster.initialise();
+    await legacyCluster.start();
+    await legacyCluster.stop();
+    legacyCluster = undefined;
+
+    recovered = await startLocalServer({
+      appDir,
+      dataDir: legacyDataDir,
+      schemaPath,
+      host: "127.0.0.1",
+      port: PORT + 10,
+      dbPort: DB_PORT + 10,
+      warmUp: false,
+      log: (line) => {
+        if (process.env.DESKTOP_TEST_VERBOSE === "1") console.log(`    ${line}`);
+      },
+    });
+    const health4 = await fetch(`${recovered.url}/api/health`).then((r) => r.json());
+    check("a WIN1251 install is rebuilt and starts", health4.ok === true, JSON.stringify(health4));
+  } catch (error) {
+    check("a WIN1251 install is rebuilt and starts", false, String(error && error.message));
+  } finally {
+    if (legacyCluster) await legacyCluster.stop().catch(() => {});
+    if (recovered) await recovered.stop();
+  }
+
+  // Verify the cluster on disk really is UTF-8 now.
+  try {
+    const { Client } = await import("pg");
+    const { default: EmbeddedPostgres } = await import("embedded-postgres");
+    const password = fs.readFileSync(path.join(legacyDataDir, "db-password"), "utf8").trim();
+    const verify = new EmbeddedPostgres({
+      databaseDir: legacyServerDir,
+      user: "scholarbridge",
+      password,
+      port: DB_PORT + 11,
+      persistent: true,
+      initdbFlags: ["--encoding=UTF8", "--locale=C"],
+      onLog: () => {},
+      onError: () => {},
+    });
+    await verify.start();
+    const client = new Client({
+      connectionString: `postgresql://scholarbridge:${password}@127.0.0.1:${DB_PORT + 11}/postgres`,
+    });
+    await client.connect();
+    const { rows } = await client.query("show server_encoding");
+    await client.end();
+    await verify.stop();
+    check("the rebuilt cluster is UTF-8", String(rows[0].server_encoding).toUpperCase() === "UTF8", rows[0].server_encoding);
+  } catch (error) {
+    check("the rebuilt cluster is UTF-8", false, String(error && error.message));
+  }
+  fs.rmSync(legacyDataDir, { recursive: true, force: true });
 
   console.log("");
   if (failures.length) {

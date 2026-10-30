@@ -175,7 +175,10 @@ seconds. The catalogue (universities, programmes, scholarships) is filled in the
 background right after startup, so the first page that shows lists may take a
 bit longer than the ones after it. The folder holds:
 
-* `postgres/` — your database (back this up: it *is* your data),
+* `postgres/` — your database, always created as **UTF-8** (back this up: it
+  *is* your data),
+* `db-password` — the password of that database (generated once; PostgreSQL
+  keeps its hash, so it must never change between launches),
 * `session-secret` — the key that signs your login cookie (per install),
 * `desktop-config.json` — settings such as "allow phone on this Wi-Fi",
 * `scholarbridge.log` — the app's log (open it from *File → Open error log*).
@@ -337,7 +340,7 @@ database bound to loopback.
 
 | Command | What it proves |
 | --- | --- |
-| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. |
+| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. Then launches it **again** on the same folder (the password must be stable), once more with the stored password corrupted, and once against a cluster created as **WIN1251** (a non-UTF-8 Windows install), which must be rebuilt as UTF-8 automatically. 28 assertions. |
 | `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
 | `node scripts/build-desktop.mjs --verify-only` | Inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
 | `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
@@ -353,6 +356,8 @@ build the real installers on GitHub's machines.
 
 | Symptom | Cause / fix |
 | --- | --- |
+| *“character with byte sequence 0xf0 0x9f 0x8c 0x90 in encoding \"UTF8\" has no equivalent in encoding \"WIN1251\"”* | The installed build is **older than 1.0.9**: on a non-English Windows `initdb` followed the system code page (WIN1251 on a Russian install), so the cluster could not store the catalogue's emoji and the schema never applied. 1.0.9 always creates a **UTF-8** cluster and rebuilds an empty non-UTF-8 one by itself — install it and start again, nothing to delete. |
+| *“password authentication failed for user \"scholarbridge\"”* right after the splash screen | The installed build is **older than 1.0.8**: it generated a new database password on every launch while PostgreSQL keeps the one from the first launch, so only the very first start could connect. Install 1.0.8 or newer — it keeps the password in `db-password` and, if an existing cluster's password was lost, resets it in a closed loopback-only window (`ALTER ROLE`) **without touching your data**. Nothing has to be deleted. |
 | Windows: *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\index.js”* | The installed build predates 1.0.4, where the compiled server was bundled into `resources/app` and replaced the app's `package.json`. Install the current build (uninstall first is not needed — the installer overwrites the program, your data stays). |
 | Desktop: "could not start" on first launch | Look at *File → Open error log*. Most common: the port range 4310–4335 is busy (close the other copy — only one instance may run), or PostgreSQL cannot run as **root** on Linux (run the app as a normal user). |
 | Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
