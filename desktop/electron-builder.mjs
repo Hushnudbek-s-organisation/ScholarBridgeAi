@@ -27,9 +27,15 @@ const config = {
   // (every other language pack is ~0.5 MB of dead weight each).
   compression: "maximum",
   electronLanguages: ["en-US", "ru"],
+  // Every source file the app needs, listed explicitly. A file missing here is
+  // NOT installed, and the app then dies at launch with
+  //   Cannot find module '…\\resources\\app\\<file>.mjs'
+  // (`tar.mjs` was exactly that). `scripts/build-desktop.mjs` now reads the
+  // app's own imports and fails the build if one of them is not packaged.
   files: [
     "main.mjs",
     "boot.mjs",
+    "tar.mjs",
     "preload.cjs",
     "splash.html",
     "build/icon.png",

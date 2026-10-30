@@ -120,6 +120,30 @@ function verifyPackagedLayout() {
     if (fs.existsSync(path.join(appDir, "index.js"))) {
       problems.push(`${label}/app/index.js exists — the compiled server was copied into resources/app`);
     }
+
+    // Follow the app's own imports: a module that is not packaged makes the
+    // app crash at launch with ERR_MODULE_NOT_FOUND. This is checked on the
+    // source files too, so a missing entry in `files` fails the build before
+    // anything is published.
+    const seen = new Set();
+    const checkImports = (file) => {
+      if (seen.has(file) || !fs.existsSync(file)) return;
+      seen.add(file);
+      if (!/\.(mjs|cjs|js)$/.test(file)) return;
+      const source = fs.readFileSync(file, "utf8");
+      for (const match of source.matchAll(/(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)) {
+        const target = path.resolve(path.dirname(file), match[1]);
+        if (!fs.existsSync(target)) {
+          problems.push(`${path.basename(file)} imports ${match[1]}, which is not packaged`);
+        } else {
+          checkImports(target);
+        }
+      }
+    };
+    checkImports(path.join(appDir, "main.mjs"));
+    for (const entry of fs.readdirSync(appDir)) {
+      if (/\.(mjs|cjs)$/.test(entry)) checkImports(path.join(appDir, entry));
+    }
     const archive = [path.join(resources, "engine.tar"), path.join(resources, "engine.tar.gz")].find((file) =>
       fs.existsSync(file)
     );

@@ -98,6 +98,32 @@ async function main() {
       check(`desktop/${file} ships with the app`, fs.existsSync(path.join(repoRoot, "desktop", file)));
     }
     const builder = (await import("../desktop/electron-builder.mjs")).default;
+    // Every local import of the app must also be in electron-builder's `files`
+    // list. A module that is imported but not installed crashes the app at
+    // launch with ERR_MODULE_NOT_FOUND (`tar.mjs` was exactly that), so it is
+    // asserted here — before anything is packaged.
+    const appSources = fs
+      .readdirSync(path.join(repoRoot, "desktop"))
+      .filter((name) => /\.(mjs|cjs)$/.test(name));
+    const declared = new Set(
+      (builder.files || []).filter((entry) => !entry.startsWith("!")).map((entry) => entry.replace(/^\.\//, ""))
+    );
+    const missing = [];
+    for (const source of appSources) {
+      const text = fs.readFileSync(path.join(repoRoot, "desktop", source), "utf8");
+      for (const match of text.matchAll(/(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)) {
+        const referenced = match[1].replace(/^\.\//, "");
+        const existsLocally = fs.existsSync(path.join(repoRoot, "desktop", referenced));
+        if (!existsLocally) {
+          missing.push(`${source} imports ${match[1]}, which does not exist`);
+        } else if (!declared.has(referenced)) {
+          missing.push(`${source} imports ${match[1]}, which is not in the installer's files list`);
+        }
+      }
+    }
+    check("every module the app imports is packaged", missing.length === 0, missing.join("; "));
+    check("the app ships its tar module", declared.has("tar.mjs"));
+
     check("the installer bundles the engine archive and the schema",
       builder.extraResources.some((r) => r.to === "engine.tar" || r.to === "engine.tar.gz") &&
         builder.extraResources.some((r) => r.to === "schema/full_schema.sql"));
