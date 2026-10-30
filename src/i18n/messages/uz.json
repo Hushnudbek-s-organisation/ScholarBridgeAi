@@ -1356,7 +1356,8 @@
     "recurring": "Takrorlanuvchi dastur — shu yilgi muddatni rasmiy sahifada ko'ring",
     "noResults": "Bu toifada hali imkoniyat yo'q.",
     "loading": "Imkoniyatlar yuklanmoqda…",
-    "searchPlaceholder": "Imkoniyatlar, sohalar va tashkilotchilarni qidirish…"
+    "searchPlaceholder": "Imkoniyatlar, sohalar va tashkilotchilarni qidirish…",
+    "deadlinePassed": "Muddat o‘tgan"
   },
   "navHints": {
     "dashboard": "Yo'lingiz, keyingi qadamlar va natijalar bir qarashda",

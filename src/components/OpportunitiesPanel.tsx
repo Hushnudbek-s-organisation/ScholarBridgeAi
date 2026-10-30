@@ -7,7 +7,14 @@ import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
 import { ShowMoreToggle } from "@/components/hubs/ui";
 import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
+import { useLocale } from "next-intl";
 import type { StudentProfile } from "./Navbar";
+import {
+  hasOpportunityNote,
+  renderOpportunityNotes,
+  type OpportunityNote,
+} from "@/lib/opportunityNotes";
+import type { Locale } from "@/i18n/config";
 
 interface OppItem {
   id: number;
@@ -23,6 +30,8 @@ interface OppItem {
   match: number | null;
   reasons: string[];
   flags: string[];
+  /** Code + parameters for the same reasons/flags (absent on an older payload). */
+  notes?: OpportunityNote[];
 }
 
 interface OppData {
@@ -33,6 +42,23 @@ interface OppData {
 }
 
 const TYPES = ["competition", "research", "internship", "summer_school"] as const;
+
+/**
+ * The recommendation sentences in the reader's language. `notes` is the
+ * structured form; an older cached payload without it falls back to the
+ * English strings the API has always returned, which is better than an empty
+ * list — and it is visible rather than silent, because those strings are
+ * English and the page may not be.
+ */
+function reasonLines(o: OppItem, locale: Locale): string[] {
+  const localized = renderOpportunityNotes(o.notes, locale, "reason");
+  return localized.length || o.notes?.length ? localized : o.reasons;
+}
+
+function flagLines(o: OppItem, locale: Locale): string[] {
+  const localized = renderOpportunityNotes(o.notes, locale, "flag");
+  return localized.length || o.notes?.length ? localized : o.flags;
+}
 
 function parseFields(raw: string): string[] {
   try {
@@ -59,6 +85,11 @@ export function OpportunitiesPanel({
   activeProfile?: StudentProfile | null;
 }) {
   const t = useTranslations("opportunities");
+  // The recommendation sentences are built on the server as codes; the reader's
+  // language decides how they read. (Before this, the panel printed the
+  // server's English straight onto a uz/ru page.)
+  const locale = useLocale() as Locale;
+  const closedLabel = t("deadlinePassed");
   const [data, setData] = useState<OppData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -201,21 +232,26 @@ export function OpportunitiesPanel({
                   {t("fields")}: {parseFields(o.fields).join(", ")}
                 </p>
               )}
-              <p className="mt-0.5 text-[10px] text-slate-400">
-                {o.deadlineDate ? `${t("deadline")}: ${o.deadlineDate}` : t("recurring")}
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                <span>{o.deadlineDate ? `${t("deadline")}: ${o.deadlineDate}` : t("recurring")}</span>
+                {hasOpportunityNote(o.notes, "deadline_passed") && (
+                  <span className="rounded-full bg-slate-100 px-1.5 py-px font-semibold text-slate-600 ring-1 ring-slate-300 ring-inset">
+                    {closedLabel}
+                  </span>
+                )}
               </p>
-              {o.reasons.length > 0 && (
+              {reasonLines(o, locale).length > 0 && (
                 <ul className="mt-1 space-y-0.5">
-                  {o.reasons.slice(0, 3).map((r, i) => (
+                  {reasonLines(o, locale).slice(0, 3).map((r, i) => (
                     <li key={i} className="text-[10px] text-emerald-700">
                       + {r}
                     </li>
                   ))}
                 </ul>
               )}
-              {o.flags.length > 0 && (
+              {flagLines(o, locale).length > 0 && (
                 <ul className="mt-1 space-y-0.5">
-                  {o.flags.slice(0, 3).map((r, i) => (
+                  {flagLines(o, locale).slice(0, 3).map((r, i) => (
                     <li key={i} className="flex items-start gap-1 text-[10px] text-amber-700">
                       <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" /> {r}
                     </li>

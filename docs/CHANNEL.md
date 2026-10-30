@@ -1466,6 +1466,64 @@ All deadline comparisons are whole-day comparisons, in UTC, in one place —
 19/0 · `test:localization` 16/0 · integration 351/0 · channel 196/0 · dataset
 50/0 · security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
 
+## 11g. The opportunities feed speaks the reader's language (2026-10-30)
+
+### Two defects, both measured
+
+**1. English inside the recommendation list.** `scoreOpportunity()`
+(`src/lib/opportunities.ts`) builds its reasons and flags as finished English
+sentences and `OpportunitiesPanel` printed them verbatim:
+
+```
++ field match: Computer Science
+! limited to Germany
+! deadline has passed
+```
+
+On an Uzbek or Russian page. Every other catalogue was made trilingual in Phase
+T; this one was missed, and a sentence cannot be translated after the fact
+without parsing it.
+
+**2. The list started with what had already expired.** `?sort=deadline` ordered
+ascending, so last year's competitions came first in the list a student opens to
+find something to enter — Phase U's `/scholarships` defect, in the second
+catalogue. The deadline test itself also compared a date-only value (midnight
+UTC) with the wall clock, so an opportunity closed at 00:00:01 on the day it
+could still be entered (Phase V's rule, not yet applied here).
+
+### The rule now
+
+* `scoreOpportunity()` returns a third field, `notes: OpportunityNote[]` —
+  `{ kind: "reason" | "flag", code, params }` — emitted *through* two local
+  helpers, so `reasons`/`flags` are always derived from `notes`, in order, and
+  the two can never drift. The English strings are unchanged: they are the API's
+  existing contract.
+* `src/lib/opportunityNotes.ts` renders the codes in **uz / ru / en** (12 codes
+  × 3 languages, parameters included: `"faqat Germany uchun"`,
+  `"целевой уровень: grad, ваш уровень: undergrad"`). An unknown code renders as
+  an empty string — never a guess.
+* The route adds `notes` to every item and sorts **expired last in both sort
+  modes** (`openFirst`), then by deadline or by match.
+* The panel renders `renderOpportunityNotes(notes, locale, kind)` and shows a
+  grey «Muddat o‘tdi» chip on a row whose notes say `deadline_passed`. A cached
+  payload without `notes` falls back to the English strings rather than showing
+  an empty list.
+* The deadline comparison is the whole-day rule from Phase V: the closing day is
+  open at every hour.
+
+### Verified
+
+`npm run test:opportunity-notes` — **10/10** (new): every code in three
+languages (Cyrillic asserted for ru, "not the English source" for uz), the
+parameters arriving in the sentence, the unknown-code rule, `reasons`/`flags`
+matching their notes exactly, the closing-day/next-day/previous-day matrix, both
+sorts consulting `deadline_passed` (and the naive deadline sort asserted gone),
+the panel wiring, and the new label present in all three message files.
+
+`test:opportunities` 27/0 · `test:render` 354/0 · `test:deadline-day` 13/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

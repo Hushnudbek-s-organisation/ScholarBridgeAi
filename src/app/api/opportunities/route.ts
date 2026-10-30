@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { authenticate } from "@/lib/auth";
 import { countByType, mergeOpportunitySearchOrder, rankOpportunities } from "@/lib/opportunities";
+import { hasOpportunityNote } from "@/lib/opportunityNotes";
 import { localeFromRequest } from "@/lib/engineText";
 import { expandMultilingualSearchTerms, localizeOpportunityRow } from "@/lib/catalogLocalizer";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
@@ -79,13 +80,26 @@ export async function GET(req: Request) {
         match: scored ? scored.match : null,
         reasons: scored ? scored.reasons : [],
         flags: scored ? scored.flags : [],
+        // The same reasons/flags as code + parameters: the panel renders these
+        // in the reader's language instead of printing English on a uz/ru page.
+        notes: scored ? scored.notes : [],
       };
     });
 
+    // Open entries first, expired ones last — in BOTH sort modes. Sorting by
+    // deadline used to put last year's competitions at the top of the list.
+    const openFirst = (a: (typeof items)[number], b: (typeof items)[number]) =>
+      Number(hasOpportunityNote(a.notes, "deadline_passed")) -
+      Number(hasOpportunityNote(b.notes, "deadline_passed"));
     if (sort === "deadline") {
-      items.sort((a, b) => (a.deadlineDate ?? "9999").localeCompare(b.deadlineDate ?? "9999") || a.title.localeCompare(b.title));
+      items.sort(
+        (a, b) =>
+          openFirst(a, b) ||
+          (a.deadlineDate ?? "9999").localeCompare(b.deadlineDate ?? "9999") ||
+          a.title.localeCompare(b.title)
+      );
     } else {
-      items.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || a.title.localeCompare(b.title));
+      items.sort((a, b) => openFirst(a, b) || (b.match ?? 0) - (a.match ?? 0) || a.title.localeCompare(b.title));
     }
 
     // Search is lexical-first and always works without a model. The explicit
@@ -125,7 +139,12 @@ export async function GET(req: Request) {
     }
 
     if (sort === "deadline") {
-      items.sort((a, b) => (a.deadlineDate ?? "9999").localeCompare(b.deadlineDate ?? "9999") || a.title.localeCompare(b.title));
+      items.sort(
+        (a, b) =>
+          openFirst(a, b) ||
+          (a.deadlineDate ?? "9999").localeCompare(b.deadlineDate ?? "9999") ||
+          a.title.localeCompare(b.title)
+      );
     }
 
     // Optional Mercury check only for a signed-in user and one explicitly

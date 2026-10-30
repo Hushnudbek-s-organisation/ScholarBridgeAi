@@ -1356,7 +1356,8 @@
     "recurring": "Recurring program — check the official page for this year's date",
     "noResults": "No opportunities in this category yet.",
     "loading": "Loading opportunities…",
-    "searchPlaceholder": "Search opportunities, fields, providers…"
+    "searchPlaceholder": "Search opportunities, fields, providers…",
+    "deadlinePassed": "Deadline passed"
   },
   "navHints": {
     "dashboard": "Your path, next steps and progress at a glance",
