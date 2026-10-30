@@ -197,7 +197,7 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {bench && (
+                          {bench?.qsRank != null && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                               <Award className="w-3 h-3" />
                               QS #{bench.qsRank}

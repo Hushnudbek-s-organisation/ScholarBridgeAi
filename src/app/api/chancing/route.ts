@@ -424,6 +424,8 @@ export async function GET(req: Request) {
         country: uni.country,
         city: uni.city,
         flagEmoji: uni.flagEmoji,
+        // QS 2026 verified value from the catalogue first; the benchmark table
+        // is a gated fallback (Phase AC) and is null for unranked institutions.
         worldRanking: uni.worldRanking ?? qsBenchmark.qsRank,
         officialWebsiteUrl: uni.officialWebsiteUrl || uni.websiteUrl || qsBenchmark.officialUrl,
         fitScore: fit.matchScore,

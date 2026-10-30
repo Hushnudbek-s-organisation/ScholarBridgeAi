@@ -527,6 +527,12 @@ export function evaluateUniversityAndProgramChance(
   existingBenchmark?: QsUniversityBenchmark
 ): ProgramChanceEvaluation {
   const qsBenchmark = existingBenchmark ?? matchQsUniversityBenchmark(uni);
+  /**
+   * Selectivity band driver only. `null` means the QS 2026 edition does not
+   * rank the institution, so it is treated as the least selective band —
+   * never as a rank of its own.
+   */
+  const benchmarkRank = qsBenchmark.qsRank ?? Number.POSITIVE_INFINITY;
 
   const programName =
     program?.name ||
@@ -898,9 +904,9 @@ export function evaluateUniversityAndProgramChance(
   }
 
   // 4. Curriculum & Subject Prerequisites (IB / A-Level / AP / Subject Requirements)
-  const ibReq = programReq?.ibRequirement || (qsBenchmark.qsRank <= 30 ? "38–42 IB Points (HL 6/6/6)" : qsBenchmark.qsRank <= 100 ? "34–37 IB Points" : "30–34 IB Points");
-  const aLevelReq = programReq?.aLevelRequirement || (qsBenchmark.qsRank <= 30 ? "A*A*A – A*AA" : qsBenchmark.qsRank <= 100 ? "AAA – AAB" : "ABB – BBB");
-  const apReq = programReq?.apRequirement || (qsBenchmark.qsRank <= 50 ? "4–5 AP exams (scores 4–5)" : "2–3 AP exams or Honors coursework");
+  const ibReq = programReq?.ibRequirement || (benchmarkRank <= 30 ? "38–42 IB Points (HL 6/6/6)" : benchmarkRank <= 100 ? "34–37 IB Points" : "30–34 IB Points");
+  const aLevelReq = programReq?.aLevelRequirement || (benchmarkRank <= 30 ? "A*A*A – A*AA" : benchmarkRank <= 100 ? "AAA – AAB" : "ABB – BBB");
+  const apReq = programReq?.apRequirement || (benchmarkRank <= 50 ? "4–5 AP exams (scores 4–5)" : "2–3 AP exams or Honors coursework");
   const subjReq = programReq?.subjectRequirements || dept.typicalPrereqs.join(", ");
 
   const subAlign = subjectAlignment(profile.completedCourses, subjReq);
@@ -920,7 +926,7 @@ export function evaluateUniversityAndProgramChance(
   const portfolioRequired = Boolean(programReq?.portfolioRequired || dept.portfolioOrAudition);
   const interviewRequired = Boolean(
     programReq?.interviewRequired ||
-      qsBenchmark.qsRank <= 15 ||
+      benchmarkRank <= 15 ||
       dept.key === "medicine_health"
   );
 

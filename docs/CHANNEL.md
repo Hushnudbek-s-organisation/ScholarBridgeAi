@@ -1798,6 +1798,75 @@ fail with both rows named.
 `test:dataset` 50/0 · integration 351/0 · security 90 · portability 57/0 ·
 `check:i18n` passed · `next build` OK.
 
+## 11m. The chancing benchmark table only states verified QS positions (2026-10-30)
+
+Phases Z, AA, AB and Y took the same rule to the catalogue, the university list,
+the hub panel and the landing marquee: **a QS number is the verified position of
+the edition it names, or it is not printed.** One surface was left — the
+chancing/recommendation benchmark table in `src/lib/qsTop200Benchmarks.ts`, which
+feeds three screens:
+
+* the `QS #N` badge on every chancing card (`ChancingPanel.tsx`),
+* `positioning.qsRank` on the programme recommendation cards
+  (`RecommendationStudio.tsx`, `/api/programs/recommend`),
+* the badge in the similar-profiles panel (`SimilarProfiles.tsx`).
+
+The table was hand-compiled from an older edition's top-200 and its rank column
+had drifted. Measured 2026-10-30 against `data/qs2026_top1500.csv` (the same
+official table Phase Y reconciled `universities.world_ranking` to): **46 of the
+200 ranks were wrong**, every one by 1–3 places because a row had been inserted
+or dropped upstream.
+
+| drift | rows |
+| --- | --- |
+| −3 | University of Waterloo #122 → **119** |
+| −2 | Purdue **88**, Oslo **119**, UNC Chapel Hill **140**, Liverpool **147**, Universidad de Chile **173** |
+| −1 | 40 rows, including UC Berkeley **17**, TUM **22**, Sydney **25**, UTokyo **36**, SNU **38**, U Queensland **42**, SJTU **47**, Malaya **58**, NTU **63**, UIUC **70**, Penn State **82**, FU Berlin **88**, Alberta **94**, Politecnico di Milano **98**, Utrecht **103**, RWTH **105**, Wisconsin **110**, UC Davis **114** |
+
+The 201st row, KAIST, claimed **#53** for an institution the 2026 edition does
+not rank at all — the same false claim Phase AB removed from the landing marquee.
+(The catalogue row `universities.id = 37` still carries `world_ranking = 53` with
+`qs_rank_year = NULL`; that is catalogue data, and this phase does not write to
+the catalogue tables.)
+
+### What changed
+
+* **All 46 ranks corrected** to the official QS 2026 position; every other field
+  in the tuple is untouched.
+* **`qsRank` is now `number | null`.** `null` means "this edition does not rank
+  it" — never a placeholder. KAIST keeps its admission band (it still matches a
+  profile by name and domain) but carries no position, so nothing can print
+  `QS #53` for it again.
+* **The verified catalogue value wins over the table.** `/api/programs/recommend`
+  now sends `verifiedRankByUniId.get(id) ?? benchmark.qsRank ?? null`, matching
+  what `/api/chancing` already did with `uni.worldRanking ?? qsBenchmark.qsRank`,
+  so the chancing card and the university profile page cannot disagree.
+* **Every badge guards the null**: the chancing card renders
+  `activeItem.worldRanking ?? qsBench.qsRank`, the recommendation card and the
+  similar-profiles badge hide the row entirely when there is no verified rank.
+* `programChancing.ts` treats an unranked university as the least selective band
+  (`?? Number.POSITIVE_INFINITY`) instead of comparing against `null`.
+
+### Verified
+
+`npm run test:qs-benchmarks` — **13/13** (new): every row's rank equals the
+official CSV position for its canonical name or an alias, no row claims a rank
+for an institution the edition does not rank (KAIST is named explicitly), a
+shared table rank is a tie the edition itself declares, no institution appears
+twice, every rank is an integer inside 1–200, the matcher returns the row for its
+own canonical name, the type is nullable, and no component or API can print an
+absent rank. Reintroducing Berkeley #18, TUM #23 and the KAIST #53 claim makes the
+gate fail with all three named.
+
+`test:chancing` **28/0** (TUM now asserted at 22, KAIST asserted `null`) ·
+`test:landing-ranks` 10/0 · `test:university-list` 15/0 · `test:university-hub`
+11/0 · `test:university-rank` 17/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

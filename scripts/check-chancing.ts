@@ -166,14 +166,20 @@ check("AI chat does not receive family income as an available contribution", () 
 console.log("\nQS Top 200 Benchmarks & 5-Layer Program Positioning Engine");
 check("QS Top 200 dataset contains all 200 ranked universities plus KAIST", () => {
   assert.ok(QS_TOP_200_BENCHMARKS.length >= 200, `Expected >=200 rows, got ${QS_TOP_200_BENCHMARKS.length}`);
+  const ranked = QS_TOP_200_BENCHMARKS.filter((b) => b.qsRank !== null);
+  assert.equal(ranked.length, 200, `Expected 200 ranked rows, got ${ranked.length}`);
   const mit = matchQsUniversityBenchmark({ name: "MIT", country: "United States" });
   const tum = matchQsUniversityBenchmark({ name: "Technical University of Munich", country: "Germany" });
   const ox = matchQsUniversityBenchmark({ name: "University of Oxford", country: "United Kingdom" });
   const kaist = matchQsUniversityBenchmark({ name: "KAIST", country: "South Korea" });
   assert.equal(mit.qsRank, 1);
-  assert.equal(tum.qsRank, 23);
+  // QS 2026: TUM is 22, not the 23 this table carried until Phase AC.
+  assert.equal(tum.qsRank, 22);
   assert.equal(ox.qsRank, 4);
   assert.equal(kaist.officialDomain, "kaist.ac.kr");
+  // KAIST is not in the QS 2026 edition, so its row must carry no position —
+  // the admission band still applies, the rank claim does not.
+  assert.equal(kaist.qsRank, null);
 });
 check("every QS benchmark carries its estimate provenance", () => {
   // These bands are compiled from Common Data Sets and admissions statistics —

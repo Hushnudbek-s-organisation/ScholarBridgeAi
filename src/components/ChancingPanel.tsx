@@ -52,7 +52,8 @@ interface MatchEvidenceBreakdown {
 }
 
 interface QsUniversityBenchmark {
-  qsRank: number;
+  /** QS 2026 position, or null when the edition does not rank the institution. */
+  qsRank: number | null;
   canonicalName: string;
   aliases: string[];
   country: string;
@@ -765,6 +766,10 @@ export function ChancingPanel({
                 : null;
 
             const qsBench = activeItem.qsBenchmark;
+            // The verified QS 2026 position from `universities.world_ranking`
+            // wins; the curated table is only a fallback, and a null there
+            // means "the edition does not rank it" — then nothing is printed.
+            const displayRank = activeItem.worldRanking ?? qsBench?.qsRank ?? null;
 
             return (
               <div
@@ -775,9 +780,9 @@ export function ChancingPanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {qsBench && (
+                      {displayRank != null && (
                         <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                          QS #{qsBench.qsRank}
+                          QS #{displayRank}
                         </span>
                       )}
                       {activeProgram && (

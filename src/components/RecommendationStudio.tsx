@@ -133,7 +133,8 @@ interface RecommendResult {
    * un-benchmarked university simply omits it, and the card renders without it.
    */
   positioning?: {
-    qsRank: number;
+    /** QS 2026 position, or null when the edition does not rank the institution. */
+    qsRank: number | null;
     universityAcceptRatePct: number | null;
     departmentLabel: string;
     gpa25: number;
@@ -1089,10 +1090,12 @@ export function RecommendationStudio({
                             <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
                               {r.positioning ? (
                                 <dl className="space-y-1 text-[11px] leading-snug">
-                                  <div className="flex items-baseline justify-between gap-2">
-                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningQsRank")}</dt>
-                                    <dd className="font-semibold text-slate-800 dark:text-slate-100">QS #{r.positioning.qsRank}</dd>
-                                  </div>
+                                  {r.positioning.qsRank != null && (
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <dt className="text-slate-500 dark:text-slate-400">{t("positioningQsRank")}</dt>
+                                      <dd className="font-semibold text-slate-800 dark:text-slate-100">QS #{r.positioning.qsRank}</dd>
+                                    </div>
+                                  )}
                                   <div className="flex items-baseline justify-between gap-2">
                                     <dt className="text-slate-500 dark:text-slate-400">{t("positioningSelectivity")}</dt>
                                     <dd className="text-right font-semibold text-slate-800 dark:text-slate-100">
