@@ -28,6 +28,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normaliseServerUrl } from "../desktop/remote.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const desktopDir = path.join(repoRoot, "desktop");
@@ -168,6 +169,39 @@ if (verifyOnly) {
 
 if (!fs.existsSync(path.join(desktopDir, "node_modules"))) {
   fail("desktop dependencies are missing — run:  cd desktop && npm install");
+}
+
+/**
+ * The site this build opens.
+ *
+ * The app is a window onto the hosted site, so the address has to be inside the
+ * installer. `desktop/server-default.mjs` carries the production address; a
+ * fork (or a staging build) overrides it without touching the source:
+ *
+ *   SCHOLARBRIDGE_SERVER_URL=https://my-site.example node scripts/build-desktop.mjs
+ */
+const serverUrlOverride = (process.env.SCHOLARBRIDGE_SERVER_URL || "").trim();
+if (serverUrlOverride) {
+  const wanted = normaliseServerUrl(serverUrlOverride);
+  if (!wanted) fail(`SCHOLARBRIDGE_SERVER_URL is not a usable address: ${serverUrlOverride}`);
+  const file = path.join(repoRoot, "desktop", "server-default.mjs");
+  // Same shape as the committed file, so a custom address is a one-line diff.
+  fs.writeFileSync(
+    file,
+    [
+      "/**",
+      " * The ScholarBridge site this build opens.",
+      " *",
+      " * The desktop and Android apps are windows onto the hosted site: every piece",
+      " * of data lives in the site's own database, so signing in on the laptop shows",
+      " * exactly what the phone shows. Written by scripts/build-desktop.mjs because",
+      " * SCHOLARBRIDGE_SERVER_URL was set for this build.",
+      " */",
+      `export const DEFAULT_SERVER_URL = ${JSON.stringify(wanted)};`,
+      "",
+    ].join("\n")
+  );
+  say(`The app will open ${wanted} (baked into desktop/server-default.mjs)`);
 }
 
 if (!skipBuild) {

@@ -51,6 +51,13 @@ jobs:
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
+      # The apps open the hosted site: which address, does it answer, is the
+      # session kept, is the offline copy ever entered silently. Pure logic, no
+      # network, no Electron — it runs on every push so a change to
+      # desktop/remote.mjs or the baked address cannot slip through.
+      - name: Site mode (desktop + Android windows onto the site)
+        run: bash ci/run-step.sh "Site mode" npm run test:remote
+
       # Phase 3: uz/ru coverage for every study field, degree level, study mode
       # and programme language in the imported catalogue, plus the localization
       # and score memos (correctness and speed).

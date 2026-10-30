@@ -85,6 +85,13 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: desktop
 
+      - name: Check the site mode
+        shell: bash
+        # The app is a window onto the hosted site. This runs before packaging:
+        # the address it opens, the probe, the persistent session partition and
+        # the "offline copy is never entered silently" rule.
+        run: node scripts/check-remote-mode.mjs
+
       # Compiles the standalone server, copies static assets, and packages the
       # installer with electron-builder (scripts/build-desktop.mjs).
       - name: Build the installer

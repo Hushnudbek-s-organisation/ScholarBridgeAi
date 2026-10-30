@@ -36,6 +36,11 @@ const config = {
     "main.mjs",
     "boot.mjs",
     "tar.mjs",
+    "remote.mjs",
+    // The address this build opens (a window onto the site). Required: without
+    // it remote.mjs cannot resolve a default and the app would silently fall
+    // back to the offline copy, i.e. to a different database than the site's.
+    "server-default.mjs",
     "preload.cjs",
     "splash.html",
     "build/icon.png",
