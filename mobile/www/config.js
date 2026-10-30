@@ -15,4 +15,4 @@
  * the phone. The value is not a secret — it is the app's public address,
  * exactly like a bookmark.
  */
-window.SCHOLARBRIDGE_DEFAULT_SERVER = "https://scholarbridge-ai.onrender.com";
+window.SCHOLARBRIDGE_DEFAULT_SERVER = "https://scholarbridgeai-9bmd.onrender.com";

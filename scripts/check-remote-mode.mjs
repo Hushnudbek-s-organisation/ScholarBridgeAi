@@ -5,7 +5,7 @@
  * own, so this check answers the questions a user can be wrong-footed by:
  *
  *   1. which address is opened (env → saved → baked-in, offline choice wins),
- *   2. is a typed address usable ("scholarbridge-ai.onrender.com",
+ *   2. is a typed address usable ("scholarbridgeai-9bmd.onrender.com",
  *      "192.168.1.42:4310", "https://x/…", "ftp://…"),
  *   3. does an address answer (200 = ready, 503 = up but database not ready,
  *      nothing = unreachable, incl. the free-plan cold start),
@@ -31,9 +31,19 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
+/**
+ * The site the shipped apps open. One place in this file: if the deployment
+ * moves, every place that follows it (desktop default, APK default, dialog
+ * placeholder) has to move too, and this check says which one was missed.
+ */
+const PRODUCTION_SITE = "https://scholarbridgeai-9bmd.onrender.com";
+
 let passed = 0;
 const failures = [];
 function check(label, condition, detail = "") {
+  if (condition !== true && condition !== false) {
+    throw new TypeError(`check("${label}") expects a boolean, got ${typeof condition}`);
+  }
   if (condition) {
     passed += 1;
     console.log(`  ✓ ${label}`);
@@ -44,7 +54,7 @@ function check(label, condition, detail = "") {
 }
 
 console.log("Addresses");
-check("a bare host name becomes https", normaliseServerUrl("scholarbridge-ai.onrender.com") === BUILT_IN_SERVER_URL);
+check("a bare host name becomes https", normaliseServerUrl(PRODUCTION_SITE.replace(/^https:\/\//, "")) === PRODUCTION_SITE);
 check("a trailing slash is dropped", normaliseServerUrl("https://x.example/") === "https://x.example");
 check("a pasted address with spaces/quotes is cleaned", normaliseServerUrl('  "<https://x.example>" ') === "https://x.example");
 check("a laptop on the Wi-Fi stays http", normaliseServerUrl("192.168.1.42:4310") === "http://192.168.1.42:4310");
@@ -160,10 +170,27 @@ check("the address module ships with the app", (() => {
   const builder = read("desktop/electron-builder.mjs");
   return /"remote\.mjs"/.test(builder) && /"server-default\.mjs"/.test(builder);
 })());
-check("the baked address is the production site", BUILT_IN_SERVER_URL.startsWith("https://") && BUILT_IN_SERVER_URL.includes("."));
+check("the baked address is the production site", BUILT_IN_SERVER_URL === PRODUCTION_SITE, BUILT_IN_SERVER_URL);
+// No stale address may survive in a file the shipped app reads: an old
+// placeholder in the address dialog sends people to a site that is not theirs.
+const staleAddresses = (() => {
+  const stale = [];
+  for (const rel of [
+    "desktop/server-default.mjs",
+    "desktop/main.mjs",
+    "mobile/www/config.js",
+    "scripts/build-desktop.mjs",
+  ]) {
+    for (const match of read(rel).matchAll(/https?:\/\/[a-z0-9.-]*onrender\.com/gi)) {
+      if (match[0].replace(/\/+$/, "") !== PRODUCTION_SITE) stale.push(`${rel}: ${match[0]}`);
+    }
+  }
+  return stale;
+})();
+check("no other site address is left in the app's own files", staleAddresses.length === 0, staleAddresses.join("; "));
 check("the Android app opens the same site", (() => {
   const config = read("mobile/www/config.js");
-  return config.includes(BUILT_IN_SERVER_URL);
+  return config.includes(BUILT_IN_SERVER_URL) && BUILT_IN_SERVER_URL === PRODUCTION_SITE;
 })());
 const phoneShell = read("mobile/www/index.html");
 check("the Android app offers 'open anyway' when a laptop address is unreachable", /openAnyway/.test(phoneShell));

@@ -269,7 +269,7 @@ async function switchServer(url) {
         type: "warning",
         title: "That address cannot be used",
         message: `“${url}” is not a web address.`,
-        detail: "Enter something like https://scholarbridge-ai.onrender.com",
+        detail: "Enter something like https://scholarbridgeai-9bmd.onrender.com",
         buttons: ["OK"],
         noLink: true,
       });
@@ -329,7 +329,7 @@ async function promptServerUrl() {
   </style></head><body>
   <h1>ScholarBridge site address</h1>
   <p>The app opens this site over the internet. Your account and all data are the site's own — the same ones you see in the phone app and the browser.</p>
-  <input id="url" value="${current}" placeholder="https://scholarbridge-ai.onrender.com" spellcheck="false" autocomplete="off">
+  <input id="url" value="${current}" placeholder="https://scholarbridgeai-9bmd.onrender.com" spellcheck="false" autocomplete="off">
   <div class="err" id="err"></div>
   <small>Leave it empty and press “Open offline copy” to use the copy bundled with the app (no account sharing with the site).</small>
   <div class="row">
