@@ -6,7 +6,7 @@
 
 ## Pass mantiqi
 
-Rel≤8 strukturlangan-minimum navbatidagi eng katta oila — **AQSh (5 yozuv)**: 682 (UT Austin Texas Exes/ISSS), 694 (UC Davis Regents), 699 (UCLA Regents), 723 (Arizona Global Wildcat), 764 (Jefferson Scholarship). Besh yozuv import-shablon GPA/IELTS qiymatlari bilan saqlanib qolgan (3.6/6.5, 3.25/–, 3.6/7.5, 3.0/6.5, 3.0/7.0). Muhim topilma: **694 ning 3.25 va 723 ning 3.00 kiși minimumi emas — bu mukofotni davom ettirish (renewal) shartlari**; ular strukturlangan kirish minimumi sifatida abituriyentni chalg'itardi.
+Rel≤8 strukturlangan-minimum navbatidagi eng katta oila — **AQSh (5 yozuv)**: 682 (UT Austin Texas Exes/ISSS), 694 (UC Davis Regents), 699 (UCLA Regents), 723 (Arizona Global Wildcat), 764 (Jefferson Scholarship). Besh yozuv import-shablon GPA/IELTS qiymatlari bilan saqlanib qolgan (3.6/6.5, 3.25/–, 3.6/7.5, 3.0/6.5, 3.0/7.0). Muhim topilma: **694 ning 3.25 va 723 ning 3.00 kirish minimumi emas — bu mukofotni davom ettirish (renewal) shartlari**; ular strukturlangan kirish minimumi sifatida abituriyentni chalg'itardi.
 
 ## Birinchi qo'ldan tekshirilgan uchlik (manba yaratilib, last_verified yangilandi)
 
