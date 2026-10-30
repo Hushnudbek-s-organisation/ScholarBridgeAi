@@ -143,7 +143,7 @@ npm run test:desktop-app  # end-to-end test of the boot path (see §8)
 
 ```
 resources/app/                    ← the app itself (main.mjs, preload, splash, Electron's deps)
-resources/engine.tar.gz           ← the compiled ScholarBridge server, as ONE archive (~33 MB)
+resources/engine.tar              ← the compiled ScholarBridge server, as ONE archive (~106 MB tar)
 resources/node/                   ← the official Node.js runtime the server runs on
 resources/schema/full_schema.sql  ← the schema a new install applies
 ```
@@ -158,7 +158,7 @@ reused afterwards. Two reasons:
   the app now writes the tree itself, into a temporary folder that is renamed
   into place only when complete, and an interrupted unpack repeats itself on
   the next launch instead of leaving a half-engine;
-* it is 33 MB instead of 103 MB of loose files, and the installer is smaller.
+* one file instead of ~3600 also lets the installer's own LZMA pass compress it, so the download got smaller rather than bigger.
 
 The engine runs on the **bundled Node.js**, not on Electron's built-in Node.
 Electron can execute a script "as node", but that Node has a different module

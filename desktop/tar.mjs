@@ -71,8 +71,13 @@ function header(relativePath, size, mode, typeflag, mtime) {
   return block;
 }
 
-/** Write `sourceDir` as a gzipped tar at `targetFile`. Returns the file size. */
-export function writeTarGz(sourceDir, targetFile) {
+/**
+ * Write `sourceDir` as a tar archive. `gzip` defaults to on for stand-alone
+ * use; the installer passes `{ gzip: false }`, because the platforms' own
+ * compressor (NSIS LZMA, dmg) packs a plain tar far better than an
+ * already-compressed one.
+ */
+export function writeTarGz(sourceDir, targetFile, { gzip = true } = {}) {
   const chunks = [];
   const mtime = Math.floor(Date.now() / 1000);
 
@@ -102,10 +107,10 @@ export function writeTarGz(sourceDir, targetFile) {
   visit(sourceDir, "");
   chunks.push(Buffer.alloc(BLOCK * 2, 0)); // end-of-archive marker
   const tar = Buffer.concat(chunks);
-  const gz = zlib.gzipSync(tar, { level: 9 });
+  const output = gzip ? zlib.gzipSync(tar, { level: 9 }) : tar;
   fs.mkdirSync(path.dirname(targetFile), { recursive: true });
-  fs.writeFileSync(targetFile, gz);
-  return gz.length;
+  fs.writeFileSync(targetFile, output);
+  return output.length;
 }
 
 function readString(block, offset, length) {
@@ -127,7 +132,10 @@ function readOctal(block, offset, length) {
  * write outside the app's own folder.
  */
 export function extractTarGz(archiveFile, targetDir) {
-  const tar = zlib.gunzipSync(fs.readFileSync(archiveFile));
+  const raw = fs.readFileSync(archiveFile);
+  // Accept both: a plain tar (what the installer ships, so the platform
+  // compressor does the work once) and a gzipped one.
+  const tar = raw.length > 2 && raw[0] === 0x1f && raw[1] === 0x8b ? zlib.gunzipSync(raw) : raw;
   const root = path.resolve(targetDir);
   fs.mkdirSync(root, { recursive: true });
 

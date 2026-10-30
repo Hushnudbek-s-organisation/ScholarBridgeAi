@@ -99,7 +99,7 @@ async function main() {
     }
     const builder = (await import("../desktop/electron-builder.mjs")).default;
     check("the installer bundles the engine archive and the schema",
-      builder.extraResources.some((r) => r.to === "engine.tar.gz") &&
+      builder.extraResources.some((r) => r.to === "engine.tar" || r.to === "engine.tar.gz") &&
         builder.extraResources.some((r) => r.to === "schema/full_schema.sql"));
     // One file, not ~3600: a per-file extraction can silently drop files on
     // Windows (that surfaced as MODULE_NOT_FOUND at engine start-up).

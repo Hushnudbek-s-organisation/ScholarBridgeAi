@@ -51,7 +51,7 @@ const config = {
     // on Windows (antivirus), which surfaced as MODULE_NOT_FOUND at engine
     // start-up. The app unpacks this itself, atomically (boot.mjs →
     // ensureEngine).
-    { from: "build-resources/engine.tar.gz", to: "engine.tar.gz" },
+    { from: "build-resources/engine.tar", to: "engine.tar" },
     // The official Node.js runtime the engine runs on (see
     // scripts/build-desktop.mjs → stageNodeRuntime). Optional: when the folder
     // is empty the app falls back to Electron's built-in Node.

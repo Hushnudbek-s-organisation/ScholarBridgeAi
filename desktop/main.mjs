@@ -26,7 +26,11 @@ const repoRoot = path.resolve(here, "..");
 // Packaged: the engine arrives as one archive and is unpacked into the data
 // folder on first launch (see boot.mjs → ensureEngine). Development: the build
 // output is used directly.
-const engineArchive = isPackaged ? path.join(process.resourcesPath, "engine.tar.gz") : "";
+const engineArchive = isPackaged
+  ? ["engine.tar", "engine.tar.gz"]
+      .map((name) => path.join(process.resourcesPath, name))
+      .find((file) => fs.existsSync(file)) || path.join(process.resourcesPath, "engine.tar")
+  : "";
 const serverDir = isPackaged ? "" : path.join(repoRoot, ".next", "standalone");
 const schemaPath = isPackaged
   ? path.join(process.resourcesPath, "schema", "full_schema.sql")

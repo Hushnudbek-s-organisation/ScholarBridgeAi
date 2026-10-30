@@ -33,7 +33,9 @@ if (!root) {
 
 const resources = path.resolve(root, "resources");
 const schemaPath = path.join(resources, "schema", "full_schema.sql");
-const engineArchive = path.join(resources, "engine.tar.gz");
+const engineArchive = ["engine.tar", "engine.tar.gz"]
+  .map((name) => path.join(resources, name))
+  .find((file) => fs.existsSync(file));
 const binary = process.platform === "win32" ? "node.exe" : "node";
 const bundledNode = path.join(resources, "node", binary);
 
@@ -41,8 +43,8 @@ if (!fs.existsSync(schemaPath)) {
   console.error(`✖ missing from the package: ${schemaPath}`);
   process.exit(1);
 }
-if (!fs.existsSync(engineArchive) && !fs.existsSync(path.join(resources, "server", "server.js"))) {
-  console.error("✖ the package carries no engine (neither engine.tar.gz nor server/)");
+if (!engineArchive && !fs.existsSync(path.join(resources, "server", "server.js"))) {
+  console.error("✖ the package carries no engine (neither engine.tar nor server/)");
   process.exit(1);
 }
 
