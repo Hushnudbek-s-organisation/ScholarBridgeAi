@@ -36,7 +36,9 @@
     "scholarshipPeriodVariable": "o‘zgaruvchan",
     "universitiesLoadError": "Universitetlar hozircha mavjud emas. Keyinroq qayta urinib ko‘ring.",
     "scholarshipsLoadError": "Stipendiyalar hozircha mavjud emas. Keyinroq qayta urinib ko‘ring.",
-    "independentGuide": "ScholarBridgeAI mustaqil ma’lumotnoma bo‘lib, hech bir universitet yoki stipendiya tashkilotiga aloqador emas. Ma’lumotlar ochiq manbalardan jamlangan, to‘liq bo‘lmasligi yoki eskirgan bo‘lishi mumkin. Ariza berishdan oldin talablar, xarajatlar va muddatlarni rasmiy manbalardan tasdiqlang."
+    "independentGuide": "ScholarBridgeAI mustaqil ma’lumotnoma bo‘lib, hech bir universitet yoki stipendiya tashkilotiga aloqador emas. Ma’lumotlar ochiq manbalardan jamlangan, to‘liq bo‘lmasligi yoki eskirgan bo‘lishi mumkin. Ariza berishdan oldin talablar, xarajatlar va muddatlarni rasmiy manbalardan tasdiqlang.",
+    "deadlinePassed": "Muddat o‘tdi",
+    "deadlinePassedHint": "Keyingi qabulni rasmiy manbadan tekshiring."
   },
   "pagination": {
     "aria": "Sahifalash",
@@ -6826,7 +6828,8 @@
     "allMajors": "Barcha yo'nalishlar",
     "allCountries": "Barcha davlatlar",
     "applicationFeeFree": "Bepul",
-    "applyOnOfficialPage": "Rasmiy sahifada topshirish"
+    "applyOnOfficialPage": "Rasmiy sahifada topshirish",
+    "deadlinePassedNote": "Bu grant uchun ariza muddati {date} kuni tugagan. Keyingi qabul shartlari rasmiy manbada e’lon qilinadi."
   },
   "adminChannel": {
     "title": "Telegram kanal",

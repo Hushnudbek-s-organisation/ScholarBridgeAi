@@ -36,7 +36,9 @@
     "scholarshipPeriodVariable": "variable",
     "universitiesLoadError": "Universities are temporarily unavailable. Please try again later.",
     "scholarshipsLoadError": "Scholarships are temporarily unavailable. Please try again later.",
-    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying."
+    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying.",
+    "deadlinePassed": "Deadline passed",
+    "deadlinePassedHint": "Check the official source for the next round."
   },
   "pagination": {
     "aria": "Pagination",
@@ -6826,7 +6828,8 @@
     "allMajors": "All fields",
     "allCountries": "All countries",
     "applicationFeeFree": "Free",
-    "applyOnOfficialPage": "Apply on the official page"
+    "applyOnOfficialPage": "Apply on the official page",
+    "deadlinePassedNote": "The application window for this award closed on {date}. The next round is announced on the official source."
   },
   "adminChannel": {
     "title": "Telegram channel",

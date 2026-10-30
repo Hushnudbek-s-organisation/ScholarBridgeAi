@@ -15,6 +15,7 @@ import { db } from "@/db";
 import { scholarships as scholarshipsTable } from "@/db/schema";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
+import { deadlineStateOf, orderForBrowsing, todayYmd, type DeadlineState } from "@/lib/catalogueOrder";
 import { localizeCountry, localizeCoverageType, localizeScholarshipProvider, localizeScholarshipTitle } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
@@ -46,6 +47,10 @@ interface ScholarshipRow {
   award_period: string | null;
   deadline: string | null;
   website_url: string | null;
+  /** The date the award closes, when the catalogue knows one. */
+  deadline_date?: string | null;
+  /** Verdict for today — a passed date is never shown as "open". */
+  state: DeadlineState;
 }
 
 // Next.js 15+: `searchParams` is async and must be awaited.
@@ -78,6 +83,8 @@ export default async function ScholarshipsPage({
   const { page: rawPage } = await searchParams;
   const parsed = Number.parseInt(Array.isArray(rawPage) ? rawPage[0] ?? "1" : rawPage ?? "1", 10);
   const requestedPage = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+  // One clock for the whole request: the order and the labels must agree.
+  const today = todayYmd();
 
   // Use the same active Drizzle/PostgreSQL catalogue as the API. Count and
   // listing share the active predicate, so pagination totals match visible rows.
@@ -86,7 +93,9 @@ export default async function ScholarshipsPage({
   try {
     const bundle = await getCachedScholarshipsBundle().catch(() => null);
     if (bundle && bundle.entries.length > 0) {
-      const sorted = [...bundle.entries].sort((a, b) => a.id - b.id);
+      // Browsing order, not import order: awards still open come first, soonest
+      // deadline first; closed ones are last. See `catalogueOrder.ts` for why.
+      const sorted = orderForBrowsing(bundle.entries, today);
       totalItems = sorted.length;
       const totalPagesForQuery = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
       if (requestedPage > totalPagesForQuery) {
@@ -103,6 +112,8 @@ export default async function ScholarshipsPage({
         award_period: scholarship.awardPeriod,
         deadline: scholarship.deadline,
         website_url: scholarship.websiteUrl,
+        deadline_date: scholarship.deadlineDate ? String(scholarship.deadlineDate).slice(0, 10) : null,
+        state: deadlineStateOf(scholarship, today),
       }));
     } else {
       const from = (requestedPage - 1) * ITEMS_PER_PAGE;
@@ -127,11 +138,19 @@ export default async function ScholarshipsPage({
             awardCurrency: scholarshipsTable.awardCurrency,
             awardPeriod: scholarshipsTable.awardPeriod,
             deadline: scholarshipsTable.deadline,
+            deadlineDate: scholarshipsTable.deadlineDate,
+            applicationStatus: scholarshipsTable.applicationStatus,
+            deadlineType: scholarshipsTable.deadlineType,
             websiteUrl: scholarshipsTable.websiteUrl,
           })
           .from(scholarshipsTable)
           .where(eq(scholarshipsTable.isActive, true))
-          .orderBy(asc(scholarshipsTable.id))
+          // Approximation of the browsing order for the cold-cache path: SQL
+          // cannot express "open first, then rolling, then undated, then
+          // closed" without the same today-dependence the helper encodes, so
+          // it pages by the date (nulls last) and the helper re-orders the
+          // page it gets. The bundle path above is the normal one.
+          .orderBy(sql`${scholarshipsTable.deadlineDate} asc nulls last`, asc(scholarshipsTable.id))
           .limit(ITEMS_PER_PAGE)
           .offset(from),
       ]);
@@ -141,16 +160,27 @@ export default async function ScholarshipsPage({
       if (requestedPage > totalPagesForQuery) {
         redirect(totalPagesForQuery > 1 ? `/scholarships?page=${totalPagesForQuery}` : "/scholarships");
       }
-      rows = data.map((scholarship) => ({
-        id: scholarship.id,
-        title: scholarship.title,
-        provider: scholarship.provider,
-        country: scholarship.country,
-        coverage_type: scholarship.coverageType,
-        amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
-        award_period: scholarship.awardPeriod,
-        deadline: scholarship.deadline,
-        website_url: scholarship.websiteUrl,
+      rows = orderForBrowsing(
+        data.map((scholarship) => ({
+          id: scholarship.id,
+          title: scholarship.title,
+          provider: scholarship.provider,
+          country: scholarship.country,
+          coverage_type: scholarship.coverageType,
+          amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
+          award_period: scholarship.awardPeriod,
+          deadline: scholarship.deadline,
+          website_url: scholarship.websiteUrl,
+          deadline_date: scholarship.deadlineDate ? String(scholarship.deadlineDate).slice(0, 10) : null,
+          deadlineDate: scholarship.deadlineDate,
+          applicationStatus: scholarship.applicationStatus,
+          deadlineType: scholarship.deadlineType,
+          state: "unknown" as DeadlineState,
+        })),
+        today
+      ).map((scholarship) => ({
+        ...scholarship,
+        state: deadlineStateOf(scholarship, today),
       }));
     }
   } catch (error) {
@@ -215,6 +245,14 @@ export default async function ScholarshipsPage({
                 <span className="inline-flex min-h-7 w-fit max-w-full items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200 ring-inset">
                   <span className="break-words">{localizeCoverageType(scholarship.coverage_type, locale) || copy.coverageNotSpecified}</span>
                 </span>
+                {/* A passed date is stated, not hidden: the award stays in the
+                    catalogue (its next round is usually the same page) but the
+                    card must not look like something to apply to today. */}
+                {scholarship.state === "passed" && (
+                  <span className="mt-2 inline-flex w-fit items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-300 ring-inset">
+                    {copy.deadlinePassed}
+                  </span>
+                )}
 
                 <h2 className="mt-2 break-words text-sm font-bold text-slate-900 sm:text-base">
                   {localizeScholarshipTitle(scholarship.title, locale)}
@@ -228,13 +266,16 @@ export default async function ScholarshipsPage({
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                     <span className="break-words">{localizeCountry(scholarship.country, locale)}</span>
                   </p>
-                  {scholarship.deadline && (
+                  {(scholarship.deadline_date || scholarship.deadline) && (
                     <p className="flex items-start gap-1.5">
                       <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                       <span className="break-words">
-                        {formatMessage(copy.deadline, { date: formatDate(scholarship.deadline, locale) })}
+                        {formatMessage(copy.deadline, { date: formatDate((scholarship.deadline_date ?? scholarship.deadline) as string, locale) })}
                       </span>
                     </p>
+                  )}
+                  {scholarship.state === "passed" && (
+                    <p className="text-[11px] leading-relaxed text-slate-500">{copy.deadlinePassedHint}</p>
                   )}
                   {/* A stored 0 means "the provider publishes no cash value" —
                       rendering "$0" would read as a real, zero-dollar award. */}

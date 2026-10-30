@@ -1342,6 +1342,73 @@ words is labelled too"* — **19/19** now, with `To'liq kontrakt`,
 `Kontraktsiz nemis davlat universiteti`, `Tibbiyot` and `Fizika (ENS)` asserted to
 stay *unlabelled*.
 
+## 11e. The catalogue leads with what a student can still apply to (2026-10-30)
+
+### What was wrong
+
+`/scholarships` — the public catalogue, the page a guest and a search engine
+see — paged in **insertion order**:
+
+```ts
+const sorted = [...bundle.entries].sort((a, b) => a.id - b.id);
+```
+
+That is a fact about the import, not about a student's choices. Page 1 showed
+whichever 24 rows were seeded first, and the cold-cache fallback ordered by
+`asc(id)` too. Nothing anywhere looked at the date, so:
+
+* an award that closed last week and one that closes in three days were equally
+  likely to be on page 1;
+* `application_status` is a value the owner set when the row was last touched.
+  When the date went by, the card and the detail page kept saying **Ochiq** —
+  the site promising an open window that had shut.
+
+### The rule now
+
+One pure module, `src/lib/catalogueOrder.ts`, with no database access and no
+clock of its own (`today` is passed in as `YYYY-MM-DD`):
+
+| state | when | where it sorts |
+|---|---|---|
+| `open` / `upcoming` | a date ≥ today | first, **soonest deadline first** |
+| `rolling` | provider accepts continuously | after the dated open rows |
+| `unknown` | the catalogue has no date | after rolling |
+| `passed` | a date < today | **last, most recently closed first** |
+
+A passed date beats a stored `open` — the database is a note the owner made,
+the date is the promise the provider made. A stored `upcoming` keeps its word
+until the date arrives, and `rolling` is never "passed". Ties break on `id`, so
+the order is identical on every request and pagination cannot shuffle rows
+between pages. The input array is never mutated.
+
+What the student sees:
+
+* **Card** — a grey *Muddat o‘tdi* chip plus *Keyingi qabulni rasmiy manbadan
+  tekshiring.* The award stays in the catalogue (its next round is usually the
+  same page) but the card no longer looks like something to apply to today.
+* **Detail page** — the status label reads `Yopilgan` when the date has passed,
+  whatever the stored status says, and an amber note states the closing date
+  (`t.deadlinePassedNote`), in all three languages.
+
+### Verified
+
+* `npm run test:catalogue-order` — **12/12** (new): the verdict table above, the
+  ordering, stability under a shuffled input, the real 45-row slice from
+  `scripts/fixtures/catalogue-slice.json` (every row kept, closed rows last,
+  open rows in ascending deadline order), and a source check that the page
+  *calls* the helper and no longer sorts by `id`.
+* `test:render` 354/0 · `test:catalogue-language` 19/0 · `test:localization`
+  16/0 · channel 196/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+  `next build` OK.
+
+### Stated limitation
+
+The cold-cache path (no bundle yet) pages by `deadline_date asc nulls last` in
+SQL and re-orders the page it receives. "Open → rolling → undated → closed"
+depends on today, which SQL does not have without a parameter; the bundle path
+is the normal one and is exact. The gate asserts the fallback no longer pages
+by `id`.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

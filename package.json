@@ -29,6 +29,7 @@
     "test:security": "tsx scripts/check-security.ts",
     "test:localization": "tsx scripts/check-localization-perf.ts",
     "test:catalogue-language": "tsx scripts/check-catalogue-language.ts",
+    "test:catalogue-order": "tsx scripts/check-catalogue-order.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",
     "check:catalog-gaps": "tsx scripts/check-catalog-gaps.ts",
     "test:match": "tsx scripts/check-match.ts",

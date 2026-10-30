@@ -40,6 +40,7 @@ import {
 } from "@/lib/catalogLocalizer";
 import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 import { formatMoney } from "@/lib/format";
+import { deadlineStateOf, todayYmd } from "@/lib/catalogueOrder";
 
 async function getPageLocale(): Promise<Locale> {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -187,8 +188,25 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
         ? formatMoney(s.amountUsdValue, "USD")
         : null;
 
+  // The date decides, not the stored status: `application_status` is a note the
+  // owner made when the row was last touched, and a window that closed last week
+  // must not still say "Ochiq". A passed deadline is stated with its date.
+  const deadlineState = deadlineStateOf(
+    {
+      id: s.id,
+      deadlineDate: s.deadlineDate,
+      deadline: s.deadline,
+      applicationStatus: s.applicationStatus,
+      deadlineType: s.deadlineType,
+    },
+    todayYmd()
+  );
+  const deadlinePassed = deadlineState === "passed";
+
   const statusLabel =
-    s.applicationStatus === "open"
+    deadlinePassed
+      ? t.statusClosed
+      : s.applicationStatus === "open"
       ? t.statusOpen
       : s.applicationStatus === "upcoming"
         ? t.statusUpcoming
@@ -281,6 +299,15 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 <span className="break-words">{country}</span>
               </p>
             </header>
+
+            {deadlinePassed && (
+              <div
+                role="status"
+                className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+              >
+                {formatMessage(t.deadlinePassedNote, { date: deadlineLabel ?? t.notPublished })}
+              </div>
+            )}
 
             {description.text && (
               <Section id="about" title={t.about} icon={<FileText className="h-4 w-4" aria-hidden />}>
