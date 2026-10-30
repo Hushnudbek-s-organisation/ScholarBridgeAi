@@ -5,6 +5,8 @@
  *   node scripts/build-desktop.mjs --no-package # only prepare .next/standalone
  *   node scripts/build-desktop.mjs --skip-build # reuse the existing build
  *   node scripts/build-desktop.mjs --verify-only # check an existing package's layout
+ *   node scripts/build-desktop.mjs --skip-build --no-package --node-runtime-only
+ *                                               # only stage the bundled Node.js
  *
  * What it does:
  *   1. `next build` with NEXT_OUTPUT_STANDALONE=1 (self-contained server), so
@@ -23,6 +25,7 @@
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,8 +120,36 @@ function verifyPackagedLayout() {
     if (fs.existsSync(path.join(appDir, "index.js"))) {
       problems.push(`${label}/app/index.js exists — the compiled server was copied into resources/app`);
     }
-    if (!fs.existsSync(path.join(serverDir, "server.js"))) {
-      problems.push(`${label}/server/server.js is missing — the app would not find its engine`);
+
+    // Follow the app's own imports: a module that is not packaged makes the
+    // app crash at launch with ERR_MODULE_NOT_FOUND. This is checked on the
+    // source files too, so a missing entry in `files` fails the build before
+    // anything is published.
+    const seen = new Set();
+    const checkImports = (file) => {
+      if (seen.has(file) || !fs.existsSync(file)) return;
+      seen.add(file);
+      if (!/\.(mjs|cjs|js)$/.test(file)) return;
+      const source = fs.readFileSync(file, "utf8");
+      for (const match of source.matchAll(/(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)) {
+        const target = path.resolve(path.dirname(file), match[1]);
+        if (!fs.existsSync(target)) {
+          problems.push(`${path.basename(file)} imports ${match[1]}, which is not packaged`);
+        } else {
+          checkImports(target);
+        }
+      }
+    };
+    checkImports(path.join(appDir, "main.mjs"));
+    for (const entry of fs.readdirSync(appDir)) {
+      if (/\.(mjs|cjs)$/.test(entry)) checkImports(path.join(appDir, entry));
+    }
+    const archive = [path.join(resources, "engine.tar"), path.join(resources, "engine.tar.gz")].find((file) =>
+      fs.existsSync(file)
+    );
+    const looseServer = path.join(serverDir, "server.js");
+    if (!archive && !fs.existsSync(looseServer)) {
+      problems.push(`${label}/engine.tar is missing — the app would have no engine to run`);
     }
     if (!fs.existsSync(path.join(resources, "schema", "full_schema.sql"))) {
       problems.push(`${label}/schema/full_schema.sql is missing — a new install could not create its database`);
@@ -238,9 +269,119 @@ say(
     (replacedLinks ? ` (${replacedLinks} link(s) materialised${droppedLinks ? `, ${droppedLinks} dangling dropped` : ""})` : "")
 );
 
+// Pack the staged server into the single archive that ships.
+const engineArchive = path.join(desktopDir, "build-resources", "engine.tar");
+{
+  const { writeTarGz, directorySize } = await import("../desktop/tar.mjs");
+  fs.rmSync(engineArchive, { force: true });
+  // Plain tar: the installer's own LZMA pass compresses it better than gzip,
+  // and it comes back smaller than an already-compressed archive.
+  const bytes = writeTarGz(stagingDir, engineArchive, { gzip: false });
+  say(
+    `Engine archive: ${Math.round(bytes / 1024 / 1024)} MB tar ` +
+      `(from ${Math.round(directorySize(stagingDir) / 1024 / 1024)} MB of files; the installer compresses it)`
+  );
+  // The loose copy is not shipped; removing it keeps the build folder small.
+  fs.rmSync(stagingDir, { recursive: true, force: true });
+}
+
+await stageNodeRuntime();
+
+if (args.has("--node-runtime-only")) {
+  say("Done (--node-runtime-only).");
+  process.exit(0);
+}
+
 if (packageOnly) {
   say("Skipping the installer (--no-package).");
   process.exit(0);
+}
+
+/**
+ * Bundle an official Node.js runtime with the app.
+ *
+ * The app is an Electron program, and Electron can execute a script "as node"
+ * (ELECTRON_RUN_AS_NODE). That path proved fragile on Windows — the packaged
+ * app exited with code 1 while the very same server bundle ran perfectly under
+ * real Node — so the installer ships the official runtime and starts the
+ * engine with it. The Electron fallback stays for builds where the download
+ * was skipped.
+ */
+async function stageNodeRuntime() {
+  const targetDir = path.join(desktopDir, "build-resources", "node");
+  fs.mkdirSync(targetDir, { recursive: true }); // electron-builder needs the folder to exist
+
+  if (args.has("--without-bundled-node") || process.env.SKIP_BUNDLED_NODE === "1") {
+    say("Skipping the bundled Node runtime (--without-bundled-node).");
+    return;
+  }
+
+  const version = process.version.replace(/^v/, "");
+  const platforms = {
+    win32: { os: "win", ext: "zip" },
+    darwin: { os: "darwin", ext: "tar.gz" },
+    linux: { os: "linux", ext: "tar.gz" },
+  };
+  const platform = platforms[process.platform];
+  if (!platform) {
+    say(`No Node runtime is published for ${process.platform}; the app will use Electron's.`);
+    return;
+  }
+  const arch = process.arch === "arm64" ? "arm64" : "x64";
+  const folder = `node-v${version}-${platform.os}-${arch}`;
+  // Overridable so the download/extract path is testable without the public
+  // network (and so a mirror can be used where nodejs.org is blocked).
+  const base = (process.env.SCHOLARBRIDGE_NODE_DIST_URL || "https://nodejs.org/dist").replace(/\/$/, "") + `/v${version}`;
+  const binaryName = process.platform === "win32" ? "node.exe" : "node";
+  const destination = path.join(targetDir, binaryName);
+  if (fs.existsSync(destination)) {
+    say("Bundled Node runtime already staged.");
+    return;
+  }
+
+  const archive = path.join(os.tmpdir(), `${folder}.${platform.ext}`);
+  const extractDir = path.join(os.tmpdir(), `scholarbridge-node-${Date.now()}`);
+  say(`Downloading the Node.js runtime for the app (${version}, ${platform.os}-${arch})…`);
+  try {
+    fs.mkdirSync(extractDir, { recursive: true });
+    const response = await fetch(`${base}/${folder}.${platform.ext}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status} from ${base}`);
+    fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
+
+    // `tar` (bsdtar on Windows and macOS) reads both tar.gz and zip.
+    const unpack = spawnSync("tar", ["-xf", archive, "-C", extractDir], { stdio: "inherit" });
+    if (unpack.status !== 0) {
+      if (process.platform !== "win32") throw new Error("tar could not unpack the runtime");
+      const ps = spawnSync(
+        "powershell",
+        ["-NoProfile", "-Command", `Expand-Archive -LiteralPath '${archive}' -DestinationPath '${extractDir}' -Force`],
+        { stdio: "inherit" }
+      );
+      if (ps.status !== 0) throw new Error("could not unpack the runtime");
+    }
+
+    const released = process.platform === "win32" ? binaryName : path.join("bin", binaryName);
+    const source = path.join(extractDir, folder, released);
+    if (!fs.existsSync(source)) throw new Error("the runtime binary is missing from the archive");
+    fs.copyFileSync(source, destination);
+    if (process.platform !== "win32") fs.chmodSync(destination, 0o755);
+
+    const check = spawnSync(destination, ["--version"], { encoding: "utf8" });
+    if (check.status !== 0 || !String(check.stdout).startsWith("v")) {
+      throw new Error(`the downloaded runtime did not run (${String(check.stdout).trim() || check.status})`);
+    }
+    say(
+      `Bundled Node runtime: ${String(check.stdout).trim()} ` +
+        `(${Math.round(fs.statSync(destination).size / 1024 / 1024)} MB)`
+    );
+  } catch (error) {
+    // Not fatal: the app falls back to Electron's own Node.
+    console.warn(`\n⚠ Could not bundle a Node runtime (${error.message}).`);
+    console.warn("  The app will start its engine with Electron's built-in Node instead.");
+  } finally {
+    fs.rmSync(archive, { force: true });
+    fs.rmSync(extractDir, { recursive: true, force: true });
+  }
 }
 
 const platformFlag =

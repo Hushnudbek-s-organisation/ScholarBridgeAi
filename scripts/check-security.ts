@@ -1263,7 +1263,7 @@ async function main() {
     assert.doesNotMatch(src, /student@scholarbridge\.edu/, "no shared default sign-up address");
     assert.match(src, /invalid_email/, "a missing/invalid email is a 400");
     assert.match(src, /isUniqueViolation\(err\)/, "a racing duplicate resolves to 409, not 500");
-    assert.match(src, /passwordPolicyError\(plainPassword\)/, "the password policy is enforced server-side");
+    assert.match(src, /passwordPolicyProblem\(plainPassword\)/, "the password policy is enforced server-side");
   });
 
   check("community and beacon writes parse a size-capped body", () => {

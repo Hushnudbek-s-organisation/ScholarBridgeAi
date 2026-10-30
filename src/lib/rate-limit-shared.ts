@@ -95,6 +95,24 @@ export async function checkSharedRateLimit(
 }
 
 /**
+ * Forget the hits recorded for one key — used after a SUCCESSFUL sign-in.
+ *
+ * The sign-in budget is recorded on every attempt, successful ones included,
+ * and a desktop install puts every request behind 127.0.0.1: a student who
+ * mistyped their password a few times and then got it right would carry the
+ * failures for the rest of the 15-minute window, and eight sign-ins in a day
+ * (sign out / sign in again) would trip the limit for a perfectly valid
+ * password. Success proves the password, so the counter starts over.
+ */
+export async function clearSharedRateLimit(key: string): Promise<void> {
+  try {
+    await db.delete(rateLimitHits).where(eq(rateLimitHits.key, key));
+  } catch {
+    // Losing this is harmless — the window expires on its own.
+  }
+}
+
+/**
  * Clear the shared counters. INTENDED FOR TESTS ONLY: concurrency checks that
  * assert "exactly one of N parallel requests wins" need a clean budget, and
  * the in-process `resetRateLimits()` alone no longer does that once the

@@ -63,6 +63,21 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # The tag IS the version the app reports (Help/About, the log line in the
+      # data folder, the title of the error dialog). When the two drift, a
+      # tester cannot tell which build they are looking at — refuse to ship.
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          app_version="$(node -p "require('./desktop/package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "tag=${tag_version} desktop/package.json=${app_version}"
+          if [ "$app_version" != "$tag_version" ]; then
+            echo "::error title=Version mismatch::The tag v${tag_version} does not match desktop/package.json (${app_version}). Bump the version before tagging."
+            exit 1
+          fi
+
       - name: Install app dependencies
         run: npm ci --no-audit --no-fund
 
@@ -88,6 +103,30 @@ jobs:
             grep -v '^[[:space:]]*$' build.log | tail -n 15 | sed 's/^/::error title=Desktop build::/' || true
           fi
           exit "$status"
+
+      # Boot the packaged engine on the OS that built it — the runtime and the
+      # server bundle from resources/, exactly as the installed app does. A
+      # Windows-only engine failure once reached a user because nothing ran the
+      # package before it was published.
+      - name: Smoke-test the packaged engine
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) TARGET="desktop/release/win-unpacked" ;;
+            macOS)   TARGET="desktop/release/mac-arm64/ScholarBridge.app/Contents" ;;
+            *)       TARGET="desktop/release/linux-unpacked" ;;
+          esac
+          if [ ! -d "$TARGET/resources" ]; then
+            TARGET="$(ls -d desktop/release/*/Contents 2>/dev/null | head -1)"
+          fi
+          echo "checking $TARGET"
+          # Phase 2 boots the private PostgreSQL as well; on Windows only the
+          # spawn/HTTP phase runs (that is the failure mode this guards).
+          if [ "${{ runner.os }}" = "Windows" ]; then export SMOKE_WITH_DATABASE=0; else export SMOKE_WITH_DATABASE=1; fi
+          node scripts/check-desktop-engine.mjs "$TARGET" || {
+            echo "::error title=Packaged engine does not start::The packaged server failed to boot on this OS."
+            exit 1
+          }
 
       - name: Upload the installer
         uses: actions/upload-artifact@v4

@@ -12,7 +12,8 @@
  * Nothing here talks to Electron APIs, so `scripts/check-desktop-app.mjs`
  * exercises the real boot path end to end.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { extractTarGz } from "./tar.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
@@ -58,6 +59,116 @@ export function ensureSessionSecret(dataDir) {
 }
 
 /**
+ * Password of the private database's `scholarbridge` role.
+ *
+ * It MUST be stable: PostgreSQL stores the password hash when the cluster is
+ * initialised, so a freshly generated password on every launch fails with
+ * `password authentication failed for user "scholarbridge"` (28P01) from the
+ * second start onwards. It is generated once, kept next to the cluster
+ * (0600) and reused.
+ */
+export function ensureDbPassword(dataDir) {
+  const file = path.join(dataDir, "db-password");
+  if (fs.existsSync(file)) {
+    const existing = fs.readFileSync(file, "utf8").trim();
+    if (existing.length >= 16) return existing;
+  }
+  fs.mkdirSync(dataDir, { recursive: true });
+  const password = randomBytes(24).toString("hex");
+  fs.writeFileSync(file, password, { mode: 0o600 });
+  return password;
+}
+
+/**
+ * Reset the password of an existing cluster whose password was lost.
+ *
+ * This is the repair path for installs created before the password was
+ * persisted (their cluster holds a hash of a password nobody kept): the
+ * cluster is stopped, `pg_hba.conf` is replaced for one boot by a loopback-only
+ * `trust` policy, the password is reset with `ALTER ROLE`, and the original
+ * authentication rules are restored before the app continues. No data is
+ * touched, so an existing install is fixed instead of having to be deleted.
+ */
+async function resetDatabasePassword(instance, dataDir, databaseUrl, log) {
+  const hba = path.join(dataDir, "postgres", "pg_hba.conf");
+  const backup = `${hba}.scholarbridge-backup`;
+  if (!fs.existsSync(hba)) throw new Error("pg_hba.conf is missing; cannot repair the database password.");
+
+  log("[db] the cluster's password is not the one on disk — resetting it (data is kept)");
+  await instance.stop();
+  fs.copyFileSync(hba, backup);
+  try {
+    // Only loopback may connect, and only while the server has no known
+    // password: this window exists for milliseconds and the port stays on
+    // 127.0.0.1.
+    fs.writeFileSync(
+      hba,
+      ["local all all trust", "host all all 127.0.0.1/32 trust", "host all all ::1/128 trust", ""].join("\n")
+    );
+    await instance.start();
+    const { Client } = await import("pg");
+    const url = new URL(databaseUrl);
+    const password = decodeURIComponent(url.password);
+    const client = new Client({
+      host: "127.0.0.1",
+      port: Number(url.port),
+      user: decodeURIComponent(url.username),
+      database: "postgres",
+    });
+    await client.connect();
+    try {
+      await client.query(`ALTER ROLE "${url.username}" WITH PASSWORD '${password.replace(/'/g, "''")}'`);
+    } finally {
+      await client.end().catch(() => {});
+    }
+    log("[db] password reset");
+  } finally {
+    await instance.stop();
+    fs.copyFileSync(backup, hba);
+    fs.rmSync(backup, { force: true });
+    await instance.start();
+  }
+}
+
+/** `server_encoding` of the cluster behind `databaseUrl` (e.g. UTF8, WIN1251). */
+async function serverEncoding(databaseUrl) {
+  const { Client } = await import("pg");
+  const client = new Client({ connectionString: databaseUrl.replace(/\/[^/]*$/, "/postgres") });
+  await client.connect();
+  try {
+    const { rows } = await client.query("show server_encoding");
+    return String(rows[0].server_encoding || "");
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+/** Does the app's own database exist and already hold tables? */
+async function appDatabaseHasTables(databaseUrl) {
+  const { Client } = await import("pg");
+  const client = new Client({ connectionString: databaseUrl });
+  try {
+    await client.connect();
+    const { rows } = await client.query(
+      "select count(*)::int as n from information_schema.tables where table_schema = 'public'"
+    );
+    return rows[0].n > 0;
+  } catch {
+    // 3D000: the database does not exist — i.e. nothing has been created yet.
+    return false;
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+/** True when PostgreSQL rejected the credentials (SQLSTATE 28P01). */
+function isAuthFailure(error) {
+  const code = error && typeof error === "object" ? error.code : undefined;
+  if (code === "28P01") return true;
+  return /password authentication failed|28P01/i.test(String(error && error.message ? error.message : error));
+}
+
+/**
  * Apply `full_schema.sql` to a fresh database (and re-apply it when the file
  * changes, e.g. after an app update). The script is written to be idempotent —
  * it creates what is missing and never drops data — so a re-run is safe.
@@ -90,6 +201,73 @@ export async function applySchema(connectionString, schemaPath, dataDir, log = (
   } finally {
     await client.end().catch(() => {});
   }
+}
+
+/**
+ * Unpack the bundled engine archive into the app's data folder.
+ *
+ * The installer carries the compiled server as ONE file (`engine.tar.gz`)
+ * rather than ~3600 loose files: a per-file extraction can silently drop
+ * files on Windows (antivirus quarantine, interrupted write), which reached a
+ * user as `MODULE_NOT_FOUND` at engine start-up while the same package booted
+ * perfectly in CI. Writing the tree ourselves is atomic — it goes to a
+ * temporary folder and is renamed into place only when complete — and the
+ * `.version` marker makes an interrupted or partial unpack simply redo itself
+ * on the next launch.
+ *
+ * Returns the folder that contains `server.js`.
+ */
+export async function ensureEngine({ archive, dataDir, log = () => {} }) {
+  if (!archive || !fs.existsSync(archive)) return null;
+  const stat = fs.statSync(archive);
+  const version = `${stat.size}-${Math.round(stat.mtimeMs)}`;
+  const engineDir = path.join(dataDir, "engine");
+  const marker = path.join(engineDir, ".version");
+  const installed = fs.existsSync(marker) ? fs.readFileSync(marker, "utf8").trim() : "";
+
+  if (installed === version && fs.existsSync(path.join(engineDir, "server.js"))) {
+    return engineDir;
+  }
+
+  const staging = path.join(dataDir, "engine.new");
+  fs.rmSync(staging, { recursive: true, force: true });
+  const started = Date.now();
+  log("[engine] unpacking the app engine (done once per version)…");
+  const files = extractTarGz(archive, staging);
+  if (!fs.existsSync(path.join(staging, "server.js"))) {
+    throw new Error("The bundled engine archive is incomplete (server.js is missing).");
+  }
+  fs.writeFileSync(path.join(staging, ".version"), version);
+  fs.rmSync(engineDir, { recursive: true, force: true });
+  fs.renameSync(staging, engineDir);
+  log(`[engine] ${files} files unpacked in ${Date.now() - started} ms → ${engineDir}`);
+  return engineDir;
+}
+
+/**
+ * The runtime the engine runs on.
+ *
+ * Preferred: the official Node.js shipped inside the app (`resources/node`).
+ * Fallback: Electron itself in "run as node" mode. The fallback is what older
+ * builds used exclusively, and on Windows the child exited immediately with
+ * code 1, which surfaced to the student as "the server stopped while starting".
+ */
+export function resolveRuntime(serverDir) {
+  const binary = process.platform === "win32" ? "node.exe" : "node";
+  const packaged = path.resolve(serverDir, "..", "node", binary);
+  if (fs.existsSync(packaged)) {
+    const check = spawnSync(packaged, ["--version"], { encoding: "utf8", timeout: 15_000 });
+    const version = String(check.stdout || "").trim();
+    if (check.status === 0 && version.startsWith("v")) {
+      return { command: packaged, env: {}, label: `bundled Node ${version}` };
+    }
+  }
+  return {
+    command: process.execPath,
+    // Electron only behaves as Node when this is set.
+    env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+    label: process.versions.electron ? `Electron ${process.versions.electron} (as node)` : `Node ${process.version}`,
+  };
 }
 
 /** Local IPv4 addresses a phone on the same Wi-Fi could use. */
@@ -131,7 +309,8 @@ function waitForExit(child, ms) {
  */
 export async function startLocalServer(options) {
   const {
-    appDir,
+    appDir: appDirInput,
+    engineArchive,
     dataDir,
     schemaPath,
     host = "127.0.0.1",
@@ -145,12 +324,23 @@ export async function startLocalServer(options) {
     warmUp = true,
   } = options;
 
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  // Packaged builds ship `engine.tar.gz`; unpack it into the data folder and
+  // run from there. A loose folder (development, or an older package) is used
+  // as-is.
+  const unpacked = await ensureEngine({ archive: engineArchive, dataDir, log });
+  // Absolute paths: the server is spawned with this folder as its cwd, so a
+  // relative path would resolve twice (…/.next/standalone/.next/standalone).
+  const appDir = path.resolve(unpacked || appDirInput);
+  if (!appDirInput && !unpacked) {
+    throw new Error("Neither an engine archive nor an engine folder was provided.");
+  }
   if (!fs.existsSync(path.join(appDir, "server.js"))) {
     throw new Error(
       `The bundled server is missing (${appDir}). Build it first: npm run desktop:prepare`
     );
   }
-  fs.mkdirSync(dataDir, { recursive: true });
 
   let pg;
   let child;
@@ -174,32 +364,88 @@ export async function startLocalServer(options) {
     log("[db] starting private PostgreSQL…");
     const { default: EmbeddedPostgres } = await import("embedded-postgres");
     const chosenDbPort = await findFreePort(dbPort, 25);
-    const dbPassword = randomBytes(16).toString("hex");
+    const dbPassword = ensureDbPassword(dataDir);
 
-    pg = new EmbeddedPostgres({
-      databaseDir: path.join(dataDir, "postgres"),
-      user: "scholarbridge",
-      password: dbPassword,
-      port: chosenDbPort,
-      persistent: true,
-      // Loopback only: the database is never exposed to the local network,
-      // even when the web server is shared with a phone.
-      postgresFlags: ["-c", "listen_addresses=127.0.0.1"],
-      onLog: (message) => log(`[db] ${message}`),
-      onError: (message) => log(`[db] ${message instanceof Error ? message.message : message}`),
-    });
-    if (!fs.existsSync(path.join(dataDir, "postgres", "PG_VERSION"))) {
+    // `--encoding=UTF8` is not optional: without it initdb picks the encoding
+    // from the locale, and on Windows that follows the OS code page — a Russian
+    // install produced a WIN1251 cluster, where the catalogue's emoji and part
+    // of the UZB/RU text cannot be stored at all:
+    //   character with byte sequence 0xf0 0x9f 0x8c 0x90 … has no equivalent
+    //   in encoding "WIN1251"
+    // `--locale=C` keeps that choice independent of the user's regional
+    // settings (the hosted deployment runs en_US.UTF-8; ordering here is done
+    // in application code, not by the collation).
+    const clusterDir = path.join(dataDir, "postgres");
+    const createCluster = () =>
+      new EmbeddedPostgres({
+        databaseDir: clusterDir,
+        user: "scholarbridge",
+        password: dbPassword,
+        port: chosenDbPort,
+        persistent: true,
+        // Loopback only: the database is never exposed to the local network,
+        // even when the web server is shared with a phone.
+        postgresFlags: ["-c", "listen_addresses=127.0.0.1"],
+        initdbFlags: ["--encoding=UTF8", "--locale=C"],
+        onLog: (message) => log(`[db] ${message}`),
+        onError: (message) => log(`[db] ${message instanceof Error ? message.message : message}`),
+      });
+
+    pg = createCluster();
+    if (!fs.existsSync(path.join(clusterDir, "PG_VERSION"))) {
       log("[db] initialising the data folder (first run only)…");
       await pg.initialise();
     }
     await pg.start();
     log(`[db] listening on 127.0.0.1:${chosenDbPort}`);
 
+    const dbUrl = `postgresql://scholarbridge:${dbPassword}@127.0.0.1:${chosenDbPort}/scholarbridge`;
+
+    // Prove the stored password is the one this cluster knows. Installs made
+    // before the password was persisted hold a hash of a password that was
+    // never kept, and every launch after the first used to die here.
+    const probe = async () => {
+      const { Client } = await import("pg");
+      const client = new Client({ connectionString: dbUrl.replace(/\/[^/]*$/, "/postgres") });
+      await client.connect();
+      await client.end().catch(() => {});
+    };
+    try {
+      await probe();
+    } catch (error) {
+      if (!isAuthFailure(error)) throw error;
+      await resetDatabasePassword(pg, dataDir, dbUrl, log);
+      await probe();
+    }
+
+    // Clusters created by an earlier build on Windows may not be UTF-8. They
+    // cannot hold the schema at all, so they are empty by definition: rebuild
+    // rather than leave the user with an install that never starts.
+    const encoding = await serverEncoding(dbUrl);
+    if (encoding.toUpperCase() !== "UTF8") {
+      if (await appDatabaseHasTables(dbUrl)) {
+        throw new Error(
+          `The private database was created with the "${encoding}" encoding, which cannot store ` +
+            "the catalogue. Move the folder\n" +
+            path.join(dataDir, "postgres") +
+            "\nelsewhere and start ScholarBridge again — the app then creates a correct one."
+        );
+      }
+      log(`[db] the existing cluster uses ${encoding}; rebuilding it as UTF-8 (it is still empty)`);
+      await pg.stop();
+      const stale = `${clusterDir}-${encoding.toLowerCase()}-${Date.now()}`;
+      fs.renameSync(clusterDir, stale);
+      fs.rmSync(stale, { recursive: true, force: true });
+      fs.rmSync(path.join(dataDir, "schema-hash.txt"), { force: true });
+      pg = createCluster();
+      await pg.initialise();
+      await pg.start();
+      log("[db] recreated as UTF-8");
+    }
+
     await pg.createDatabase("scholarbridge").catch(() => {
       /* already exists — the normal case on every run after the first */
     });
-
-    const dbUrl = `postgresql://scholarbridge:${dbPassword}@127.0.0.1:${chosenDbPort}/scholarbridge`;
 
     onStatus("schema");
     await applySchema(dbUrl, schemaPath, dataDir, log);
@@ -210,13 +456,14 @@ export async function startLocalServer(options) {
     const appUrl = `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${serverPort}`;
     log(`[server] starting on ${host}:${serverPort}`);
 
-    child = spawn(process.execPath, [path.join(appDir, "server.js")], {
+    const runtime = resolveRuntime(appDir);
+    log(`[server] runtime: ${runtime.label}`);
+
+    child = spawn(runtime.command, [path.join(appDir, "server.js")], {
       cwd: appDir,
       env: {
         ...process.env,
-        // Electron re-executed as Node, so the app does not need a Node.js
-        // installation on the machine (ignored when running under plain Node).
-        ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+        ...runtime.env,
         NODE_ENV: "production",
         NEXT_TELEMETRY_DISABLED: "1",
         PORT: String(serverPort),
@@ -237,6 +484,13 @@ export async function startLocalServer(options) {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    // Keep the engine's own output: when it dies, these lines are the only
+    // useful explanation, and the student can copy them from the dialog.
+    const engineLog = [];
+    const remember = (line) => {
+      engineLog.push(line);
+      if (engineLog.length > 40) engineLog.shift();
+    };
     const pipe = (stream, tag) => {
       let buffer = "";
       stream.setEncoding("utf8");
@@ -244,7 +498,11 @@ export async function startLocalServer(options) {
         buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) if (line.trim()) log(`[${tag}] ${line}`);
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          remember(line);
+          log(`[${tag}] ${line}`);
+        }
       });
     };
     pipe(child.stdout, "server");
@@ -261,9 +519,14 @@ export async function startLocalServer(options) {
     let healthy = false;
     while (Date.now() < deadline) {
       if (exitInfo) {
-        throw new Error(
-          `The ScholarBridge server stopped while starting (code ${exitInfo.code}). Open the log for details.`
+        const tail = engineLog.slice(-12).join("\n");
+        const error = new Error(
+          `The ScholarBridge engine stopped while starting (code ${exitInfo.code}).` +
+            (tail ? `\n\n${tail}` : "")
         );
+        error.engineOutput = tail;
+        error.logFile = path.join(dataDir, "scholarbridge.log");
+        throw error;
       }
       try {
         const res = await fetch(`${appUrl}/api/health`, { signal: AbortSignal.timeout(3_000) });
@@ -277,7 +540,13 @@ export async function startLocalServer(options) {
       await new Promise((resolve) => setTimeout(resolve, 750));
     }
     if (!healthy) {
-      throw new Error("The ScholarBridge server did not answer in time. Open the log for details.");
+      const tail = engineLog.slice(-12).join("\n");
+      const error = new Error(
+        "The ScholarBridge engine did not answer in time." + (tail ? `\n\n${tail}` : "")
+      );
+      error.engineOutput = tail;
+      error.logFile = path.join(dataDir, "scholarbridge.log");
+      throw error;
     }
 
     // First run only: the empty database is filled by the catalogue routes

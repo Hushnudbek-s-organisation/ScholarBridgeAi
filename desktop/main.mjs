@@ -23,9 +23,15 @@ const isPackaged = app.isPackaged;
 const repoRoot = path.resolve(here, "..");
 
 /** The compiled server: inside the installer, or the repo build in dev. */
-const serverDir = isPackaged
-  ? path.join(process.resourcesPath, "server")
-  : path.join(repoRoot, ".next", "standalone");
+// Packaged: the engine arrives as one archive and is unpacked into the data
+// folder on first launch (see boot.mjs → ensureEngine). Development: the build
+// output is used directly.
+const engineArchive = isPackaged
+  ? ["engine.tar", "engine.tar.gz"]
+      .map((name) => path.join(process.resourcesPath, name))
+      .find((file) => fs.existsSync(file)) || path.join(process.resourcesPath, "engine.tar")
+  : "";
+const serverDir = isPackaged ? "" : path.join(repoRoot, ".next", "standalone");
 const schemaPath = isPackaged
   ? path.join(process.resourcesPath, "schema", "full_schema.sql")
   : path.join(repoRoot, "supabase", "full_schema.sql");
@@ -179,6 +185,7 @@ async function boot() {
   const allowLan = Boolean(config.allowLan);
   server = await startLocalServer({
     appDir: serverDir,
+    engineArchive,
     dataDir,
     schemaPath,
     host: allowLan ? "0.0.0.0" : "127.0.0.1",
@@ -354,22 +361,54 @@ function reportBootError(err) {
   log(`[fatal] ${message}`);
   log(err instanceof Error && err.stack ? err.stack : "");
   setSplash("error", `${message}\n\nDetails are in:\n${logFile}`);
+
   const hint =
     process.platform === "linux" && /root|initdb|permission/i.test(message)
       ? "\n\nIf you are running as root, PostgreSQL refuses to start — run the app as a normal user."
       : "";
+
+  // The dialog carries the engine's own last lines: asking a student to find
+  // and copy a log file is a round trip that a readable message avoids.
+  const detail = [];
+  if (err && err.logFile) detail.push(`Log: ${err.logFile}`);
+  detail.push(`Data folder: ${dataDir}`);
+  detail.push("");
+  detail.push("Copy these details if you need help:");
+  detail.push(message);
+
   dialog
     .showMessageBox({
       type: "error",
       title: "ScholarBridge could not start",
-      message: message + hint,
-      buttons: ["Open log folder", "Quit"],
-      defaultId: 1,
-      cancelId: 1,
+      // Lead with the informative line: "Cannot find module 'X'", not just
+      // "the engine stopped while starting".
+      message:
+        (message
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => /cannot find|not found|error:|ENOENT|EACCES|EADDRINUSE/i.test(line)) ||
+          message.split("\n")[0]) + hint,
+      detail: detail.join("\n"),
+      buttons: ["Copy details", "Open log folder", "Quit"],
+      defaultId: 2,
+      cancelId: 2,
+      noLink: true,
     })
     .then((choice) => {
-      if (choice.response === 0) shell.openPath(dataDir).catch(() => {});
-      app.quit();
+      if (choice.response === 0) {
+        clipboard.writeText(
+          [
+            `ScholarBridge ${app.getVersion()} — ${process.platform} ${process.arch}`,
+            `Electron ${process.versions.electron}, Node ${process.versions.node}`,
+            `Data folder: ${dataDir}`,
+            "",
+            message,
+          ].join("\n")
+        );
+        return reportBootError(err);
+      }
+      if (choice.response === 1) shell.openPath(dataDir).catch(() => {});
+      return app.quit();
     })
     .catch(() => app.quit());
 }

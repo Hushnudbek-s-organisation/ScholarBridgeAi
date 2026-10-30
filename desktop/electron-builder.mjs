@@ -27,9 +27,15 @@ const config = {
   // (every other language pack is ~0.5 MB of dead weight each).
   compression: "maximum",
   electronLanguages: ["en-US", "ru"],
+  // Every source file the app needs, listed explicitly. A file missing here is
+  // NOT installed, and the app then dies at launch with
+  //   Cannot find module '…\\resources\\app\\<file>.mjs'
+  // (`tar.mjs` was exactly that). `scripts/build-desktop.mjs` now reads the
+  // app's own imports and fails the build if one of them is not packaged.
   files: [
     "main.mjs",
     "boot.mjs",
+    "tar.mjs",
     "preload.cjs",
     "splash.html",
     "build/icon.png",
@@ -47,7 +53,15 @@ const config = {
   // build (scripts/build-desktop.mjs stages it): electron-builder's archiver
   // cannot follow Next's `pg-<hash>` relative symlink on Windows.
   extraResources: [
-    { from: "build-resources/server", to: "server", filter: ["**/*"] },
+    // ONE file instead of ~3600: a per-file installer extraction can drop files
+    // on Windows (antivirus), which surfaced as MODULE_NOT_FOUND at engine
+    // start-up. The app unpacks this itself, atomically (boot.mjs →
+    // ensureEngine).
+    { from: "build-resources/engine.tar", to: "engine.tar" },
+    // The official Node.js runtime the engine runs on (see
+    // scripts/build-desktop.mjs → stageNodeRuntime). Optional: when the folder
+    // is empty the app falls back to Electron's built-in Node.
+    { from: "build-resources/node", to: "node", filter: ["**/*"] },
     { from: "../supabase/full_schema.sql", to: "schema/full_schema.sql" },
   ],
   extraMetadata: {

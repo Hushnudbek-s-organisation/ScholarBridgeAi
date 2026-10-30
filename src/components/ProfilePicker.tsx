@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ShieldCheck, X, LogIn, Loader2, Plus, Mail, Send } from "lucide-react";
+import { ShieldCheck, X, LogIn, Loader2, Plus, Mail, Send, Eye, EyeOff } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { TelegramCodeFlow } from "./telegram/TelegramCodeFlow";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
@@ -14,7 +14,8 @@ interface ProfilePickerProps {
   currentId: number | null;
   onClose: () => void;
   onSelect: (profile: StudentProfile) => void;
-  onAddNew: () => void;
+  /** Start a new account, optionally carrying the email already typed. */
+  onAddNew: (email?: string) => void;
   /** Server-side hint (e.g. "sign in to open this account"). */
   notice?: string;
 }
@@ -37,6 +38,9 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
+  // Show what was typed: a stray space or a Cyrillic keyboard layout makes a
+  // correct password fail with no visible clue.
+  const [showPassword, setShowPassword] = useState(false);
   const [tg, setTg] = useState<TelegramPublicConfig | null>(null);
   const [method, setMethod] = useState<"telegram" | "email" | null>(null);
 
@@ -128,6 +132,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
       if (!res.ok || !data.profile) {
         throw new Error(res.status === 401 ? t("wrongCredentials") : res.status === 429 ? t("tooMany") : data.error || t("failed"));
       }
+      setSignInError("");
       onSelect(data.profile as StudentProfile);
     } catch (err: unknown) {
       setSignInError(err instanceof Error ? err.message : t("failed"));
@@ -262,21 +267,51 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     aria-label={t("email")}
                     className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     autoComplete="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onBlur={() => setEmail((value) => value.trim().toLowerCase())}
                     required
                   />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t("password")}
-                    aria-label={t("password")}
-                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    autoComplete="current-password"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={t("password")}
+                      aria-label={t("password")}
+                      className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 pr-12 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      autoComplete="current-password"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                      aria-pressed={showPassword}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+                    </button>
+                  </div>
                   {signInError && (
-                    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
-                      {signInError}
+                    <div role="alert" className="space-y-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+                      <p>{signInError}</p>
+                      {/* The two realistic reasons an otherwise-correct pair
+                          fails: the account was created elsewhere (the
+                          desktop app keeps its own database), or it never
+                          completed. Both are fixed by creating it here. */}
+                      <p className="font-medium text-red-600/90">{t("noAccountHint")}</p>
+                      <button
+                        type="button"
+                        onClick={() => onAddNew(email.trim().toLowerCase() || undefined)}
+                        className="min-h-9 w-full rounded-lg border border-red-300 bg-white px-2 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                      >
+                        {t("createWithThisEmail")}
+                      </button>
                     </div>
                   )}
                   <button
@@ -293,7 +328,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
           </div>
 
           <button
-            onClick={onAddNew}
+            onClick={() => onAddNew()}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-2.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             <Plus className="h-3.5 w-3.5" /> {t("createAccount")}

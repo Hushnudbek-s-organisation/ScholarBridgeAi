@@ -143,9 +143,32 @@ npm run test:desktop-app  # end-to-end test of the boot path (see §8)
 
 ```
 resources/app/                    ← the app itself (main.mjs, preload, splash, Electron's deps)
-resources/server/                 ← the compiled ScholarBridge server + its node_modules
+resources/engine.tar              ← the compiled ScholarBridge server, as ONE archive (~106 MB tar)
+resources/node/                   ← the official Node.js runtime the server runs on
 resources/schema/full_schema.sql  ← the schema a new install applies
 ```
+
+**The engine ships as a single archive.** It is unpacked by the app itself on
+first launch (into `<data folder>/engine`, about a second) and the folder is
+reused afterwards. Two reasons:
+
+* a per-file installer extraction can silently drop files on Windows
+  (antivirus quarantine, an interrupted write). The server then dies at
+  start-up with `MODULE_NOT_FOUND` even though the same package booted in CI —
+  the app now writes the tree itself, into a temporary folder that is renamed
+  into place only when complete, and an interrupted unpack repeats itself on
+  the next launch instead of leaving a half-engine;
+* one file instead of ~3600 also lets the installer's own LZMA pass compress it, so the download got smaller rather than bigger.
+
+The engine runs on the **bundled Node.js**, not on Electron's built-in Node.
+Electron can execute a script "as node", but that Node has a different module
+ABI than the official runtime, and the server bundle contains native modules
+(`sharp`): on Windows such a child process exits immediately with code 1 —
+which reached users as "the server stopped while starting". Shipping the real
+runtime removes that whole class of failure; `resources/node` is the binary
+the app starts, and the app falls back to Electron's Node only if it is
+missing. This is also why the installer is ~30 MB larger than a plain Electron
+app of the same content.
 
 The server bundle is staged first (`desktop/build-resources/server`): Next's
 standalone output contains one relative symlink (`pg-<hash> → ../../node_modules/pg`)
@@ -175,7 +198,11 @@ seconds. The catalogue (universities, programmes, scholarships) is filled in the
 background right after startup, so the first page that shows lists may take a
 bit longer than the ones after it. The folder holds:
 
-* `postgres/` — your database (back this up: it *is* your data),
+* `postgres/` — your database, always created as **UTF-8** (back this up: it
+  *is* your data),
+* `engine/` — the unpacked server, written on first launch of each version,
+* `db-password` — the password of that database (generated once; PostgreSQL
+  keeps its hash, so it must never change between launches),
 * `session-secret` — the key that signs your login cookie (per install),
 * `desktop-config.json` — settings such as "allow phone on this Wi-Fi",
 * `scholarbridge.log` — the app's log (open it from *File → Open error log*).
@@ -337,9 +364,12 @@ database bound to loopback.
 
 | Command | What it proves |
 | --- | --- |
-| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. |
+| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. Then launches it **again** on the same folder (the password must be stable), once more with the stored password corrupted, once against a cluster created as **WIN1251** (a non-UTF-8 Windows install), which must be rebuilt as UTF-8 automatically, and checks the engine archive (deep-path round-trip, a corrupt archive fails instead of producing a half-engine, unpack-once, repair of a half-unpacked folder), that a bundled `resources/node` runtime is preferred over Electron's Node, and that a broken engine's own output reaches the error message. 41 assertions. |
 | `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
-| `node scripts/build-desktop.mjs --verify-only` | Inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
+| `node scripts/check-desktop-engine.mjs <unpacked dir>` | Unpacks the engine from the built package, boots it with the packaged `resources/node`, and requires an HTTP answer (plus, with `SMOKE_WITH_DATABASE=1`, the private database, `/api/health` and a rendered landing page). Runs in CI on Windows, macOS and Linux after packaging, so a broken engine is caught before an installer is published — the gap that let the "server stopped while starting" build ship. |
+| `node scripts/build-desktop.mjs --verify-only` | Follows the app's own imports (`main.mjs` → `boot.mjs` → `tar.mjs` …) and fails if a referenced module is not in the package — the check for `ERR_MODULE_NOT_FOUND` at launch. Also inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
+| `npm run test:auth` | 14 assertions on the credential code and its wiring: the value hashed at sign-up and the value compared at sign-in are normalised identically (a trailing space can no longer lock an account), an exactly-`MIN`-character password is accepted, `12345678` is reported as *too_common* rather than *too short*, the sign-in route clears the failure budget on success, and the wizard/sign-in form keep their per-field messages. |
+| `node desktop/auth-flow.mjs` | 41 assertions against the **packaged engine** over HTTP: sign-up with an 8-character password → sign-in → session; a password typed with surrounding spaces; an email typed with spaces and capitals; refusals that carry a specific reason; three cycles of *7 wrong passwords + 1 correct* (the correct one must still sign in, never 429); an unknown account answered with the same message as a wrong password. Needs `npm run desktop:prepare` first. |
 | `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
 
 Prepare the build first (`npm run desktop:prepare`), then run
@@ -353,14 +383,23 @@ build the real installers on GitHub's machines.
 
 | Symptom | Cause / fix |
 | --- | --- |
+| *“character with byte sequence 0xf0 0x9f 0x8c 0x90 in encoding \"UTF8\" has no equivalent in encoding \"WIN1251\"”* | The installed build is **older than 1.0.9**: on a non-English Windows `initdb` followed the system code page (WIN1251 on a Russian install), so the cluster could not store the catalogue's emoji and the schema never applied. 1.0.9 always creates a **UTF-8** cluster and rebuilds an empty non-UTF-8 one by itself — install it and start again, nothing to delete. |
+| *“password authentication failed for user \"scholarbridge\"”* right after the splash screen | The installed build is **older than 1.0.8**: it generated a new database password on every launch while PostgreSQL keeps the one from the first launch, so only the very first start could connect. Install 1.0.8 or newer — it keeps the password in `db-password` and, if an existing cluster's password was lost, resets it in a closed loopback-only window (`ALTER ROLE`) **without touching your data**. Nothing has to be deleted. |
 | Windows: *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\index.js”* | The installed build predates 1.0.4, where the compiled server was bundled into `resources/app` and replaced the app's `package.json`. Install the current build (uninstall first is not needed — the installer overwrites the program, your data stays). |
 | Desktop: "could not start" on first launch | Look at *File → Open error log*. Most common: the port range 4310–4335 is busy (close the other copy — only one instance may run), or PostgreSQL cannot run as **root** on Linux (run the app as a normal user). |
+| *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\tar.mjs”* | The installed build is **older than 1.0.15**: one of the app's own modules was missing from the installer's file list. 1.0.15 packages it and the build now verifies that **every module the app imports is installed**, so this cannot ship again. |
+| *“The ScholarBridge engine stopped while starting (code 1)”* with `MODULE_NOT_FOUND` | The installed build is **older than 1.0.12**: the engine was installed as ~3600 separate files, and on some Windows machines the installer left some of them behind (antivirus), so a module was missing at start-up. 1.0.12 ships the engine as one archive that the app unpacks itself and verifies — install it and start the app; the data folder is untouched. |
+| *“The ScholarBridge engine stopped while starting (code 1)”* | The installed build is **older than 1.0.10**: it ran the server on Electron's built-in Node, whose module ABI does not match the native modules in the server bundle, so the engine died instantly. 1.0.10 ships and uses the official Node.js runtime. The dialog now also shows the engine's own last lines — press **Copy details** and send them if anything still fails. |
+| Sign-in: *“Incorrect email or password”* although the password is certainly right | Three causes, all visible now. **(1)** In 1.0.16 and later the form can show the typed password (eye button) — a trailing space or a Cyrillic keyboard layout is the most common culprit, and both are stripped automatically now. **(2)** The account must exist **in this app**: the desktop build keeps its own database in `%APPDATA%\ScholarBridge`, so an account created on the website, or on another laptop/phone, is not there. The form offers *“Create an account with this email”* right under the error. **(3)** Eight attempts in 15 minutes from one address are throttled; a **successful** sign-in now clears that budget, so a correct password never inherits an earlier mistake. |
+| Sign-up: *“Your password must be at least 8 characters”* although the password **is** 8 characters | Fixed in **1.0.16**. That one message was printed for every refusal and for all three fields: a correct 8-character password was reported as too short when the **name** or **email** was the actual problem, and a blocked password such as `12345678` was also reported as a length problem. 1.0.16 reports each field separately (*“Enter your email address.”*, *“That email address is not complete…”*), tells a blocked password apart (*“too easy to guess”*), normalises spaces/capitals in the email, and shows a `n / 8 characters` counter with a show-password button. |
+| Sign-up: *“Could not create the account”* with no reason | Older than 1.0.16, where a duplicate email, a throttled address and a rejected password could all end in the same sentence. 1.0.16 says which one it is (and how many minutes the sign-up throttle has left). |
 | Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
 | Desktop: works, but no AI answers | No AI provider key is configured in that install. Add one to the deployment env (or use a hosted deployment) — the rest of the app is unaffected. |
 | Phone: "Could not reach …" | Phone and laptop on different networks; sharing off; firewall blocking port 4310 (allow the app on *private* networks); guest Wi-Fi isolating devices; laptop asleep. |
 | Phone: app opens but shows the connect screen again | The address was unreachable, so it was not saved. Check the laptop's *Share → Show phone connection*. |
 | Android build: `SDK location not found` | Set `ANDROID_HOME`, or create `mobile/android/local.properties` with `sdk.dir=/path/to/Android/Sdk`. |
 | Android build: Gradle download fails | First build needs internet for Gradle + Android dependencies. In mainland networks configure a mirror, or build with the GitHub workflow. |
+| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow now **fails the build** when the tag (`v1.0.16`) and that number disagree. |
 | macOS: "app is damaged" | Unsigned build, quarantine attribute: `xattr -dr com.apple.quarantine /Applications/ScholarBridge.app`. |
 | Linux: `.AppImage` will not run | Make it executable: `chmod +x ScholarBridge-1.0.0.AppImage`, and install `libfuse2` if your distribution needs it. |
 

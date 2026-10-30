@@ -30,29 +30,73 @@ const BLOCKED_PASSWORDS = new Set([
 ]);
 
 /**
- * Validate a password. Returns null when acceptable, otherwise the reason it
- * was rejected (safe to show to the user).
+ * One canonical form for a password, applied at BOTH ends of its life.
+ *
+ * Sign up, sign in and password change used to disagree: the sign-up route
+ * trimmed the typed value before hashing it, while the sign-in route compared
+ * the raw value. A password typed with a trailing space — mobile keyboards and
+ * password managers add one routinely — therefore stored as "mypass123" and was
+ * then checked as "mypass123 ", which can never match: the account is created
+ * successfully and can never be signed into again.
  */
-export function passwordPolicyError(plain: string): string | null {
-  if (typeof plain !== "string" || plain.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+export function normalisePassword(plain: string): string {
+  return typeof plain === "string" ? plain.trim() : "";
+}
+
+/**
+ * Which rule a password broke. The UI needs the REASON, not just "invalid":
+ * a visitor who typed eight characters and saw "your password must be at least
+ * 8 characters" concluded the app cannot count, when in fact the password was
+ * on the blocked list (`12345678`, `qwerty123`, …).
+ */
+export type PasswordProblem = "too_short" | "too_long" | "too_common";
+
+/**
+ * Validate a password. Returns null when acceptable, otherwise the rule it
+ * broke plus a sentence safe to show to the user.
+ */
+export function passwordPolicyProblem(rawPlain: string): { problem: PasswordProblem; message: string } | null {
+  const plain = normalisePassword(rawPlain);
+  if (plain.length < MIN_PASSWORD_LENGTH) {
+    return {
+      problem: "too_short",
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    };
   }
-  if (plain.length > 200) return "Password is too long (max 200 characters)";
+  if (plain.length > 200) {
+    return { problem: "too_long", message: "Password is too long (max 200 characters)" };
+  }
   if (BLOCKED_PASSWORDS.has(plain.toLowerCase())) {
-    return "This password is too common — please choose another one";
+    return {
+      problem: "too_common",
+      message: "This password is too common — please choose another one",
+    };
   }
   return null;
 }
 
+/** Validate a password. Returns null when acceptable, otherwise the reason it
+ * was rejected (safe to show to the user). */
+export function passwordPolicyError(rawPlain: string): string | null {
+  return passwordPolicyProblem(rawPlain)?.message ?? null;
+}
+
 /** Hash a plain-text password with a fresh random salt. */
-export function hashPassword(plain: string): string {
+export function hashPassword(rawPlain: string): string {
+  const plain = normalisePassword(rawPlain);
   const salt = randomBytes(SALT_BYTES).toString("hex");
   const hash = scryptSync(plain, salt, SCRYPT_KEYLEN).toString("hex");
   return `scrypt:${salt}:${hash}`;
 }
 
-/** Constant-time check of a plain password against a stored hash. */
-export function verifyPassword(plain: string, stored: string | null | undefined): boolean {
+/**
+ * Constant-time check of a plain password against a stored hash.
+ *
+ * The candidate is normalised exactly like `hashPassword` did, so a trailing
+ * space can no longer produce "correct password rejected".
+ */
+export function verifyPassword(rawPlain: string, stored: string | null | undefined): boolean {
+  const plain = normalisePassword(rawPlain);
   if (!stored || typeof stored !== "string") return false;
   const parts = stored.split(":");
   if (parts.length !== 3 || parts[0] !== "scrypt") return false;
