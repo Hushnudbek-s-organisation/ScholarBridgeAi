@@ -1,36 +1,47 @@
 # ScholarBridge apps — desktop (.exe / .dmg / AppImage) and Android (.apk)
 
 This document describes the two **installed programs** built from this
-repository. They are not websites opened in a tab:
+repository. They are not websites opened in a tab, and they do not download a
+copy of the data:
 
-| App | What the user gets | Needs the internet? |
+| App | What the user gets | Where the data lives |
 | --- | --- | --- |
-| **Desktop** (`desktop/`) | A double-clickable program with its own window, its own icon, and its **own private PostgreSQL database** inside the app. One install, then it opens instantly — like Telegram Desktop. | Only for AI features, university images and Telegram. Catalogue, profiles, tracking and applications work offline. |
-| **Android** (`mobile/`) | A real `.apk` installed on the phone: home-screen icon, full screen, no address bar. It connects to a ScholarBridge server (the desktop app on the same Wi-Fi, or a hosted deployment) and remembers the address. | Yes — it talks to a server. |
+| **Desktop** (`desktop/`) | A double-clickable program with its own window and icon that opens the **hosted ScholarBridge site** over the internet — like Telegram Desktop opening Telegram. | In the **site's database**, always current, shared with the phone and the browser. Nothing is downloaded to the computer. |
+| **Android** (`mobile/`) | A real `.apk`: home-screen icon, full screen, no address bar. It opens the same site. | The same site database. |
 
 Both are built **from the same codebase and the same database schema** as the
-website, so accounts, saved lists, applications and AI quotas behave exactly
-the same everywhere. There is no second implementation to keep in sync.
+website, so accounts, saved lists, applications and AI quotas are one and the
+same everywhere. There is no second copy of anything, and no second
+implementation to keep in sync.
 
 ```
-            ┌───────────────────────────────────────────────┐
-            │  Desktop app (installed program)              │
-            │  ┌──────────────┐   ┌───────────────────────┐ │
-            │  │ Electron     │──▶│ ScholarBridge server  │ │
-            │  │ window       │   │ (Next.js, bundled)    │ │
-            │  └──────────────┘   └──────────┬────────────┘ │
-            │                                │              │
-            │                     ┌──────────▼────────────┐ │
-            │                     │ PostgreSQL (private,  │ │
-            │                     │ inside the app data)  │ │
-            │                     └───────────────────────┘ │
-            └───────────────────────┬───────────────────────┘
-                                    │  http://192.168.x.x:4310
-                       ┌────────────▼─────────────┐
-                       │  Android app (.apk)      │
-                       │  optional: hosted server │
-                       └──────────────────────────┘
+            ┌──────────────────────┐        ┌──────────────────────┐
+            │ Desktop app          │        │ Android app (.apk)   │
+            │ (installed program)  │        │                      │
+            └──────────┬───────────┘        └──────────┬───────────┘
+                       │   https, one account           │
+                       └───────────────┬────────────────┘
+                                       ▼
+                        ┌──────────────────────────────┐
+                        │ Hosted ScholarBridge site    │
+                        │ Next.js + its own PostgreSQL │
+                        │ (the data lives here)        │
+                        └──────────────────────────────┘
 ```
+
+**Signing in is remembered.** The session cookie is stored by the app (a
+persistent Electron partition on the desktop, the WebView cookie store on the
+phone) and is valid for 7 days, so the password is asked once — not on every
+launch. Signing out in the app signs out there and nowhere else, because the
+session is per installation.
+
+### The offline copy (optional, desktop only)
+
+The installer still carries the compiled server and a private PostgreSQL, so
+the app opens even with no internet. It is **never used silently**: it appears
+only if the user chooses *Server → Use the offline copy*, and its data is a
+separate database — an account created against the site does not exist in it.
+*Server → Back to the online site* returns to the shared data.
 
 ---
 
@@ -297,25 +308,34 @@ foregrounds and the splash screens from `public/icon-512.png`.
 
 ---
 
-## 5. Using a hosted server instead
+## 5. Which site the apps open (and how to change it)
 
-Both apps can talk to a hosted deployment (Render/Supabase, see
-[`DEPLOYMENT.md`](../DEPLOYMENT.md)) instead of the bundled one:
+The apps open the hosted site by default. The address is baked into a build, so
+an installed copy outside this repository never opens somebody else's site by
+accident:
 
-* **Android** — enter the https address on first launch, or bake it in with
-  `SCHOLARBRIDGE_DEFAULT_SERVER`.
-* **Desktop** — either enter nothing and keep the local install, or start the
-  app pointed at the server:
+| Where | How it is set | How the user changes it |
+| --- | --- | --- |
+| Desktop | `desktop/server-default.mjs` → `DEFAULT_SERVER_URL` | *Server → Open the online site…* (the address is saved in `desktop-config.json`), then restart-free |
+| Android | `mobile/www/config.js` → `SCHOLARBRIDGE_DEFAULT_SERVER` | the connect screen; the address is remembered on the phone |
 
-  ```bash
-  SCHOLARBRIDGE_SERVER_URL=https://app.your-domain.com  # Windows: set SCHOLARBRIDGE_SERVER_URL=…
-  ```
+Ship a build for another deployment (a fork, a staging site):
 
-  (or write `{"serverUrl": "https://…"}` into `desktop-config.json`). The
-  window then loads the hosted app and the bundled database is not started.
+```bash
+SCHOLARBRIDGE_SERVER_URL=https://app.your-domain.com node scripts/build-desktop.mjs
+SCHOLARBRIDGE_DEFAULT_SERVER=https://app.your-domain.com npm run mobile:prepare
+```
 
-Accounts do **not** sync between a local install and a hosted deployment: they
-are separate databases. Pick one as your source of truth.
+Both write the value into the files above, which are part of the repository, so
+the built installer and the APK carry the same address. A one-off run of the
+installed desktop app can also be pointed elsewhere with
+`SCHOLARBRIDGE_SERVER_URL=…`, which takes priority over everything except an
+explicit *Use the offline copy* choice.
+
+**Accounts do not sync with the offline copy.** The site's database and the
+bundled engine's database are separate: an account created online does not
+exist in the offline copy, and the app says so when you switch. Keep the site
+as the source of truth and use the offline copy only when the internet is gone.
 
 ---
 
@@ -324,7 +344,7 @@ are separate databases. Pick one as your source of truth.
 | Variable | Where | Meaning |
 | --- | --- | --- |
 | `APP_PLAIN_HTTP` | set by the desktop launcher (`=1`) | The app is served over plain `http://` on the user's machine or LAN: the session cookie is not marked `Secure` (the browser would drop it), and the CSP does not `upgrade-insecure-requests` (it would break the app's own assets). Never set this on a public deployment. |
-| `SCHOLARBRIDGE_SERVER_URL` | desktop | Use a hosted deployment instead of the bundled server. |
+| `SCHOLARBRIDGE_SERVER_URL` | desktop (build or run) | The site the app opens. Sets the default for every user when building; for one launch it overrides the saved address. |
 | `SCHOLARBRIDGE_DEFAULT_SERVER` | mobile build | Default address baked into the APK; empty = ask on first launch. |
 | `SEED_ON_REQUEST` | set by the desktop launcher (`=on`) | A single-user self-hosted install may fill the catalogue on the first page load (see `src/lib/db/requestSeeding.ts`). |
 | `GOOGLE_API_KEY`, `GEMINI_API_KEY`, … | optional | AI features are off until a provider key is configured, in both apps; everything else works. Provider keys are **not** shipped in the installers. |
@@ -368,6 +388,7 @@ database bound to loopback.
 | `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
 | `node scripts/check-desktop-engine.mjs <unpacked dir>` | Unpacks the engine from the built package, boots it with the packaged `resources/node`, and requires an HTTP answer (plus, with `SMOKE_WITH_DATABASE=1`, the private database, `/api/health` and a rendered landing page). Runs in CI on Windows, macOS and Linux after packaging, so a broken engine is caught before an installer is published — the gap that let the "server stopped while starting" build ship. |
 | `node scripts/build-desktop.mjs --verify-only` | Follows the app's own imports (`main.mjs` → `boot.mjs` → `tar.mjs` …) and fails if a referenced module is not in the package — the check for `ERR_MODULE_NOT_FOUND` at launch. Also inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
+| `npm run test:remote` | 40 assertions on the "window onto the site" mode: which address a launch uses (environment → saved → baked-in, with an explicit *offline copy* choice winning), address normalisation (bare host → https, a laptop on the Wi-Fi → http, `ftp:` refused), the reachability probe (200 = ready, 503 = up but its database is not ready, closed port = unreachable, a slow cold-start answer still counts, a timeout is reported rather than thrown), that the window uses a persistent partition for the 7-day session cookie, that the bundled engine is **not** started in site mode, that an unreachable site explains itself and offers the offline copy, that the phone QR points at the site, and that `remote.mjs` + `server-default.mjs` are packaged and the APK carries the same address. |
 | `npm run test:auth` | 14 assertions on the credential code and its wiring: the value hashed at sign-up and the value compared at sign-in are normalised identically (a trailing space can no longer lock an account), an exactly-`MIN`-character password is accepted, `12345678` is reported as *too_common* rather than *too short*, the sign-in route clears the failure budget on success, and the wizard/sign-in form keep their per-field messages. |
 | `node desktop/auth-flow.mjs` | 41 assertions against the **packaged engine** over HTTP: sign-up with an 8-character password → sign-in → session; a password typed with surrounding spaces; an email typed with spaces and capitals; refusals that carry a specific reason; three cycles of *7 wrong passwords + 1 correct* (the correct one must still sign in, never 429); an unknown account answered with the same message as a wrong password. Needs `npm run desktop:prepare` first. |
 | `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
@@ -393,13 +414,17 @@ build the real installers on GitHub's machines.
 | Sign-in: *“Incorrect email or password”* although the password is certainly right | Three causes, all visible now. **(1)** In 1.0.16 and later the form can show the typed password (eye button) — a trailing space or a Cyrillic keyboard layout is the most common culprit, and both are stripped automatically now. **(2)** The account must exist **in this app**: the desktop build keeps its own database in `%APPDATA%\ScholarBridge`, so an account created on the website, or on another laptop/phone, is not there. The form offers *“Create an account with this email”* right under the error. **(3)** Eight attempts in 15 minutes from one address are throttled; a **successful** sign-in now clears that budget, so a correct password never inherits an earlier mistake. |
 | Sign-up: *“Your password must be at least 8 characters”* although the password **is** 8 characters | Fixed in **1.0.16**. That one message was printed for every refusal and for all three fields: a correct 8-character password was reported as too short when the **name** or **email** was the actual problem, and a blocked password such as `12345678` was also reported as a length problem. 1.0.16 reports each field separately (*“Enter your email address.”*, *“That email address is not complete…”*), tells a blocked password apart (*“too easy to guess”*), normalises spaces/capitals in the email, and shows a `n / 8 characters` counter with a show-password button. |
 | Sign-up: *“Could not create the account”* with no reason | Older than 1.0.16, where a duplicate email, a throttled address and a rejected password could all end in the same sentence. 1.0.16 says which one it is (and how many minutes the sign-up throttle has left). |
+| Desktop: *“Could not open scholarbridge-ai.onrender.com”* | The site could not be reached. No internet, or the **free Render plan was asleep** — the first open after a quiet period can take up to a minute; press **Try again**. The dialog also offers **Use the offline copy**, which works with no internet (separate database). |
+| Desktop: the app opens a site that is not yours | *Server → Open the online site…* and type your address (it is saved), or start it with `SCHOLARBRIDGE_SERVER_URL=…`. *Server* shows which address is in use. |
+| Desktop: signed in on the website, but the app asks to sign in | Expected — the website in a browser and the app are two separate cookie stores. Sign in once in the app; the session is kept for 7 days. |
+| Desktop: signed in online, but the *offline copy* says the account does not exist | Two databases. *Server → Back to the online site* returns to the shared one. |
 | Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
 | Desktop: works, but no AI answers | No AI provider key is configured in that install. Add one to the deployment env (or use a hosted deployment) — the rest of the app is unaffected. |
 | Phone: "Could not reach …" | Phone and laptop on different networks; sharing off; firewall blocking port 4310 (allow the app on *private* networks); guest Wi-Fi isolating devices; laptop asleep. |
 | Phone: app opens but shows the connect screen again | The address was unreachable, so it was not saved. Check the laptop's *Share → Show phone connection*. |
 | Android build: `SDK location not found` | Set `ANDROID_HOME`, or create `mobile/android/local.properties` with `sdk.dir=/path/to/Android/Sdk`. |
 | Android build: Gradle download fails | First build needs internet for Gradle + Android dependencies. In mainland networks configure a mirror, or build with the GitHub workflow. |
-| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow now **fails the build** when the tag (`v1.0.16`) and that number disagree. |
+| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow **fails the build** when the tag (`v1.0.17`) and that number disagree. |
 | macOS: "app is damaged" | Unsigned build, quarantine attribute: `xattr -dr com.apple.quarantine /Applications/ScholarBridge.app`. |
 | Linux: `.AppImage` will not run | Make it executable: `chmod +x ScholarBridge-1.0.0.AppImage`, and install `libfuse2` if your distribution needs it. |
 

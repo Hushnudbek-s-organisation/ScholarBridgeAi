@@ -73,7 +73,7 @@
     <div class="wrap">
       <div class="logo">🎓</div>
       <h1>ScholarBridge</h1>
-      <p class="sub" id="subtitle">Connect to your ScholarBridge server to continue.</p>
+      <p class="sub" id="subtitle">Opening ScholarBridge… the app works through the internet, on the same account as the site.</p>
 
       <div id="connectForm">
         <label for="server">Server address</label>
@@ -87,7 +87,8 @@
           spellcheck="false"
           placeholder="192.168.1.42:4310"
         />
-        <button id="connect">Connect</button>
+        <button id="connect">Open ScholarBridge</button>
+        <button id="openAnyway" class="secondary hidden">Open anyway</button>
         <div class="status" id="status"></div>
       </div>
 
@@ -97,17 +98,20 @@
       </div>
 
       <details>
-        <summary>Where do I find the address?</summary>
+        <summary>About this address</summary>
+        <p>
+          The app normally opens the ScholarBridge site over the internet — the
+          address above is already filled in, and the account is the same one
+          you use in the browser.
+        </p>
+        <p><strong>Using the desktop app on your laptop instead?</strong></p>
         <ol>
-          <li>Open the ScholarBridge app on your laptop.</li>
-          <li>Choose <strong>Share → Allow phone on this Wi-Fi</strong>.</li>
-          <li>Scan the QR code with this phone, or type the address it shows (for example <em>192.168.1.42:4310</em>).</li>
+          <li>On the laptop: <strong>Server → Use the offline copy</strong>.</li>
+          <li>Then <strong>Share → Allow phone on this Wi-Fi</strong>.</li>
+          <li>Scan its QR code, or type the address it shows (for example <em>192.168.1.42:4310</em>).</li>
           <li>The phone and the laptop must be on the same Wi-Fi network.</li>
         </ol>
-        <p>
-          Using a hosted ScholarBridge instead? Enter its address, e.g.
-          <em>https://scholarbridge.example.com</em>.
-        </p>
+        <p>Reset the field to the site address at any time: it is stored on this phone.</p>
       </details>
     </div>
 
@@ -156,7 +160,9 @@
             var finish = function (ok) {
               if (!done) { done = true; resolve(ok); }
             };
-            var timer = setTimeout(function () { finish(false); }, 6000);
+            // A free hosting plan puts the site to sleep when idle; the first
+            // request is the one that waits for the wake-up. 45 s covers it.
+            var timer = setTimeout(function () { finish(false); }, 45000);
             try {
               fetch(url + "/api/health", { mode: "no-cors", cache: "no-store" })
                 .then(function () { clearTimeout(timer); finish(true); })
@@ -187,22 +193,39 @@
             return;
           }
           input.value = url;
+          // An https address is the hosted site: open it directly. Probing it
+          // first would add a wait to a host that puts itself to sleep when
+          // idle, and the site is the app's whole purpose — the WebView shows
+          // its own progress while it wakes up.
+          if (/^https:\/\//i.test(url)) {
+            say("Opening…", "ok");
+            open(url);
+            return;
+          }
           connectBtn.disabled = true;
-          say("Looking for the server…");
+          say("Connecting…");
           var ok = await reachable(url);
           connectBtn.disabled = false;
           if (ok) {
             say("Connected.", "ok");
             open(url);
           } else {
+            // Never a dead end: the site can be asleep, the connection can be
+            // slow, but the app can still open it — Chromium inside the app
+            // shows the site's own error page and the retry button there.
             say(
-              "Could not reach " + url + ". Check that the laptop app is open, phone access is on, and both devices are on the same Wi-Fi.",
+              "Could not check " + url + " (no internet, or the site is waking up). You can still open it.",
               "bad"
             );
+            var openAnyway = document.getElementById("openAnyway");
+            if (openAnyway) openAnyway.classList.remove("hidden");
           }
         }
 
         connectBtn.addEventListener("click", function () { connect(input.value); });
+        document.getElementById("openAnyway").addEventListener("click", function () {
+          open(normalize(input.value) || initial);
+        });
         input.addEventListener("keydown", function (event) {
           if (event.key === "Enter") connect(input.value);
         });

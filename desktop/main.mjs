@@ -1,22 +1,30 @@
 /**
  * ScholarBridge desktop — Electron main process.
  *
- * This is not a browser pointed at a website: the app carries the ScholarBridge
- * server and its own PostgreSQL database, starts them on launch, and stops
- * them on quit. The window then talks to 127.0.0.1 over loopback, so the app
- * works with no internet connection at all (the AI features need one, the
- * catalogue, tracking and profile do not).
+ * DEFAULT MODE — "a window onto the site" (remote.mjs): the app opens the
+ * hosted ScholarBridge site over the internet and keeps nothing of its own.
+ * Profiles, applications, messages and everything else are the rows in the
+ * site's database, so the laptop, the phone and the browser show the same
+ * account. The session cookie lives in a persistent partition, so the student
+ * stays signed in — the app is not asked for the password on every launch.
  *
- * The boot logic lives in boot.mjs so it can be tested under plain Node
- * (scripts/check-desktop-app.mjs). This file only does Electron things:
+ * FALLBACK MODE — the bundled engine: the installer also carries the compiled
+ * server and a private PostgreSQL, purely so the app still opens when there is
+ * no internet (or the site is down). It is never chosen silently: the user
+ * picks it (Server → Use offline copy), and its data is separate from the
+ * site's, which is why the menu and the title bar say which one is in use.
+ *
+ * The boot logic lives in boot.mjs (engine) and remote.mjs (address choice) so
+ * it can be tested under plain Node. This file only does Electron things:
  * windows, menus, the phone-pairing QR, and shutdown.
  */
-import { app, BrowserWindow, clipboard, dialog, Menu, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import { lanAddresses, startLocalServer } from "./boot.mjs";
+import { describeTarget, normaliseServerUrl, probeServer, resolveTarget } from "./remote.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isPackaged = app.isPackaged;
@@ -40,7 +48,7 @@ const dataDir = app.getPath("userData");
 const logFile = path.join(dataDir, "scholarbridge.log");
 const configFile = path.join(dataDir, "desktop-config.json");
 
-/** @type {{allowLan?: boolean, serverUrl?: string}} */
+/** @type {{allowLan?: boolean, serverUrl?: string, offline?: boolean}} */
 let config = {};
 try {
   config = JSON.parse(fs.readFileSync(configFile, "utf8"));
@@ -68,13 +76,21 @@ function log(line) {
   }
 }
 
-/** A hosted deployment can be used instead of the bundled server. */
-const remoteUrl = process.env.SCHOLARBRIDGE_SERVER_URL || config.serverUrl || "";
+/**
+ * Where this launch talks to: the hosted site (default), or the bundled engine
+ * when the user asked for the offline copy.
+ * @type {{mode: "remote", url: string, source: string} | {mode: "local", reason: string}}
+ */
+let target = resolveTarget({ envUrl: process.env.SCHOLARBRIDGE_SERVER_URL || "", config });
 
 let mainWindow = null;
 let splash = null;
 let server = null;
+/** The one-field "site address" window, while it is open. */
+let addressWindow = null;
 let quitting = false;
+/** Set once the window has reported a failed load, so the retry loop stops. */
+let remoteFailed = false;
 
 const STATUS_TEXT = {
   starting: { title: "Starting ScholarBridge", detail: "Preparing the app…" },
@@ -83,11 +99,16 @@ const STATUS_TEXT = {
   server: { title: "Starting ScholarBridge", detail: "Starting the app engine…" },
   waiting: { title: "Almost there", detail: "Waiting for the app to answer…" },
   ready: { title: "Ready", detail: "Opening ScholarBridge…" },
+  online: { title: "Connecting", detail: "Opening ScholarBridge…" },
 };
 
 function setSplash(state, detail) {
   if (!splash || splash.isDestroyed()) return;
-  const text = state === "error" ? { title: "ScholarBridge could not start", detail } : STATUS_TEXT[state] ?? STATUS_TEXT.starting;
+  const base = STATUS_TEXT[state] ?? STATUS_TEXT.starting;
+  const text =
+    state === "error"
+      ? { title: "ScholarBridge could not start", detail }
+      : { title: base.title, detail: detail || base.detail };
   const safe = JSON.stringify(text);
   splash.webContents
     .executeJavaScript(`window.setStatus && window.setStatus(${safe})`)
@@ -129,6 +150,13 @@ function createMainWindow(url) {
       sandbox: true,
       preload: path.join(here, "preload.cjs"),
       spellcheck: true,
+      // A named, persistent partition: the session cookie (sb_session, valid
+      // for 7 days) is written to disk inside the app's data folder, so
+      // signing in once is enough — the next launch opens already signed in,
+      // exactly like a browser that remembers you. Without a partition the
+      // cookie would still persist, but tied to whatever session Electron
+      // happened to create; this makes it explicit and testable.
+      partition: "persist:scholarbridge",
     },
   });
 
@@ -165,7 +193,19 @@ function createMainWindow(url) {
     }
   });
 
-  // If the local server dies, say so instead of showing a browser error page.
+  // A window onto the site can fail to load: no internet, the site asleep, a
+  // proxy blocking it. Chromium would show its own grey error page, which looks
+  // like the app is broken. Say what happened and offer the two real choices.
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3) return; // -3 = ABORTED (a redirect/new load)
+    log(`[window] load failed (${errorCode} ${errorDescription}) ${validatedURL}`);
+    if (!target || target.mode !== "remote" || remoteFailed) return;
+    remoteFailed = true;
+    reportRemoteError(errorDescription || `error ${errorCode}`);
+  });
+
+  // If the bundled server dies (offline mode), say so instead of showing a
+  // browser error page.
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
     log(`[window] renderer gone: ${details.reason}`);
   });
@@ -176,11 +216,17 @@ function createMainWindow(url) {
 }
 
 async function boot() {
-  if (remoteUrl) {
-    log(`[boot] using hosted server ${remoteUrl}`);
-    createMainWindow(remoteUrl);
+  if (target.mode === "remote") {
+    log(`[boot] site mode → ${target.url} (${target.source})`);
+    setSplash("online", describeTarget(target));
+    // Open the window straight away. Probing first would add a second round
+    // trip to a host that puts itself to sleep when idle, and the window shows
+    // the site's own progress while it wakes up.
+    remoteFailed = false;
+    createMainWindow(target.url);
     return;
   }
+  log(`[boot] offline mode (${target.reason}) → bundled engine`);
   setSplash("starting");
   const allowLan = Boolean(config.allowLan);
   server = await startLocalServer({
@@ -197,23 +243,133 @@ async function boot() {
   createMainWindow(server.url);
 }
 
-/** Restart the bundled server (port, LAN toggle, "try again"). */
+/** Restart whatever this launch uses (the bundled engine, or the site view). */
 async function restartServer() {
   if (server) {
     await server.stop();
     server = null;
   }
+  target = resolveTarget({ envUrl: process.env.SCHOLARBRIDGE_SERVER_URL || "", config });
   await boot();
 }
 
+/**
+ * Switch between the hosted site and the bundled offline copy.
+ * `serverUrl === ""` selects the offline copy; `null`/`undefined` = no change.
+ */
+async function switchServer(url) {
+  if (url === null || url === undefined) return;
+  if (url === "") {
+    // Keep the address: "back to the online site" reuses it.
+    config.offline = true;
+  } else {
+    const wanted = normaliseServerUrl(url);
+    if (!wanted) {
+      dialog.showMessageBox({
+        type: "warning",
+        title: "That address cannot be used",
+        message: `“${url}” is not a web address.`,
+        detail: "Enter something like https://scholarbridge-ai.onrender.com",
+        buttons: ["OK"],
+        noLink: true,
+      });
+      return;
+    }
+    config.serverUrl = wanted;
+    delete config.offline;
+  }
+  saveConfig();
+  target = resolveTarget({ envUrl: process.env.SCHOLARBRIDGE_SERVER_URL || "", config });
+  buildMenu();
+  if (mainWindow) {
+    mainWindow.close();
+    mainWindow = null;
+  }
+  if (!splash || splash.isDestroyed()) createSplash();
+  setSplash("starting", "Switching…");
+  try {
+    await restartServer();
+  } catch (err) {
+    reportBootError(err);
+  }
+}
+
+/** Ask for an address, then open it (or the offline copy when left empty). */
+async function promptServerUrl() {
+  const current = target.mode === "remote" ? target.url : "";
+  const win = new BrowserWindow({
+    width: 540,
+    height: 340,
+    resizable: false,
+    title: "ScholarBridge site address",
+    backgroundColor: "#ffffff",
+    autoHideMenuBar: true,
+    parent: mainWindow ?? undefined,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(here, "preload.cjs"),
+    },
+  });
+  addressWindow = win;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;padding:24px;color:#0f172a;background:#fff}
+    h1{font-size:17px;margin:0 0 6px}
+    p{color:#475569;font-size:13px;line-height:1.55;margin:0 0 14px}
+    input{width:100%;box-sizing:border-box;padding:12px 14px;font-size:15px;border:1px solid #cbd5e1;border-radius:10px;outline:none}
+    input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+    .row{display:flex;gap:10px;margin-top:18px}
+    button{flex:1;padding:12px;font-size:14px;font-weight:650;border-radius:10px;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#0f172a}
+    button.primary{background:linear-gradient(135deg,#4f8cff,#9d7bff);border:0;color:#fff}
+    button.link{flex:0 0 auto;border:0;background:none;color:#4f46e5;font-weight:600;padding:12px 4px}
+    .err{color:#b91c1c;font-size:12.5px;height:18px;margin-top:10px}
+    small{color:#64748b;font-size:12px}
+  </style></head><body>
+  <h1>ScholarBridge site address</h1>
+  <p>The app opens this site over the internet. Your account and all data are the site's own — the same ones you see in the phone app and the browser.</p>
+  <input id="url" value="${current}" placeholder="https://scholarbridge-ai.onrender.com" spellcheck="false" autocomplete="off">
+  <div class="err" id="err"></div>
+  <small>Leave it empty and press “Open offline copy” to use the copy bundled with the app (no account sharing with the site).</small>
+  <div class="row">
+    <button id="cancel">Cancel</button>
+    <button class="link" id="offline">Open offline copy</button>
+    <button id="save" class="primary">Open</button>
+  </div>
+  <script>
+    const input = document.getElementById("url");
+    const err = document.getElementById("err");
+    const send = (value) => window.scholarbridgeDesktop && window.scholarbridgeDesktop.connect(value);
+    input.focus(); input.select();
+    document.getElementById("cancel").onclick = () => window.close();
+    document.getElementById("offline").onclick = () => send("");
+    const go = () => {
+      const value = input.value.trim();
+      if (!value) { err.textContent = "Enter an address, or choose the offline copy."; return; }
+      send(value);
+    };
+    document.getElementById("save").onclick = go;
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  </script></body></html>`;
+  win.on("closed", () => {
+    if (addressWindow === win) addressWindow = null;
+  });
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
 async function showPhoneWindow() {
-  if (!server) {
+  // Online: the site is already public — the phone opens the same address, with
+  // the same account. Offline: the phone can only reach the bundled engine over
+  // the Wi-Fi, so it needs this computer's LAN address.
+  const online = target.mode === "remote";
+  if (!online && !server) {
     dialog.showMessageBox({ message: "The local server is not running.", type: "error" });
     return;
   }
-  const port = server.port;
-  const addresses = lanAddresses().map((entry) => `http://${entry.address}:${port}`);
-  const url = addresses[0] ?? `http://127.0.0.1:${port}`;
+  const port = server?.port;
+  const addresses = online ? [] : lanAddresses().map((entry) => `http://${entry.address}:${port}`);
+  const url = online ? target.url : addresses[0] ?? `http://127.0.0.1:${port}`;
   const qr = await QRCode.toDataURL(url, { width: 320, margin: 1, color: { dark: "#1B2A4A", light: "#ffffff" } });
 
   const win = new BrowserWindow({
@@ -235,12 +391,20 @@ async function showPhoneWindow() {
     ul{margin:0;padding-left:18px;color:#475569;font-size:13px;line-height:1.6}
   </style></head><body>
   <h1>Open ScholarBridge on your phone</h1>
-  <p>Scan this with the ScholarBridge Android app, or open the address in any phone browser on the same Wi-Fi.</p>
+  <p>${
+    online
+      ? "Scan this with the ScholarBridge Android app, or open the address in any phone browser. It is the same site and the same account as on this computer."
+      : "Scan this with the ScholarBridge Android app, or open the address in any phone browser on the same Wi-Fi."
+  }</p>
   <img src="${qr}" alt="QR code">
   <p><code>${url}</code></p>
-  <div class="warn">Phone access is on. Anyone on this Wi-Fi network can reach the app while it is open — turn it off in the Share menu when you are on public Wi-Fi.</div>
-  <p style="margin-top:16px"><strong>If the QR does not work:</strong></p>
-  <ul><li>Phone and laptop must be on the same Wi-Fi</li><li>Allow the app through the firewall (private networks)</li><li>Guest/“isolation” Wi-Fi blocks device-to-device traffic</li></ul>
+  ${
+    online
+      ? ""
+      : '<div class="warn">Phone access is on. Anyone on this Wi-Fi network can reach the app while it is open — turn it off in the Share menu when you are on public Wi-Fi.</div>' +
+        '<p style="margin-top:16px"><strong>If the QR does not work:</strong></p>' +
+        '<ul><li>Phone and laptop must be on the same Wi-Fi</li><li>Allow the app through the firewall (private networks)</li><li>Guest/“isolation” Wi-Fi blocks device-to-device traffic</li></ul>'
+  }
   </body></html>`;
   win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
@@ -295,11 +459,72 @@ function buildMenu() {
       ],
     },
     {
+      label: "Server",
+      submenu: [
+        {
+          label: target.mode === "remote" ? `Site: ${target.url.replace(/^https?:\/\//, "")}` : "Offline copy in use",
+          enabled: false,
+        },
+        { type: "separator" },
+        {
+          label: "Open the online site…",
+          click: () => promptServerUrl().catch((err) => log(`[server] ${err?.message ?? err}`)),
+        },
+        {
+          label: "Use the offline copy",
+          enabled: target.mode === "remote",
+          click: async () => {
+            await switchServer("");
+          },
+        },
+        {
+          label: "Back to the online site",
+          enabled: target.mode === "local",
+          click: async () => {
+            // The saved address (or the built-in one) is used again.
+            delete config.offline;
+            saveConfig();
+            if (mainWindow) {
+              mainWindow.close();
+              mainWindow = null;
+            }
+            if (!splash || splash.isDestroyed()) createSplash();
+            try {
+              target = resolveTarget({ envUrl: process.env.SCHOLARBRIDGE_SERVER_URL || "", config });
+              await restartServer();
+            } catch (err) {
+              reportBootError(err);
+            }
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Reload",
+          click: () => mainWindow?.webContents.reload(),
+        },
+        {
+          label: "Open in browser",
+          click: () =>
+            shell
+              .openExternal(target.mode === "remote" ? target.url : server?.url ?? "")
+              .catch(() => {}),
+        },
+        {
+          label: "Copy the site address",
+          enabled: target.mode === "remote",
+          click: () => {
+            if (target.mode === "remote") clipboard.writeText(target.url);
+          },
+        },
+      ],
+    },
+    {
       label: "Share",
       submenu: [
         {
-          label: "Allow phone on this Wi-Fi",
+          label: target.mode === "remote" ? "Allow phone on this Wi-Fi (offline copy only)" : "Allow phone on this Wi-Fi",
           type: "checkbox",
+          enabled: target.mode === "local",
           checked: Boolean(config.allowLan),
           click: async (item) => {
             config.allowLan = item.checked;
@@ -313,15 +538,16 @@ function buildMenu() {
           },
         },
         {
-          label: "Show phone connection (QR)…",
-          enabled: Boolean(server),
+          label: target.mode === "remote" ? "Show the site as a QR code…" : "Show phone connection (QR)…",
+          enabled: target.mode === "remote" || Boolean(server),
           click: () => showPhoneWindow().catch((err) => log(`[share] ${err?.message ?? err}`)),
         },
         { type: "separator" },
         {
           label: "Copy app address",
           click: () => {
-            if (server) clipboard.writeText(server.url);
+            if (target.mode === "remote") clipboard.writeText(target.url);
+            else if (server) clipboard.writeText(server.url);
           },
         },
       ],
@@ -338,7 +564,8 @@ function buildMenu() {
               message: `ScholarBridge ${app.getVersion()}`,
               detail:
                 `Platform: ${process.platform} ${process.arch}\n` +
-                `Engine: ${remoteUrl ? remoteUrl : server?.url ?? "not running"}\n` +
+                `Mode: ${target.mode === "remote" ? `online site (${target.url})` : "offline copy (bundled engine)"}\n` +
+                `Engine: ${target.mode === "remote" ? "not used — all data comes from the site" : server?.url ?? "not running"}\n` +
                 `Data folder: ${dataDir}\n` +
                 `Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
             }),
@@ -355,6 +582,109 @@ function buildMenu() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+/**
+ * The site could not be reached. This is the moment to be honest about the two
+ * different things that can be wrong — no internet (nothing to fix here) and
+ * the site being asleep or down (wait, then retry) — and to offer the offline
+ * copy instead of a grey Chromium error page.
+ */
+function reportRemoteError(reason) {
+  const host = (() => {
+    try {
+      return new URL(target.url).host;
+    } catch {
+      return target.url;
+    }
+  })();
+  log(`[remote] cannot open ${target.url}: ${reason}`);
+  // The splash would otherwise sit behind the dialog for ever.
+  if (splash && !splash.isDestroyed()) {
+    splash.close();
+    splash = null;
+  }
+
+  dialog
+    .showMessageBox({
+      type: "error",
+      title: "ScholarBridge could not be reached",
+      message: `Could not open ${host}`,
+      detail:
+        `${reason}\n\n` +
+        "• Check the internet connection.\n" +
+        "• A free hosting plan puts the site to sleep when nobody uses it; the first open can take up to a minute. Retry once after waiting.\n" +
+        "• The offline copy bundled with this app still works — its data is separate from the site's, so an account made online does not exist there.",
+      buttons: ["Try again", "Use the offline copy", "Quit"],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    })
+    .then(async (choice) => {
+      if (choice.response === 0) {
+        remoteFailed = false;
+        if (mainWindow) {
+          // The window was hidden because it never finished loading.
+          if (!mainWindow.isVisible()) mainWindow.show();
+          mainWindow.webContents.reload();
+        } else {
+          createMainWindow(target.url);
+        }
+        return;
+      }
+      if (choice.response === 1) {
+        await switchServer("");
+        return;
+      }
+      app.quit();
+    })
+    .catch(() => app.quit());
+}
+
+// The "site address" window talks to the main process through this one channel.
+// Anything that is not that window is ignored, so the hosted site (which also
+// runs with this preload) cannot rewrite the app's configuration.
+ipcMain.on("scholarbridge:connect", async (event, value) => {
+  if (!addressWindow || event.sender !== addressWindow.webContents) return;
+  // "" is the "Open offline copy" button; a cancelled window sends nothing.
+  const text = String(value ?? "").trim();
+  addressWindow.close();
+  if (!text) {
+    await switchServer("");
+    return;
+  }
+  const url = normaliseServerUrl(text);
+  if (!url) {
+    await switchServer(text); // shows "that address cannot be used"
+    return;
+  }
+  // Check before saving: a typo in the address should not replace the address
+  // that works. The wait is shown in the splash screen, and a slow first
+  // answer (the free plan waking up) still counts as reachable.
+  if (splash && !splash.isDestroyed()) setSplash("starting", `Checking ${new URL(url).host}…`);
+  const result = await probeServer(url, { timeoutMs: 45_000, attempts: 2, log });
+  if (!result.ok) {
+    const { response } = await dialog.showMessageBox({
+      type: "warning",
+      title: "No answer from that address",
+      message: `${new URL(url).host} did not answer (${result.detail}).`,
+      detail:
+        "The address may be wrong, the site may be down, or its free hosting plan is still waking up.\n\n" +
+        "You can still open it — the window will show the site's own error page — or keep the current address.",
+      buttons: ["Open anyway", "Keep the current address"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response !== 0) {
+      setSplash("ready");
+      if (mainWindow) mainWindow.show();
+      return;
+    }
+  } else if (result.kind === "not_ready") {
+    log(`[remote] ${url} is up but its database is not ready (${result.detail})`);
+  }
+  await switchServer(url);
+});
 
 function reportBootError(err) {
   const message = err instanceof Error ? err.message : String(err);
@@ -435,6 +765,7 @@ if (!app.requestSingleInstanceLock()) {
     } catch (err) {
       reportBootError(err);
     }
+    buildMenu();
   });
 
   app.on("activate", () => {

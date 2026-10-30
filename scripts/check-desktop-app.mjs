@@ -137,7 +137,10 @@ async function main() {
     check("the compiled server is not mixed into resources/app",
       !builder.extraResources.some((r) => r.to === "app"),
       "extraResources must target `server`, not `app`");
-    check("the window loads the bundled app (not a remote page)",
+    // The window is a real window onto an app, never a file:// shell: it loads
+    // the hosted site (default) or the bundled engine (offline copy). Which one
+    // is decided in remote.mjs and asserted by scripts/check-remote-mode.mjs.
+    check("the window loads the app over HTTP, not a local file",
       /loadURL\(url\)/.test(fs.readFileSync(path.join(repoRoot, "desktop", "main.mjs"), "utf8")));
     check("the renderer gets no Node.js access",
       /contextIsolation: true/.test(fs.readFileSync(path.join(repoRoot, "desktop", "main.mjs"), "utf8")) &&
