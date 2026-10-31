@@ -2143,6 +2143,145 @@ Reverting the list endpoint to the raw row fails it by name.
 integration **356/0** · security 90 · portability 57/0 · `check:i18n` passed ·
 `tsc --noEmit` clean · `next build` OK.
 
+## 11q. A forgotten password has a way back in (2026-10-31)
+
+Until this phase the product had a door in and no way out: `sign-in` checked a
+password, and nothing anywhere could replace one. `student_profiles.password_hash`
+is `scrypt:<salt>:<hash>` — deliberately one-way — so a student who forgot their
+password could only be rescued by someone with database access running an
+`UPDATE` by hand. That is not a support process, and it is exactly the request
+that arrived ("I cannot log in to my account").
+
+### The flow
+
+| step | route | what it does |
+| --- | --- | --- |
+| 1 | `GET /forgot-password` | asks for the email address, in the visitor's language |
+| 2 | `POST /api/auth/password-reset/request` | creates **one** link, emails it, retires older ones |
+| 3 | `GET /reset-password?token=…` | the link from the email; asks for the new password |
+| 4 | `POST /api/auth/password-reset/confirm` | spends the link, replaces the hash, revokes sessions |
+
+The sign-in card in `ProfilePicker` now carries the link
+("Parolni unutdingizmi?" / "Забыли пароль?" / "Forgot your password?") — the only
+exit from a form that cannot succeed.
+
+### The rules, and why each one exists
+
+* **The token is 256 bits of CSPRNG output**, base64url, 43 characters
+  (`src/lib/passwordReset.ts`). Guessing is not a threat model; the shape guard
+  (`^[A-Za-z0-9_-]{43}$`) exists so garbage never reaches a query.
+* **Only its SHA-256 is stored** (`password_reset_tokens.token_hash`, UNIQUE).
+  A dump of the database cannot be replayed into an account takeover — the same
+  reasoning as `user_sessions.token_hash`.
+* **60 minutes, one use.** `expires_at` is written at creation; `used_at` is
+  stamped by a *guarded* update (`used_at IS NULL`) **before** the password is
+  written, so two tabs or a retried request cannot set the password twice.
+  Requesting a new link stamps every older unused row: a leaked link dies with
+  the next request instead of living out its hour.
+* **No account enumeration.** The request endpoint answers exactly one sentence —
+  "If an account exists for this address, a reset link is on its way." — for a
+  known address, an unknown address, a Telegram-only profile with no password,
+  a deployment without SMTP, and a mail server that refused the message. Only a
+  malformed address gets its own 400.
+* **Old sessions die with the old password.** Sessions are fingerprint-bound to
+  the stored hash (`fp` in `auth.ts`), so every existing cookie stops verifying
+  the moment the hash changes; `revokeAllSessionsForProfile()` also stamps
+  `revoked_at` on the rows and clears the in-process auth cache, so audit and
+  `user_sessions` stay truthful.
+* **Nothing is created that nobody can receive.** When SMTP is not configured the
+  endpoint logs one line naming the missing variables and returns *before* a
+  token row exists — otherwise a reset request would invalidate the link the
+  student still has in their inbox while delivering nothing. When a send fails,
+  the just-created row is retired immediately.
+* **One generic 503 on error**, never a distinction between "the database is
+  down" and "mail is down".
+
+### Mail
+
+The repo had no mailer — no nodemailer, no provider SDK, nothing. `src/lib/mail.ts`
+is a ~150-line SMTP client on `node:net`/`node:tls`: EHLO, STARTTLS when offered
+(and **required** whenever a credential is set — a credential is never sent over
+a cleartext link), `AUTH LOGIN`, `MAIL FROM`/`RCPT TO`/`DATA`, dot-stuffing,
+10 s per command, 32 KB reply cap. It never throws: every failure is a reason
+(`not_configured` · `connect_failed` · `timeout` · `smtp_error` · `tls_required` ·
+`bad_recipient`), because a reset request must not 500 when the mail server is
+down. Port 465 implies TLS even if `SMTP_SECURE` is unset.
+
+Configuration is by environment only (documented in `.env.example`):
+`SMTP_HOST`, `SMTP_PORT` (587), `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`,
+`MAIL_FROM`, and `APP_URL` for the absolute link. There is no brand, host or
+credential in the source.
+
+### What changed
+
+* **`src/db/schema.ts` + `src/lib/core/ddl.ts`** — `password_reset_tokens`
+  (profile FK `ON DELETE CASCADE`, `token_hash` UNIQUE, `expires_at`, `used_at`,
+  `requested_ip`, index on `profile_id`), self-healed at startup like the other
+  core tables.
+* **`src/lib/passwordReset.ts`** (new, pure) — token creation, hashing,
+  constant-time comparison, the `valid | expired | used` state machine, the link
+  builder and the trilingual plain-text email.
+* **`src/lib/mail.ts`** (new) — the SMTP client above.
+* **`src/app/api/auth/password-reset/{request,confirm}/route.ts`** (new) — the
+  two endpoints, both rate limited (per IP and per address; the confirm bucket
+  separately).
+* **`src/app/{forgot-password,reset-password}/`** (new) — public, translated
+  pages (`noindex` — a live token must never be crawled or previewed). The reset
+  page reads `?token=` inside a `Suspense` boundary, and a link with no token is
+  reported before any round trip.
+* **`src/components/ProfilePicker.tsx`** — the sign-in card links to the flow.
+* **`src/i18n/messages/{en,uz,ru}.json`** — a `passwordReset` namespace (41 keys)
+  plus `picker.forgotPassword`.
+* **`supabase/password_reset_tokens_2026-10-31.sql`** — the same table for
+  deployments that apply SQL by hand; additive and re-runnable.
+* **`src/lib/auth.ts`** — `revokeAllSessionsForProfile()`.
+* **`src/lib/rate-limit.ts`** — `LIMITS.passwordReset` (5/hour) and
+  `LIMITS.passwordResetConfirm` (10/15 min).
+
+### Verified
+
+`npm run test:password-reset` — **38/38** (new): token entropy and shape
+(500 draws, all distinct), hash-only storage, the 60-minute boundary (valid at
+T−1 ms, dead at exactly expiry), `used` beating `expired`, ISO-string dates from
+postgres, unparsable expiry failing closed, the link builder refusing a bare
+host, the trilingual email, and a **real SMTP conversation** against a throwaway
+server — EHLO/MAIL/RCPT/DATA/QUIT, dot-stuffing proven (a lone `.` arrives
+doubled and the body survives it), `AUTH LOGIN` refused over cleartext
+(`tls_required`), and STARTTLS attempted before any credential is offered.
+
+**Integration (+18):** a real profile with a real scrypt hash — confirm sets the
+new password, `verifyPassword` accepts it and rejects the old one, the stored
+value stays `scrypt:<salt>:<hash>`, `used_at` is stamped, the replay returns
+**410 token_used**, an expired row returns **410 token_expired**, a weak
+password and a mismatched confirmation write nothing, a malformed token never
+reaches SQL, the session that was open before the reset is **revoked**
+(`checkSessionRecord` `ok` → `revoked`), known and unknown addresses get a
+byte-identical 200 with no row written when SMTP is absent, and deleting the
+account cascades its links away.
+
+`test:security` **90 → 96** (6 new assertions): both endpoints are in the
+reviewed public-write allowlist, reset limits exist and are bounded, every
+response is `no-store`, no log line can contain a token, no path stores the raw
+token, and the profile id comes from the token row, never from the request body.
+
+`test:render` 354/0 · `test:portability` 57/0 · `test:localization` 16/0 ·
+`test:channel` 196/0 · `test:university-costs` 12/0 · `test:university-rank-year`
+14/0 · `test:university-rank` 17/0 · `test:university-list` 15/0 ·
+`test:university-hub` 11/0 · `test:qs-catalogue-ranks` 13/0 ·
+`test:qs-benchmarks` 13/0 · `test:chancing` 28/0 · `test:landing-ranks` 10/0 ·
+`test:university-prose` 19/0 · `test:catalogue-language` 19/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 ·
+`test:opportunity-notes` 10/0 · `test:opportunities` 27/0 · `test:dataset` 50/0 ·
+integration **356 → 374/0** · security 96 · `check:i18n` passed · `lint:baseline`
+passed · `tsc --noEmit` clean · `next build` OK (both pages dynamic).
+
+### Still open
+
+With no `SMTP_HOST`/`MAIL_FROM` in a deployment, the pages work, the endpoint
+answers correctly, and **nothing is delivered** — the only trace is one server
+log line naming the missing variables. Configuring mail is the remaining step for
+this flow to be usable in production.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

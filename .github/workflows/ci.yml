@@ -51,6 +51,11 @@ jobs:
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
+      # Phase AG: the reset-link lifetime, the hash-only storage, and a real SMTP
+      # conversation against a throwaway server (no network, no credentials).
+      - name: Password reset tests (token lifetime, single use, SMTP)
+        run: bash ci/run-step.sh "Password reset tests (token lifetime, single use, SMTP)" npm run test:password-reset
+
       # Phase 3: uz/ru coverage for every study field, degree level, study mode
       # and programme language in the imported catalogue, plus the localization
       # and score memos (correctness and speed).

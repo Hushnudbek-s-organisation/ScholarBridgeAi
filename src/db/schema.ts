@@ -2224,6 +2224,35 @@ export const userSessions = pgTable(
   (table) => [index("idx_user_sessions_profile").on(table.profileId)]
 );
 
+/**
+ * Password reset links (Phase AG).
+ *
+ * One row per "I forgot my password" request. The link carries a random
+ * 32-byte token; only its SHA-256 hash is stored, so a database read cannot
+ * turn into an account takeover — the same reasoning as `user_sessions`.
+ *
+ * A row is valid exactly once, for `PASSWORD_RESET_TTL_MINUTES` (60), and is
+ * stamped `used_at` the moment the password changes. Requesting a new link
+ * marks every older unused row used, so a leaked link dies with the next
+ * request instead of living out its hour.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => studentProfiles.id, { onDelete: "cascade" }),
+    /** SHA-256 hex of the token — the token itself never touches the DB. */
+    tokenHash: text("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    requestedIp: text("requested_ip"),
+  },
+  (table) => [index("idx_password_reset_profile").on(table.profileId)]
+);
+
 export const visaRequirements = pgTable(
   "visa_requirements",
   {

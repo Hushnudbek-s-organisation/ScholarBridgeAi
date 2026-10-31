@@ -27,6 +27,7 @@
     "db:schema": "tsx scripts/ensure-schema.ts",
     "db:core-repair-sql": "tsx scripts/gen-core-repair-sql.ts",
     "test:security": "tsx scripts/check-security.ts",
+    "test:password-reset": "tsx scripts/check-password-reset.ts",
     "test:localization": "tsx scripts/check-localization-perf.ts",
     "test:catalogue-language": "tsx scripts/check-catalogue-language.ts",
     "test:catalogue-order": "tsx scripts/check-catalogue-order.ts",

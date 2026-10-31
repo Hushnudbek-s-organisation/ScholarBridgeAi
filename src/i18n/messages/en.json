@@ -3121,7 +3121,8 @@
     "bothRequired": "Enter both email and password",
     "wrongCredentials": "Incorrect email or password",
     "tooMany": "Too many attempts. Please wait a few minutes.",
-    "failed": "Sign-in failed"
+    "failed": "Sign-in failed",
+    "forgotPassword": "Forgot your password?"
   },
   "telegram": {
     "loginTitle": "Sign in with Telegram",
@@ -7348,5 +7349,48 @@
         "body": "New matching grants, deadline reminders and verified announcements — in chat."
       }
     }
+  },
+  "passwordReset": {
+    "forgotMetaTitle": "Reset your password | ScholarBridge",
+    "forgotMetaDescription": "Request a password reset link by email and set a new password for your ScholarBridge account.",
+    "resetMetaTitle": "Set a new password | ScholarBridge",
+    "resetMetaDescription": "Choose a new password for your ScholarBridge account from an emailed reset link.",
+    "forgotEyebrow": "Account recovery",
+    "forgotTitle": "Forgot your password?",
+    "forgotBody": "Enter the email address you use for ScholarBridge. If an account exists for it, we will send a link that lets you set a new password.",
+    "resetEyebrow": "Account recovery",
+    "resetTitle": "Set a new password",
+    "resetBody": "Choose a new password for your account. Any device that is still signed in with the old password will be signed out.",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "sendLink": "Send reset link",
+    "sending": "Sending",
+    "sentTitle": "Check your inbox",
+    "sentBody": "If an account exists for this address, a reset link is on its way. The link works once and expires in 60 minutes.",
+    "sentSpamNote": "If nothing arrives within a few minutes, check the spam folder and then try again.",
+    "tryAnother": "Use another email",
+    "backToSignIn": "Back to sign in",
+    "invalidEmail": "Enter a valid email address.",
+    "requestFailed": "We could not send the email right now. Please try again shortly.",
+    "rateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the new password",
+    "passwordHint": "At least 8 characters. A short phrase is easier to remember than a single word.",
+    "updatePassword": "Update password",
+    "updating": "Updating",
+    "doneTitle": "Password updated",
+    "doneBody": "Your new password is active and other devices have been signed out. Sign in again with it.",
+    "doneAction": "Go to sign in",
+    "mismatch": "The two passwords do not match.",
+    "weak": "That password is too short or too easy to guess.",
+    "invalidLink": "This reset link is not valid. Request a new one.",
+    "expiredLink": "This reset link has expired. Request a new one.",
+    "usedLink": "This reset link has already been used. Request a new one.",
+    "resetFailed": "We could not update the password right now. Please try again shortly.",
+    "linkProblemTitle": "This link cannot be used",
+    "missingTokenTitle": "This link is incomplete",
+    "missingTokenBody": "The reset link is missing its token. Open the full link from the email, or request a new one.",
+    "requestNewLink": "Request a new link",
+    "privacyLink": "How we handle your data"
   }
 }

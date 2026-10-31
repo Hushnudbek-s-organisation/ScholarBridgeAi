@@ -3121,7 +3121,8 @@
     "bothRequired": "Email va parolni kiriting",
     "wrongCredentials": "Email yoki parol noto'g'ri",
     "tooMany": "Juda ko'p urinish. Bir necha daqiqa kuting.",
-    "failed": "Kirib bo'lmadi"
+    "failed": "Kirib bo'lmadi",
+    "forgotPassword": "Parolni unutdingizmi?"
   },
   "telegram": {
     "loginTitle": "Telegram orqali kirish",
@@ -7348,5 +7349,48 @@
         "body": "Yangi mos grantlar, muddat eslatmalari va tasdiqlangan e’lonlar — chatda."
       }
     }
+  },
+  "passwordReset": {
+    "forgotMetaTitle": "Parolni tiklash | ScholarBridge",
+    "forgotMetaDescription": "Elektron pochta orqali parolni tiklash havolasini soʻrang va ScholarBridge hisobingiz uchun yangi parol qoʻying.",
+    "resetMetaTitle": "Yangi parol qoʻyish | ScholarBridge",
+    "resetMetaDescription": "Pochtaga kelgan havola orqali ScholarBridge hisobingiz uchun yangi parol tanlang.",
+    "forgotEyebrow": "Hisobni tiklash",
+    "forgotTitle": "Parolni unutdingizmi?",
+    "forgotBody": "ScholarBridge uchun ishlatadigan elektron pochta manzilingizni kiriting. Bu manzilga hisob bogʻlangan boʻlsa, yangi parol qoʻyish havolasini yuboramiz.",
+    "resetEyebrow": "Hisobni tiklash",
+    "resetTitle": "Yangi parol qoʻying",
+    "resetBody": "Hisobingiz uchun yangi parol tanlang. Eski parol bilan ochiq turgan barcha qurilmalar tizimdan chiqariladi.",
+    "emailLabel": "Elektron pochta",
+    "emailPlaceholder": "you@example.com",
+    "sendLink": "Havolani yuborish",
+    "sending": "Yuborilmoqda",
+    "sentTitle": "Pochtangizni tekshiring",
+    "sentBody": "Bu manzilga hisob bogʻlangan boʻlsa, tiklash havolasi yuborildi. Havola bir marta ishlaydi va 60 daqiqada amal qiladi.",
+    "sentSpamNote": "Bir necha daqiqada kelmasa, spam papkasini tekshirib, keyin qayta urinib koʻring.",
+    "tryAnother": "Boshqa manzil kiritish",
+    "backToSignIn": "Kirish sahifasiga qaytish",
+    "invalidEmail": "Toʻgʻri elektron pochta manzilini kiriting.",
+    "requestFailed": "Hozir xat yubora olmadik. Birozdan soʻng qayta urinib koʻring.",
+    "rateLimited": "Urinishlar juda koʻp. Bir necha daqiqadan soʻng qayta urinib koʻring.",
+    "newPassword": "Yangi parol",
+    "confirmPassword": "Yangi parolni takrorlang",
+    "passwordHint": "Kamida 8 ta belgi. Bitta soʻzdan koʻra qisqa ibora eslab qolish osonroq.",
+    "updatePassword": "Parolni yangilash",
+    "updating": "Yangilanmoqda",
+    "doneTitle": "Parol yangilandi",
+    "doneBody": "Yangi parolingiz faol, boshqa qurilmalar tizimdan chiqarildi. Shu parol bilan qayta kiring.",
+    "doneAction": "Kirish sahifasiga oʻtish",
+    "mismatch": "Ikki parol bir-biriga mos emas.",
+    "weak": "Bu parol juda qisqa yoki juda oson topiladi.",
+    "invalidLink": "Bu tiklash havolasi yaroqsiz. Yangisini soʻrang.",
+    "expiredLink": "Bu tiklash havolasining muddati tugagan. Yangisini soʻrang.",
+    "usedLink": "Bu tiklash havolasi allaqachon ishlatilgan. Yangisini soʻrang.",
+    "resetFailed": "Hozir parolni yangilay olmadik. Birozdan soʻng qayta urinib koʻring.",
+    "linkProblemTitle": "Bu havoladan foydalanib boʻlmaydi",
+    "missingTokenTitle": "Havola toʻliq emas",
+    "missingTokenBody": "Tiklash havolasida kalit yoʻq. Pochtadagi toʻliq havolani oching yoki yangisini soʻrang.",
+    "requestNewLink": "Yangi havola soʻrash",
+    "privacyLink": "Maʼlumotlaringiz qanday saqlanadi"
   }
 }
